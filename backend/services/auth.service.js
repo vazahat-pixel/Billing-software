@@ -10,7 +10,7 @@ const generateToken = (user) => {
             role: user.role, 
             companyId: user.companyId 
         }, 
-        process.env.JWT_SECRET, 
+        process.env.JWT_SECRET || 'your_super_secret_jwt_key_here', 
         { expiresIn: '30d' }
     );
 };

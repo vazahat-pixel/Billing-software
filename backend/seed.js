@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
 const User = require('./models/User');
 const Plan = require('./models/Plan');
+const path = require('path');
 const dotenv = require('dotenv');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const seedAdmin = async () => {
     try {
