@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import useStore from '../../store/useStore';
-import { FileText, Download, TrendingUp, TrendingDown, Landmark, PieChart } from 'lucide-react';
+import { FileText, Download, TrendingUp, TrendingDown, Landmark, PieChart, ArrowRight } from 'lucide-react';
 
 const GSTPage = () => {
   const { sales, purchases } = useStore();
@@ -15,106 +15,114 @@ const GSTPage = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn pb-10">
-      {/* Header */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-           <h1 className="text-2xl font-black text-slate-900 tracking-tight">GST Compliance Dashboard</h1>
-           <p className="text-slate-500 text-sm">GSTR-1, GSTR-2 tracking and Input Tax Credit (ITC) management.</p>
+      {/* Architectural Header */}
+      <div className="bg-white p-10 border-2 border-black flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-2xl">
+        <div className="flex items-center gap-6">
+           <div className="p-4 bg-black text-white">
+              <Landmark size={28} />
+           </div>
+           <div>
+              <h1 className="text-3xl font-black text-black uppercase tracking-tighter">Compliance Intelligence</h1>
+              <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-2">
+                 <span>Taxation</span>
+                 <ArrowRight size={10} />
+                 <span className="text-black">GST Audit Framework</span>
+              </div>
+           </div>
         </div>
-        <div className="flex gap-3">
-           <button className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
-             <Download size={14} /> Download GSTR-1 JSON
+        <div className="flex gap-4">
+           <button className="flex items-center gap-3 px-10 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">
+             <Download size={14} /> GSTR-1 Schema JSON
            </button>
         </div>
       </div>
 
-      {/* ITC Summary Cards */}
+      {/* ITC Summary Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-8 text-indigo-500/10 group-hover:scale-125 transition-transform"><TrendingUp size={80} /></div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Output Tax Liability</p>
-            <h3 className="text-3xl font-black text-slate-900">₹ {gstSummary.outputTax.toLocaleString()}</h3>
-            <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-slate-400">
-               <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded">GSTR-1</span>
-               <span>From Total Sales</span>
+         <div className="bg-white p-8 border-2 border-black relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-10 text-slate-50 opacity-50"><TrendingUp size={120} /></div>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] mb-4">Output Liability</p>
+            <h3 className="text-4xl font-black text-black tracking-tighter">₹ {gstSummary.outputTax.toLocaleString()}</h3>
+            <div className="mt-8 flex items-center gap-4">
+               <span className="px-3 py-1 bg-black text-white text-[9px] font-black uppercase tracking-widest">GSTR-1</span>
+               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sales Registry</span>
             </div>
          </div>
-         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-8 text-emerald-500/10 group-hover:scale-125 transition-transform"><TrendingDown size={80} /></div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Input Tax Credit (ITC)</p>
-            <h3 className="text-3xl font-black text-emerald-600">₹ {gstSummary.inputTax.toLocaleString()}</h3>
-            <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-slate-400">
-               <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded">GSTR-2</span>
-               <span>Available for Offset</span>
+         <div className="bg-white p-8 border-2 border-black relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-10 text-slate-50 opacity-50"><TrendingDown size={120} /></div>
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] mb-4">Input Credit (ITC)</p>
+            <h3 className="text-4xl font-black text-black tracking-tighter">₹ {gstSummary.inputTax.toLocaleString()}</h3>
+            <div className="mt-8 flex items-center gap-4">
+               <span className="px-3 py-1 bg-slate-100 text-black border-2 border-black text-[9px] font-black uppercase tracking-widest">GSTR-2</span>
+               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Offset Capability</span>
             </div>
          </div>
-         <div className="bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200 text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 text-white/5"><Landmark size={80} /></div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Net GST Payable</p>
-            <h3 className={`text-3xl font-black ${gstSummary.netPayable >= 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+         <div className="bg-black p-8 text-white relative overflow-hidden">
+            <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.4em] mb-4">Net Fiscal Position</p>
+            <h3 className="text-4xl font-black tracking-tighter">
                ₹ {Math.abs(gstSummary.netPayable).toLocaleString()}
-               {gstSummary.netPayable < 0 ? ' (Carry Forward)' : ''}
+               <span className="text-sm ml-2 opacity-50">{gstSummary.netPayable < 0 ? 'CFWD' : 'LIAB'}</span>
             </h3>
-            <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-slate-500">
-               <span className="px-1.5 py-0.5 bg-white/10 text-white rounded">PAYABLE</span>
-               <span>After ITC Adjustment</span>
+            <div className="mt-8 flex items-center gap-4">
+               <span className="px-3 py-1 bg-white text-black text-[9px] font-black uppercase tracking-widest">PAYABLE</span>
+               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Post-Adjustment</span>
             </div>
          </div>
       </div>
 
-      {/* GSTR-1 Preview Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-         <div className="p-5 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-slate-700 font-bold">
-               <FileText size={18} className="text-indigo-600" />
-               <span>GSTR-1 Invoice-wise Details</span>
+      {/* GSTR-1 Preview Ledger */}
+      <div className="bg-white border-2 border-black overflow-hidden flex flex-col shadow-2xl">
+         <div className="p-6 border-b-2 border-black bg-white">
+            <div className="flex items-center gap-4">
+               <FileText size={20} className="text-black" />
+               <h3 className="text-[10px] font-black uppercase text-black tracking-[0.4em]">Invoice-Level Audit Preview</h3>
             </div>
          </div>
          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-left border-collapse">
                <thead>
-                  <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                     <th className="px-6 py-4">Invoice No & Date</th>
-                     <th className="px-6 py-4">GSTIN / UIN</th>
-                     <th className="px-6 py-4 text-right">Taxable Value</th>
-                     <th className="px-6 py-4 text-right">CGST</th>
-                     <th className="px-6 py-4 text-right">SGST</th>
-                     <th className="px-6 py-4 text-right">IGST</th>
-                     <th className="px-6 py-4 text-right">Total Invoice</th>
+                  <tr className="bg-black text-[9px] font-black text-white uppercase tracking-[0.3em] sticky top-0 z-10">
+                     <th className="px-8 py-5">Audit Ref & Timestamp</th>
+                     <th className="px-8 py-5">GSTIN / Identity</th>
+                     <th className="px-8 py-5 text-right">Taxable Cap</th>
+                     <th className="px-8 py-5 text-right">CGST</th>
+                     <th className="px-8 py-5 text-right">SGST</th>
+                     <th className="px-8 py-5 text-right">IGST</th>
+                     <th className="px-8 py-5 text-right">Invoice Gross</th>
                   </tr>
                </thead>
-               <tbody className="divide-y divide-slate-50">
+               <tbody className="divide-y-2 divide-slate-50">
                   {sales.map((sale) => (
-                    <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
-                       <td className="px-6 py-4">
-                          <p className="text-xs font-bold text-slate-800">{sale.invoiceNo}</p>
-                          <p className="text-[10px] text-slate-400 font-bold">{sale.date}</p>
+                    <tr key={sale.id} className="hover:bg-slate-50 transition-all">
+                       <td className="px-8 py-5">
+                          <p className="text-[11px] font-black text-black uppercase tracking-widest">{sale.invoiceNo}</p>
+                          <p className="text-[9px] text-slate-400 font-black uppercase mt-1 tracking-widest">{sale.date}</p>
                        </td>
-                       <td className="px-6 py-4 text-xs font-medium text-slate-600">
+                       <td className="px-8 py-5 text-[10px] font-black text-black tracking-widest">
                           {sale.gstin || '24ABCDE1234F1Z5'}
                        </td>
-                       <td className="px-6 py-4 text-right text-xs font-black text-slate-700">
+                       <td className="px-8 py-5 text-right text-[11px] font-black text-black tracking-widest">
                           ₹ {parseFloat(sale.totals.subtotal).toLocaleString()}
                        </td>
-                       <td className="px-6 py-4 text-right text-xs font-bold text-slate-400">
+                       <td className="px-8 py-5 text-right text-[10px] font-black text-slate-400">
                           {sale.totals.cgst || '0.00'}
                        </td>
-                       <td className="px-6 py-4 text-right text-xs font-bold text-slate-400">
+                       <td className="px-8 py-5 text-right text-[10px] font-black text-slate-400">
                           {sale.totals.sgst || '0.00'}
                        </td>
-                       <td className="px-6 py-4 text-right text-xs font-bold text-slate-400">
+                       <td className="px-8 py-5 text-right text-[10px] font-black text-slate-400">
                           {sale.totals.igst || '0.00'}
                        </td>
-                       <td className="px-6 py-4 text-right text-xs font-black text-slate-900">
+                       <td className="px-8 py-5 text-right text-[12px] font-black text-black tracking-tighter">
                           ₹ {parseFloat(sale.totals.total).toLocaleString()}
                        </td>
                     </tr>
                   ))}
                   {sales.length === 0 && (
                     <tr>
-                       <td colSpan="7" className="px-6 py-20 text-center text-slate-400">
-                          <PieChart size={40} className="mx-auto opacity-10 mb-4" />
-                          <p className="text-sm font-medium">No sales data available for GSTR-1.</p>
+                       <td colSpan="7" className="px-8 py-24 text-center">
+                          <PieChart size={48} className="mx-auto text-slate-100 mb-6" />
+                          <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">Zero Compliance Records</p>
                        </td>
                     </tr>
                   )}

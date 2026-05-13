@@ -178,16 +178,16 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
     <Modal isOpen={isOpen} onClose={onClose} title="Generate Sales Invoice" className="max-w-[95vw] h-[90vh] p-0 overflow-hidden">
       
       {/* Dynamic Tab Navigation */}
-      <div className="flex border-b border-[#E2E8F0] p-1 bg-slate-50 gap-1 shrink-0">
+      <div className="flex border-b-2 border-black p-0 bg-white gap-0 shrink-0">
          {['Generate Sales Bill', 'View Sales Bill'].map(tab => (
            <button 
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+            className={`px-8 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${
                activeTab === tab 
-                  ? 'bg-white text-[#1B3A6B] shadow-sm border border-[#E2E8F0]' 
-                  : 'text-slate-500 hover:bg-slate-100'
+                  ? 'bg-black text-white' 
+                  : 'text-slate-400 hover:bg-slate-50'
             }`}
            >
              {tab}
@@ -201,154 +201,154 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
         <div className="p-5 flex-1 overflow-y-auto space-y-4 no-scrollbar">
            
            <div className="flex items-center gap-3">
-              <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Party & Broker Details</span>
-              <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap">Party & Broker Details</span>
+              <div className="h-[2px] flex-1 bg-black" />
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1">
-                 <label className="text-[12px] font-bold text-slate-700">Party / Customer</label>
-                 <ERPSearchableSelect 
-                   className="w-full h-[38px]" 
-                   value={header.party}
-                   onChange={(val) => {
-                     const party = parties.find(p => p._id === val || p.id === val);
-                     setHeader({...header, party: val, add: party?.address || '', gstin: party?.gstin || '', city: party?.station || ''});
-                   }}
-                   onCreateNew={handleCreateAccount}
-                   options={parties.map(p => ({value: p._id || p.id, label: p.name}))} 
-                   label="Party"
-                 />
-                 {header.gstin && (
-                    <p className="text-[11px] text-slate-400 mt-0.5">GSTIN: {header.gstin}</p>
-                 )}
-              </div>
+               <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black uppercase text-black tracking-widest">Party / Customer</label>
+                  <ERPSearchableSelect 
+                    className="w-full h-11 border-2 border-slate-100 focus:border-black transition-all font-bold" 
+                    value={header.party}
+                    onChange={(val) => {
+                      const party = parties.find(p => p._id === val || p.id === val);
+                      setHeader({...header, party: val, add: party?.address || '', gstin: party?.gstin || '', city: party?.station || ''});
+                    }}
+                    onCreateNew={handleCreateAccount}
+                    options={parties.map(p => ({value: p._id || p.id, label: p.name}))} 
+                    label="Party"
+                  />
+                  {header.gstin && (
+                     <p className="text-[10px] font-black uppercase text-slate-400 mt-1">GSTIN: {header.gstin}</p>
+                  )}
+               </div>
 
-              <div className="flex flex-col gap-1">
-                 <label className="text-[12px] font-bold text-slate-700">Address</label>
-                 <ERPInput className="w-full h-[38px] text-sm" value={header.add} onChange={e => setHeader({...header, add: e.target.value})} />
-              </div>
+               <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black uppercase text-black tracking-widest">Address</label>
+                  <ERPInput className="w-full h-11 border-2 border-slate-100 focus:border-black transition-all font-bold" value={header.add} onChange={e => setHeader({...header, add: e.target.value})} />
+               </div>
 
-              <div className="flex flex-col gap-1">
-                 <label className="text-[12px] font-bold text-slate-700">Broker</label>
-                 <ERPSearchableSelect 
-                   className="w-full h-[38px]" 
-                   value={header.broker}
-                   onChange={(val) => setHeader({...header, broker: val})}
-                   options={parties.filter(p => p.group === 'Broker').map(p => ({value: p._id || p.id, label: p.name}))} 
-                   label="Broker"
-                 />
-              </div>
+               <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black uppercase text-black tracking-widest">Broker</label>
+                  <ERPSearchableSelect 
+                    className="w-full h-11 border-2 border-slate-100 focus:border-black transition-all font-bold" 
+                    value={header.broker}
+                    onChange={(val) => setHeader({...header, broker: val})}
+                    options={parties.filter(p => p.group === 'Broker').map(p => ({value: p._id || p.id, label: p.name}))} 
+                    label="Broker"
+                  />
+               </div>
 
-              <div className="flex flex-col gap-1">
-                 <label className="text-[12px] font-bold text-slate-700">Book / Sub-ledger</label>
-                  <ERPSelect className="w-full h-[38px] text-sm font-bold text-[#1B3A6B] bg-slate-50" value={header.book} onChange={e => setHeader({...header, book: e.target.value})} options={[{value: 'FINISH SALES', label: 'FINISH SALES'}, ...(header.book && header.book !== 'FINISH SALES' ? [{value: header.book, label: header.book}] : [])]} />
-              </div>
+               <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black uppercase text-black tracking-widest">Book / Sub-ledger</label>
+                   <ERPSelect className="w-full h-11 border-2 border-slate-100 focus:border-black transition-all font-black bg-slate-50" value={header.book} onChange={e => setHeader({...header, book: e.target.value})} options={[{value: 'FINISH SALES', label: 'FINISH SALES'}, ...(header.book && header.book !== 'FINISH SALES' ? [{value: header.book, label: header.book}] : [])]} />
+               </div>
            </div>
 
            <div className="flex items-center gap-3 pt-2">
-              <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Invoice & Logistics Specs</span>
-              <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap">Invoice & Logistics Specs</span>
+              <div className="h-[2px] flex-1 bg-black" />
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid grid-cols-2 gap-3">
-                 <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-bold text-slate-700">Invoice No</label>
-                    <ERPInput className="w-full h-[38px] text-sm font-bold text-[#0D7377] bg-slate-50 border border-slate-200" value={header.billNo} readOnly />
-                 </div>
-                 <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-bold text-slate-700">Invoice Date</label>
-                    <input 
-                      type="date" 
-                      className="w-full h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-2 focus:ring-[#0D7377] text-slate-800 text-sm bg-white" 
-                      value={header.billDate} 
-                      onChange={e => setHeader({...header, billDate: e.target.value})} 
-                    />
-                 </div>
-              </div>
+               <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                     <label className="text-[10px] font-black uppercase text-black tracking-widest">Invoice No</label>
+                     <ERPInput className="w-full h-11 border-2 border-slate-100 bg-slate-50 font-black text-black" value={header.billNo} readOnly />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                     <label className="text-[10px] font-black uppercase text-black tracking-widest">Invoice Date</label>
+                     <input 
+                       type="date" 
+                       className="w-full h-11 px-3 border-2 border-slate-100 focus:border-black outline-none font-bold text-sm bg-white transition-all" 
+                       value={header.billDate} 
+                       onChange={e => setHeader({...header, billDate: e.target.value})} 
+                     />
+                  </div>
+               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                 <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-bold text-slate-700">Challan No</label>
-                    <ERPInput className="w-full h-[38px] text-sm" value={header.challanNo} onChange={e => setHeader({...header, challanNo: e.target.value})} />
-                 </div>
-                 <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-bold text-slate-700">Challan Date</label>
-                    <input 
-                      type="date" 
-                      className="w-full h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-2 focus:ring-[#0D7377] text-slate-800 text-sm bg-white" 
-                      value={header.chDate} 
-                      onChange={e => setHeader({...header, chDate: e.target.value})} 
-                    />
-                 </div>
-              </div>
+               <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                     <label className="text-[10px] font-black uppercase text-black tracking-widest">Challan No</label>
+                     <ERPInput className="w-full h-11 border-2 border-slate-100 focus:border-black font-bold transition-all" value={header.challanNo} onChange={e => setHeader({...header, challanNo: e.target.value})} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                     <label className="text-[10px] font-black uppercase text-black tracking-widest">Challan Date</label>
+                     <input 
+                       type="date" 
+                       className="w-full h-11 px-3 border-2 border-slate-100 focus:border-black outline-none font-bold text-sm bg-white transition-all" 
+                       value={header.chDate} 
+                       onChange={e => setHeader({...header, chDate: e.target.value})} 
+                     />
+                  </div>
+               </div>
 
-              <div className="flex flex-col gap-1">
-                 <label className="text-[12px] font-bold text-slate-700">GST Type Toggle</label>
-                 <div className="flex bg-slate-100 p-1 rounded-lg w-max border border-slate-200">
-                    {['CGST+SGST', 'IGST'].map(type => (
-                       <button
-                          key={type}
-                          type="button"
-                          onClick={() => setHeader({ ...header, gstType: type })}
-                          className={`px-4 py-1 text-xs font-bold rounded-md transition-all ${
-                             header.gstType === type 
-                                ? 'bg-[#0D7377] text-white shadow-sm' 
-                                : 'text-slate-500 hover:text-slate-800'
-                          }`}
-                       >
-                          {type}
-                       </button>
-                    ))}
-                 </div>
-              </div>
+               <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black uppercase text-black tracking-widest">GST Type Toggle</label>
+                  <div className="flex bg-slate-100 p-0 w-max border-2 border-black">
+                     {['CGST+SGST', 'IGST'].map(type => (
+                        <button
+                           key={type}
+                           type="button"
+                           onClick={() => setHeader({ ...header, gstType: type })}
+                           className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+                              header.gstType === type 
+                                 ? 'bg-black text-white' 
+                                 : 'text-black hover:bg-slate-200'
+                           }`}
+                        >
+                           {type}
+                        </button>
+                     ))}
+                  </div>
+               </div>
 
-              <div className="flex flex-col gap-1">
-                 <label className="text-[12px] font-bold text-slate-700">Payment Terms</label>
-                 <select
-                    className="w-full h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-2 focus:ring-[#0D7377] text-slate-800 text-sm bg-white"
-                    value={footer.dueDays}
-                    onChange={e => setFooter({ ...footer, dueDays: Number(e.target.value) })}
-                 >
-                    <option value={0}>Immediate</option>
-                    <option value={7}>7 days</option>
-                    <option value={15}>15 days</option>
-                    <option value={30}>30 days</option>
-                    <option value={45}>45 days</option>
-                    <option value={60}>60 days</option>
-                 </select>
-              </div>
-           </div>
+               <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black uppercase text-black tracking-widest">Payment Terms</label>
+                  <select
+                     className="w-full h-11 px-3 border-2 border-slate-100 focus:border-black outline-none font-bold text-sm bg-white transition-all"
+                     value={footer.dueDays}
+                     onChange={e => setFooter({ ...footer, dueDays: Number(e.target.value) })}
+                  >
+                     <option value={0}>Immediate</option>
+                     <option value={7}>7 days</option>
+                     <option value={15}>15 days</option>
+                     <option value={30}>30 days</option>
+                     <option value={45}>45 days</option>
+                     <option value={60}>60 days</option>
+                  </select>
+               </div>
+            </div>
 
            <div className="flex items-center gap-3 pt-2">
-              <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Invoice Line Items</span>
-              <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap">Invoice Line Items</span>
+              <div className="h-[2px] flex-1 bg-black" />
            </div>
 
            {/* High Density Grid */}
-           <div className="border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
+           <div className="border-2 border-black overflow-hidden shadow-none">
               <table className="w-full text-xs border-collapse">
-                 <thead className="bg-[#F8FAFC] text-[#64748B] border-b border-[#E2E8F0]">
+                 <thead className="bg-black text-white border-b-2 border-black">
                     <tr className="h-10">
-                       <th className="px-2 font-semibold text-center uppercase tracking-[0.05em] text-[11px] w-12">#</th>
-                       <th className="px-3 text-left font-semibold uppercase tracking-[0.05em] text-[11px]">Item</th>
-                       <th className="px-2 text-left font-semibold uppercase tracking-[0.05em] text-[11px] w-36">Lot</th>
-                       <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-20">Pcs</th>
-                       <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-20">Cut</th>
-                       <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-24">Qty (Mts)</th>
-                       <th className="px-2 text-right font-semibold uppercase tracking-[0.05em] text-[11px] w-28">Rate</th>
-                       <th className="px-2 text-right font-semibold uppercase tracking-[0.05em] text-[11px] w-28">Amount</th>
-                       <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-16">Action</th>
+                       <th className="px-2 font-black text-center uppercase tracking-widest text-[10px] w-12">#</th>
+                       <th className="px-3 text-left font-black uppercase tracking-widest text-[10px]">Item</th>
+                       <th className="px-2 text-left font-black uppercase tracking-widest text-[10px] w-36">Lot</th>
+                       <th className="px-2 text-center font-black uppercase tracking-widest text-[10px] w-20">Pcs</th>
+                       <th className="px-2 text-center font-black uppercase tracking-widest text-[10px] w-20">Cut</th>
+                       <th className="px-2 text-center font-black uppercase tracking-widest text-[10px] w-24">Qty (Mts)</th>
+                       <th className="px-2 text-right font-black uppercase tracking-widest text-[10px] w-28">Rate</th>
+                       <th className="px-2 text-right font-black uppercase tracking-widest text-[10px] w-28">Amount</th>
+                       <th className="px-2 text-center font-black uppercase tracking-widest text-[10px] w-16">Action</th>
                     </tr>
                  </thead>
-                 <tbody className="divide-y divide-[#F1F5F9]">
+                 <tbody className="divide-y-2 divide-slate-100">
                     {gridItems.map((row, idx) => (
-                       <tr key={row.id || idx} className={`h-[44px] hover:bg-[#F8FAFC] transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'}`}>
-                          <td className="text-center text-slate-400 font-bold">{idx + 1}</td>
+                       <tr key={row.id || idx} className={`h-[44px] hover:bg-slate-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'}`}>
+                          <td className="text-center text-black font-black">{idx + 1}</td>
                           <td className="px-2">
                              <ERPSearchableSelect 
-                               className="w-full h-[32px] border-none bg-transparent hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#0D7377] transition-all rounded-md px-1" 
+                               className="w-full h-9 border-none bg-transparent hover:bg-slate-100 focus:bg-white transition-all px-1 font-bold" 
                                value={row.itemId}
                                onChange={(val) => {
                                  const item = items.find(i => i._id === val || i.id === val);
@@ -373,7 +373,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
                           </td>
                            <td className="px-2">
                               <select 
-                                 className="w-full h-[32px] border-none bg-transparent hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#0D7377] transition-all rounded-md px-1 text-xs outline-none font-bold text-slate-700"
+                                 className="w-full h-9 border-none bg-transparent hover:bg-slate-100 focus:bg-white transition-all px-1 text-xs outline-none font-black text-black"
                                  value={row.lotId || ''}
                                  onChange={(e) => {
                                     const updated = [...gridItems];
@@ -392,7 +392,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
                            <td className="px-2">
                               <input 
                                  type="number"
-                                 className="w-full h-[32px] text-center border-none bg-transparent hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#0D7377] transition-all rounded-md px-1 text-xs outline-none" 
+                                 className="w-full h-9 text-center border-none bg-transparent hover:bg-slate-100 focus:bg-white transition-all px-1 text-xs outline-none font-bold" 
                                  value={row.pcs || ''} 
                                  onChange={e => {
                                     const updated = [...gridItems];
@@ -406,7 +406,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
                            <td className="px-2">
                               <input 
                                  type="number"
-                                 className="w-full h-[32px] text-center border-none bg-transparent hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#0D7377] transition-all rounded-md px-1 text-xs outline-none" 
+                                 className="w-full h-9 text-center border-none bg-transparent hover:bg-slate-100 focus:bg-white transition-all px-1 text-xs outline-none font-bold" 
                                  value={row.cut || ''} 
                                  onChange={e => {
                                     const updated = [...gridItems];
@@ -417,11 +417,11 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
                                  }} 
                               />
                            </td>
-                           <td className="px-2 text-center font-semibold text-slate-600 bg-slate-50">{row.mts || 0}</td>
+                           <td className="px-2 text-center font-black text-black bg-slate-100">{row.mts || 0}</td>
                            <td className="px-2">
                               <input 
                                  type="number"
-                                 className="w-full h-[32px] text-right border-none bg-transparent hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#0D7377] transition-all rounded-md px-1 text-xs outline-none" 
+                                 className="w-full h-9 text-right border-none bg-transparent hover:bg-slate-100 focus:bg-white transition-all px-1 text-xs outline-none font-black" 
                                  value={row.saleRate || ''} 
                                  onChange={e => {
                                     const updated = [...gridItems];
@@ -431,7 +431,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
                                  }} 
                               />
                            </td>
-                           <td className="px-2 text-right font-bold text-slate-700 bg-slate-50">₹ {parseFloat(row.amount || 0).toFixed(2)}</td>
+                           <td className="px-2 text-right font-black text-black bg-slate-100">₹ {parseFloat(row.amount || 0).toFixed(2)}</td>
                            <td className="px-2 text-center">
                               <button 
                                  type="button" 
@@ -439,9 +439,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
                                     const updated = gridItems.filter((_, i) => i !== idx);
                                     setGridItems(updated.length ? updated : [{ id: Date.now(), itemId: '', itemName: '', desc: '', packingType: '', unit: 'PCS', pcs: 0, cut: 0, mts: 0, saleRate: 0, amount: 0, disPer: 0, disAmt: 0, addAmt: 0, gstRate: 0 }]);
                                  }}
-                                 className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                 className="p-1.5 text-black hover:bg-black hover:text-white transition-all rounded-none"
                               >
-                                 <Trash2 size={15} />
+                                 <Trash2 size={14} />
                               </button>
                            </td>
                        </tr>
@@ -451,48 +451,48 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
            </div>
 
            {/* Totals Section */}
-           <div className="flex flex-col md:flex-row justify-between items-start gap-4 pt-4 border-t border-[#E2E8F0]">
+           <div className="flex flex-col md:flex-row justify-between items-start gap-10 pt-8 border-t-2 border-black">
               <div className="flex-1 w-full">
-                 <label className="text-[12px] font-bold text-slate-700">Remarks / Narration</label>
+                 <label className="text-[10px] font-black uppercase text-black tracking-widest">Remarks / Narration</label>
                  <textarea 
-                    className="w-full p-2.5 border border-[#CBD5E1] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0D7377] text-slate-800 text-sm bg-white" 
-                    rows={2} 
+                    className="w-full p-4 border-2 border-slate-100 focus:border-black outline-none font-bold text-sm bg-white transition-all" 
+                    rows={3} 
                     value={footer.remarks}
                     onChange={e => setFooter({ ...footer, remarks: e.target.value })}
-                    placeholder="Enter invoice narration..."
+                    placeholder="ENTER INVOICE NARRATION..."
                  />
               </div>
 
               {/* Gorgeous Totals Panel */}
-              <div className="w-80 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4 space-y-2 shrink-0 shadow-sm">
-                 <div className="flex justify-between text-xs text-slate-500">
+              <div className="w-96 bg-black text-white p-8 space-y-3 shrink-0 shadow-none">
+                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
                     <span>Subtotal (Taxable)</span>
-                    <span className="font-semibold text-slate-700">₹ {calculations.taxable.toFixed(2)}</span>
+                    <span className="text-white">₹ {calculations.taxable.toFixed(2)}</span>
                  </div>
                  {header.gstType === 'IGST' ? (
-                    <div className="flex justify-between text-xs text-slate-500">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
                        <span>IGST (5%)</span>
-                       <span className="font-semibold text-slate-700">₹ {calculations.gstAmt.toFixed(2)}</span>
+                       <span className="text-white">₹ {calculations.gstAmt.toFixed(2)}</span>
                     </div>
                  ) : (
                     <>
-                       <div className="flex justify-between text-xs text-slate-500">
+                       <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
                           <span>CGST (2.5%)</span>
-                          <span className="font-semibold text-slate-700">₹ {(calculations.gstAmt / 2).toFixed(2)}</span>
+                          <span className="text-white">₹ {(calculations.gstAmt / 2).toFixed(2)}</span>
                        </div>
-                       <div className="flex justify-between text-xs text-slate-500">
+                       <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
                           <span>SGST (2.5%)</span>
-                          <span className="font-semibold text-slate-700">₹ {(calculations.gstAmt / 2).toFixed(2)}</span>
+                          <span className="text-white">₹ {(calculations.gstAmt / 2).toFixed(2)}</span>
                        </div>
                     </>
                  )}
-                 <div className="flex justify-between text-xs text-slate-500 border-b border-[#E2E8F0] pb-2">
+                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-white/20 pb-4">
                     <span>Round-off</span>
-                    <span className="font-semibold text-slate-700">₹ 0.00</span>
+                    <span className="text-white">₹ 0.00</span>
                  </div>
-                 <div className="flex justify-between items-center pt-1">
-                    <span className="text-sm font-bold text-[#1B3A6B]">Net Amount</span>
-                    <span className="text-lg font-bold text-[#0D7377]">₹ {calculations.net.toFixed(2)}</span>
+                 <div className="flex justify-between items-center pt-2">
+                    <span className="text-[12px] font-black uppercase tracking-[0.2em]">Net Amount</span>
+                    <span className="text-2xl font-black">₹ {calculations.net.toFixed(2)}</span>
                  </div>
               </div>
            </div>
@@ -500,20 +500,20 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-[#E2E8F0] bg-[#F8FAFC] flex justify-end gap-3 shrink-0 rounded-b-xl">
+        <div className="p-6 bg-black flex justify-end gap-4 shrink-0">
            <button 
               type="button" 
               onClick={onClose}
-              className="h-[38px] px-6 bg-white border border-[#1B3A6B] text-[#1B3A6B] font-medium rounded-lg hover:bg-slate-50 transition-all text-sm"
+              className="px-8 py-2 bg-transparent border border-white/20 text-white text-[11px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
            >
               Cancel
            </button>
            <button 
               type="submit"
               disabled={saving}
-              className="h-[38px] px-6 bg-[#1B3A6B] hover:bg-[#142d56] text-white font-medium rounded-lg transition-all text-sm shadow-sm disabled:opacity-50"
+              className="px-12 py-2 bg-white text-black text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-none disabled:opacity-50"
            >
-              {saving ? 'Saving...' : 'Save Invoice'}
+              {saving ? 'Processing...' : 'Complete Invoice (F12)'}
            </button>
         </div>
 

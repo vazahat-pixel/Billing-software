@@ -126,16 +126,16 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null }) => {
     <Modal isOpen={isOpen} onClose={onClose} title="Purchase Invoice Entry" className="max-w-[95vw] h-[90vh] p-0 overflow-hidden">
       
       {/* Dynamic Tab Navigation */}
-      <div className="flex border-b border-[#E2E8F0] p-1 bg-slate-50 gap-1 shrink-0">
+      <div className="flex border-b-2 border-black p-0 bg-white gap-0 shrink-0">
          {['Purchase Invoice', 'View Purchase Bill'].map(tab => (
             <button 
              key={tab}
              type="button"
              onClick={() => setActiveTab(tab)}
-             className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+             className={`px-8 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${
                 activeTab === tab 
-                   ? 'bg-white text-[#1B3A6B] shadow-sm border border-[#E2E8F0]' 
-                   : 'text-slate-500 hover:bg-slate-100'
+                   ? 'bg-black text-white' 
+                   : 'text-slate-400 hover:bg-slate-50'
              }`}
             >
               {tab}
@@ -148,20 +148,20 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null }) => {
         <div className="p-5 flex-1 overflow-y-auto space-y-4 no-scrollbar">
            
            <div className="flex items-center gap-3">
-              <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Supplier & Booking Details</span>
-              <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap">Supplier & Booking Details</span>
+              <div className="h-[2px] flex-1 bg-black" />
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
                  <div className="flex items-center justify-between">
-                    <label className="text-[12px] font-bold text-slate-700">Supplier / Vendor</label>
-                    <span className="px-2.5 py-0.5 bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-bold rounded-full shadow-sm">
+                    <label className="text-[10px] font-black uppercase text-black tracking-widest">Supplier / Vendor</label>
+                    <span className="px-3 py-1 bg-black text-white text-[9px] font-black uppercase tracking-widest border border-black shadow-none">
                        GRN Ref: GRN-2026-904
                     </span>
                  </div>
                  <ERPSearchableSelect 
-                   className="w-full h-[38px]" 
+                   className="w-full h-11 border-2 border-slate-100 focus:border-black transition-all font-bold" 
                    value={header.party}
                    onChange={(val) => {
                      const party = parties.find(p => p._id === val || p.id === val);
@@ -172,19 +172,19 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null }) => {
                    label="Party"
                  />
                  {header.gstin && (
-                    <p className="text-[11px] text-slate-400 mt-0.5">GSTIN: {header.gstin}</p>
+                    <p className="text-[10px] font-black uppercase text-slate-400 mt-1">GSTIN: {header.gstin}</p>
                  )}
               </div>
 
               <div className="flex flex-col gap-1">
-                 <label className="text-[12px] font-bold text-slate-700">Address</label>
-                 <ERPInput className="w-full h-[38px] text-sm" value={header.add} onChange={e => setHeader({...header, add: e.target.value})} />
+                 <label className="text-[10px] font-black uppercase text-black tracking-widest">Address</label>
+                 <ERPInput className="w-full h-11 border-2 border-slate-100 focus:border-black transition-all font-bold" value={header.add} onChange={e => setHeader({...header, add: e.target.value})} />
               </div>
 
               <div className="flex flex-col gap-1">
-                 <label className="text-[12px] font-bold text-slate-700">Broker</label>
+                 <label className="text-[10px] font-black uppercase text-black tracking-widest">Broker</label>
                  <ERPSearchableSelect 
-                   className="w-full h-[38px]" 
+                   className="w-full h-11 border-2 border-slate-100 focus:border-black transition-all font-bold" 
                    value={header.broker}
                    onChange={(val) => setHeader({...header, broker: val})}
                    options={parties.filter(p => p.group === 'Broker').map(p => ({value: p._id || p.id, label: p.name}))} 
@@ -193,183 +193,182 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null }) => {
               </div>
 
               <div className="flex flex-col gap-1">
-                 <label className="text-[12px] font-bold text-slate-700">Purchase Book</label>
-                  <ERPSelect className="w-full h-[38px] text-sm font-bold text-[#1B3A6B] bg-slate-50" value={header.book} onChange={e => setHeader({...header, book: e.target.value})} options={[{value: 'FINISH PURCHASE', label: 'FINISH PURCHASE'}, ...(header.book && header.book !== 'FINISH PURCHASE' ? [{value: header.book, label: header.book}] : [])]} />
+                 <label className="text-[10px] font-black uppercase text-black tracking-widest">Purchase Book</label>
+                  <ERPSelect className="w-full h-11 border-2 border-slate-100 focus:border-black transition-all font-black bg-slate-50" value={header.book} onChange={e => setHeader({...header, book: e.target.value})} options={[{value: 'FINISH PURCHASE', label: 'FINISH PURCHASE'}, ...(header.book && header.book !== 'FINISH PURCHASE' ? [{value: header.book, label: header.book}] : [])]} />
               </div>
            </div>
 
            <div className="flex items-center gap-3 pt-2">
-              <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Logistics & Invoicing Specs</span>
-              <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap">Logistics & Invoicing Specs</span>
+              <div className="h-[2px] flex-1 bg-black" />
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid grid-cols-2 gap-3">
-                 <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-bold text-slate-700">Invoice No</label>
-                    <ERPInput className="w-full h-[38px] text-sm" value={header.billNo} onChange={e => setHeader({...header, billNo: e.target.value})} />
-                 </div>
-                 <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-bold text-slate-700">Invoice Date</label>
-                    <input 
-                      type="date" 
-                      className="w-full h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-2 focus:ring-[#0D7377] text-slate-800 text-sm bg-white" 
-                      value={header.billDate} 
-                      onChange={e => setHeader({...header, billDate: e.target.value})} 
-                    />
-                 </div>
-              </div>
+               <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                     <label className="text-[10px] font-black uppercase text-black tracking-widest">Invoice No</label>
+                     <ERPInput className="w-full h-11 border-2 border-slate-100 focus:border-black font-bold transition-all" value={header.billNo} onChange={e => setHeader({...header, billNo: e.target.value})} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                     <label className="text-[10px] font-black uppercase text-black tracking-widest">Invoice Date</label>
+                     <input 
+                       type="date" 
+                       className="w-full h-11 px-3 border-2 border-slate-100 focus:border-black outline-none font-bold text-sm bg-white transition-all" 
+                       value={header.billDate} 
+                       onChange={e => setHeader({...header, billDate: e.target.value})} 
+                     />
+                  </div>
+               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                 <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-bold text-slate-700">Challan No</label>
-                    <ERPInput className="w-full h-[38px] text-sm" value={header.challanNo} onChange={e => setHeader({...header, challanNo: e.target.value})} />
-                 </div>
-                 <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-bold text-slate-700">Challan Date</label>
-                    <input 
-                      type="date" 
-                      className="w-full h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-2 focus:ring-[#0D7377] text-slate-800 text-sm bg-white" 
-                      value={header.chDate} 
-                      onChange={e => setHeader({...header, chDate: e.target.value})} 
-                    />
-                 </div>
-              </div>
+               <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                     <label className="text-[10px] font-black uppercase text-black tracking-widest">Challan No</label>
+                     <ERPInput className="w-full h-11 border-2 border-slate-100 focus:border-black font-bold transition-all" value={header.challanNo} onChange={e => setHeader({...header, challanNo: e.target.value})} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                     <label className="text-[10px] font-black uppercase text-black tracking-widest">Challan Date</label>
+                     <input 
+                       type="date" 
+                       className="w-full h-11 px-3 border-2 border-slate-100 focus:border-black outline-none font-bold text-sm bg-white transition-all" 
+                       value={header.chDate} 
+                       onChange={e => setHeader({...header, chDate: e.target.value})} 
+                     />
+                  </div>
+               </div>
 
-              <div className="flex flex-col gap-1">
-                 <label className="text-[12px] font-bold text-slate-700">GST Computation Type</label>
-                 <ERPSelect className="w-full h-[38px] text-sm" value={header.gstType} onChange={e => setHeader({...header, gstType: e.target.value})} options={[{value: 'GST 5%', label: 'GST 5%'}, {value: 'GST 12%', label: 'GST 12%'}, {value: 'GST 18%', label: 'GST 18%'}]} />
-              </div>
+               <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black uppercase text-black tracking-widest">GST Computation Type</label>
+                  <ERPSelect className="w-full h-11 border-2 border-slate-100 focus:border-black font-black transition-all" value={header.gstType} onChange={e => setHeader({...header, gstType: e.target.value})} options={[{value: 'GST 5%', label: 'GST 5%'}, {value: 'GST 12%', label: 'GST 12%'}, {value: 'GST 18%', label: 'GST 18%'}]} />
+               </div>
 
-              <div className="flex flex-col gap-1">
-                 <label className="text-[12px] font-bold text-slate-700">Voucher No</label>
-                 <ERPInput className="w-full h-[38px] text-sm font-bold text-slate-600 bg-slate-50" value={header.vNo} readOnly />
-              </div>
-           </div>
+               <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black uppercase text-black tracking-widest">Voucher No</label>
+                  <ERPInput className="w-full h-11 border-2 border-slate-100 bg-slate-50 font-black text-black" value={header.vNo} readOnly />
+               </div>
+            </div>
 
            <div className="flex items-center gap-3 pt-2">
-              <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Purchase Line Items</span>
-              <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap">Purchase Line Items</span>
+              <div className="h-[2px] flex-1 bg-black" />
            </div>
 
-           {/* Grid Table */}
-           <div className="border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
-              <table className="w-full text-xs border-collapse">
-                 <thead className="bg-[#F8FAFC] text-[#64748B] border-b border-[#E2E8F0]">
-                    <tr className="h-10">
-                       <th className="px-2 font-semibold text-center uppercase tracking-[0.05em] text-[11px] w-12">#</th>
-                       <th className="px-3 text-left font-semibold uppercase tracking-[0.05em] text-[11px]">Item</th>
-                       <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-24">HSN</th>
-                       <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-20">Unit</th>
-                       <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-20">Pcs</th>
-                       <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-28">Cut</th>
-                       <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-24">Qty (Mts)</th>
-                       <th className="px-2 text-right font-semibold uppercase tracking-[0.05em] text-[11px] w-28">Rate</th>
-                       <th className="px-2 text-right font-semibold uppercase tracking-[0.05em] text-[11px] w-28">Amount</th>
-                    </tr>
-                 </thead>
-                 <tbody className="divide-y divide-[#F1F5F9]">
-                    {gridItems.map((row, idx) => (
-                       <tr key={row.id || idx} className={`h-[44px] hover:bg-[#F8FAFC] transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'}`}>
-                          <td className="text-center text-slate-400 font-bold">{idx + 1}</td>
-                          <td className="px-2">
-                             <ERPSearchableSelect 
-                               className="w-full h-[32px] border-none bg-transparent hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#0D7377] transition-all rounded-md px-1" 
-                               value={row.itemId}
-                               onChange={(val) => {
-                                 const item = items.find(i => i._id === val || i.id === val);
-                                 const updated = [...gridItems];
-                                 updated[idx] = { ...updated[idx], itemId: val, itemName: item?.itemName || '', unit: item?.unit || 'MTRS', rate: item?.purRate || 0 };
-                                 setGridItems(updated);
-                               }}
-                               onCreateNew={(search) => handleCreateItem(search, idx)}
-                               options={items.map(i => ({value: i._id || i.id, label: i.itemName}))} 
-                               label="Item"
-                             />
-                          </td>
-                          <td className="text-center text-slate-500">{row.hsnCode || '—'}</td>
-                          <td className="text-center font-semibold text-slate-500 bg-slate-50">{row.unit}</td>
-                          <td className="px-2">
-                             <input 
-                                type="number" 
-                                className="w-full h-[32px] text-center border-none bg-transparent hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#0D7377] transition-all rounded-md px-1 text-xs outline-none" 
-                                value={row.pcs || ''} 
-                                onChange={e => {
-                                   const updated = [...gridItems];
-                                   updated[idx].pcs = Number(e.target.value);
-                                   updated[idx].mts = Number(e.target.value) * (updated[idx].cut || 1);
-                                   updated[idx].amount = updated[idx].mts * updated[idx].rate;
-                                   setGridItems(updated);
-                                }} 
-                             />
-                          </td>
-                          <td className="px-2">
-                             {/* Amber Cut Highlight input with suffix mts */}
-                             <div className="relative flex items-center bg-amber-50/50 rounded-md border border-amber-100 hover:bg-amber-50 focus-within:ring-1 focus-within:ring-[#0D7377] transition-all pr-2">
-                                <input 
-                                   type="number" 
-                                   className="w-full h-[32px] text-center border-none bg-transparent text-xs outline-none font-semibold text-amber-900" 
-                                   value={row.cut || ''} 
-                                   onChange={e => {
-                                      const updated = [...gridItems];
-                                      updated[idx].cut = Number(e.target.value);
-                                      updated[idx].mts = Number(e.target.value) * (updated[idx].pcs || 1);
-                                      updated[idx].amount = updated[idx].mts * updated[idx].rate;
-                                      setGridItems(updated);
-                                   }} 
-                                />
-                                <span className="text-[10px] font-bold text-amber-500 uppercase">mts</span>
-                             </div>
-                          </td>
-                          <td className="text-center font-semibold text-slate-600 bg-slate-50">{row.mts || 0}</td>
-                          <td className="px-2">
-                             <input 
-                                type="number" 
-                                className="w-full h-[32px] text-right border-none bg-transparent hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#0D7377] transition-all rounded-md px-1 text-xs outline-none" 
-                                value={row.rate || ''} 
-                                onChange={e => {
-                                   const updated = [...gridItems];
-                                   updated[idx].rate = Number(e.target.value);
-                                   updated[idx].amount = updated[idx].mts * Number(e.target.value);
-                                   setGridItems(updated);
-                                }} 
-                             />
-                          </td>
-                          <td className="text-right font-bold text-slate-700 bg-slate-50 pr-4">₹ {parseFloat(row.amount || 0).toFixed(2)}</td>
-                       </tr>
-                    ))}
-                 </tbody>
-              </table>
-           </div>
+            {/* Grid Table */}
+            <div className="border-2 border-black overflow-hidden shadow-none">
+               <table className="w-full text-xs border-collapse">
+                  <thead className="bg-black text-white border-b-2 border-black">
+                     <tr className="h-10">
+                        <th className="px-2 font-black text-center uppercase tracking-widest text-[10px] w-12">#</th>
+                        <th className="px-3 text-left font-black uppercase tracking-widest text-[10px]">Item</th>
+                        <th className="px-2 text-center font-black uppercase tracking-widest text-[10px] w-24">HSN</th>
+                        <th className="px-2 text-center font-black uppercase tracking-widest text-[10px] w-20">Unit</th>
+                        <th className="px-2 text-center font-black uppercase tracking-widest text-[10px] w-20">Pcs</th>
+                        <th className="px-2 text-center font-black uppercase tracking-widest text-[10px] w-28">Cut</th>
+                        <th className="px-2 text-center font-black uppercase tracking-widest text-[10px] w-24">Qty (Mts)</th>
+                        <th className="px-2 text-right font-black uppercase tracking-widest text-[10px] w-28">Rate</th>
+                        <th className="px-2 text-right font-black uppercase tracking-widest text-[10px] w-28">Amount</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y-2 divide-slate-100">
+                     {gridItems.map((row, idx) => (
+                        <tr key={row.id || idx} className={`h-[44px] hover:bg-slate-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'}`}>
+                           <td className="text-center text-black font-black">{idx + 1}</td>
+                           <td className="px-2">
+                              <ERPSearchableSelect 
+                                className="w-full h-9 border-none bg-transparent hover:bg-slate-100 focus:bg-white transition-all px-1 font-bold" 
+                                value={row.itemId}
+                                onChange={(val) => {
+                                  const item = items.find(i => i._id === val || i.id === val);
+                                  const updated = [...gridItems];
+                                  updated[idx] = { ...updated[idx], itemId: val, itemName: item?.itemName || '', unit: item?.unit || 'MTRS', rate: item?.purRate || 0 };
+                                  setGridItems(updated);
+                                }}
+                                onCreateNew={(search) => handleCreateItem(search, idx)}
+                                options={items.map(i => ({value: i._id || i.id, label: i.itemName}))} 
+                                label="Item"
+                              />
+                           </td>
+                           <td className="text-center text-black font-bold uppercase tracking-widest">{row.hsnCode || '—'}</td>
+                           <td className="text-center font-black text-black bg-slate-100 text-[10px]">{row.unit}</td>
+                           <td className="px-2">
+                              <input 
+                                 type="number" 
+                                 className="w-full h-9 text-center border-none bg-transparent hover:bg-slate-100 focus:bg-white transition-all px-1 text-xs outline-none font-bold" 
+                                 value={row.pcs || ''} 
+                                 onChange={e => {
+                                    const updated = [...gridItems];
+                                    updated[idx].pcs = Number(e.target.value);
+                                    updated[idx].mts = Number(e.target.value) * (updated[idx].cut || 1);
+                                    updated[idx].amount = updated[idx].mts * updated[idx].rate;
+                                    setGridItems(updated);
+                                 }} 
+                              />
+                           </td>
+                           <td className="px-2">
+                              <div className="relative flex items-center bg-slate-50 border-2 border-slate-100 hover:border-black transition-all pr-2">
+                                 <input 
+                                    type="number" 
+                                    className="w-full h-8 text-center border-none bg-transparent text-xs outline-none font-black text-black" 
+                                    value={row.cut || ''} 
+                                    onChange={e => {
+                                       const updated = [...gridItems];
+                                       updated[idx].cut = Number(e.target.value);
+                                       updated[idx].mts = Number(e.target.value) * (updated[idx].pcs || 1);
+                                       updated[idx].amount = updated[idx].mts * updated[idx].rate;
+                                       setGridItems(updated);
+                                    }} 
+                                 />
+                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">mts</span>
+                              </div>
+                           </td>
+                           <td className="text-center font-black text-black bg-slate-100">{row.mts || 0}</td>
+                           <td className="px-2">
+                              <input 
+                                 type="number" 
+                                 className="w-full h-9 text-right border-none bg-transparent hover:bg-slate-100 focus:bg-white transition-all px-1 text-xs outline-none font-black" 
+                                 value={row.rate || ''} 
+                                 onChange={e => {
+                                    const updated = [...gridItems];
+                                    updated[idx].rate = Number(e.target.value);
+                                    updated[idx].amount = updated[idx].mts * Number(e.target.value);
+                                    setGridItems(updated);
+                                 }} 
+                              />
+                           </td>
+                           <td className="text-right font-black text-black bg-slate-100 pr-4">₹ {parseFloat(row.amount || 0).toFixed(2)}</td>
+                        </tr>
+                     ))}
+                  </tbody>
+               </table>
+            </div>
 
-           {/* Totals & Bottom cards */}
-           <div className="flex flex-col md:flex-row justify-between items-start gap-4 pt-4 border-t border-[#E2E8F0]">
-              <div className="flex-1 w-full" />
-              
-              <div className="w-80 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4 space-y-2 shrink-0 shadow-sm">
-                 <div className="flex justify-between text-xs text-slate-500">
-                    <span>Subtotal Gross Amount</span>
-                    <span className="font-semibold text-slate-700">₹ {calculations.gross.toFixed(2)}</span>
-                 </div>
-                 <div className="flex justify-between text-xs text-slate-500 border-b border-[#E2E8F0] pb-2">
-                    <span>Estimated GST (5%)</span>
-                    <span className="font-semibold text-slate-700">₹ {(calculations.gross * 0.05).toFixed(2)}</span>
-                 </div>
-                 <div className="flex justify-between items-center pt-1">
-                    <span className="text-sm font-bold text-[#1B3A6B]">Total Amount</span>
-                    <span className="text-lg font-bold text-[#0D7377]">₹ {calculations.net.toFixed(2)}</span>
-                 </div>
-              </div>
-           </div>
+            {/* Totals & Bottom cards */}
+            <div className="flex flex-col md:flex-row justify-between items-start gap-10 pt-8 border-t-2 border-black">
+               <div className="flex-1 w-full" />
+               
+               <div className="w-96 bg-black text-white p-8 space-y-3 shrink-0 shadow-none">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400">
+                     <span>Subtotal Gross Amount</span>
+                     <span className="text-white">₹ {calculations.gross.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-white/20 pb-4">
+                     <span>Estimated GST (5%)</span>
+                     <span className="text-white">₹ {(calculations.gross * 0.05).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2">
+                     <span className="text-[12px] font-black uppercase tracking-[0.2em]">Total Amount</span>
+                     <span className="text-2xl font-black">₹ {calculations.net.toFixed(2)}</span>
+                  </div>
+               </div>
+            </div>
 
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-[#E2E8F0] bg-[#F8FAFC] flex justify-end gap-3 shrink-0 rounded-b-xl">
+        <div className="p-6 bg-black flex justify-end gap-4 shrink-0">
            <button 
               type="button" 
               onClick={onClose}
-              className="h-[38px] px-6 bg-white border border-[#1B3A6B] text-[#1B3A6B] font-medium rounded-lg hover:bg-slate-50 transition-all text-sm"
+              className="px-8 py-2 bg-transparent border border-white/20 text-white text-[11px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
            >
               Cancel
            </button>
@@ -377,9 +376,9 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null }) => {
               type="button"
               disabled={saving}
               onClick={handleSave}
-              className="h-[38px] px-6 bg-[#1B3A6B] hover:bg-[#142d56] text-white font-medium rounded-lg transition-all text-sm shadow-sm disabled:opacity-50"
+              className="px-12 py-2 bg-white text-black text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-none disabled:opacity-50"
            >
-              {saving ? 'Saving...' : 'Save Purchase'}
+              {saving ? 'Processing...' : 'Save Purchase (F12)'}
            </button>
         </div>
       </div>

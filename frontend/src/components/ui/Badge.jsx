@@ -3,11 +3,11 @@ import { twMerge } from 'tailwind-merge';
 
 const Badge = ({ children, variant = 'default', className }) => {
   const variants = {
-    default: 'bg-slate-100 text-slate-700',
-    success: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    warning: 'bg-amber-50 text-amber-700 border-amber-100',
-    danger: 'bg-rose-50 text-rose-700 border-rose-100',
-    info: 'bg-blue-50 text-blue-700 border-blue-100',
+    default: 'bg-slate-100 text-slate-800 border-slate-200',
+    success: 'bg-black text-white border-black',
+    warning: 'bg-slate-200 text-black border-slate-300',
+    danger: 'bg-white text-black border-black border-dashed',
+    info: 'bg-slate-800 text-white border-slate-900',
   };
 
   return (

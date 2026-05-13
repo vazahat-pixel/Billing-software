@@ -110,36 +110,32 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook }) => {
           initial={{ scale: 0.95, y: 15, opacity: 0 }}
           animate={{ scale: 1, y: 0, opacity: 1 }}
           exit={{ scale: 0.95, y: 15, opacity: 0 }}
-          className={`relative w-full max-w-lg rounded-xl shadow-2xl overflow-hidden border ${
-            isDark 
-              ? 'bg-slate-900 border-slate-700 text-white' 
-              : 'bg-white border-slate-200 text-slate-800'
-          }`}
+          className="relative w-full max-w-lg bg-white rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden border border-slate-200"
         >
-          {/* Title Bar */}
-          <div className="bg-gradient-to-r from-[#1e3a8a] to-[#0f172a] text-white px-5 py-3.5 flex items-center justify-between border-b border-[#3b82f6]/20">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-yellow-400/10 text-yellow-400 flex items-center justify-center">
-                <FontAwesomeIcon icon={faBookOpen} className="text-sm" />
+          {/* Title Bar - Matching Reference */}
+          <div className="bg-[#0f172a] text-white px-6 py-5 flex items-center justify-between border-b border-white/5">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-yellow-400/10 text-yellow-400 flex items-center justify-center border border-yellow-400/20 shadow-inner">
+                <FontAwesomeIcon icon={faBookOpen} className="text-lg" />
               </div>
               <div>
-                <h3 className="text-sm font-black uppercase tracking-widest text-yellow-300">Book Selection</h3>
-                <p className="text-[10px] text-slate-300 font-semibold uppercase mt-0.5">Select a Ledger Book to Continue</p>
+                <h3 className="text-lg font-black uppercase tracking-widest text-yellow-400 leading-none">Book Selection</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1.5 tracking-wider">Select a Ledger Book to Continue</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10"
+              className="text-slate-500 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/10"
             >
-              <FontAwesomeIcon icon={faTimes} />
+              <FontAwesomeIcon icon={faTimes} size="lg" />
             </button>
           </div>
 
-          {/* Search Box */}
-          <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20">
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
-                <FontAwesomeIcon icon={faSearch} className="text-xs" />
+          {/* Search Box - Blue Ring style */}
+          <div className="p-6 pb-2">
+            <div className="relative group">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors">
+                <FontAwesomeIcon icon={faSearch} className="text-sm" />
               </span>
               <input
                 type="text"
@@ -150,26 +146,22 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook }) => {
                   setSearchQuery(e.target.value);
                   setSelectedIdx(0);
                 }}
-                className={`w-full h-10 pl-9 pr-4 text-xs font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all border ${
-                  isDark
-                    ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500'
-                    : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'
-                }`}
+                className="w-full h-12 pl-11 pr-4 text-[13px] font-bold rounded-xl focus:outline-none ring-2 ring-slate-100 focus:ring-black transition-all border-none bg-slate-50 placeholder-slate-400"
               />
             </div>
           </div>
 
           {/* Toggle Button for Add Book Form */}
-          <div className="px-4 py-2 flex justify-between items-center bg-slate-100/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              {moduleName ? `${moduleName} Books` : 'Books'}
+          <div className="px-6 py-4 flex justify-between items-center bg-slate-50/50 border-b border-slate-100">
+            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
+              {moduleName ? `${moduleName} Books` : 'Ledger Books'}
             </span>
             <button
               onClick={() => {
                 setShowAddForm(!showAddForm);
                 setCreationError('');
               }}
-              className="text-[10px] font-black uppercase text-sky-500 hover:text-sky-600 transition-colors flex items-center gap-1"
+              className="text-[10px] font-black uppercase text-black hover:bg-slate-100 transition-colors flex items-center gap-2 px-3 py-1 bg-white border border-slate-200 rounded-md shadow-sm"
             >
               <FontAwesomeIcon icon={showAddForm ? faTimes : faPlus} />
               {showAddForm ? 'Cancel' : 'Add Custom Book'}
@@ -184,39 +176,32 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook }) => {
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 onSubmit={handleCreateBook}
-                className="px-4 py-3 bg-sky-50/50 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800 overflow-hidden space-y-2.5"
+                className="px-6 py-4 bg-slate-50/80 border-b border-slate-100 overflow-hidden space-y-3"
               >
-                <p className="text-[10px] font-black text-sky-600 dark:text-sky-400 uppercase tracking-widest">
+                <p className="text-[10px] font-black text-black uppercase tracking-widest flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-black rounded-full" />
                   Create New Book for {moduleName}
                 </p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2">
-                    <label className="block text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase mb-1">Book Name</label>
+                    <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5 tracking-wider">Book Name</label>
                     <input
                       type="text"
                       placeholder="e.g. GREY PURCHASE"
                       value={newBookName}
                       onChange={(e) => setNewBookName(e.target.value)}
-                      className={`w-full h-8 px-2 text-[11px] font-bold rounded focus:outline-none focus:ring-1 focus:ring-sky-500 border ${
-                        isDark
-                          ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-600'
-                          : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'
-                      }`}
+                      className="w-full h-10 px-3 text-[12px] font-bold rounded-lg focus:outline-none ring-1 ring-slate-200 focus:ring-black border-none bg-white placeholder-slate-300 transition-all"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase mb-1">Book Code</label>
+                    <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5 tracking-wider">Book Code</label>
                     <input
                       type="text"
                       placeholder="e.g. 97"
                       value={newBookCode}
                       onChange={(e) => setNewBookCode(e.target.value)}
-                      className={`w-full h-8 px-2 text-[11px] font-mono font-bold rounded focus:outline-none focus:ring-1 focus:ring-sky-500 border ${
-                        isDark
-                          ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-600'
-                          : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'
-                      }`}
+                      className="w-full h-10 px-3 text-[12px] font-mono font-bold rounded-lg focus:outline-none ring-1 ring-slate-200 focus:ring-black border-none bg-white placeholder-slate-300 transition-all"
                       required
                     />
                   </div>
@@ -239,7 +224,7 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook }) => {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-3 py-1 text-[9px] font-black uppercase rounded bg-sky-500 hover:bg-sky-600 text-white flex items-center gap-1"
+                    className="px-3 py-1 text-[9px] font-black uppercase rounded bg-black hover:bg-slate-800 text-white flex items-center gap-1"
                   >
                     {saving ? 'Saving...' : (
                       <>
@@ -256,22 +241,22 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook }) => {
           {/* Table Area */}
           <div className="max-h-[300px] overflow-y-auto">
             {loading ? (
-              <div className="py-12 text-center text-xs text-slate-400 font-bold uppercase tracking-wider animate-pulse">
-                Loading books from backend...
+              <div className="py-12 text-center text-[11px] text-slate-400 font-black uppercase tracking-widest animate-pulse">
+                Fetching ledger books...
               </div>
             ) : filteredBooks.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400 font-bold uppercase tracking-wider">
-                No ledger books found matching query
+              <div className="py-12 text-center text-[11px] text-slate-400 font-black uppercase tracking-widest">
+                No matching ledger books found
               </div>
             ) : (
-              <table className="w-full text-left text-xs border-collapse">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 h-9">
-                    <th className="px-5 font-black uppercase tracking-wider text-slate-400 text-[10px] w-2/3">Book</th>
-                    <th className="px-5 font-black uppercase tracking-wider text-slate-400 text-[10px] text-right">Book Cd</th>
+                  <tr className="bg-slate-50 border-b border-slate-100 h-10">
+                    <th className="px-6 font-black uppercase tracking-widest text-slate-400 text-[10px] w-3/4">Book</th>
+                    <th className="px-6 font-black uppercase tracking-widest text-slate-400 text-[10px] text-right">Book Cd</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody className="divide-y divide-slate-50">
                   {filteredBooks.map((book, idx) => {
                     const isSelected = idx === selectedIdx;
                     return (
@@ -279,19 +264,22 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook }) => {
                         key={book._id || idx}
                         onClick={() => setSelectedIdx(idx)}
                         onDoubleClick={() => onSelectBook(book)}
-                        className={`h-11 cursor-pointer transition-all duration-150 ${
+                        className={`h-14 cursor-pointer transition-all duration-150 relative ${
                           isSelected
-                            ? 'bg-sky-500/10 text-sky-500 font-black border-l-4 border-sky-500'
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
+                            ? 'bg-slate-100 text-black font-black'
+                            : 'hover:bg-slate-50 text-slate-700'
                         }`}
                       >
-                        <td className="px-5 font-bold uppercase text-[11px] flex items-center justify-between h-11">
-                          <span>{book.name}</span>
-                          {isSelected && (
-                            <FontAwesomeIcon icon={faChevronRight} className="text-[10px] text-sky-500 animate-pulse" />
-                          )}
+                        <td className="px-6 text-[13px] font-bold uppercase tracking-tight">
+                           <div className="flex items-center justify-between">
+                              <span>{book.name}</span>
+                              {isSelected && (
+                                 <FontAwesomeIcon icon={faChevronRight} className="text-black mr-4" />
+                              )}
+                           </div>
+                           {isSelected && <div className="absolute left-0 top-0 bottom-0 w-1 bg-black" />}
                         </td>
-                        <td className="px-5 text-right font-mono font-bold text-slate-600 dark:text-slate-400 text-[11px]">
+                        <td className="px-6 text-right font-mono font-black text-slate-500 text-[13px]">
                           {book.code}
                         </td>
                       </tr>
@@ -302,9 +290,11 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook }) => {
             )}
           </div>
 
-          {/* Footer Guide */}
-          <div className="p-3.5 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-950/20">
-            <span>Use ↑ ↓ to navigate • Enter to select</span>
+          {/* Footer Guide - Matching Reference */}
+          <div className="p-6 border-t border-slate-100 flex justify-between items-center bg-white">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+              Use ↑ ↓ to navigate • Enter to select
+            </span>
             <button
               onClick={() => {
                 if (filteredBooks[selectedIdx]) {
@@ -312,7 +302,7 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook }) => {
                 }
               }}
               disabled={filteredBooks.length === 0}
-              className="px-4 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-md text-[10px] font-black transition-all shadow-sm active:scale-95 disabled:opacity-50"
+              className="px-6 py-2.5 bg-black hover:bg-slate-800 text-white rounded-lg text-[12px] font-black uppercase tracking-wider transition-all shadow-[0_4px_15px_rgba(0,0,0,0.2)] active:scale-95 disabled:opacity-50"
             >
               Select Book
             </button>

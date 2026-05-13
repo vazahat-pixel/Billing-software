@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import useStore from '../../store/useStore';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import Modal from '../../components/ui/Modal';
+import { ArrowRight, Save, X, Banknote, FileText, Hash, Calendar, Layout } from 'lucide-react';
 
 export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selectedBook = null }) => {
   const { parties } = useStore();
@@ -34,99 +35,98 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
 
   const [dcType, setDcType] = useState('Dr');
 
+  if (!isOpen) return null;
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`${type} Entry`} className="max-w-[95vw] h-[90vh] p-0 overflow-hidden">
-      
-      {/* Dynamic Tab Navigation & Toggle */}
-      <div className="flex justify-between items-center border-b border-[#E2E8F0] px-4 py-1.5 bg-slate-50 shrink-0">
-         <div className="flex gap-1">
-            <span className="px-3 py-1 bg-[#1B3A6B]/10 text-[#1B3A6B] text-xs font-bold rounded-lg">
-               {type} Voucher Entry
-            </span>
-         </div>
-         <div className="flex gap-3 items-center">
-            <button 
-               type="button"
-               onClick={() => setType(type === 'Receipt' ? 'Payment' : 'Receipt')} 
-               className="text-xs bg-white border border-[#1B3A6B] text-[#1B3A6B] px-4 py-1.5 font-semibold rounded-lg hover:bg-slate-50 transition-all"
-            >
-               Switch to {type === 'Receipt' ? 'Payment' : 'Receipt'}
-            </button>
-            <span className="text-xs font-bold text-slate-400">Ref: #{type === 'Receipt' ? '3' : '4'}</span>
-         </div>
-      </div>
-
-      <div className="flex flex-col h-full overflow-hidden bg-white">
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-[95vw] h-[90vh] border-4 border-black shadow-[20px_20px_0px_0px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden">
          
-         {/* Main 2-Column Split Workspace */}
-         <div className="flex-1 flex overflow-hidden">
+         {/* Architectural Tab Navigation */}
+         <div className="flex justify-between items-center border-b-4 border-black bg-white shrink-0">
+            <div className="flex">
+               <div className="bg-black text-white px-10 py-6 flex items-center gap-4">
+                  <Banknote size={20} />
+                  <span className="text-[11px] font-black uppercase tracking-[0.4em]">
+                     {type} Protocol Entry
+                  </span>
+               </div>
+               <div className="px-10 py-6 border-r-2 border-black flex items-center gap-2 text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                  Ref: #00{type === 'Receipt' ? '3' : '4'}
+               </div>
+            </div>
+            <div className="flex items-center gap-6 pr-8">
+               <button 
+                  type="button"
+                  onClick={() => setType(type === 'Receipt' ? 'Payment' : 'Receipt')} 
+                  className="text-[10px] bg-white border-2 border-black text-black px-8 py-3 font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all"
+               >
+                  Invert To {type === 'Receipt' ? 'Payment' : 'Receipt'}
+               </button>
+               <button onClick={onClose} className="p-2 border-2 border-black text-black hover:bg-black hover:text-white transition-all">
+                  <X size={20} />
+               </button>
+            </div>
+         </div>
+
+         <div className="flex flex-1 overflow-hidden bg-white">
             
-            {/* Left Column: Voucher Specs (40% width) */}
-            <div className="w-[38%] border-r border-[#E2E8F0] p-5 overflow-y-auto space-y-4 no-scrollbar bg-slate-50/50">
-               <div className="flex items-center gap-3">
-                  <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Voucher Parameters</span>
-                  <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
+            {/* Left Column: Voucher Specs (Architectural Parameters) */}
+            <div className="w-[38%] border-r-4 border-black p-10 overflow-y-auto space-y-8 bg-slate-50/50 custom-scrollbar">
+               <div className="flex items-center gap-6">
+                  <span className="text-[10px] font-black uppercase tracking-[0.4em] text-black">Voucher Schema</span>
+                  <div className="h-[2px] flex-1 bg-black" />
                </div>
 
-               <div className="flex flex-col gap-1.5">
-                  <label className="text-[12px] font-bold text-slate-700">Bank / Cash Account</label>
-                  <ERPSelect className="w-full h-[38px] text-sm font-semibold" options={parties.filter(p => p.group === 'Bank').map(p => ({value: p.id, label: p.name}))} />
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Settlement Repository</label>
+                  <ERPSelect className="w-full h-12 border-2 border-black font-black uppercase text-[10px]" options={parties.filter(p => p.group === 'Bank').map(p => ({value: p.id, label: p.name}))} />
                </div>
 
-               <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                     <label className="text-[12px] font-bold text-slate-700">Voucher No</label>
-                     <ERPInput className="w-full h-[38px] text-sm font-bold text-slate-500 bg-slate-100 border-none" readOnly value="1" />
+               <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Register Index</label>
+                     <ERPInput className="w-full h-12 bg-slate-100 border-2 border-black font-black text-center" readOnly value="1" />
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                     <label className="text-[12px] font-bold text-slate-700">Voucher Date</label>
-                     <input 
-                        type="date" 
-                        className="w-full h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-2 focus:ring-[#0D7377] text-slate-800 text-xs bg-white" 
-                        defaultValue="2026-05-05"
-                     />
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Protocol Date</label>
+                     <ERPInput type="date" className="w-full h-12 border-2 border-black font-black uppercase text-[10px]" defaultValue="2026-05-05" />
                   </div>
                </div>
 
-               <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                     <label className="text-[12px] font-bold text-slate-700">Cheque / UTR No</label>
-                     <ERPInput className="w-full h-[38px] text-sm" placeholder="Enter Reference" value={header.chqNo} onChange={e => setHeader({ ...header, chqNo: e.target.value })} />
+               <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cheque / UTR Ref</label>
+                     <ERPInput className="w-full h-12 border-2 border-black font-black uppercase text-[10px]" placeholder="REF_ID" value={header.chqNo} onChange={e => setHeader({ ...header, chqNo: e.target.value })} />
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                     <label className="text-[12px] font-bold text-slate-700">Cheque Date</label>
-                     <input 
-                        type="date" 
-                        className="w-full h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-2 focus:ring-[#0D7377] text-slate-800 text-xs bg-white" 
-                        defaultValue="2026-05-05"
-                     />
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Clearance Date</label>
+                     <ERPInput type="date" className="w-full h-12 border-2 border-black font-black uppercase text-[10px]" defaultValue="2026-05-05" />
                   </div>
                </div>
 
-               <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                     <label className="text-[12px] font-bold text-slate-700">Slip No</label>
-                     <ERPInput className="w-full h-[38px] text-sm" placeholder="Slip Ref" value={header.slipNo} onChange={e => setHeader({...header, slipNo: e.target.value})} />
+               <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Slip Reference</label>
+                     <ERPInput className="w-full h-12 border-2 border-black font-black uppercase text-[10px]" placeholder="SLIP_ID" value={header.slipNo} onChange={e => setHeader({...header, slipNo: e.target.value})} />
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                     <label className="text-[12px] font-bold text-slate-700">Amount (₹)</label>
-                     <ERPInput className="w-full h-[38px] text-sm font-bold text-emerald-700 bg-emerald-50/50" placeholder="0.00" value={header.amount} onChange={e => setHeader({...header, amount: e.target.value})} />
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantum Amount (₹)</label>
+                     <ERPInput className="w-full h-12 border-2 border-black font-black text-xl text-center bg-black text-white" placeholder="0.00" value={header.amount} onChange={e => setHeader({...header, amount: e.target.value})} />
                   </div>
                </div>
 
-               {/* Debit / Credit Selection Toggle */}
-               <div className="flex flex-col gap-1.5">
-                  <label className="text-[12px] font-bold text-slate-700">Voucher Account Type (Dr / Cr)</label>
-                  <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 w-full">
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Account Type (Dr / Cr)</label>
+                  <div className="flex border-2 border-black p-1 bg-white">
                      {['Dr', 'Cr'].map(mode => (
                         <button
                            key={mode}
                            type="button"
                            onClick={() => setDcType(mode)}
-                           className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${
+                           className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${
                               dcType === mode 
-                                 ? 'bg-[#1B3A6B] text-white shadow-sm' 
-                                 : 'text-slate-500 hover:text-slate-800'
+                                 ? 'bg-black text-white' 
+                                 : 'text-slate-300 hover:text-black'
                            }`}
                         >
                            {mode === 'Dr' ? 'Debit (Dr)' : 'Credit (Cr)'}
@@ -135,54 +135,54 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
                   </div>
                </div>
 
-               {/* Narration 3-Row Textarea */}
-               <div className="flex flex-col gap-1.5">
-                  <label className="text-[12px] font-bold text-slate-700">Narration / Remark</label>
+               <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Audit Narrative</label>
                   <textarea 
                      rows={3}
-                     className="w-full px-3 py-2 border border-[#CBD5E1] rounded-lg text-slate-800 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D7377] resize-none"
-                     placeholder="Enter transaction narration..."
+                     className="w-full p-4 border-2 border-black font-black text-[10px] uppercase tracking-widest focus:outline-none bg-white resize-none"
+                     placeholder="ENTER TRANSACTION NARRATIVE..."
                      value={header.remark}
                      onChange={e => setHeader({ ...header, remark: e.target.value })}
                   />
                </div>
             </div>
 
-            {/* Right Column: Ledger Grid Table (62% width) */}
+            {/* Right Column: Ledger Grid Table (Atomic Adjustments) */}
             <div className="w-[62%] flex flex-col overflow-hidden bg-white">
                
-               <div className="p-4 border-b border-[#E2E8F0] bg-slate-50 flex items-center justify-between shrink-0">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#64748B]">Ledger Bill Adjustments</span>
-                  <div className="flex gap-2">
-                     <span className="px-2.5 py-0.5 bg-sky-50 text-sky-700 border border-sky-200 text-[10px] font-bold rounded-full">
-                        Cur. Bal: ₹ {header.curBal}
-                     </span>
+               <div className="p-8 border-b-2 border-black flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-4">
+                     <FileText size={20} />
+                     <h3 className="text-[11px] font-black uppercase tracking-[0.4em]">Ledger Balance Adjustments</h3>
+                  </div>
+                  <div className="px-6 py-2 bg-slate-50 border-2 border-black text-[10px] font-black text-black uppercase tracking-widest">
+                     Cur. Bal: ₹ {header.curBal}
                   </div>
                </div>
 
-               {/* High Density Grid */}
-               <div className="flex-1 overflow-y-auto">
-                  <table className="w-full text-xs border-collapse">
-                     <thead className="bg-[#F8FAFC] text-[#64748B] border-b border-[#E2E8F0] sticky top-0">
-                        <tr className="h-10">
-                           <th className="px-2 font-semibold text-center uppercase tracking-[0.05em] text-[11px] w-12">#</th>
-                           <th className="px-3 text-left font-semibold uppercase tracking-[0.05em] text-[11px]">Bill Reference</th>
-                           <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-24">Date</th>
-                           <th className="px-2 text-right font-semibold uppercase tracking-[0.05em] text-[11px] w-28">Net Amt</th>
-                           <th className="px-2 text-right font-semibold uppercase tracking-[0.05em] text-[11px] w-28">Paid Amt</th>
+               {/* High Density High Contrast Grid */}
+               <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <table className="w-full text-left border-collapse">
+                     <thead className="bg-black text-white sticky top-0 z-10">
+                        <tr className="h-14">
+                           <th className="px-6 font-black uppercase tracking-[0.2em] text-[9px] w-16 text-center border-r border-white/10">IDX</th>
+                           <th className="px-8 font-black uppercase tracking-[0.2em] text-[9px] border-r border-white/10">Bill Registry Ref</th>
+                           <th className="px-6 text-center font-black uppercase tracking-[0.2em] text-[9px] w-32 border-r border-white/10">Audit Date</th>
+                           <th className="px-8 text-right font-black uppercase tracking-[0.2em] text-[9px] w-40 border-r border-white/10">Quantum</th>
+                           <th className="px-8 text-right font-black uppercase tracking-[0.2em] text-[9px] w-40">Applied</th>
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-[#F1F5F9]">
-                        {[...Array(6)].map((_, idx) => (
-                           <tr key={idx} className={`h-[44px] hover:bg-[#F8FAFC] transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'}`}>
-                              <td className="text-center text-slate-400 font-bold">{idx + 1}</td>
-                              <td className="px-3 font-semibold text-slate-700">INV-2026-00{idx + 10}</td>
-                              <td className="text-center text-slate-500">05/05/2026</td>
-                              <td className="text-right text-slate-600 bg-slate-50 pr-2">₹ {((idx + 1) * 14500).toFixed(2)}</td>
-                              <td className="px-2">
+                     <tbody className="divide-y-2 divide-slate-50">
+                        {[...Array(12)].map((_, idx) => (
+                           <tr key={idx} className="h-16 hover:bg-slate-50 transition-all group">
+                              <td className="text-center text-[10px] font-black text-slate-300 border-r-2 border-slate-50">{(idx + 1).toString().padStart(2, '0')}</td>
+                              <td className="px-8 font-black text-black uppercase tracking-widest text-[10px]">INV_SCHEMA_2026_00{idx + 10}</td>
+                              <td className="text-center text-[10px] font-black text-slate-400 uppercase">05 / 05 / 26</td>
+                              <td className="px-8 text-right text-[11px] font-black text-black bg-slate-50/50">₹ {((idx + 1) * 14500).toFixed(2)}</td>
+                              <td className="px-8">
                                  <input 
                                     type="number" 
-                                    className="w-full h-[32px] text-right border border-slate-200 bg-transparent hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-[#0D7377] transition-all rounded px-2 text-xs outline-none" 
+                                    className="w-full h-10 text-right border-2 border-black bg-transparent group-hover:bg-white focus:bg-white transition-all px-4 text-[11px] font-black outline-none" 
                                     placeholder="0.00" 
                                  />
                               </td>
@@ -193,43 +193,46 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
                </div>
 
                {/* Grid totals card */}
-               <div className="p-4 bg-slate-50 border-t border-[#E2E8F0] grid grid-cols-3 gap-4 shrink-0 shadow-sm text-center">
-                  <div className="bg-white border border-[#E2E8F0] rounded-xl p-3">
-                     <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Gross Amount</span>
-                     <span className="text-sm font-bold text-[#1B3A6B]">₹ {header.amount}</span>
+               <div className="p-10 bg-white border-t-4 border-black grid grid-cols-3 gap-10 shrink-0">
+                  <div className="border-2 border-black p-6">
+                     <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest block mb-2">Aggregate Quantum</span>
+                     <span className="text-xl font-black text-black">₹ {header.amount}</span>
                   </div>
-                  <div className="bg-white border border-[#E2E8F0] rounded-xl p-3">
-                     <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Adjust Pending</span>
-                     <span className="text-sm font-bold text-rose-600">₹ 0.00</span>
+                  <div className="border-2 border-black p-6">
+                     <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest block mb-2">Pending Adjustment</span>
+                     <span className="text-xl font-black text-black">₹ 0.00</span>
                   </div>
-                  <div className="bg-white border border-[#E2E8F0] rounded-xl p-3">
-                     <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Special Discount</span>
-                     <span className="text-sm font-bold text-emerald-600">₹ 0.00</span>
+                  <div className="bg-black p-6 shadow-2xl">
+                     <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest block mb-2">Applied Quantum</span>
+                     <span className="text-xl font-black text-white">₹ 0.00</span>
                   </div>
                </div>
 
             </div>
          </div>
 
-         {/* Footer Actions */}
-         <div className="p-4 border-t border-[#E2E8F0] bg-[#F8FAFC] flex justify-end gap-3 shrink-0 rounded-b-xl">
+         {/* Architectural Footer */}
+         <div className="p-10 border-t-4 border-black bg-white flex justify-end gap-6 shrink-0">
             <button 
                type="button" 
                onClick={onClose}
-               className="h-[38px] px-6 bg-white border border-[#1B3A6B] text-[#1B3A6B] font-medium rounded-lg hover:bg-slate-50 transition-all text-sm"
+               className="px-14 py-4 bg-white border-2 border-black text-black text-[10px] font-black uppercase tracking-[0.3em] hover:bg-slate-50 transition-all"
             >
-               Close
+               Abort Protocol
             </button>
             <button 
                type="button"
                onClick={onClose}
-               className="h-[38px] px-6 bg-[#1B3A6B] hover:bg-[#142d56] text-white font-medium rounded-lg transition-all text-sm shadow-sm"
+               className="px-14 py-4 bg-black text-white text-[10px] font-black uppercase tracking-[0.3em] hover:bg-slate-800 transition-all flex items-center gap-3 shadow-[10px_10px_0px_0px_rgba(0,0,0,0.1)]"
             >
-               Save Voucher
+               <Save size={16} /> Commit Voucher
             </button>
          </div>
 
       </div>
-    </Modal>
+    </div>
+  );
+};
+
   );
 };

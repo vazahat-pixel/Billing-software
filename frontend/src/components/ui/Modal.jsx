@@ -25,23 +25,23 @@ const Modal = ({ isOpen, onClose, title, children, className }) => {
             transition={{ type: "spring", damping: 25, stiffness: 400 }}
             style={{ width: 'min(90vw, 900px)', maxHeight: '90vh' }}
             className={twMerge(
-              "relative bg-white rounded-xl shadow-xl overflow-hidden flex flex-col z-[1000] border border-[#E2E8F0]",
+              "relative bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col z-[1000] border border-slate-200",
               className
             )}
           >
-            {/* Header: 56px height, bg #1B3A6B, text white 16px font-weight 600 */}
-            <div className="bg-[#1B3A6B] h-[56px] px-6 flex items-center justify-between shrink-0">
-              <h3 className="text-white font-semibold text-[16px] tracking-tight">{title}</h3>
+            {/* Header: 56px height, bg Black, text white */}
+            <div className="bg-black h-[52px] px-6 flex items-center justify-between shrink-0">
+              <h3 className="text-white font-bold text-[13px] uppercase tracking-widest">{title}</h3>
               <button 
                 onClick={onClose} 
-                className="p-1.5 hover:bg-white/10 rounded-lg text-white transition-all"
+                className="p-1.5 hover:bg-white/20 rounded-md text-white transition-all"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
             
-            {/* Body: padding 20px 24px */}
-            <div className="p-[20px_24px] overflow-y-auto flex-1 bg-white text-slate-800 no-scrollbar">
+            {/* Body */}
+            <div className="p-6 overflow-y-auto flex-1 bg-white text-black no-scrollbar">
               {children}
             </div>
           </motion.div>

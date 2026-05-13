@@ -13,6 +13,7 @@ const gstRoutes = require('./gstRoutes');
 const reportRoutes = require('./reportRoutes');
 const accountingRoutes = require('./accountingRoutes');
 const bookRoutes = require('./bookRoutes');
+const visitRoutes = require('./visit.routes');
 const authMiddleware = require('../middlewares/auth.middleware');
 const subscriptionMiddleware = require('../middlewares/subscription.middleware');
 
@@ -34,5 +35,6 @@ router.use('/accounting', accountingRoutes);
 router.use('/gst', gstRoutes);
 router.use('/reports', reportRoutes);
 router.use('/books', bookRoutes);
+router.use('/visits', visitRoutes);
 
 module.exports = router;

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import useStore from '../../store/useStore';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
+import { Layout, FileText, ArrowRight, Printer, X, Monitor } from 'lucide-react';
 
 const SalesOutstanding = ({ isOpen, onClose }) => {
   const { parties } = useStore();
@@ -47,131 +48,158 @@ const SalesOutstanding = ({ isOpen, onClose }) => {
     { label: 'DueDays On Payment', checked: false }
   ];
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-[#1e293b] w-full max-w-5xl rounded shadow-2xl border-2 border-slate-600 overflow-hidden font-['Outfit']">
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-5xl border-4 border-black shadow-[20px_20px_0px_0px_rgba(0,0,0,0.3)] overflow-hidden flex flex-col">
          
-         {/* Header */}
-         <div className="bg-slate-800 text-white px-3 py-1 flex justify-between items-center border-b border-slate-700">
-            <h2 className="text-[11px] font-black uppercase tracking-wider flex items-center gap-2">
-               📊 Sales Outstanding
-            </h2>
-            <div className="flex gap-4 text-[10px] font-black text-yellow-500 italic">
-               <span>( Press F3 to Select Group. )</span>
-               <span>( F5 for Multiple Selection )</span>
+         {/* Architectural Header */}
+         <div className="bg-black text-white px-8 py-6 flex justify-between items-center">
+            <div className="flex items-center gap-6">
+               <div className="p-3 bg-white text-black">
+                  <Layout size={24} />
+               </div>
+               <div>
+                  <h2 className="text-xl font-black uppercase tracking-[0.3em]">Sales Outstanding</h2>
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.4em] mt-1">Audit Registry & Fiscal Aging Analytics</p>
+               </div>
             </div>
+            <button onClick={onClose} className="p-2 hover:bg-white/10 transition-all border-2 border-white/20">
+               <X size={20} />
+            </button>
          </div>
 
-         {/* Content */}
-         <div className="p-4 bg-[#f1f5f9] grid grid-cols-12 gap-6">
+         {/* Monochromatic Grid Content */}
+         <div className="p-10 bg-white grid grid-cols-12 gap-12">
             
-            {/* Left Column: Primary Filters */}
-            <div className="col-span-7 space-y-1 text-[11px]">
-               <div className="flex items-center gap-2">
-                  <label className="w-24 font-black text-right">From Date :</label>
-                  <ERPInput className="w-32 h-6 bg-orange-100 font-bold" value={formData.fromDate} />
-                  <label className="w-20 font-black text-right">To Date :</label>
-                  <ERPInput className="w-32 h-6" value={formData.toDate} />
-               </div>
-               <div className="flex items-center gap-2">
-                  <label className="w-24 font-black text-right">Company :</label>
-                  <ERPSelect className="flex-1 h-6" value={formData.company} options={[{value: 'MAHAVEER IMPEX', label: 'MAHAVEER IMPEX'}]} />
-               </div>
-               <div className="flex items-center gap-2">
-                  <label className="w-24 font-black text-right">Book :</label>
-                  <ERPSelect className="flex-1 h-6" value={formData.book} options={[]} />
-               </div>
-               <div className="flex items-center gap-2">
-                  <label className="w-24 font-black text-right">Select Party :</label>
-                  <ERPSelect className="flex-1 h-6" options={parties.map(p => ({value: p.id, label: p.name}))} />
-               </div>
-               {['Group', 'City', 'State', 'Broker', 'Transport', 'Haste', 'Area'].map(f => (
-                  <div key={f} className="flex items-center gap-2">
-                     <label className="w-24 font-black text-right">{f} :</label>
-                     <ERPSelect className="flex-1 h-6" options={[]} />
+            {/* Left Column: Primary Schema Filters */}
+            <div className="col-span-7 space-y-4">
+               <div className="flex items-center gap-4">
+                  <label className="w-32 text-[10px] font-black text-black uppercase tracking-widest text-right">Date Range :</label>
+                  <div className="flex-1 flex items-center gap-2">
+                     <ERPInput className="flex-1 h-10 bg-slate-50 border-2 border-black font-black uppercase text-[10px] text-center" value={formData.fromDate} />
+                     <ArrowRight size={14} className="text-slate-300" />
+                     <ERPInput className="flex-1 h-10 bg-slate-50 border-2 border-black font-black uppercase text-[10px] text-center" value={formData.toDate} />
                   </div>
-               ))}
-               <div className="flex items-center gap-2 pt-1">
-                  <label className="w-24 font-black text-right">From Bill</label>
-                  <ERPInput className="w-24 h-6 text-center" value="0" />
-                  <div className="flex-1"></div>
-                  <label className="w-20 font-black text-right">To Bill</label>
-                  <ERPInput className="w-24 h-6 text-center" value="0" />
                </div>
-               <div className="flex items-center gap-2">
-                  <label className="w-24 font-black text-right">From Pay Date :</label>
-                  <ERPInput className="w-24 h-6 text-center" value="01/04/2026" />
-                  <div className="flex-1"></div>
-                  <label className="w-20 font-black text-right">To Pay Date :</label>
-                  <ERPInput className="w-24 h-6 text-center" value="05/05/2026" />
+
+               <div className="flex items-center gap-4">
+                  <label className="w-32 text-[10px] font-black text-black uppercase tracking-widest text-right">Legal Entity :</label>
+                  <ERPSelect className="flex-1 h-10 border-2 border-black font-black uppercase text-[10px]" value={formData.company} options={[{value: 'MAHAVEER IMPEX', label: 'MAHAVEER IMPEX'}]} />
                </div>
-               <div className="flex items-center gap-2">
-                  <label className="w-24 font-black text-right">DueDays {'>'}</label>
-                  <ERPInput className="w-24 h-6 text-center" value="0" />
-                  <div className="flex-1"></div>
-                  <label className="w-20 font-black text-right">DueDays {'<'}</label>
-                  <ERPInput className="w-24 h-6 text-center" value="0" />
+
+               <div className="flex items-center gap-4">
+                  <label className="w-32 text-[10px] font-black text-black uppercase tracking-widest text-right">Audit Book :</label>
+                  <ERPSelect className="flex-1 h-10 border-2 border-black font-black uppercase text-[10px]" value={formData.book} options={[]} />
                </div>
-               <div className="flex items-center gap-2">
-                  <label className="w-24 font-black text-right">Dis(%)</label>
-                  <ERPInput className="w-24 h-6 text-center" value="0.00" />
-                  <div className="flex-1"></div>
-                  <label className="w-20 font-black text-right">Unit</label>
-                  <ERPSelect className="w-32 h-6" value="--Select Unit--" options={[]} />
+
+               <div className="flex items-center gap-4">
+                  <label className="w-32 text-[10px] font-black text-black uppercase tracking-widest text-right">Counterparty :</label>
+                  <ERPSelect className="flex-1 h-10 border-2 border-black font-black uppercase text-[10px]" options={parties.map(p => ({value: p.id, label: p.name}))} />
                </div>
-               <div className="flex items-center gap-2">
-                  <label className="w-24 font-black text-right">Sub Book :</label>
-                  <ERPSelect className="w-32 h-6" value="All" options={[]} />
+
+               <div className="grid grid-cols-2 gap-4 ml-36 pt-4 border-t-2 border-slate-50">
+                  {['Group', 'City', 'State', 'Broker', 'Transport', 'Haste'].map(f => (
+                     <div key={f} className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">{f} Parameter</label>
+                        <ERPSelect className="w-full h-10 border-2 border-black font-black uppercase text-[10px]" options={[]} />
+                     </div>
+                  ))}
+               </div>
+
+               <div className="pt-6 border-t-2 border-black grid grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                     <div className="flex items-center gap-4">
+                        <label className="w-20 text-[9px] font-black text-black uppercase tracking-widest text-right">Bill Range</label>
+                        <div className="flex-1 flex items-center gap-2">
+                           <ERPInput className="w-full h-9 border-2 border-black text-center font-black text-[10px]" value="0" />
+                           <ERPInput className="w-full h-9 border-2 border-black text-center font-black text-[10px]" value="0" />
+                        </div>
+                     </div>
+                     <div className="flex items-center gap-4">
+                        <label className="w-20 text-[9px] font-black text-black uppercase tracking-widest text-right">Due Aging</label>
+                        <div className="flex-1 flex items-center gap-2">
+                           <ERPInput className="w-full h-9 border-2 border-black text-center font-black text-[10px]" value="0" />
+                           <ERPInput className="w-full h-9 border-2 border-black text-center font-black text-[10px]" value="0" />
+                        </div>
+                     </div>
+                  </div>
+                  <div className="space-y-4">
+                     <div className="flex items-center gap-4">
+                        <label className="w-20 text-[9px] font-black text-black uppercase tracking-widest text-right">Pay Window</label>
+                        <div className="flex-1 flex items-center gap-2">
+                           <ERPInput className="w-full h-9 border-2 border-black text-center font-black text-[10px]" value="01/04" />
+                           <ERPInput className="w-full h-9 border-2 border-black text-center font-black text-[10px]" value="05/05" />
+                        </div>
+                     </div>
+                  </div>
                </div>
             </div>
 
-            {/* Right Column: Options and Subtotals */}
-            <div className="col-span-5 space-y-4">
-               <div className="bg-white p-3 border border-slate-300 rounded shadow-sm space-y-2">
-                  <h4 className="text-[10px] font-black uppercase text-rose-600 border-b border-slate-100">Select Group / SubTotal :</h4>
-                  <div className="flex items-center gap-2">
-                     <label className="w-4 font-bold text-slate-400">1 :</label>
-                     <ERPSelect className="flex-1 h-6 text-[10px]" value="None" options={[]} />
+            {/* Right Column: Protocols and Sub-Registry */}
+            <div className="col-span-5 space-y-8">
+               <div className="bg-slate-50 p-8 border-2 border-black shadow-xl space-y-6">
+                  <h4 className="text-[10px] font-black uppercase text-black tracking-[0.4em] border-b-2 border-black pb-4 flex items-center gap-3">
+                     <FileText size={16} /> Sub-Registry Logic
+                  </h4>
+                  <div className="space-y-4">
+                     <div className="flex items-center gap-4">
+                        <label className="w-6 text-[10px] font-black text-slate-300">01</label>
+                        <ERPSelect className="flex-1 h-10 text-[10px] border-2 border-black font-black uppercase" value="None" options={[]} />
+                     </div>
+                     <div className="flex items-center gap-4">
+                        <label className="w-6 text-[10px] font-black text-slate-300">02</label>
+                        <ERPSelect className="flex-1 h-10 text-[10px] border-2 border-black font-black uppercase" value="None" options={[]} />
+                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                     <label className="w-4 font-bold text-slate-400">2 :</label>
-                     <ERPSelect className="flex-1 h-6 text-[10px]" value="None" options={[]} />
-                  </div>
-                  <div className="flex items-center gap-2 pt-1">
-                     <input type="checkbox" className="w-3 h-3" />
-                     <label className="text-[10px] font-black uppercase">Summary</label>
+                  <div className="pt-4 border-t-2 border-slate-200 flex items-center gap-4">
+                     <label className="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" className="w-4 h-4 border-2 border-black rounded-none appearance-none checked:bg-black transition-all" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Enable Summary</span>
+                     </label>
                      <div className="flex-1"></div>
-                     <ERPSelect className="w-32 h-6 text-[10px]" value="Pending" options={[]} />
+                     <ERPSelect className="w-32 h-10 text-[10px] border-2 border-black font-black uppercase" value="Pending" options={[]} />
                   </div>
                </div>
 
-               <div className="grid grid-cols-1 gap-1 text-[10px] font-bold text-indigo-900">
+               <div className="space-y-2 max-h-[300px] overflow-y-auto pr-4 custom-scrollbar">
                   {checkboxes.map(cb => (
-                     <label key={cb.label} className="flex items-center gap-2 hover:bg-white/50 px-1 py-0.5 rounded cursor-pointer">
-                        <input type="checkbox" className="w-3 h-3" defaultChecked={cb.checked} />
-                        {cb.label}
+                     <label key={cb.label} className="flex items-center gap-4 p-3 hover:bg-slate-50 transition-all cursor-pointer border-b border-slate-50">
+                        <input 
+                           type="checkbox" 
+                           className="w-4 h-4 border-2 border-black rounded-none appearance-none checked:bg-black transition-all" 
+                           defaultChecked={cb.checked} 
+                        />
+                        <span className="text-[10px] font-black text-black uppercase tracking-widest">{cb.label}</span>
                      </label>
                   ))}
                </div>
 
-               <div className="space-y-1 pt-4 border-t border-slate-200">
-                  <div className="flex items-center gap-2">
-                     <label className="w-20 font-black text-right text-[10px]">SalesMan :</label>
-                     <ERPInput className="flex-1 h-6" />
+               <div className="space-y-4 pt-6 border-t-2 border-black">
+                  <div className="flex items-center gap-4">
+                     <label className="w-24 text-[9px] font-black text-black uppercase tracking-widest text-right">Sales Executive :</label>
+                     <ERPInput className="flex-1 h-10 border-2 border-black font-black uppercase text-[10px]" />
                   </div>
-                  <div className="flex items-center gap-2">
-                     <label className="w-20 font-black text-right text-[10px]">OrderNo :</label>
-                     <ERPInput className="flex-1 h-6" />
+                  <div className="flex items-center gap-4">
+                     <label className="w-24 text-[9px] font-black text-black uppercase tracking-widest text-right">Ref Order :</label>
+                     <ERPInput className="flex-1 h-10 border-2 border-black font-black uppercase text-[10px]" />
                   </div>
                </div>
             </div>
          </div>
 
-         {/* Footer Actions */}
-         <div className="bg-slate-900 p-2 flex justify-center gap-2 border-t border-slate-700">
-            <button className="px-12 py-1.5 bg-slate-200 text-slate-800 text-[11px] font-black uppercase border border-slate-400 hover:bg-white transition-all">Preview</button>
-            <button className="px-12 py-1.5 bg-slate-200 text-slate-800 text-[11px] font-black uppercase border border-slate-400 hover:bg-white transition-all" onClick={onClose}>Cancel</button>
-            <button className="px-12 py-1.5 bg-slate-200 text-slate-800 text-[11px] font-black uppercase border border-slate-400 hover:bg-white transition-all" onClick={onClose}>Exit</button>
+         {/* Architectural Footer */}
+         <div className="bg-black p-8 flex justify-end gap-4 border-t-4 border-black">
+            <button className="px-14 py-4 bg-white text-black text-[10px] font-black uppercase tracking-[0.3em] hover:bg-slate-200 transition-all flex items-center gap-3">
+               <Monitor size={16} /> Generate Preview
+            </button>
+            <button className="px-14 py-4 bg-transparent border-2 border-white/30 text-white text-[10px] font-black uppercase tracking-[0.3em] hover:border-white transition-all" onClick={onClose}>
+               Abort Operation
+            </button>
+            <button className="px-14 py-4 bg-white text-black text-[10px] font-black uppercase tracking-[0.3em] hover:bg-slate-200 transition-all flex items-center gap-3" onClick={onClose}>
+               <Printer size={16} /> Hard Copy Audit
+            </button>
          </div>
 
       </div>

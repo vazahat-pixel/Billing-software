@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import useStore from '../../store/useStore';
 import { FormField, ERPInput, ERPSelect, ERPButton } from '../../components/forms/FormElements';
 import Modal from '../../components/ui/Modal';
-import { Wallet, Search, Filter, ArrowUpRight, ArrowDownLeft, FileText, Banknote } from 'lucide-react';
+import { Wallet, Search, Filter, ArrowUpRight, ArrowDownLeft, FileText, Banknote, ArrowRight, User, X } from 'lucide-react';
 
 const AccountingPage = () => {
   const { ledgerEntries, parties, addPayment } = useStore();
@@ -24,96 +24,116 @@ const AccountingPage = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn pb-20">
-      {/* Header */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Financial Accounting</h1>
-           <p className="text-slate-500 text-sm">Real-time ledger management and payment tracking.</p>
+      {/* Architectural Header */}
+      <div className="bg-white p-10 border-2 border-black flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-2xl">
+        <div className="flex items-center gap-6">
+           <div className="p-4 bg-black text-white">
+              <Banknote size={28} />
+           </div>
+           <div>
+              <h1 className="text-3xl font-black text-black uppercase tracking-tighter">Fiscal Registry</h1>
+              <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-2">
+                 <span>Accounting</span>
+                 <ArrowRight size={10} />
+                 <span className="text-black">Ledger & Settlement Intelligence</span>
+              </div>
+           </div>
         </div>
-        <div className="flex gap-3">
-           <ERPButton icon={ArrowUpRight} className="bg-rose-600 border-none" onClick={() => { setPaymentType('payment'); setShowPaymentModal(true); }}>
-             Record Payment
-           </ERPButton>
-           <ERPButton icon={ArrowDownLeft} className="bg-emerald-600 border-none" onClick={() => { setPaymentType('receipt'); setShowPaymentModal(true); }}>
-             Record Receipt
-           </ERPButton>
+        <div className="flex gap-4">
+           <button 
+              className="px-10 py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all border-2 border-black flex items-center gap-3"
+              onClick={() => { setPaymentType('payment'); setShowPaymentModal(true); }}
+           >
+              <ArrowUpRight size={14} /> Record Payment
+           </button>
+           <button 
+              className="px-10 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all border-2 border-black flex items-center gap-3"
+              onClick={() => { setPaymentType('receipt'); setShowPaymentModal(true); }}
+           >
+              <ArrowDownLeft size={14} /> Record Receipt
+           </button>
         </div>
       </div>
 
-      {/* Filter & Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 h-fit">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest">Select Account</h4>
-            <ERPSelect 
-                value={selectedPartyId} 
-                onChange={(e) => setSelectedPartyId(e.target.value)}
-                options={parties.map(p => ({ value: p.id, label: p.name }))}
-            />
-            {selectedPartyId && (
-              <div className="mt-8 space-y-4">
-                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Total Debit</p>
-                    <p className="text-lg font-black text-rose-600">₹ {stats.dr.toLocaleString()}</p>
+      {/* Filter & Analytics Sidebar */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
+         <div className="space-y-10">
+            <div className="bg-white p-8 border-2 border-black shadow-xl">
+               <h4 className="text-[10px] font-black text-black uppercase mb-6 tracking-[0.4em] border-b-2 border-black pb-4">Account Protocol</h4>
+               <ERPSelect 
+                   value={selectedPartyId} 
+                   onChange={(e) => setSelectedPartyId(e.target.value)}
+                   options={parties.map(p => ({ value: p.id, label: p.name }))}
+                   className="h-12 border-2 border-black font-black uppercase text-[10px]"
+               />
+               
+               {selectedPartyId && (
+                 <div className="mt-10 space-y-4">
+                    <div className="p-6 bg-slate-50 border-2 border-black">
+                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Aggregate Debit</p>
+                       <p className="text-2xl font-black text-black mt-2">₹ {stats.dr.toLocaleString()}</p>
+                    </div>
+                    <div className="p-6 bg-slate-50 border-2 border-black">
+                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Aggregate Credit</p>
+                       <p className="text-2xl font-black text-black mt-2">₹ {stats.cr.toLocaleString()}</p>
+                    </div>
+                    <div className="p-6 bg-black text-white shadow-2xl">
+                       <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em]">Net Closing Position</p>
+                       <p className="text-3xl font-black text-white mt-2 tracking-tighter">₹ {Math.abs(stats.bal).toLocaleString()} <span className="text-xs opacity-50">{stats.bal >= 0 ? 'DR' : 'CR'}</span></p>
+                    </div>
                  </div>
-                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Total Credit</p>
-                    <p className="text-lg font-black text-emerald-600">₹ {stats.cr.toLocaleString()}</p>
-                 </div>
-                 <div className="p-4 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-100">
-                    <p className="text-[10px] font-bold text-indigo-200 uppercase">Closing Balance</p>
-                    <p className="text-xl font-black text-white">₹ {Math.abs(stats.bal).toLocaleString()} {stats.bal >= 0 ? 'DR' : 'CR'}</p>
-                 </div>
-              </div>
-            )}
+               )}
+            </div>
          </div>
 
-         <div className="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-5 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
-               <div className="flex items-center gap-2 text-slate-700 font-bold">
-                  <FileText size={18} />
-                  <span>Ledger Statement</span>
+         {/* Main Ledger Statement */}
+         <div className="lg:col-span-3 bg-white border-2 border-black overflow-hidden flex flex-col shadow-2xl">
+            <div className="p-6 border-b-2 border-black bg-white flex items-center justify-between">
+               <div className="flex items-center gap-4 text-black">
+                  <FileText size={20} />
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.4em]">Counterparty Audit Statement</h3>
                </div>
                <div className="flex gap-2">
-                  <button className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-500 hover:text-indigo-600">PDF</button>
-                  <button className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-500 hover:text-indigo-600">EXCEL</button>
+                  <button className="px-6 py-2 bg-white border-2 border-black text-[9px] font-black text-black hover:bg-black hover:text-white transition-all uppercase tracking-widest">Generate PDF</button>
+                  <button className="px-6 py-2 bg-black text-white border-2 border-black text-[9px] font-black hover:bg-slate-800 transition-all uppercase tracking-widest">Export Dataset</button>
                </div>
             </div>
             
             <div className="overflow-x-auto">
-               <table className="w-full text-left">
+               <table className="w-full text-left border-collapse">
                   <thead>
-                     <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase">
-                        <th className="px-6 py-4">Date</th>
-                        <th className="px-6 py-4">Particulars</th>
-                        <th className="px-6 py-4 text-right">Debit (DR)</th>
-                        <th className="px-6 py-4 text-right">Credit (CR)</th>
-                        <th className="px-6 py-4 text-right">Balance</th>
+                     <tr className="bg-black text-[9px] font-black text-white uppercase tracking-[0.3em] sticky top-0 z-10">
+                        <th className="px-8 py-5">Audit Timestamp</th>
+                        <th className="px-8 py-5">Particular Intelligence</th>
+                        <th className="px-8 py-5 text-right">Debit (DR)</th>
+                        <th className="px-8 py-5 text-right">Credit (CR)</th>
+                        <th className="px-8 py-5 text-right">Net Position</th>
                      </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-50">
+                  <tbody className="divide-y-2 divide-slate-50">
                      {filteredLedger.map((entry) => (
-                       <tr key={entry.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-6 py-4 text-xs text-slate-500">{entry.date}</td>
-                          <td className="px-6 py-4">
-                             <p className="text-xs font-bold text-slate-700">{entry.particular}</p>
-                             <p className="text-[9px] text-slate-400">Ref: {entry.id}</p>
+                       <tr key={entry.id} className="hover:bg-slate-50 transition-all">
+                          <td className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">{entry.date}</td>
+                          <td className="px-8 py-5">
+                             <p className="text-[11px] font-black text-black uppercase tracking-widest">{entry.particular}</p>
+                             <p className="text-[9px] text-slate-300 font-black uppercase mt-1 tracking-widest">REF_ID: {entry.id.substring(0, 8)}</p>
                           </td>
-                          <td className="px-6 py-4 text-right text-xs font-black text-rose-500">
+                          <td className="px-8 py-5 text-right text-[11px] font-black text-black">
                              {entry.debit > 0 ? `₹ ${entry.debit.toLocaleString()}` : '-'}
                           </td>
-                          <td className="px-6 py-4 text-right text-xs font-black text-emerald-500">
+                          <td className="px-8 py-5 text-right text-[11px] font-black text-black">
                              {entry.credit > 0 ? `₹ ${entry.credit.toLocaleString()}` : '-'}
                           </td>
-                          <td className="px-6 py-4 text-right text-xs font-black text-slate-900">
-                             ₹ {Math.abs(entry.balance).toLocaleString()} {entry.balance >= 0 ? 'DR' : 'CR'}
+                          <td className="px-8 py-5 text-right text-[12px] font-black text-black tracking-tighter">
+                             ₹ {Math.abs(entry.balance).toLocaleString()} <span className="text-[9px] opacity-30">{entry.balance >= 0 ? 'DR' : 'CR'}</span>
                           </td>
                        </tr>
                      ))}
                      {!selectedPartyId && (
                        <tr>
-                          <td colSpan="5" className="px-6 py-20 text-center text-slate-400">
-                             <Search size={40} className="mx-auto opacity-10 mb-4" />
-                             <p className="text-sm font-medium">Please select a party account to view ledger statement.</p>
+                          <td colSpan="5" className="px-8 py-32 text-center">
+                             <Search size={48} className="mx-auto text-slate-100 mb-6" />
+                             <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">Zero Dataset Selected</p>
                           </td>
                        </tr>
                      )}
@@ -150,53 +170,75 @@ const PaymentModal = ({ isOpen, onClose, type }) => {
     onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Record ${type === 'payment' ? 'Payment' : 'Receipt'}`} className="max-w-md">
-       <form onSubmit={handleSubmit} className="space-y-5">
-          <FormField label="Select Account" icon={User}>
-             <ERPSelect 
-               value={formData.partyId}
-               onChange={(e) => setFormData({...formData, partyId: e.target.value})}
-               options={parties.map(p => ({ value: p.id, label: p.name }))}
-             />
-          </FormField>
-          <FormField label="Amount" icon={Banknote}>
-             <ERPInput 
-               type="number" 
-               value={formData.amount} 
-               onChange={(e) => setFormData({...formData, amount: e.target.value})} 
-               placeholder="0.00"
-             />
-          </FormField>
-          <div className="grid grid-cols-2 gap-4">
-             <FormField label="Payment Mode">
-                <ERPSelect 
-                   value={formData.mode}
-                   onChange={(e) => setFormData({...formData, mode: e.target.value})}
-                   options={[
-                     { value: 'Bank Transfer', label: 'Bank Transfer' },
-                     { value: 'Cash', label: 'Cash' },
-                     { value: 'Cheque', label: 'Cheque' },
-                     { value: 'UPI', label: 'UPI' }
-                   ]}
-                />
-             </FormField>
-             <FormField label="Date">
-                <ERPInput type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} />
-             </FormField>
-          </div>
-          <FormField label="Reference / Note">
-             <ERPInput value={formData.ref} onChange={(e) => setFormData({...formData, ref: e.target.value})} placeholder="e.g. Inv #123 Part Payment" />
-          </FormField>
-          
-          <div className="flex gap-2 pt-4">
-             <ERPButton variant="secondary" className="flex-1" onClick={onClose}>Discard</ERPButton>
-             <ERPButton type="submit" className={`flex-1 border-none ${type === 'payment' ? 'bg-rose-600' : 'bg-emerald-600'}`}>
-                Post Entry
-             </ERPButton>
-          </div>
-       </form>
-    </Modal>
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-xl border-4 border-black shadow-[20px_20px_0px_0px_rgba(0,0,0,0.3)]">
+         <div className="bg-black p-6 flex justify-between items-center text-white">
+            <h3 className="text-sm font-black uppercase tracking-[0.4em]">Record Fiscal Entry : {type}</h3>
+            <button onClick={onClose} className="p-1 hover:bg-white/10 transition-all"><X size={20} /></button>
+         </div>
+
+         <form onSubmit={handleSubmit} className="p-10 space-y-8">
+            <div className="space-y-6">
+               <FormField label="COUNTERPARTY ACCOUNT">
+                  <ERPSelect 
+                    value={formData.partyId}
+                    onChange={(e) => setFormData({...formData, partyId: e.target.value})}
+                    options={parties.map(p => ({ value: p.id, label: p.name }))}
+                    className="h-12 border-2 border-black font-black uppercase text-[10px]"
+                  />
+               </FormField>
+
+               <FormField label="QUANTUM AMOUNT (INR)">
+                  <ERPInput 
+                    type="number" 
+                    value={formData.amount} 
+                    onChange={(e) => setFormData({...formData, amount: e.target.value})} 
+                    placeholder="0.00"
+                    className="h-12 border-2 border-black font-black text-xl"
+                  />
+               </FormField>
+
+               <div className="grid grid-cols-2 gap-6">
+                  <FormField label="SETTLEMENT MODE">
+                     <ERPSelect 
+                        value={formData.mode}
+                        onChange={(e) => setFormData({...formData, mode: e.target.value})}
+                        options={[
+                          { value: 'Bank Transfer', label: 'Bank Transfer' },
+                          { value: 'Cash', label: 'Cash' },
+                          { value: 'Cheque', label: 'Cheque' },
+                          { value: 'UPI', label: 'UPI' }
+                        ]}
+                        className="h-12 border-2 border-black font-black uppercase text-[10px]"
+                     />
+                  </FormField>
+                  <FormField label="FISCAL DATE">
+                     <ERPInput type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className="h-12 border-2 border-black font-black uppercase text-[10px]" />
+                  </FormField>
+               </div>
+
+               <FormField label="AUDIT REFERENCE / NARRATIVE">
+                  <ERPInput 
+                    value={formData.ref} 
+                    onChange={(e) => setFormData({...formData, ref: e.target.value})} 
+                    placeholder="e.g. SETTLEMENT FOR INV_4021" 
+                    className="h-12 border-2 border-black font-black uppercase text-[10px]"
+                  />
+               </FormField>
+            </div>
+            
+            <div className="flex gap-4 pt-6 border-t-2 border-black">
+               <button type="button" className="flex-1 py-4 bg-transparent border-2 border-black text-black font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all" onClick={onClose}>Discard</button>
+               <button type="submit" className="flex-1 py-4 bg-black text-white font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all shadow-xl">
+                  Commit Entry
+               </button>
+            </div>
+         </form>
+      </div>
+    </div>
   );
 };
 

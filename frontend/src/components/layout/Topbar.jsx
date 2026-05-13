@@ -24,44 +24,44 @@ const Topbar = () => {
   }, [location.pathname]);
 
   return (
-    <header className="h-[60px] bg-white border-b border-[#E2E8F0] shadow-sm px-6 flex items-center justify-between no-print">
+    <header className="h-[52px] bg-white border-b border-slate-200 shadow-sm px-6 flex items-center justify-between no-print">
       <div className="flex items-center gap-6">
-        <h1 className="text-[18px] font-semibold text-[#1B3A6B] tracking-tight">
+        <h1 className="text-[14px] font-black text-black uppercase tracking-widest">
           {pageTitle}
         </h1>
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Company Selector Dropdown */}
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-[#E2E8F0] rounded-lg">
-          <Building size={14} className="text-[#0D7377]" />
-          <span className="text-[12px] font-semibold text-[#1B3A6B]">{user?.companyName || 'Laxmi Libas Pvt Ltd'}</span>
+        {/* Company Selector */}
+        <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 border border-slate-200 rounded">
+          <Building size={14} className="text-black" />
+          <span className="text-[11px] font-bold text-black uppercase">{user?.companyName || 'Laxmi Libas'}</span>
         </div>
 
-        <button className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-all relative">
-          <Bell size={18} className="text-[#1B3A6B]" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#0D7377] border border-white rounded-full"></span>
+        <button className="p-2 text-black hover:bg-slate-100 rounded transition-all relative">
+          <Bell size={18} />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-black border border-white rounded-full"></span>
         </button>
 
-        <div className="h-6 w-px bg-[#E2E8F0]"></div>
+        <div className="h-6 w-px bg-slate-200"></div>
 
         <div className="relative">
           <div 
-            className="flex items-center gap-3 cursor-pointer group hover:bg-slate-50 pl-2 pr-1 py-1 rounded-lg transition-all"
+            className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 pl-2 pr-1 py-1 rounded transition-all"
             onClick={() => setShowProfileMenu(!showProfileMenu)}
           >
             <div className="text-right hidden sm:block">
-              <p className="text-[13px] font-semibold text-[#1B3A6B] leading-none">
-                {user?.name || 'Admin User'}
+              <p className="text-[11px] font-black text-black leading-none uppercase">
+                {user?.name || 'Admin'}
               </p>
-              <p className="text-[10px] font-medium text-[#0D7377] uppercase tracking-wider mt-1">
-                {user?.role === 'super_admin' ? 'Super Admin' : 'Administrator'}
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                {user?.role === 'super_admin' ? 'Super User' : 'Standard'}
               </p>
             </div>
-            <div className="w-[36px] h-[36px] bg-[#1B3A6B] rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm group-hover:scale-105 transition-transform">
+            <div className="w-[32px] h-[32px] bg-black rounded flex items-center justify-center text-white text-[10px] font-black shadow-md">
                {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'AD'}
             </div>
-            <ChevronDown size={14} className="text-slate-400 transition-transform" />
+            <ChevronDown size={12} className="text-black" />
           </div>
 
           {showProfileMenu && (

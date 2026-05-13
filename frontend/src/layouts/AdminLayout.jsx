@@ -24,14 +24,14 @@ const AdminLayout = () => {
     ];
 
     return (
-        <div className="flex h-screen bg-[#f8fafc]">
-            {/* Sidebar */}
-            <aside className="w-64 bg-slate-900 text-white flex flex-col">
+        <div className="flex h-screen bg-white">
+            {/* Sidebar - Solid Black */}
+            <aside className="w-64 bg-black text-white flex flex-col">
                 <div className="p-6 flex items-center gap-3">
-                    <div className="p-2 bg-indigo-500 rounded-lg">
-                        <ShieldCheck size={24} />
+                    <div className="p-2 bg-slate-800 rounded-lg">
+                        <ShieldCheck size={24} className="text-white" />
                     </div>
-                    <span className="text-xl font-bold tracking-tight">ERP Admin</span>
+                    <span className="text-xl font-bold tracking-tight uppercase">Admin</span>
                 </div>
 
                 <nav className="flex-1 px-4 py-4 space-y-1">
@@ -39,10 +39,10 @@ const AdminLayout = () => {
                         <Link
                             key={item.path}
                             to={item.path}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                            className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
                                 location.pathname === item.path
-                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                                    ? 'bg-white text-black font-bold'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
                             }`}
                         >
                             <item.icon size={20} />
@@ -73,7 +73,7 @@ const AdminLayout = () => {
                             <p className="text-sm font-semibold text-slate-900">System Admin</p>
                             <p className="text-xs text-slate-500">Super Admin Access</p>
                         </div>
-                        <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
+                        <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-black font-bold border border-slate-200">
                             SA
                         </div>
                     </div>

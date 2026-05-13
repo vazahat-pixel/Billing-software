@@ -23,3 +23,13 @@ exports.login = async (req, res) => {
 exports.getMe = async (req, res) => {
     res.status(200).json({ user: req.user });
 };
+
+exports.forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        // In a real app, you would send an email here
+        res.status(200).json({ message: 'If an account exists, instructions have been sent.' });
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+};

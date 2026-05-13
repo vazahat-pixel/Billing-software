@@ -40,10 +40,10 @@ const Sidebar = () => {
   return (
     <aside className="sidebar-compact">
       <div className="h-12 px-5 flex items-center gap-2.5 border-b border-slate-50 shrink-0">
-        <div className="w-6 h-6 bg-emerald-600 rounded flex items-center justify-center text-white font-bold text-xs shadow-sm">
+        <div className="w-6 h-6 bg-black rounded flex items-center justify-center text-white font-black text-[10px] shadow-md">
           S
         </div>
-        <span className="text-[15px] font-bold text-slate-800 tracking-tight">Stockly</span>
+        <span className="text-[14px] font-black text-black uppercase tracking-widest">Stockly</span>
       </div>
 
       <div className="flex-1 py-4 space-y-0.5 overflow-y-auto no-scrollbar">
