@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
 const User = require('./models/User');
 const Plan = require('./models/Plan');
+const path = require('path');
 const dotenv = require('dotenv');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const seedAdmin = async () => {
     try {
@@ -53,6 +54,22 @@ const seedAdmin = async () => {
                 role: 'super_admin'
             });
             console.log('✅ Super Admin created successfully');
+        }
+
+        // Create default normal tenant user if they don't exist
+        const userEmail = 'user@textileerp.com';
+        const existingUser = await User.findOne({ email: userEmail });
+        if (existingUser) {
+            console.log('ℹ️ Default Test User already exists');
+        } else {
+            const authService = require('./services/auth.service');
+            await authService.register(
+                'Test User',
+                userEmail,
+                'User@123',
+                'Acme Textile Mills'
+            );
+            console.log('✅ Default Test User and Company created successfully');
         }
 
         process.exit(0);
