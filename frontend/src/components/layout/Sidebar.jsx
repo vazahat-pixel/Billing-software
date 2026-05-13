@@ -11,67 +11,74 @@ import {
   Database,
   LogOut,
   Book,
-  ShieldCheck
+  ShieldCheck,
+  Truck,
+  Users,
+  CreditCard,
+  Lock,
+  Bell
 } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
 import useStore from '../../store/useStore';
 
 const Sidebar = () => {
-  const { plan, role } = useStore();
-
-  const menuItems = [
-    { name: 'Dashboard', icon: LayoutDashboard, path: '/', feature: null },
-    { name: 'Masters', icon: Database, path: '/masters', feature: null },
-    { name: 'Purchase', icon: ShoppingCart, path: '/purchase', feature: 'purchase' },
-    { name: 'Inventory', icon: Warehouse, path: '/inventory', feature: 'inventory' },
-    { name: 'Job Work', icon: Hammer, path: '/jobwork', feature: 'jobWork' },
-    { name: 'Sales', icon: TrendingUp, path: '/sales', feature: 'purchase' }, // Sales usually tied to purchase/inventory
-    { name: 'Accounting', icon: Book, path: '/accounting', feature: 'gst' },
-    { name: 'GST', icon: ShieldCheck, path: '/gst', feature: 'gst' },
-    { name: 'Reports', icon: FileText, path: '/reports', feature: 'reports' },
-  ];
-
-  // Show all items as per user request
-  const visibleItems = menuItems;
-
   const { logout } = useStore();
 
+  const menuItems = [
+    { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
+    { name: 'Tapals', icon: ShoppingCart, path: '/purchase' },
+    { name: 'Harvest', icon: Hammer, path: '/jobwork' },
+    { name: 'Inventory', icon: Warehouse, path: '/inventory' },
+    { name: 'Logistics', icon: Truck, path: '/logistics' },
+    { name: 'Drivers', icon: Users, path: '/drivers' },
+    { name: 'Vehicle Fleet', icon: Warehouse, path: '/fleet' },
+    { name: 'Outlets', icon: Warehouse, path: '/outlets' },
+    { name: 'Finance', icon: CreditCard, path: '/accounting' },
+    { name: 'Billing', icon: FileText, path: '/billing' },
+    { name: 'Access Control', icon: Lock, path: '/access' },
+    { name: 'Settings', icon: Settings, path: '/settings' },
+  ];
+
   return (
-    <aside className="sidebar-compact">
-      <div className="h-12 px-5 flex items-center gap-2.5 border-b border-slate-50 shrink-0">
-        <div className="w-6 h-6 bg-black rounded flex items-center justify-center text-white font-black text-[10px] shadow-md">
-          S
-        </div>
-        <span className="text-[14px] font-black text-black uppercase tracking-widest">Stockly</span>
+    <aside className="w-64 bg-white border-r border-slate-100 flex flex-col h-screen sticky top-0 overflow-hidden">
+      <div className="p-8 mb-4">
+        <h1 className="text-2xl font-black italic tracking-tighter text-black">OGUN<span className="text-slate-300">.</span></h1>
       </div>
 
-      <div className="flex-1 py-4 space-y-0.5 overflow-y-auto no-scrollbar">
-        <p className="px-5 text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Main</p>
-        {visibleItems.map((item) => (
+      <nav className="flex-1 px-4 space-y-1 overflow-y-auto no-scrollbar">
+        {menuItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) => 
-              twMerge('nav-item-compact', isActive && 'active')
+              twMerge(
+                'flex items-center gap-4 px-4 py-3 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all duration-200',
+                isActive 
+                  ? 'bg-black text-white shadow-lg' 
+                  : 'text-slate-400 hover:bg-slate-50 hover:text-black'
+              )
             }
           >
-            <item.icon size={16} />
+            <item.icon size={18} />
             {item.name}
           </NavLink>
         ))}
-      </div>
+      </nav>
 
-      <div className="p-3 border-t border-slate-50 shrink-0">
-        <NavLink to="/settings" className="nav-item-compact">
-          <Settings size={16} />
-          Settings
+      <div className="p-4 border-t border-slate-50 space-y-1">
+        <NavLink
+          to="/notifications"
+          className="flex items-center gap-4 px-4 py-3 rounded-lg text-[11px] font-bold uppercase tracking-widest text-slate-400 hover:bg-slate-50 hover:text-black transition-all"
+        >
+          <Bell size={18} />
+          Notifications
         </NavLink>
         <button 
           onClick={logout}
-          className="nav-item-compact w-full text-left text-rose-500 hover:bg-rose-50 hover:text-rose-600 mt-1"
+          className="flex items-center gap-4 px-4 py-3 rounded-lg text-[11px] font-bold uppercase tracking-widest text-rose-500 hover:bg-rose-50 transition-all w-full text-left"
         >
-          <LogOut size={16} />
+          <LogOut size={18} />
           Logout
         </button>
       </div>

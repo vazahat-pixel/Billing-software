@@ -134,42 +134,26 @@ const Dashboard = () => {
    };
 
    const desktopIcons = [
-      { id: 1, label: 'Sales Billing', icon: faFileInvoiceDollar, color: 'from-slate-800 to-black', key: 'sales' },
-      { id: 2, label: 'Purchase', icon: faCartFlatbed, color: 'from-slate-700 to-slate-900', key: 'purchase' },
-      { id: 3, label: 'Bank Receipt', icon: faMoneyCheckDollar, color: 'from-slate-800 to-black', key: 'receipt' },
-      { id: 4, label: 'Bank Payment', icon: faHandHoldingDollar, color: 'from-slate-700 to-slate-900', key: 'payment' },
-      { id: 5, label: 'Mill Issue', icon: faTruckArrowRight, color: 'from-slate-800 to-black', key: 'millIssue' },
-      { id: 6, label: 'Mill Receive', icon: faWarehouse, color: 'from-slate-700 to-slate-900', key: 'millRec' },
-      { id: 7, label: 'Job Issue', icon: faScrewdriverWrench, color: 'from-slate-800 to-black', key: 'jobIssue' },
-      { id: 8, label: 'Job Receive', icon: faClipboardCheck, color: 'from-slate-700 to-slate-900', key: 'jobRec' },
-      { id: 9, label: 'Visit Log', icon: faHandshake, color: 'from-slate-800 to-black', key: 'visit' },
-      { id: 10, label: 'Outstanding', icon: faChartPie, color: 'from-slate-700 to-slate-900', key: 'outstanding' },
-   ];
-
-   const gstIcons = [
-      { id: 1, label: '3B Monthly', icon: faIndianRupeeSign, color: 'from-slate-800 to-black', key: 'gst3bMonthly' },
-      { id: 2, label: 'GSTR-1', icon: faBagShopping, color: 'from-slate-700 to-slate-900', key: 'gstr1' },
-      { id: 3, label: '2B Matching', icon: faScaleBalanced, color: 'from-slate-800 to-black', key: 'gst2bMatching' },
-      { id: 4, label: '3B Detail', icon: faChartColumn, color: 'from-slate-700 to-slate-900', key: 'gst3bDetail' },
-      { id: 5, label: 'R-1 Errorchek', icon: faTriangleExclamation, color: 'from-slate-800 to-black', key: 'gstr1Errorchek' }
+      { id: 1, label: 'Sales Billing', icon: faFileInvoiceDollar, key: 'sales' },
+      { id: 2, label: 'Purchase', icon: faCartFlatbed, key: 'purchase' },
+      { id: 3, label: 'Bank Receipt', icon: faMoneyCheckDollar, key: 'receipt' },
+      { id: 4, label: 'Bank Payment', icon: faHandHoldingDollar, key: 'payment' },
+      { id: 5, label: 'Mill Issue', icon: faTruckArrowRight, key: 'millIssue' },
+      { id: 6, label: 'Mill Receive', icon: faWarehouse, key: 'millRec' },
+      { id: 7, label: 'Job Issue', icon: faScrewdriverWrench, key: 'jobIssue' },
+      { id: 8, label: 'Job Receive', icon: faClipboardCheck, key: 'jobRec' },
+      { id: 9, label: 'Visit Log', icon: faHandshake, key: 'visit' },
+      { id: 10, label: 'Outstanding', icon: faChartPie, key: 'outstanding' },
    ];
 
    return (
-      <div className={`fixed inset-0 overflow-hidden flex flex-col select-none transition-colors duration-500 ${isDark ? 'bg-slate-950 text-white' : 'bg-[#f8fafc] text-black'}`}>
+      <div className={`fixed inset-0 overflow-hidden flex flex-col select-none transition-colors duration-500 bg-[#FDFCF9] ${isDark ? 'text-white' : 'text-black'}`}>
 
-         {/* Minimal Background */}
-         <div className="absolute inset-0 opacity-10">
-            <div className={`absolute top-0 left-0 w-full h-full ${isDark ? 'bg-slate-900' : 'bg-slate-100'}`} />
-         </div>
-
-         {/* Top Header - High Contrast Black */}
-         <div className={`flex items-center justify-between h-9 text-[10px] font-bold border-b relative z-[100] shadow-md transition-colors duration-500 ${isDark ? 'bg-black border-white/10 text-white' : 'bg-black border-slate-800 text-white'}`}>
+         {/* Top Header - Monochromatic Modern */}
+         <div className={`flex items-center justify-between h-10 text-[10px] font-bold border-b relative z-[100] shadow-sm bg-white border-slate-100`}>
             <div className="flex h-full">
                {Object.keys(menuData).map(menu => (
-                  <div
-                     key={menu}
-                     className="relative h-full"
-                  >
+                  <div key={menu} className="relative h-full">
                      <button
                         onClick={() => {
                            if (menu === 'Ledger') {
@@ -178,7 +162,7 @@ const Dashboard = () => {
                               setActiveMenu(activeMenu === menu ? null : menu);
                            }
                         }}
-                        className={`px-4 h-full border-r border-white/10 hover:bg-white/10 transition-all uppercase tracking-tight ${activeMenu === menu ? 'bg-white/20' : ''}`}
+                        className={`px-4 h-full border-r border-slate-100 hover:bg-slate-50 transition-all uppercase tracking-widest text-slate-500 hover:text-black ${activeMenu === menu ? 'bg-slate-100 text-black' : ''}`}
                      >
                         {menu}
                      </button>
@@ -188,167 +172,143 @@ const Dashboard = () => {
                            <>
                               <div className="fixed inset-0 z-[105]" onClick={() => setActiveMenu(null)}></div>
                               <motion.div
-                                 initial={{ opacity: 0, y: -2 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -2 }}
-                              className={`absolute top-8 left-0 w-56 border shadow-2xl py-1 z-[110] ${isDark ? 'bg-slate-900 border-white/10' : 'bg-black border-white/10'}`}
-                           >
-                              {menuData[menu].map((item, idx) => {
-                                 const label = typeof item === 'object' ? item.label : item;
-                                 const key = typeof item === 'object' ? item.key : null;
-                                 const color = typeof item === 'object' ? item.color : 'text-white/90';
+                                 initial={{ opacity: 0, y: 5 }}
+                                 animate={{ opacity: 1, y: 0 }}
+                                 exit={{ opacity: 0, y: 5 }}
+                                 className="absolute top-10 left-0 w-64 bg-white border border-slate-100 shadow-2xl rounded-xl py-2 z-[110]"
+                              >
+                                 {menuData[menu].map((item, idx) => {
+                                    const label = typeof item === 'object' ? item.label : item;
+                                    const key = typeof item === 'object' ? item.key : null;
+                                    const color = typeof item === 'object' ? item.color : 'text-slate-700';
 
-                                 return (
-                                    <button
-                                       key={idx}
-                                       onClick={() => {
-                                          if (key) toggleModal(key, true);
-                                          setActiveMenu(null);
-                                       }}
-                                       className={`w-full text-left px-3 py-1.5 text-[10px] hover:bg-white/20 transition-colors flex justify-between items-center group ${color}`}
-                                    >
-                                       <span>{label}</span>
-                                       {['Process', 'Job Work', 'Import', 'Reports'].some(s => label.includes(s)) &&
-                                          <FontAwesomeIcon icon={faChevronRight} className="text-[9px] opacity-40 group-hover:opacity-100" />
-                                       }
-                                    </button>
-                                 );
-                              })}
-                           </motion.div>
-                        </>
-                     )}
+                                    return (
+                                       <button
+                                          key={idx}
+                                          onClick={() => {
+                                             if (key) toggleModal(key, true);
+                                             setActiveMenu(null);
+                                          }}
+                                          className={`w-full text-left px-4 py-2 text-[10px] hover:bg-slate-50 transition-colors flex justify-between items-center group font-bold uppercase tracking-widest ${color} hover:text-black`}
+                                       >
+                                          <span>{label}</span>
+                                          {['Process', 'Job Work', 'Import', 'Reports'].some(s => label.includes(s)) &&
+                                             <FontAwesomeIcon icon={faChevronRight} className="text-[9px] opacity-20 group-hover:opacity-100" />
+                                          }
+                                       </button>
+                                    );
+                                 })}
+                              </motion.div>
+                           </>
+                        )}
                      </AnimatePresence>
                   </div>
                ))}
-               <button className="px-4 border-r border-white/10 hover:bg-white/10 transition-colors uppercase tracking-tight">
-                  Exit
-               </button>
-               <button className="px-4 border-r border-white/10 hover:bg-white/10 transition-colors uppercase tracking-tight text-yellow-300 flex items-center gap-1.5">
-                  <FontAwesomeIcon icon={faPhone} className="animate-bounce" /> Support
-               </button>
             </div>
 
-            <div className="flex items-center h-full pr-4 gap-6">
-               {/* Theme Toggle - Compact */}
-               <button
-                  onClick={toggleTheme}
-                  className={`p-1 px-2.5 rounded-full flex items-center gap-2 transition-all border ${isDark ? 'bg-slate-800 border-white/10 text-yellow-400 hover:bg-slate-700' : 'bg-white/10 border-white/20 text-yellow-300 hover:bg-white/20'}`}
-               >
-                  <FontAwesomeIcon icon={isDark ? faSun : faMoon} className="text-[9px]" />
-                  <span className="text-[9px] uppercase font-black">{isDark ? 'Light' : 'Dark'}</span>
-               </button>
-
-               <div className="text-yellow-300 font-black flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 bg-yellow-300 rounded-full animate-pulse shadow-[0_0_6px_rgba(253,224,71,1)]" />
-                  Id: 5630
+            <div className="flex items-center h-full pr-6 gap-8">
+               <div className="text-black font-black flex items-center gap-2">
+                  <div className="w-2 h-2 bg-black rounded-full animate-pulse" />
+                  ID: 5630
                </div>
-               <div className="flex items-center gap-4 text-white/70 text-[9px]">
-                  <button className="hover:text-white transition-colors flex items-center gap-1.5"><FontAwesomeIcon icon={faFilePen} /> Notepad</button>
-                  <button className="hover:text-white transition-colors flex items-center gap-1.5"><FontAwesomeIcon icon={faDisplay} /> UltraViewer</button>
-                  <button className="hover:text-white transition-colors flex items-center gap-1.5"><FontAwesomeIcon icon={faSync} /> Auto Update</button>
+               <div className="flex items-center gap-6 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                  <button className="hover:text-black transition-colors flex items-center gap-2"><FontAwesomeIcon icon={faFilePen} /> Notepad</button>
+                  <button className="hover:text-black transition-colors flex items-center gap-2"><FontAwesomeIcon icon={faDisplay} /> Remote</button>
+                  <button className="hover:text-black transition-colors flex items-center gap-2" onClick={toggleTheme}><FontAwesomeIcon icon={isDark ? faSun : faMoon} /> {isDark ? 'Light' : 'Dark'}</button>
                </div>
             </div>
          </div>
 
-         {/* Main Desktop Area - Analytics Command Center */}
-         <div className="flex-1 relative overflow-y-auto p-6 z-10 space-y-6 no-scrollbar">
-            {/* Top Header & Branding Panel */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-black text-white p-8 border-none shadow-2xl">
-                <div>
-                   <h1 className="text-4xl font-black tracking-tighter uppercase leading-none">MAHAVEER IMPEX</h1>
-                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em] mt-3 flex items-center gap-2">
-                      <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                      ERP Command Center • Professional Edition 5.6.30
-                   </p>
-                </div>
+         {/* Main Content Area */}
+         <div className="flex-1 overflow-y-auto p-10 space-y-10 no-scrollbar">
+            {/* Branding Panel */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+               <div>
+                  <h1 className="text-5xl font-black tracking-tight uppercase leading-none italic">MAHAVEER IMPEX<span className="text-slate-200">.</span></h1>
+                  <p className="text-slate-400 text-[11px] font-bold uppercase tracking-[0.3em] mt-3">Professional ERP Command Center • v5.6.30</p>
+               </div>
                <div className="flex items-center gap-4">
-                  <button onClick={() => toggleModal('sales', true)} className="px-8 py-3 bg-white text-black font-black text-[11px] uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center gap-2">
-                     <FontAwesomeIcon icon={faFileInvoiceDollar} />
-                     New Sales Bill
+                  <button onClick={() => toggleModal('sales', true)} className="px-8 py-3.5 bg-black text-white font-bold text-[11px] uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-all shadow-lg flex items-center gap-3">
+                     <FontAwesomeIcon icon={faFileInvoiceDollar} /> New Invoice
                   </button>
-                  <button onClick={() => toggleModal('purchase', true)} className="px-8 py-3 bg-transparent border-2 border-white/20 text-white font-black text-[11px] uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2">
-                     <FontAwesomeIcon icon={faCartFlatbed} />
-                     New Purchase
+                  <button onClick={() => toggleModal('purchase', true)} className="px-8 py-3.5 bg-white border border-slate-200 text-black font-bold text-[11px] uppercase tracking-widest rounded-xl hover:bg-slate-50 transition-all shadow-sm flex items-center gap-3">
+                     <FontAwesomeIcon icon={faCartFlatbed} /> New Purchase
                   </button>
                </div>
             </div>
 
-            {/* Grid Modules Shortcuts — MOVED ABOVE KPIs */}
-            <div className="space-y-4">
-               <div className="flex items-center gap-3">
-                  <div className="h-[1px] flex-1 bg-slate-200" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-black">Core Modules Shortcuts</span>
-                  <div className="h-[1px] flex-1 bg-slate-200" />
-               </div>
-               <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-4">
-                  {desktopIcons.map((icon, idx) => (
-                     <div
-                        key={icon.id}
-                        onClick={() => toggleModal(icon.key, true)}
-                        className="group flex flex-col items-center cursor-pointer bg-white border-2 border-slate-100 p-5 hover:border-black transition-all duration-300"
-                     >
-                        <div className={`w-12 h-12 bg-black rounded-none flex items-center justify-center text-white mb-3 transition-all group-hover:bg-slate-800`}>
-                           <FontAwesomeIcon icon={icon.icon} className="text-sm" />
-                        </div>
-                        <p className="text-[9px] font-black uppercase tracking-widest text-center text-black leading-tight">
-                           {icon.label}
-                        </p>
-                     </div>
-                  ))}
-               </div>
-            </div>
-
-            {/* 4 KPI Metric Cards Grid */}
+            {/* Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                {[
-                  { label: "Today's Sales", val: "₹ 1,84,500", icon: faIndianRupeeSign },
-                  { label: "Pending Receivables", val: "₹ 12,40,200", icon: faScaleBalanced },
-                  { label: "Open Job Orders", val: "14 Active", icon: faWarehouse },
-                  { label: "GST Liability", val: "₹ 45,300", icon: faChartColumn }
+                  { label: "Today's Revenue", val: "₹ 1,84,500", icon: faIndianRupeeSign, color: "text-green-500" },
+                  { label: "Receivables", val: "₹ 12,40,200", icon: faScaleBalanced, color: "text-blue-500" },
+                  { label: "Active Jobs", val: "14 Orders", icon: faWarehouse, color: "text-amber-500" },
+                  { label: "Compliance", val: "₹ 45,300", icon: faChartColumn, color: "text-cyan-500" }
                ].map((kpi, idx) => (
-                  <div key={idx} className="bg-white border-2 border-black p-6 flex flex-col justify-between h-32 relative overflow-hidden group">
-                     <div className="flex justify-between items-start z-10">
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{kpi.label}</span>
-                        <FontAwesomeIcon icon={kpi.icon} className="text-black text-xs" />
+                  <div key={idx} className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm group hover:shadow-md transition-all">
+                     <div className="flex justify-between items-start mb-6">
+                        <div className={`p-4 bg-slate-50 rounded-2xl group-hover:bg-black group-hover:text-white transition-all`}>
+                           <FontAwesomeIcon icon={kpi.icon} className="text-lg" />
+                        </div>
+                        <span className={`text-[10px] font-bold uppercase tracking-widest ${kpi.color}`}>{kpi.label.split(' ')[0]}</span>
                      </div>
-                     <div className="z-10">
-                        <p className="text-3xl font-black text-black tracking-tighter">{kpi.val}</p>
-                     </div>
-                     <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-slate-50 rounded-full group-hover:scale-150 transition-transform duration-700 opacity-50" />
+                     <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{kpi.label}</p>
+                     <h3 className="text-3xl font-black text-black mt-1 tracking-tight">{kpi.val}</h3>
                   </div>
                ))}
             </div>
 
-            {/* Second Row: Recent Invoices (60%) + Stock Alerts (40%) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-               {/* Recent Invoices (60%) */}
-               <div className="lg:col-span-7 bg-white border-2 border-black overflow-hidden flex flex-col">
-                  <div className="p-6 bg-black flex justify-between items-center">
-                     <h3 className="text-[10px] font-black text-white uppercase tracking-[0.3em]">Recent Transactions</h3>
-                     <button onClick={() => toggleModal('outstanding', true)} className="text-white border-b border-white/30 hover:border-white text-[9px] font-black uppercase tracking-widest transition-all">View All Ledger</button>
+            {/* Shortcut Grid */}
+            <div className="space-y-6">
+               <div className="flex items-center gap-4">
+                  <h3 className="text-[11px] font-bold text-black uppercase tracking-[0.4em] whitespace-nowrap">Rapid Access</h3>
+                  <div className="h-[1px] flex-1 bg-slate-100" />
+               </div>
+               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-4">
+                  {desktopIcons.map((icon) => (
+                     <button
+                        key={icon.id}
+                        onClick={() => toggleModal(icon.key, true)}
+                        className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm hover:shadow-md hover:border-black transition-all flex flex-col items-center gap-3 group"
+                     >
+                        <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-black group-hover:text-white transition-all">
+                           <FontAwesomeIcon icon={icon.icon} />
+                        </div>
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-center text-slate-400 group-hover:text-black">{icon.label}</span>
+                     </button>
+                  ))}
+               </div>
+            </div>
+
+            {/* Bottom Row: Activity + Alerts */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+               <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+                  <div className="p-8 border-b border-slate-50 flex justify-between items-center">
+                     <h3 className="text-[12px] font-bold text-black uppercase tracking-widest">Recent Activity</h3>
+                     <button className="text-[10px] font-bold text-slate-400 hover:text-black uppercase tracking-widest transition-all">View Analytics</button>
                   </div>
-                  <div className="overflow-x-auto">
-                     <table className="w-full text-left text-xs border-collapse">
+                  <div className="p-4 overflow-x-auto">
+                     <table className="w-full text-left">
                         <thead>
-                           <tr className="bg-slate-50 border-b-2 border-black h-12">
-                              <th className="px-6 font-black text-black uppercase tracking-widest text-[9px]">Invoice Ref</th>
-                              <th className="px-6 font-black text-black uppercase tracking-widest text-[9px]">Entity</th>
-                              <th className="px-6 font-black text-black uppercase tracking-widest text-[9px] text-right">Value</th>
-                              <th className="px-6 font-black text-black uppercase tracking-widest text-[9px] text-center">Status</th>
+                           <tr className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                              <th className="px-6 py-4">Reference</th>
+                              <th className="px-6 py-4">Counterparty</th>
+                              <th className="px-6 py-4 text-right">Amount</th>
+                              <th className="px-6 py-4 text-center">Protocol</th>
                            </tr>
                         </thead>
-                        <tbody className="divide-y-2 divide-slate-100">
+                        <tbody className="divide-y divide-slate-50">
                            {[
-                              { ref: 'INV-2026-004', entity: 'Ankit Fabrics Pvt Ltd', val: '₹ 42,500.00', status: 'PAID' },
-                              { ref: 'INV-2026-003', entity: 'Balaji Creation', val: '₹ 88,000.00', status: 'UNPAID' },
-                              { ref: 'INV-2026-002', entity: 'Vardhman Textiles', val: '₹ 1,18,400.00', status: 'UNPAID' },
+                              { ref: 'INV-2026-004', entity: 'Ankit Fabrics Pvt Ltd', val: '₹ 42,500.00', status: 'SETTLED' },
+                              { ref: 'INV-2026-003', entity: 'Balaji Creation', val: '₹ 88,000.00', status: 'PENDING' },
+                              { ref: 'INV-2026-002', entity: 'Vardhman Textiles', val: '₹ 1,18,400.00', status: 'PENDING' },
                            ].map((inv, idx) => (
-                              <tr key={idx} className="h-14 hover:bg-slate-50 transition-colors">
-                                 <td className="px-6 font-black text-black text-[10px] tracking-widest">{inv.ref}</td>
-                                 <td className="px-6 font-bold text-slate-600 uppercase text-[10px]">{inv.entity}</td>
-                                 <td className="px-6 text-right font-black text-black text-[11px]">{inv.val}</td>
-                                 <td className="px-6 text-center">
-                                    <span className={`px-3 py-1 text-[9px] font-black uppercase tracking-widest border-2 ${inv.status === 'PAID' ? 'bg-black text-white border-black' : 'border-slate-200 text-slate-400'}`}>
+                              <tr key={idx} className="hover:bg-slate-50/50 transition-all group">
+                                 <td className="px-6 py-5 font-bold text-black text-[11px] tracking-tight">{inv.ref}</td>
+                                 <td className="px-6 py-5 text-[10px] font-bold text-slate-400 uppercase">{inv.entity}</td>
+                                 <td className="px-6 py-5 text-right font-black text-black text-[11px]">{inv.val}</td>
+                                 <td className="px-6 py-5 text-center">
+                                    <span className={`px-3 py-1 text-[9px] font-bold uppercase rounded-lg ${inv.status === 'SETTLED' ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-400'}`}>
                                        {inv.status}
                                     </span>
                                  </td>
@@ -359,58 +319,47 @@ const Dashboard = () => {
                   </div>
                </div>
 
-               {/* Critical Stock Alerts (40%) */}
-               <div className="lg:col-span-5 bg-white border-2 border-black overflow-hidden flex flex-col">
-                  <div className="p-6 bg-black flex justify-between items-center">
-                     <h3 className="text-[10px] font-black text-white uppercase tracking-[0.3em]">Inventory Alerts</h3>
-                     <span className="px-3 py-1 bg-white text-black text-[9px] font-black uppercase tracking-widest">2 CRITICAL</span>
+               <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-100 shadow-sm p-8 flex flex-col">
+                  <div className="flex justify-between items-center mb-8">
+                     <h3 className="text-[12px] font-bold text-black uppercase tracking-widest">Stock Alerts</h3>
+                     <span className="px-3 py-1 bg-red-50 text-red-600 text-[9px] font-bold uppercase rounded-lg">2 Priority</span>
                   </div>
-                  <div className="p-8 space-y-6 flex-1 flex flex-col justify-center">
-                     <div className="flex items-center justify-between border-b-2 border-slate-100 pb-5">
+                  <div className="space-y-6 flex-1">
+                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
                         <div className="flex items-center gap-4">
-                           <span className="w-14 h-14 bg-slate-100 flex items-center justify-center font-black text-xs">45M</span>
+                           <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center font-black text-[11px] shadow-sm">45M</div>
                            <div>
-                              <p className="text-[10px] font-black text-black uppercase tracking-widest">Lycra Cotton 180GSM</p>
-                              <p className="text-[9px] font-black text-slate-400 uppercase mt-1">Below Safe Limit (200M)</p>
+                              <p className="text-[11px] font-bold text-black uppercase tracking-tight">Lycra Cotton 180</p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Refill Recommended</p>
                            </div>
                         </div>
-                        <button onClick={() => toggleModal('purchase', true)} className="px-6 py-2 bg-black text-white text-[9px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">
-                           RESTOCK
-                        </button>
+                        <button className="px-5 py-2 bg-black text-white text-[9px] font-bold rounded-lg hover:bg-slate-800 transition-all">ORDER</button>
                      </div>
-                     <div className="flex items-center justify-between">
+                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
                         <div className="flex items-center gap-4">
-                           <span className="w-14 h-14 bg-slate-100 flex items-center justify-center font-black text-xs">12M</span>
+                           <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center font-black text-[11px] shadow-sm">12M</div>
                            <div>
-                              <p className="text-[10px] font-black text-black uppercase tracking-widest">Premium Knit</p>
-                              <p className="text-[9px] font-black text-slate-400 uppercase mt-1">Below Safe Limit (150M)</p>
+                              <p className="text-[11px] font-bold text-black uppercase tracking-tight">Premium Knit Blue</p>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Critical Low</p>
                            </div>
                         </div>
-                        <button onClick={() => toggleModal('purchase', true)} className="px-6 py-2 bg-black text-white text-[9px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">
-                           RESTOCK
-                        </button>
+                        <button className="px-5 py-2 bg-black text-white text-[9px] font-bold rounded-lg hover:bg-slate-800 transition-all">ORDER</button>
                      </div>
                   </div>
                </div>
             </div>
          </div>
 
-         {/* Status Bar - Compact Height */}
-         <div className={`text-[9px] font-black px-6 py-3 flex justify-between items-center border-t relative z-50 transition-colors duration-500 bg-black text-white`}>
-            <div className="flex gap-10 uppercase tracking-[0.2em] opacity-60">
-               <span className="hover:text-white transition-colors cursor-pointer">Ctrl+L : Ledger</span>
-               <span className="hover:text-white transition-colors cursor-pointer">F4 : Master Search</span>
-               <span className="hover:text-white transition-colors cursor-pointer">F12 : Quick Save</span>
+         {/* Compact Status Bar */}
+         <div className="h-10 bg-white border-t border-slate-100 flex items-center justify-between px-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className="flex gap-10">
+               <span className="hover:text-black transition-colors cursor-pointer">Ctrl+L : Ledger</span>
+               <span className="hover:text-black transition-colors cursor-pointer">F4 : Master</span>
+               <span className="hover:text-black transition-colors cursor-pointer">F12 : Save</span>
             </div>
-            <div className="flex items-center gap-10">
-               <div className="flex items-center gap-2"><FontAwesomeIcon icon={faBuilding} className="text-white" /> <span className="opacity-40 uppercase">Org:</span> <span className="font-black uppercase tracking-widest">MAHAVEER IMPEX</span></div>
-               <div className="flex items-center gap-2 opacity-60 uppercase tracking-widest"><FontAwesomeIcon icon={faCircleQuestion} /> Help Desk</div>
-               <button
-                  onClick={() => window.close()}
-                  className="px-8 py-1.5 bg-white text-black font-black uppercase tracking-[0.2em] hover:bg-slate-200 transition-all"
-               >
-                  Shutdown ERP
-               </button>
+            <div className="flex items-center gap-8">
+               <span className="flex items-center gap-2"><FontAwesomeIcon icon={faBuilding} /> MAHAVEER IMPEX</span>
+               <button onClick={() => window.close()} className="px-6 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all">Exit ERP</button>
             </div>
          </div>
 
