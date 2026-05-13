@@ -55,6 +55,22 @@ const seedAdmin = async () => {
             console.log('✅ Super Admin created successfully');
         }
 
+        // Create default normal tenant user if they don't exist
+        const userEmail = 'user@textileerp.com';
+        const existingUser = await User.findOne({ email: userEmail });
+        if (existingUser) {
+            console.log('ℹ️ Default Test User already exists');
+        } else {
+            const authService = require('./services/auth.service');
+            await authService.register(
+                'Test User',
+                userEmail,
+                'User@123',
+                'Acme Textile Mills'
+            );
+            console.log('✅ Default Test User and Company created successfully');
+        }
+
         process.exit(0);
     } catch (err) {
         console.error('❌ Seeding failed:', err);
