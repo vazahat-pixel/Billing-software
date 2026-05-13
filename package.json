@@ -1,0 +1,17 @@
+{
+  "name": "billing-software-saas",
+  "version": "1.0.0",
+  "description": "Multi-module Billing Software SaaS",
+  "scripts": {
+    "start": "concurrently \"npm run start --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "install-all": "npm install && npm install --prefix frontend && npm install --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "workspaces": [
+    "frontend",
+    "backend"
+  ]
+}
