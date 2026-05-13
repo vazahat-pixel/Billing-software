@@ -44,21 +44,28 @@ const VisitLogModal = ({ isOpen, onClose, onSuccess }) => {
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="New Customer Visit Entry" className="max-w-3xl bg-white">
-            <div className="p-0">
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-2 gap-6">
+        <Modal isOpen={isOpen} onClose={onClose} title="Field Intelligence Log" className="max-w-4xl bg-white p-0 overflow-hidden border-none shadow-2xl">
+            <div className="flex flex-col h-full">
+                <div className="p-10 bg-black text-white flex justify-between items-center">
+                    <div>
+                        <h2 className="text-2xl font-black uppercase tracking-tighter italic">Visit Registry<span className="text-slate-500">.</span></h2>
+                        <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.3em] mt-1">CRM Intelligence • Field Observation</p>
+                    </div>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-10 space-y-10 overflow-y-auto no-scrollbar">
+                    <div className="grid grid-cols-2 gap-10">
                         {/* Party Selection */}
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-black tracking-widest flex items-center gap-2">
-                                <User size={12} className="text-black" /> Customer / Party *
+                            <label className="text-[10px] font-black uppercase text-black tracking-[0.2em] flex items-center gap-2">
+                                <User size={12} /> Entity Designation
                             </label>
-                            <ERPSelect 
-                                className="w-full h-11 text-sm font-bold border-2 border-slate-100 focus:border-black rounded-none transition-all"
+                            <ERPSelect
+                                className="w-full h-12 text-[11px] font-black border-2 border-slate-100 focus:border-black rounded-xl transition-all uppercase tracking-widest bg-slate-50 focus:bg-white"
                                 value={formData.partyId}
-                                onChange={(e) => setFormData({...formData, partyId: e.target.value})}
+                                onChange={(e) => setFormData({ ...formData, partyId: e.target.value })}
                                 options={[
-                                    { value: '', label: '-- Select Party --' },
+                                    { value: '', label: '-- SELECT ENTITY --' },
                                     ...parties.map(p => ({ value: p._id, label: p.name }))
                                 ]}
                                 required
@@ -67,102 +74,84 @@ const VisitLogModal = ({ isOpen, onClose, onSuccess }) => {
 
                         {/* Visit Date */}
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-black tracking-widest flex items-center gap-2">
-                                <Calendar size={12} className="text-black" /> Visit Date *
+                            <label className="text-[10px] font-black uppercase text-black tracking-[0.2em] flex items-center gap-2">
+                                <Calendar size={12} /> Registry Date
                             </label>
-                            <ERPInput 
+                            <ERPInput
                                 type="date"
-                                className="w-full h-11 text-sm font-bold border-2 border-slate-100 focus:border-black rounded-none transition-all"
+                                className="w-full h-12 text-[11px] font-black border-2 border-slate-100 focus:border-black rounded-xl transition-all uppercase tracking-widest bg-slate-50 focus:bg-white"
                                 value={formData.visitDate}
-                                onChange={(e) => setFormData({...formData, visitDate: e.target.value})}
+                                onChange={(e) => setFormData({ ...formData, visitDate: e.target.value })}
                                 required
                             />
                         </div>
 
                         {/* Purpose */}
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-black tracking-widest flex items-center gap-2">
-                                <Sparkles size={12} className="text-black" /> Purpose *
+                            <label className="text-[10px] font-black uppercase text-black tracking-[0.2em] flex items-center gap-2">
+                                <MessageSquare size={12} /> Strategic Purpose
                             </label>
-                            <ERPSelect 
-                                className="w-full h-11 text-sm font-bold border-2 border-slate-100 focus:border-black rounded-none transition-all"
+                            <ERPSelect
+                                className="w-full h-12 text-[11px] font-black border-2 border-slate-100 focus:border-black rounded-xl transition-all uppercase tracking-widest bg-slate-50 focus:bg-white"
                                 value={formData.purpose}
-                                onChange={(e) => setFormData({...formData, purpose: e.target.value})}
+                                onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
                                 options={[
-                                    { value: 'Sales', label: 'Sales / Marketing' },
-                                    { value: 'Payment Collection', label: 'Payment Collection' },
-                                    { value: 'Service', label: 'Service / Support' },
-                                    { value: 'Complaint', label: 'Complaint Handling' },
-                                    { value: 'Other', label: 'Other' }
+                                    { value: 'Sales', label: 'SALES ACQUISITION' },
+                                    { value: 'Payment Collection', label: 'FINANCIAL COLLECTION' },
+                                    { value: 'Service', label: 'SERVICE PROTOCOL' },
+                                    { value: 'Complaint', label: 'ANOMALY HANDLING' },
+                                    { value: 'Other', label: 'GENERAL ADVISORY' }
                                 ]}
                             />
                         </div>
 
                         {/* Next Follow Up */}
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase text-black tracking-widest flex items-center gap-2">
-                                <Calendar size={12} className="text-black" /> Next Follow-up
+                            <label className="text-[10px] font-black uppercase text-black tracking-[0.2em] flex items-center gap-2">
+                                <Calendar size={12} /> Follow-up Protocol
                             </label>
-                            <ERPInput 
+                            <ERPInput
                                 type="date"
-                                className="w-full h-11 text-sm font-bold border-2 border-slate-100 focus:border-black rounded-none transition-all"
+                                className="w-full h-12 text-[11px] font-black border-2 border-slate-100 focus:border-black rounded-xl transition-all uppercase tracking-widest bg-slate-50 focus:bg-white"
                                 value={formData.nextFollowUp}
-                                onChange={(e) => setFormData({...formData, nextFollowUp: e.target.value})}
+                                onChange={(e) => setFormData({ ...formData, nextFollowUp: e.target.value })}
                             />
                         </div>
                     </div>
 
                     {/* Discussion Points */}
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-black tracking-widest flex items-center gap-2">
-                            <MessageSquare size={12} className="text-black" /> Discussion Points *
+                        <label className="text-[10px] font-black uppercase text-black tracking-[0.2em] flex items-center gap-2">
+                            <ClipboardCheck size={12} /> Observation Narrative
                         </label>
-                        <textarea 
-                            className="w-full min-h-[100px] text-sm p-3 border-2 border-slate-100 focus:border-black rounded-none outline-none transition-all placeholder:text-slate-300"
-                            placeholder="Describe what was discussed during the visit..."
+                        <textarea
+                            className="w-full min-h-[120px] text-[11px] font-black p-5 border-2 border-slate-100 focus:border-black rounded-3xl outline-none transition-all placeholder:text-slate-300 uppercase tracking-widest bg-slate-50 focus:bg-white resize-none"
+                            placeholder="TRANSCRIBE CORE OBSERVATIONS..."
                             value={formData.discussion}
-                            onChange={(e) => setFormData({...formData, discussion: e.target.value})}
+                            onChange={(e) => setFormData({ ...formData, discussion: e.target.value })}
                             required
-                        />
-                    </div>
-
-                    {/* Outcome */}
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-black tracking-widest flex items-center gap-2">
-                            <ClipboardCheck size={12} className="text-black" /> Expected Outcome / Remarks
-                        </label>
-                        <textarea 
-                            className="w-full min-h-[60px] text-sm p-3 border-2 border-slate-100 focus:border-black rounded-none outline-none transition-all placeholder:text-slate-300"
-                            placeholder="Any orders expected or specific commitments made..."
-                            value={formData.outcome}
-                            onChange={(e) => setFormData({...formData, outcome: e.target.value})}
                         />
                     </div>
                 </form>
 
-                <div className="mt-8 flex justify-between bg-black -mx-0 -mb-0 p-6">
-                    <div className="flex gap-2 items-center">
-                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Mandatory Compliance Fields</p>
-                    </div>
-                    <div className="flex gap-3">
-                        <button 
-                            onClick={onClose} 
-                            className="px-6 py-2 bg-transparent text-white text-[11px] font-black uppercase tracking-widest border border-white/20 hover:bg-white/10 transition-all"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            onClick={handleSubmit}
-                            disabled={loading}
-                            className="px-10 py-2 bg-white text-black text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center gap-2"
-                        >
-                            {loading ? 'Processing...' : (
-                                <>
-                                    Save Entry <ArrowRight size={14} />
-                                </>
-                            )}
-                        </button>
-                    </div>
+                <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-4 shrink-0">
+                    <button
+                        onClick={onClose}
+                        className="px-10 py-4 bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-black transition-all rounded-xl border border-slate-200"
+                    >
+                        Abort Entry
+                    </button>
+                    <button
+                        onClick={handleSubmit}
+                        disabled={loading}
+                        className="px-14 py-4 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all rounded-xl shadow-xl flex items-center gap-3"
+                    >
+                        {loading ? 'Processing...' : (
+                            <>
+                                Commit Registry <ArrowRight size={14} />
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
         </Modal>

@@ -33,7 +33,8 @@ import {
    Gstr1Modal,
    Gst2bMatchingModal,
    Gst3bDetailModal,
-   Gstr1ErrorChekModal
+   Gstr1ErrorChekModal,
+   GstComplianceModal
 } from './gst/GstModals';
 import VisitLogModal from './crm/VisitLogModal';
 import PartyModal from './masters/PartyModal';
@@ -61,12 +62,13 @@ const Dashboard = () => {
       gst2bMatching: false,
       gst3bDetail: false,
       gstr1Errorchek: false,
+      gstCompliance: false,
       visit: false,
       party: false,
       jobWorker: false,
       placeholder: false
    });
-   
+
    const [placeholderName, setPlaceholderName] = useState('');
 
    const [bookSelection, setBookSelection] = useState({
@@ -88,7 +90,7 @@ const Dashboard = () => {
          setActiveMenu(null);
          return;
       }
-      
+
       // Handle navigation or placeholder for missing modules
       if (val === true && !key) {
          setPlaceholderName('MODULE');
@@ -258,28 +260,28 @@ const Dashboard = () => {
             </div>
 
             {/* Metrics Grid */}
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                   { label: "Today's Sales", val: "₹ 1,84,500", icon: faIndianRupeeSign },
-                   { label: "Pending Receivables", val: "₹ 12,40,200", icon: faScaleBalanced },
-                   { label: "14 Active", sub: "Open Job Work Orders", icon: faWarehouse },
-                   { label: "GST Liability This Month", val: "₹ 45,300", icon: faChartColumn }
-                ].map((kpi, idx) => (
-                   <div key={idx} className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all flex items-center gap-4 group">
-                      <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 group-hover:bg-black group-hover:text-white transition-all shrink-0 border border-slate-100">
-                         <FontAwesomeIcon icon={kpi.icon} className="text-xs" />
-                      </div>
-                      <div className="flex flex-col">
-                         <h3 className="text-lg font-black text-black tracking-tight leading-none">
-                            {kpi.val || kpi.label.split(' ')[0] + ' ' + kpi.label.split(' ')[1]}
-                         </h3>
-                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                            {kpi.val ? kpi.label : kpi.sub}
-                         </p>
-                      </div>
-                   </div>
-                ))}
-             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+               {[
+                  { label: "Today's Sales", val: "₹ 1,84,500", icon: faIndianRupeeSign },
+                  { label: "Pending Receivables", val: "₹ 12,40,200", icon: faScaleBalanced },
+                  { label: "14 Active", sub: "Open Job Work Orders", icon: faWarehouse },
+                  { label: "GST Liability This Month", val: "₹ 45,300", icon: faChartColumn }
+               ].map((kpi, idx) => (
+                  <div key={idx} className="bg-white rounded-xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all flex items-center gap-4 group">
+                     <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 group-hover:bg-black group-hover:text-white transition-all shrink-0 border border-slate-100">
+                        <FontAwesomeIcon icon={kpi.icon} className="text-xs" />
+                     </div>
+                     <div className="flex flex-col">
+                        <h3 className="text-lg font-black text-black tracking-tight leading-none">
+                           {kpi.val || kpi.label.split(' ')[0] + ' ' + kpi.label.split(' ')[1]}
+                        </h3>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                           {kpi.val ? kpi.label : kpi.sub}
+                        </p>
+                     </div>
+                  </div>
+               ))}
+            </div>
 
             {/* Shortcut Grid */}
             <div className="space-y-8 pt-4">
@@ -298,6 +300,39 @@ const Dashboard = () => {
                            <FontAwesomeIcon icon={icon.icon} size="sm" />
                         </div>
                         <span className="text-[8px] font-black uppercase tracking-widest text-center text-black">{icon.label}</span>
+                     </button>
+                  ))}
+               </div>
+            </div>
+
+            {/* Advanced Intelligence & Compliance Section */}
+            <div className="space-y-8 pt-4">
+               <div className="flex flex-col items-center gap-2">
+                  <h3 className="text-[10px] font-black text-black uppercase tracking-[0.5em]">Intelligence & Compliance</h3>
+                  <div className="h-[1px] w-12 bg-black" />
+               </div>
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  {[
+                     { label: 'Visit Management', icon: faHandshake, key: 'visit', desc: 'CRM & Field Intelligence' },
+                     { label: 'GSTR-1 Advanced', icon: faFilePen, key: 'gstr1', desc: 'Compliant Schema Export' },
+                     { label: '2B Matching', icon: faClipboardCheck, key: 'gst2bMatching', desc: 'Automated ITC Matching' },
+                     { label: 'Compliance Overview', icon: faUserShield, key: 'gstCompliance', desc: 'GST Health Scorecard' },
+                  ].map((item, idx) => (
+                     <button
+                        key={idx}
+                        onClick={() => toggleModal(item.key, true)}
+                        className="bg-black text-white p-8 rounded-[2rem] shadow-xl hover:shadow-2xl transition-all flex flex-col items-center gap-4 group relative overflow-hidden"
+                     >
+                        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform">
+                           <FontAwesomeIcon icon={item.icon} size="4x" />
+                        </div>
+                        <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white mb-2 group-hover:bg-white group-hover:text-black transition-all">
+                           <FontAwesomeIcon icon={item.icon} size="lg" />
+                        </div>
+                        <div className="text-center">
+                           <span className="text-[11px] font-black uppercase tracking-[0.2em] block">{item.label}</span>
+                           <span className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mt-2 block">{item.desc}</span>
+                        </div>
                      </button>
                   ))}
                </div>
@@ -406,6 +441,7 @@ const Dashboard = () => {
          <Gst2bMatchingModal isOpen={modals.gst2bMatching} onClose={() => toggleModal('gst2bMatching', false)} />
          <Gst3bDetailModal isOpen={modals.gst3bDetail} onClose={() => toggleModal('gst3bDetail', false)} />
          <Gstr1ErrorChekModal isOpen={modals.gstr1Errorchek} onClose={() => toggleModal('gstr1Errorchek', false)} />
+         <GstComplianceModal isOpen={modals.gstCompliance} onClose={() => toggleModal('gstCompliance', false)} />
          <VisitLogModal isOpen={modals.visit} onClose={() => toggleModal('visit', false)} />
          <PartyModal isOpen={modals.party} onClose={() => toggleModal('party', false)} />
 
@@ -417,9 +453,9 @@ const Dashboard = () => {
          </Modal>
 
          {/* Module Placeholder Modal */}
-         <Modal 
-            isOpen={modals.placeholder} 
-            onClose={() => toggleModal('placeholder', false)} 
+         <Modal
+            isOpen={modals.placeholder}
+            onClose={() => toggleModal('placeholder', false)}
             title="System Command Center"
             className="max-w-md"
          >
@@ -433,7 +469,7 @@ const Dashboard = () => {
                      This module is currently being optimized for the new monochromatic design system. Functional logic is active, but UI rendering is pending.
                   </p>
                </div>
-               <button 
+               <button
                   onClick={() => toggleModal('placeholder', false)}
                   className="w-full py-4 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all rounded-xl"
                >
