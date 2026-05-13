@@ -12,27 +12,27 @@ const Dashboard = () => {
     if (loading && !stats) return <div>Loading...</div>;
 
     const cards = [
-        { name: 'Total Companies', value: stats?.totalCompanies || 0, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { name: 'Active Subscriptions', value: stats?.activeSubs || 0, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { name: 'Expiring Soon', value: stats?.expiringSoon || 0, icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' },
-        { name: 'Est. MRR', value: `₹${stats?.mrr || 0}`, icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+        { name: 'Total Companies', value: stats?.totalCompanies || 0, icon: Building2 },
+        { name: 'Active Subscriptions', value: stats?.activeSubs || 0, icon: Users },
+        { name: 'Expiring Soon', value: stats?.expiringSoon || 0, icon: AlertCircle },
+        { name: 'Est. MRR', value: `₹${stats?.mrr || 0}`, icon: TrendingUp },
     ];
 
     return (
         <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {cards.map((card) => (
-                    <div key={card.name} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                    <div key={card.name} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:border-black transition-all group">
                         <div className="flex items-center justify-between mb-4">
-                            <div className={`p-3 rounded-xl ${card.bg}`}>
-                                <card.icon size={24} className={card.color} />
+                            <div className={`p-3 rounded-xl bg-slate-50 group-hover:bg-black group-hover:text-white transition-all`}>
+                                <card.icon size={24} />
                             </div>
-                            <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded-full flex items-center gap-1">
-                                <ArrowUpRight size={12} /> +12%
+                            <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-3 py-1 rounded-lg flex items-center gap-1 uppercase tracking-widest">
+                                <ArrowUpRight size={10} /> +12%
                             </span>
                         </div>
-                        <h3 className="text-slate-500 text-sm font-medium">{card.name}</h3>
-                        <p className="text-2xl font-bold text-slate-900 mt-1">{card.value}</p>
+                        <h3 className="text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-none">{card.name}</h3>
+                        <p className="text-3xl font-black text-black mt-2 tracking-tight">{card.value}</p>
                     </div>
                 ))}
             </div>

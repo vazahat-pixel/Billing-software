@@ -1,70 +1,75 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Outfit:wght@100;200;300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
   --color-primary: #000000;
   --color-accent: #000000;
-  --color-warning: #C9A84C;
-  --color-background: #ffffff;
-  --color-sidebar: #000000;
-  --color-border: #e2e8f0;
+  --color-gold: #000000; /* Removed gold */
+  --color-background: #ffffff; /* Pure white background */
+  --color-sidebar: #ffffff;
+  --color-border: #000000; /* Higher contrast borders */
   
-  --radius-sm: 2px;
-  --radius-md: 4px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
-  
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-huge: 2.5rem;
 }
 
 @layer base {
   * {
-    font-family: 'Inter', system-ui, sans-serif !important;
+    @apply border-slate-100;
+    font-family: 'Inter', system-ui, sans-serif;
   }
   
-  body {
-    @apply min-h-screen bg-white text-black antialiased text-[14px] leading-relaxed;
+  h1, h2, h3, h4, .font-heading {
+    font-family: 'Outfit', sans-serif;
   }
 
-  ::selection {
-    background-color: #0D737722;
-    color: #1B3A6B;
+  body {
+    @apply min-h-screen bg-white text-black antialiased selection:bg-black selection:text-white;
+  }
+
+  /* Custom Utilities */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
 
-/* High Contrast Scrollbar */
+/* Premium Transitions */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Minimal Scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #ffffff;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #000000;
-  border-radius: 0px;
+  background: #e2e8f0;
+  border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #333333;
+  background: #cbd5e1;
 }
 
-/* Print Styles */
-@media print {
-  .no-print, 
-  header, 
-  aside, 
-  button {
-    display: none !important;
-  }
-  
-  main {
-    padding: 0 !important;
-    margin: 0 !important;
-  }
+/* Modal Animation Styles */
+.modal-overlay {
+  @apply fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6;
+}
 
-  body {
-    background: white !important;
-    color: black !important;
-  }
+.modal-content {
+  @apply bg-white rounded-huge shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col border border-slate-100;
+}
+
+@media print {
+  .no-print { display: none !important; }
 }

@@ -97,7 +97,7 @@ export const Gst3bMonthlyModal = ({ isOpen, onClose }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="GSTR-3B Monthly Return Dashboard" className="max-w-6xl h-[92vh] bg-[#FDFCF9] rounded-[2.5rem] p-0 border-none shadow-2xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="GSTR-3B Monthly Return Dashboard" className="max-w-6xl h-[92vh] bg-white rounded-[2.5rem] p-0 border-none shadow-2xl">
       <div className="flex flex-col h-full p-10 space-y-8">
         {/* Modern Header */}
         <div className="flex items-center justify-between">
@@ -119,7 +119,7 @@ export const Gst3bMonthlyModal = ({ isOpen, onClose }) => {
                 disabled={isFiling || filedStatus}
                 onClick={handleFileReturn}
                 className={`px-8 py-3 rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center gap-3 transition-all ${
-                   filedStatus ? 'bg-green-50 text-green-600 border border-green-100 cursor-default' : 'bg-black text-white hover:bg-slate-800'
+                   filedStatus ? 'bg-black text-white cursor-default' : 'bg-black text-white hover:bg-slate-800'
                 }`}
               >
                 {isFiling ? <RefreshCw size={14} className="animate-spin" /> : filedStatus ? <CheckCircle2 size={14} /> : <Play size={14} />}
@@ -252,7 +252,7 @@ export const Gstr1Modal = ({ isOpen, onClose }) => {
   }, [sales]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="GSTR-1 Outward Supplies" className="max-w-[95vw] h-[92vh] bg-[#FDFCF9] rounded-[2.5rem] p-0 border-none shadow-2xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="GSTR-1 Outward Supplies" className="max-w-[95vw] h-[92vh] bg-white rounded-[2.5rem] p-0 border-none shadow-2xl">
       <div className="flex flex-col h-full p-10 space-y-8">
          <div className="flex items-center justify-between">
             <div>
@@ -350,7 +350,7 @@ export const Gst2bMatchingModal = ({ isOpen, onClose }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="GSTR-2B ITC Matching" className="max-w-6xl h-[92vh] bg-[#FDFCF9] rounded-[2.5rem] p-0 border-none shadow-2xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="GSTR-2B ITC Matching" className="max-w-6xl h-[92vh] bg-white rounded-[2.5rem] p-0 border-none shadow-2xl">
       <div className="flex flex-col h-full p-10 space-y-8">
          <div className="flex items-center justify-between">
             <div>
@@ -369,10 +369,10 @@ export const Gst2bMatchingModal = ({ isOpen, onClose }) => {
 
          <div className="grid grid-cols-4 gap-6">
             {[
-              { label: 'Verified', val: '24', color: 'text-green-500' },
-              { label: 'Mismatch', val: '02', color: 'text-amber-500' },
-              { label: 'Missing', val: '01', color: 'text-rose-500' },
-              { label: 'Net ITC', val: '₹ 84K', color: 'text-black' }
+               { label: 'Verified', val: '24', color: 'text-black' },
+               { label: 'Mismatch', val: '02', color: 'text-slate-400' },
+               { label: 'Missing', val: '01', color: 'text-slate-300' },
+               { label: 'Net ITC', val: '₹ 84K', color: 'text-black' }
             ].map((s, idx) => (
                <div key={idx} className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
                   <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-400">{s.label}</span>
@@ -404,7 +404,7 @@ export const Gst2bMatchingModal = ({ isOpen, onClose }) => {
                            <td className="px-8 py-5 text-right font-bold text-black text-[11px]">₹ {row.erpTaxable.toLocaleString()}</td>
                            <td className="px-8 py-5 text-right font-bold text-slate-400 text-[11px]">₹ {row.portalTaxable.toLocaleString()}</td>
                            <td className="px-8 py-5 text-center">
-                              <span className={`px-4 py-1 text-[9px] font-bold uppercase rounded-lg border ${row.status === 'MATCHED' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                              <span className={`px-4 py-1 text-[9px] font-bold uppercase rounded-lg border ${row.status === 'MATCHED' ? 'bg-black text-white border-black' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
                                  {row.status}
                               </span>
                            </td>
@@ -432,7 +432,7 @@ export const Gst3bDetailModal = ({ isOpen, onClose }) => {
   }, [isOpen, fetchSales, fetchPurchases]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="GST Ledger Detail" className="max-w-[95vw] h-[92vh] bg-[#FDFCF9] rounded-[2.5rem] p-0 border-none shadow-2xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="GST Ledger Detail" className="max-w-[95vw] h-[92vh] bg-white rounded-[2.5rem] p-0 border-none shadow-2xl">
       <div className="flex flex-col h-full p-10 space-y-8">
          <div>
             <h2 className="text-4xl font-black text-black tracking-tight italic">Drilldown Analysis<span className="text-slate-300">.</span></h2>
@@ -527,7 +527,7 @@ export const Gstr1ErrorChekModal = ({ isOpen, onClose }) => {
   const warningsCount = issuesList.filter(i => i.type === 'WARNING').length;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="GSTR-1 Compliance Audit" className="max-w-6xl h-[92vh] bg-[#FDFCF9] rounded-[2.5rem] p-0 border-none shadow-2xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="GSTR-1 Compliance Audit" className="max-w-6xl h-[92vh] bg-white rounded-[2.5rem] p-0 border-none shadow-2xl">
       <div className="flex flex-col h-full p-10 space-y-8">
         <div className="flex items-center justify-between">
            <div>
@@ -580,18 +580,18 @@ export const Gstr1ErrorChekModal = ({ isOpen, onClose }) => {
            ) : (
               <div className="w-full h-full flex flex-col space-y-8">
                  <div className="flex gap-6">
-                    <div className="flex items-center gap-3 px-6 py-3 bg-rose-50 text-rose-600 rounded-xl border border-rose-100">
+                    <div className="flex items-center gap-3 px-6 py-3 bg-black text-white rounded-xl border border-black">
                        <AlertCircle size={14} />
                        <span className="text-[10px] font-bold uppercase tracking-widest">{errorsCount} Severe Errors</span>
                     </div>
-                    <div className="flex items-center gap-3 px-6 py-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-100">
+                    <div className="flex items-center gap-3 px-6 py-3 bg-slate-100 text-black rounded-xl border border-slate-200">
                        <AlertTriangle size={14} />
                        <span className="text-[10px] font-bold uppercase tracking-widest">{warningsCount} Warnings</span>
                     </div>
                  </div>
                  <div className="flex-1 overflow-auto space-y-4 custom-scrollbar">
                     {issuesList.map((issue, idx) => (
-                       <div key={idx} className="p-6 rounded-3xl border border-slate-50 bg-[#FDFCF9]/50 hover:bg-white hover:shadow-sm transition-all flex items-start gap-6 group">
+                       <div key={idx} className="p-6 rounded-3xl border border-slate-50 bg-white/50 hover:bg-white hover:shadow-sm transition-all flex items-start gap-6 group">
                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${issue.type === 'ERROR' ? 'bg-black text-white' : 'bg-slate-100 text-slate-400'}`}>
                              {issue.type === 'ERROR' ? <AlertCircle size={20} /> : <AlertTriangle size={20} />}
                           </div>
