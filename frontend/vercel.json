@@ -6,8 +6,16 @@
   "trailingSlash": false,
   "rewrites": [
     {
+      "source": "/login",
+      "destination": "/dist/index.html"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/dist/index.html"
+    },
+    {
       "source": "/(.*)",
-      "destination": "/index.html"
+      "destination": "/dist/index.html"
     }
   ]
 }
