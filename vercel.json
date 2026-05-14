@@ -1,17 +1,4 @@
 {
-  "builds": [
-    {
-      "src": "api/index.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
