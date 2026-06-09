@@ -19,6 +19,11 @@ const userSchema = new mongoose.Schema({
         enum: ['user', 'super_admin'], 
         default: 'user' 
     },
+    companyRole: {
+        type: String,
+        enum: ['owner', 'admin', 'accountant', 'sales', 'viewer'],
+        default: 'owner'
+    },
     companyId: { 
         type: mongoose.Schema.Types.ObjectId, 
         ref: 'Company',

@@ -35,7 +35,8 @@ async function generateVoucherNo(companyId, type) {
 // 1. Create Ledger Account
 exports.createLedger = async (req, res) => {
   try {
-    const { companyId } = req.body;
+    const companyId = req.companyId || req.body.companyId;
+    req.body.companyId = companyId;
     await checkPeriodLocked(companyId, new Date());
     
     const ledger = await LedgerMaster.create(req.body);
@@ -48,7 +49,8 @@ exports.createLedger = async (req, res) => {
 // 2. List Ledgers
 exports.listLedgers = async (req, res) => {
   try {
-    const { companyId, group, search, partyId } = req.query;
+    const companyId = req.companyId || req.query.companyId;
+    const { group, search, partyId } = req.query;
     const filter = { companyId: new mongoose.Types.ObjectId(companyId) };
     
     if (group) {
@@ -79,7 +81,10 @@ exports.getLedgerStatement = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Ledger not found' });
     }
 
-    const companyId = ledger.companyId;
+    const companyId = req.companyId || ledger.companyId;
+    if (ledger.companyId.toString() !== companyId.toString()) {
+      return res.status(403).json({ success: false, message: 'Unauthorized access to this ledger' });
+    }
 
     // Filter by dates
     const entryFilter = {
@@ -148,8 +153,9 @@ exports.createPaymentVoucher = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
+    const companyId = req.companyId || req.body.companyId;
     const { 
-      companyId, date, partyLedgerId, amount, 
+      date, partyLedgerId, amount, 
       paymentMode, bankLedgerId, chequeNo, utrNo, status, againstInvoices, narration
     } = req.body;
 
@@ -163,7 +169,14 @@ exports.createPaymentVoucher = async (req, res) => {
       throw new Error(`UTR/Reference number is required when payment mode is ${paymentMode}`);
     }
 
-    const partyLedger = await LedgerMaster.findById(partyLedgerId);
+    let partyLedger = await LedgerMaster.findById(partyLedgerId);
+    if (!partyLedger) {
+      try {
+        partyLedger = await accountingService.getOrCreatePartyLedger(companyId, partyLedgerId);
+      } catch (err) {
+        // ignore and let next block throw if not found
+      }
+    }
     const bankLedger = await LedgerMaster.findById(bankLedgerId);
 
     if (!partyLedger || !bankLedger) {
@@ -177,7 +190,7 @@ exports.createPaymentVoucher = async (req, res) => {
       voucherNo,
       date,
       voucherType: 'Payment',
-      partyLedgerId,
+      partyLedgerId: partyLedger._id,
       partyName: partyLedger.name,
       amount,
       paymentMode,
@@ -201,7 +214,7 @@ exports.createPaymentVoucher = async (req, res) => {
         refId: voucher._id,
         lines: [
           {
-            ledgerId: partyLedgerId,
+            ledgerId: partyLedger._id,
             ledgerName: partyLedger.name,
             type: 'Dr',
             amount: parseFloat(amount),
@@ -246,8 +259,9 @@ exports.createReceiptVoucher = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
+    const companyId = req.companyId || req.body.companyId;
     const { 
-      companyId, date, partyLedgerId, amount, 
+      date, partyLedgerId, amount, 
       paymentMode, bankLedgerId, chequeNo, utrNo, status, againstInvoices, narration
     } = req.body;
 
@@ -260,7 +274,14 @@ exports.createReceiptVoucher = async (req, res) => {
       throw new Error(`UTR/Reference number is required when payment mode is ${paymentMode}`);
     }
 
-    const partyLedger = await LedgerMaster.findById(partyLedgerId);
+    let partyLedger = await LedgerMaster.findById(partyLedgerId);
+    if (!partyLedger) {
+      try {
+        partyLedger = await accountingService.getOrCreatePartyLedger(companyId, partyLedgerId);
+      } catch (err) {
+        // ignore and let next block throw if not found
+      }
+    }
     const bankLedger = await LedgerMaster.findById(bankLedgerId);
 
     if (!partyLedger || !bankLedger) {
@@ -274,7 +295,7 @@ exports.createReceiptVoucher = async (req, res) => {
       voucherNo,
       date,
       voucherType: 'Receipt',
-      partyLedgerId,
+      partyLedgerId: partyLedger._id,
       partyName: partyLedger.name,
       amount,
       paymentMode,
@@ -304,7 +325,7 @@ exports.createReceiptVoucher = async (req, res) => {
             narration: `Received via ${paymentMode}`
           },
           {
-            ledgerId: partyLedgerId,
+            ledgerId: partyLedger._id,
             ledgerName: partyLedger.name,
             type: 'Cr',
             amount: parseFloat(amount),
@@ -338,7 +359,8 @@ exports.createReceiptVoucher = async (req, res) => {
 // 6. List Payment / Receipt Vouchers
 exports.listVouchers = async (req, res) => {
   try {
-    const { companyId, from, to, partyId, type } = req.query;
+    const companyId = req.companyId || req.query.companyId;
+    const { from, to, partyId, type } = req.query;
     const filter = { companyId };
 
     if (type) {
@@ -363,7 +385,8 @@ exports.listVouchers = async (req, res) => {
 // 7. Manual Journal Entry Creation
 exports.createJournalEntry = async (req, res) => {
   try {
-    const { companyId, entryDate, lines, narration } = req.body;
+    const companyId = req.companyId || req.body.companyId;
+    const { entryDate, lines, narration } = req.body;
     await checkPeriodLocked(companyId, entryDate);
 
     const entryNo = await accountingService.generateEntryNo(companyId, 'JNL');
@@ -432,7 +455,8 @@ async function computeRunningBalances(companyId, asOnDate) {
 // 8. Trial Balance
 exports.getTrialBalance = async (req, res) => {
   try {
-    const { companyId, asOn } = req.query;
+    const companyId = req.companyId || req.query.companyId;
+    const { asOn } = req.query;
     const balances = await computeRunningBalances(companyId, asOn);
     res.status(200).json({ success: true, data: balances });
   } catch (error) {
@@ -443,7 +467,8 @@ exports.getTrialBalance = async (req, res) => {
 // 9. Profit & Loss Report (Income vs Expense ledgers)
 exports.getProfitLoss = async (req, res) => {
   try {
-    const { companyId, from, to } = req.query;
+    const companyId = req.companyId || req.query.companyId;
+    const { from, to } = req.query;
     const balances = await computeRunningBalances(companyId, to);
 
     // Filter incomes and expenses within range
@@ -471,7 +496,8 @@ exports.getProfitLoss = async (req, res) => {
 // 10. Balance Sheet Report (Assets vs Liabilities + Capital)
 exports.getBalanceSheet = async (req, res) => {
   try {
-    const { companyId, asOn } = req.query;
+    const companyId = req.companyId || req.query.companyId;
+    const { asOn } = req.query;
     const balances = await computeRunningBalances(companyId, asOn);
 
     const assets = balances.filter(b => b.ledger.group === 'Assets');
@@ -503,7 +529,8 @@ exports.getBalanceSheet = async (req, res) => {
 // 11. Party-wise Outstanding with Aging Reports (receivable/payable)
 exports.getOutstandingReport = async (req, res) => {
   try {
-    const { companyId, type, asOn } = req.query;
+    const companyId = req.companyId || req.query.companyId;
+    const { type, asOn } = req.query;
     const isReceivable = type === 'receivable';
 
     // Fetch matching customers or suppliers

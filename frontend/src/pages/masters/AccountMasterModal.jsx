@@ -37,7 +37,11 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   const handleSave = async () => {
     if (!formData.name) return alert('Name is required');
     try {
-      const type = formData.group === 'SUNDRY CREDITORS' ? 'Supplier' : 'Customer';
+      let type = 'Customer';
+      const g = (formData.group || '').toUpperCase();
+      if (g.includes('CREDITOR')) type = 'Supplier';
+      else if (g.includes('BROKER')) type = 'Broker';
+      else if (g.includes('JOB') || g.includes('WORKER')) type = 'Job Worker';
       const response = await addParty({ ...formData, type });
       if (onSuccess) {
         onSuccess({
@@ -86,7 +90,12 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                       className="w-full" 
                       value={formData.group}
                       onChange={(e) => setFormData({...formData, group: e.target.value})}
-                      options={[{value: 'SUNDRY DEBTORS', label: 'SUNDRY DEBTORS'}, {value: 'SUNDRY CREDITORS', label: 'SUNDRY CREDITORS'}]} 
+                      options={[
+                        { value: 'SUNDRY DEBTORS', label: 'SUNDRY DEBTORS (Customer)' },
+                        { value: 'SUNDRY CREDITORS', label: 'SUNDRY CREDITORS (Supplier)' },
+                        { value: 'BROKER', label: 'BROKER' },
+                        { value: 'JOB WORKER', label: 'JOB WORKER' }
+                      ]} 
                     />
                  </div>
                  <div className="space-y-1.5">

@@ -1,26 +1,69 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import useStore from '../../store/useStore';
-import { FormField, ERPInput, ERPSelect, ERPButton } from '../../components/forms/FormElements';
-import Modal from '../../components/ui/Modal';
-import { Wallet, Search, Filter, ArrowUpRight, ArrowDownLeft, FileText, Banknote, ArrowRight, User, X } from 'lucide-react';
+import { ERPSelect } from '../../components/forms/FormElements';
+import api from '../../api/client';
+import { Banknote, FileText, Search, ArrowUpRight, ArrowDownLeft, ArrowRight, X } from 'lucide-react';
+import { PaymentForm } from './AccountingForms';
 
 const AccountingPage = () => {
-  const { ledgerEntries, parties, addPayment } = useStore();
+  const { parties, currentLedgerStatement, fetchLedgerStatement, fetchParties } = useStore();
   const [selectedPartyId, setSelectedPartyId] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentType, setPaymentType] = useState('payment'); // payment or receipt
 
+  // Fetch parties on mount
+  useEffect(() => {
+    fetchParties();
+  }, []);
+
+  // Fetch the ledger statement when selected party changes
+  useEffect(() => {
+    if (selectedPartyId) {
+      api.get(`/accounting/ledgers?partyId=${selectedPartyId}`)
+        .then(res => {
+          const ledger = res.data.data?.[0];
+          if (ledger) {
+            fetchLedgerStatement({ ledgerId: ledger._id });
+          } else {
+            // Reset if no ledger matches
+            useStore.setState({ currentLedgerStatement: null });
+          }
+        })
+        .catch(err => {
+          console.error("Error fetching ledger for party:", err);
+          useStore.setState({ currentLedgerStatement: null });
+        });
+    } else {
+      useStore.setState({ currentLedgerStatement: null });
+    }
+  }, [selectedPartyId]);
+
   const filteredLedger = useMemo(() => {
-    if (!selectedPartyId) return [];
-    return ledgerEntries.filter(e => e.partyId === selectedPartyId);
-  }, [ledgerEntries, selectedPartyId]);
+    return currentLedgerStatement?.statement || [];
+  }, [currentLedgerStatement]);
 
   const stats = useMemo(() => {
+    if (!currentLedgerStatement) {
+      return { dr: 0, cr: 0, bal: 0, balType: 'Dr' };
+    }
     const dr = filteredLedger.reduce((acc, e) => acc + (e.debit || 0), 0);
     const cr = filteredLedger.reduce((acc, e) => acc + (e.credit || 0), 0);
-    const bal = dr - cr;
-    return { dr, cr, bal };
-  }, [filteredLedger]);
+    const bal = currentLedgerStatement.closingBalance || 0;
+    const balType = currentLedgerStatement.closingBalanceType || 'Dr';
+    return { dr, cr, bal, balType };
+  }, [currentLedgerStatement, filteredLedger]);
+
+  const refreshStatement = () => {
+    if (selectedPartyId) {
+      api.get(`/accounting/ledgers?partyId=${selectedPartyId}`)
+        .then(res => {
+          const ledger = res.data.data?.[0];
+          if (ledger) {
+            fetchLedgerStatement({ ledgerId: ledger._id });
+          }
+        });
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fadeIn pb-20">
@@ -61,10 +104,11 @@ const AccountingPage = () => {
             <div className="bg-white p-8 border-2 border-black shadow-xl">
                <h4 className="text-[10px] font-black text-black uppercase mb-6 tracking-[0.4em] border-b-2 border-black pb-4">Account Protocol</h4>
                <ERPSelect 
-                   value={selectedPartyId} 
-                   onChange={(e) => setSelectedPartyId(e.target.value)}
-                   options={parties.map(p => ({ value: p.id, label: p.name }))}
-                   className="h-12 border-2 border-black font-black uppercase text-[10px]"
+                    value={selectedPartyId} 
+                    onChange={(e) => setSelectedPartyId(e.target.value)}
+                    options={parties.map(p => ({ value: p._id || p.id, label: p.name }))}
+                    className="h-12 border-2 border-black font-black uppercase text-[10px]"
+                    label="Account"
                />
                
                {selectedPartyId && (
@@ -79,7 +123,9 @@ const AccountingPage = () => {
                     </div>
                     <div className="p-6 bg-black text-white shadow-2xl">
                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em]">Net Closing Position</p>
-                       <p className="text-3xl font-black text-white mt-2 tracking-tighter">₹ {Math.abs(stats.bal).toLocaleString()} <span className="text-xs opacity-50">{stats.bal >= 0 ? 'DR' : 'CR'}</span></p>
+                       <p className="text-3xl font-black text-white mt-2 tracking-tighter">
+                         ₹ {stats.bal.toLocaleString()} <span className="text-xs opacity-50">{stats.balType}</span>
+                       </p>
                     </div>
                  </div>
                )}
@@ -93,17 +139,13 @@ const AccountingPage = () => {
                   <FileText size={20} />
                   <h3 className="text-[10px] font-black uppercase tracking-[0.4em]">Counterparty Audit Statement</h3>
                </div>
-               <div className="flex gap-2">
-                  <button className="px-6 py-2 bg-white border-2 border-black text-[9px] font-black text-black hover:bg-black hover:text-white transition-all uppercase tracking-widest">Generate PDF</button>
-                  <button className="px-6 py-2 bg-black text-white border-2 border-black text-[9px] font-black hover:bg-slate-800 transition-all uppercase tracking-widest">Export Dataset</button>
-               </div>
             </div>
             
             <div className="overflow-x-auto">
                <table className="w-full text-left border-collapse">
                   <thead>
                      <tr className="bg-black text-[9px] font-black text-white uppercase tracking-[0.3em] sticky top-0 z-10">
-                        <th className="px-8 py-5">Audit Timestamp</th>
+                        <th className="px-8 py-5">Audit Date</th>
                         <th className="px-8 py-5">Particular Intelligence</th>
                         <th className="px-8 py-5 text-right">Debit (DR)</th>
                         <th className="px-8 py-5 text-right">Credit (CR)</th>
@@ -112,30 +154,36 @@ const AccountingPage = () => {
                   </thead>
                   <tbody className="divide-y-2 divide-slate-50">
                      {filteredLedger.map((entry) => (
-                       <tr key={entry.id} className="hover:bg-slate-50 transition-all">
-                          <td className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">{entry.date}</td>
-                          <td className="px-8 py-5">
-                             <p className="text-[11px] font-black text-black uppercase tracking-widest">{entry.particular}</p>
-                             <p className="text-[9px] text-slate-300 font-black uppercase mt-1 tracking-widest">REF_ID: {entry.id.substring(0, 8)}</p>
-                          </td>
-                          <td className="px-8 py-5 text-right text-[11px] font-black text-black">
-                             {entry.debit > 0 ? `₹ ${entry.debit.toLocaleString()}` : '-'}
-                          </td>
-                          <td className="px-8 py-5 text-right text-[11px] font-black text-black">
-                             {entry.credit > 0 ? `₹ ${entry.credit.toLocaleString()}` : '-'}
-                          </td>
-                          <td className="px-8 py-5 text-right text-[12px] font-black text-black tracking-tighter">
-                             ₹ {Math.abs(entry.balance).toLocaleString()} <span className="text-[9px] opacity-30">{entry.balance >= 0 ? 'DR' : 'CR'}</span>
-                          </td>
-                       </tr>
+                        <tr key={entry._id} className="hover:bg-slate-50 transition-all">
+                           <td className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                             {entry.date ? new Date(entry.date).toLocaleDateString() : ''}
+                           </td>
+                           <td className="px-8 py-5">
+                              <p className="text-[11px] font-black text-black uppercase tracking-widest">{entry.narration}</p>
+                              <p className="text-[9px] text-slate-300 font-black uppercase mt-1 tracking-widest">
+                                REF: {entry.voucherNo} ({entry.voucherType})
+                              </p>
+                           </td>
+                           <td className="px-8 py-5 text-right text-[11px] font-black text-black">
+                              {entry.debit > 0 ? `₹ ${entry.debit.toLocaleString()}` : '-'}
+                           </td>
+                           <td className="px-8 py-5 text-right text-[11px] font-black text-black">
+                              {entry.credit > 0 ? `₹ ${entry.credit.toLocaleString()}` : '-'}
+                           </td>
+                           <td className="px-8 py-5 text-right text-[12px] font-black text-black tracking-tighter">
+                              ₹ {entry.runningBalance?.toLocaleString()} <span className="text-[9px] opacity-30">{entry.balanceType}</span>
+                           </td>
+                        </tr>
                      ))}
-                     {!selectedPartyId && (
-                       <tr>
-                          <td colSpan="5" className="px-8 py-32 text-center">
-                             <Search size={48} className="mx-auto text-slate-100 mb-6" />
-                             <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">Zero Dataset Selected</p>
-                          </td>
-                       </tr>
+                     {(!selectedPartyId || filteredLedger.length === 0) && (
+                        <tr>
+                           <td colSpan="5" className="px-8 py-32 text-center">
+                              <Search size={48} className="mx-auto text-slate-100 mb-6" />
+                              <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">
+                                {selectedPartyId ? 'Zero Statement Entries' : 'Zero Dataset Selected'}
+                              </p>
+                           </td>
+                        </tr>
                      )}
                   </tbody>
                </table>
@@ -143,101 +191,14 @@ const AccountingPage = () => {
          </div>
       </div>
 
-      <PaymentModal 
+      <PaymentForm 
         isOpen={showPaymentModal} 
-        onClose={() => setShowPaymentModal(false)} 
-        type={paymentType}
+        onClose={() => {
+          setShowPaymentModal(false);
+          refreshStatement();
+        }} 
+        initialType={paymentType === 'receipt' ? 'Receipt' : 'Payment'}
       />
-    </div>
-  );
-};
-
-const PaymentModal = ({ isOpen, onClose, type }) => {
-  const { parties, addPayment } = useStore();
-  const [formData, setFormData] = useState({
-    partyId: '',
-    amount: '',
-    date: new Date().toISOString().split('T')[0],
-    mode: 'Bank Transfer',
-    ref: '',
-    type: type
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!formData.partyId || !formData.amount) return;
-    addPayment({ ...formData, type });
-    onClose();
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-xl border-4 border-black shadow-[20px_20px_0px_0px_rgba(0,0,0,0.3)]">
-         <div className="bg-black p-6 flex justify-between items-center text-white">
-            <h3 className="text-sm font-black uppercase tracking-[0.4em]">Record Fiscal Entry : {type}</h3>
-            <button onClick={onClose} className="p-1 hover:bg-white/10 transition-all"><X size={20} /></button>
-         </div>
-
-         <form onSubmit={handleSubmit} className="p-10 space-y-8">
-            <div className="space-y-6">
-               <FormField label="COUNTERPARTY ACCOUNT">
-                  <ERPSelect 
-                    value={formData.partyId}
-                    onChange={(e) => setFormData({...formData, partyId: e.target.value})}
-                    options={parties.map(p => ({ value: p.id, label: p.name }))}
-                    className="h-12 border-2 border-black font-black uppercase text-[10px]"
-                  />
-               </FormField>
-
-               <FormField label="QUANTUM AMOUNT (INR)">
-                  <ERPInput 
-                    type="number" 
-                    value={formData.amount} 
-                    onChange={(e) => setFormData({...formData, amount: e.target.value})} 
-                    placeholder="0.00"
-                    className="h-12 border-2 border-black font-black text-xl"
-                  />
-               </FormField>
-
-               <div className="grid grid-cols-2 gap-6">
-                  <FormField label="SETTLEMENT MODE">
-                     <ERPSelect 
-                        value={formData.mode}
-                        onChange={(e) => setFormData({...formData, mode: e.target.value})}
-                        options={[
-                          { value: 'Bank Transfer', label: 'Bank Transfer' },
-                          { value: 'Cash', label: 'Cash' },
-                          { value: 'Cheque', label: 'Cheque' },
-                          { value: 'UPI', label: 'UPI' }
-                        ]}
-                        className="h-12 border-2 border-black font-black uppercase text-[10px]"
-                     />
-                  </FormField>
-                  <FormField label="FISCAL DATE">
-                     <ERPInput type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className="h-12 border-2 border-black font-black uppercase text-[10px]" />
-                  </FormField>
-               </div>
-
-               <FormField label="AUDIT REFERENCE / NARRATIVE">
-                  <ERPInput 
-                    value={formData.ref} 
-                    onChange={(e) => setFormData({...formData, ref: e.target.value})} 
-                    placeholder="e.g. SETTLEMENT FOR INV_4021" 
-                    className="h-12 border-2 border-black font-black uppercase text-[10px]"
-                  />
-               </FormField>
-            </div>
-            
-            <div className="flex gap-4 pt-6 border-t-2 border-black">
-               <button type="button" className="flex-1 py-4 bg-transparent border-2 border-black text-black font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all" onClick={onClose}>Discard</button>
-               <button type="submit" className="flex-1 py-4 bg-black text-white font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all shadow-xl">
-                  Commit Entry
-               </button>
-            </div>
-         </form>
-      </div>
     </div>
   );
 };

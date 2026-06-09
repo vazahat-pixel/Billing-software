@@ -7,16 +7,26 @@ import { Trash2, Plus, Calculator, Truck, FileText, XCircle, Save, Printer, Sear
 import AccountMasterModal from '../masters/AccountMasterModal';
 import ItemMasterModal from '../masters/ItemMasterModal';
 
+const today = () => new Date().toISOString().split('T')[0];
+
 const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }) => {
-  const { parties, items, inventoryLots, addSale } = useStore();
+  const { parties, items, sales, inventoryLots, addSale, fetchParties, fetchItems } = useStore();
   const [activeTab, setActiveTab] = useState('Generate Sales Bill');
   const [rowLots, setRowLots] = useState({});
 
   useEffect(() => {
     if (isOpen) {
-      if (selectedBook) {
-        setHeader(prev => ({ ...prev, book: selectedBook }));
-      }
+      fetchParties();
+      fetchItems();
+      const nextBillNo = String((sales?.length || 0) + 1);
+      setHeader(prev => ({
+        ...prev,
+        billNo: nextBillNo,
+        billDate: today(),
+        chDate: today(),
+        book: selectedBook || prev.book
+      }));
+      setFooter(prev => ({ ...prev, dueDate: today(), lrDate: today(), lrRecDate: today() }));
       const fetchAllLots = async () => {
         const itemIds = [...new Set(gridItems.map(item => item.itemId).filter(Boolean))];
         for (const id of itemIds) {
@@ -41,10 +51,10 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
     gstin: '',
     city: '',
     haste: '',
-    billNo: '2',
-    billDate: '05/05/2026',
-    challanNo: '2',
-    chDate: '05/05/2026',
+    billNo: '1',
+    billDate: today(),
+    challanNo: '',
+    chDate: today(),
     gstType: '--Select GstType--',
   });
 
@@ -56,15 +66,15 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
     remarks: '',
     remark1: '',
     dueDays: 0,
-    dueDate: '05/05/2026',
+    dueDate: today(),
     trnChrg: '',
     ccAttach: '',
     transport: '',
     lrNo: '',
     station: '',
     eway: '',
-    lrDate: '05/05/2026',
-    lrRecDate: '05/05/2026',
+    lrDate: today(),
+    lrRecDate: today(),
     vehicle: '',
     baleNo: '',
     weight: 0,
@@ -80,6 +90,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
   // Inline Modal State
   const [inlineModal, setInlineModal] = useState({
     type: null, // 'account' or 'item'
+    target: 'party', // 'party' | 'broker'
     initialData: null,
     rowIndex: null
   });
@@ -94,7 +105,11 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
   }, [gridItems]);
 
   const handleCreateAccount = (search) => {
-    setInlineModal({ type: 'account', initialData: { name: search } });
+    setInlineModal({ type: 'account', target: 'party', initialData: { name: search } });
+  };
+
+  const handleCreateBroker = (search) => {
+    setInlineModal({ type: 'account', target: 'broker', initialData: { name: search, group: 'BROKER' } });
   };
 
   const handleCreateItem = (search, index) => {
@@ -102,12 +117,17 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
   };
 
   const handleAccountSuccess = (newAccount) => {
+    const id = newAccount._id || newAccount.id;
+    if (inlineModal.target === 'broker') {
+      setHeader(prev => ({ ...prev, broker: id }));
+      return;
+    }
     setHeader(prev => ({ 
       ...prev, 
-      party: newAccount._id || newAccount.id,
+      party: id,
       add: newAccount.address || '',
       gstin: newAccount.gstin || '',
-      city: newAccount.station || ''
+      city: newAccount.station || newAccount.city || ''
     }));
   };
 
@@ -213,11 +233,12 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
                     value={header.party}
                     onChange={(val) => {
                       const party = parties.find(p => p._id === val || p.id === val);
-                      setHeader({...header, party: val, add: party?.address || '', gstin: party?.gstin || '', city: party?.station || ''});
+                      setHeader({...header, party: val, add: party?.address || '', gstin: party?.gstin || '', city: party?.station || party?.city || ''});
                     }}
                     onCreateNew={handleCreateAccount}
-                    options={parties.map(p => ({value: p._id || p.id, label: p.name}))} 
+                    options={parties.filter(p => p.type !== 'Broker').map(p => ({value: p._id || p.id, label: p.name}))} 
                     label="Party"
+                    createLabel="Party"
                   />
                   {header.gstin && (
                      <p className="text-[10px] font-black uppercase text-slate-400 mt-1">GSTIN: {header.gstin}</p>
@@ -235,8 +256,10 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
                     className="w-full h-11 border-2 border-slate-100 focus:border-black transition-all font-bold" 
                     value={header.broker}
                     onChange={(val) => setHeader({...header, broker: val})}
-                    options={parties.filter(p => p.group === 'Broker').map(p => ({value: p._id || p.id, label: p.name}))} 
+                    onCreateNew={handleCreateBroker}
+                    options={parties.filter(p => p.type === 'Broker' || p.group === 'BROKER').map(p => ({value: p._id || p.id, label: p.name}))} 
                     label="Broker"
+                    createLabel="Broker"
                   />
                </div>
 
@@ -367,8 +390,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
                                  }
                                }}
                                onCreateNew={(search) => handleCreateItem(search, idx)}
-                               options={items.map(i => ({value: i._id || i.id, label: i.itemName}))} 
+                               options={items.map(i => ({value: i._id || i.id, label: i.itemName || i.name}))} 
                                label="Item"
+                               createLabel="Item"
                              />
                           </td>
                            <td className="px-2">
@@ -522,13 +546,13 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null }
       {/* Inline Creation Modals */}
       <AccountMasterModal 
         isOpen={inlineModal.type === 'account'} 
-        onClose={() => setInlineModal({ type: null, initialData: null, rowIndex: null })}
+        onClose={() => setInlineModal({ type: null, target: 'party', initialData: null, rowIndex: null })}
         initialData={inlineModal.initialData}
         onSuccess={handleAccountSuccess}
       />
       <ItemMasterModal 
         isOpen={inlineModal.type === 'item'} 
-        onClose={() => setInlineModal({ type: null, initialData: null, rowIndex: null })}
+        onClose={() => setInlineModal({ type: null, target: 'party', initialData: null, rowIndex: null })}
         initialData={inlineModal.initialData}
         onSuccess={handleItemSuccess}
       />

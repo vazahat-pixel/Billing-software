@@ -7,7 +7,7 @@ import ItemMasterModal from '../masters/ItemMasterModal';
 import { Trash2, Plus, Calculator, Truck, FileText, XCircle, Save, Printer, Search } from 'lucide-react';
 
 const PurchaseModal = ({ isOpen, onClose, selectedBook = null }) => {
-  const { parties, items, addPurchase } = useStore();
+  const { parties, items, purchases, addPurchase, fetchParties, fetchItems } = useStore();
   
   const [activeTab, setActiveTab] = useState('Purchase Invoice');
   const [header, setHeader] = useState({
@@ -26,17 +26,28 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null }) => {
   });
 
   useEffect(() => {
-    if (isOpen && selectedBook) {
-      setHeader(prev => ({ ...prev, book: selectedBook }));
+    if (isOpen) {
+      fetchParties();
+      fetchItems();
+      if (selectedBook) {
+        setHeader(prev => ({ ...prev, book: selectedBook }));
+      }
+      setHeader(prev => ({
+        ...prev,
+        vNo: String((purchases?.length || 0) + 1),
+        billDate: new Date().toISOString().split('T')[0],
+        chDate: new Date().toISOString().split('T')[0]
+      }));
     }
-  }, [isOpen, selectedBook]);
+  }, [isOpen, selectedBook, fetchParties, fetchItems, purchases?.length]);
 
   const [gridItems, setGridItems] = useState([
     { id: 1, itemId: '', itemName: '', hsnCode: '', fold: '0.00', unit: 'MTRS', pcs: 0, cut: 0, mts: 0, rate: 0, amount: 0 }
   ]);
 
   const [inlineModal, setInlineModal] = useState({
-    type: null, // 'account' or 'item'
+    type: null,
+    target: 'party',
     initialData: null,
     rowIndex: null
   });
@@ -49,7 +60,11 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null }) => {
   }, [gridItems]);
 
   const handleCreateAccount = (search) => {
-    setInlineModal({ type: 'account', initialData: { name: search } });
+    setInlineModal({ type: 'account', target: 'party', initialData: { name: search, group: 'SUNDRY CREDITORS' } });
+  };
+
+  const handleCreateBroker = (search) => {
+    setInlineModal({ type: 'account', target: 'broker', initialData: { name: search, group: 'BROKER' } });
   };
 
   const handleCreateItem = (search, index) => {
@@ -57,12 +72,17 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null }) => {
   };
 
   const handleAccountSuccess = (newAccount) => {
+    const id = newAccount._id || newAccount.id;
+    if (inlineModal.target === 'broker') {
+      setHeader(prev => ({ ...prev, broker: id }));
+      return;
+    }
     setHeader(prev => ({ 
       ...prev, 
-      party: newAccount._id || newAccount.id,
+      party: id,
       add: newAccount.address || '',
       gstin: newAccount.gstin || '',
-      city: newAccount.station || ''
+      city: newAccount.station || newAccount.city || ''
     }));
   };
 
@@ -159,11 +179,12 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null }) => {
                    value={header.party}
                    onChange={(val) => {
                      const party = parties.find(p => p._id === val || p.id === val);
-                     setHeader({...header, party: val, add: party?.address || '', gstin: party?.gstin || '', city: party?.station || ''});
+                     setHeader({...header, party: val, add: party?.address || '', gstin: party?.gstin || '', city: party?.station || party?.city || ''});
                    }}
                    onCreateNew={handleCreateAccount}
-                   options={parties.map(p => ({value: p._id || p.id, label: p.name}))} 
+                   options={parties.filter(p => p.type === 'Supplier' || p.type === 'Both' || p.group === 'SUNDRY CREDITORS').map(p => ({value: p._id || p.id, label: p.name}))} 
                    label="Party"
+                   createLabel="Supplier"
                  />
                  {header.gstin && (
                     <p className="text-[10px] font-bold text-slate-400 mt-2 px-1">GSTIN: {header.gstin}</p>
@@ -181,8 +202,10 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null }) => {
                    className="w-full" 
                    value={header.broker}
                    onChange={(val) => setHeader({...header, broker: val})}
-                   options={parties.filter(p => p.group === 'Broker').map(p => ({value: p._id || p.id, label: p.name}))} 
+                   onCreateNew={handleCreateBroker}
+                   options={parties.filter(p => p.type === 'Broker' || p.group === 'BROKER').map(p => ({value: p._id || p.id, label: p.name}))} 
                    label="Broker"
+                   createLabel="Broker"
                  />
               </div>
 
@@ -274,7 +297,8 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null }) => {
                                   setGridItems(updated);
                                 }}
                                 onCreateNew={(search) => handleCreateItem(search, idx)}
-                                options={items.map(i => ({value: i._id || i.id, label: i.itemName}))} 
+                                options={items.map(i => ({value: i._id || i.id, label: i.itemName || i.name}))}
+                                createLabel="Item" 
                                 label="Item"
                               />
                            </td>

@@ -5,6 +5,7 @@ import LoginPage from './pages/auth/LoginPage';
 import SignupPage from './pages/auth/SignupPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import AuthBootstrap from './components/auth/AuthBootstrap';
 import AdminLayout from './layouts/AdminLayout';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminCompanies from './pages/admin/Companies';
@@ -27,7 +28,9 @@ function App() {
         {/* Only the Legacy Dashboard is kept */}
         <Route path="/" element={
           <ProtectedRoute allowedRoles={['user', 'super_admin']}>
-            <Dashboard />
+            <AuthBootstrap>
+              <Dashboard />
+            </AuthBootstrap>
           </ProtectedRoute>
         } />
 

@@ -66,16 +66,22 @@ export const ERPSearchableSelect = ({
   onCreateNew, 
   placeholder = "Search...", 
   label,
+  createLabel,
   className = "" 
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const dropdownRef = useRef(null);
 
+  const entityLabel = createLabel || label || 'Record';
   const selectedOption = options.find(opt => opt.value === value);
   const filteredOptions = options.filter(opt => 
     opt.label.toLowerCase().includes(search.toLowerCase())
   );
+  const exactMatch = search && options.some(
+    opt => opt.label.toLowerCase() === search.toLowerCase()
+  );
+  const showCreate = onCreateNew && search && !exactMatch;
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -129,7 +135,7 @@ export const ERPSearchableSelect = ({
               ))
             ) : (
               <div className="px-3 py-4 text-center text-slate-400 text-xs">
-                No results found for "{search}"
+                {search ? `No ${entityLabel.toLowerCase()} found for "${search}"` : `No ${entityLabel.toLowerCase()} registered yet`}
               </div>
             )}
           </div>
@@ -139,11 +145,18 @@ export const ERPSearchableSelect = ({
               onClick={() => {
                 onCreateNew(search);
                 setIsOpen(false);
+                setSearch("");
               }}
-              className="p-2 border-t border-slate-100 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold cursor-pointer flex items-center gap-2 transition-colors"
+              className={`p-2 border-t border-slate-100 text-xs font-bold cursor-pointer flex items-center gap-2 transition-colors ${
+                showCreate || options.length === 0
+                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800'
+                  : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
+              }`}
             >
               <FontAwesomeIcon icon={faPlus} />
-              Create New "{search || label}"
+              {search
+                ? `+ Quick Add ${entityLabel}: "${search}"`
+                : `+ Register New ${entityLabel}`}
             </div>
           )}
         </div>

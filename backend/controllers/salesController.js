@@ -2,6 +2,7 @@ const salesService = require('../services/salesService');
 
 exports.createInvoice = async (req, res) => {
   try {
+    req.body.companyId = req.companyId;
     const sales = await salesService.createInvoice(req.body);
     res.status(201).json({ success: true, data: sales });
   } catch (error) {
@@ -11,7 +12,7 @@ exports.createInvoice = async (req, res) => {
 
 exports.getSales = async (req, res) => {
   try {
-    const { companyId } = req.query;
+    const companyId = req.companyId || req.query.companyId;
     const sales = await salesService.getSales(companyId);
     res.status(200).json({ success: true, data: sales });
   } catch (error) {

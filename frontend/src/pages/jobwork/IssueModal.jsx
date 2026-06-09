@@ -1,64 +1,102 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../../components/ui/Modal';
-import { ERPInput, ERPSelect, ERPSearchableSelect } from '../../components/forms/FormElements';
+import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
-import AccountMasterModal from '../masters/AccountMasterModal';
-import ItemMasterModal from '../masters/ItemMasterModal';
 
 const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
-  const { parties, items } = useStore();
+  const { 
+    parties, 
+    inventoryLots, 
+    jobWorkEntries, 
+    fetchParties, 
+    fetchInventory, 
+    fetchJobs, 
+    issueToMill 
+  } = useStore();
+
   const [activeTab, setActiveTab] = useState('Mill Issue');
+  const [selectedLot, setSelectedLot] = useState(null);
 
   const [header, setHeader] = useState({
-    book: 'PROCESS',
-    challanNo: '1',
-    date: '05/05/2026',
-    jobParty: '',
-    add: '',
-    item: ''
+    processType: 'Printing',
+    jobCardNo: '',
+    date: new Date().toISOString().substring(0, 10),
+    workerId: '',
+    issuePcs: '',
+    issueQty: ''
   });
 
-  React.useEffect(() => {
-    if (isOpen && selectedBook) {
-      setHeader(prev => ({ ...prev, book: selectedBook }));
+  useEffect(() => {
+    if (isOpen) {
+      fetchParties();
+      fetchInventory();
+      fetchJobs();
+      // Auto-generate job card no
+      setHeader(prev => ({
+        ...prev,
+        jobCardNo: `JC-${Math.floor(100000 + Math.random() * 900000)}`
+      }));
     }
-  }, [isOpen, selectedBook]);
+  }, [isOpen, fetchParties, fetchInventory, fetchJobs]);
 
-  const [gridItems, setGridItems] = useState([
-    { id: 1, purVno: '', billNo: '', partyName: '', totPcs: 0, totQty: 0, totKgs: 0, issPcs: 0, issQty: 0, issKgs: 0, purRate: 0 }
-  ]);
+  const workers = useMemo(() => {
+    return parties.filter(p => p.type === 'Job Worker');
+  }, [parties]);
 
-  const [takaItems, setTakaItems] = useState([
-    { sr: 1, purSr: 0, mts: 0.000, kgs: 0.000, cp: '' }
-  ]);
+  const availableLots = useMemo(() => {
+    return inventoryLots.filter(lot => lot.remainingMtrs > 0 && lot.status !== 'Closed');
+  }, [inventoryLots]);
 
-  // Inline Modal State
-  const [inlineModal, setInlineModal] = useState({
-    type: null, // 'account' or 'item'
-    initialData: null
-  });
-
-  const handleCreateAccount = (search) => {
-    setInlineModal({ type: 'account', initialData: { name: search, group: 'SUNDRY CREDITORS' } });
-  };
-
-  const handleCreateItem = (search) => {
-    setInlineModal({ type: 'item', initialData: { itemName: search, group: 'GREY' } });
-  };
-
-  const handleAccountSuccess = (newAccount) => {
-    setHeader(prev => ({ 
-      ...prev, 
-      jobParty: newAccount.id,
-      add: newAccount.address || ''
+  const handleSelectLot = (lot) => {
+    setSelectedLot(lot);
+    setHeader(prev => ({
+      ...prev,
+      issuePcs: lot.remainingPcs || '',
+      issueQty: lot.remainingMtrs || ''
     }));
   };
 
-  const handleItemSuccess = (newItem) => {
-    setHeader(prev => ({ 
-      ...prev, 
-      item: newItem.id
-    }));
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedLot) {
+      alert('Please select an available lot from the right panel first.');
+      return;
+    }
+    if (!header.workerId) {
+      alert('Please select a Job Worker / Mill Party.');
+      return;
+    }
+    if (!header.issueQty || parseFloat(header.issueQty) <= 0) {
+      alert('Please enter a valid issue quantity.');
+      return;
+    }
+
+    try {
+      await issueToMill({
+        jobCardNo: header.jobCardNo,
+        lotId: selectedLot._id,
+        workerId: header.workerId,
+        processType: header.processType,
+        issuePcs: Number(header.issuePcs) || 0,
+        issueQty: Number(header.issueQty),
+        issueDate: new Date(header.date)
+      });
+      alert('Job issued to mill successfully!');
+      setSelectedLot(null);
+      // Reset form
+      setHeader(prev => ({
+        ...prev,
+        jobCardNo: `JC-${Math.floor(100000 + Math.random() * 900000)}`,
+        workerId: '',
+        issuePcs: '',
+        issueQty: ''
+      }));
+      setActiveTab('View Mill Issue');
+      fetchInventory();
+      fetchJobs();
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to issue lot');
+    }
   };
 
   return (
@@ -73,7 +111,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
              onClick={() => setActiveTab(tab)}
              className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                 activeTab === tab 
-                   ? 'bg-white text-[#1B3A6B] shadow-sm border border-[#E2E8F0]' 
+                   ? 'bg-white text-black shadow-sm border border-[#E2E8F0]' 
                    : 'text-slate-500 hover:bg-slate-100'
              }`}
             >
@@ -84,195 +122,236 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
 
       <div className="flex flex-col h-full overflow-hidden bg-white">
         
-        {/* Main Content Area */}
-        <div className="flex-1 flex overflow-hidden">
-           {/* Left Form (70%) */}
-           <div className="flex-[3] flex flex-col overflow-y-auto p-5 space-y-4 no-scrollbar">
-              
-              <div className="flex items-center gap-3">
-                 <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Process Specifications</span>
-                 <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
-              </div>
+        {activeTab === 'Mill Issue' ? (
+          <div className="flex-1 flex overflow-hidden">
+             {/* Left Form (70%) */}
+             <form onSubmit={handleSubmit} className="flex-[3] flex flex-col overflow-y-auto p-5 space-y-4 no-scrollbar">
+                
+                <div className="flex items-center gap-3">
+                   <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Process Specifications</span>
+                   <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
+                </div>
 
-              {/* Form details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-bold text-slate-700">Challan / Order No</label>
-                    <ERPInput className="w-full h-[38px] text-sm font-bold text-[#1B3A6B] bg-slate-50 border border-slate-200" value={header.challanNo} readOnly />
-                 </div>
+                {/* Form details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-bold text-slate-700">Job Card No</label>
+                      <ERPInput 
+                        className="w-full h-[38px] text-sm font-bold text-black bg-slate-50 border border-slate-200" 
+                        value={header.jobCardNo} 
+                        onChange={e => setHeader({...header, jobCardNo: e.target.value})}
+                        required
+                      />
+                   </div>
 
-                 <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-bold text-slate-700">Challan Date</label>
-                    <input 
-                      type="date" 
-                      className="w-full h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-2 focus:ring-[#0D7377] text-slate-800 text-sm bg-white" 
-                      value={header.date} 
-                      onChange={e => setHeader({...header, date: e.target.value})} 
-                    />
-                 </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-bold text-slate-700">Challan Date</label>
+                      <input 
+                        type="date" 
+                        className="w-full h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-1 focus:ring-black text-slate-800 text-sm bg-white" 
+                        value={header.date} 
+                        onChange={e => setHeader({...header, date: e.target.value})} 
+                        required
+                      />
+                   </div>
 
-                 <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-bold text-slate-700">Job Worker / Mill Party</label>
-                    <ERPSearchableSelect 
-                      className="w-full h-[38px]" 
-                      value={header.jobParty}
-                      onChange={(val) => {
-                         const party = parties.find(p => p.id === val);
-                         setHeader({...header, jobParty: val, add: party?.address || ''});
-                      }}
-                      onCreateNew={handleCreateAccount}
-                      options={parties.map(p => ({value: p.id, label: p.name}))} 
-                      label="Job Party"
-                    />
-                 </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-bold text-slate-700">Job Worker / Mill Party</label>
+                      <ERPSelect 
+                        className="w-full h-[38px]" 
+                        value={header.workerId}
+                        onChange={(e) => setHeader({...header, workerId: e.target.value})}
+                        options={[{value: '', label: 'Select Worker'}, ...workers.map(w => ({value: w._id, label: w.name}))]} 
+                        required
+                      />
+                   </div>
 
-                 <div className="flex flex-col gap-1">
-                    <label className="text-[12px] font-bold text-slate-700">Item Fabric (Grey)</label>
-                    <ERPSearchableSelect 
-                      className="w-full h-[38px]" 
-                      value={header.item}
-                      onChange={(val) => setHeader({...header, item: val})}
-                      onCreateNew={handleCreateItem}
-                      options={items.map(i => ({value: i.id, label: i.itemName}))} 
-                      label="Item"
-                    />
-                 </div>
-              </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-bold text-slate-700">Process Type</label>
+                      <ERPSelect 
+                        className="w-full h-[38px]" 
+                        value={header.processType}
+                        onChange={(e) => setHeader({...header, processType: e.target.value})}
+                        options={[
+                          { value: 'Printing', label: 'Printing' },
+                          { value: 'Dyeing', label: 'Dyeing' },
+                          { value: 'Stitching', label: 'Stitching' },
+                          { value: 'Finishing', label: 'Finishing' },
+                        ]} 
+                        required
+                      />
+                   </div>
+                </div>
 
-              {/* Process type colored button group selection */}
-              <div className="flex flex-col gap-2 pt-2">
-                 <label className="text-[12px] font-bold text-slate-700 uppercase tracking-wider">Process Type Selection</label>
-                 <div className="flex gap-2 flex-wrap">
-                    {[
-                       { name: 'Bleaching', color: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100', activeColor: 'bg-blue-600 text-white border-blue-600' },
-                       { name: 'Dyeing', color: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100', activeColor: 'bg-indigo-600 text-white border-indigo-600' },
-                       { name: 'Printing', color: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100', activeColor: 'bg-emerald-600 text-white border-emerald-600' },
-                       { name: 'Calendar', color: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100', activeColor: 'bg-amber-600 text-white border-amber-600' }
-                    ].map(proc => {
-                       const isActive = header.book === proc.name.toUpperCase();
-                       return (
-                          <button
-                             key={proc.name}
-                             type="button"
-                             onClick={() => setHeader({ ...header, book: proc.name.toUpperCase() })}
-                             className={`px-4 py-2 border text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 shadow-sm ${
-                                isActive ? proc.activeColor : proc.color
-                             }`}
-                          >
-                             {proc.name}
-                          </button>
-                       );
-                    })}
-                 </div>
-              </div>
+                <div className="flex items-center gap-3 pt-2">
+                   <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Selected Lot Stock Issue Details</span>
+                   <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
+                </div>
 
-              <div className="flex items-center gap-3 pt-2">
-                 <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Challan Allocation Grid</span>
-                 <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
-              </div>
-
-              {/* Grid Table */}
-              <div className="border border-[#E2E8F0] rounded-xl overflow-hidden shadow-sm">
-                 <table className="w-full text-xs border-collapse">
-                    <thead className="bg-[#F8FAFC] text-[#64748B] border-b border-[#E2E8F0]">
-                       <tr className="h-10">
-                          <th className="px-2 font-semibold text-center uppercase tracking-[0.05em] text-[11px] w-12">#</th>
-                          <th className="px-3 text-left font-semibold uppercase tracking-[0.05em] text-[11px]">PurVno</th>
-                          <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-24">Bill No</th>
-                          <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-20">Tot Pcs</th>
-                          <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-24">Tot Qty</th>
-                          <th className="px-2 text-center font-semibold uppercase tracking-[0.05em] text-[11px] w-24">Iss Qty</th>
-                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#F1F5F9]">
-                       {[...Array(4)].map((_, idx) => (
-                          <tr key={idx} className={`h-[40px] hover:bg-[#F8FAFC] transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#FAFAFA]'}`}>
-                             <td className="text-center text-slate-400 font-bold">{idx + 1}</td>
-                             <td className="px-3 font-semibold text-[#1b3a6b]">PUR-2026-00{idx + 1}</td>
-                             <td className="text-center text-slate-500">B-108{idx}</td>
-                             <td className="text-center font-bold text-slate-600 bg-slate-50">12</td>
-                             <td className="text-center font-bold text-slate-600 bg-slate-50">240.00</td>
-                             <td className="px-2">
-                                <input 
-                                   type="number" 
-                                   className="w-full h-[28px] text-center border border-slate-200 bg-transparent focus:bg-white focus:ring-1 focus:ring-[#0D7377] transition-all rounded px-1 text-xs outline-none" 
-                                   placeholder="0.00" 
-                                />
-                             </td>
-                          </tr>
-                       ))}
-                    </tbody>
-                 </table>
-              </div>
-
-           </div>
-
-           {/* Lot Selector Card Grid (Right Column 30%) */}
-           <div className="flex-1 flex flex-col bg-slate-50 border-l border-[#E2E8F0] overflow-hidden">
-              <div className="bg-[#1B3A6B] text-white text-xs px-4 h-[56px] flex justify-between items-center font-semibold shrink-0">
-                 <span>Available Lots selector</span>
-                 <span className="px-2 py-0.5 bg-white/15 rounded text-[10px]">Select Lot to Issue</span>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
-                 {[
-                    { lotNo: 'LOT-2026-A1', mtrs: '1,450 Mtrs', grade: 'Premium A+', bg: 'hover:border-[#0D7377]' },
-                    { lotNo: 'LOT-2026-A2', mtrs: '820 Mtrs', grade: 'Standard A', bg: 'hover:border-[#0D7377]' },
-                    { lotNo: 'LOT-2026-B1', mtrs: '2,100 Mtrs', grade: 'Commercial B', bg: 'hover:border-amber-500' }
-                 ].map(lot => (
-                    <div 
-                       key={lot.lotNo}
-                       onClick={() => setHeader({ ...header, challanNo: lot.lotNo })}
-                       className={`bg-white border border-[#E2E8F0] rounded-xl p-3.5 shadow-sm cursor-pointer transition-all ${lot.bg} hover:shadow-md hover:scale-[1.02]`}
-                    >
-                       <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs font-bold text-[#1B3A6B]">{lot.lotNo}</span>
-                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold rounded-full">
-                             {lot.grade}
-                          </span>
-                       </div>
-                       <div className="flex justify-between items-center text-xs text-slate-500">
-                          <span>Available Meters</span>
-                          <span className="font-bold text-[#0D7377]">{lot.mtrs}</span>
-                       </div>
+                {selectedLot ? (
+                  <div className="bg-slate-50 p-4 border border-slate-200 rounded-xl space-y-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase">Selected Lot ID</p>
+                        <p className="text-black font-black uppercase mt-1">{selectedLot.lotId}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase">Fabric Item</p>
+                        <p className="text-black font-black uppercase mt-1">{selectedLot.itemId?.name || selectedLot.itemName}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase">Available Pcs</p>
+                        <p className="text-black font-black mt-1">{selectedLot.remainingPcs} Pcs</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase">Available Meters</p>
+                        <p className="text-black font-black mt-1">{selectedLot.remainingMtrs} Mtrs</p>
+                      </div>
                     </div>
-                 ))}
-              </div>
-           </div>
-        </div>
 
-        {/* Action Footer */}
-        <div className="p-4 border-t border-[#E2E8F0] bg-[#F8FAFC] flex justify-end gap-3 shrink-0 rounded-b-xl">
-           <button 
-              type="button" 
-              onClick={onClose}
-              className="h-[38px] px-6 bg-white border border-[#1B3A6B] text-[#1B3A6B] font-medium rounded-lg hover:bg-slate-50 transition-all text-sm"
-           >
-              Cancel
-           </button>
-           <button 
-              type="button"
-              onClick={onClose}
-              className="h-[38px] px-6 bg-[#1B3A6B] hover:bg-[#142d56] text-white font-medium rounded-lg transition-all text-sm shadow-sm"
-           >
-              Save & Issue
-           </button>
-        </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                         <label className="text-[12px] font-bold text-slate-700">Issue Pcs</label>
+                         <input 
+                            type="number" 
+                            className="h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-1 focus:ring-black text-slate-800 text-sm bg-white font-bold" 
+                            value={header.issuePcs} 
+                            onChange={e => setHeader({...header, issuePcs: e.target.value})}
+                            max={selectedLot.remainingPcs}
+                            placeholder="0"
+                         />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                         <label className="text-[12px] font-bold text-slate-700">Issue Meters (Qty)</label>
+                         <input 
+                            type="number" 
+                            className="h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-1 focus:ring-black text-slate-800 text-sm bg-white font-bold" 
+                            value={header.issueQty} 
+                            onChange={e => setHeader({...header, issueQty: e.target.value})}
+                            max={selectedLot.remainingMtrs}
+                            placeholder="0.00"
+                            required
+                         />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-12 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 font-semibold uppercase tracking-widest text-[11px]">
+                     Select a Grey Lot from the Available Lots panel to continue
+                  </div>
+                )}
+
+                {/* Footer Actions inside form */}
+                <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+                   <button 
+                      type="button" 
+                      onClick={onClose}
+                      className="h-[38px] px-6 bg-white border border-black text-black font-bold uppercase tracking-widest text-xs hover:bg-slate-50 transition-all rounded-lg"
+                   >
+                      Cancel
+                   </button>
+                   <button 
+                      type="submit"
+                      className="h-[38px] px-6 bg-black text-white font-bold uppercase tracking-widest text-xs hover:bg-slate-800 transition-all shadow-sm rounded-lg"
+                   >
+                      Save & Issue to Mill
+                   </button>
+                </div>
+
+             </form>
+
+             {/* Lot Selector Card Grid (Right Column 30%) */}
+             <div className="flex-1 flex flex-col bg-slate-50 border-l border-[#E2E8F0] overflow-hidden">
+                <div className="bg-black text-white text-xs px-4 h-[56px] flex justify-between items-center font-bold tracking-wider uppercase shrink-0">
+                   <span>Available Lots</span>
+                   <span className="px-2 py-0.5 bg-white/10 rounded text-[9px]">Select to Load</span>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                   {availableLots.map(lot => {
+                      const isSelected = selectedLot?._id === lot._id;
+                      return (
+                        <div 
+                           key={lot._id}
+                           onClick={() => handleSelectLot(lot)}
+                           className={`bg-white border rounded-xl p-3.5 shadow-sm cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${
+                             isSelected ? 'border-black ring-1 ring-black' : 'border-[#E2E8F0]'
+                           }`}
+                        >
+                           <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-xs font-black text-black tracking-wide">{lot.lotId}</span>
+                              <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold rounded-full uppercase tracking-wider">
+                                 {lot.itemId?.category || lot.category || 'Grey'}
+                              </span>
+                           </div>
+                           <div className="space-y-1 mt-2">
+                             <div className="flex justify-between items-center text-[10px] text-slate-400">
+                                <span>Fabric</span>
+                                <span className="font-bold text-slate-700 uppercase">{lot.itemId?.name || lot.itemName}</span>
+                             </div>
+                             <div className="flex justify-between items-center text-[10px] text-slate-400">
+                                <span>Meters</span>
+                                <span className="font-black text-black">{lot.remainingMtrs.toFixed(2)} Mtrs</span>
+                             </div>
+                           </div>
+                        </div>
+                      );
+                   })}
+                   {availableLots.length === 0 && (
+                     <div className="py-12 text-center text-slate-400 font-bold uppercase tracking-widest text-[9px]">
+                        No grey fabric lots in stock
+                     </div>
+                   )}
+                </div>
+             </div>
+          </div>
+        ) : (
+          // View Mill Issue list tab
+          <div className="flex-1 p-6 overflow-y-auto">
+             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-xs text-left border-collapse">
+                   <thead className="bg-slate-50 text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-200">
+                      <tr className="h-10">
+                         <th className="px-4 py-3">Date</th>
+                         <th className="px-4 py-3">Job Card No</th>
+                         <th className="px-4 py-3">Mill Partner</th>
+                         <th className="px-4 py-3">Process</th>
+                         <th className="px-4 py-3 text-right">Issued Qty</th>
+                         <th className="px-4 py-3 text-center">Status</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-100 text-[11px]">
+                      {jobWorkEntries.map((job) => (
+                         <tr key={job._id} className="hover:bg-slate-50/50">
+                            <td className="px-4 py-3 text-slate-500 font-medium">{new Date(job.issueDate).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 font-bold text-black uppercase">{job.jobCardNo}</td>
+                            <td className="px-4 py-3 font-semibold uppercase">{job.workerId?.name || 'N/A'}</td>
+                            <td className="px-4 py-3 text-slate-500 uppercase font-medium">{job.processType}</td>
+                            <td className="px-4 py-3 text-right font-black">{job.issueQty} Mtrs</td>
+                            <td className="px-4 py-3 text-center">
+                               <span className={`px-2.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                 job.status === 'Received' 
+                                   ? 'bg-green-50 text-green-700 border border-green-150' 
+                                   : 'bg-amber-50 text-amber-700 border border-amber-150'
+                               }`}>
+                                  {job.status}
+                               </span>
+                            </td>
+                         </tr>
+                      ))}
+                      {jobWorkEntries.length === 0 && (
+                        <tr>
+                          <td colSpan="6" className="px-4 py-12 text-center text-slate-400 font-bold uppercase tracking-widest">
+                            No Issued Jobs Found
+                          </td>
+                        </tr>
+                      )}
+                   </tbody>
+                </table>
+             </div>
+          </div>
+        )}
 
       </div>
-
-      {/* Inline Creation Modals */}
-      <AccountMasterModal 
-        isOpen={inlineModal.type === 'account'} 
-        onClose={() => setInlineModal({ type: null, initialData: null })}
-        initialData={inlineModal.initialData}
-        onSuccess={handleAccountSuccess}
-      />
-      <ItemMasterModal 
-        isOpen={inlineModal.type === 'item'} 
-        onClose={() => setInlineModal({ type: null, initialData: null })}
-        initialData={inlineModal.initialData}
-        onSuccess={handleItemSuccess}
-      />
 
     </Modal>
   );

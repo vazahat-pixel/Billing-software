@@ -2,6 +2,7 @@ const jobService = require('../services/jobService');
 
 exports.issueToJob = async (req, res) => {
   try {
+    req.body.companyId = req.companyId;
     const job = await jobService.issueToJob(req.body);
     res.status(201).json({ success: true, data: job });
   } catch (error) {
@@ -11,6 +12,7 @@ exports.issueToJob = async (req, res) => {
 
 exports.receiveFromJob = async (req, res) => {
   try {
+    req.body.companyId = req.companyId;
     const result = await jobService.receiveFromJob(req.body);
     res.status(200).json({ success: true, data: result });
   } catch (error) {
@@ -20,7 +22,8 @@ exports.receiveFromJob = async (req, res) => {
 
 exports.updateProcess = async (req, res) => {
   try {
-    const { jobId, status, companyId } = req.body;
+    const { jobId, status } = req.body;
+    const companyId = req.companyId || req.body.companyId;
     const job = await jobService.updateProcess(jobId, status, companyId);
     res.status(200).json({ success: true, data: job });
   } catch (error) {
@@ -30,7 +33,7 @@ exports.updateProcess = async (req, res) => {
 
 exports.getJobs = async (req, res) => {
   try {
-    const { companyId } = req.query;
+    const companyId = req.companyId || req.query.companyId;
     const jobs = await jobService.getJobs(companyId);
     res.status(200).json({ success: true, data: jobs });
   } catch (error) {

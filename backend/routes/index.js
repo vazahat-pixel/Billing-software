@@ -14,6 +14,11 @@ const reportRoutes = require('./reportRoutes');
 const accountingRoutes = require('./accountingRoutes');
 const bookRoutes = require('./bookRoutes');
 const visitRoutes = require('./visit.routes');
+const subMasterRoutes = require('./subMasterRoutes');
+const orderRoutes = require('./orderRoutes');
+const returnRoutes = require('./returnRoutes');
+const noteRoutes = require('./noteRoutes');
+const userRoutes = require('./user.routes');
 const authMiddleware = require('../middlewares/auth.middleware');
 const subscriptionMiddleware = require('../middlewares/subscription.middleware');
 
@@ -36,5 +41,10 @@ router.use('/gst', gstRoutes);
 router.use('/reports', reportRoutes);
 router.use('/books', bookRoutes);
 router.use('/visits', visitRoutes);
+router.use('/submasters', subMasterRoutes);
+router.use('/orders', orderRoutes);
+router.use('/returns', returnRoutes);
+router.use('/notes', noteRoutes);
+router.use('/users', userRoutes);
 
 module.exports = router;

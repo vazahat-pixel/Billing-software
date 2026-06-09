@@ -1,244 +1,346 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../../components/ui/Modal';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
 
 const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
-  const { parties, items } = useStore();
+  const { 
+    parties, 
+    inventoryLots, 
+    jobWorkEntries, 
+    fetchParties, 
+    fetchInventory, 
+    fetchJobs, 
+    issueToMill 
+  } = useStore();
+
   const [activeTab, setActiveTab] = useState('Job Issue');
+  const [selectedLot, setSelectedLot] = useState(null);
 
   const [header, setHeader] = useState({
-    book: 'EMB. JOBWORK',
-    party: '',
-    broker: '',
-    partyGstin: '',
-    panNo: '',
-    hsnCode: '9988',
-    type: '--Select GstType--',
-    challanNo: '1',
-    challanDate: '01/04/2026',
-    challan2: '',
-    jobType: ''
+    processType: 'Embroidery',
+    jobCardNo: '',
+    date: new Date().toISOString().substring(0, 10),
+    workerId: '',
+    issuePcs: '',
+    issueQty: ''
   });
 
-  React.useEffect(() => {
-    if (isOpen && selectedBook) {
-      setHeader(prev => ({ ...prev, book: selectedBook }));
+  useEffect(() => {
+    if (isOpen) {
+      fetchParties();
+      fetchInventory();
+      fetchJobs();
+      // Auto-generate embroidery job card no
+      setHeader(prev => ({
+        ...prev,
+        jobCardNo: `JC-EMB-${Math.floor(100000 + Math.random() * 900000)}`
+      }));
     }
-  }, [isOpen, selectedBook]);
+  }, [isOpen, fetchParties, fetchInventory, fetchJobs]);
+
+  const workers = useMemo(() => {
+    return parties.filter(p => p.type === 'Job Worker');
+  }, [parties]);
+
+  const availableLots = useMemo(() => {
+    return inventoryLots.filter(lot => lot.remainingMtrs > 0 && lot.status !== 'Closed');
+  }, [inventoryLots]);
+
+  const handleSelectLot = (lot) => {
+    setSelectedLot(lot);
+    setHeader(prev => ({
+      ...prev,
+      issuePcs: lot.remainingPcs || '',
+      issueQty: lot.remainingMtrs || ''
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedLot) {
+      alert('Please select an available lot from the right panel first.');
+      return;
+    }
+    if (!header.workerId) {
+      alert('Please select a Job Worker party.');
+      return;
+    }
+    if (!header.issueQty || parseFloat(header.issueQty) <= 0) {
+      alert('Please enter a valid issue quantity.');
+      return;
+    }
+
+    try {
+      await issueToMill({
+        jobCardNo: header.jobCardNo,
+        lotId: selectedLot._id,
+        workerId: header.workerId,
+        processType: 'Embroidery',
+        issuePcs: Number(header.issuePcs) || 0,
+        issueQty: Number(header.issueQty),
+        issueDate: new Date(header.date)
+      });
+      alert('Embroidery job issued successfully!');
+      setSelectedLot(null);
+      // Reset form
+      setHeader(prev => ({
+        ...prev,
+        jobCardNo: `JC-EMB-${Math.floor(100000 + Math.random() * 900000)}`,
+        workerId: '',
+        issuePcs: '',
+        issueQty: ''
+      }));
+      setActiveTab('View Job Issue');
+      fetchInventory();
+      fetchJobs();
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to issue lot');
+    }
+  };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Job Issue" className="max-w-[98vw] h-[95vh] p-0 overflow-hidden bg-[#e1e9f5]">
+    <Modal isOpen={isOpen} onClose={onClose} title="Embroidery Job Issue" className="max-w-[95vw] h-[90vh] p-0 overflow-hidden">
       
-      <div className="flex bg-[#cbd5e1] border-b border-slate-400 p-0.5 gap-0.5">
+      {/* Dynamic Tab Navigation */}
+      <div className="flex border-b border-[#E2E8F0] p-1 bg-slate-50 gap-1 shrink-0">
          {['Job Issue', 'View Job Issue'].map(tab => (
-           <button 
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1 text-[11px] font-bold border-t-2 ${activeTab === tab ? 'bg-white border-indigo-600 text-slate-900' : 'bg-slate-200 border-transparent text-slate-500'}`}
-           >
-             {tab}
-           </button>
+            <button 
+             key={tab}
+             type="button"
+             onClick={() => setActiveTab(tab)}
+             className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                activeTab === tab 
+                   ? 'bg-white text-black shadow-sm border border-[#E2E8F0]' 
+                   : 'text-slate-500 hover:bg-slate-100'
+             }`}
+            >
+              {tab}
+            </button>
          ))}
       </div>
-      <div className="flex flex-col h-full overflow-hidden">
-        {/* Header */}
-        <div className="p-2 grid grid-cols-12 gap-x-6 gap-y-1 bg-[#f8fafc] border-b border-slate-300">
-           <div className="col-span-1 flex items-center">
-              <ERPInput className="h-6 text-[11px]" value="1" />
-           </div>
-           <div className="col-span-5 space-y-1">
-              <div className="flex items-center gap-2">
-                 <label className="text-[11px] font-black w-20 uppercase">Book</label>
-                 <ERPSelect className="flex-1 h-6 text-[11px] bg-orange-100 font-bold" value={header.book} onChange={e => setHeader({...header, book: e.target.value})} options={[{value: header.book, label: header.book}]} />
-              </div>
-              <div className="flex items-center gap-2">
-                 <label className="text-[11px] font-black w-20 uppercase">Party</label>
-                 <ERPSelect className="flex-1 h-6 text-[11px]" options={parties.map(p => ({value: p.id, label: p.name}))} />
-              </div>
-              <div className="flex items-center gap-2 h-6"></div> {/* Spacer */}
-              <div className="flex items-center gap-2">
-                 <label className="text-[11px] font-black w-20 uppercase">Broker</label>
-                 <ERPSelect className="flex-1 h-6 text-[11px]" options={parties.filter(p => p.group === 'Broker').map(p => ({value: p.id, label: p.name}))} />
-              </div>
-           </div>
 
-           <div className="col-span-6 space-y-1 pl-4">
-              <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                       <label className="text-[11px] font-black w-20 text-rose-600 uppercase">Party Gstin</label>
-                       <ERPInput className="flex-1 h-6 text-[11px]" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                       <label className="text-[11px] font-black w-20 text-rose-600 uppercase">Pan No</label>
-                       <ERPInput className="flex-1 h-6 text-[11px]" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                       <label className="text-[11px] font-black w-20 uppercase">HsnCode</label>
-                       <ERPInput className="w-32 h-6 text-[11px]" value="9988" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                       <label className="text-[11px] font-black w-20 uppercase">Type</label>
-                       <ERPSelect className="flex-1 h-6 text-[11px]" options={[{value: '--Select GstType--', label: '--Select GstType--'}]} />
-                    </div>
-                 </div>
-                 <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                       <label className="text-[11px] font-black w-24 text-right uppercase">Challan No</label>
-                       <ERPInput className="w-24 h-6 text-[11px]" value="1" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                       <label className="text-[11px] font-black w-24 text-right uppercase">Challan Date</label>
-                       <ERPInput className="w-24 h-6 text-[11px]" value="01/04/2026" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                       <label className="text-[11px] font-black w-24 text-right uppercase">Challan2</label>
-                       <ERPInput className="w-24 h-6 text-[11px]" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                       <label className="text-[11px] font-black w-24 text-right uppercase">Job Type</label>
-                       <ERPSelect className="w-24 h-6 text-[11px]" options={[]} />
-                    </div>
-                 </div>
-              </div>
-           </div>
-        </div>
+      <div className="flex flex-col h-full overflow-hidden bg-white">
+        
+        {activeTab === 'Job Issue' ? (
+          <div className="flex-1 flex overflow-hidden">
+             {/* Left Form (70%) */}
+             <form onSubmit={handleSubmit} className="flex-[3] flex flex-col overflow-y-auto p-5 space-y-4 no-scrollbar">
+                
+                <div className="flex items-center gap-3">
+                   <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Embroidery Specifications</span>
+                   <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
+                </div>
 
-        {/* Grid */}
-        <div className="flex-1 overflow-auto bg-[#8e97a3] border-b border-slate-400">
-           <table className="w-full text-[10px] border-collapse border border-slate-500">
-              <thead className="bg-[#1e293b] text-white sticky top-0">
-                 <tr>
-                    {['Sr No.', 'Item Name', 'Fin Item', 'Unit', 'Pcs', 'Cut', 'Mts', 'Kgs', 'Rate', 'Amount', 'Fab.Rate', 'Remark'].map(h => (
-                       <th key={h} className="border border-slate-600 px-1 py-1 font-bold whitespace-nowrap">{h}</th>
-                    ))}
-                 </tr>
-              </thead>
-              <tbody className="bg-white">
-                 {[...Array(12)].map((_, idx) => (
-                    <tr key={idx} className="h-6 odd:bg-slate-50">
-                       <td className="border border-slate-300 text-center bg-slate-100">{idx + 1}</td>
-                       <td className="border border-slate-300 px-1"><ERPSelect className="w-full h-4 border-none p-0 text-[10px]" options={items.map(i => ({value: i.id, label: i.itemName}))} /></td>
-                       <td className="border border-slate-300 px-1"><ERPSelect className="w-full h-4 border-none p-0 text-[10px]" options={items.map(i => ({value: i.id, label: i.itemName}))} /></td>
-                       <td className="border border-slate-300 px-1 text-center font-bold">MTRS</td>
-                       <td className="border border-slate-300 px-1 text-center font-bold">0</td>
-                       <td className="border border-slate-300 px-1 text-center">0.00</td>
-                       <td className="border border-slate-300 px-1 text-center">0.00</td>
-                       <td className="border border-slate-300 px-1 text-center">0.000</td>
-                       <td className="border border-slate-300 px-1 text-right">0.00</td>
-                       <td className="border border-slate-300 px-1 text-right bg-slate-50">0.00</td>
-                       <td className="border border-slate-300 px-1 text-right">0.00</td>
-                       <td className="border border-slate-300 px-1"></td>
-                    </tr>
-                 ))}
-              </tbody>
-           </table>
-        </div>
+                {/* Form details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-bold text-slate-700">Job Card No</label>
+                      <ERPInput 
+                        className="w-full h-[38px] text-sm font-bold text-black bg-slate-50 border border-slate-200" 
+                        value={header.jobCardNo} 
+                        onChange={e => setHeader({...header, jobCardNo: e.target.value})}
+                        required
+                      />
+                   </div>
 
-        {/* Summary Row */}
-        <div className="bg-[#cbd5e1] border-b border-slate-400 p-1 grid grid-cols-10 gap-1 text-[11px] font-black uppercase text-center">
-           <div className="col-span-2 text-right px-4">Total Quan :</div>
-           <div className="bg-white border border-slate-400">0.00</div>
-           <div className="text-right px-4">Total Pcs :</div>
-           <div className="bg-white border border-slate-400">0.00</div>
-           <div className="text-right px-4">Total Qty :</div>
-           <div className="bg-white border border-slate-400">0.00</div>
-           <div className="text-right px-4">Total Kgs :</div>
-           <div className="bg-white border border-slate-400">0.00</div>
-           <div className="text-right px-4">Total Amt :</div>
-           <div className="bg-white border border-slate-400">0.00</div>
-        </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-bold text-slate-700">Challan Date</label>
+                      <input 
+                        type="date" 
+                        className="w-full h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-1 focus:ring-black text-slate-800 text-sm bg-white" 
+                        value={header.date} 
+                        onChange={e => setHeader({...header, date: e.target.value})} 
+                        required
+                      />
+                   </div>
 
-        {/* Bottom */}
-        <div className="bg-[#f1f5f9] p-2 border-t border-slate-400">
-           <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-4 bg-white border border-slate-300 rounded p-2">
-                 <div className="text-[10px] font-black uppercase text-slate-500 mb-2 border-b border-slate-200">Gst Details</div>
-                 <div className="space-y-1 text-[11px]">
-                    <div className="flex items-center justify-between">
-                       <label>CGST %</label>
-                       <div className="flex gap-2">
-                          <ERPInput className="w-12 h-5" value="0.00" />
-                          <label>Amt :</label>
-                          <ERPInput className="w-20 h-5 bg-slate-50" readOnly value="0.00" />
-                       </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                       <label>SGST %</label>
-                       <div className="flex gap-2">
-                          <ERPInput className="w-12 h-5" value="0.00" />
-                          <label>Amt :</label>
-                          <ERPInput className="w-20 h-5 bg-slate-50" readOnly value="0.00" />
-                       </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                       <label>IGST %</label>
-                       <div className="flex gap-2">
-                          <ERPInput className="w-12 h-5" value="0.00" />
-                          <label>Amt :</label>
-                          <ERPInput className="w-20 h-5 bg-slate-50" readOnly value="0.00" />
-                       </div>
-                    </div>
-                 </div>
-              </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-bold text-slate-700">Job Worker / Embroidery Unit</label>
+                      <ERPSelect 
+                        className="w-full h-[38px]" 
+                        value={header.workerId}
+                        onChange={(e) => setHeader({...header, workerId: e.target.value})}
+                        options={[{value: '', label: 'Select Embroidery Partner'}, ...workers.map(w => ({value: w._id, label: w.name}))]} 
+                        required
+                      />
+                   </div>
 
-              <div className="col-span-5 space-y-1 text-[11px]">
-                 <div className="grid grid-cols-2 gap-2">
-                    <div className="flex items-center gap-1">
-                       <label className="w-20 font-bold">Transport :</label>
-                       <ERPInput className="flex-1 h-5" />
-                    </div>
-                    <div className="flex items-center gap-1">
-                       <label className="w-12">L.R. No :</label>
-                       <ERPInput className="flex-1 h-5" />
-                    </div>
-                 </div>
-                 <div className="grid grid-cols-2 gap-2">
-                    <div className="flex items-center gap-1">
-                       <label className="w-20">Vehical No :</label>
-                       <ERPSelect className="flex-1 h-5" options={[]} />
-                    </div>
-                    <div className="flex items-center gap-1">
-                       <label className="w-12 font-bold">Remark :</label>
-                       <ERPInput className="flex-1 h-5" />
-                    </div>
-                 </div>
-                 <div className="flex items-center gap-2">
-                    <label className="w-20 uppercase font-bold">Remark1</label>
-                    <ERPInput className="flex-1 h-5" />
-                 </div>
-              </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="text-[12px] font-bold text-slate-700">Book Type</label>
+                      <ERPInput 
+                        className="w-full h-[38px] text-sm font-bold text-slate-500 bg-slate-50 border border-slate-200" 
+                        value="EMB. JOBWORK" 
+                        readOnly 
+                      />
+                   </div>
+                </div>
 
-              <div className="col-span-3 bg-slate-100 border border-slate-300 p-2 space-y-1 text-[11px] font-black">
-                 <div className="flex justify-between"><span>Total Gst Amt :</span><span>0.00</span></div>
-                 <div className="flex justify-between text-indigo-700 text-lg border-t border-slate-300 mt-2 pt-2">
-                    <span>Net Amount :</span>
-                    <span>0.00</span>
-                 </div>
-                 <div className="flex items-center gap-2 pt-4">
-                    <label className="uppercase text-[10px]">E-Way :</label>
-                    <ERPInput className="flex-1 h-6" />
-                 </div>
-              </div>
-           </div>
-        </div>
+                <div className="flex items-center gap-3 pt-2">
+                   <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Selected Lot Stock Issue Details</span>
+                   <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
+                </div>
 
-        {/* Footer */}
-        <div className="bg-slate-900 p-1 flex justify-between gap-1 border-t border-slate-700 mt-auto">
-           <div className="flex gap-1 overflow-x-auto no-scrollbar">
-              {['Add', 'Edit', 'Save', 'Cancel', 'Find', 'Print', 'Delete', 'Exit'].map(btn => (
-                 <button key={btn} className={`px-5 py-1.5 text-[10px] font-black uppercase tracking-tighter ${btn === 'Save' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-800'} border border-slate-400`}>
-                    {btn}
-                 </button>
-              ))}
-           </div>
-           <div className="flex gap-1">
-              <button className="px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-black uppercase border border-indigo-700">Rec.Detail</button>
-              <button className="px-3 py-1.5 bg-rose-600 text-white text-[10px] font-black uppercase border border-rose-700">Close Bill</button>
-              <button className="px-3 py-1.5 bg-slate-600 text-white text-[10px] font-black uppercase border border-slate-700">Old Year</button>
-           </div>
-        </div>
+                {selectedLot ? (
+                  <div className="bg-slate-50 p-4 border border-slate-200 rounded-xl space-y-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase">Selected Lot ID</p>
+                        <p className="text-black font-black uppercase mt-1">{selectedLot.lotId}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase">Fabric Item</p>
+                        <p className="text-black font-black uppercase mt-1">{selectedLot.itemId?.name || selectedLot.itemName}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase">Available Pcs</p>
+                        <p className="text-black font-black mt-1">{selectedLot.remainingPcs} Pcs</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 font-bold uppercase">Available Meters</p>
+                        <p className="text-black font-black mt-1">{selectedLot.remainingMtrs} Mtrs</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1">
+                         <label className="text-[12px] font-bold text-slate-700">Issue Pcs</label>
+                         <input 
+                            type="number" 
+                            className="h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-1 focus:ring-black text-slate-800 text-sm bg-white font-bold" 
+                            value={header.issuePcs} 
+                            onChange={e => setHeader({...header, issuePcs: e.target.value})}
+                            max={selectedLot.remainingPcs}
+                            placeholder="0"
+                         />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                         <label className="text-[12px] font-bold text-slate-700">Issue Meters (Qty)</label>
+                         <input 
+                            type="number" 
+                            className="h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-1 focus:ring-black text-slate-800 text-sm bg-white font-bold" 
+                            value={header.issueQty} 
+                            onChange={e => setHeader({...header, issueQty: e.target.value})}
+                            max={selectedLot.remainingMtrs}
+                            placeholder="0.00"
+                            required
+                         />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-12 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 font-semibold uppercase tracking-widest text-[11px]">
+                     Select a Grey Lot from the Available Lots panel to continue
+                  </div>
+                )}
+
+                {/* Footer Actions inside form */}
+                <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+                   <button 
+                      type="button" 
+                      onClick={onClose}
+                      className="h-[38px] px-6 bg-white border border-black text-black font-bold uppercase tracking-widest text-xs hover:bg-slate-50 transition-all rounded-lg"
+                   >
+                      Cancel
+                   </button>
+                   <button 
+                      type="submit"
+                      className="h-[38px] px-6 bg-black text-white font-bold uppercase tracking-widest text-xs hover:bg-slate-800 transition-all shadow-sm rounded-lg"
+                   >
+                      Save & Issue
+                   </button>
+                </div>
+
+             </form>
+
+             {/* Lot Selector Card Grid (Right Column 30%) */}
+             <div className="flex-1 flex flex-col bg-slate-50 border-l border-[#E2E8F0] overflow-hidden">
+                <div className="bg-black text-white text-xs px-4 h-[56px] flex justify-between items-center font-bold tracking-wider uppercase shrink-0">
+                   <span>Available Lots</span>
+                   <span className="px-2 py-0.5 bg-white/10 rounded text-[9px]">Select to Load</span>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                   {availableLots.map(lot => {
+                      const isSelected = selectedLot?._id === lot._id;
+                      return (
+                        <div 
+                           key={lot._id}
+                           onClick={() => handleSelectLot(lot)}
+                           className={`bg-white border rounded-xl p-3.5 shadow-sm cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${
+                             isSelected ? 'border-black ring-1 ring-black' : 'border-[#E2E8F0]'
+                           }`}
+                        >
+                           <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-xs font-black text-black tracking-wide">{lot.lotId}</span>
+                              <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-bold rounded-full uppercase tracking-wider">
+                                 {lot.itemId?.category || lot.category || 'Grey'}
+                              </span>
+                           </div>
+                           <div className="space-y-1 mt-2">
+                             <div className="flex justify-between items-center text-[10px] text-slate-400">
+                                <span>Fabric</span>
+                                <span className="font-bold text-slate-700 uppercase">{lot.itemId?.name || lot.itemName}</span>
+                             </div>
+                             <div className="flex justify-between items-center text-[10px] text-slate-400">
+                                <span>Meters</span>
+                                <span className="font-black text-black">{lot.remainingMtrs.toFixed(2)} Mtrs</span>
+                             </div>
+                           </div>
+                        </div>
+                      );
+                   })}
+                   {availableLots.length === 0 && (
+                     <div className="py-12 text-center text-slate-400 font-bold uppercase tracking-widest text-[9px]">
+                        No grey fabric lots in stock
+                     </div>
+                   )}
+                </div>
+             </div>
+          </div>
+        ) : (
+          // View Embroidery Job Issue list tab
+          <div className="flex-1 p-6 overflow-y-auto">
+             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-xs text-left border-collapse">
+                   <thead className="bg-slate-50 text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-200">
+                      <tr className="h-10">
+                         <th className="px-4 py-3">Date</th>
+                         <th className="px-4 py-3">Job Card No</th>
+                         <th className="px-4 py-3">Embroidery Partner</th>
+                         <th className="px-4 py-3 text-right">Issued Qty</th>
+                         <th className="px-4 py-3 text-center">Status</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-slate-100 text-[11px]">
+                      {jobWorkEntries.filter(j => j.processType === 'Embroidery').map((job) => (
+                         <tr key={job._id} className="hover:bg-slate-50/50">
+                            <td className="px-4 py-3 text-slate-500 font-medium">{new Date(job.issueDate).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 font-bold text-black uppercase">{job.jobCardNo}</td>
+                            <td className="px-4 py-3 font-semibold uppercase">{job.workerId?.name || 'N/A'}</td>
+                            <td className="px-4 py-3 text-right font-black">{job.issueQty} Mtrs</td>
+                            <td className="px-4 py-3 text-center">
+                               <span className={`px-2.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                 job.status === 'Received' 
+                                   ? 'bg-green-50 text-green-700 border border-green-150' 
+                                   : 'bg-amber-50 text-amber-700 border border-amber-150'
+                               }`}>
+                                  {job.status}
+                               </span>
+                            </td>
+                         </tr>
+                      ))}
+                      {jobWorkEntries.filter(j => j.processType === 'Embroidery').length === 0 && (
+                        <tr>
+                          <td colSpan="5" className="px-4 py-12 text-center text-slate-400 font-bold uppercase tracking-widest">
+                            No Issued Embroidery Jobs Found
+                          </td>
+                        </tr>
+                      )}
+                   </tbody>
+                </table>
+             </div>
+          </div>
+        )}
 
       </div>
     </Modal>

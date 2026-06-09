@@ -26,13 +26,17 @@ exports.register = async (name, email, password, companyName) => {
         // Seed Basic plan if it doesn't exist
         plan = await Plan.create({
             name: 'Basic',
-            price: 29,
-            features: { purchase: true, inventory: true, jobWork: false, gst: false, reports: false }
+            priceMonthly: 29,
+            priceYearly: 290,
+            features: {
+                modules: { purchase: true, inventory: true, sales: true, jobWork: false, accounting: false, gst: false, reports: false }
+            },
+            limits: { users: 5, invoicesPerMonth: 100, storageMb: 500 }
         });
     }
 
     // 3. Create User (Role: user)
-    const user = new User({ name, email, password, role: 'user' });
+    const user = new User({ name, email, password, role: 'user', companyRole: 'owner' });
     await user.save();
 
     // 4. Create Company
@@ -56,7 +60,16 @@ exports.register = async (name, email, password, companyName) => {
     await user.save();
 
     const token = generateToken(user);
-    return { token, user: { id: user._id, name: user.name, role: user.role, companyId: user.companyId } };
+    return {
+        token,
+        user: {
+            id: user._id,
+            name: user.name,
+            role: user.role,
+            companyRole: user.companyRole,
+            companyId: user.companyId
+        }
+    };
 };
 
 exports.login = async (email, password) => {
@@ -80,7 +93,8 @@ exports.login = async (email, password) => {
         user: { 
             id: user._id, 
             name: user.name, 
-            role: user.role, 
+            role: user.role,
+            companyRole: user.companyRole || 'owner',
             companyId: user.companyId,
             plan: company?.planId?.features || null
         } 
