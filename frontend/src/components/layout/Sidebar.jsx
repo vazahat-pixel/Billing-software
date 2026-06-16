@@ -40,52 +40,51 @@ const Sidebar = () => {
   ];
 
   return (
-    <aside className="w-72 bg-white border-r border-slate-100 flex flex-col h-screen sticky top-0 overflow-hidden select-none">
-      <div className="p-10 mb-2">
+    <aside className="w-[180px] bg-[var(--bg-sidebar)] border-r border-[var(--border)] flex flex-col h-screen sticky top-0 overflow-hidden select-none z-20">
+      <div className="p-5 mb-2 border-b border-[var(--border)]">
         <div className="flex items-center gap-3">
-           <div className="w-10 h-10 bg-black rounded-2xl flex items-center justify-center text-white shadow-xl">
-              <Command size={20} strokeWidth={3} />
+           <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm shadow-[var(--accent)]/10" style={{ background: 'var(--accent-gradient)' }}>
+              <Command size={16} strokeWidth={2.5} />
            </div>
            <div>
-              <h1 className="text-2xl font-black italic tracking-tighter text-black leading-none">OGUN<span className="text-slate-200">.</span></h1>
-              <p className="text-[8px] font-black uppercase tracking-[0.4em] text-slate-300 mt-1">Enterprise ERP</p>
+              <h1 className="text-lg font-bold tracking-tight text-[var(--text-primary)] leading-none">OGUN<span className="text-[var(--accent)]">.</span></h1>
+              <p className="text-[8px] font-medium uppercase tracking-[0.2em] text-[var(--text-muted)] mt-1">Enterprise</p>
            </div>
         </div>
       </div>
 
-      <nav className="flex-1 px-6 space-y-2 overflow-y-auto no-scrollbar py-4">
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto no-scrollbar py-3">
         {menuItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) =>
               twMerge(
-                'flex items-center gap-4 px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] transition-all duration-300 group',
+                'flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-medium tracking-[0.02em] transition-all duration-200 group',
                 isActive
-                  ? 'bg-black text-white shadow-2xl shadow-black/20 scale-[1.02]'
-                  : 'text-slate-400 hover:bg-slate-50 hover:text-black'
-              )
-            }
-          >
-            <item.icon size={18} className={twMerge("transition-transform duration-300 group-hover:scale-110", "stroke-[2.5]")} />
+                  ? 'bg-[var(--blue-bg)] text-[var(--accent)] shadow-sm border border-transparent'
+                  : 'text-[var(--text-secondary)] border border-transparent hover:bg-[var(--bg-base)] hover:text-[var(--text-primary)]'
+              )}
+            >
+            <item.icon size={16} className={twMerge("transition-colors duration-300 group-hover:text-[var(--text-primary)]", "stroke-[2]")} />
             {item.name}
           </NavLink>
         ))}
       </nav>
 
-      <div className="p-6 border-t border-slate-50 space-y-2">
+      <div className="p-4 border-t border-[var(--border)] space-y-1">
         <NavLink
           to="/notifications"
-          className="flex items-center gap-4 px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 hover:bg-slate-50 hover:text-black transition-all group"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-medium tracking-[0.02em] text-[var(--text-secondary)] hover:bg-[var(--bg-base)] hover:text-[var(--text-primary)] transition-all group"
         >
-          <Bell size={18} className="stroke-[2.5] group-hover:rotate-12 transition-transform" />
+          <Bell size={14} className="stroke-[2] group-hover:rotate-12 transition-transform" />
           Alerts
         </NavLink>
         <button
           onClick={logout}
-          className="flex items-center gap-4 px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] text-rose-500 hover:bg-rose-50 transition-all w-full text-left group"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-medium tracking-[0.02em] text-[var(--red)] hover:bg-[var(--red-bg)] transition-all w-full text-left group"
         >
-          <LogOut size={18} className="stroke-[2.5] group-hover:-translate-x-1 transition-transform" />
+          <LogOut size={14} className="stroke-[2] group-hover:-translate-x-1 transition-transform" />
           Exit Session
         </button>
       </div>

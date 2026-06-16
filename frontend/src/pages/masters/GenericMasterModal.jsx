@@ -3,9 +3,11 @@ import useStore from '../../store/useStore';
 import { ERPInput } from '../../components/forms/FormElements';
 import { X, Plus, Trash2, Search, Settings } from 'lucide-react';
 
-const GenericMasterModal = ({ isOpen, onClose, type }) => {
+const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
   const { subMasters, fetchSubMasters, addSubMaster, deleteSubMaster } = useStore();
   const [name, setName] = useState('');
+  const [hsnCode, setHsnCode] = useState('');
+  const [gstRate, setGstRate] = useState('5');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -15,6 +17,8 @@ const GenericMasterModal = ({ isOpen, onClose, type }) => {
     if (isOpen && type) {
       fetchSubMasters(type);
       setName('');
+      setHsnCode('');
+      setGstRate('5');
       setSearchQuery('');
       setErrorMsg('');
     }
@@ -29,6 +33,7 @@ const GenericMasterModal = ({ isOpen, onClose, type }) => {
       case 'Transport': return 'Transport Agent Registry';
       case 'Color': return 'Color master Registry';
       case 'Design': return 'Design Master Registry';
+      case 'HSN': return 'HSN Code Registry';
       default: return 'Master Registry';
     }
   }, [type]);
@@ -43,15 +48,33 @@ const GenericMasterModal = ({ isOpen, onClose, type }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
-    if (!name.trim()) {
+    if (type === 'HSN') {
+      if (!hsnCode.trim() || hsnCode.trim().length < 4) {
+        setErrorMsg('Valid HSN code is required');
+        return;
+      }
+      if (!name.trim()) {
+        setErrorMsg('Description is required');
+        return;
+      }
+    } else if (!name.trim()) {
       setErrorMsg('Name is required');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await addSubMaster({ type, name: name.trim() });
+      const payload = type === 'HSN'
+        ? {
+            type,
+            name: name.trim(),
+            extraFields: { code: hsnCode.trim(), description: name.trim(), gstRate: Number(gstRate || 5) }
+          }
+        : { type, name: name.trim() };
+      await addSubMaster(payload);
       setName('');
+      setHsnCode('');
+      setGstRate('5');
     } catch (err) {
       setErrorMsg(err.response?.data?.message || err.message || 'Failed to add record');
     } finally {
@@ -92,23 +115,35 @@ const GenericMasterModal = ({ isOpen, onClose, type }) => {
 
         {/* Add Record Form */}
         <div className="p-10 border-b border-slate-100 bg-white">
-          <form onSubmit={handleSubmit} className="flex gap-4 items-end">
-            <div className="flex-1 space-y-2">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Master Item Name</label>
-              <ERPInput 
-                value={name} 
-                onChange={e => setName(e.target.value)} 
-                placeholder={`Enter new ${type} name...`}
-                className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold uppercase text-[10px] focus:ring-1 focus:ring-black"
-              />
-            </div>
-            <button 
-              type="submit" 
-              disabled={isSubmitting}
-              className="h-12 px-6 bg-black text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg disabled:opacity-50"
-            >
-              <Plus size={16} /> Add Record
-            </button>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {type === 'HSN' ? (
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">HSN Code</label>
+                  <ERPInput value={hsnCode} onChange={e => setHsnCode(e.target.value)} placeholder="5208" maxLength={8} disabled={readOnly} className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold text-[10px]" />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description</label>
+                  <ERPInput value={name} onChange={e => setName(e.target.value)} placeholder="Cotton fabric" disabled={readOnly} className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold text-[10px]" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">GST Rate %</label>
+                  <ERPInput type="number" value={gstRate} onChange={e => setGstRate(e.target.value)} disabled={readOnly} className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold text-[10px]" />
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-4 items-end">
+                <div className="flex-1 space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Master Item Name</label>
+                  <ERPInput value={name} onChange={e => setName(e.target.value)} placeholder={`Enter new ${type} name...`} disabled={readOnly} className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold uppercase text-[10px] focus:ring-1 focus:ring-black" />
+                </div>
+              </div>
+            )}
+            {!readOnly && (
+              <button type="submit" disabled={isSubmitting} className="h-12 px-6 bg-black text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg disabled:opacity-50">
+                <Plus size={16} /> Add Record
+              </button>
+            )}
           </form>
           {errorMsg && (
             <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mt-3">Error: {errorMsg}</p>
@@ -134,15 +169,22 @@ const GenericMasterModal = ({ isOpen, onClose, type }) => {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-slate-50 text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50/50">
-                  <th className="px-6 py-4">Name</th>
+                  <th className="px-6 py-4">{type === 'HSN' ? 'HSN / Description' : 'Name'}</th>
+                  {type === 'HSN' && <th className="px-6 py-4">GST %</th>}
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filteredList.map((item) => (
                   <tr key={item._id} className="hover:bg-slate-50/50 transition-all group">
-                    <td className="px-6 py-4 font-bold text-black uppercase tracking-wider text-[10px]">{item.name}</td>
+                    <td className="px-6 py-4 font-bold text-black uppercase tracking-wider text-[10px]">
+                      {type === 'HSN' ? `${item.extraFields?.code || item.name} — ${item.extraFields?.description || item.name}` : item.name}
+                    </td>
+                    {type === 'HSN' && (
+                      <td className="px-6 py-4 text-[10px] font-bold">{item.extraFields?.gstRate ?? 5}%</td>
+                    )}
                     <td className="px-6 py-4 text-right">
+                      {!readOnly && (
                       <button 
                         onClick={() => handleDelete(item._id)}
                         className="p-2 text-slate-300 hover:text-rose-600 transition-all opacity-0 group-hover:opacity-100"
@@ -150,6 +192,7 @@ const GenericMasterModal = ({ isOpen, onClose, type }) => {
                       >
                         <Trash2 size={14} />
                       </button>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -1,9 +1,24 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import useStore from '../../store/useStore';
+import { downloadJson, getMonthDateRange, buildGstr1Filename } from '../../utils/gstExport';
 import { FileText, Download, TrendingUp, TrendingDown, Landmark, PieChart, ArrowRight } from 'lucide-react';
 
 const GSTPage = () => {
-  const { sales, purchases } = useStore();
+  const { sales, purchases, fetchGstr1 } = useStore();
+  const [exporting, setExporting] = useState(false);
+  const { startDate, endDate } = getMonthDateRange();
+
+  const handleGstr1Export = async () => {
+    setExporting(true);
+    try {
+      const data = await fetchGstr1(startDate, endDate);
+      downloadJson(data, buildGstr1Filename(startDate, endDate));
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'GSTR-1 export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const gstSummary = useMemo(() => {
     const outputTax = sales.reduce((acc, s) => acc + (parseFloat(s.totals.igst || 0) + parseFloat(s.totals.cgst || 0) + parseFloat(s.totals.sgst || 0)), 0);
@@ -31,8 +46,13 @@ const GSTPage = () => {
            </div>
         </div>
         <div className="flex gap-4">
-           <button className="flex items-center gap-3 px-10 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">
-             <Download size={14} /> GSTR-1 Schema JSON
+           <button
+             type="button"
+             onClick={handleGstr1Export}
+             disabled={exporting}
+             className="flex items-center gap-3 px-10 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-50"
+           >
+             <Download size={14} /> {exporting ? 'Exporting...' : 'GSTR-1 Schema JSON'}
            </button>
         </div>
       </div>

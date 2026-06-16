@@ -16,19 +16,19 @@ const GSTReport = () => {
         const matchesSearch = s.invoiceNo?.toLowerCase().includes(filterText.toLowerCase()) || 
                               s.customerId?.toLowerCase().includes(filterText.toLowerCase());
         const matchesGst = gstType === 'All' || 
-                           (gstType === 'IGST' && parseFloat(s.totals.igst) > 0) ||
-                           (gstType === 'CGST/SGST' && parseFloat(s.totals.cgst) > 0);
+                           (gstType === 'IGST' && parseFloat(s.igst) > 0) ||
+                           (gstType === 'CGST/SGST' && parseFloat(s.cgst) > 0);
         return matchesSearch && matchesGst;
       })
       .map(s => ({
         date: s.date,
         invoice: s.invoiceNo,
         party: s.customerId,
-        taxable: parseFloat(s.totals.taxableValue) || 0,
-        cgst: parseFloat(s.totals.cgst) || 0,
-        sgst: parseFloat(s.totals.sgst) || 0,
-        igst: parseFloat(s.totals.igst) || 0,
-        total: parseFloat(s.totals.total) || 0
+        taxable: parseFloat(s.taxableAmount) || 0,
+        cgst: parseFloat(s.cgst) || 0,
+        sgst: parseFloat(s.sgst) || 0,
+        igst: parseFloat(s.igst) || 0,
+        total: parseFloat(s.netAmount) || 0
       }));
   }, [sales, filterText, gstType]);
 
@@ -37,11 +37,11 @@ const GSTReport = () => {
       date: p.date,
       invoice: p.invoiceNo,
       party: p.supplierId,
-      taxable: parseFloat(p.totals.taxableValue) || 0,
-      cgst: parseFloat(p.totals.cgst) || 0,
-      sgst: parseFloat(p.totals.sgst) || 0,
-      igst: 0, // Simplified for now
-      total: parseFloat(p.totals.total) || 0
+      taxable: parseFloat(p.taxableAmount) || 0,
+      cgst: parseFloat(p.cgst) || 0,
+      sgst: parseFloat(p.sgst) || 0,
+      igst: parseFloat(p.igst) || 0,
+      total: parseFloat(p.netAmount) || 0
     }));
   }, [purchases]);
 

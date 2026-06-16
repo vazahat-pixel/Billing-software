@@ -43,3 +43,15 @@ exports.getItemStock = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.createOpeningStock = async (req, res) => {
+  try {
+    const lot = await inventoryService.createOpeningStock({
+      ...req.body,
+      companyId: req.companyId
+    });
+    res.status(201).json({ success: true, data: lot });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};

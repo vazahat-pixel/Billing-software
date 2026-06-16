@@ -38,9 +38,17 @@ const PaymentVoucherSchema = new mongoose.Schema({
   },
   paymentMode: {
     type: String,
-    enum: ['Cash', 'Cheque', 'NEFT', 'RTGS', 'UPI'],
+    enum: ['Cash', 'Card', 'Cheque', 'NEFT', 'RTGS', 'UPI', 'Mixed'],
     required: true
   },
+  paymentSplits: [{
+    mode: {
+      type: String,
+      enum: ['Cash', 'Card', 'Cheque', 'NEFT', 'RTGS', 'UPI']
+    },
+    amount: { type: Number, min: 0 },
+    reference: String
+  }],
   bankLedgerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'LedgerMaster',

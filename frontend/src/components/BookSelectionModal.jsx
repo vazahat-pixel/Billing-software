@@ -113,19 +113,19 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook }) => {
           className="relative w-full max-w-lg bg-white rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden border border-slate-200"
         >
           {/* Title Bar - Matching Reference */}
-          <div className="bg-[#0f172a] text-white px-6 py-5 flex items-center justify-between border-b border-white/5">
+          <div className="px-6 py-5 flex items-center justify-between border-b border-[var(--border)] bg-[var(--bg-base)]">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-yellow-400/10 text-yellow-400 flex items-center justify-center border border-yellow-400/20 shadow-inner">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: 'var(--accent-gradient)', color: 'white' }}>
                 <FontAwesomeIcon icon={faBookOpen} className="text-lg" />
               </div>
               <div>
-                <h3 className="text-lg font-black uppercase tracking-widest text-yellow-400 leading-none">Book Selection</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1.5 tracking-wider">Select a Ledger Book to Continue</p>
+                <h3 className="text-lg font-bold text-[var(--text-primary)] leading-none">Book Selection</h3>
+                <p className="text-[11px] text-[var(--text-muted)] font-medium mt-1 uppercase tracking-wider">Select a Ledger Book to Continue</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="text-slate-500 hover:text-white transition-colors p-2 rounded-lg hover:bg-white/10"
+              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-2 rounded-lg hover:bg-[var(--bg-card)]"
             >
               <FontAwesomeIcon icon={faTimes} size="lg" />
             </button>

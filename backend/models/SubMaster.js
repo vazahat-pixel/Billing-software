@@ -9,7 +9,7 @@ const SubMasterSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['AccountGroup', 'ItemGroup', 'City', 'Transport', 'Color', 'Design'],
+    enum: ['AccountGroup', 'ItemGroup', 'City', 'Transport', 'Color', 'Design', 'HSN'],
     required: true,
     index: true
   },

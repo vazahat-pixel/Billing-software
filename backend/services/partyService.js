@@ -65,9 +65,26 @@ class PartyService {
   }
 
   async updateParty(id, companyId, updateData) {
+    const allowed = [
+      'name', 'type', 'gstin', 'pan', 'mobile', 'email', 'address', 'city', 'state',
+      'creditLimit', 'openingBalance', 'openingBalanceType', 'station', 'group'
+    ];
+    const patch = {};
+    allowed.forEach((key) => {
+      if (updateData[key] !== undefined) patch[key] = updateData[key];
+    });
+    if (patch.station && !patch.city) patch.city = patch.station;
+    if (patch.group && !patch.type) {
+      const g = String(patch.group).toUpperCase();
+      if (g.includes('CREDITOR')) patch.type = 'Supplier';
+      else if (g.includes('BROKER')) patch.type = 'Broker';
+      else if (g.includes('JOB') || g.includes('WORKER')) patch.type = 'Job Worker';
+      else patch.type = 'Customer';
+    }
+    if (patch.openingBalance !== undefined) patch.openingBalance = Number(patch.openingBalance);
     return await Party.findOneAndUpdate(
       { _id: id, companyId },
-      updateData,
+      patch,
       { new: true, runValidators: true }
     );
   }

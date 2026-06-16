@@ -3,50 +3,52 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
-const Modal = ({ isOpen, onClose, title, children, className }) => {
+const Modal = ({ isOpen, onClose, title, children, className, footer }) => {
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-6 overflow-hidden">
-          {/* Backdrop */}
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 overflow-hidden">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/40 backdrop-blur-md"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm"
           />
-          
-          {/* Content */}
+
           <motion.div
-            initial={{ opacity: 0, scale: 0.98, y: 20 }}
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: 20 }}
-            transition={{ type: "spring", damping: 30, stiffness: 400 }}
+            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 350 }}
             className={twMerge(
-              "relative bg-white rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col z-[1000] border border-slate-100 w-full max-w-5xl max-h-[90vh]",
+              'relative flex flex-col z-[1000] w-full max-w-4xl max-h-[96vh] rounded-2xl overflow-hidden',
+              'bg-[var(--bg-card)] border border-[var(--border)] shadow-[var(--shadow-float)]',
               className
             )}
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="bg-black py-6 px-10 flex items-center justify-between shrink-0">
-               <div>
-                  <h3 className="text-white font-black text-[12px] uppercase tracking-[0.2em] italic font-heading">
-                    {title}<span className="text-white/30">.</span>
-                  </h3>
-               </div>
-               <button 
-                 onClick={onClose} 
-                 className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white text-white hover:text-black rounded-xl transition-all"
-               >
-                 <X size={18} />
-               </button>
+            <div className="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[var(--border)] bg-gradient-to-r from-[var(--bg-base)] to-[var(--bg-card)]">
+              <h3 className="text-[15px] font-semibold text-[var(--text-primary)] tracking-tight">{title}</h3>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--border-subtle)] transition-colors"
+              >
+                <X size={16} />
+              </button>
             </div>
-            
-            {/* Body */}
-            <div className="p-0 overflow-y-auto flex-1 bg-white text-black no-scrollbar">
+
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
               {children}
             </div>
+
+            {footer && (
+              <div className="erp-modal-footer shrink-0">
+                {footer}
+              </div>
+            )}
           </motion.div>
         </div>
       )}

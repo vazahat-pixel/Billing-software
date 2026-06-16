@@ -23,6 +23,42 @@ class InventoryService {
     const totalPcs = lots.reduce((acc, lot) => acc + lot.remainingPcs, 0);
     return { totalMtrs, totalPcs, lotCount: lots.length };
   }
+
+  async createOpeningStock({ companyId, itemId, pcs = 0, mts, remarks = 'Opening stock entry' }) {
+    if (!itemId || !mts || mts <= 0) {
+      throw new Error('Item and quantity (mts) are required for opening stock.');
+    }
+
+    const timestamp = Date.now();
+    const lotCode = `OPN-${timestamp}`;
+
+    const lot = new InventoryLot({
+      lotId: lotCode,
+      itemId,
+      purchaseId: null,
+      source: 'opening',
+      totalPcs: pcs,
+      remainingPcs: pcs,
+      totalMtrs: mts,
+      remainingMtrs: mts,
+      companyId
+    });
+    await lot.save();
+
+    const movement = new StockMovement({
+      lotId: lot._id,
+      type: 'OPENING',
+      qtyPcs: pcs,
+      qtyMtrs: mts,
+      balanceMtrs: mts,
+      referenceId: lot._id,
+      remarks,
+      companyId
+    });
+    await movement.save();
+
+    return lot;
+  }
 }
 
 module.exports = new InventoryService();

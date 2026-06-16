@@ -16,6 +16,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
 
   const [activeTab, setActiveTab] = useState('Mill Issue');
   const [selectedLot, setSelectedLot] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const [header, setHeader] = useState({
     processType: 'Printing',
@@ -34,7 +35,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
       // Auto-generate job card no
       setHeader(prev => ({
         ...prev,
-        jobCardNo: `JC-${Math.floor(100000 + Math.random() * 900000)}`
+        jobCardNo: 'AUTO'
       }));
     }
   }, [isOpen, fetchParties, fetchInventory, fetchJobs]);
@@ -71,6 +72,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
       return;
     }
 
+    setSaving(true);
     try {
       await issueToMill({
         jobCardNo: header.jobCardNo,
@@ -86,7 +88,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
       // Reset form
       setHeader(prev => ({
         ...prev,
-        jobCardNo: `JC-${Math.floor(100000 + Math.random() * 900000)}`,
+        jobCardNo: 'AUTO',
         workerId: '',
         issuePcs: '',
         issueQty: ''
@@ -96,6 +98,8 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
       fetchJobs();
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Failed to issue lot');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -125,107 +129,107 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
         {activeTab === 'Mill Issue' ? (
           <div className="flex-1 flex overflow-hidden">
              {/* Left Form (70%) */}
-             <form onSubmit={handleSubmit} className="flex-[3] flex flex-col overflow-y-auto p-5 space-y-4 no-scrollbar">
+             <form onSubmit={handleSubmit} className="flex-[3] flex flex-col overflow-y-auto p-5 space-y-6 no-scrollbar pb-32">
                 
-                <div className="flex items-center gap-3">
-                   <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Process Specifications</span>
-                   <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
+                <div className="erp-form-section mt-0">
+                   <div className="erp-form-section-header">
+                      <span className="erp-form-section-title">Process Specifications</span>
+                   </div>
+
+                   {/* Form details */}
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="erp-field">
+                         <label className="erp-label">Job Card No</label>
+                         <ERPInput 
+                           className="w-full bg-[var(--bg-base)]" 
+                           value={header.jobCardNo} 
+                           readOnly
+                         />
+                      </div>
+
+                      <div className="erp-field">
+                         <label className="erp-label">Challan Date</label>
+                         <input 
+                           type="date" 
+                           className="erp-input w-full" 
+                           value={header.date} 
+                           onChange={e => setHeader({...header, date: e.target.value})} 
+                           required
+                         />
+                      </div>
+
+                      <div className="erp-field">
+                         <label className="erp-label">Job Worker / Mill Party</label>
+                         <ERPSelect 
+                           className="w-full" 
+                           value={header.workerId}
+                           onChange={(e) => setHeader({...header, workerId: e.target.value})}
+                           options={[{value: '', label: 'Select Worker'}, ...workers.map(w => ({value: w._id, label: w.name}))]} 
+                           required
+                         />
+                      </div>
+
+                      <div className="erp-field">
+                         <label className="erp-label">Process Type</label>
+                         <ERPSelect 
+                           className="w-full" 
+                           value={header.processType}
+                           onChange={(e) => setHeader({...header, processType: e.target.value})}
+                           options={[
+                             { value: 'Printing', label: 'Printing' },
+                             { value: 'Dyeing', label: 'Dyeing' },
+                             { value: 'Stitching', label: 'Stitching' },
+                             { value: 'Finishing', label: 'Finishing' },
+                           ]} 
+                           required
+                         />
+                      </div>
+                   </div>
                 </div>
 
-                {/* Form details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <div className="flex flex-col gap-1">
-                      <label className="text-[12px] font-bold text-slate-700">Job Card No</label>
-                      <ERPInput 
-                        className="w-full h-[38px] text-sm font-bold text-black bg-slate-50 border border-slate-200" 
-                        value={header.jobCardNo} 
-                        onChange={e => setHeader({...header, jobCardNo: e.target.value})}
-                        required
-                      />
+                <div className="erp-form-section">
+                   <div className="erp-form-section-header">
+                      <span className="erp-form-section-title">Selected Lot Stock Issue Details</span>
                    </div>
-
-                   <div className="flex flex-col gap-1">
-                      <label className="text-[12px] font-bold text-slate-700">Challan Date</label>
-                      <input 
-                        type="date" 
-                        className="w-full h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-1 focus:ring-black text-slate-800 text-sm bg-white" 
-                        value={header.date} 
-                        onChange={e => setHeader({...header, date: e.target.value})} 
-                        required
-                      />
-                   </div>
-
-                   <div className="flex flex-col gap-1">
-                      <label className="text-[12px] font-bold text-slate-700">Job Worker / Mill Party</label>
-                      <ERPSelect 
-                        className="w-full h-[38px]" 
-                        value={header.workerId}
-                        onChange={(e) => setHeader({...header, workerId: e.target.value})}
-                        options={[{value: '', label: 'Select Worker'}, ...workers.map(w => ({value: w._id, label: w.name}))]} 
-                        required
-                      />
-                   </div>
-
-                   <div className="flex flex-col gap-1">
-                      <label className="text-[12px] font-bold text-slate-700">Process Type</label>
-                      <ERPSelect 
-                        className="w-full h-[38px]" 
-                        value={header.processType}
-                        onChange={(e) => setHeader({...header, processType: e.target.value})}
-                        options={[
-                          { value: 'Printing', label: 'Printing' },
-                          { value: 'Dyeing', label: 'Dyeing' },
-                          { value: 'Stitching', label: 'Stitching' },
-                          { value: 'Finishing', label: 'Finishing' },
-                        ]} 
-                        required
-                      />
-                   </div>
-                </div>
-
-                <div className="flex items-center gap-3 pt-2">
-                   <span className="text-[12px] font-bold uppercase tracking-wider text-[#64748B] whitespace-nowrap">Selected Lot Stock Issue Details</span>
-                   <div className="h-[1px] flex-1 bg-[#E2E8F0]" />
-                </div>
 
                 {selectedLot ? (
-                  <div className="bg-slate-50 p-4 border border-slate-200 rounded-xl space-y-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                  <div className="bg-[var(--bg-card)] p-4 border border-[var(--border-strong)] rounded-lg space-y-4 shadow-sm animate-fade-in-up">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-[13px]">
                       <div>
-                        <p className="text-slate-400 font-bold uppercase">Selected Lot ID</p>
-                        <p className="text-black font-black uppercase mt-1">{selectedLot.lotId}</p>
+                        <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider">Selected Lot ID</p>
+                        <p className="text-[var(--text-primary)] font-bold uppercase mt-1">{selectedLot.lotId}</p>
                       </div>
                       <div>
-                        <p className="text-slate-400 font-bold uppercase">Fabric Item</p>
-                        <p className="text-black font-black uppercase mt-1">{selectedLot.itemId?.name || selectedLot.itemName}</p>
+                        <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider">Fabric Item</p>
+                        <p className="text-[var(--text-primary)] font-bold uppercase mt-1">{selectedLot.itemId?.name || selectedLot.itemName}</p>
                       </div>
                       <div>
-                        <p className="text-slate-400 font-bold uppercase">Available Pcs</p>
-                        <p className="text-black font-black mt-1">{selectedLot.remainingPcs} Pcs</p>
+                        <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider">Available Pcs</p>
+                        <p className="text-[var(--text-primary)] font-bold mt-1">{selectedLot.remainingPcs} Pcs</p>
                       </div>
                       <div>
-                        <p className="text-slate-400 font-bold uppercase">Available Meters</p>
-                        <p className="text-black font-black mt-1">{selectedLot.remainingMtrs} Mtrs</p>
+                        <p className="text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider">Available Meters</p>
+                        <p className="text-[var(--text-primary)] font-bold mt-1">{selectedLot.remainingMtrs} Mtrs</p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1">
-                         <label className="text-[12px] font-bold text-slate-700">Issue Pcs</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-[var(--border-subtle)]">
+                      <div className="erp-field">
+                         <label className="erp-label">Issue Pcs</label>
                          <input 
                             type="number" 
-                            className="h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-1 focus:ring-black text-slate-800 text-sm bg-white font-bold" 
+                            className="erp-input w-full font-bold text-[14px]" 
                             value={header.issuePcs} 
                             onChange={e => setHeader({...header, issuePcs: e.target.value})}
                             max={selectedLot.remainingPcs}
                             placeholder="0"
                          />
                       </div>
-                      <div className="flex flex-col gap-1">
-                         <label className="text-[12px] font-bold text-slate-700">Issue Meters (Qty)</label>
+                      <div className="erp-field">
+                         <label className="erp-label">Issue Meters (Qty)</label>
                          <input 
                             type="number" 
-                            className="h-[38px] px-3 border border-[#CBD5E1] rounded-md focus:outline-none focus:ring-1 focus:ring-black text-slate-800 text-sm bg-white font-bold" 
+                            className="erp-input w-full font-bold text-[14px]" 
                             value={header.issueQty} 
                             onChange={e => setHeader({...header, issueQty: e.target.value})}
                             max={selectedLot.remainingMtrs}
@@ -236,25 +240,27 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
                     </div>
                   </div>
                 ) : (
-                  <div className="py-12 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 font-semibold uppercase tracking-widest text-[11px]">
+                  <div className="py-12 border-2 border-dashed border-[var(--border)] rounded-lg text-center text-[var(--text-muted)] font-semibold uppercase tracking-widest text-[11px] bg-[var(--bg-base)] animate-fade-in">
                      Select a Grey Lot from the Available Lots panel to continue
                   </div>
                 )}
+                </div>
 
                 {/* Footer Actions inside form */}
-                <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+                <div className="erp-modal-footer absolute bottom-0 left-0 w-[70%] bg-[var(--bg-base)]">
                    <button 
                       type="button" 
                       onClick={onClose}
-                      className="h-[38px] px-6 bg-white border border-black text-black font-bold uppercase tracking-widest text-xs hover:bg-slate-50 transition-all rounded-lg"
+                      className="erp-btn erp-btn-secondary"
                    >
                       Cancel
                    </button>
                    <button 
                       type="submit"
-                      className="h-[38px] px-6 bg-black text-white font-bold uppercase tracking-widest text-xs hover:bg-slate-800 transition-all shadow-sm rounded-lg"
+                      disabled={saving}
+                      className="erp-btn erp-btn-primary px-8"
                    >
-                      Save & Issue to Mill
+                      {saving ? 'Processing...' : 'Confirm Issue'} to Mill
                    </button>
                 </div>
 

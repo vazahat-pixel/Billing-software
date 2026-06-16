@@ -1,6 +1,12 @@
 const mongoose = require('mongoose');
 
 const SalesSchema = new mongoose.Schema({
+  companyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    required: true,
+    index: true
+  },
   customerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Party',
@@ -9,13 +15,37 @@ const SalesSchema = new mongoose.Schema({
   },
   invoiceNo: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
   date: {
     type: Date,
-    default: Date.now
+    default: Date.now,
+    index: true
   },
+  bookId: {
+    type: String,
+    default: null
+  },
+  orderNo: { type: String, default: '' },
+  orderDate: { type: Date, default: null },
+  challanNo: { type: String, default: '' },
+  chDate: { type: Date, default: null },
+  brokerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', default: null },
+  haste: { type: String, default: '' },
+  type: { type: String, default: '' },
+  narration: {
+    type: String,
+    trim: true
+  },
+  transport: { type: String, default: '' },
+  station: { type: String, default: '' },
+  lrNo: { type: String, default: '' },
+  lrDate: { type: Date, default: null },
+  baleNo: { type: String, default: '' },
+  freight: { type: Number, default: 0 },
+  weight: { type: Number, default: 0 },
+  eway: { type: String, default: '' },
+  remarks: { type: String, default: '' },
   items: [{
     itemId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -25,33 +55,71 @@ const SalesSchema = new mongoose.Schema({
     lotId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'InventoryLot',
-      required: true
+      default: null
     },
-    pcs: Number,
-    mts: Number,
-    rate: Number,
-    amount: Number
+    pcs: { type: Number, default: 0 },
+    mts: { type: Number, default: 0 },
+    rate: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
+    amount: { type: Number, default: 0 },
+    desc: { type: String, default: '' },
+    fold: { type: Number, default: 0 },
+    cut: { type: Number, default: 0 },
+    dis1Per: { type: Number, default: 0 },
+    dis1Amt: { type: Number, default: 0 }
   }],
   taxableAmount: {
     type: Number,
-    required: true
+    required: true,
+    min: 0
   },
+  gstType: {
+    type: String,
+    enum: ['CGST+SGST', 'IGST'],
+    default: 'CGST+SGST'
+  },
+  cgst: { type: Number, default: 0 },
+  sgst: { type: Number, default: 0 },
+  igst: { type: Number, default: 0 },
   gstAmount: {
     type: Number,
-    required: true
+    required: true,
+    min: 0
   },
   netAmount: {
     type: Number,
-    required: true
-  },
-  companyId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Company',
     required: true,
-    index: true
+    min: 0
+  },
+  foldLess: { type: Number, default: 0 },
+  rdAmt: { type: Number, default: 0 },
+  discountAmt: { type: Number, default: 0 },
+  lessAmt: { type: Number, default: 0 },
+  addAmt: { type: Number, default: 0 },
+  tcs: { type: Number, default: 0 },
+  roundOff: { type: Number, default: 0 },
+  // Tracks how much has been received against this invoice (for partial payment)
+  paidAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  status: {
+    type: String,
+    enum: ['active', 'cancelled', 'paid', 'partial'],
+    default: 'active'
+  },
+  accountingEntryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AccountingEntry',
+    default: null
   }
 }, {
   timestamps: true
 });
 
+// Per-company unique invoice number — fixes cross-tenant collision bug
+SalesSchema.index({ invoiceNo: 1, companyId: 1 }, { unique: true });
+
 module.exports = mongoose.model('Sales', SalesSchema);
+

@@ -1,15 +1,11 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
    faFileInvoiceDollar, faCartFlatbed, faMoneyCheckDollar,
    faHandHoldingDollar, faTruckArrowRight, faWarehouse,
    faScrewdriverWrench, faClipboardCheck, faChartPie,
-   faCircleQuestion, faPowerOff, faFilePen, faDisplay, faSync,
-   faBuilding, faUserShield, faChevronRight, faPhone,
-   faMoon, faSun,
-   faIndianRupeeSign, faBagShopping, faScaleBalanced, faChartColumn, faTriangleExclamation,
-   faHandshake
+   faChevronRight, faChevronDown, faSync, faSearch, faBell,
+   faTriangleExclamation, faHandshake
 } from '@fortawesome/free-solid-svg-icons';
 import useStore from '../store/useStore';
 import Modal from '../components/ui/Modal';
@@ -50,9 +46,14 @@ import ReturnModal from './transactions/ReturnModal';
 import NoteModal from './transactions/NoteModal';
 import JournalEntryModal from './transactions/JournalEntryModal';
 import UserRightsModal from './admin/UserRightsModal';
+import OpeningBalanceModal from './masters/OpeningBalanceModal';
+import OpeningStockModal from './masters/OpeningStockModal';
+import DataRecordsHub from './records/DataRecordsHub';
+import { getPermissions } from '../utils/permissions';
 
 const Dashboard = () => {
-   const { theme, toggleTheme, user, bootstrapMasters } = useStore();
+   const { user, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items } = useStore();
+   const permissions = useMemo(() => getPermissions(user?.companyRole), [user?.companyRole]);
    const [modals, setModals] = useState({
       sales: false,
       purchase: false,
@@ -88,7 +89,11 @@ const Dashboard = () => {
       note: false,
       noteType: 'Credit',
       journal: false,
-      userRights: false
+      userRights: false,
+      openingBalance: false,
+      openingStock: false,
+      recordsHub: false,
+      recordsTab: 'accounts'
    });
 
    const [placeholderName, setPlaceholderName] = useState('');
@@ -107,8 +112,14 @@ const Dashboard = () => {
       module: null
    });
    const [selectedBooks, setSelectedBooks] = useState({});
+   const [sidebarOpen, setSidebarOpen] = useState(true);
+   const [activeMenuKey, setActiveMenuKey] = useState(null);
 
-   const isDark = theme === 'dark';
+   const parseMenuLabel = (label) => {
+      const match = label.match(/^(\d+)\s+(.+)$/);
+      if (match) return { badge: match[1], text: match[2] };
+      return { badge: null, text: label };
+   };
    const CORE_MODULES_WITH_BOOKS = ['sales', 'purchase', 'receipt', 'payment', 'millIssue', 'millRec', 'jobIssue', 'jobRec', 'ledger'];
 
    const toggleModal = (key, val) => {
@@ -181,11 +192,29 @@ const Dashboard = () => {
       }));
    };
 
+   const openRecordsHub = (tab = 'accounts') => {
+      setModals(prev => ({
+         ...prev,
+         recordsHub: true,
+         recordsTab: tab
+      }));
+   };
+
+   const dashboardStats = useMemo(() => {
+      const totalSales = sales.reduce((a, s) => a + (s.netAmount || s.totals?.total || 0), 0);
+      const totalPurchases = purchases.reduce((a, p) => a + (p.netAmount || p.totals?.total || 0), 0);
+      const stockMtrs = inventoryLots.reduce((a, l) => a + (l.remainingMtrs || 0), 0);
+      const activeJobs = jobWorkEntries.filter(j => j.status !== 'Received' && j.status !== 'Closed').length;
+      return { totalSales, totalPurchases, stockMtrs, activeJobs, accountCount: parties.length, itemCount: items.length };
+   }, [sales, purchases, inventoryLots, jobWorkEntries, parties, items]);
+
    const toggleSection = (section) => {
       setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
    };
 
    const handleMenuItemClick = (item) => {
+      const key = item.key || item.label;
+      setActiveMenuKey(key);
       if (item.action) {
          item.action();
       } else if (item.key) {
@@ -208,25 +237,44 @@ const Dashboard = () => {
          { label: 'Transport', action: () => openGenericMaster('Transport') },
          { label: 'Color', action: () => openGenericMaster('Color') },
          { label: 'Design', action: () => openGenericMaster('Design') },
-         { label: 'Opening Balance', action: () => openPlaceholder('Opening Balance') },
-         { label: 'Opening Stock Entry', action: () => openPlaceholder('Opening Stock Entry') },
+         { label: 'HSN Code', action: () => openGenericMaster('HSN') },
+         { label: 'Opening Balance', action: () => setModals(prev => ({ ...prev, openingBalance: true })) },
+         { label: 'Opening Stock Entry', action: () => setModals(prev => ({ ...prev, openingStock: true })) },
          { label: 'Bank Setup (Recon)', action: () => openPlaceholder('Bank Setup') }
       ],
       Transaction: [
-         { label: '1 Bank Receipt', key: 'receipt' },
-         { label: '2 Bank Payment', key: 'payment' },
-         { label: '3 Sales Billing', key: 'sales' },
-         { label: '4 Purchase', key: 'purchase' },
-         { label: '5 Mill Issue', key: 'millIssue' },
-         { label: '6 Mill Receive', key: 'millRec' },
-         { label: '7 Job Issue', key: 'jobIssue' },
-         { label: '8 Job Receive', key: 'jobRec' },
+         { label: 'Bank Receipt', key: 'receipt' },
+         { label: 'Bank Payment', key: 'payment' },
+         { label: 'Sales Billing', key: 'sales' },
+         { label: 'Purchase', key: 'purchase' },
+         { label: 'Mill Issue', key: 'millIssue' },
+         { label: 'Mill Receive', key: 'millRec' },
+         { label: 'Job Issue', key: 'jobIssue' },
+         { label: 'Job Receive', key: 'jobRec' },
          { label: 'Journal Entry', action: () => openJournal() },
          { label: 'Debit/Credit Note', action: () => openNote('Credit') },
          { label: 'Sales Return', action: () => openReturn('Sales') },
          { label: 'Purchase Return', action: () => openReturn('Purchase') },
          { label: 'Sales Order', action: () => openOrder('Sales') },
          { label: 'Purchase Order', action: () => openOrder('Purchase') }
+      ],
+      Records: [
+         { label: 'All Saved Data', action: () => openRecordsHub('accounts') },
+         { label: 'Account List', action: () => openRecordsHub('accounts') },
+         { label: 'Item List', action: () => openRecordsHub('items') },
+         { label: 'Inventory Lots', action: () => openRecordsHub('inventory') },
+         { label: 'Sales Invoices', action: () => openRecordsHub('sales') },
+         { label: 'Purchase Bills', action: () => openRecordsHub('purchases') },
+         { label: 'Mill Issue List', action: () => openRecordsHub('millIssue') },
+         { label: 'Bank Receipts', action: () => openRecordsHub('receipts') },
+         { label: 'Bank Payments', action: () => openRecordsHub('payments') },
+         { label: 'Sales Orders', action: () => openRecordsHub('salesOrders') },
+         { label: 'Purchase Orders', action: () => openRecordsHub('purchaseOrders') },
+         { label: 'Sales Returns', action: () => openRecordsHub('salesReturns') },
+         { label: 'Purchase Returns', action: () => openRecordsHub('purchaseReturns') },
+         { label: 'Debit/Credit Notes', action: () => openRecordsHub('notes') },
+         { label: 'Visit Logs', action: () => openRecordsHub('visits') },
+         { label: 'Book List', action: () => openRecordsHub('books') }
       ],
       Reports: [
          { label: 'Sales Outstanding', key: 'outstanding' },
@@ -242,7 +290,7 @@ const Dashboard = () => {
          { label: 'Account Ledger Book', key: 'ledger' }
       ],
       Utilities: [
-         { label: 'Data Refresh', action: () => bootstrapMasters().then(() => alert('All master data refreshed from server.')) },
+         { label: 'Data Refresh', action: () => refreshAllData().then(() => alert('All data refreshed from server.')) },
          { label: 'Backup Database', action: () => openPlaceholder('Backup') },
          { label: 'Import Masters', action: () => openPlaceholder('Import Masters') },
          { label: 'Print Barcode', action: () => openPlaceholder('Print Barcode') },
@@ -260,7 +308,19 @@ const Dashboard = () => {
       ]
    };
 
-   const desktopIcons = [
+   const visibleMenuData = useMemo(() => {
+      const filtered = {};
+      Object.entries(menuData).forEach(([section, items]) => {
+         if (permissions.canAccessSection(section)) {
+            filtered[section] = section === 'Admin'
+              ? items.filter(i => i.label !== 'User Rights' || permissions.canManageUsers)
+              : items;
+         }
+      });
+      return filtered;
+   }, [permissions]);
+
+   const coreModules = [
       { id: 1, label: 'Sales Billing', icon: faFileInvoiceDollar, key: 'sales' },
       { id: 2, label: 'Purchase', icon: faCartFlatbed, key: 'purchase' },
       { id: 3, label: 'Bank Receipt', icon: faMoneyCheckDollar, key: 'receipt' },
@@ -269,293 +329,174 @@ const Dashboard = () => {
       { id: 6, label: 'Mill Receive', icon: faWarehouse, key: 'millRec' },
       { id: 7, label: 'Job Issue', icon: faScrewdriverWrench, key: 'jobIssue' },
       { id: 8, label: 'Job Receive', icon: faClipboardCheck, key: 'jobRec' },
-      { id: 9, label: 'Visit Log', icon: faHandshake, key: 'visit' },
-      { id: 10, label: 'Outstanding', icon: faChartPie, key: 'outstanding' },
+      { id: 9, label: 'GSTR-1', icon: faChartPie, key: 'gstr1' },
+      { id: 10, label: 'GSTR-2', icon: faChartPie, key: 'gst2bMatching' },
+      { id: 11, label: 'ETB', icon: faFileInvoiceDollar, key: 'gstCompliance' },
+      { id: 12, label: 'Visit Log', icon: faHandshake, key: 'visit' },
+      { id: 13, label: 'Outstanding', icon: faChartPie, key: 'outstanding' },
    ];
 
    return (
-      <div className={`fixed inset-0 overflow-hidden flex flex-col select-none transition-colors duration-500 bg-white ${isDark ? 'text-white bg-zinc-950' : 'text-black bg-white'}`}>
+      <div className="erp-shell fixed inset-0 flex overflow-hidden select-none">
 
-         {/* Top Header - Monochromatic Modern */}
-         <div className={`flex items-center justify-between h-10 text-[10px] font-bold border-b relative z-[100] shadow-sm bg-black border-slate-800`}>
-            <div className="flex items-center h-full pl-6 gap-3">
-               <div className="w-3 h-3 bg-white rounded-sm" />
-               <span className="text-white font-black uppercase tracking-[0.2em]">MAHAVEER IMPEX ERP</span>
-            </div>
+         {/* Core modules sidebar */}
+         <aside className="erp-rail flex flex-col py-3 gap-1 shrink-0 overflow-y-auto no-scrollbar bg-white/50 backdrop-blur-md">
+            <p className="px-4 py-2 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest shrink-0">Core Modules</p>
+            {coreModules.map((mod) => (
+               <button
+                  key={mod.id}
+                  type="button"
+                  onClick={() => { setActiveMenuKey(mod.key); toggleModal(mod.key, true); }}
+                  className={`mx-2 flex items-center gap-3 h-10 px-3 rounded-xl text-left transition-all group ${
+                     activeMenuKey === mod.key
+                        ? 'bg-[var(--accent)] text-white shadow-md'
+                        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-base)] hover:text-[var(--text-primary)]'
+                  }`}
+               >
+                  <FontAwesomeIcon icon={mod.icon} className={`text-sm w-4 shrink-0 transition-transform group-hover:scale-110 ${activeMenuKey === mod.key ? 'text-white' : 'text-[var(--accent)]'}`} />
+                  <span className="text-[13px] font-semibold truncate leading-tight">{mod.label}</span>
+               </button>
+            ))}
+         </aside>
 
-            <div className="flex items-center h-full pr-6 gap-8">
-               <div className="text-white font-black flex items-center gap-2">
-                  <div className="w-2 h-2 bg-white rounded-full animate-pulse shadow-[0_0_8px_white]" />
-                  {user?.name || 'User'}
-               </div>
-               <div className="flex items-center gap-6 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                  <button className="hover:text-white transition-colors flex items-center gap-2"><FontAwesomeIcon icon={faFilePen} /> Notepad</button>
-                  <button className="hover:text-white transition-colors flex items-center gap-2"><FontAwesomeIcon icon={faDisplay} /> Remote</button>
-                  <button className="hover:text-white transition-colors flex items-center gap-2" onClick={toggleTheme}><FontAwesomeIcon icon={isDark ? faSun : faMoon} /> {isDark ? 'Light' : 'Dark'}</button>
-               </div>
-            </div>
-         </div>
+         {/* Menu sidebar removed, moved to Top Bar */}
 
-         {/* Main Workspace with Double Sidebar */}
-         <div className="flex-1 flex overflow-hidden">
+         {/* Main Dashboard Area */}
+         <main className="flex-1 min-w-0 flex flex-col bg-[var(--bg-base)] overflow-y-auto relative no-scrollbar">
             
-            {/* Outer Sidebar (Narrow: 64px) */}
-            <div className="w-16 flex flex-col items-center py-4 justify-between border-r shrink-0 z-10 transition-colors duration-500 bg-black border-slate-800 text-slate-400">
-               <div className="flex flex-col gap-2 items-center w-full">
-                  {desktopIcons.map((icon) => (
-                     <button
-                        key={icon.id}
-                        onClick={() => toggleModal(icon.key, true)}
-                        title={icon.label}
-                        className="w-12 h-12 flex flex-col items-center justify-center rounded-xl transition-all hover:bg-slate-800 hover:text-white group relative"
-                     >
-                        <FontAwesomeIcon icon={icon.icon} className="text-sm" />
-                        <span className="text-[7px] font-black uppercase tracking-tighter mt-1 text-center scale-90 opacity-70 group-hover:opacity-100">{icon.label.split(' ')[0]}</span>
-                     </button>
-                  ))}
-               </div>
-               
-               <div className="flex flex-col items-center gap-4">
-                  <button 
-                     onClick={toggleTheme}
-                     title={isDark ? "Light Mode" : "Dark Mode"}
-                     className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-800 hover:text-white transition-all text-slate-400"
-                  >
-                     <FontAwesomeIcon icon={isDark ? faSun : faMoon} />
-                  </button>
-               </div>
-            </div>
-
-            {/* Inner Sidebar (Wide: 240px) */}
-            <div className={`w-60 flex flex-col border-r overflow-y-auto no-scrollbar shrink-0 transition-colors duration-500 ${isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
-               <div className="flex-1 flex flex-col divide-y divide-slate-150 dark:divide-zinc-800">
-                  {Object.keys(menuData).map((section) => {
-                     const isCollapsed = collapsedSections[section];
-                     const items = menuData[section];
-                     
-                     return (
-                        <div key={section} className="flex flex-col">
-                           <button
-                              onClick={() => toggleSection(section)}
-                              className={`w-full flex items-center justify-between px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'bg-zinc-950/40 hover:bg-zinc-950/80 text-zinc-400 hover:text-white' : 'bg-slate-100/50 hover:bg-slate-100 text-slate-500 hover:text-black'}`}
-                           >
-                              <span>{section}</span>
-                              <FontAwesomeIcon 
-                                 icon={faChevronRight} 
-                                 className={`text-[8px] transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`} 
-                              />
-                           </button>
-                           
-                           {!isCollapsed && (
-                              <div className="py-1 flex flex-col bg-transparent">
-                                 {items.map((item, idx) => {
-                                    const label = typeof item === 'object' ? item.label : item;
-                                    return (
-                                       <button
-                                          key={idx}
-                                          onClick={() => handleMenuItemClick(item)}
-                                          className={`w-full text-left px-6 py-2 text-[10px] font-bold uppercase tracking-wider transition-all ${isDark ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-slate-600 hover:text-black hover:bg-slate-200/50'}`}
-                                       >
-                                          {label}
-                                       </button>
-                                    );
-                                 })}
-                              </div>
-                           )}
-                        </div>
-                     );
-                  })}
-               </div>
-            </div>
-
-            {/* Main Content Workspace Container (Right pane) */}
-            <div className={`flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar transition-colors duration-500 ${isDark ? 'bg-zinc-950 text-white' : 'bg-slate-50/10 text-black'}`}>
-               
-               {/* Branding Panel */}
-               <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 animate-fadeIn">
-                  <div>
-                     <h1 className={`text-5xl font-black tracking-tight uppercase leading-none italic ${isDark ? 'text-white' : 'text-black'}`}>MAHAVEER IMPEX<span className="text-slate-200">.</span></h1>
-                     <p className="text-slate-400 text-[11px] font-bold uppercase tracking-[0.3em] mt-3">Professional ERP Command Center • v5.6.30</p>
-                  </div>
+            {/* Premium Top Navbar */}
+            <header className="sticky top-0 z-50 flex flex-col bg-white/80 backdrop-blur-md border-b border-[var(--border)] transition-all">
+               {/* Top Row */}
+               <div className="flex items-center justify-between px-6 h-[56px]">
                   <div className="flex items-center gap-4">
-                     <button onClick={() => toggleModal('sales', true)} className={`px-8 py-3.5 font-bold text-[11px] uppercase tracking-widest rounded-xl transition-all shadow-lg flex items-center gap-3 ${isDark ? 'bg-white text-black hover:bg-zinc-200' : 'bg-black text-white hover:bg-slate-800'}`}>
-                        <FontAwesomeIcon icon={faFileInvoiceDollar} /> New Invoice
+                     <div className="w-8 h-8 rounded-lg bg-[var(--accent)] text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                        {user?.companyName ? user.companyName.charAt(0) : 'E'}
+                     </div>
+                     <nav className="flex items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
+                        <span className="text-[var(--text-primary)] font-bold tracking-tight text-[14px]">{user?.companyName || 'Mahaveer Impex'}</span>
+                        <span className="text-[var(--text-muted)] px-1">•</span>
+                        <span className="text-[var(--text-secondary)] uppercase tracking-wider text-[10px]">Enterprise Plan</span>
+                     </nav>
+                  </div>
+
+                  <div className="flex-1 max-w-md mx-6 hidden md:block">
+                     <div className="relative group">
+                        <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-[var(--accent)] transition-colors text-[12px]" />
+                        <input type="text" placeholder="Global Search (Ctrl+K)..." className="w-full bg-white border border-[var(--border-strong)] rounded-full py-1.5 pl-8 pr-4 text-[12px] shadow-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-light)] transition-all" />
+                     </div>
+                  </div>
+
+                  <div className="flex items-center gap-5">
+                     <button type="button" onClick={() => refreshAllData().then(() => alert('Data refreshed.'))} className="text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors flex items-center gap-2">
+                        <FontAwesomeIcon icon={faSync} className="text-[10px]" />
+                        <span className="hidden sm:inline">Sync</span>
                      </button>
-                     <button onClick={() => toggleModal('purchase', true)} className={`px-8 py-3.5 border font-bold text-[11px] uppercase tracking-widest rounded-xl transition-all shadow-sm flex items-center gap-3 ${isDark ? 'bg-zinc-900 border-zinc-800 text-white hover:bg-zinc-800' : 'bg-white border-slate-200 text-black hover:bg-slate-50'}`}>
-                        <FontAwesomeIcon icon={faCartFlatbed} /> New Purchase
+                     <div className="h-4 w-[1px] bg-[var(--border-strong)]"></div>
+                     <button className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors relative">
+                        <FontAwesomeIcon icon={faBell} className="text-[14px]" />
+                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-[var(--red)] rounded-full border border-white"></span>
                      </button>
+                     <div className="h-4 w-[1px] bg-[var(--border-strong)]"></div>
+                     <div className="flex items-center gap-3 cursor-pointer group">
+                        <div className="text-right hidden sm:block">
+                           <div className="text-[12px] font-semibold text-[var(--text-primary)] leading-none mb-0.5">{user?.name || 'Administrator'}</div>
+                           <div className="text-[10px] text-[var(--text-muted)] font-medium uppercase tracking-wide">{user?.role || 'System Access'}</div>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-[var(--accent-light)] text-[var(--accent)] flex items-center justify-center font-bold text-[12px] group-hover:scale-105 transition-transform shadow-sm">
+                           {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                        </div>
+                     </div>
                   </div>
                </div>
 
-               {/* Metrics Grid */}
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {[
-                     { label: "Today's Sales", val: "₹ 1,84,500", icon: faIndianRupeeSign },
-                     { label: "Pending Receivables", val: "₹ 12,40,200", icon: faScaleBalanced },
-                     { label: "14 Active", sub: "Open Job Work Orders", icon: faWarehouse },
-                     { label: "GST Liability This Month", val: "₹ 45,300", icon: faChartColumn }
-                  ].map((kpi, idx) => (
-                     <div key={idx} className={`rounded-xl border p-4 shadow-sm hover:shadow-md transition-all flex items-center gap-4 group ${isDark ? 'bg-zinc-900 border-zinc-800/80 text-white' : 'bg-white border-slate-100 text-black'}`}>
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shrink-0 border ${isDark ? 'bg-zinc-950 text-zinc-400 border-zinc-800 group-hover:bg-white group-hover:text-black' : 'bg-slate-50 text-slate-400 border-slate-100 group-hover:bg-black group-hover:text-white'}`}>
-                           <FontAwesomeIcon icon={kpi.icon} className="text-xs" />
-                        </div>
-                        <div className="flex flex-col">
-                           <h3 className={`text-lg font-black tracking-tight leading-none ${isDark ? 'text-white' : 'text-black'}`}>
-                              {kpi.val || kpi.label.split(' ')[0] + ' ' + kpi.label.split(' ')[1]}
-                           </h3>
-                           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                              {kpi.val ? kpi.label : kpi.sub}
-                           </p>
+               {/* Bottom Row - Mega Menu */}
+               <div className="flex items-center gap-2 px-6 h-[44px] border-t border-[var(--border-subtle)] bg-white/40">
+                  {Object.keys(visibleMenuData).map((section) => (
+                     <div key={section} className="relative group h-full flex items-center">
+                        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold text-[var(--text-secondary)] group-hover:text-[var(--accent)] group-hover:bg-[var(--accent-light)] transition-colors uppercase tracking-widest">
+                           {section}
+                           <FontAwesomeIcon icon={faChevronDown} className="text-[9px] opacity-70" />
+                        </button>
+                        
+                        {/* Dropdown Content */}
+                        <div className="absolute top-[40px] left-0 mt-0 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-1 group-hover:translate-y-0 z-50">
+                           <div className="bg-[var(--bg-card)] border border-[var(--border-strong)] rounded-xl shadow-[var(--shadow-float)] overflow-y-auto max-h-[calc(100vh-120px)] py-2 mt-1 no-scrollbar">
+                              {visibleMenuData[section].map((item, idx) => {
+                                 const label = typeof item === 'object' ? item.label : item;
+                                 const { badge, text } = parseMenuLabel(label);
+                                 return (
+                                    <button
+                                       key={idx}
+                                       type="button"
+                                       onClick={() => handleMenuItemClick(item)}
+                                       className="w-full flex items-center gap-3 px-4 py-2 text-[13px] text-left text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--blue-bg)] transition-colors font-medium"
+                                    >
+                                       {badge && <span className="text-[10px] text-white bg-[var(--accent)] px-1.5 py-0.5 rounded w-5 text-center font-mono shrink-0">{badge}</span>}
+                                       <span className="truncate">{text}</span>
+                                    </button>
+                                 );
+                              })}
+                           </div>
                         </div>
                      </div>
                   ))}
                </div>
+            </header>
 
-               {/* Shortcut Grid */}
-               <div className="space-y-8 pt-4">
-                  <div className="flex flex-col items-center gap-2">
-                     <h3 className={`text-[10px] font-black uppercase tracking-[0.5em] ${isDark ? 'text-zinc-400' : 'text-black'}`}>Core Modules Shortcuts</h3>
-                     <div className={`h-[1px] w-12 ${isDark ? 'bg-zinc-700' : 'bg-black'}`} />
+            <div className="p-6 relative flex-1 flex flex-col">
+               <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-white/40 to-transparent pointer-events-none"></div>
+               
+               <div className="w-full max-w-7xl mx-auto relative z-10 flex flex-col gap-6">
+               
+               {/* Dashboard Header */}
+               <div className="flex items-end justify-between animate-fade-in-up">
+                  <div>
+                     <h2 className="text-display mb-1 text-[22px]">Dashboard Overview</h2>
+                     <p className="text-body text-[var(--text-muted)]">Here's what's happening with your business today.</p>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-4">
-                     {desktopIcons.map((icon) => (
-                        <button
-                           key={icon.id}
-                           onClick={() => toggleModal(icon.key, true)}
-                           className={`border p-4 rounded-xl shadow-sm hover:shadow-md transition-all flex flex-col items-center gap-3 group ${isDark ? 'bg-zinc-900 border-zinc-800/80 hover:border-zinc-500' : 'bg-white border-slate-100 hover:border-black'}`}
-                        >
-                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all shadow-lg group-hover:scale-110 ${isDark ? 'bg-white text-black shadow-white/5' : 'bg-black text-white shadow-black/10'}`}>
-                              <FontAwesomeIcon icon={icon.icon} size="sm" />
-                           </div>
-                           <span className={`text-[8px] font-black uppercase tracking-widest text-center ${isDark ? 'text-zinc-300' : 'text-black'}`}>{icon.label}</span>
-                        </button>
-                     ))}
+                  <div className="flex gap-3">
+                     <button className="erp-btn erp-btn-secondary h-8 px-4 text-[12px]" onClick={() => refreshAllData()}><FontAwesomeIcon icon={faSync} className="text-[10px]" /> Sync Data</button>
+                     <button className="erp-btn erp-btn-secondary h-8 px-4 text-[12px]" onClick={() => openRecordsHub('accounts')}>View Records</button>
+                     <button className="erp-btn erp-btn-primary h-8 px-4 text-[12px]" onClick={() => toggleModal('sales', true)}>+ New Invoice</button>
                   </div>
                </div>
 
-               {/* Advanced Intelligence & Compliance Section */}
-               <div className="space-y-8 pt-4">
-                  <div className="flex flex-col items-center gap-2">
-                     <h3 className={`text-[10px] font-black uppercase tracking-[0.5em] ${isDark ? 'text-zinc-400' : 'text-black'}`}>Intelligence & Compliance</h3>
-                     <div className={`h-[1px] w-12 ${isDark ? 'bg-zinc-700' : 'bg-black'}`} />
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                     {[
-                        { label: 'Visit Management', icon: faHandshake, key: 'visit', desc: 'CRM & Field Intelligence' },
-                        { label: 'GSTR-1 Advanced', icon: faFilePen, key: 'gstr1', desc: 'Compliant Schema Export' },
-                        { label: '2B Matching', icon: faClipboardCheck, key: 'gst2bMatching', desc: 'Automated ITC Matching' },
-                        { label: 'Compliance Overview', icon: faUserShield, key: 'gstCompliance', desc: 'GST Health Scorecard' },
-                     ].map((item, idx) => (
-                        <button
-                           key={idx}
-                           onClick={() => toggleModal(item.key, true)}
-                           className={`p-8 rounded-[2rem] shadow-xl hover:shadow-2xl transition-all flex flex-col items-center gap-4 group relative overflow-hidden ${isDark ? 'bg-zinc-900 border border-zinc-800 text-white' : 'bg-black text-white'}`}
-                        >
-                           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform">
-                              <FontAwesomeIcon icon={item.icon} size="4x" />
-                           </div>
-                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 transition-all ${isDark ? 'bg-zinc-950 text-white group-hover:bg-white group-hover:text-black' : 'bg-white/10 text-white group-hover:bg-white group-hover:text-black'}`}>
-                              <FontAwesomeIcon icon={item.icon} size="lg" />
-                           </div>
-                           <div className="text-center">
-                              <span className="text-[11px] font-black uppercase tracking-[0.2em] block">{item.label}</span>
-                              <span className="text-[8px] font-bold uppercase tracking-widest text-slate-500 mt-2 block">{item.desc}</span>
-                           </div>
-                        </button>
-                     ))}
-                  </div>
-               </div>
+               {/* KPI Cards removed to hide sensitive information on home screen */}
 
-               {/* Bottom Row: Activity + Alerts */}
-               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fadeIn">
+               {/* Secondary Grid (Charts & Activity) */}
+               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
                   
-                  {/* Activity list */}
-                  <div className={`lg:col-span-7 rounded-2xl border shadow-sm overflow-hidden flex flex-col ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-slate-100'}`}>
-                     <div className={`px-6 py-4 border-b flex justify-between items-center ${isDark ? 'bg-zinc-950/45 border-zinc-800' : 'bg-slate-50/30 border-slate-50'}`}>
-                        <h3 className={`text-[10px] font-black uppercase tracking-[0.4em] ${isDark ? 'text-zinc-400' : 'text-black'}`}>Recent Activity</h3>
-                        <button className="text-[9px] font-bold text-slate-400 hover:text-black uppercase tracking-widest transition-all">View Analytics</button>
-                     </div>
-                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                           <thead>
-                              <tr className={`text-[9px] font-bold uppercase tracking-widest border-b ${isDark ? 'text-zinc-500 border-zinc-800 bg-zinc-950/20' : 'text-slate-300 border-slate-50'}`}>
-                                 <th className="px-6 py-3">Reference</th>
-                                 <th className="px-6 py-3">Counterparty</th>
-                                 <th className="px-6 py-3 text-right">Amount</th>
-                                 <th className="px-6 py-3 text-center">Protocol</th>
-                              </tr>
-                           </thead>
-                           <tbody className={`divide-y ${isDark ? 'divide-zinc-800' : 'divide-slate-50'}`}>
-                              {[
-                                 { ref: 'INV-2026-004', entity: 'Ankit Fabrics Pvt Ltd', val: '₹ 42,500.00', status: 'SETTLED' },
-                                 { ref: 'INV-2026-003', entity: 'Balaji Creation', val: '₹ 88,000.00', status: 'PENDING' },
-                                 { ref: 'INV-2026-002', entity: 'Vardhman Textiles', val: '₹ 1,18,400.00', status: 'PENDING' },
-                              ].map((inv, idx) => (
-                                 <tr key={idx} className={`transition-all group border-b last:border-0 ${isDark ? 'border-zinc-805 hover:bg-zinc-950/20' : 'border-slate-50 hover:bg-slate-50/50'}`}>
-                                    <td className={`px-6 py-3 font-bold text-[10px] tracking-tight uppercase ${isDark ? 'text-white' : 'text-black'}`}>{inv.ref}</td>
-                                    <td className="px-6 py-3 text-[9px] font-bold text-slate-400 uppercase">{inv.entity}</td>
-                                    <td className={`px-6 py-3 text-right font-black text-[10px] ${isDark ? 'text-white' : 'text-black'}`}>{inv.val}</td>
-                                    <td className="px-6 py-3 text-center">
-                                       <span className={`px-3 py-1 text-[8px] font-bold uppercase rounded-lg ${inv.status === 'SETTLED' ? (isDark ? 'bg-white text-black' : 'bg-black text-white') : (isDark ? 'bg-zinc-800 text-zinc-400' : 'bg-slate-100 text-slate-400')}`}>
-                                          {inv.status}
-                                       </span>
-                                    </td>
-                                 </tr>
-                              ))}
-                           </tbody>
-                        </table>
-                     </div>
-                  </div>
-
-                  {/* Alerts */}
-                  <div className={`lg:col-span-5 rounded-2xl border shadow-sm p-6 flex flex-col ${isDark ? 'bg-zinc-900 border-zinc-800 text-white' : 'bg-white border-slate-100 text-black'}`}>
-                     <div className="flex justify-between items-center mb-6">
-                        <h3 className={`text-[10px] font-black uppercase tracking-[0.4em] ${isDark ? 'text-zinc-400' : 'text-black'}`}>Stock Alerts</h3>
-                        <span className={`px-3 py-1 text-[8px] font-bold uppercase rounded-lg tracking-widest ${isDark ? 'bg-white text-black' : 'bg-black text-white'}`}>2 Priority</span>
-                     </div>
-                     <div className="space-y-4 flex-1">
-                        <div className={`flex items-center justify-between p-3 rounded-xl border transition-all group ${isDark ? 'bg-zinc-950 border-zinc-800 hover:border-zinc-500' : 'bg-slate-50 border-slate-50 hover:border-black'}`}>
-                           <div className="flex items-center gap-4">
-                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-[10px] shadow-sm transition-all ${isDark ? 'bg-zinc-900 text-zinc-400 group-hover:bg-white group-hover:text-black' : 'bg-white text-slate-600 group-hover:bg-black group-hover:text-white'}`}>45M</div>
+                  {/* Recent Activity Timeline - taking full width since quick access modules are removed */}
+                  <div className="erp-card p-5 lg:col-span-3 max-w-4xl">
+                     <h3 className="text-[14px] font-semibold mb-4 text-[var(--text-primary)]">Recent Activity</h3>
+                     <div className="flex flex-col gap-4">
+                        {[
+                           { text: 'New Sales Invoice #INV-2041 created', time: '10 mins ago', type: 'sales' },
+                           { text: 'Payment of ₹50,000 received from Acme Corp', time: '1 hour ago', type: 'receipt' },
+                           { text: 'Job Work issue challan generated', time: '3 hours ago', type: 'job' },
+                           { text: 'Purchase bill #PB-902 entered', time: '5 hours ago', type: 'purchase' },
+                           { text: 'Stock transfer to Warehouse B completed', time: 'Yesterday', type: 'inventory' },
+                        ].map((act, i) => (
+                           <div key={i} className="flex gap-3 items-start">
+                              <div className="w-2 h-2 mt-1.5 rounded-full bg-[var(--accent)] shrink-0 shadow-[0_0_0_4px_var(--accent-light)]"></div>
                               <div>
-                                 <p className={`text-[10px] font-bold uppercase tracking-tight leading-none ${isDark ? 'text-white' : 'text-black'}`}>Lycra Cotton 180</p>
-                                 <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Refill Recommended</p>
+                                 <div className="text-[12px] font-medium text-[var(--text-primary)]">{act.text}</div>
+                                 <div className="text-[10px] text-[var(--text-muted)] mt-0.5">{act.time}</div>
                               </div>
                            </div>
-                           <button className={`px-4 py-1.5 text-[8px] font-bold rounded-lg transition-all uppercase tracking-widest ${isDark ? 'bg-white text-black hover:bg-zinc-200' : 'bg-black text-white hover:bg-slate-800'}`}>ORDER</button>
-                        </div>
-                        <div className={`flex items-center justify-between p-3 rounded-xl border transition-all group ${isDark ? 'bg-zinc-950 border-zinc-800 hover:border-zinc-500' : 'bg-slate-50 border-slate-50 hover:border-black'}`}>
-                           <div className="flex items-center gap-4">
-                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-[10px] shadow-sm transition-all ${isDark ? 'bg-zinc-900 text-zinc-400 group-hover:bg-white group-hover:text-black' : 'bg-white text-slate-600 group-hover:bg-black group-hover:text-white'}`}>12M</div>
-                              <div>
-                                 <p className={`text-[10px] font-bold uppercase tracking-tight leading-none ${isDark ? 'text-white' : 'text-black'}`}>Premium Knit Blue</p>
-                                 <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">Critical Low</p>
-                              </div>
-                           </div>
-                           <button className={`px-4 py-1.5 text-[8px] font-bold rounded-lg transition-all uppercase tracking-widest ${isDark ? 'bg-white text-black hover:bg-zinc-200' : 'bg-black text-white hover:bg-slate-800'}`}>ORDER</button>
-                        </div>
+                        ))}
                      </div>
+                     <button type="button" onClick={() => openRecordsHub('sales')} className="w-full mt-5 py-2 text-[12px] font-medium text-[var(--accent)] hover:bg-[var(--accent-light)] rounded-lg transition-colors">View All Records →</button>
                   </div>
                </div>
-            </div>
-         </div>
 
-         {/* Compact Status Bar */}
-         <div className="h-10 bg-black border-t border-slate-800 flex items-center justify-between px-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            <div className="flex gap-10">
-               <span className="hover:text-white transition-colors cursor-pointer" onClick={() => toggleModal('ledger', true)}>Ctrl+L : Ledger</span>
-               <span className="hover:text-white transition-colors cursor-pointer" onClick={() => openGenericMaster('AccountGroup')}>F4 : Master</span>
-               <span className="hover:text-white transition-colors cursor-pointer">F12 : Save</span>
-            </div>
-            <div className="flex items-center gap-8">
-               <span className="flex items-center gap-2 text-white"><FontAwesomeIcon icon={faBuilding} /> MAHAVEER IMPEX</span>
-               <button onClick={() => window.close()} className="px-6 py-1 bg-white text-black rounded-lg hover:bg-slate-200 transition-all font-black">Exit ERP</button>
             </div>
          </div>
+         </main>
 
          {/* Modals */}
-         <SalesModal isOpen={modals.sales} onClose={() => toggleModal('sales', false)} selectedBook={selectedBooks.sales?.name} />
-         <PurchaseModal isOpen={modals.purchase} onClose={() => toggleModal('purchase', false)} selectedBook={selectedBooks.purchase?.name} />
+         <SalesModal isOpen={modals.sales} onClose={() => toggleModal('sales', false)} selectedBook={selectedBooks.sales?.name} readOnly={!permissions.canSave} />
+         <PurchaseModal isOpen={modals.purchase} onClose={() => toggleModal('purchase', false)} selectedBook={selectedBooks.purchase?.name} readOnly={!permissions.canSave} />
          <AccountingModal isOpen={modals.receipt} onClose={() => toggleModal('receipt', false)} initialType="Receipt" selectedBook={selectedBooks.receipt?.name} />
          <AccountingModal isOpen={modals.payment} onClose={() => toggleModal('payment', false)} initialType="Payment" selectedBook={selectedBooks.payment?.name} />
          <IssueModal isOpen={modals.millIssue} onClose={() => toggleModal('millIssue', false)} selectedBook={selectedBooks.millIssue?.name} />
@@ -563,8 +504,8 @@ const Dashboard = () => {
          <UpdateModal isOpen={modals.jobIssue} onClose={() => toggleModal('jobIssue', false)} selectedBook={selectedBooks.jobIssue?.name} />
          <JobReceiptModal isOpen={modals.jobRec} onClose={() => toggleModal('jobRec', false)} selectedBook={selectedBooks.jobRec?.name} />
          <LedgerModal isOpen={modals.ledger} onClose={() => toggleModal('ledger', false)} selectedBook={selectedBooks.ledger?.name} />
-         <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} />
-         <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} />
+         <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters} />
+         <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} readOnly={permissions.readOnlyMasters} />
          {modals.outstanding && <SalesOutstanding isOpen={modals.outstanding} onClose={() => toggleModal('outstanding', false)} />}
 
          {/* GST Compliance Modals */}
@@ -578,14 +519,14 @@ const Dashboard = () => {
          <PartyModal isOpen={modals.party} onClose={() => toggleModal('party', false)} />
          <BookMasterModal isOpen={modals.bookMaster} onClose={() => toggleModal('bookMaster', false)} />
          <Modal isOpen={modals.inventoryPage} onClose={() => toggleModal('inventoryPage', false)} title="Inventory Stock Control" className="max-w-[90vw]">
-            <div className="bg-white p-2 rounded-[2.5rem] overflow-hidden">
+            <div className="bg-[var(--bg-card)] p-2 rounded-[2.5rem] overflow-hidden">
                <InventoryPage />
             </div>
          </Modal>
 
          {/* Job Worker Modal Wrap */}
          <Modal isOpen={modals.jobWorker} onClose={() => toggleModal('jobWorker', false)} title="Processing Partner Registry" className="max-w-[90vw]">
-            <div className="bg-white p-10 rounded-[2.5rem]">
+            <div className="bg-[var(--bg-card)] p-10 rounded-[2.5rem]">
                <JobWorkerMaster />
             </div>
          </Modal>
@@ -594,25 +535,17 @@ const Dashboard = () => {
          <Modal
             isOpen={modals.placeholder}
             onClose={() => toggleModal('placeholder', false)}
-            title="System Command Center"
-            className="max-w-md"
-         >
-            <div className="p-10 text-center space-y-6">
-               <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto">
-                  <FontAwesomeIcon icon={faTriangleExclamation} className="text-slate-200 text-3xl" />
-               </div>
-               <div>
-                  <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-black">{placeholderName} Under Construction</h4>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-4 leading-relaxed">
-                     This module is currently being optimized for the new monochromatic design system. Functional logic is active, but UI rendering is pending.
-                  </p>
-               </div>
-               <button
-                  onClick={() => toggleModal('placeholder', false)}
-                  className="w-full py-4 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all rounded-xl"
-               >
-                  Acknowledge & Continue
+            title={placeholderName}
+            className="max-w-sm"
+            footer={
+               <button type="button" className="erp-btn erp-btn-primary" onClick={() => toggleModal('placeholder', false)}>
+                  OK
                </button>
+            }
+         >
+            <div className="erp-modal-body text-center py-4">
+               <FontAwesomeIcon icon={faTriangleExclamation} className="text-2xl text-[var(--amber)] mb-3" />
+               <p className="text-body text-[var(--text-secondary)]">This module is not available yet.</p>
             </div>
          </Modal>
 
@@ -628,7 +561,18 @@ const Dashboard = () => {
          <GenericMasterModal 
             isOpen={modals.genericMaster} 
             onClose={() => setModals(prev => ({ ...prev, genericMaster: false }))} 
-            type={modals.genericMasterType} 
+            type={modals.genericMasterType}
+            readOnly={permissions.readOnlyMasters}
+         />
+         <OpeningBalanceModal
+            isOpen={modals.openingBalance}
+            onClose={() => setModals(prev => ({ ...prev, openingBalance: false }))}
+            readOnly={permissions.readOnlyMasters}
+         />
+         <OpeningStockModal
+            isOpen={modals.openingStock}
+            onClose={() => setModals(prev => ({ ...prev, openingStock: false }))}
+            readOnly={permissions.readOnlyMasters}
          />
          <OrderModal 
             isOpen={modals.order} 
@@ -652,6 +596,12 @@ const Dashboard = () => {
          <UserRightsModal
             isOpen={modals.userRights}
             onClose={() => setModals(prev => ({ ...prev, userRights: false }))}
+         />
+
+         <DataRecordsHub
+            isOpen={modals.recordsHub}
+            onClose={() => setModals(prev => ({ ...prev, recordsHub: false }))}
+            initialTab={modals.recordsTab}
          />
 
       </div>

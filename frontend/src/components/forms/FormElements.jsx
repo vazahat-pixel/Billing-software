@@ -2,35 +2,27 @@ import React, { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faSearch, faChevronDown } from '@fortawesome/free-solid-svg-icons';
 
-/**
- * FormField Wrapper - Upgraded for Premium Spacing
- */
-export const FormField = ({ label, error, children, className = "" }) => (
-  <div className={`erp-module-container erp-field ${className}`}>
+export const FormField = ({ label, error, children, className = '' }) => (
+  <div className={`erp-field ${className}`}>
     {label && <label className="erp-label">{label}</label>}
-    <div className="erp-input-container">
-      {children}
-    </div>
-    {error && <span className="text-[11px] font-bold text-rose-500 mt-1.5 pl-1 uppercase tracking-wider">{error}</span>}
+    <div className="erp-input-container">{children}</div>
+    {error && <span className="text-[11px] text-[var(--red)] mt-0.5">{error}</span>}
   </div>
 );
 
-/**
- * Premium ERP Input - Upgraded with smooth interactions
- */
-export const ERPInput = ({ 
-  type = "text", 
-  placeholder, 
-  value, 
-  onChange, 
-  error, 
+export const ERPInput = ({
+  type = 'text',
+  placeholder,
+  value,
+  onChange,
+  error,
   disabled,
-  className = "",
-  ...props 
+  className = '',
+  ...props
 }) => (
   <input
     type={type}
-    className={`erp-input ${error ? 'border-rose-400 focus:border-rose-500' : ''} ${className}`}
+    className={`erp-input ${error ? 'border-[var(--red)]' : ''} ${className}`}
     placeholder={placeholder}
     value={value}
     onChange={onChange}
@@ -39,49 +31,39 @@ export const ERPInput = ({
   />
 );
 
-/**
- * Premium ERP Select - Upgraded with custom styling
- */
-export const ERPSelect = ({ options = [], value, onChange, error, label, className = "", ...props }) => (
+export const ERPSelect = ({ options = [], value, onChange, error, label, className = '', ...props }) => (
   <select
-    className={`erp-select ${error ? 'border-rose-400 focus:border-rose-500' : ''} ${className}`}
+    className={`erp-select ${error ? 'border-[var(--red)]' : ''} ${className}`}
     value={value}
     onChange={onChange}
     {...props}
   >
-    <option value="">Select {label || 'Option'}</option>
-    {options.map(opt => (
+    <option value="">Select {label || 'option'}</option>
+    {options.map((opt) => (
       <option key={opt.value} value={opt.value}>{opt.label}</option>
     ))}
   </select>
 );
 
-/**
- * Advanced Searchable Select with Inline Creation
- */
-export const ERPSearchableSelect = ({ 
-  options = [], 
-  value, 
-  onChange, 
-  onCreateNew, 
-  placeholder = "Search...", 
+export const ERPSearchableSelect = ({
+  options = [],
+  value,
+  onChange,
+  onCreateNew,
+  placeholder = 'Search...',
   label,
   createLabel,
-  className = "" 
+  className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const dropdownRef = useRef(null);
 
   const entityLabel = createLabel || label || 'Record';
-  const selectedOption = options.find(opt => opt.value === value);
-  const filteredOptions = options.filter(opt => 
+  const selectedOption = options.find((opt) => opt.value === value);
+  const filteredOptions = options.filter((opt) =>
     opt.label.toLowerCase().includes(search.toLowerCase())
   );
-  const exactMatch = search && options.some(
-    opt => opt.label.toLowerCase() === search.toLowerCase()
-  );
-  const showCreate = onCreateNew && search && !exactMatch;
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -89,75 +71,74 @@ export const ERPSearchableSelect = ({
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
-      <div 
+      <div
         onClick={() => setIsOpen(!isOpen)}
-        className={`erp-input cursor-pointer flex justify-between items-center ${isOpen ? 'ring-2 ring-blue-500/20 border-blue-500' : ''}`}
+        className={`erp-input cursor-pointer flex justify-between items-center ${isOpen ? 'border-[rgba(0,0,0,0.4)]' : ''}`}
       >
-        <span className={selectedOption ? 'text-inherit' : 'text-slate-400'}>
+        <span className={selectedOption ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <FontAwesomeIcon icon={faChevronDown} className={`text-[10px] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <FontAwesomeIcon icon={faChevronDown} className={`text-[10px] text-[var(--text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 w-full mt-1 bg-white border border-slate-200 shadow-2xl z-[200] rounded-lg overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
-          <div className="p-2 border-b border-slate-100 flex items-center gap-2 bg-slate-50">
-            <FontAwesomeIcon icon={faSearch} className="text-slate-400 text-xs" />
-            <input 
+        <div className="absolute top-full left-0 w-full mt-1 bg-[var(--bg-card)] border border-[var(--border-strong)] shadow-[var(--shadow-lg)] z-[200] rounded-lg overflow-hidden animate-fade-in-up origin-top">
+          <div className="p-2 border-b border-[var(--border-subtle)] flex items-center gap-2 bg-[var(--bg-base)]">
+            <FontAwesomeIcon icon={faSearch} className="text-[var(--accent)] text-xs ml-1" />
+            <input
               autoFocus
-              className="w-full bg-transparent border-none outline-none text-xs h-6"
-              placeholder={`Type to search ${label}...`}
+              className="w-full bg-transparent border-none outline-none text-[13px] font-medium h-7 text-[var(--text-primary)]"
+              placeholder={`Search ${entityLabel.toLowerCase()}...`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          
-          <div className="max-h-60 overflow-y-auto">
+
+          <div className="max-h-56 overflow-y-auto no-scrollbar">
             {filteredOptions.length > 0 ? (
-              filteredOptions.map(opt => (
-                <div 
+              filteredOptions.map((opt) => (
+                <div
                   key={opt.value}
                   onClick={() => {
                     onChange(opt.value);
                     setIsOpen(false);
-                    setSearch("");
+                    setSearch('');
                   }}
-                  className={`px-3 py-2 text-xs cursor-pointer transition-colors ${value === opt.value ? 'bg-blue-50 text-blue-700 font-bold' : 'hover:bg-slate-50'}`}
+                  className={`px-3 py-2 text-[13px] cursor-pointer transition-colors ${
+                    value === opt.value
+                      ? 'bg-[var(--accent-light)] font-semibold text-[var(--accent-hover)]'
+                      : 'hover:bg-[var(--bg-base)] text-[var(--text-secondary)] font-medium'
+                  }`}
                 >
                   {opt.label}
                 </div>
               ))
             ) : (
-              <div className="px-3 py-4 text-center text-slate-400 text-xs">
-                {search ? `No ${entityLabel.toLowerCase()} found for "${search}"` : `No ${entityLabel.toLowerCase()} registered yet`}
+              <div className="px-3 py-3 text-center text-[var(--text-muted)] text-xs">
+                {search ? `No ${entityLabel.toLowerCase()} found` : `No ${entityLabel.toLowerCase()} yet`}
               </div>
             )}
           </div>
 
           {onCreateNew && (
-            <div 
+            <button
+              type="button"
               onClick={() => {
                 onCreateNew(search);
                 setIsOpen(false);
-                setSearch("");
+                setSearch('');
               }}
-              className={`p-2 border-t border-slate-100 text-xs font-bold cursor-pointer flex items-center gap-2 transition-colors ${
-                showCreate || options.length === 0
-                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800'
-                  : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
-              }`}
+              className="w-full px-3 py-2 border-t border-[var(--border-subtle)] text-[13px] text-[var(--accent)] hover:text-[var(--accent-hover)] bg-[var(--accent-light)]/30 hover:bg-[var(--accent-light)] flex items-center gap-2 transition-colors text-left font-semibold"
             >
-              <FontAwesomeIcon icon={faPlus} />
-              {search
-                ? `+ Quick Add ${entityLabel}: "${search}"`
-                : `+ Register New ${entityLabel}`}
-            </div>
+              <FontAwesomeIcon icon={faPlus} className="text-[11px]" />
+              {search ? `Add ${entityLabel}: "${search}"` : `Add new ${entityLabel}`}
+            </button>
           )}
         </div>
       )}
@@ -165,26 +146,20 @@ export const ERPSearchableSelect = ({
   );
 };
 
-/**
- * ERP Button - Upgraded with smooth click animations & colorful variants
- */
-export const ERPButton = ({ variant = "indigo", icon: Icon, children, className = "", ...props }) => (
-  <button 
-    className={`erp-btn erp-btn-${variant} ${className}`} 
+export const ERPButton = ({ variant = 'primary', icon: Icon, children, className = '', ...props }) => (
+  <button
+    className={`erp-btn ${variant === 'secondary' ? 'erp-btn-secondary' : 'erp-btn-primary'} ${className}`}
     {...props}
   >
-    {Icon && <Icon size={18} className="relative z-10" />}
-    <span className="relative z-10">{children}</span>
+    {Icon && <Icon size={14} />}
+    <span>{children}</span>
   </button>
 );
 
-/**
- * ERP Form Section - For grouping fields with style
- */
-export const ERPSection = ({ title, icon: Icon, children, className = "" }) => (
+export const ERPSection = ({ title, icon: Icon, children, className = '' }) => (
   <div className={`erp-form-section ${className}`}>
     <div className="erp-form-section-header">
-      {Icon && <Icon size={18} />}
+      {Icon && <Icon size={14} />}
       <h4 className="erp-form-section-title">{title}</h4>
     </div>
     {children}

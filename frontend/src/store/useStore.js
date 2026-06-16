@@ -43,9 +43,17 @@ const useStore = create((set, get) => ({
   orders: [],
   returns: [],
   notes: [],
+  visits: [],
+  vouchers: [],
   companyUsers: [],
   sessionReady: false,
+  // FIXED: Per-entity loading states instead of one shared boolean
   loading: false,
+  partiesLoading: false,
+  itemsLoading: false,
+  salesLoading: false,
+  purchasesLoading: false,
+  inventoryLoading: false,
   error: null,
 
   // --- AUTH ACTIONS ---
@@ -75,7 +83,9 @@ const useStore = create((set, get) => ({
       const user = normalizeUser(res.data.user);
       localStorage.setItem('role', user.role);
       localStorage.setItem('user', JSON.stringify(user));
-      set({ user, role: user.role, sessionReady: true });
+      // FIXED: Restore plan from saved user data so plan isn't null after refresh
+      const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      set({ user, role: user.role, plan: user.plan || savedUser.plan || null, sessionReady: true });
     } catch {
       localStorage.removeItem('token');
       localStorage.removeItem('role');
@@ -88,6 +98,7 @@ const useStore = create((set, get) => ({
     localStorage.removeItem('token');
     localStorage.removeItem('role');
     localStorage.removeItem('user');
+    // FIXED: Clear ALL entity state on logout to prevent data leakage
     set({
       token: null,
       user: null,
@@ -95,41 +106,69 @@ const useStore = create((set, get) => ({
       plan: null,
       parties: [],
       items: [],
+      purchases: [],
+      sales: [],
+      inventoryLots: [],
+      jobWorkEntries: [],
+      ledgers: [],
+      payments: [],
+      receipts: [],
+      orders: [],
+      returns: [],
+      notes: [],
+      visits: [],
+      vouchers: [],
       companyUsers: [],
       sessionReady: true
     });
   },
 
   bootstrapMasters: async () => {
-    const { fetchParties, fetchItems, fetchSales, fetchPurchases, fetchInventory } = get();
-    await Promise.all([
+    return get().refreshAllData();
+  },
+
+  refreshAllData: async () => {
+    const {
+      fetchParties, fetchItems, fetchSales, fetchPurchases, fetchInventory,
+      fetchJobs, fetchOrders, fetchReturns, fetchNotes, fetchVisits, fetchVouchers, fetchBooks
+    } = get();
+    const results = await Promise.allSettled([
       fetchParties(),
       fetchItems(),
       fetchSales(),
       fetchPurchases(),
-      fetchInventory()
+      fetchInventory(),
+      fetchJobs(),
+      fetchOrders(),
+      fetchReturns(),
+      fetchNotes(),
+      fetchVisits(),
+      fetchVouchers(),
+      fetchBooks()
     ]);
+    const failed = results.filter(r => r.status === 'rejected');
+    if (failed.length > 0) {
+      console.warn(`[Refresh] ${failed.length} data fetches failed:`, failed.map(f => f.reason?.message));
+    }
   },
 
   // --- MASTER ACTIONS ---
   fetchParties: async () => {
-    set({ loading: true });
+    set({ partiesLoading: true });
     try {
       const res = await api.get('/parties');
       const raw = res.data.data || res.data || [];
       const parties = (Array.isArray(raw) ? raw : []).map(normalizeParty);
-      set({ parties, loading: false });
+      set({ parties, partiesLoading: false });
     } catch (err) {
-      set({ error: err.message, loading: false });
+      set({ error: err.message, partiesLoading: false });
     }
   },
 
   addParty: async (partyData) => {
     try {
-      const res = await api.post('/parties', {
-        ...partyData,
-        companyId: get().user?.companyId
-      });
+      // SECURITY FIX: Do not send companyId from frontend — server extracts from JWT
+      const res = await api.post('/parties', partyData);
       const newParty = normalizeParty(res.data.data || res.data);
       set((state) => ({ parties: [...state.parties, newParty] }));
       return newParty;
@@ -187,10 +226,8 @@ const useStore = create((set, get) => ({
 
   addItem: async (itemData) => {
     try {
-      const res = await api.post('/items', {
-        ...itemData,
-        companyId: get().user?.companyId
-      });
+      // SECURITY FIX: Do not send companyId from frontend — server extracts from JWT
+      const res = await api.post('/items', itemData);
       const newItem = normalizeItem(res.data.data || res.data);
       set((state) => ({ items: [...state.items, newItem] }));
       return newItem;
@@ -235,34 +272,59 @@ const useStore = create((set, get) => ({
   },
 
   // --- PURCHASE ACTIONS ---
-  fetchPurchases: async () => {
-    set({ loading: true });
+  fetchPurchases: async (params = {}) => {
+    set({ purchasesLoading: true });
     try {
-      const res = await api.get('/purchases');
-      const raw = res.data.data || res.data || [];
+      const queryParams = new URLSearchParams(params).toString();
+      const res = await api.get(`/purchases${queryParams ? '?' + queryParams : ''}`);
+      const raw = res.data.data?.purchases || res.data.data || res.data || [];
       const purchases = (Array.isArray(raw) ? raw : []).map(normalizePurchase);
-      set({ purchases, loading: false });
+      set({ purchases, purchasesLoading: false });
     } catch (err) {
-      set({ error: err.message, loading: false });
+      set({ error: err.message, purchasesLoading: false });
     }
   },
 
   addPurchase: async (purchaseData) => {
     try {
-      const res = await api.post('/purchases', {
-        ...purchaseData,
-        companyId: get().user?.companyId
-      });
+      // SECURITY FIX: Do not send companyId from frontend — server extracts from JWT
+      const res = await api.post('/purchases', purchaseData);
       const newPurchase = normalizePurchase(res.data.data || res.data);
       set((state) => ({ purchases: [newPurchase, ...state.purchases] }));
-      
       // Auto-sync inventory after purchase
       get().fetchInventory();
-      
       return newPurchase;
     } catch (err) {
       throw err;
     }
+  },
+
+  deletePurchase: async (id) => {
+    const res = await api.delete(`/purchases/${id}`);
+    const result = res.data.data;
+    if (result?.status === 'cancelled' || result?._id) {
+      set(state => ({
+        purchases: state.purchases.map(p => (p._id === id || p.id === id ? normalizePurchase(result) : p))
+      }));
+    } else {
+      set(state => ({ purchases: state.purchases.filter(p => p._id !== id && p.id !== id) }));
+    }
+    return result;
+  },
+
+  updatePurchaseStatus: async (id, status) => {
+    const res = await api.put(`/purchases/${id}/status`, { status });
+    const updated = normalizePurchase(res.data.data);
+    set(state => ({
+      purchases: state.purchases.map(p => (p._id === id || p.id === id ? updated : p))
+    }));
+    return updated;
+  },
+
+  createOpeningStock: async (data) => {
+    const res = await api.post('/inventory/opening-stock', data);
+    get().fetchInventory();
+    return res.data.data;
   },
 
   // --- SALES ACTIONS ---
@@ -270,7 +332,7 @@ const useStore = create((set, get) => ({
     set({ loading: true });
     try {
       const res = await api.get('/sales');
-      const raw = res.data.data || res.data || [];
+      const raw = res.data.data?.sales || res.data.data || res.data || [];
       const sales = (Array.isArray(raw) ? raw : []).map(normalizeSale);
       set({ sales, loading: false });
     } catch (err) {
@@ -294,6 +356,33 @@ const useStore = create((set, get) => ({
     } catch (err) {
       throw err;
     }
+  },
+
+  deleteSale: async (id) => {
+    const res = await api.delete(`/sales/${id}`);
+    const result = res.data.data;
+    if (result?.status === 'cancelled' || result?._id) {
+      set(state => ({
+        sales: state.sales.map(s => (s._id === id || s.id === id ? normalizeSale(result) : s))
+      }));
+    } else {
+      set(state => ({ sales: state.sales.filter(s => s._id !== id && s.id !== id) }));
+    }
+    return result;
+  },
+
+  updateSaleStatus: async (id, status) => {
+    const res = await api.put(`/sales/${id}/status`, { status });
+    const updated = normalizeSale(res.data.data);
+    set(state => ({
+      sales: state.sales.map(s => (s._id === id || s.id === id ? updated : s))
+    }));
+    return updated;
+  },
+
+  fetchGstr1: async (startDate, endDate) => {
+    const res = await api.get(`/gst/gstr1?startDate=${startDate || ''}&endDate=${endDate || ''}`);
+    return res.data.data;
   },
 
   // --- INVENTORY ---
@@ -385,9 +474,13 @@ const useStore = create((set, get) => ({
       });
       const newVoucher = res.data.data;
       set(state => ({ 
-        payments: [newVoucher, ...state.payments], 
+        payments: [newVoucher, ...state.payments],
+        vouchers: [newVoucher, ...state.vouchers],
         loading: false 
       }));
+      get().fetchVouchers();
+      get().fetchSales();
+      get().fetchPurchases();
       return newVoucher;
     } catch (err) {
       set({ loading: false });
@@ -404,9 +497,13 @@ const useStore = create((set, get) => ({
       });
       const newVoucher = res.data.data;
       set(state => ({ 
-        receipts: [newVoucher, ...state.receipts], 
+        receipts: [newVoucher, ...state.receipts],
+        vouchers: [newVoucher, ...state.vouchers],
         loading: false 
       }));
+      get().fetchVouchers();
+      get().fetchSales();
+      get().fetchPurchases();
       return newVoucher;
     } catch (err) {
       set({ loading: false });
@@ -456,6 +553,20 @@ const useStore = create((set, get) => ({
       return res.data.data;
     } catch (err) {
       set({ error: err.message, loading: false });
+    }
+  },
+
+  fetchBooks: async () => {
+    set({ loading: true });
+    try {
+      const companyId = get().user?.companyId;
+      const res = await api.get(`/books?companyId=${companyId}`);
+      set({ books: res.data.data || [], loading: false });
+      return res.data.data;
+    } catch (err) {
+      console.error('Fetch books failed:', err);
+      set({ error: err.message, loading: false });
+      return [];
     }
   },
 
@@ -594,6 +705,37 @@ const useStore = create((set, get) => ({
     } catch (err) {
       console.error('Add note failed:', err);
       throw err;
+    }
+  },
+
+  // --- VISITS ---
+  fetchVisits: async () => {
+    try {
+      const res = await api.get('/visits');
+      const raw = res.data.data || res.data || [];
+      set({ visits: Array.isArray(raw) ? raw : [] });
+      return Array.isArray(raw) ? raw : [];
+    } catch (err) {
+      console.error('Fetch visits failed:', err);
+      return [];
+    }
+  },
+
+  // --- VOUCHERS (Receipts & Payments) ---
+  fetchVouchers: async (type = '') => {
+    try {
+      const query = type ? `?type=${type}` : '';
+      const res = await api.get(`/accounting/payments${query}`);
+      const raw = res.data.data || [];
+      const vouchers = Array.isArray(raw) ? raw : [];
+      if (type) {
+        return vouchers;
+      }
+      set({ vouchers });
+      return vouchers;
+    } catch (err) {
+      console.error('Fetch vouchers failed:', err);
+      return [];
     }
   },
 

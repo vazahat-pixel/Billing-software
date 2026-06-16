@@ -19,12 +19,17 @@ const AccountingEntrySchema = new mongoose.Schema({
   },
   voucherType: {
     type: String,
-    enum: ['Payment', 'Receipt', 'Journal', 'SalesAuto', 'PurchaseAuto', 'JobWorkAuto', 'WastageAuto'],
+    enum: ['Payment', 'Receipt', 'Journal', 'SalesAuto', 'PurchaseAuto', 'JobWorkAuto', 'WastageAuto', 'ReturnAuto', 'NoteAuto'],
     required: true
   },
   refType: {
     type: String,
-    enum: ['SalesInvoice', 'PurchaseBill', 'GRN', 'JobIssue', 'JobReceive', 'Payment', 'Receipt', 'Journal']
+    enum: [
+      'SalesInvoice', 'PurchaseBill', 'GRN', 'JobIssue', 'JobReceive',
+      'Payment', 'Receipt', 'Journal',
+      'CreditNote', 'DebitNote',           // Fix: was missing these
+      'SalesReturn', 'PurchaseReturn'       // Fix: descriptive return types
+    ]
   },
   refId: {
     type: mongoose.Schema.Types.ObjectId
@@ -76,11 +81,11 @@ const AccountingEntrySchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Pre-validate hook
+// Pre-validate hook — enforces double-entry rule
 AccountingEntrySchema.pre('validate', function(next) {
   let totalDr = 0;
   let totalCr = 0;
-  
+
   if (this.lines && this.lines.length > 0) {
     this.lines.forEach(line => {
       if (line.type === 'Dr') {
@@ -101,4 +106,11 @@ AccountingEntrySchema.pre('validate', function(next) {
   next();
 });
 
+// Performance indexes for date-range financial report queries
+AccountingEntrySchema.index({ companyId: 1, entryDate: 1 });
+AccountingEntrySchema.index({ companyId: 1, voucherType: 1 });
+AccountingEntrySchema.index({ companyId: 1, isReversed: 1 });
+AccountingEntrySchema.index({ 'lines.ledgerId': 1 });
+
 module.exports = mongoose.model('AccountingEntry', AccountingEntrySchema);
+

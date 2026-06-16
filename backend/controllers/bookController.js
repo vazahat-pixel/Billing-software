@@ -34,6 +34,46 @@ const DEFAULT_BOOKS = {
   ]
 };
 
+/**
+ * FIXED: Default books are now seeded into DB (with companyId: null = system books).
+ * This ensures all books have _id fields, so delete buttons work correctly in the frontend.
+ */
+async function ensureDefaultBooksExist(module) {
+  const defaults = DEFAULT_BOOKS[module] || [];
+  for (const b of defaults) {
+    await Book.findOneAndUpdate(
+      { module, code: b.code, companyId: null },
+      { name: b.name, code: b.code, module, companyId: null },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  }
+}
+
+exports.getAllBooks = async (req, res) => {
+  try {
+    const companyId = req.companyId;
+
+    // Ensure system default books exist in DB for all modules
+    const modules = Object.keys(DEFAULT_BOOKS);
+    for (const module of modules) {
+      await ensureDefaultBooksExist(module);
+    }
+
+    // Fetch both system books (companyId: null) and company-specific custom books
+    const query = {
+      $or: [
+        { companyId: null },
+        { companyId: companyId }
+      ]
+    };
+
+    const books = await Book.find(query).sort({ module: 1, code: 1 });
+    res.status(200).json({ success: true, data: books });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.getBooksByModule = async (req, res) => {
   try {
     const { module } = req.params;
@@ -43,28 +83,19 @@ exports.getBooksByModule = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Module is required' });
     }
 
-    // Find custom books for this company
-    const query = { module };
-    if (companyId) {
-      query.$or = [
-        { companyId },
-        { companyId: null }
-      ];
-    } else {
-      query.companyId = null;
-    }
+    // Ensure system default books exist in DB (idempotent upsert)
+    await ensureDefaultBooksExist(module);
 
-    let books = await Book.find(query).sort({ code: 1 });
+    // Fetch both system books (companyId: null) and company-specific custom books
+    const query = {
+      module,
+      $or: [
+        { companyId: null },
+        { companyId: companyId }
+      ]
+    };
 
-    // If no books exist in DB, fallback to default books for this module
-    if (books.length === 0 && DEFAULT_BOOKS[module]) {
-      books = DEFAULT_BOOKS[module].map(b => ({
-        ...b,
-        module,
-        companyId: companyId || null
-      }));
-    }
-
+    const books = await Book.find(query).sort({ code: 1 });
     res.status(200).json({ success: true, data: books });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -80,9 +111,14 @@ exports.createBook = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Name, code, and module are required' });
     }
 
-    // Create a new custom book
+    // Check for code collision with system books
+    const codeConflict = await Book.findOne({ module, code });
+    if (codeConflict) {
+      return res.status(400).json({ success: false, message: `Book code '${code}' is already in use for this module` });
+    }
+
     const newBook = new Book({
-      name,
+      name: name.toUpperCase(),
       code,
       module,
       companyId: companyId || null
@@ -91,6 +127,9 @@ exports.createBook = async (req, res) => {
     await newBook.save();
     res.status(201).json({ success: true, data: newBook });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: 'A book with this name or code already exists' });
+    }
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -105,13 +144,14 @@ exports.deleteBook = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Book not found' });
     }
 
-    // Ensure users can only delete custom books of their own company
-    if (book.companyId && book.companyId.toString() !== companyId?.toString()) {
-      return res.status(403).json({ success: false, message: 'Unauthorized to delete this book' });
+    // Prevent deleting system books (companyId: null)
+    if (!book.companyId) {
+      return res.status(403).json({ success: false, message: 'Cannot delete system default books' });
     }
 
-    if (!book.companyId) {
-      return res.status(403).json({ success: false, message: 'Cannot delete global system books' });
+    // Prevent deleting another company's custom books
+    if (book.companyId.toString() !== companyId?.toString()) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to delete this book' });
     }
 
     await book.deleteOne();

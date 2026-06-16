@@ -16,7 +16,12 @@ const InventoryLotSchema = new mongoose.Schema({
   purchaseId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Purchase',
-    required: true
+    default: null
+  },
+  source: {
+    type: String,
+    enum: ['purchase', 'opening', 'jobwork'],
+    default: 'purchase'
   },
   totalPcs: {
     type: Number,

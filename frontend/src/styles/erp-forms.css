@@ -1,174 +1,263 @@
-/* ERP Design System - GOLDEN MONOCHROMATIC PREMIUM */
+/* Enterprise Form Design System */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Outfit:wght@100;200;300;400;500;600;700;800;900&display=swap');
-
-:root {
-  --erp-black: #000000;
-  --erp-white: #ffffff;
-  --erp-bg: #FDFCF9;
-  --erp-slate-100: #f1f5f9;
-  --erp-slate-200: #e2e8f0;
-  --erp-slate-400: #94a3b8;
-  --erp-slate-700: #334155;
-  --erp-radius-huge: 2.5rem;
-  --erp-radius-xl: 1rem;
-}
-
-/* Global Reset */
 .erp-module-container {
-  font-family: 'Inter', sans-serif;
-  color: var(--erp-black);
+  color: var(--text-primary);
 }
 
-/* Field Container */
 .erp-field {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 8px !important;
-  margin-bottom: 24px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
 }
 
-/* Modern Labels */
 .erp-label {
-  font-size: 10px !important;
-  font-weight: 800 !important;
-  color: var(--erp-black) !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.15em !important;
-  padding-left: 2px !important;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0;
+  transition: color 0.2s ease;
 }
 
-/* PREMIUM MONOCHROMATIC INPUT */
-.erp-input, .erp-select {
-  width: 100% !important;
-  height: 48px !important;
-  background: var(--erp-white) !important;
-  border: 1px solid var(--erp-slate-200) !important;
-  border-radius: var(--erp-radius-xl) !important;
-  padding: 0 18px !important;
-  font-size: 12px !important;
-  font-weight: 700 !important;
-  color: var(--erp-black) !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  outline: none !important;
-  box-sizing: border-box !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.05em !important;
+.erp-field:focus-within .erp-label {
+  color: var(--text-primary);
 }
 
-.erp-input:hover, .erp-select:hover {
-  border-color: var(--erp-black) !important;
+.erp-input,
+.erp-select {
+  width: 100%;
+  height: 40px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-input);
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  outline: none;
+  box-sizing: border-box;
+  transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.02) inset;
 }
 
-.erp-input:focus, .erp-select:focus {
-  border-color: var(--erp-black) !important;
-  background: var(--erp-white) !important;
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.05) !important;
+.erp-input:hover,
+.erp-select:hover {
+  border-color: #94a3b8;
+  background: var(--bg-card-hover);
+}
+
+.erp-input:focus,
+.erp-select:focus {
+  border-color: var(--accent);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-glow);
 }
 
 .erp-input::placeholder {
-  color: var(--erp-slate-400) !important;
-  font-weight: 500 !important;
+  color: var(--text-muted);
+  font-weight: 400;
 }
 
-/* Select Customization */
+.erp-input:disabled,
+.erp-select:disabled {
+  background: var(--bg-base);
+  color: var(--text-muted);
+  border-color: var(--border);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .erp-select {
-  appearance: none !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23000000' stroke-width='3'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E") !important;
-  background-repeat: no-repeat !important;
-  background-position: right 18px center !important;
-  background-size: 12px !important;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px;
+  padding-right: 36px;
 }
 
-/* Modern Form Section */
 .erp-form-section {
-  background: var(--erp-white) !important;
-  border: 1px solid var(--erp-slate-100) !important;
-  border-radius: var(--erp-radius-huge) !important;
-  padding: 32px !important;
-  margin: 32px 0 !important;
-  box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.03) !important;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  margin: 16px 0;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.3s ease;
+}
+
+.erp-form-section:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .erp-form-section-header {
-  display: flex !important;
-  align-items: center !important;
-  gap: 12px !important;
-  margin-bottom: 24px !important;
-  color: var(--erp-black) !important;
-  border-bottom: 1px solid var(--erp-slate-100) !important;
-  padding-bottom: 16px !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .erp-form-section-title {
-  font-family: 'Outfit', sans-serif !important;
-  font-size: 14px !important;
-  font-weight: 900 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.1em !important;
-  font-style: italic !important;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
-/* PREMIUM BUTTON */
+/* Premium Buttons */
 .erp-btn {
-  height: 48px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 0 32px !important;
-  font-weight: 900 !important;
-  font-size: 11px !important;
-  border-radius: var(--erp-radius-xl) !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  cursor: pointer !important;
-  border: 1px solid transparent !important;
-  gap: 12px !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.1em !important;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: var(--radius-input);
+  cursor: pointer;
+  border: 1px solid transparent;
+  gap: 8px;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: var(--shadow-sm);
+  will-change: transform, box-shadow;
 }
 
+.erp-btn:active {
+  transform: scale(0.97);
+}
+
+.erp-btn-primary,
 .erp-btn-indigo {
-  background: var(--erp-black) !important;
-  color: var(--erp-white) !important;
-  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.2) !important;
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid transparent;
 }
 
+.erp-btn-primary:hover,
 .erp-btn-indigo:hover {
-  background: #333 !important;
-  transform: translateY(-2px) !important;
-  box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.3) !important;
+  background: var(--accent-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .erp-btn-secondary {
-  background: var(--erp-white) !important;
-  color: var(--erp-black) !important;
-  border: 1px solid var(--erp-slate-200) !important;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
 }
 
 .erp-btn-secondary:hover {
-  background: var(--erp-bg) !important;
-  border-color: var(--erp-black) !important;
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+  background: var(--bg-base);
+  box-shadow: var(--shadow-sm);
 }
 
-/* Grid Utilities */
 .erp-grid {
-  display: grid !important;
-  gap: 32px !important;
+  display: grid;
+  gap: 16px;
 }
 
-.erp-grid-2 { grid-template-columns: repeat(2, 1fr) !important; }
-.erp-grid-3 { grid-template-columns: repeat(3, 1fr) !important; }
+.erp-grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.erp-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
 
 @media (max-width: 1024px) {
-  .erp-grid-2, .erp-grid-3 { grid-template-columns: 1fr !important; }
+  .erp-grid-2,
+  .erp-grid-3 {
+    grid-template-columns: 1fr;
+  }
 }
 
-/* Animations */
-.animate-premium {
-  animation: premiumEnter 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+/* Data Tables - Premium Look */
+.erp-data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
 }
 
-@keyframes premiumEnter {
-  from { opacity: 0; transform: scale(0.98) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+.erp-data-table th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.erp-data-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+  color: var(--text-primary);
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.erp-data-table tbody tr:hover td {
+  background: var(--bg-card-hover);
+}
+
+.erp-data-table .erp-input,
+.erp-data-table .erp-select {
+  height: 36px;
+  font-size: 13px;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 6px;
+  padding: 0 8px;
+}
+
+.erp-data-table .erp-input:hover,
+.erp-data-table .erp-select:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-card);
+}
+
+.erp-data-table .erp-input:focus,
+.erp-data-table .erp-select:focus {
+  border-color: var(--accent);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-glow);
+}
+
+/* Modal layout helpers */
+.erp-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.erp-modal-footer {
+  height: 64px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 0 24px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+
+.erp-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
 }

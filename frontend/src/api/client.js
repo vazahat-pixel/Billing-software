@@ -29,12 +29,13 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('role');
-      // Use window.location only if not in a component context where navigate is available
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
-      }
+      // Import store dynamically to avoid circular dependencies
+      import('../store/useStore').then(({ default: useStore }) => {
+        useStore.getState().logout();
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      });
     }
     return Promise.reject(error);
   }

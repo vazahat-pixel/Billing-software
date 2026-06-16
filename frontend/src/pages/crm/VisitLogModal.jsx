@@ -6,8 +6,9 @@ import api from '../../utils/api';
 import { Calendar, User, MessageSquare, ClipboardCheck, ArrowRight } from 'lucide-react';
 
 const VisitLogModal = ({ isOpen, onClose, onSuccess }) => {
-    const { parties, fetchParties } = useStore();
+    const { parties, visits, fetchParties, fetchVisits } = useStore();
     const [loading, setLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState('Add');
     const [formData, setFormData] = useState({
         partyId: '',
         visitDate: new Date().toISOString().split('T')[0],
@@ -19,10 +20,11 @@ const VisitLogModal = ({ isOpen, onClose, onSuccess }) => {
     });
 
     useEffect(() => {
-        if (isOpen && parties.length === 0) {
+        if (isOpen) {
             fetchParties();
+            fetchVisits();
         }
-    }, [isOpen, parties.length, fetchParties]);
+    }, [isOpen, fetchParties, fetchVisits]);
 
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
@@ -35,7 +37,8 @@ const VisitLogModal = ({ isOpen, onClose, onSuccess }) => {
         try {
             const response = await api.post('/visits', formData);
             if (onSuccess) onSuccess(response.data);
-            onClose();
+            fetchVisits();
+            setActiveTab('View');
         } catch (err) {
             alert('Error saving visit: ' + (err.response?.data?.message || err.message));
         } finally {
@@ -53,6 +56,50 @@ const VisitLogModal = ({ isOpen, onClose, onSuccess }) => {
                     </div>
                 </div>
 
+                <div className="flex border-b border-slate-100 px-10 pt-4 gap-2 shrink-0">
+                    {['Add', 'View'].map(tab => (
+                        <button
+                            key={tab}
+                            type="button"
+                            onClick={() => setActiveTab(tab)}
+                            className={`px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-lg ${
+                                activeTab === tab ? 'bg-black text-white' : 'text-slate-400 hover:bg-slate-50'
+                            }`}
+                        >
+                            {tab === 'Add' ? 'Log Visit' : `View Logs (${visits.length})`}
+                        </button>
+                    ))}
+                </div>
+
+                {activeTab === 'View' ? (
+                    <div className="p-10 overflow-y-auto no-scrollbar">
+                        <table className="w-full text-xs text-left">
+                            <thead className="text-[9px] uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                                <tr>
+                                    <th className="py-2 pr-3">Date</th>
+                                    <th className="py-2 pr-3">Party</th>
+                                    <th className="py-2 pr-3">Purpose</th>
+                                    <th className="py-2 pr-3">Discussion</th>
+                                    <th className="py-2">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {visits.map(v => (
+                                    <tr key={v._id} className="hover:bg-slate-50">
+                                        <td className="py-2 pr-3">{new Date(v.visitDate).toLocaleDateString('en-IN')}</td>
+                                        <td className="py-2 pr-3 font-semibold">{v.partyId?.name || parties.find(p => p._id === v.partyId)?.name || '—'}</td>
+                                        <td className="py-2 pr-3">{v.purpose}</td>
+                                        <td className="py-2 pr-3 text-slate-500 max-w-[200px] truncate">{v.discussion}</td>
+                                        <td className="py-2">{v.status}</td>
+                                    </tr>
+                                ))}
+                                {visits.length === 0 && (
+                                    <tr><td colSpan={5} className="py-8 text-center text-slate-400">No visits logged yet</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
                 <form onSubmit={handleSubmit} className="p-10 space-y-10 overflow-y-auto no-scrollbar">
                     <div className="grid grid-cols-2 gap-10">
                         {/* Party Selection */}
@@ -133,7 +180,9 @@ const VisitLogModal = ({ isOpen, onClose, onSuccess }) => {
                         />
                     </div>
                 </form>
+                )}
 
+                {activeTab === 'Add' && (
                 <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-4 shrink-0">
                     <button
                         onClick={onClose}
@@ -153,6 +202,7 @@ const VisitLogModal = ({ isOpen, onClose, onSuccess }) => {
                         )}
                     </button>
                 </div>
+                )}
             </div>
         </Modal>
     );

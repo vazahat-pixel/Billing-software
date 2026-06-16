@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import useStore from '../../store/useStore';
-import { Plus, Search, Filter, FileText, Calendar, User, MoreVertical, ArrowRight, History, TrendingUp, Package } from 'lucide-react';
+import { Plus, Search, Filter, FileText, Calendar, User, MoreVertical, Printer, ArrowRight, History, TrendingUp, Package } from 'lucide-react';
 import PurchaseModal from './PurchaseModal';
+import PurchasePrint from './PurchasePrint';
 
 const PurchasePage = () => {
   const { purchases, parties, fetchPurchases, fetchParties } = useStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [printInvoiceId, setPrintInvoiceId] = useState(null);
   const [activeTab, setActiveTab] = useState('ALL');
 
   useEffect(() => {
@@ -118,8 +120,9 @@ const PurchasePage = () => {
                   {purchases.map((pur) => (
                     <tr key={pur.id} className="hover:bg-slate-50/50 transition-all group">
                        <td className="px-8 py-6">
-                          <p className="text-[11px] font-black text-black uppercase tracking-widest">#{pur.invoiceNo}</p>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{pur.date}</p>
+                          <p className="text-[11px] font-black text-black uppercase tracking-widest">Vch: {pur.invoiceNo}</p>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Bill: {pur.supplierInvoiceNo || 'N/A'}</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{pur.date ? new Date(pur.date).toLocaleDateString() : ''}</p>
                        </td>
                        <td className="px-8 py-6">
                           <p className="text-[10px] font-bold text-black uppercase tracking-widest">{parties.find(p => p.id === pur.supplierId)?.name || 'UNREGISTERED'}</p>
@@ -129,15 +132,20 @@ const PurchasePage = () => {
                           {pur.items.reduce((acc, i) => acc + parseFloat(i.mtrs || 0), 0).toFixed(2)}
                        </td>
                        <td className="px-8 py-6 text-right font-bold text-slate-400 text-[11px]">
-                          ₹ {pur.totals.subtotal.toLocaleString()}
+                          ₹ {(pur.taxableAmount || pur.totals?.subtotal || 0).toLocaleString()}
                        </td>
                        <td className="px-8 py-6 text-right font-black text-black text-[12px]">
-                          ₹ {pur.totals.total.toLocaleString()}
+                          ₹ {(pur.netAmount || pur.totals?.total || 0).toLocaleString()}
                        </td>
                        <td className="px-8 py-6 text-right">
-                          <button className="p-2 text-slate-300 hover:text-black transition-all">
-                             <MoreVertical size={18} />
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                             <button onClick={() => setPrintInvoiceId(pur.id || pur._id)} className="p-2 text-slate-300 hover:text-black transition-all" title="Print Voucher">
+                                <Printer size={16} />
+                             </button>
+                             <button className="p-2 text-slate-300 hover:text-black transition-all">
+                                <MoreVertical size={18} />
+                             </button>
+                          </div>
                        </td>
                     </tr>
                   ))}
@@ -147,6 +155,7 @@ const PurchasePage = () => {
       </div>
 
       <PurchaseModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      {printInvoiceId && <PurchasePrint invoiceId={printInvoiceId} onClose={() => setPrintInvoiceId(null)} />}
     </div>
   );
 };

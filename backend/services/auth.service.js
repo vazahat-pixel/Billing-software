@@ -1,16 +1,25 @@
+const crypto = require('crypto');
 const User = require('../models/User');
 const Company = require('../models/Company');
 const Plan = require('../models/Plan');
+const Subscription = require('../models/Subscription');
+const License = require('../models/License');
 const jwt = require('jsonwebtoken');
+const { generateLicenseKey } = require('../utils/license');
+
+// CRITICAL: Fail fast if JWT_SECRET is not set — never allow a fallback
+if (!process.env.JWT_SECRET) {
+    throw new Error('FATAL: JWT_SECRET environment variable is not set. Server cannot start.');
+}
 
 const generateToken = (user) => {
     return jwt.sign(
-        { 
-            id: user._id, 
-            role: user.role, 
-            companyId: user.companyId 
-        }, 
-        process.env.JWT_SECRET || 'your_super_secret_jwt_key_here', 
+        {
+            id: user._id,
+            role: user.role,
+            companyId: user.companyId
+        },
+        process.env.JWT_SECRET,
         { expiresIn: '30d' }
     );
 };
@@ -20,10 +29,9 @@ exports.register = async (name, email, password, companyName) => {
     const existingUser = await User.findOne({ email });
     if (existingUser) throw new Error('Email already registered');
 
-    // 2. Get Default Plan (Basic)
+    // 2. Get Default Plan (Basic) or create it
     let plan = await Plan.findOne({ name: 'Basic' });
     if (!plan) {
-        // Seed Basic plan if it doesn't exist
         plan = await Plan.create({
             name: 'Basic',
             priceMonthly: 29,
@@ -35,7 +43,7 @@ exports.register = async (name, email, password, companyName) => {
         });
     }
 
-    // 3. Create User (Role: user)
+    // 3. Create User (Role: user, CompanyRole: owner)
     const user = new User({ name, email, password, role: 'user', companyRole: 'owner' });
     await user.save();
 
@@ -47,7 +55,7 @@ exports.register = async (name, email, password, companyName) => {
     });
     await company.save();
 
-    // Pre-seed system ledgers on company creation
+    // 5. Pre-seed system ledgers
     const accountingService = require('./accountingService');
     try {
         await accountingService.seedSystemLedgers(company._id);
@@ -55,9 +63,43 @@ exports.register = async (name, email, password, companyName) => {
         console.error('Failed to auto seed company system ledgers:', seedErr);
     }
 
-    // 5. Update User with companyId
+    // 6. Update User with companyId
     user.companyId = company._id;
     await user.save();
+
+    // 7. AUTO-CREATE trial Subscription — fixes critical bug where new users were blocked in production
+    const trialStart = new Date();
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 30); // 30-day trial
+
+    await Subscription.create({
+        companyId: company._id,
+        planId: plan._id,
+        status: 'active',
+        startDate: trialStart,
+        endDate: trialEnd,
+        billingCycle: 'monthly',
+        autoRenew: false
+    });
+
+    // 8. AUTO-CREATE trial License — required by subscription middleware
+    const licenseKey = generateLicenseKey(company._id);
+    const licenseChecksum = crypto.createHash('sha256')
+        .update(`${company._id}-TRIAL`)
+        .digest('hex')
+        .substring(0, 8)
+        .toUpperCase();
+
+    await License.create({
+        companyId: company._id,
+        licenseKey,
+        expiresAt: trialEnd,
+        isActive: true,
+        checksum: licenseChecksum
+    });
+
+    // Update company with license key
+    await Company.findByIdAndUpdate(company._id, { licenseKey });
 
     const token = generateToken(user);
     return {
@@ -65,9 +107,11 @@ exports.register = async (name, email, password, companyName) => {
         user: {
             id: user._id,
             name: user.name,
+            email: user.email,
             role: user.role,
             companyRole: user.companyRole,
-            companyId: user.companyId
+            companyId: user.companyId,
+            plan: plan.features || null
         }
     };
 };
@@ -78,25 +122,76 @@ exports.login = async (email, password) => {
         throw new Error('Invalid credentials');
     }
 
-    if (!user.isActive) throw new Error('Account deactivated');
+    if (!user.isActive) throw new Error('Account deactivated. Please contact support.');
 
     const token = generateToken(user);
-    
+
     // Fetch company/plan details for user
-    let company = null;
+    let planFeatures = null;
+    let companyInfo = null;
     if (user.role === 'user' && user.companyId) {
-        company = await Company.findById(user.companyId).populate('planId');
+        const company = await Company.findById(user.companyId).populate('planId');
+        planFeatures = company?.planId?.features || null;
+        companyInfo = company ? { name: company.name, status: company.status } : null;
     }
 
-    return { 
-        token, 
-        user: { 
-            id: user._id, 
-            name: user.name, 
+    return {
+        token,
+        user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
             role: user.role,
             companyRole: user.companyRole || 'owner',
             companyId: user.companyId,
-            plan: company?.planId?.features || null
-        } 
+            plan: planFeatures,
+            company: companyInfo
+        }
     };
 };
+
+/**
+ * Initiates a password reset — generates a token and stores it on the user.
+ * The token should be sent via email. Email sending is pluggable (nodemailer, sendgrid, etc.)
+ */
+exports.forgotPassword = async (email) => {
+    const user = await User.findOne({ email });
+    // Always return success to prevent user enumeration attacks
+    if (!user) return { message: 'If an account exists, a reset link has been sent.' };
+
+    // Generate a secure random reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Store hashed version in DB
+    user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    user.passwordResetExpires = resetExpires;
+    await user.save({ validateBeforeSave: false });
+
+    // TODO: Send email with resetToken (raw, unhashed)
+    // Example: await emailService.sendPasswordReset(email, resetToken);
+    console.log(`[DEV] Password reset token for ${email}: ${resetToken}`);
+
+    return { message: 'If an account exists, a reset link has been sent.', devToken: process.env.NODE_ENV === 'development' ? resetToken : undefined };
+};
+
+/**
+ * Validates a reset token and updates the password.
+ */
+exports.resetPassword = async (token, newPassword) => {
+    const hashed = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await User.findOne({
+        passwordResetToken: hashed,
+        passwordResetExpires: { $gt: Date.now() }
+    });
+
+    if (!user) throw new Error('Password reset token is invalid or has expired.');
+
+    user.password = newPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    return { message: 'Password has been reset successfully.' };
+};
+

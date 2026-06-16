@@ -91,15 +91,15 @@ const JobWorkPage = () => {
                <tbody className="divide-y-2 divide-slate-50">
                   {jobWorkEntries.map(job => (
                      <tr key={job.id} className="hover:bg-slate-50 transition-all">
-                        <td className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">{job.date || '05/05/2026'}</td>
-                        <td className="px-8 py-5 text-[10px] font-black text-black tracking-widest">#{job.vno || '1'}</td>
-                        <td className="px-8 py-5 text-[11px] font-black text-black uppercase tracking-widest">{parties.find(p => p.id === job.partyId)?.name || 'UNREGISTERED'}</td>
+                        <td className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">{job.issueDate ? new Date(job.issueDate).toLocaleDateString() : 'N/A'}</td>
+                        <td className="px-8 py-5 text-[10px] font-black text-black tracking-widest">#{job.jobCardNo}</td>
+                        <td className="px-8 py-5 text-[11px] font-black text-black uppercase tracking-widest">{job.workerId?.name || 'UNKNOWN'}</td>
                         <td className="px-8 py-5 text-[10px] uppercase font-black text-black tracking-widest">
-                           <span className="px-3 py-1 border-2 border-black bg-slate-50">{job.book || 'PROCESS'}</span>
+                           <span className="px-3 py-1 border-2 border-black bg-slate-50">{job.processType || 'PROCESS'}</span>
                         </td>
-                        <td className="px-8 py-5 text-[12px] text-right font-black tracking-tighter">{job.mtrs || 0} <span className="text-[9px]">MTRS</span></td>
+                        <td className="px-8 py-5 text-[12px] text-right font-black tracking-tighter">{job.issueQty || 0} <span className="text-[9px]">MTRS</span></td>
                         <td className="px-8 py-5">
-                           <span className="px-3 py-1 border-2 border-black text-[9px] font-black uppercase tracking-widest">In Process</span>
+                           <span className="px-3 py-1 border-2 border-black text-[9px] font-black uppercase tracking-widest">{job.status}</span>
                         </td>
                      </tr>
                   ))}

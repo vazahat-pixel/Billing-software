@@ -9,7 +9,7 @@ const StockMovementSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['PURCHASE', 'ISSUE', 'RECEIVE', 'SALE', 'ADJUSTMENT'],
+    enum: ['PURCHASE', 'ISSUE', 'RECEIVE', 'SALE', 'ADJUSTMENT', 'OPENING', 'RETURN'],
     required: true
   },
   qtyPcs: {
@@ -39,4 +39,9 @@ const StockMovementSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Performance indexes
+StockMovementSchema.index({ lotId: 1, type: 1 });
+StockMovementSchema.index({ companyId: 1, createdAt: -1 });
+
 module.exports = mongoose.model('StockMovement', StockMovementSchema);
+

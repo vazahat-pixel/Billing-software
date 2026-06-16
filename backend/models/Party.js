@@ -50,6 +50,11 @@ const PartySchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  openingBalanceType: {
+    type: String,
+    enum: ['Dr', 'Cr'],
+    default: 'Dr'
+  },
   companyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const inventoryController = require('../controllers/inventoryController');
 
+router.post('/opening-stock', inventoryController.createOpeningStock);
 router.get('/', inventoryController.getInventory);
 router.get('/lots', inventoryController.getLotsByItem);
 router.get('/lot/:lotId', inventoryController.getLotDetails);

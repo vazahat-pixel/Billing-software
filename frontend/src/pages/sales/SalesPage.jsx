@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import useStore from '../../store/useStore';
 import { Plus, Search, Filter, ShoppingBag, CreditCard, User, MoreVertical, Printer, ArrowRight, History, TrendingUp } from 'lucide-react';
 import SalesModal from './SalesModal';
+import SalesPrint from './SalesPrint';
 
 const SalesPage = () => {
    const { sales, parties, fetchSales, fetchParties } = useStore();
    const [isModalOpen, setIsModalOpen] = useState(false);
+   const [printInvoiceId, setPrintInvoiceId] = useState(null);
    const [activeTab, setActiveTab] = useState('ALL');
 
    useEffect(() => {
@@ -125,10 +127,10 @@ const SalesPage = () => {
                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{sale.destination || 'LOCAL'}</p>
                            </td>
                            <td className="px-8 py-6 text-right font-bold text-slate-400 text-[11px]">
-                              ₹ {sale.totals.subtotal.toLocaleString()}
+                              ₹ {(sale.taxableAmount || sale.totals?.subtotal || 0).toLocaleString()}
                            </td>
                            <td className="px-8 py-6 text-right font-black text-black text-[12px]">
-                              ₹ {sale.totals.total.toLocaleString()}
+                              ₹ {(sale.netAmount || sale.totals?.total || 0).toLocaleString()}
                            </td>
                            <td className="px-8 py-6 text-center">
                               <span className={`px-3 py-1 bg-slate-50 text-slate-400 text-[10px] font-bold uppercase rounded-md border border-slate-100`}>
@@ -137,7 +139,7 @@ const SalesPage = () => {
                            </td>
                            <td className="px-8 py-6 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                 <button className="p-2 text-slate-300 hover:text-black transition-all">
+                                 <button onClick={() => setPrintInvoiceId(sale.id || sale._id)} className="p-2 text-slate-300 hover:text-black transition-all" title="Print Invoice">
                                     <Printer size={16} />
                                  </button>
                                  <button className="p-2 text-slate-300 hover:text-black transition-all">
@@ -153,6 +155,7 @@ const SalesPage = () => {
          </div>
 
          <SalesModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+         {printInvoiceId && <SalesPrint invoiceId={printInvoiceId} onClose={() => setPrintInvoiceId(null)} />}
       </div>
    );
 };

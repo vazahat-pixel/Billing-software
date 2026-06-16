@@ -2,7 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import useStore from '../../store/useStore';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import api from '../../api/client';
-import { Save, X, Banknote, History } from 'lucide-react';
+import { Save, X, Banknote, History, Plus, Trash2 } from 'lucide-react';
+import { formatPaymentSplits, PAYMENT_MODE_OPTIONS, buildSplitsPayload } from '../../utils/paymentFormat';
+
+const DEFAULT_SPLITS = () => ([
+  { mode: 'Cash', amount: '', reference: '' },
+  { mode: 'Card', amount: '', reference: '' }
+]);
 
 export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selectedBook = null }) => {
   const { 
@@ -15,15 +21,20 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
     fetchSales, 
     fetchPurchases,
     addPayment,
-    addReceipt
+    addReceipt,
+    fetchVouchers,
+    vouchers
   } = useStore();
 
+  const [activeTab, setActiveTab] = useState('Entry');
   const [type, setType] = useState(initialType);
   const [bankLedgerId, setBankLedgerId] = useState('');
   const [partyId, setPartyId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState('0.00');
   const [paymentMode, setPaymentMode] = useState('Cash');
+  const [useSplitPayment, setUseSplitPayment] = useState(false);
+  const [paymentSplits, setPaymentSplits] = useState(DEFAULT_SPLITS());
   const [chequeNo, setChequeNo] = useState('');
   const [utrNo, setUtrNo] = useState('');
   const [chequeDate, setChequeDate] = useState(new Date().toISOString().split('T')[0]);
@@ -37,10 +48,12 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
   useEffect(() => {
     if (isOpen) {
       setType(initialType);
+      setActiveTab('Entry');
       fetchParties();
       fetchLedgers();
       fetchSales();
       fetchPurchases();
+      fetchVouchers();
       setFormError('');
       setAdjustments({});
       setAmount('0.00');
@@ -49,17 +62,22 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
       setChequeNo('');
       setUtrNo('');
       setNarration('');
+      setUseSplitPayment(false);
+      setPaymentSplits(DEFAULT_SPLITS());
+    }
+  }, [isOpen, initialType]);
 
-      // Fetch all vouchers to compute outstanding balances
+  useEffect(() => {
+    if (isOpen) {
       api.get('/accounting/payments')
         .then(res => {
           setVouchersList(res.data.data || []);
         })
         .catch(err => {
-          console.error("Error fetching vouchers:", err);
+          console.error('Error fetching vouchers:', err);
         });
     }
-  }, [isOpen, initialType]);
+  }, [isOpen, vouchers]);
 
   // Fallback / Filter Cash and Bank accounts from ledgers
   const bankCashLedgers = useMemo(() => {
@@ -116,6 +134,33 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
     return Object.values(adjustments).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
   }, [adjustments]);
 
+  const splitTotal = useMemo(() => {
+    return paymentSplits.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+  }, [paymentSplits]);
+
+  const effectiveAmount = useMemo(() => {
+    if (useSplitPayment) return splitTotal;
+    return parseFloat(amount) || 0;
+  }, [useSplitPayment, splitTotal, amount]);
+
+  const viewVouchers = useMemo(() => {
+    return (vouchersList.length ? vouchersList : vouchers)
+      .filter(v => v.voucherType === type)
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [vouchersList, vouchers, type]);
+
+  const updateSplit = (index, field, value) => {
+    setPaymentSplits(prev => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  };
+
+  const addSplitRow = () => {
+    setPaymentSplits(prev => [...prev, { mode: 'UPI', amount: '', reference: '' }]);
+  };
+
+  const removeSplitRow = (index) => {
+    setPaymentSplits(prev => prev.filter((_, i) => i !== index));
+  };
+
   // Auto-allocate payment to oldest invoices first
   const handleAutoAllocate = () => {
     const amt = parseFloat(amount) || 0;
@@ -151,24 +196,49 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
       setFormError('Please select a Cash/Bank ledger repository');
       return;
     }
-    const numericAmount = parseFloat(amount) || 0;
+    let numericAmount = parseFloat(amount) || 0;
+    let splitsPayload = null;
+
+    if (useSplitPayment) {
+      splitsPayload = buildSplitsPayload(paymentSplits);
+      if (splitsPayload.length === 0) {
+        setFormError('Enter amount in at least one payment mode (Cash, Card, UPI, etc.)');
+        return;
+      }
+      for (const split of splitsPayload) {
+        if (split.mode === 'Cheque' && !split.reference) {
+          setFormError('Cheque number is required for cheque split');
+          return;
+        }
+        if (['NEFT', 'RTGS', 'UPI'].includes(split.mode) && !split.reference) {
+          setFormError(`Reference/UTR is required for ${split.mode} split`);
+          return;
+        }
+      }
+      numericAmount = splitsPayload.reduce((sum, s) => sum + s.amount, 0);
+    } else {
+      if (numericAmount <= 0) {
+        setFormError('Voucher amount must be greater than zero');
+        return;
+      }
+      if (paymentMode === 'Cheque' && !chequeNo) {
+        setFormError('Cheque number is required');
+        return;
+      }
+      if (['NEFT', 'RTGS', 'UPI'].includes(paymentMode) && !utrNo) {
+        setFormError('UTR/Reference number is required');
+        return;
+      }
+    }
+
     if (numericAmount <= 0) {
       setFormError('Voucher amount must be greater than zero');
-      return;
-    }
-    if (paymentMode === 'Cheque' && !chequeNo) {
-      setFormError('Cheque number is required');
-      return;
-    }
-    if (['NEFT', 'RTGS', 'UPI'].includes(paymentMode) && !utrNo) {
-      setFormError('UTR/Reference number is required');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // Build the againstInvoices array
       const againstInvoices = Object.entries(adjustments)
         .map(([invoiceId, appliedAmt]) => {
           const amt = parseFloat(appliedAmt) || 0;
@@ -186,15 +256,20 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
         date,
         partyLedgerId: partyId,
         amount: numericAmount,
-        paymentMode,
         bankLedgerId,
-        chequeNo: paymentMode === 'Cheque' ? chequeNo : undefined,
-        utrNo: ['NEFT', 'RTGS', 'UPI'].includes(paymentMode) ? utrNo : undefined,
-        chequeDate: paymentMode === 'Cheque' ? chequeDate : undefined,
-        narration: narration || `${type} to ${parties.find(p => p._id === partyId)?.name}`,
+        narration: narration || `${type} — ${parties.find(p => p._id === partyId)?.name}`,
         againstInvoices,
         status: 'Posted'
       };
+
+      if (useSplitPayment) {
+        payload.paymentSplits = splitsPayload;
+      } else {
+        payload.paymentMode = paymentMode;
+        payload.chequeNo = paymentMode === 'Cheque' ? chequeNo : undefined;
+        payload.utrNo = ['NEFT', 'RTGS', 'UPI'].includes(paymentMode) ? utrNo : undefined;
+        payload.chequeDate = paymentMode === 'Cheque' ? chequeDate : undefined;
+      }
 
       if (type === 'Receipt') {
         await addReceipt(payload);
@@ -202,7 +277,12 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
         await addPayment(payload);
       }
 
-      onClose();
+      await fetchVouchers();
+      setActiveTab('View');
+      setUseSplitPayment(false);
+      setPaymentSplits(DEFAULT_SPLITS());
+      setAmount('0.00');
+      setAdjustments({});
     } catch (err) {
       console.error(err);
       setFormError(err.response?.data?.message || err.message || 'Error creating voucher');
@@ -252,6 +332,60 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
            </div>
          )}
 
+         <div className="flex border-b border-slate-100 px-10 pt-3 gap-2 shrink-0 bg-white">
+            {['Entry', 'View'].map(tab => (
+               <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-5 py-2 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all ${
+                     activeTab === tab ? 'bg-black text-white' : 'text-slate-400 hover:bg-slate-50'
+                  }`}
+               >
+                  {tab === 'Entry' ? `${type} Entry` : `View ${type}s (${viewVouchers.length})`}
+               </button>
+            ))}
+         </div>
+
+         {activeTab === 'View' ? (
+            <div className="flex-1 overflow-y-auto p-8 bg-[#FDFCF9]">
+               <table className="w-full text-left bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                  <thead className="text-[9px] uppercase tracking-widest text-slate-400 border-b border-slate-50">
+                     <tr>
+                        <th className="px-6 py-4">Date</th>
+                        <th className="px-6 py-4">Voucher No</th>
+                        <th className="px-6 py-4">Party</th>
+                        <th className="px-6 py-4">Payment Mode (Split Details)</th>
+                        <th className="px-6 py-4 text-right">Amount</th>
+                        <th className="px-6 py-4">Against Invoices</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 text-[11px]">
+                     {viewVouchers.map(v => (
+                        <tr key={v._id} className="hover:bg-slate-50/50">
+                           <td className="px-6 py-4">{new Date(v.date).toLocaleDateString('en-IN')}</td>
+                           <td className="px-6 py-4 font-bold">{v.voucherNo}</td>
+                           <td className="px-6 py-4 font-semibold">{v.partyName}</td>
+                           <td className="px-6 py-4">
+                              <span className="font-semibold text-black">{formatPaymentSplits(v)}</span>
+                           </td>
+                           <td className="px-6 py-4 text-right font-black">₹ {Number(v.amount).toLocaleString('en-IN')}</td>
+                           <td className="px-6 py-4 text-slate-500">
+                              {(v.againstInvoices || []).map(i => i.invoiceNo).filter(Boolean).join(', ') || '—'}
+                           </td>
+                        </tr>
+                     ))}
+                     {viewVouchers.length === 0 && (
+                        <tr>
+                           <td colSpan={6} className="px-6 py-16 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">
+                              No {type.toLowerCase()} vouchers found
+                           </td>
+                        </tr>
+                     )}
+                  </tbody>
+               </table>
+            </div>
+         ) : (
          <div className="flex flex-1 overflow-hidden">
             
             {/* Left Column: Form Fields */}
@@ -298,19 +432,86 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
                         />
                      </div>
                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Quantum Amount (₹)</label>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                           {useSplitPayment ? 'Total (Auto from splits)' : 'Quantum Amount (₹)'}
+                        </label>
                         <ERPInput 
                           className="w-full h-12 bg-black text-white border-none rounded-xl font-black text-lg text-center focus:ring-2 focus:ring-slate-500" 
                           placeholder="0.00" 
-                          value={amount} 
+                          value={useSplitPayment ? splitTotal.toFixed(2) : amount} 
+                          readOnly={useSplitPayment}
                           onChange={e => {
                             setAmount(e.target.value);
-                            setAdjustments({}); // clear adjustments when amount changes
+                            setAdjustments({});
                           }}
                         />
                      </div>
                   </div>
 
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                     <input
+                        type="checkbox"
+                        id="splitPayment"
+                        checked={useSplitPayment}
+                        onChange={e => {
+                           setUseSplitPayment(e.target.checked);
+                           if (e.target.checked) setPaymentSplits(DEFAULT_SPLITS());
+                        }}
+                        className="w-4 h-4"
+                     />
+                     <label htmlFor="splitPayment" className="text-[10px] font-bold text-black uppercase tracking-widest cursor-pointer">
+                        Split Payment (Cash + Card + UPI mix)
+                     </label>
+                  </div>
+
+                  {useSplitPayment ? (
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payment Breakdown</label>
+                       {paymentSplits.map((split, index) => (
+                          <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                             <div className="col-span-4">
+                                <ERPSelect
+                                  className="w-full h-10 text-[10px] font-bold"
+                                  value={split.mode}
+                                  onChange={e => updateSplit(index, 'mode', e.target.value)}
+                                  options={PAYMENT_MODE_OPTIONS}
+                                />
+                             </div>
+                             <div className="col-span-3">
+                                <ERPInput
+                                  type="number"
+                                  className="w-full h-10 text-[11px] font-bold text-right"
+                                  placeholder="Amount"
+                                  value={split.amount}
+                                  onChange={e => updateSplit(index, 'amount', e.target.value)}
+                                />
+                             </div>
+                             <div className="col-span-4">
+                                <ERPInput
+                                  className="w-full h-10 text-[10px]"
+                                  placeholder={['Cheque', 'NEFT', 'RTGS', 'UPI', 'Card'].includes(split.mode) ? 'Ref / UTR / Chq No' : 'Optional ref'}
+                                  value={split.reference}
+                                  onChange={e => updateSplit(index, 'reference', e.target.value)}
+                                />
+                             </div>
+                             <div className="col-span-1 flex justify-center">
+                                {paymentSplits.length > 1 && (
+                                  <button type="button" onClick={() => removeSplitRow(index)} className="text-slate-300 hover:text-red-500">
+                                     <Trash2 size={14} />
+                                  </button>
+                                )}
+                             </div>
+                          </div>
+                       ))}
+                       <button type="button" onClick={addSplitRow} className="flex items-center gap-1 text-[9px] font-bold uppercase text-slate-500 hover:text-black">
+                          <Plus size={12} /> Add mode
+                       </button>
+                       <p className="text-[9px] text-slate-400 font-semibold">
+                          Example: Cash ₹5000 + Card ₹3000 = Total ₹8000
+                       </p>
+                    </div>
+                  ) : (
+                  <>
                   <div className="space-y-2">
                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payment Mode</label>
                      <ERPSelect 
@@ -318,13 +519,7 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
                        label="Mode"
                        value={paymentMode}
                        onChange={e => setPaymentMode(e.target.value)}
-                       options={[
-                         { value: 'Cash', label: 'Cash' },
-                         { value: 'Cheque', label: 'Cheque' },
-                         { value: 'NEFT', label: 'NEFT' },
-                         { value: 'RTGS', label: 'RTGS' },
-                         { value: 'UPI', label: 'UPI' }
-                       ]}
+                       options={PAYMENT_MODE_OPTIONS}
                      />
                   </div>
 
@@ -361,6 +556,8 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
                          onChange={e => setUtrNo(e.target.value)} 
                        />
                     </div>
+                  )}
+                  </>
                   )}
 
                   <div className="space-y-2">
@@ -440,13 +637,13 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
                <div className="px-10 py-8 bg-white border-t border-slate-100 grid grid-cols-3 gap-6 shrink-0">
                   <div className="bg-slate-50 p-6 rounded-2xl">
                      <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest block mb-1">Aggregate Quantum</span>
-                     <span className="text-xl font-black text-black tracking-tight">₹ {parseFloat(amount || 0).toFixed(2)}</span>
+                     <span className="text-xl font-black text-black tracking-tight">₹ {effectiveAmount.toFixed(2)}</span>
                   </div>
                   <div className="bg-slate-50 p-6 rounded-2xl flex flex-col justify-between">
                      <div>
                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest block mb-1">Unallocated Balance</span>
                        <span className="text-xl font-black text-black tracking-tight">
-                         ₹ {Math.max(0, (parseFloat(amount || 0) - totalApplied)).toFixed(2)}
+                         ₹ {Math.max(0, effectiveAmount - totalApplied).toFixed(2)}
                        </span>
                      </div>
                      {partyInvoices.length > 0 && (
@@ -466,8 +663,10 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
                </div>
             </div>
          </div>
+         )}
 
          {/* Compact Footer */}
+         {activeTab === 'Entry' && (
          <div className="px-10 py-8 bg-white border-t border-slate-100 flex justify-end gap-4 shrink-0">
             <button 
                type="button" 
@@ -486,6 +685,7 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
                <Save size={16} /> {isSubmitting ? 'Posting...' : 'Commit Voucher'}
             </button>
          </div>
+         )}
 
       </div>
     </div>

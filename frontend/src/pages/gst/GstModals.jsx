@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
+import { downloadJson, getMonthDateRange, buildGstr1Filename } from '../../utils/gstExport';
 import {
    Check,
    AlertTriangle,
@@ -218,12 +219,26 @@ export const Gst3bMonthlyModal = ({ isOpen, onClose }) => {
 // 2. GSTR-1 OUTWARD SUPPLIES RETURN MODAL
 // ==========================================
 export const Gstr1Modal = ({ isOpen, onClose }) => {
-   const { sales, fetchSales } = useStore();
+   const { sales, fetchSales, fetchGstr1 } = useStore();
    const [activeTab, setActiveTab] = useState('b2b');
+   const [exporting, setExporting] = useState(false);
+   const { startDate, endDate } = getMonthDateRange();
 
    useEffect(() => {
       if (isOpen) fetchSales();
    }, [isOpen, fetchSales]);
+
+   const handleDownloadJson = async () => {
+      setExporting(true);
+      try {
+         const data = await fetchGstr1(startDate, endDate);
+         downloadJson(data, buildGstr1Filename(startDate, endDate));
+      } catch (err) {
+         alert(err.response?.data?.message || err.message || 'GSTR-1 export failed');
+      } finally {
+         setExporting(false);
+      }
+   };
 
    const invoiceData = useMemo(() => {
       const b2b = [];
@@ -270,8 +285,13 @@ export const Gstr1Modal = ({ isOpen, onClose }) => {
                   <h2 className="text-4xl font-black text-black tracking-tight italic">GSTR-1 Registry<span className="text-slate-300">.</span></h2>
                   <p className="text-slate-400 text-[11px] font-bold uppercase tracking-[0.2em] mt-2">Sales Inbound • Government Schema Export</p>
                </div>
-               <button className="px-8 py-3 bg-black text-white rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center gap-3 hover:bg-slate-800 transition-all">
-                  <Download size={14} /> Download JSON Schema
+               <button
+                  type="button"
+                  onClick={handleDownloadJson}
+                  disabled={exporting}
+                  className="px-8 py-3 bg-black text-white rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center gap-3 hover:bg-slate-800 transition-all disabled:opacity-50"
+               >
+                  <Download size={14} /> {exporting ? 'Exporting...' : 'Download JSON Schema'}
                </button>
             </div>
 

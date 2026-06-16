@@ -17,7 +17,9 @@ export const normalizeParty = (party) => {
     station: party.station || party.city || '',
     city: party.city || party.station || '',
     group: party.group || TYPE_TO_GROUP[type] || 'SUNDRY DEBTORS',
-    type
+    type,
+    openingBalance: party.openingBalance ?? 0,
+    openingBalanceType: party.openingBalanceType || 'Dr'
   };
 };
 
@@ -47,6 +49,7 @@ export const normalizeSale = (sale) => {
     ...sale,
     _id: id,
     id,
+    status: sale.status || 'active',
     totals: sale.totals || {
       subtotal: taxable,
       taxableValue: taxable,
@@ -69,6 +72,7 @@ export const normalizePurchase = (purchase) => {
     ...purchase,
     _id: id,
     id,
+    status: purchase.status || 'active',
     totals: purchase.totals || {
       subtotal: taxable,
       taxableValue: taxable,
