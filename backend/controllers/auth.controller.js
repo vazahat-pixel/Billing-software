@@ -27,7 +27,64 @@ exports.login = async (req, res) => {
 };
 
 exports.getMe = async (req, res) => {
-    res.status(200).json({ user: req.user });
+    try {
+        const User = require('../models/User');
+        const Company = require('../models/Company');
+        const CompanyModuleConfig = require('../models/CompanyModuleConfig');
+        const CompanySettings = require('../models/CompanySettings');
+        
+        const user = req.user;
+        let planFeatures = null;
+        let companyInfo = null;
+        let moduleConfig = null;
+        let settings = null;
+
+        let resolvedCompanyId = user.companyId;
+        if (user.role === 'user' && user.companyId) {
+            const company = await Company.findById(user.companyId).populate('planId');
+            planFeatures = company?.planId?.features || null;
+            companyInfo = company ? { name: company.name, status: company.status } : null;
+
+            moduleConfig = await CompanyModuleConfig.findOne({ companyId: user.companyId });
+            if (!moduleConfig) {
+                moduleConfig = await CompanyModuleConfig.create({ companyId: user.companyId });
+            }
+
+            settings = await CompanySettings.findOne({ companyId: user.companyId });
+            if (!settings) {
+                settings = await CompanySettings.create({
+                    companyId: user.companyId,
+                    legalName: company.name
+                });
+            }
+        } else if (user.role === 'super_admin') {
+            const company = await Company.findOne().sort({ createdAt: 1 }).populate('planId');
+            if (company) {
+                resolvedCompanyId = company._id;
+                planFeatures = company?.planId?.features || null;
+                companyInfo = { name: company.name, status: company.status };
+                moduleConfig = await CompanyModuleConfig.findOne({ companyId: company._id });
+                settings = await CompanySettings.findOne({ companyId: company._id });
+            }
+        }
+
+        res.status(200).json({
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                companyRole: user.companyRole || 'owner',
+                companyId: resolvedCompanyId || req.companyId,
+                plan: planFeatures,
+                company: companyInfo,
+                moduleConfig: moduleConfig,
+                settings: settings
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
 };
 
 exports.forgotPassword = async (req, res) => {

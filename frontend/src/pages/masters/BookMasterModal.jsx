@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash, faTimes, faBook, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
 
-const BookMasterModal = ({ isOpen, onClose }) => {
+const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
   const { fetchBooksByModule, createBook, deleteBook } = useStore();
   
   const modules = [
@@ -22,18 +20,47 @@ const BookMasterModal = ({ isOpen, onClose }) => {
   const [selectedModule, setSelectedModule] = useState('sales');
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  // Form states
-  const [newBookName, setNewBookName] = useState('');
-  const [newBookCode, setNewBookCode] = useState('');
-  const [saving, setSaving] = useState(false);
+  const [selectedBookId, setSelectedBookId] = useState('');
+  const [mode, setMode] = useState('View'); // 'View', 'Add'
   const [error, setError] = useState('');
+
+  // Book fields matching PDF Page 3
+  const [formData, setFormData] = useState({
+    code: '',
+    name: '',
+    bookType: 'SALES BOOK',
+    groupHead: 'TRADING INCOME',
+    opBalance: 0,
+    retailTax: '',
+    detailJobWork: 'D',
+    rowFinishMaterial: 'F',
+    incExcVat: '',
+    effectOnStock: 'N',
+    address1: '',
+    address2: '',
+    dist: '',
+    state: '',
+    head1: 'Pcs',
+    head2: 'Qty',
+    createDate: new Date().toISOString().split('T')[0],
+    jobWorkBook: false,
+    tdsHead: '',
+    tdsCode: 0
+  });
+
+  const locked = readOnly || mode === 'View';
 
   const loadBooks = async () => {
     setLoading(true);
     try {
       const data = await fetchBooksByModule(selectedModule);
       setBooks(data || []);
+      if (data && data.length > 0) {
+        setSelectedBookId(data[0]._id || data[0].id);
+        setFormData({ ...formData, ...data[0] });
+      } else {
+        setSelectedBookId('');
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -44,178 +71,278 @@ const BookMasterModal = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (isOpen) {
       loadBooks();
+      if (!readOnly) setMode('Add');
     }
-  }, [isOpen, selectedModule]);
+  }, [isOpen, selectedModule, readOnly]);
 
-  const handleCreateBook = async (e) => {
-    e.preventDefault();
-    if (!newBookName || !newBookCode) {
-      setError('Both Name and Code are required');
-      return;
-    }
-    setSaving(true);
-    setError('');
-    try {
-      const created = await createBook({
-        name: newBookName.toUpperCase(),
-        code: newBookCode,
-        module: selectedModule
-      });
-      setBooks((prev) => [...prev, created]);
-      setNewBookName('');
-      setNewBookCode('');
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to create book');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteBook = async (bookId) => {
-    if (window.confirm('Are you sure you want to delete this custom book?')) {
-      try {
-        await deleteBook(bookId);
-        setBooks((prev) => prev.filter((b) => b._id !== bookId));
-      } catch (err) {
-        alert(err.response?.data?.message || err.message || 'Failed to delete book');
+  const handleSelectBook = (e) => {
+    const id = e.target.value;
+    setSelectedBookId(id);
+    if (id) {
+      const book = books.find(b => b._id === id || b.id === id);
+      if (book) {
+        setFormData({ ...formData, ...book });
+        setMode('View');
       }
     }
   };
 
+  const handleNew = () => {
+    setFormData({
+      code: '',
+      name: '',
+      bookType: selectedModule === 'sales' ? 'SALES BOOK' : selectedModule === 'purchase' ? 'PURCHASE BOOK' : 'GENERAL BOOK',
+      groupHead: selectedModule === 'sales' ? 'TRADING INCOME' : 'TRADING EXPENSE',
+      opBalance: 0,
+      retailTax: '',
+      detailJobWork: 'D',
+      rowFinishMaterial: 'F',
+      incExcVat: '',
+      effectOnStock: 'N',
+      address1: '',
+      address2: '',
+      dist: '',
+      state: '',
+      head1: 'Pcs',
+      head2: 'Qty',
+      createDate: new Date().toISOString().split('T')[0],
+      jobWorkBook: false,
+      tdsHead: '',
+      tdsCode: 0
+    });
+    setMode('Add');
+  };
+
+  const handleSave = async (e) => {
+    if (e) e.preventDefault();
+    if (!formData.name || !formData.code) {
+      setError('Name and Code are required');
+      return;
+    }
+    setError('');
+    try {
+      const created = await createBook({
+        ...formData,
+        name: formData.name.toUpperCase(),
+        module: selectedModule
+      });
+      alert('Book saved successfully!');
+      setMode('View');
+      loadBooks();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to save book');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedBookId) return alert('Select a book first');
+    const book = books.find(b => b._id === selectedBookId || b.id === selectedBookId);
+    if (!book.companyId) {
+      return alert('Cannot delete system default books');
+    }
+    if (window.confirm('Are you sure you want to delete this custom book?')) {
+      try {
+        await deleteBook(selectedBookId);
+        alert('Book deleted!');
+        loadBooks();
+      } catch (err) {
+        alert(err.response?.data?.message || err.message || 'Failed to delete');
+      }
+    }
+  };
+
+  const handleCancel = () => {
+    if (selectedBookId) {
+      const book = books.find(b => b._id === selectedBookId || b.id === selectedBookId);
+      if (book) setFormData({ ...formData, ...book });
+    }
+    setMode('View');
+    setError('');
+  };
+
+  const setField = (key) => (e) => {
+    const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setFormData({ ...formData, [key]: val });
+  };
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Book Master Configuration" className="max-w-4xl">
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 p-2">
-        {/* Left column: Module selector */}
-        <div className="md:col-span-4 border-r border-slate-100 pr-4 space-y-2">
-          <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Select Module</h4>
-          <div className="flex flex-col gap-1">
-            {modules.map((m) => {
-              const isSelected = selectedModule === m.key;
-              return (
-                <button
-                  key={m.key}
-                  onClick={() => {
-                    setSelectedModule(m.key);
-                    setError('');
-                    setNewBookName('');
-                    setNewBookCode('');
-                  }}
-                  className={`w-full text-left px-4 py-3 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all flex justify-between items-center ${
-                    isSelected
-                      ? 'bg-black text-white'
-                      : 'hover:bg-slate-50 text-slate-600 hover:text-black'
-                  }`}
-                >
-                  <span>{m.label}</span>
-                  {isSelected && <FontAwesomeIcon icon={faChevronRight} className="text-[10px]" />}
-                </button>
-              );
-            })}
+    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-5xl">
+      <div className="classic-erp-window flex flex-col h-full">
+        {/* Title bar */}
+        <div className="classic-erp-header">
+          <span>Book Master</span>
+          <button className="classic-erp-close-btn" onClick={onClose}>X</button>
+        </div>
+
+        {/* Outer Split Pane Layout */}
+        <div className="grid grid-cols-12 gap-3 classic-erp-body flex-1 overflow-y-auto">
+          
+          {/* Left Panel: Module Selector */}
+          <div className="col-span-3 classic-erp-frame flex flex-col gap-1 p-2">
+            <span className="classic-erp-label blue-label mb-2 uppercase font-bold text-center">Module</span>
+            {modules.map((m) => (
+              <button
+                key={m.key}
+                onClick={() => {
+                  setSelectedModule(m.key);
+                  setMode('View');
+                }}
+                className={`classic-erp-btn text-left justify-start w-full ${selectedModule === m.key ? 'btn-blue' : ''}`}
+                style={selectedModule === m.key ? { borderStyle: 'inset', backgroundColor: '#e4e0d8' } : {}}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Right Panel: Detail Fields */}
+          <div className="col-span-9 flex flex-col gap-3">
+            
+            {/* View Selection Mode */}
+            {mode === 'View' && (
+              <div className="classic-erp-frame flex gap-3 items-center">
+                <span className="classic-erp-label blue-label">Select Book:</span>
+                <select className="classic-erp-input flex-1" value={selectedBookId} onChange={handleSelectBook}>
+                  <option value="">- Select Book to View -</option>
+                  {books.map(b => (
+                    <option key={b._id || b.id} value={b._id || b.id}>{b.name} ({b.code})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="classic-erp-frame grid grid-cols-12 gap-2">
+              <div className="col-span-4 flex gap-2">
+                <span className="classic-erp-label red-label w-20">Book Id:</span>
+                <input type="text" className="classic-erp-input w-24" value={formData.code} onChange={setField('code')} disabled={locked} placeholder="e.g. F00000" />
+              </div>
+              <div className="col-span-8 flex gap-2">
+                <span className="classic-erp-label red-label w-24">Book Name:</span>
+                <input type="text" className="classic-erp-input flex-1" value={formData.name} onChange={setField('name')} disabled={locked} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* Box 1: Core Parameters */}
+              <div className="classic-erp-frame space-y-2">
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-32">Book Type:</span>
+                  <select className="classic-erp-select flex-1" value={formData.bookType} onChange={setField('bookType')} disabled={locked}>
+                    <option value="SALES BOOK">SALES BOOK</option>
+                    <option value="PURCHASE BOOK">PURCHASE BOOK</option>
+                    <option value="CASH BOOK">CASH BOOK</option>
+                    <option value="BANK BOOK">BANK BOOK</option>
+                    <option value="GENERAL LEDGER">GENERAL LEDGER</option>
+                    <option value="JOB WORK BOOK">JOB WORK BOOK</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-32">Group Head:</span>
+                  <select className="classic-erp-select flex-1" value={formData.groupHead} onChange={setField('groupHead')} disabled={locked}>
+                    <option value="TRADING INCOME">TRADING INCOME</option>
+                    <option value="TRADING EXPENSE">TRADING EXPENSE</option>
+                    <option value="INDIRECT INCOME">INDIRECT INCOME</option>
+                    <option value="INDIRECT EXPENSE">INDIRECT EXPENSE</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-32">Op. Balance:</span>
+                  <input type="number" className="classic-erp-input flex-1 text-right" value={formData.opBalance} onChange={setField('opBalance')} disabled={locked} />
+                </div>
+
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-32">Retail / Tax [R/T]:</span>
+                  <input type="text" className="classic-erp-input w-16 text-center" value={formData.retailTax} onChange={setField('retailTax')} disabled={locked} />
+                </div>
+
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-32">Detail/JobWork [D/J]:</span>
+                  <input type="text" className="classic-erp-input w-16 text-center" value={formData.detailJobWork} onChange={setField('detailJobWork')} disabled={locked} />
+                </div>
+
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-32">Row/Finish Mat [R/F]:</span>
+                  <input type="text" className="classic-erp-input w-16 text-center" value={formData.rowFinishMaterial} onChange={setField('rowFinishMaterial')} disabled={locked} />
+                </div>
+
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-32">Incl/Excl Vat [I/E]:</span>
+                  <input type="text" className="classic-erp-input w-16 text-center" value={formData.incExcVat} onChange={setField('incExcVat')} disabled={locked} />
+                </div>
+
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-32">Effect On Stock Y/N:</span>
+                  <input type="text" className="classic-erp-input w-16 text-center" value={formData.effectOnStock} onChange={setField('effectOnStock')} disabled={locked} />
+                </div>
+              </div>
+
+              {/* Box 2: Address & TDS Setup */}
+              <div className="classic-erp-frame space-y-2">
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-24">Address 1:</span>
+                  <input type="text" className="classic-erp-input flex-1" value={formData.address1} onChange={setField('address1')} disabled={locked} />
+                </div>
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-24">Address 2:</span>
+                  <input type="text" className="classic-erp-input flex-1" value={formData.address2} onChange={setField('address2')} disabled={locked} />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex gap-2">
+                    <span className="classic-erp-label w-12">Dist:</span>
+                    <input type="text" className="classic-erp-input flex-1" value={formData.dist} onChange={setField('dist')} disabled={locked} />
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="classic-erp-label w-12">State:</span>
+                    <input type="text" className="classic-erp-input flex-1" value={formData.state} onChange={setField('state')} disabled={locked} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex gap-2">
+                    <span className="classic-erp-label w-16">Head[1]:</span>
+                    <input type="text" className="classic-erp-input flex-1" value={formData.head1} onChange={setField('head1')} disabled={locked} />
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="classic-erp-label w-16">Head[2]:</span>
+                    <input type="text" className="classic-erp-input flex-1" value={formData.head2} onChange={setField('head2')} disabled={locked} />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-24">CreateDate:</span>
+                  <input type="date" className="classic-erp-input flex-1" value={formData.createDate} onChange={setField('createDate')} disabled={locked} />
+                </div>
+
+                <div className="flex gap-2 items-center">
+                  <span className="classic-erp-label w-24">JobWork Book:</span>
+                  <input type="checkbox" checked={formData.jobWorkBook} onChange={setField('jobWorkBook')} disabled={locked} />
+                </div>
+
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-24">Tds Head:</span>
+                  <input type="text" className="classic-erp-input flex-1" value={formData.tdsHead} onChange={setField('tdsHead')} disabled={locked} />
+                </div>
+                <div className="flex gap-2">
+                  <span className="classic-erp-label w-24">Tds Code:</span>
+                  <input type="number" className="classic-erp-input flex-1" value={formData.tdsCode} onChange={setField('tdsCode')} disabled={locked} />
+                </div>
+              </div>
+            </div>
+
+            {error && <p className="text-red-600 font-bold text-xs uppercase tracking-wide">{error}</p>}
           </div>
         </div>
 
-        {/* Right column: Books list and Add form */}
-        <div className="md:col-span-8 flex flex-col space-y-6">
-          <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
-            <h4 className="text-[11px] font-black text-black uppercase tracking-widest mb-4 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 bg-black rounded-full" />
-              Add Custom Book to {modules.find((m) => m.key === selectedModule)?.label}
-            </h4>
-            <form onSubmit={handleCreateBook} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-              <div className="sm:col-span-2">
-                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5 tracking-wider">Book Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. SPECIAL GREY SALES"
-                  value={newBookName}
-                  onChange={(e) => setNewBookName(e.target.value)}
-                  className="w-full h-10 px-3 text-[12px] font-bold rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-black placeholder-slate-300 transition-all bg-white"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1.5 tracking-wider">Book Code</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="e.g. 102"
-                    value={newBookCode}
-                    onChange={(e) => setNewBookCode(e.target.value)}
-                    className="w-full h-10 px-3 text-[12px] font-mono font-bold rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-black placeholder-slate-300 transition-all bg-white"
-                    required
-                  />
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="h-10 px-4 bg-black hover:bg-slate-800 text-white rounded-lg text-[12px] font-bold uppercase transition-all shadow-md active:scale-95 disabled:opacity-50"
-                  >
-                    {saving ? '...' : <FontAwesomeIcon icon={faPlus} />}
-                  </button>
-                </div>
-              </div>
-            </form>
-            {error && <p className="text-[10px] font-bold text-rose-500 mt-2 uppercase tracking-wide">{error}</p>}
-          </div>
-
-          <div className="flex-1">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Available Books</h4>
-            {loading ? (
-              <div className="py-12 text-center text-[11px] text-slate-400 font-bold uppercase tracking-widest animate-pulse">
-                Loading books...
-              </div>
-            ) : books.length === 0 ? (
-              <div className="py-12 text-center text-[11px] text-slate-400 font-bold uppercase tracking-widest">
-                No books found for this module.
-              </div>
-            ) : (
-              <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                <table className="w-full text-left">
-                  <thead>
-                     <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                       <th className="px-6 py-3">Book Name</th>
-                       <th className="px-6 py-3">Code</th>
-                       <th className="px-6 py-3 text-center">Type</th>
-                       <th className="px-6 py-3 text-right">Action</th>
-                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {books.map((b) => {
-                      const isSystem = !b.companyId;
-                      return (
-                        <tr key={b._id || b.name} className="hover:bg-slate-50/50 transition-all">
-                          <td className="px-6 py-4 text-[12px] font-bold uppercase tracking-tight text-slate-800">
-                            {b.name}
-                          </td>
-                          <td className="px-6 py-4 font-mono text-[12px] font-bold text-slate-500">
-                            {b.code}
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <span className={`px-2.5 py-0.5 text-[8px] font-bold uppercase rounded ${
-                              isSystem ? 'bg-slate-100 text-slate-400' : 'bg-black text-white font-black'
-                            }`}>
-                              {isSystem ? 'System' : 'Custom'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            {!isSystem ? (
-                              <button
-                                onClick={() => handleDeleteBook(b._id)}
-                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-all"
-                              >
-                                <FontAwesomeIcon icon={faTrash} size="sm" />
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-slate-300 italic font-medium">Locked</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+        {/* Action Button Bar */}
+        <div className="classic-erp-form-footer">
+          <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View'}>New</button>
+          <button className="classic-erp-btn btn-blue" type="button" onClick={handleSave} disabled={locked}>Save</button>
+          <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked}>Cancel</button>
+          <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || !selectedBookId}>Delete</button>
+          <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
         </div>
       </div>
     </Modal>

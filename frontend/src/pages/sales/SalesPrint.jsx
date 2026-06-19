@@ -121,38 +121,83 @@ const SalesPrint = ({ invoiceId, onClose }) => {
                  <p>We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.</p>
               </div>
            </div>
-           {/* Totals Right */}
-           <div className="w-1/3 flex flex-col text-[11px]">
-              <div className="flex justify-between p-1.5 border-b border-slate-200 font-bold">
-                 <span>Taxable Amount</span>
-                 <span className="font-mono">{(invoice.taxableAmount || 0).toFixed(2)}</span>
-              </div>
-              {invoice.gstType !== 'IGST' ? (
-                <>
-                  <div className="flex justify-between p-1.5 border-b border-slate-200">
-                     <span>CGST</span>
-                     <span className="font-mono">{(invoice.cgst || (invoice.gstAmount/2) || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between p-1.5 border-b border-slate-200">
-                     <span>SGST</span>
-                     <span className="font-mono">{(invoice.sgst || (invoice.gstAmount/2) || 0).toFixed(2)}</span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex justify-between p-1.5 border-b border-slate-200">
-                   <span>IGST</span>
-                   <span className="font-mono">{(invoice.igst || invoice.gstAmount || 0).toFixed(2)}</span>
-                </div>
-              )}
-              <div className="flex justify-between p-1.5 border-b-2 border-black">
-                 <span>Round Off</span>
-                 <span className="font-mono">{(invoice.roundOff || 0).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between p-2 font-black text-sm bg-slate-100">
-                 <span>Total</span>
-                 <span className="font-mono">₹ {(invoice.netAmount || 0).toFixed(2)}</span>
-              </div>
-           </div>
+            {/* Totals Right */}
+            <div className="w-1/3 flex flex-col text-[11px]">
+               <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                  <span>Gross Subtotal</span>
+                  <span className="font-mono">{((invoice.taxableAmount || 0) 
+                    - (invoice.foldLessSign === '+' ? 1 : -1) * (invoice.foldLess || 0)
+                    - (invoice.rdAmtSign === '+' ? 1 : -1) * (invoice.rdAmt || 0)
+                    - (invoice.discountSign === '+' ? 1 : -1) * (invoice.discountAmt || 0)
+                    - (invoice.lessSign === '+' ? 1 : -1) * (invoice.lessAmt || 0)
+                    - (invoice.addSign === '+' ? 1 : -1) * (invoice.addAmt || 0)).toFixed(2)}</span>
+               </div>
+               {invoice.foldLess > 0 && (
+                 <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                    <span>Fold Less ({invoice.foldLessSign})</span>
+                    <span className="font-mono">{invoice.foldLess.toFixed(2)}</span>
+                 </div>
+               )}
+               {invoice.rdAmt > 0 && (
+                 <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                    <span>RD Amount ({invoice.rdAmtSign})</span>
+                    <span className="font-mono">{invoice.rdAmt.toFixed(2)}</span>
+                 </div>
+               )}
+               {invoice.discountAmt > 0 && (
+                 <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                    <span>Discount ({invoice.discountSign})</span>
+                    <span className="font-mono">{invoice.discountAmt.toFixed(2)}</span>
+                 </div>
+               )}
+               {invoice.lessAmt > 0 && (
+                 <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                    <span>Less ({invoice.lessSign})</span>
+                    <span className="font-mono">{invoice.lessAmt.toFixed(2)}</span>
+                 </div>
+               )}
+               {invoice.addAmt > 0 && (
+                 <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                    <span>Add ({invoice.addSign})</span>
+                    <span className="font-mono">{invoice.addAmt.toFixed(2)}</span>
+                 </div>
+               )}
+               <div className="flex justify-between p-1.5 border-b border-slate-200 font-bold bg-slate-50">
+                  <span>Taxable Amount</span>
+                  <span className="font-mono">{(invoice.taxableAmount || 0).toFixed(2)}</span>
+               </div>
+               {invoice.gstType !== 'IGST' ? (
+                 <>
+                   <div className="flex justify-between p-1.5 border-b border-slate-200">
+                      <span>CGST</span>
+                      <span className="font-mono">{(invoice.cgst || (invoice.gstAmount/2) || 0).toFixed(2)}</span>
+                   </div>
+                   <div className="flex justify-between p-1.5 border-b border-slate-200">
+                      <span>SGST</span>
+                      <span className="font-mono">{(invoice.sgst || (invoice.gstAmount/2) || 0).toFixed(2)}</span>
+                   </div>
+                 </>
+               ) : (
+                 <div className="flex justify-between p-1.5 border-b border-slate-200">
+                    <span>IGST</span>
+                    <span className="font-mono">{(invoice.igst || invoice.gstAmount || 0).toFixed(2)}</span>
+                 </div>
+               )}
+               {invoice.tcsAmount > 0 && (
+                 <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                    <span>TCS ({invoice.tcsPer || 0}%)</span>
+                    <span className="font-mono">{invoice.tcsAmount.toFixed(2)}</span>
+                 </div>
+               )}
+               <div className="flex justify-between p-1.5 border-b-2 border-black">
+                  <span>Round Off</span>
+                  <span className="font-mono">{(invoice.roundOff || 0).toFixed(2)}</span>
+               </div>
+               <div className="flex justify-between p-2 font-black text-sm bg-slate-100">
+                  <span>Total</span>
+                  <span className="font-mono">₹ {(invoice.netAmount || 0).toFixed(2)}</span>
+               </div>
+            </div>
         </div>
         
         {/* Signatures */}

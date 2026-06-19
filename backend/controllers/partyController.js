@@ -2,6 +2,9 @@ const partyService = require('../services/partyService');
 
 exports.createParty = async (req, res) => {
   try {
+    if (!req.companyId) {
+      return res.status(400).json({ success: false, message: 'No company context. Log in with a company user account.' });
+    }
     req.body.companyId = req.companyId;
     const party = await partyService.createParty(req.body);
     res.status(201).json({ success: true, data: party });

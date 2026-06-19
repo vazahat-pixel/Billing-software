@@ -4,7 +4,6 @@ const InventoryLotSchema = new mongoose.Schema({
   lotId: {
     type: String,
     required: true,
-    unique: true,
     index: true
   },
   itemId: {
@@ -20,7 +19,7 @@ const InventoryLotSchema = new mongoose.Schema({
   },
   source: {
     type: String,
-    enum: ['purchase', 'opening', 'jobwork'],
+    enum: ['purchase', 'opening', 'jobwork', 'job_receive'],
     default: 'purchase'
   },
   totalPcs: {
@@ -53,5 +52,7 @@ const InventoryLotSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+InventoryLotSchema.index({ lotId: 1, companyId: 1 }, { unique: true });
 
 module.exports = mongoose.model('InventoryLot', InventoryLotSchema);

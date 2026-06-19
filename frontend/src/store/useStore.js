@@ -71,6 +71,32 @@ const useStore = create((set, get) => ({
     });
   },
 
+  /** Sync live config bundle into user snapshot (admin changes → user panel) */
+  syncActiveConfig: (bundle) => {
+    if (!bundle) return;
+    const current = get().user;
+    if (!current) return;
+    const updated = normalizeUser({
+      ...current,
+      moduleConfig: {
+        modules: bundle.modules || {},
+        subMenus: bundle.subMenus || {},
+        fields: bundle.fields || {}
+      },
+      configVersion: bundle.bundleVersion,
+      configHash: bundle.configHash,
+      activeConfig: {
+        featureFlags: bundle.featureFlags,
+        bills: bundle.bills,
+        columns: bundle.columns,
+        permissions: bundle.permissions,
+        companySettings: bundle.companySettings
+      }
+    });
+    localStorage.setItem('user', JSON.stringify(updated));
+    set({ user: updated });
+  },
+
   restoreSession: async () => {
     const token = get().token || localStorage.getItem('token');
     if (!token) {
@@ -130,7 +156,8 @@ const useStore = create((set, get) => ({
   refreshAllData: async () => {
     const {
       fetchParties, fetchItems, fetchSales, fetchPurchases, fetchInventory,
-      fetchJobs, fetchOrders, fetchReturns, fetchNotes, fetchVisits, fetchVouchers, fetchBooks
+      fetchJobs, fetchOrders, fetchReturns, fetchNotes, fetchVisits, fetchVouchers, fetchBooks,
+      fetchLedgers
     } = get();
     const results = await Promise.allSettled([
       fetchParties(),
@@ -144,7 +171,8 @@ const useStore = create((set, get) => ({
       fetchNotes(),
       fetchVisits(),
       fetchVouchers(),
-      fetchBooks()
+      fetchBooks(),
+      fetchLedgers()
     ]);
     const failed = results.filter(r => r.status === 'rejected');
     if (failed.length > 0) {
@@ -182,7 +210,7 @@ const useStore = create((set, get) => ({
       const res = await api.put(`/parties/${id}`, partyData);
       const updatedParty = normalizeParty(res.data.data || res.data);
       set((state) => ({
-        parties: state.parties.map((p) => (p._id === id ? updatedParty : p))
+        parties: state.parties.map((p) => (String(p._id) === String(id) ? updatedParty : p))
       }));
       return updatedParty;
     } catch (err) {
@@ -385,6 +413,19 @@ const useStore = create((set, get) => ({
     return res.data.data;
   },
 
+  fetchGstr2: async (startDate, endDate) => {
+    const res = await api.get(`/gst/gstr2?startDate=${startDate || ''}&endDate=${endDate || ''}`);
+    return res.data.data;
+  },
+
+  fetchCADashboard: async (startDate, endDate) => {
+    const res = await api.get(`/gst/ca-dashboard?startDate=${startDate || ''}&endDate=${endDate || ''}`);
+    return res.data.data;
+  },
+
+  caDashboard: null,
+  caDashboardLoading: false,
+
   // --- INVENTORY ---
   fetchInventory: async () => {
     set({ loading: true });
@@ -420,10 +461,24 @@ const useStore = create((set, get) => ({
   receiveFromMill: async (receiveData) => {
     try {
       const res = await api.post('/jobs/receive', receiveData);
-      set((state) => ({ 
-        jobWorkEntries: state.jobWorkEntries.map(j => j._id === receiveData.jobId ? res.data.data || res.data : j) 
+      await get().fetchJobs();
+      await get().fetchInventory();
+      return res.data.data;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  updateJobProcess: async (jobId, status) => {
+    try {
+      const res = await api.put('/jobs/process', { jobId, status });
+      const updated = res.data.data;
+      set((state) => ({
+        jobWorkEntries: state.jobWorkEntries.map((j) =>
+          j._id === jobId ? { ...j, ...updated } : j
+        )
       }));
-      return res.data;
+      return updated;
     } catch (err) {
       throw err;
     }
@@ -527,9 +582,12 @@ const useStore = create((set, get) => ({
     try {
       const companyId = get().user?.companyId;
       const res = await api.get(`/accounting/trial-balance?companyId=${companyId}&asOn=${asOn || ''}`);
-      set({ trialBalance: res.data.data || [], loading: false });
+      const data = res.data.data || [];
+      set({ trialBalance: data, loading: false });
+      return data;
     } catch (err) {
       set({ error: err.message, loading: false });
+      return [];
     }
   },
 
@@ -553,7 +611,23 @@ const useStore = create((set, get) => ({
       return res.data.data;
     } catch (err) {
       set({ error: err.message, loading: false });
+      return [];
     }
+  },
+
+  fetchReportsBundle: async (startDate, endDate) => {
+    try {
+      const res = await api.get(`/reports/bundle?startDate=${startDate || ''}&endDate=${endDate || ''}`);
+      return res.data.data;
+    } catch (err) {
+      console.error('Reports bundle failed:', err);
+      throw err;
+    }
+  },
+
+  fetchStockReport: async () => {
+    const res = await api.get('/reports/stock');
+    return res.data.data;
   },
 
   fetchBooks: async () => {
@@ -632,6 +706,20 @@ const useStore = create((set, get) => ({
       set(state => ({ subMasters: state.subMasters.filter(sm => sm._id !== id) }));
     } catch (err) {
       console.error('Delete sub-master failed:', err);
+      throw err;
+    }
+  },
+
+  updateSubMaster: async (id, data) => {
+    try {
+      const res = await api.put(`/submasters/${id}`, data);
+      const updated = res.data.data;
+      set((state) => ({
+        subMasters: state.subMasters.map((sm) => (sm._id === id ? updated : sm))
+      }));
+      return updated;
+    } catch (err) {
+      console.error('Update sub-master failed:', err);
       throw err;
     }
   },

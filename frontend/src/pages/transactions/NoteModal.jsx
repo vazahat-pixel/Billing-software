@@ -67,102 +67,97 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit' }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-6 backdrop-blur-md">
-      <div className="bg-[#FDFCF9] w-full max-w-xl rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-white/20 animate-fadeIn">
+    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4">
+      <div className="classic-erp-window w-full max-w-xl flex flex-col overflow-hidden">
         
         {/* Header */}
-        <div className="px-10 py-6 flex justify-between items-center bg-white border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-6">
-            <div className="p-4 bg-black text-white rounded-2xl shadow-lg">
-              <Edit size={20} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-black tracking-tight italic">{type} Note Registry<span className="text-slate-200">.</span></h2>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Note Adjustment Manager</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:text-black transition-all">
-            <X size={18} />
-          </button>
+        <div className="classic-erp-header shrink-0">
+          <span>{type} Note Registry [ NOTE VOUCHER ]</span>
+          <button className="classic-erp-close-btn" onClick={onClose}>X</button>
         </div>
 
         {errorMsg && (
-          <div className="bg-rose-50 border-b border-rose-100 px-10 py-3 text-rose-600 font-bold text-xs uppercase tracking-wider">
+          <div className="bg-rose-50 border-b border-rose-200 px-3 py-1.5 text-red-800 font-bold text-xs font-mono">
             Error: {errorMsg}
           </div>
         )}
 
-        <form onSubmit={handleSave} className="p-10 space-y-6 flex-1 bg-white">
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Selected Counterparty</label>
-            <ERPSelect 
+        <form onSubmit={handleSave} className="p-3 space-y-3 bg-[#d4d0c8] flex-1">
+          <div className="classic-erp-frame flex items-center gap-2">
+            <span className="classic-erp-label red-label w-24">Counterparty:</span>
+            <select 
               value={partyId}
               onChange={e => setPartyId(e.target.value)}
-              options={parties.map(p => ({ value: p._id, label: `${p.name} (${p.type})` }))}
-              className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold uppercase text-[10px]"
-              label="Party"
-            />
+              className="classic-erp-select flex-1"
+            >
+              <option value="">- Select Party / Account -</option>
+              {parties.map(p => (
+                <option key={p._id} value={p._id}>{p.name} ({p.type})</option>
+              ))}
+            </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Note Ref No</label>
-              <ERPInput 
+          <div className="classic-erp-frame grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-2">
+              <span className="classic-erp-label w-20">Note No:</span>
+              <input 
+                type="text"
                 value={noteNo}
                 onChange={e => setNoteNo(e.target.value)}
                 placeholder="AUTO-GENERATED"
-                className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold uppercase text-[10px]"
+                className="classic-erp-input flex-1"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Adjustment Date</label>
-              <ERPInput 
+            <div className="flex items-center gap-2">
+              <span className="classic-erp-label red-label w-20">Date:</span>
+              <input 
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
-                className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold uppercase text-[10px]"
+                className="classic-erp-input flex-1"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Quantum Amount (₹)</label>
-              <ERPInput 
+          <div className="classic-erp-frame grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-2">
+              <span className="classic-erp-label red-label w-20">Amount:</span>
+              <input 
                 type="number"
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full h-12 bg-black text-white border-none rounded-xl font-black text-lg text-center"
+                className="classic-erp-input flex-1 text-right font-bold"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Against Invoice Reference</label>
-              <ERPInput 
+            <div className="flex items-center gap-2">
+              <span className="classic-erp-label w-20">Invoice Ref:</span>
+              <input 
+                type="text"
                 value={againstInvoiceNo}
                 onChange={e => setAgainstInvoiceNo(e.target.value)}
-                placeholder="INV-2026-0045"
-                className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold uppercase text-[10px]"
+                placeholder="INV-XXXX"
+                className="classic-erp-input flex-1"
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Narrative / Reason</label>
+          <div className="classic-erp-frame flex flex-col gap-1">
+            <span className="classic-erp-label">Reason / Remarks:</span>
             <textarea 
               rows={3}
-              className="w-full p-4 bg-slate-50 border-none rounded-xl font-bold text-[10px] uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-black resize-none text-black"
+              className="classic-erp-textarea w-full"
               placeholder="ENTER REASON OR NARRATIVE DETAILS..."
               value={reason}
               onChange={e => setReason(e.target.value)}
             />
           </div>
 
-          <div className="flex gap-4 pt-6 border-t border-slate-100">
+          <div className="classic-erp-form-footer pt-3 border-t border-[#808080]">
             <button 
               type="button" 
               onClick={onClose}
-              className="flex-1 py-4 bg-white border border-slate-200 rounded-xl text-black text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all"
+              className="classic-erp-btn"
               disabled={isSubmitting}
             >
               Cancel
@@ -170,13 +165,12 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit' }) => {
             <button 
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 py-4 bg-black text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-lg disabled:opacity-50"
+              className="classic-erp-btn btn-blue"
             >
-              <Save size={16} /> {isSubmitting ? 'Posting...' : 'Commit Note'}
+              {isSubmitting ? 'Posting...' : 'Commit Note'}
             </button>
           </div>
         </form>
-
       </div>
     </div>
   );

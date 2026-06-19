@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
+import { useConfig } from '../../context/ConfigContext';
+import { applyColumnConfig, isFlagEnabled } from '../../utils/configHelpers';
 import { formatPaymentSplits } from '../../utils/paymentFormat';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -98,6 +100,7 @@ const RecordsTable = ({ columns, rows, emptyText }) => (
 
 const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
   const store = useStore();
+  const { bundle } = useConfig();
   const {
     parties, items, inventoryLots, sales, purchases, jobWorkEntries,
     orders, returns, notes, visits, vouchers, books,
@@ -146,7 +149,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
 
   const filterText = (text) => !search || String(text || '').toLowerCase().includes(search.toLowerCase());
 
-  const tableConfig = useMemo(() => {
+  const baseTableConfig = useMemo(() => {
     switch (activeTab) {
       case 'accounts':
         return {
@@ -459,6 +462,20 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
         return { title: 'Records', subtitle: '', columns: [], rows: [], emptyText: 'Select a category' };
     }
   }, [activeTab, parties, items, books, inventoryLots, sales, purchases, jobWorkEntries, vouchers, orders, returns, notes, visits, counts, search]);
+
+  const tableConfig = useMemo(() => {
+    const columnKeyMap = {
+      sales: 'records.sales',
+      purchases: 'records.purchases',
+      inventory: 'records.inventory'
+    };
+    const tableKey = columnKeyMap[activeTab];
+    if (!tableKey || !baseTableConfig.columns?.length) return baseTableConfig;
+    return {
+      ...baseTableConfig,
+      columns: applyColumnConfig(bundle, tableKey, baseTableConfig.columns)
+    };
+  }, [baseTableConfig, activeTab, bundle]);
 
   return (
     <Modal

@@ -9,8 +9,7 @@ const PaymentVoucherSchema = new mongoose.Schema({
   },
   voucherNo: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
   date: {
     type: Date,
@@ -75,5 +74,7 @@ const PaymentVoucherSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+PaymentVoucherSchema.index({ voucherNo: 1, companyId: 1, voucherType: 1 }, { unique: true });
 
 module.exports = mongoose.model('PaymentVoucher', PaymentVoucherSchema);

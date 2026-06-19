@@ -15,11 +15,18 @@ import AdminLicenses from './pages/admin/Licenses';
 import AdminUsage from './pages/admin/Usage';
 import AdminAudit from './pages/admin/Audit';
 import AdminLogin from './pages/admin/Login';
+import AdminModuleControl from './pages/admin/ModuleControl';
+import AdminUserManagement from './pages/admin/UserManagement';
+import AdminCompanyConfig from './pages/admin/CompanyConfig';
+import AdminDynamicConfig from './pages/admin/DynamicConfig';
+import PanelPortal from './pages/PanelPortal';
+import { ConfigProvider } from './context/ConfigContext';
 
 function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/portal" element={<PanelPortal />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -29,7 +36,9 @@ function App() {
         <Route path="/" element={
           <ProtectedRoute allowedRoles={['user', 'super_admin']}>
             <AuthBootstrap>
-              <Dashboard />
+              <ConfigProvider>
+                <Dashboard />
+              </ConfigProvider>
             </AuthBootstrap>
           </ProtectedRoute>
         } />
@@ -48,9 +57,13 @@ function App() {
           <Route path="licenses" element={<AdminLicenses />} />
           <Route path="usage" element={<AdminUsage />} />
           <Route path="audit" element={<AdminAudit />} />
+          <Route path="modules" element={<AdminModuleControl />} />
+          <Route path="dynamic" element={<AdminDynamicConfig />} />
+          <Route path="users" element={<AdminUserManagement />} />
+          <Route path="config" element={<AdminCompanyConfig />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/portal" replace />} />
       </Routes>
     </Router>
   );

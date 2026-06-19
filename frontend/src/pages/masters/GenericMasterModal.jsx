@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import useStore from '../../store/useStore';
-import { ERPInput } from '../../components/forms/FormElements';
-import { X, Plus, Trash2, Search, Settings } from 'lucide-react';
+import Modal from '../../components/ui/Modal';
+import { Plus, Trash2, Search } from 'lucide-react';
 
 const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
   const { subMasters, fetchSubMasters, addSubMaster, deleteSubMaster } = useStore();
@@ -27,14 +27,20 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
   // Compute readable title
   const title = useMemo(() => {
     switch (type) {
-      case 'AccountGroup': return 'Account Group Registry';
+      case 'AccountGroup': return 'Account Main Group Registry';
+      case 'AccountHead': return 'Account Head Registry';
+      case 'BookType': return 'Book Type Registry';
       case 'ItemGroup': return 'Item Group Registry';
-      case 'City': return 'City Registry';
+      case 'Unit': return 'Unit Registry';
+      case 'ItemTaxSlab': return 'Item Tax Slab Registry';
+      case 'City': return 'Station / City Registry';
       case 'Transport': return 'Transport Agent Registry';
-      case 'Color': return 'Color master Registry';
+      case 'Type': return 'Type Registry';
+      case 'OtherMaster': return 'Other Master Registry';
+      case 'Color': return 'Color Master Registry';
       case 'Design': return 'Design Master Registry';
       case 'HSN': return 'HSN Code Registry';
-      default: return 'Master Registry';
+      default: return type ? `${type} Registry` : 'Master Registry';
     }
   }, [type]);
 
@@ -91,125 +97,89 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-6 backdrop-blur-md">
-      <div className="bg-[#FDFCF9] w-full max-w-2xl rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden border border-white/20 animate-fadeIn">
-        
-        {/* Header */}
-        <div className="px-10 py-6 flex justify-between items-center bg-white border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-6">
-            <div className="p-4 bg-black text-white rounded-2xl shadow-lg">
-              <Settings size={20} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-black tracking-tight italic">{title}<span className="text-slate-200">.</span></h2>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Configuration Masters</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:text-black transition-all">
-            <X size={18} />
-          </button>
+    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-2xl">
+      <div className="classic-erp-window flex flex-col max-h-[90vh]">
+        <div className="classic-erp-header">
+          <span>{title}</span>
+          <button type="button" className="classic-erp-close-btn" onClick={onClose}>×</button>
         </div>
 
-        {/* Add Record Form */}
-        <div className="p-10 border-b border-slate-100 bg-white">
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="classic-erp-body border-b border-[var(--border)]">
+          <form onSubmit={handleSubmit} className="space-y-3">
             {type === 'HSN' ? (
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">HSN Code</label>
-                  <ERPInput value={hsnCode} onChange={e => setHsnCode(e.target.value)} placeholder="5208" maxLength={8} disabled={readOnly} className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold text-[10px]" />
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="classic-erp-label">HSN Code</label>
+                  <input className="classic-erp-input w-full mt-1" value={hsnCode} onChange={e => setHsnCode(e.target.value)} placeholder="5208" maxLength={8} disabled={readOnly} />
                 </div>
-                <div className="space-y-2 col-span-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description</label>
-                  <ERPInput value={name} onChange={e => setName(e.target.value)} placeholder="Cotton fabric" disabled={readOnly} className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold text-[10px]" />
+                <div className="col-span-2">
+                  <label className="classic-erp-label">Description</label>
+                  <input className="classic-erp-input w-full mt-1" value={name} onChange={e => setName(e.target.value)} disabled={readOnly} />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">GST Rate %</label>
-                  <ERPInput type="number" value={gstRate} onChange={e => setGstRate(e.target.value)} disabled={readOnly} className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold text-[10px]" />
+                <div>
+                  <label className="classic-erp-label">GST %</label>
+                  <input type="number" className="classic-erp-input w-full mt-1" value={gstRate} onChange={e => setGstRate(e.target.value)} disabled={readOnly} />
                 </div>
               </div>
             ) : (
-              <div className="flex gap-4 items-end">
-                <div className="flex-1 space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Master Item Name</label>
-                  <ERPInput value={name} onChange={e => setName(e.target.value)} placeholder={`Enter new ${type} name...`} disabled={readOnly} className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold uppercase text-[10px] focus:ring-1 focus:ring-black" />
-                </div>
+              <div>
+                <label className="classic-erp-label">Name</label>
+                <input className="classic-erp-input w-full mt-1" value={name} onChange={e => setName(e.target.value)} placeholder={`New ${type} name`} disabled={readOnly} />
               </div>
             )}
             {!readOnly && (
-              <button type="submit" disabled={isSubmitting} className="h-12 px-6 bg-black text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 shadow-lg disabled:opacity-50">
-                <Plus size={16} /> Add Record
+              <button type="submit" disabled={isSubmitting} className="classic-erp-btn btn-blue">
+                <Plus size={12} /> Add
               </button>
             )}
           </form>
-          {errorMsg && (
-            <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mt-3">Error: {errorMsg}</p>
-          )}
+          {errorMsg && <p className="text-[11px] text-[var(--red)] mt-2">{errorMsg}</p>}
         </div>
 
-        {/* List Section */}
-        <div className="flex-1 p-10 flex flex-col overflow-hidden max-h-[40vh]">
-          {/* Search bar */}
-          <div className="relative mb-6 shrink-0">
-            <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Search master record..." 
+        <div className="classic-erp-body flex-1 min-h-0 flex flex-col">
+          <div className="relative mb-2">
+            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <input
+              type="text"
+              placeholder="Search..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-[10px] font-bold uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-black"
+              className="classic-erp-input w-full pl-7"
             />
           </div>
-
-          {/* Table */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar border border-slate-100 rounded-2xl bg-white shadow-sm">
-            <table className="w-full text-left">
+          <div className="classic-erp-table-container flex-1 min-h-[160px]">
+            <table className="classic-erp-table">
               <thead>
-                <tr className="border-b border-slate-50 text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50/50">
-                  <th className="px-6 py-4">{type === 'HSN' ? 'HSN / Description' : 'Name'}</th>
-                  {type === 'HSN' && <th className="px-6 py-4">GST %</th>}
-                  <th className="px-6 py-4 text-right">Actions</th>
+                <tr>
+                  <th>{type === 'HSN' ? 'HSN / Description' : 'Name'}</th>
+                  {type === 'HSN' && <th>GST %</th>}
+                  <th className="text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody>
                 {filteredList.map((item) => (
-                  <tr key={item._id} className="hover:bg-slate-50/50 transition-all group">
-                    <td className="px-6 py-4 font-bold text-black uppercase tracking-wider text-[10px]">
-                      {type === 'HSN' ? `${item.extraFields?.code || item.name} — ${item.extraFields?.description || item.name}` : item.name}
-                    </td>
-                    {type === 'HSN' && (
-                      <td className="px-6 py-4 text-[10px] font-bold">{item.extraFields?.gstRate ?? 5}%</td>
-                    )}
-                    <td className="px-6 py-4 text-right">
+                  <tr key={item._id}>
+                    <td>{type === 'HSN' ? `${item.extraFields?.code || item.name} — ${item.extraFields?.description || item.name}` : item.name}</td>
+                    {type === 'HSN' && <td>{item.extraFields?.gstRate ?? 5}%</td>}
+                    <td className="text-right">
                       {!readOnly && (
-                      <button 
-                        onClick={() => handleDelete(item._id)}
-                        className="p-2 text-slate-300 hover:text-rose-600 transition-all opacity-0 group-hover:opacity-100"
-                        title="Delete Record"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                        <button type="button" onClick={() => handleDelete(item._id)} className="classic-erp-btn btn-red" style={{ height: 24, padding: '0 8px' }}>
+                          <Trash2 size={11} />
+                        </button>
                       )}
                     </td>
                   </tr>
                 ))}
                 {filteredList.length === 0 && (
-                  <tr>
-                    <td colSpan="2" className="px-6 py-8 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      No matching records found.
-                    </td>
-                  </tr>
+                  <tr><td colSpan={type === 'HSN' ? 3 : 2} className="text-center text-[var(--text-muted)] py-6">No records</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
-
       </div>
-    </div>
+    </Modal>
   );
 };
 

@@ -32,8 +32,8 @@ client.interceptors.response.use(
       // Import store dynamically to avoid circular dependencies
       import('../store/useStore').then(({ default: useStore }) => {
         useStore.getState().logout();
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-          window.location.href = '/login';
+        if (typeof window !== 'undefined' && !['/portal', '/login', '/admin/login'].includes(window.location.pathname)) {
+          window.location.href = '/portal';
         }
       });
     }

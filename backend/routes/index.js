@@ -19,6 +19,7 @@ const orderRoutes = require('./orderRoutes');
 const returnRoutes = require('./returnRoutes');
 const noteRoutes = require('./noteRoutes');
 const userRoutes = require('./user.routes');
+const configRoutes = require('./config.routes');
 const authMiddleware = require('../middlewares/auth.middleware');
 const subscriptionMiddleware = require('../middlewares/subscription.middleware');
 
@@ -46,5 +47,6 @@ router.use('/orders', orderRoutes);
 router.use('/returns', returnRoutes);
 router.use('/notes', noteRoutes);
 router.use('/users', userRoutes);
+router.use('/config', configRoutes);
 
 module.exports = router;

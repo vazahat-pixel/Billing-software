@@ -4,7 +4,6 @@ const JobSchema = new mongoose.Schema({
   jobCardNo: {
     type: String,
     required: true,
-    unique: true,
     index: true
   },
   lotId: {
@@ -61,5 +60,7 @@ const JobSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+JobSchema.index({ jobCardNo: 1, companyId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Job', JobSchema);

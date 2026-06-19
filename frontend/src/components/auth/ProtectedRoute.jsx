@@ -8,7 +8,7 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 
     // 1. If not logged in, redirect to appropriate login
     if (!token) {
-        const redirectPath = location.pathname.startsWith('/admin') ? '/admin/login' : '/login';
+        const redirectPath = location.pathname.startsWith('/admin') ? '/admin/login' : '/portal';
         return <Navigate to={redirectPath} state={{ from: location }} replace />;
     }
 

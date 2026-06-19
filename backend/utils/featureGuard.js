@@ -24,3 +24,14 @@ exports.checkFeature = async (req, module, field = null) => {
 
     return true;
 };
+
+exports.guard = (module, field = null) => {
+    return async (req, res, next) => {
+        try {
+            await exports.checkFeature(req, module, field);
+            next();
+        } catch (err) {
+            res.status(403).json({ message: err.message });
+        }
+    };
+};

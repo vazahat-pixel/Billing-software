@@ -25,12 +25,8 @@ const LoginPage = () => {
             // 1. Save to global state
             setAuth({ token, user });
 
-            // 2. Dual Panel Redirection Logic
-            if (user.role === 'super_admin') {
-                navigate('/admin');
-            } else {
-                navigate('/');
-            }
+            // 2. Redirect to ERP panel (super_admin can switch to admin from header)
+            navigate('/');
         } catch (err) {
             setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
         } finally {
@@ -117,6 +113,9 @@ const LoginPage = () => {
                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                             Don't have a business account? 
                             <Link to="/signup" className="text-black font-black hover:underline ml-1.5">Create Account</Link>
+                        </p>
+                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-3">
+                            <Link to="/portal" className="text-slate-500 hover:text-black transition-colors">← Back to Panel Selection</Link>
                         </p>
                     </div>
                 </div>

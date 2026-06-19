@@ -121,6 +121,87 @@ const useAdminStore = create((set, get) => ({
         } catch (err) {
             set({ error: err.response?.data?.message || err.message, loading: false });
         }
+    },
+
+    createCompany: async (companyData) => {
+        set({ loading: true });
+        try {
+            const response = await api.post('/admin/company', companyData);
+            set((state) => ({
+                companies: [...state.companies, response.data],
+                loading: false
+            }));
+            return response.data;
+        } catch (err) {
+            const msg = err.response?.data?.message || err.message;
+            set({ error: msg, loading: false });
+            throw new Error(msg);
+        }
+    },
+
+    updateCompany: async (id, companyData) => {
+        set({ loading: true });
+        try {
+            const response = await api.put(`/admin/company/${id}`, companyData);
+            set((state) => ({
+                companies: state.companies.map(c => c._id === id ? response.data : c),
+                loading: false
+            }));
+            return response.data;
+        } catch (err) {
+            const msg = err.response?.data?.message || err.message;
+            set({ error: msg, loading: false });
+            throw new Error(msg);
+        }
+    },
+
+    deletePlan: async (id) => {
+        set({ loading: true });
+        try {
+            await api.delete(`/admin/plans/${id}`);
+            set((state) => ({
+                plans: state.plans.filter(p => p._id !== id),
+                loading: false
+            }));
+        } catch (err) {
+            const msg = err.response?.data?.message || err.message;
+            set({ error: msg, loading: false });
+            throw new Error(msg);
+        }
+    },
+
+    updateSubscription: async (companyId, subData) => {
+        set({ loading: true });
+        try {
+            const response = await api.put(`/admin/subscription/${companyId}`, subData);
+            set((state) => ({
+                subscriptions: state.subscriptions.map(s => s.companyId?._id === companyId ? response.data : s),
+                loading: false
+            }));
+            get().fetchSubscriptions();
+            return response.data;
+        } catch (err) {
+            const msg = err.response?.data?.message || err.message;
+            set({ error: msg, loading: false });
+            throw new Error(msg);
+        }
+    },
+
+    renewLicense: async (companyId, data) => {
+        set({ loading: true });
+        try {
+            const response = await api.put(`/admin/license/${companyId}/renew`, data);
+            set((state) => ({
+                licenses: state.licenses.map(l => l.companyId === companyId ? response.data : l),
+                loading: false
+            }));
+            get().fetchCompanies();
+            return response.data;
+        } catch (err) {
+            const msg = err.response?.data?.message || err.message;
+            set({ error: msg, loading: false });
+            throw new Error(msg);
+        }
     }
 }));
 

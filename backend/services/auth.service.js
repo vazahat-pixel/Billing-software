@@ -101,6 +101,21 @@ exports.register = async (name, email, password, companyName) => {
     // Update company with license key
     await Company.findByIdAndUpdate(company._id, { licenseKey });
 
+    const CompanyModuleConfig = require('../models/CompanyModuleConfig');
+    const CompanySettings = require('../models/CompanySettings');
+    const configService = require('./configService');
+
+    // Seed full dynamic config bundle (Phase 1)
+    const { moduleConfig, settings } = await configService.seedCompanyDefaults(company._id, user._id);
+    if (companyName) {
+      await CompanySettings.findOneAndUpdate(
+        { companyId: company._id },
+        { legalName: companyName },
+        { new: true }
+      );
+      settings.legalName = companyName;
+    }
+
     const token = generateToken(user);
     return {
         token,
@@ -111,7 +126,10 @@ exports.register = async (name, email, password, companyName) => {
             role: user.role,
             companyRole: user.companyRole,
             companyId: user.companyId,
-            plan: plan.features || null
+            plan: plan.features || null,
+            moduleConfig: moduleConfig,
+            settings: settings,
+            configVersion: moduleConfig?.version || 1
         }
     };
 };
@@ -129,10 +147,56 @@ exports.login = async (email, password) => {
     // Fetch company/plan details for user
     let planFeatures = null;
     let companyInfo = null;
+    let moduleConfig = null;
+    let settings = null;
+    let resolvedCompanyId = user.companyId;
     if (user.role === 'user' && user.companyId) {
         const company = await Company.findById(user.companyId).populate('planId');
         planFeatures = company?.planId?.features || null;
         companyInfo = company ? { name: company.name, status: company.status } : null;
+
+        const CompanyModuleConfig = require('../models/CompanyModuleConfig');
+        const CompanySettings = require('../models/CompanySettings');
+        const configService = require('./configService');
+
+        moduleConfig = await CompanyModuleConfig.findOne({ companyId: user.companyId });
+        if (!moduleConfig) {
+            await configService.seedCompanyDefaults(user.companyId);
+            moduleConfig = await CompanyModuleConfig.findOne({ companyId: user.companyId });
+        }
+
+        settings = await CompanySettings.findOne({ companyId: user.companyId });
+        if (!settings) {
+            settings = await CompanySettings.create({
+                companyId: user.companyId,
+                legalName: company.name
+            });
+        }
+    } else if (user.role === 'super_admin') {
+        const company = await Company.findOne().sort({ createdAt: 1 }).populate('planId');
+        if (company) {
+            resolvedCompanyId = company._id;
+            planFeatures = company?.planId?.features || null;
+            companyInfo = { name: company.name, status: company.status };
+
+            const CompanyModuleConfig = require('../models/CompanyModuleConfig');
+            const CompanySettings = require('../models/CompanySettings');
+            const configService = require('./configService');
+
+            moduleConfig = await CompanyModuleConfig.findOne({ companyId: company._id });
+            if (!moduleConfig) {
+                await configService.seedCompanyDefaults(company._id);
+                moduleConfig = await CompanyModuleConfig.findOne({ companyId: company._id });
+            }
+
+            settings = await CompanySettings.findOne({ companyId: company._id });
+            if (!settings) {
+                settings = await CompanySettings.create({
+                    companyId: company._id,
+                    legalName: company.name
+                });
+            }
+        }
     }
 
     return {
@@ -143,9 +207,12 @@ exports.login = async (email, password) => {
             email: user.email,
             role: user.role,
             companyRole: user.companyRole || 'owner',
-            companyId: user.companyId,
+            companyId: resolvedCompanyId,
             plan: planFeatures,
-            company: companyInfo
+            company: companyInfo,
+            moduleConfig: moduleConfig,
+            settings: settings,
+            configVersion: moduleConfig?.version || 1
         }
     };
 };

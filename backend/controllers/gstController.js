@@ -21,3 +21,15 @@ exports.getGstr2 = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.getCADashboard = async (req, res) => {
+  try {
+    const companyId = req.companyId || req.query.companyId;
+    const { startDate, endDate } = req.query;
+    const data = await gstService.getCADashboard(companyId, startDate, endDate);
+    res.set('Cache-Control', 'private, max-age=10');
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

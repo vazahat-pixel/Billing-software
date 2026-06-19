@@ -1,79 +1,107 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Database, FileText, Users } from 'lucide-react';
+import { BarChart3, Database, FileText, Users, TrendingUp, Layers } from 'lucide-react';
+import { motion } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
 
 const Usage = () => {
-    const { usage, fetchUsage, companies, fetchCompanies, loading } = useAdminStore();
+    const { usage, fetchUsage, companies, fetchCompanies } = useAdminStore();
     const [selectedCompany, setSelectedCompany] = useState('');
-    const [period, setPeriod] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
+    const [period, setPeriod] = useState(new Date().toISOString().substring(0, 7));
 
     useEffect(() => {
         fetchCompanies();
         fetchUsage(selectedCompany, period);
     }, [fetchCompanies, fetchUsage, selectedCompany, period]);
 
+    const metrics = [
+        { key: 'invoicesCount', label: 'Invoices', icon: FileText, color: '#3b82f6', max: 500 },
+        { key: 'usersCount', label: 'Active Users', icon: Users, color: '#10b981', max: 50 },
+        { key: 'storageUsedMb', label: 'Storage (MB)', icon: Database, color: '#f59e0b', max: 1000, unit: 'MB' },
+    ];
+
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row gap-4 items-end bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="space-y-5">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-lg font-black text-white">Usage Analytics</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">Monitor resource consumption per company</p>
+                </div>
+            </motion.div>
+
+            {/* Filters */}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-4 flex flex-col sm:flex-row gap-4">
                 <div className="flex-1">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Filter by Company</label>
-                    <select 
-                        className="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-                        value={selectedCompany}
-                        onChange={(e) => setSelectedCompany(e.target.value)}
-                    >
+                    <label className="dark-input__label">Filter by Company</label>
+                    <select className="dark-input" value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)}>
                         <option value="">All Companies</option>
                         {companies.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                     </select>
                 </div>
-                <div className="w-full md:w-48">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Month</label>
-                    <input 
-                        type="month" 
-                        className="w-full p-3 bg-slate-50 border-none rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-                        value={period}
-                        onChange={(e) => setPeriod(e.target.value)}
-                    />
+                <div className="w-full sm:w-48">
+                    <label className="dark-input__label">Period</label>
+                    <input type="month" className="dark-input" value={period} onChange={e => setPeriod(e.target.value)} />
                 </div>
-            </div>
+            </motion.div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {usage.map((u) => (
-                    <div key={u._id} className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="font-black text-slate-900">{u.companyId?.name || 'Unknown'}</h3>
-                            <span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full uppercase">{u.period}</span>
+            {/* Usage Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {usage.map((u, idx) => (
+                    <motion.div
+                        key={u._id}
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.06 }}
+                        whileHover={{ y: -3 }}
+                        className="usage-card"
+                    >
+                        <div className="flex items-center justify-between mb-5">
+                            <div>
+                                <h3 className="text-sm font-black text-white">{u.companyId?.name || 'Unknown'}</h3>
+                                <span className="text-[10px] font-bold text-slate-600">{u.period}</span>
+                            </div>
+                            <div className="usage-period-badge">
+                                <TrendingUp size={10} />
+                                <span>{u.period?.split('-')[1]}</span>
+                            </div>
                         </div>
-                        
+
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-                                <div className="flex items-center gap-3">
-                                    <FileText size={20} className="text-blue-500" />
-                                    <span className="text-sm font-bold text-slate-600">Invoices</span>
-                                </div>
-                                <span className="font-black text-slate-900">{u.invoicesCount}</span>
-                            </div>
-                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-                                <div className="flex items-center gap-3">
-                                    <Users size={20} className="text-emerald-500" />
-                                    <span className="text-sm font-bold text-slate-600">Active Users</span>
-                                </div>
-                                <span className="font-black text-slate-900">{u.usersCount}</span>
-                            </div>
-                            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
-                                <div className="flex items-center gap-3">
-                                    <Database size={20} className="text-amber-500" />
-                                    <span className="text-sm font-bold text-slate-600">Storage</span>
-                                </div>
-                                <span className="font-black text-slate-900">{u.storageUsedMb} MB</span>
-                            </div>
+                            {metrics.map(({ key, label, icon: Icon, color, max, unit }) => {
+                                const val = u[key] || 0;
+                                const pct = Math.min((val / max) * 100, 100);
+                                return (
+                                    <div key={key}>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <div className="flex items-center gap-2">
+                                                <Icon size={13} style={{ color }} />
+                                                <span className="text-xs font-bold text-slate-400">{label}</span>
+                                            </div>
+                                            <span className="text-xs font-black text-slate-300">
+                                                {val}{unit || ''}
+                                                <span className="text-slate-600 font-normal">/{max}{unit || ''}</span>
+                                            </span>
+                                        </div>
+                                        <div className="usage-bar">
+                                            <motion.div
+                                                className="usage-bar__fill"
+                                                style={{ background: color }}
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${pct}%` }}
+                                                transition={{ delay: idx * 0.06 + 0.3, duration: 0.8, ease: 'easeOut' }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
-                    </div>
+                    </motion.div>
                 ))}
+
                 {usage.length === 0 && (
-                    <div className="col-span-full p-20 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400">
-                        <BarChart3 size={48} className="mb-4 opacity-20" />
-                        <p className="font-bold">No usage data found for the selected filters</p>
+                    <div className="col-span-full glass-card p-16 flex flex-col items-center text-center">
+                        <BarChart3 size={40} className="text-slate-700 mb-4" />
+                        <h3 className="text-sm font-black text-slate-500">No Usage Data</h3>
+                        <p className="text-xs text-slate-600 mt-1">No usage records for the selected filters</p>
                     </div>
                 )}
             </div>

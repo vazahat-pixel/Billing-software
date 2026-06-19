@@ -1,147 +1,273 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, MoreVertical, Lock, Unlock, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Building2, Lock, Unlock, ShieldCheck, Edit3, Plus, X, Search, Filter, Users, ArrowUpRight, Globe } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
+import { AdminPageHeader, AdminButton, AdminBadge } from '../../components/admin/AdminUI';
+
+/* ── Dark Glass Modal ── */
+const DarkModal = ({ isOpen, onClose, title, subtitle, children }) => (
+    <AnimatePresence>
+        {isOpen && (
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/70 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+                onClick={(e) => e.target === e.currentTarget && onClose()}
+            >
+                <motion.div
+                    initial={{ scale: 0.92, y: 20, opacity: 0 }}
+                    animate={{ scale: 1, y: 0, opacity: 1 }}
+                    exit={{ scale: 0.92, y: 20, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                    className="dark-modal"
+                >
+                    <div className="dark-modal__header">
+                        <div>
+                            <h3 className="dark-modal__title">{title}</h3>
+                            {subtitle && <p className="dark-modal__subtitle">{subtitle}</p>}
+                        </div>
+                        <button onClick={onClose} className="dark-modal__close">
+                            <X size={16} />
+                        </button>
+                    </div>
+                    <div className="dark-modal__body">{children}</div>
+                </motion.div>
+            </motion.div>
+        )}
+    </AnimatePresence>
+);
+
+/* ── Dark Input ── */
+const DarkInput = ({ label, ...props }) => (
+    <div>
+        {label && <label className="dark-input__label">{label}</label>}
+        <input className="dark-input" {...props} />
+    </div>
+);
+
+/* ── Dark Select ── */
+const DarkSelect = ({ label, children, ...props }) => (
+    <div>
+        {label && <label className="dark-input__label">{label}</label>}
+        <select className="dark-input" {...props}>{children}</select>
+    </div>
+);
 
 const Companies = () => {
-    const { companies, fetchCompanies, lockCompany, unlockCompany, generateLicense, loading } = useAdminStore();
-    const [selectedCompany, setSelectedCompany] = useState(null);
+    const { companies, fetchCompanies, lockCompany, unlockCompany, generateLicense, createCompany, updateCompany, plans, fetchPlans, loading } = useAdminStore();
+
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [editingCompany, setEditingCompany] = useState(null);
+    const [licenseCompany, setLicenseCompany] = useState(null);
+    const [search, setSearch] = useState('');
+
+    const [createForm, setCreateForm] = useState({ name: '', ownerName: '', ownerEmail: '', ownerPassword: '', planId: '' });
+    const [editForm, setEditForm] = useState({ name: '', planId: '', status: '' });
     const [expiryDate, setExpiryDate] = useState('');
 
     useEffect(() => {
         fetchCompanies();
-    }, [fetchCompanies]);
+        fetchPlans();
+    }, [fetchCompanies, fetchPlans]);
 
-    const handleLicenseGenerate = async (companyId) => {
-        if (!expiryDate) return alert('Please select an expiry date');
-        await generateLicense({ companyId, expiresAt: expiryDate });
-        setExpiryDate('');
-        setSelectedCompany(null);
+    useEffect(() => {
+        if (plans.length > 0 && !createForm.planId) {
+            setCreateForm(prev => ({ ...prev, planId: plans[0]._id }));
+        }
+    }, [plans]);
+
+    const handleCreate = async (e) => {
+        e.preventDefault();
+        if (!createForm.name || !createForm.ownerName || !createForm.ownerEmail || !createForm.ownerPassword || !createForm.planId) {
+            return alert('Please fill in all fields.');
+        }
+        try {
+            await createCompany(createForm);
+            setIsCreateOpen(false);
+            setCreateForm({ name: '', ownerName: '', ownerEmail: '', ownerPassword: '', planId: plans[0]?._id || '' });
+        } catch (err) { alert(err.message || 'Failed to create company'); }
     };
 
+    const handleUpdate = async (e) => {
+        e.preventDefault();
+        try {
+            await updateCompany(editingCompany._id, editForm);
+            setEditingCompany(null);
+        } catch (err) { alert(err.message || 'Failed to update'); }
+    };
+
+    const handleLicenseGenerate = async (e) => {
+        e.preventDefault();
+        if (!expiryDate) return alert('Please select an expiry date');
+        try {
+            await generateLicense({ companyId: licenseCompany._id, expiresAt: expiryDate });
+            setExpiryDate('');
+            setLicenseCompany(null);
+        } catch (err) { alert(err.message || 'Failed to generate license'); }
+    };
+
+    const startEdit = (company) => {
+        setEditingCompany(company);
+        setEditForm({ name: company.name, planId: company.planId?._id || '', status: company.status || 'active' });
+    };
+
+    const filtered = companies.filter(c =>
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.ownerId?.email?.toLowerCase().includes(search.toLowerCase())
+    );
+
     return (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-xl font-bold text-slate-800">Managed Companies</h2>
-                <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors">
-                    Add New Company
-                </button>
-            </div>
+        <div className="space-y-5">
+            <AdminPageHeader
+                title="Managed Companies"
+                subtitle={`${companies.length} registered clients on the platform`}
+                actions={
+                    <AdminButton icon={Plus} onClick={() => setIsCreateOpen(true)}>
+                        Add Company
+                    </AdminButton>
+                }
+            />
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                    <thead>
-                        <tr className="bg-slate-50 border-b border-slate-100">
-                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Company</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Owner</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Plan</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Status</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {companies.map((company) => (
-                            <tr key={company._id} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 font-bold">
-                                            {company.name.charAt(0)}
-                                        </div>
-                                        <div>
-                                            <p className="font-semibold text-slate-900">{company.name}</p>
-                                            <p className="text-xs text-slate-500">ID: {company._id.substring(0, 8)}</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <p className="text-sm text-slate-700">{company.ownerId?.name || 'N/A'}</p>
-                                    <p className="text-xs text-slate-500">{company.ownerId?.email || ''}</p>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-semibold">
-                                        {company.planId?.name || 'No Plan'}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                        company.status === 'active' ? 'bg-emerald-50 text-emerald-700' :
-                                        company.status === 'suspended' ? 'bg-rose-50 text-rose-700' :
-                                        'bg-amber-50 text-amber-700'
-                                    }`}>
-                                        {company.status.toUpperCase()}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <div className="flex items-center justify-end gap-2">
-                                        {company.status === 'active' ? (
-                                            <button 
-                                                onClick={() => lockCompany(company._id)}
-                                                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                                                title="Lock Company"
-                                            >
-                                                <Lock size={18} />
-                                            </button>
-                                        ) : (
-                                            <button 
-                                                onClick={() => unlockCompany(company._id)}
-                                                className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                                title="Unlock Company"
-                                            >
-                                                <Unlock size={18} />
-                                            </button>
-                                        )}
-                                        <button 
-                                            onClick={() => setSelectedCompany(company)}
-                                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                                            title="Issue License"
-                                        >
-                                            <ShieldCheck size={18} />
-                                        </button>
-                                        <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all">
-                                            <MoreVertical size={18} />
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {selectedCompany && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md p-8 shadow-2xl">
-                        <h3 className="text-xl font-bold text-slate-900 mb-2">Issue License</h3>
-                        <p className="text-slate-500 mb-6 text-sm">Issue a new license key for {selectedCompany.name}</p>
-                        
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Expiry Date</label>
-                                <input 
-                                    type="date" 
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                                    value={expiryDate}
-                                    onChange={(e) => setExpiryDate(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex gap-3 mt-8">
-                            <button 
-                                onClick={() => setSelectedCompany(null)}
-                                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button 
-                                onClick={() => handleLicenseGenerate(selectedCompany._id)}
-                                className="flex-1 px-4 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors"
-                            >
-                                Generate Key
-                            </button>
-                        </div>
-                    </div>
+            {/* Search & Filters */}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="admin-toolbar">
+                <div className="admin-toolbar__search">
+                    <Search size={14} className="text-slate-500 flex-shrink-0" />
+                    <input
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Search companies, owners..."
+                    />
                 </div>
-            )}
+                <div className="flex items-center gap-2 text-xs text-slate-500 px-2">
+                    <Filter size={13} />
+                    <span className="font-bold">{filtered.length} results</span>
+                </div>
+            </motion.div>
+
+            {/* Table */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="admin-table-wrap">
+                <div className="overflow-x-auto">
+                    <table className="admin-table">
+                        <thead>
+                            <tr>
+                                {['Company', 'Owner', 'Plan', 'Status', 'Actions'].map(h => (
+                                    <th key={h}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.map((company, idx) => (
+                                <motion.tr
+                                    key={company._id}
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: idx * 0.04 }}
+                                >
+                                    <td>
+                                        <div className="flex items-center gap-3">
+                                            <div className="company-avatar">
+                                                <span>{company.name.charAt(0).toUpperCase()}</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-slate-200">{company.name}</p>
+                                                <p className="text-[10px] text-slate-600 font-mono truncate max-w-[120px]">ID: {company._id?.slice(-8)}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <p className="text-sm font-semibold text-slate-300">{company.ownerId?.name || 'N/A'}</p>
+                                        <p className="text-[10px] text-slate-600">{company.ownerId?.email || ''}</p>
+                                    </td>
+                                    <td>
+                                        <span className="plan-badge">{company.planId?.name || 'No Plan'}</span>
+                                    </td>
+                                    <td>
+                                        <AdminBadge variant={company.status === 'active' ? 'success' : company.status === 'suspended' ? 'danger' : 'warning'} dot>
+                                            {company.status || 'unknown'}
+                                        </AdminBadge>
+                                    </td>
+                                    <td>
+                                        <div className="flex items-center gap-1">
+                                            {company.status === 'active' ? (
+                                                <button onClick={() => lockCompany(company._id)} className="icon-btn icon-btn--danger" title="Suspend">
+                                                    <Lock size={14} />
+                                                </button>
+                                            ) : (
+                                                <button onClick={() => unlockCompany(company._id)} className="icon-btn icon-btn--success" title="Activate">
+                                                    <Unlock size={14} />
+                                                </button>
+                                            )}
+                                            <button onClick={() => setLicenseCompany(company)} className="icon-btn icon-btn--info" title="Issue License">
+                                                <ShieldCheck size={14} />
+                                            </button>
+                                            <button onClick={() => startEdit(company)} className="icon-btn icon-btn--warn" title="Edit">
+                                                <Edit3 size={14} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </motion.tr>
+                            ))}
+                            {filtered.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="px-5 py-16 text-center">
+                                        <Globe size={32} className="mx-auto mb-3 text-slate-700" />
+                                        <p className="text-slate-600 font-bold text-sm">No companies found</p>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </motion.div>
+
+            {/* CREATE COMPANY MODAL */}
+            <DarkModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Register New Company" subtitle="Onboard a new client to the ERP platform">
+                <form onSubmit={handleCreate} className="space-y-4">
+                    <DarkInput label="Company Name" type="text" value={createForm.name} onChange={e => setCreateForm({ ...createForm, name: e.target.value })} placeholder="Acme Textiles Ltd." required />
+                    <div className="grid grid-cols-2 gap-3">
+                        <DarkInput label="Owner Name" type="text" value={createForm.ownerName} onChange={e => setCreateForm({ ...createForm, ownerName: e.target.value })} placeholder="Ravi Kumar" required />
+                        <DarkSelect label="Subscription Plan" value={createForm.planId} onChange={e => setCreateForm({ ...createForm, planId: e.target.value })}>
+                            {plans.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                        </DarkSelect>
+                    </div>
+                    <DarkInput label="Owner Email" type="email" value={createForm.ownerEmail} onChange={e => setCreateForm({ ...createForm, ownerEmail: e.target.value })} placeholder="owner@company.com" required />
+                    <DarkInput label="Owner Password" type="password" value={createForm.ownerPassword} onChange={e => setCreateForm({ ...createForm, ownerPassword: e.target.value })} placeholder="••••••••" required />
+                    <button type="submit" className="dark-submit-btn w-full">
+                        <Building2 size={15} /> Register & Seed Company
+                    </button>
+                </form>
+            </DarkModal>
+
+            {/* EDIT MODAL */}
+            <DarkModal isOpen={!!editingCompany} onClose={() => setEditingCompany(null)} title="Edit Company" subtitle={editingCompany?.name}>
+                <form onSubmit={handleUpdate} className="space-y-4">
+                    <DarkInput label="Company Name" type="text" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} required />
+                    <DarkSelect label="Subscription Plan" value={editForm.planId} onChange={e => setEditForm({ ...editForm, planId: e.target.value })}>
+                        {plans.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                    </DarkSelect>
+                    <DarkSelect label="Status" value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })}>
+                        <option value="active">Active</option>
+                        <option value="suspended">Suspended</option>
+                    </DarkSelect>
+                    <button type="submit" className="dark-submit-btn w-full">
+                        <Edit3 size={15} /> Save Changes
+                    </button>
+                </form>
+            </DarkModal>
+
+            {/* LICENSE MODAL */}
+            <DarkModal isOpen={!!licenseCompany} onClose={() => setLicenseCompany(null)} title="Issue License Key" subtitle={licenseCompany?.name}>
+                <form onSubmit={handleLicenseGenerate} className="space-y-4">
+                    <p className="text-xs text-slate-400 bg-white/[0.03] p-3 rounded-xl border border-white/[0.05]">
+                        Generate a product license key for <strong className="text-violet-400">{licenseCompany?.name}</strong>. This will activate or renew their subscription.
+                    </p>
+                    <DarkInput label="Expiry Date" type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} required />
+                    <button type="submit" className="dark-submit-btn w-full">
+                        <ShieldCheck size={15} /> Generate & Apply Key
+                    </button>
+                </form>
+            </DarkModal>
         </div>
     );
 };

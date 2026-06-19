@@ -23,7 +23,7 @@ exports.getAccountBalance = async (req, res) => {
   try {
     const { partyId } = req.params;
     const { companyId } = req.query;
-    const balance = await ledgerService.getAccountBalance(partyId, partyId);
+    const balance = await ledgerService.getAccountBalance(partyId, companyId || req.companyId);
     res.status(200).json({ success: true, balance });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

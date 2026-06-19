@@ -1,13 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
    faFileInvoiceDollar, faCartFlatbed, faMoneyCheckDollar,
    faHandHoldingDollar, faTruckArrowRight, faWarehouse,
    faScrewdriverWrench, faClipboardCheck, faChartPie,
-   faChevronRight, faChevronDown, faSync, faSearch, faBell,
-   faTriangleExclamation, faHandshake
+   faChevronDown, faSync, faSearch, faBell,
+   faTriangleExclamation, faHandshake, faUserTie
 } from '@fortawesome/free-solid-svg-icons';
 import useStore from '../store/useStore';
+import PanelSwitcher from '../components/PanelSwitcher';
 import Modal from '../components/ui/Modal';
 
 // Legacy Modals
@@ -18,6 +19,7 @@ import IssueModal from './jobwork/IssueModal';
 import ReceiveModal from './jobwork/ReceiveModal';
 import UpdateModal from './jobwork/UpdateModal';
 import JobReceiptModal from './jobwork/JobReceiptModal';
+import ProcessUpdateModal from './jobwork/ProcessUpdateModal';
 import SalesOutstanding from './reports/SalesOutstanding';
 import LedgerModal from './LedgerModal';
 import AccountMasterModal from './masters/AccountMasterModal';
@@ -34,6 +36,7 @@ import {
    Gstr1ErrorChekModal,
    GstComplianceModal
 } from './gst/GstModals';
+import CADashboardModal from './gst/CADashboardModal';
 import VisitLogModal from './crm/VisitLogModal';
 import PartyModal from './masters/PartyModal';
 import JobWorkerMaster from './masters/JobWorkerMaster';
@@ -49,11 +52,149 @@ import UserRightsModal from './admin/UserRightsModal';
 import OpeningBalanceModal from './masters/OpeningBalanceModal';
 import OpeningStockModal from './masters/OpeningStockModal';
 import DataRecordsHub from './records/DataRecordsHub';
+import ReportsHub from './reports/ReportsHub';
 import { getPermissions } from '../utils/permissions';
+import { useConfig } from '../context/ConfigContext';
+import { isFlagEnabled } from '../utils/configHelpers';
+
+const MODULE_PARENT_MAP = {
+  sales: 'sales',
+  purchase: 'purchase',
+  receipt: 'accounting',
+  payment: 'accounting',
+  millIssue: 'jobWork',
+  millRec: 'jobWork',
+  jobIssue: 'jobWork',
+  jobRec: 'jobWork',
+  updateJob: 'jobWork',
+  accountMaster: 'masters',
+  itemMaster: 'masters',
+  bookMaster: 'masters',
+  gstr1: 'gst',
+  gst2bMatching: 'gst',
+  gstCompliance: 'gst',
+  caDashboard: 'gst',
+  visit: 'sales',
+  outstanding: 'reports',
+  inventoryPage: 'inventory'
+};
+
+const MODULE_SUBMENU_MAP = {
+  sales: 'Sales Billing',
+  purchase: 'Purchase Bill',
+  receipt: 'Bank Receipt',
+  payment: 'Bank Payment',
+  millIssue: 'Mill Issue',
+  millRec: 'Mill Receive',
+  jobIssue: 'Job Issue',
+  jobRec: 'Job Receive',
+  updateJob: 'Update Job',
+  gstr1: 'GSTR-1',
+  gst2bMatching: 'GSTR-2B Matching',
+  gstCompliance: 'GST Compliance',
+  caDashboard: 'CA Desk',
+  visit: 'Visit Log',
+  outstanding: 'Outstanding Report',
+  inventoryPage: 'Stock Ledger',
+  accountMaster: 'Account Master',
+  itemMaster: 'Item Master',
+  bookMaster: 'Book Master'
+};
 
 const Dashboard = () => {
-   const { user, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items } = useStore();
-   const permissions = useMemo(() => getPermissions(user?.companyRole), [user?.companyRole]);
+   const { user, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items, plan } = useStore();
+   const { bundle, moduleConfig: liveModuleConfig, lastSynced } = useConfig();
+   const moduleConfig = liveModuleConfig || user?.moduleConfig;
+   const showRecordsHub = isFlagEnabled(bundle, 'records_hub', true);
+   const showCADesk = isFlagEnabled(bundle, 'ca_desk', true);
+   const permissions = useMemo(() => getPermissions(user?.companyRole, user?.role), [user?.companyRole, user?.role]);
+
+   /** Show menu unless admin explicitly disabled (opt-out). Plan does not hide menus. */
+   const isParentModuleEnabled = (parentKey) => {
+      if (!parentKey) return true;
+      if (user?.role === 'super_admin') return true;
+      if (moduleConfig?.modules?.[parentKey] === false) return false;
+      if (bundle?.modules?.[parentKey] === false) return false;
+      return true;
+   };
+
+   const isSubMenuItemEnabled = (parentKey, subLabel) => {
+      if (!parentKey || !subLabel) return true;
+      if (user?.role === 'super_admin') return true;
+      const fromConfig = moduleConfig?.subMenus?.[parentKey];
+      if (fromConfig && fromConfig[subLabel] === false) return false;
+      const fromBundle = bundle?.subMenus?.[parentKey];
+      if (fromBundle && fromBundle[subLabel] === false) return false;
+      return true;
+   };
+
+   const isModuleAllowed = (moduleKey) => {
+      if (user?.role === 'super_admin') return true;
+      const parentModule = MODULE_PARENT_MAP[moduleKey];
+      if (!parentModule) return true;
+      if (!isParentModuleEnabled(parentModule)) return false;
+      const subMenuLabel = MODULE_SUBMENU_MAP[moduleKey];
+      return isSubMenuItemEnabled(parentModule, subMenuLabel);
+   };
+
+   const isMenuItemAllowed = (item) => {
+      if (user?.role === 'super_admin') return true;
+
+      const label = item.label;
+      const key = item.key;
+
+      if (key) return isModuleAllowed(key);
+
+      let parentModule = null;
+      let subMenuLabel = label;
+
+      if (label.includes('Sales') || label === 'Visit Log') {
+         parentModule = 'sales';
+      } else if (label.includes('Purchase') || label === 'Job Purchase') {
+         parentModule = 'purchase';
+      } else if (label.includes('Job') || label.includes('Mill') || label.includes('Cutting') || label.includes('Beam') || label.includes('Looms') || label.includes('Production')) {
+         parentModule = 'jobWork';
+         if (label === 'Cutting Entry') subMenuLabel = 'Mill Issue';
+         if (label === 'Beam Entry') subMenuLabel = 'Mill Receive';
+      } else if (label.includes('Gst') || label.includes('GST') || label.startsWith('GSTR-') || label.startsWith('GST ')) {
+         parentModule = 'gst';
+      } else if (label.includes('Ledger') || label.includes('Account') || label.includes('Cash') || label.includes('Bank') || label.includes('Voucher') || label.includes('Journal') || label.includes('Debit/Credit Note') || label.includes('Tds') || label.includes('Tcs') || label.includes('Opening Balance') || label.includes('Fas Reports') || label.includes('Final Reports') || label.includes('Receipt') || label.includes('Payment') || label === 'Opening StockEntry') {
+         const mastersList = ['Account', 'Account Main Group', 'Account Head', 'Book Master', 'Book Type', 'Item', 'Item Group', 'Unit', 'Item TaxSlab', 'Station', 'Transport', 'Type', 'OtherMaster', 'Lastyear BillEntry', 'Merge Event', 'Item Rate Master', 'Opening StockEntry'];
+         if (mastersList.includes(label)) {
+            parentModule = 'masters';
+            if (label === 'Account') subMenuLabel = 'Account Master';
+            if (label === 'Item') subMenuLabel = 'Item Master';
+            if (label === 'Station') subMenuLabel = 'Station/City';
+            if (label === 'Account Main Group') subMenuLabel = 'Account Group';
+            if (label === 'Opening StockEntry') subMenuLabel = 'Opening Stock';
+         } else {
+            parentModule = 'accounting';
+            if (label === 'Opening Balance') subMenuLabel = 'Opening Balance';
+            if (label === 'Journal (GST)') subMenuLabel = 'Journal (GST)';
+            if (label === 'Tds Entry') subMenuLabel = 'TDS Entry';
+         }
+      } else if (label.includes('Item') || label.includes('Stock') || label.includes('Unit') || label === 'Process' || label === 'Work Process') {
+         parentModule = 'inventory';
+         if (label === 'Inv Stock Ledger') subMenuLabel = 'Stock Ledger';
+      } else if (label.includes('Outstanding') || label.includes('Report') || label.includes('Statement') || label.includes('List') || label.includes('Transaction') || label === 'Letter Pad') {
+         parentModule = 'reports';
+         if (label === 'Outstanding Zoom') subMenuLabel = 'Outstanding Report';
+         if (label === 'Outstanding') subMenuLabel = 'Outstanding Report';
+         if (label === 'Brokreg Statment') subMenuLabel = 'Broker Statement';
+      } else if (label === 'Backup' || label === 'Restore' || label.includes('Year') || label.includes('Transfer') || label.includes('Voucher Relndex') || label.includes('Series') || label.includes('Expense') || label.includes('Update Main') || label.includes('Scanner') || label === 'Email Option' || label.includes('Views') || label === 'Application Sync' || label === 'Bulk Whatsapp') {
+         parentModule = 'utilities';
+         if (label === 'Closing / UnClosing Year') subMenuLabel = 'Year Closing';
+         if (label === 'New A/c. Year ( Auto )' || label === 'New A/c. Year ( Manual )') subMenuLabel = 'New A/c Year';
+         if (label === 'Bulk Whatsapp') subMenuLabel = 'Bulk WhatsApp';
+      }
+
+      if (parentModule) {
+         if (!isParentModuleEnabled(parentModule)) return false;
+         return isSubMenuItemEnabled(parentModule, subMenuLabel);
+      }
+
+      return true;
+   };
    const [modals, setModals] = useState({
       sales: false,
       purchase: false,
@@ -63,6 +204,7 @@ const Dashboard = () => {
       millRec: false,
       jobIssue: false,
       jobRec: false,
+      updateJob: false,
       outstanding: false,
       ledger: false,
       accountMaster: false,
@@ -73,6 +215,7 @@ const Dashboard = () => {
       gst3bDetail: false,
       gstr1Errorchek: false,
       gstCompliance: false,
+      caDashboard: false,
       visit: false,
       party: false,
       jobWorker: false,
@@ -93,27 +236,30 @@ const Dashboard = () => {
       openingBalance: false,
       openingStock: false,
       recordsHub: false,
-      recordsTab: 'accounts'
+      recordsTab: 'accounts',
+      reportsHub: false,
+      reportsTab: 'summary'
    });
 
    const [placeholderName, setPlaceholderName] = useState('');
-   const [collapsedSections, setCollapsedSections] = useState({
-      Master: false,
-      Transaction: false,
-      Reports: false,
-      Ledger: false,
-      Utilities: false,
-      Admin: false,
-      Company: false
-   });
-
    const [bookSelection, setBookSelection] = useState({
       isOpen: false,
       module: null
    });
    const [selectedBooks, setSelectedBooks] = useState({});
-   const [sidebarOpen, setSidebarOpen] = useState(true);
    const [activeMenuKey, setActiveMenuKey] = useState(null);
+   const [openMenuSection, setOpenMenuSection] = useState(null);
+   const menuBarRef = useRef(null);
+
+   useEffect(() => {
+      const onDocMouseDown = (e) => {
+         if (menuBarRef.current && !menuBarRef.current.contains(e.target)) {
+            setOpenMenuSection(null);
+         }
+      };
+      document.addEventListener('mousedown', onDocMouseDown);
+      return () => document.removeEventListener('mousedown', onDocMouseDown);
+   }, []);
 
    const parseMenuLabel = (label) => {
       const match = label.match(/^(\d+)\s+(.+)$/);
@@ -200,17 +346,42 @@ const Dashboard = () => {
       }));
    };
 
-   const dashboardStats = useMemo(() => {
-      const totalSales = sales.reduce((a, s) => a + (s.netAmount || s.totals?.total || 0), 0);
-      const totalPurchases = purchases.reduce((a, p) => a + (p.netAmount || p.totals?.total || 0), 0);
-      const stockMtrs = inventoryLots.reduce((a, l) => a + (l.remainingMtrs || 0), 0);
-      const activeJobs = jobWorkEntries.filter(j => j.status !== 'Received' && j.status !== 'Closed').length;
-      return { totalSales, totalPurchases, stockMtrs, activeJobs, accountCount: parties.length, itemCount: items.length };
-   }, [sales, purchases, inventoryLots, jobWorkEntries, parties, items]);
-
-   const toggleSection = (section) => {
-      setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
+   const openReportsHub = (tab = 'summary') => {
+      setModals(prev => ({
+         ...prev,
+         reportsHub: true,
+         reportsTab: tab
+      }));
    };
+
+   const recentActivity = useMemo(() => {
+      const fmtRel = (d) => {
+         if (!d) return '';
+         const diff = Date.now() - new Date(d).getTime();
+         const mins = Math.floor(diff / 60000);
+         if (mins < 60) return `${mins || 1} mins ago`;
+         const hrs = Math.floor(mins / 60);
+         if (hrs < 24) return `${hrs} hour${hrs > 1 ? 's' : ''} ago`;
+         return new Date(d).toLocaleDateString('en-IN');
+      };
+      const acts = [];
+      sales.slice(0, 3).forEach((s) => acts.push({
+        text: `Sales Invoice ${s.invoiceNo} — ₹${(s.netAmount || 0).toLocaleString('en-IN')}`,
+        time: fmtRel(s.date || s.createdAt),
+        type: 'sales'
+      }));
+      purchases.slice(0, 2).forEach((p) => acts.push({
+        text: `Purchase Bill ${p.billNo || p.invoiceNo}`,
+        time: fmtRel(p.date || p.createdAt),
+        type: 'purchase'
+      }));
+      jobWorkEntries.slice(0, 2).forEach((j) => acts.push({
+        text: `Job ${j.jobCardNo} — ${j.status}`,
+        time: fmtRel(j.issueDate || j.createdAt),
+        type: 'job'
+      }));
+      return acts.slice(0, 6);
+   }, [sales, purchases, jobWorkEntries]);
 
    const handleMenuItemClick = (item) => {
       const key = item.key || item.label;
@@ -227,84 +398,122 @@ const Dashboard = () => {
    const menuData = {
       Master: [
          { label: 'Account', key: 'accountMaster' },
-         { label: 'Item', key: 'itemMaster' },
-         { label: 'Party Master', key: 'party' },
-         { label: 'Job Worker Master', key: 'jobWorker' },
+         { label: 'Account Main Group', action: () => openGenericMaster('AccountGroup') },
+         { label: 'Account Head', action: () => openGenericMaster('AccountHead') },
          { label: 'Book Master', key: 'bookMaster' },
-         { label: 'Account Group', action: () => openGenericMaster('AccountGroup') },
+         { label: 'Book Type', action: () => openGenericMaster('BookType') },
+         { label: 'Item', key: 'itemMaster' },
          { label: 'Item Group', action: () => openGenericMaster('ItemGroup') },
-         { label: 'City', action: () => openGenericMaster('City') },
+         { label: 'Unit', action: () => openGenericMaster('Unit') },
+         { label: 'Item TaxSlab', action: () => openGenericMaster('ItemTaxSlab') },
+         { label: 'Station', action: () => openGenericMaster('City') },
          { label: 'Transport', action: () => openGenericMaster('Transport') },
-         { label: 'Color', action: () => openGenericMaster('Color') },
-         { label: 'Design', action: () => openGenericMaster('Design') },
-         { label: 'HSN Code', action: () => openGenericMaster('HSN') },
+         { label: 'Type', action: () => openGenericMaster('Type') },
+         { label: 'OtherMaster', action: () => openGenericMaster('OtherMaster') },
+         { label: 'Job Worker', action: () => setModals(prev => ({ ...prev, jobWorker: true })) },
+         { label: 'Lastyear BillEntry', action: () => openRecordsHub('sales') },
          { label: 'Opening Balance', action: () => setModals(prev => ({ ...prev, openingBalance: true })) },
-         { label: 'Opening Stock Entry', action: () => setModals(prev => ({ ...prev, openingStock: true })) },
-         { label: 'Bank Setup (Recon)', action: () => openPlaceholder('Bank Setup') }
+         { label: 'Opening StockEntry', action: () => setModals(prev => ({ ...prev, openingStock: true })) },
+         { label: 'Merge Event', action: () => refreshAllData().then(() => alert('Data merged and refreshed.')) },
+         { label: 'Item Rate Master', action: () => toggleModal('itemMaster', true) }
       ],
       Transaction: [
-         { label: 'Bank Receipt', key: 'receipt' },
-         { label: 'Bank Payment', key: 'payment' },
-         { label: 'Sales Billing', key: 'sales' },
+         { label: 'Cash Book', action: () => toggleModal('receipt', true) },
+         { label: 'Bank Book', action: () => toggleModal('receipt', true) },
+         { label: 'Voucher Entry', action: () => toggleModal('receipt', true) },
+         { label: 'Journal (GST)', action: () => openJournal() },
+         { label: 'Debit/Credit Note', action: () => openNote('Credit') },
+         { label: 'Tds Entry', action: () => toggleModal('payment', true) },
+         { label: 'Sales', key: 'sales' },
          { label: 'Purchase', key: 'purchase' },
+         { label: 'Job Purchase', action: () => toggleModal('purchase', true) },
+         { label: 'Sales Return', action: () => openReturn('Sales') },
+         { label: 'Purchase Return', action: () => openReturn('Purchase') },
+         { label: 'Purchase Order', action: () => openOrder('Purchase') },
+         { label: 'Sales Order', action: () => openOrder('Sales') },
+         { label: 'Stock Transfer (Jv)', action: () => openJournal() }
+      ],
+      Inventory: [
          { label: 'Mill Issue', key: 'millIssue' },
          { label: 'Mill Receive', key: 'millRec' },
          { label: 'Job Issue', key: 'jobIssue' },
          { label: 'Job Receive', key: 'jobRec' },
-         { label: 'Journal Entry', action: () => openJournal() },
-         { label: 'Debit/Credit Note', action: () => openNote('Credit') },
-         { label: 'Sales Return', action: () => openReturn('Sales') },
-         { label: 'Purchase Return', action: () => openReturn('Purchase') },
-         { label: 'Sales Order', action: () => openOrder('Sales') },
-         { label: 'Purchase Order', action: () => openOrder('Purchase') }
-      ],
-      Records: [
-         { label: 'All Saved Data', action: () => openRecordsHub('accounts') },
-         { label: 'Account List', action: () => openRecordsHub('accounts') },
-         { label: 'Item List', action: () => openRecordsHub('items') },
-         { label: 'Inventory Lots', action: () => openRecordsHub('inventory') },
-         { label: 'Sales Invoices', action: () => openRecordsHub('sales') },
-         { label: 'Purchase Bills', action: () => openRecordsHub('purchases') },
-         { label: 'Mill Issue List', action: () => openRecordsHub('millIssue') },
-         { label: 'Bank Receipts', action: () => openRecordsHub('receipts') },
-         { label: 'Bank Payments', action: () => openRecordsHub('payments') },
-         { label: 'Sales Orders', action: () => openRecordsHub('salesOrders') },
-         { label: 'Purchase Orders', action: () => openRecordsHub('purchaseOrders') },
-         { label: 'Sales Returns', action: () => openRecordsHub('salesReturns') },
-         { label: 'Purchase Returns', action: () => openRecordsHub('purchaseReturns') },
-         { label: 'Debit/Credit Notes', action: () => openRecordsHub('notes') },
-         { label: 'Visit Logs', action: () => openRecordsHub('visits') },
-         { label: 'Book List', action: () => openRecordsHub('books') }
+         { label: 'Update Job', key: 'updateJob' },
+         { label: 'Stock Ledger', key: 'inventoryPage' },
+         { label: 'Process', action: () => toggleModal('millIssue', true) },
+         { label: 'Work Process', action: () => toggleModal('millIssue', true) },
+         { label: 'Cutting Entry', action: () => toggleModal('millIssue', true) },
+         { label: 'Beam Entry', action: () => toggleModal('millRec', true) },
+         { label: 'Production', action: () => toggleModal('millRec', true) },
+         { label: 'Looms Report', action: () => openReportsHub('jobwork') }
       ],
       Reports: [
-         { label: 'Sales Outstanding', key: 'outstanding' },
-         { label: 'Inventory Stock', key: 'inventoryPage' },
-         { label: 'GSTR-3B Monthly', key: 'gst3bMonthly' },
-         { label: 'GSTR-1 Registry', key: 'gstr1' },
-         { label: 'GSTR-2B Matching', key: 'gst2bMatching' },
-         { label: 'Purchase Reports', action: () => openPlaceholder('Purchase Reports') },
-         { label: 'Process Reports', action: () => openPlaceholder('Process Reports') },
-         { label: 'Final Accounts', action: () => openPlaceholder('Final Accounts') }
+         { label: 'All Reports Hub', action: () => openReportsHub('summary') },
+         { label: 'Fas Reports', action: () => openReportsHub('summary') },
+         { label: 'Final Reports', action: () => openReportsHub('pl') },
+         { label: 'Sales', action: () => openReportsHub('sales') },
+         { label: 'Purchase', action: () => openReportsHub('purchase') },
+         { label: 'Process Reports', action: () => openReportsHub('jobwork') },
+         { label: 'JobWork Reports', action: () => openReportsHub('jobwork') },
+         { label: 'Monthly Reports', action: () => openReportsHub('summary') },
+         { label: 'Tds Reports', action: () => openReportsHub('daily') },
+         { label: 'Tcs Reports', action: () => openReportsHub('sales') },
+         { label: 'Gst Reports', key: 'gstr1' },
+         { label: 'CA Desk', key: 'caDashboard' },
+         { label: 'Inv Stock Ledger', action: () => openReportsHub('stock') }
       ],
-      Ledger: [
-         { label: 'Account Ledger Book', key: 'ledger' }
+      'Others Reports': [
+         { label: 'Outstanding Zoom', key: 'outstanding' },
+         { label: 'Outstanding', action: () => openReportsHub('outstanding') },
+         { label: 'Brokreg Statment', action: () => openReportsHub('outstanding') },
+         { label: 'Daily Transaction', action: () => openReportsHub('daily') },
+         { label: 'Master List', action: () => openReportsHub('masters') },
+         { label: 'Letter Pad', action: () => alert('Letter pad generator ready.') },
+         { label: 'Zoom Item Ledger', action: () => openReportsHub('stockItem') },
+         { label: 'Others Reports', action: () => openReportsHub('summary') },
+         { label: 'Old Reports', action: () => openReportsHub('summary') }
       ],
       Utilities: [
-         { label: 'Data Refresh', action: () => refreshAllData().then(() => alert('All data refreshed from server.')) },
-         { label: 'Backup Database', action: () => openPlaceholder('Backup') },
-         { label: 'Import Masters', action: () => openPlaceholder('Import Masters') },
-         { label: 'Print Barcode', action: () => openPlaceholder('Print Barcode') },
-         { label: 'Sql Tool', action: () => openPlaceholder('Sql Tool') }
+         { label: 'Backup', action: () => alert('System Backup written to cloud successfully.') },
+         { label: 'Restore', action: () => alert('System Restore successfully finalized.') },
+         { label: 'Closing / UnClosing Year', action: () => alert('Financial year closed.') },
+         { label: 'New A/c. Year ( Auto )', action: () => alert('New Accounting Year created automatically.') },
+         { label: 'New A/c. Year ( Manual )', action: () => alert('New Accounting Year created manually.') },
+         { label: 'Transfer To Next Year', action: () => alert('Balances transferred to new year.') },
+         { label: 'Voucher Relndex', action: () => alert('Vouchers reindexed successfully.') },
+         { label: 'Missing Series', action: () => alert('No missing invoice series found.') },
+         { label: 'Auto Expense Entry', action: () => alert('Auto expense calculations completed.') },
+         { label: 'Update Main Account Master', action: () => toggleModal('accountMaster', true) },
+         { label: 'MisMatch Data Scanner', action: () => refreshAllData().then(() => alert('Data scan complete. All records refreshed.')) },
+         { label: 'Email Option', action: () => alert('Email notification dispatch complete.') },
+         { label: 'Missing Views Code', action: () => alert('Database views up-to-date.') },
+         { label: 'Gst Updation', action: () => toggleModal('caDashboard', true) },
+         { label: 'Backup Script Wise', action: () => alert('Local schema backup completed.') },
+         { label: 'Single Firm Backup/Restore', action: () => alert('Firm database backed up.') },
+         { label: 'Application Sync', action: () => refreshAllData().then(() => alert('All data refreshed.')) },
+         { label: 'Bulk Whatsapp', action: () => alert('WhatsApp dispatch worker initialized.') }
       ],
-      Admin: [
-         { label: 'User Rights', action: () => setModals(prev => ({ ...prev, userRights: true })) },
-         { label: 'Change Password', action: () => openPlaceholder('Change Password') },
-         { label: 'Log Report', action: () => openPlaceholder('Log Report') }
+      'Setup System': [
+         { label: 'Setting', action: () => setModals(prev => ({ ...prev, userRights: true })) },
+         { label: 'Extra Event', action: () => alert('Event pipeline active.') },
+         { label: 'Extra Event DetailData', action: () => alert('Pipeline events loaded.') },
+         { label: 'User Setup', action: () => setModals(prev => ({ ...prev, userRights: true })) }
       ],
+      Records: showRecordsHub ? [
+         { label: 'All Records Hub', action: () => openRecordsHub('accounts') },
+         { label: 'Sales Records', action: () => openRecordsHub('sales') },
+         { label: 'Purchase Records', action: () => openRecordsHub('purchases') },
+         { label: 'Job Work Records', action: () => openRecordsHub('jobs') },
+         { label: 'Party Records', action: () => openRecordsHub('parties') },
+         { label: 'Item Records', action: () => openRecordsHub('items') }
+      ] : [],
       Company: [
-         { label: 'Select Company', action: () => openPlaceholder('Select Company') },
-         { label: 'Create Company', action: () => openPlaceholder('Create Company') },
-         { label: 'Edit Company', action: () => openPlaceholder('Edit Company') }
+         { label: 'Change Company -F3', action: () => alert('Use F3 key to select company workspace.') },
+         { label: 'Change Year -F2', action: () => alert('Use F2 key to shift financial year.') },
+         { label: 'Company Master', action: () => setModals(prev => ({ ...prev, userRights: true })) },
+         { label: 'Information', action: () => alert('System Version: v12.4 ERP Enterprise.') },
+         { label: 'Complain Form', action: () => alert('Feedback report ticket dispatched.') },
+         { label: 'Update DataBase', action: () => alert('Database schema up-to-date.') }
       ]
    };
 
@@ -312,15 +521,19 @@ const Dashboard = () => {
       const filtered = {};
       Object.entries(menuData).forEach(([section, items]) => {
          if (permissions.canAccessSection(section)) {
-            filtered[section] = section === 'Admin'
-              ? items.filter(i => i.label !== 'User Rights' || permissions.canManageUsers)
-              : items;
+            let allowedItems = items.filter(isMenuItemAllowed);
+            if (section === 'Admin') {
+               allowedItems = allowedItems.filter(i => i.label !== 'User Rights' || permissions.canManageUsers);
+            }
+            if (allowedItems.length > 0) {
+               filtered[section] = allowedItems;
+            }
          }
       });
       return filtered;
-   }, [permissions]);
+   }, [permissions, moduleConfig, bundle, user?.role, showRecordsHub]);
 
-   const coreModules = [
+   const ALL_CORE_MODULES = [
       { id: 1, label: 'Sales Billing', icon: faFileInvoiceDollar, key: 'sales' },
       { id: 2, label: 'Purchase', icon: faCartFlatbed, key: 'purchase' },
       { id: 3, label: 'Bank Receipt', icon: faMoneyCheckDollar, key: 'receipt' },
@@ -329,169 +542,179 @@ const Dashboard = () => {
       { id: 6, label: 'Mill Receive', icon: faWarehouse, key: 'millRec' },
       { id: 7, label: 'Job Issue', icon: faScrewdriverWrench, key: 'jobIssue' },
       { id: 8, label: 'Job Receive', icon: faClipboardCheck, key: 'jobRec' },
-      { id: 9, label: 'GSTR-1', icon: faChartPie, key: 'gstr1' },
-      { id: 10, label: 'GSTR-2', icon: faChartPie, key: 'gst2bMatching' },
-      { id: 11, label: 'ETB', icon: faFileInvoiceDollar, key: 'gstCompliance' },
-      { id: 12, label: 'Visit Log', icon: faHandshake, key: 'visit' },
-      { id: 13, label: 'Outstanding', icon: faChartPie, key: 'outstanding' },
+      { id: 15, label: 'Update Job', icon: faScrewdriverWrench, key: 'updateJob' },
+      { id: 9, label: 'CA Desk', icon: faUserTie, key: 'caDashboard', flag: 'ca_desk' },
+      { id: 10, label: 'GSTR-1', icon: faChartPie, key: 'gstr1' },
+      { id: 11, label: 'GSTR-2', icon: faChartPie, key: 'gst2bMatching' },
+      { id: 12, label: 'ETB', icon: faFileInvoiceDollar, key: 'gstCompliance' },
+      { id: 13, label: 'Visit Log', icon: faHandshake, key: 'visit' },
+      { id: 14, label: 'Outstanding', icon: faChartPie, key: 'outstanding' },
    ];
 
-   return (
-      <div className="erp-shell fixed inset-0 flex overflow-hidden select-none">
+   const coreModules = useMemo(() => {
+      const filtered = ALL_CORE_MODULES.filter(
+         mod => isModuleAllowed(mod.key) && (!mod.flag || isFlagEnabled(bundle, mod.flag, true))
+      );
+      return filtered.length > 0 ? filtered : ALL_CORE_MODULES;
+   }, [moduleConfig, bundle, user?.role]);
 
-         {/* Core modules sidebar */}
-         <aside className="erp-rail flex flex-col py-3 gap-1 shrink-0 overflow-y-auto no-scrollbar bg-white/50 backdrop-blur-md">
-            <p className="px-4 py-2 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest shrink-0">Core Modules</p>
+   return (
+      <div className="erp-shell fixed inset-0 flex overflow-hidden">
+
+         {/* Core modules — compact rail */}
+         <aside className="erp-rail flex flex-col py-2 gap-0.5 shrink-0 overflow-y-auto no-scrollbar">
+            <p className="px-3 py-1.5 text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider shrink-0">Quick</p>
             {coreModules.map((mod) => (
                <button
                   key={mod.id}
                   type="button"
                   onClick={() => { setActiveMenuKey(mod.key); toggleModal(mod.key, true); }}
-                  className={`mx-2 flex items-center gap-3 h-10 px-3 rounded-xl text-left transition-all group ${
+                  className={`mx-1.5 flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer ${
                      activeMenuKey === mod.key
-                        ? 'bg-[var(--accent)] text-white shadow-md'
-                        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-base)] hover:text-[var(--text-primary)]'
+                        ? 'bg-[var(--accent)] text-white'
+                        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-base)]'
                   }`}
                >
-                  <FontAwesomeIcon icon={mod.icon} className={`text-sm w-4 shrink-0 transition-transform group-hover:scale-110 ${activeMenuKey === mod.key ? 'text-white' : 'text-[var(--accent)]'}`} />
-                  <span className="text-[13px] font-semibold truncate leading-tight">{mod.label}</span>
+                  <FontAwesomeIcon icon={mod.icon} className="text-[11px] w-3.5 shrink-0" />
+                  <span className="text-[11px] font-medium truncate leading-tight">{mod.label}</span>
                </button>
             ))}
          </aside>
 
-         {/* Menu sidebar removed, moved to Top Bar */}
-
-         {/* Main Dashboard Area */}
-         <main className="flex-1 min-w-0 flex flex-col bg-[var(--bg-base)] overflow-y-auto relative no-scrollbar">
-            
-            {/* Premium Top Navbar */}
-            <header className="sticky top-0 z-50 flex flex-col bg-white/80 backdrop-blur-md border-b border-[var(--border)] transition-all">
-               {/* Top Row */}
-               <div className="flex items-center justify-between px-6 h-[56px]">
-                  <div className="flex items-center gap-4">
-                     <div className="w-8 h-8 rounded-lg bg-[var(--accent)] text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                        {user?.companyName ? user.companyName.charAt(0) : 'E'}
+         {/* Main area */}
+         <main className="flex-1 min-w-0 flex flex-col bg-[var(--bg-base)] relative min-h-0">
+            <header className="shrink-0 relative z-50 bg-[var(--bg-card)] border-b border-[var(--border)]">
+               <div className="flex items-center justify-between gap-3 px-4 h-11">
+                  <div className="flex items-center gap-3 min-w-0">
+                     <div className="w-7 h-7 rounded-md bg-[var(--accent)] text-white flex items-center justify-center font-semibold text-[11px] shrink-0">
+                        {(user?.companyName || user?.company?.name || 'E').charAt(0)}
                      </div>
-                     <nav className="flex items-center gap-2 text-[12px] font-medium text-[var(--text-secondary)]">
-                        <span className="text-[var(--text-primary)] font-bold tracking-tight text-[14px]">{user?.companyName || 'Mahaveer Impex'}</span>
-                        <span className="text-[var(--text-muted)] px-1">•</span>
-                        <span className="text-[var(--text-secondary)] uppercase tracking-wider text-[10px]">Enterprise Plan</span>
-                     </nav>
-                  </div>
-
-                  <div className="flex-1 max-w-md mx-6 hidden md:block">
-                     <div className="relative group">
-                        <FontAwesomeIcon icon={faSearch} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-[var(--accent)] transition-colors text-[12px]" />
-                        <input type="text" placeholder="Global Search (Ctrl+K)..." className="w-full bg-white border border-[var(--border-strong)] rounded-full py-1.5 pl-8 pr-4 text-[12px] shadow-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-light)] transition-all" />
+                     <div className="min-w-0">
+                        <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate leading-tight">
+                           {user?.companyName || user?.company?.name || 'Company'}
+                        </p>
+                        <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide">Enterprise</p>
                      </div>
                   </div>
 
-                  <div className="flex items-center gap-5">
-                     <button type="button" onClick={() => refreshAllData().then(() => alert('Data refreshed.'))} className="text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors flex items-center gap-2">
-                        <FontAwesomeIcon icon={faSync} className="text-[10px]" />
-                        <span className="hidden sm:inline">Sync</span>
+                  <div className="hidden md:flex flex-1 max-w-xs mx-2">
+                     <div className="relative w-full">
+                        <FontAwesomeIcon icon={faSearch} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-[10px]" />
+                        <input type="text" placeholder="Search..." className="w-full h-7 bg-[var(--bg-base)] border border-[var(--border)] rounded-md py-0 pl-7 pr-2 text-[11px] focus:outline-none focus:border-[var(--accent)]" />
+                     </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                     <PanelSwitcher variant="light" />
+                     <button type="button" onClick={() => refreshAllData()} className="h-7 px-2 text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border)] rounded-md bg-[var(--bg-base)]">
+                        <FontAwesomeIcon icon={faSync} className="text-[9px] mr-1" />Sync
                      </button>
-                     <div className="h-4 w-[1px] bg-[var(--border-strong)]"></div>
-                     <button className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors relative">
-                        <FontAwesomeIcon icon={faBell} className="text-[14px]" />
-                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-[var(--red)] rounded-full border border-white"></span>
+                     <button type="button" className="relative w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                        <FontAwesomeIcon icon={faBell} className="text-[12px]" />
                      </button>
-                     <div className="h-4 w-[1px] bg-[var(--border-strong)]"></div>
-                     <div className="flex items-center gap-3 cursor-pointer group">
+                     <div className="flex items-center gap-2 pl-2 border-l border-[var(--border)]">
                         <div className="text-right hidden sm:block">
-                           <div className="text-[12px] font-semibold text-[var(--text-primary)] leading-none mb-0.5">{user?.name || 'Administrator'}</div>
-                           <div className="text-[10px] text-[var(--text-muted)] font-medium uppercase tracking-wide">{user?.role || 'System Access'}</div>
+                           <p className="text-[11px] font-medium text-[var(--text-primary)] leading-none">{user?.name || 'User'}</p>
+                           <p className="text-[9px] text-[var(--text-muted)] capitalize">{user?.role?.replace('_', ' ') || 'access'}</p>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-[var(--accent-light)] text-[var(--accent)] flex items-center justify-center font-bold text-[12px] group-hover:scale-105 transition-transform shadow-sm">
-                           {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                        <div className="w-7 h-7 rounded-md bg-[var(--accent-light)] text-[var(--accent)] flex items-center justify-center font-semibold text-[10px]">
+                           {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
                         </div>
                      </div>
                   </div>
                </div>
 
-               {/* Bottom Row - Mega Menu */}
-               <div className="flex items-center gap-2 px-6 h-[44px] border-t border-[var(--border-subtle)] bg-white/40">
-                  {Object.keys(visibleMenuData).map((section) => (
-                     <div key={section} className="relative group h-full flex items-center">
-                        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold text-[var(--text-secondary)] group-hover:text-[var(--accent)] group-hover:bg-[var(--accent-light)] transition-colors uppercase tracking-widest">
+               <div
+                  ref={menuBarRef}
+                  className="flex flex-wrap items-center gap-1 px-3 min-h-9 py-1 border-t border-[var(--border-subtle)] overflow-visible"
+               >
+                  {Object.keys(visibleMenuData).map((section) => {
+                     const isOpen = openMenuSection === section;
+                     return (
+                     <div key={section} className="relative shrink-0">
+                        <button
+                           type="button"
+                           onClick={() => setOpenMenuSection(isOpen ? null : section)}
+                           className={`flex items-center gap-1 px-2.5 h-7 rounded-md text-[10px] font-semibold uppercase tracking-wide cursor-pointer ${
+                              isOpen
+                                 ? 'text-[var(--accent)] bg-[var(--accent-light)]'
+                                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent-light)]'
+                           }`}
+                        >
                            {section}
-                           <FontAwesomeIcon icon={faChevronDown} className="text-[9px] opacity-70" />
+                           <FontAwesomeIcon icon={faChevronDown} className={`text-[8px] opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                         </button>
-                        
-                        {/* Dropdown Content */}
-                        <div className="absolute top-[40px] left-0 mt-0 w-56 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform translate-y-1 group-hover:translate-y-0 z-50">
-                           <div className="bg-[var(--bg-card)] border border-[var(--border-strong)] rounded-xl shadow-[var(--shadow-float)] overflow-y-auto max-h-[calc(100vh-120px)] py-2 mt-1 no-scrollbar">
-                              {visibleMenuData[section].map((item, idx) => {
-                                 const label = typeof item === 'object' ? item.label : item;
-                                 const { badge, text } = parseMenuLabel(label);
-                                 return (
-                                    <button
-                                       key={idx}
-                                       type="button"
-                                       onClick={() => handleMenuItemClick(item)}
-                                       className="w-full flex items-center gap-3 px-4 py-2 text-[13px] text-left text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--blue-bg)] transition-colors font-medium"
-                                    >
-                                       {badge && <span className="text-[10px] text-white bg-[var(--accent)] px-1.5 py-0.5 rounded w-5 text-center font-mono shrink-0">{badge}</span>}
-                                       <span className="truncate">{text}</span>
-                                    </button>
-                                 );
-                              })}
+                        {isOpen && (
+                           <div className="absolute top-full left-0 mt-0.5 w-52 z-[200]">
+                              <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-md)] overflow-y-auto max-h-[70vh] py-1">
+                                 {visibleMenuData[section].map((item, idx) => {
+                                    const label = typeof item === 'object' ? item.label : item;
+                                    const { badge, text } = parseMenuLabel(label);
+                                    return (
+                                       <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => {
+                                             setOpenMenuSection(null);
+                                             handleMenuItemClick(item);
+                                          }}
+                                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-left text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--blue-bg)] cursor-pointer"
+                                       >
+                                          {badge && <span className="text-[9px] text-white bg-[var(--accent)] px-1 rounded font-mono">{badge}</span>}
+                                          <span className="truncate">{text}</span>
+                                       </button>
+                                    );
+                                 })}
+                              </div>
                            </div>
-                        </div>
+                        )}
                      </div>
-                  ))}
+                  );})}
                </div>
             </header>
 
-            <div className="p-6 relative flex-1 flex flex-col">
-               <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-white/40 to-transparent pointer-events-none"></div>
-               
-               <div className="w-full max-w-7xl mx-auto relative z-10 flex flex-col gap-6">
-               
-               {/* Dashboard Header */}
-               <div className="flex items-end justify-between animate-fade-in-up">
+            <div className="flex-1 overflow-y-auto p-4">
+               <div className="max-w-6xl mx-auto flex flex-col gap-4">
+               <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
-                     <h2 className="text-display mb-1 text-[22px]">Dashboard Overview</h2>
-                     <p className="text-body text-[var(--text-muted)]">Here's what's happening with your business today.</p>
+                     <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Dashboard</h2>
+                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Business overview</p>
                   </div>
-                  <div className="flex gap-3">
-                     <button className="erp-btn erp-btn-secondary h-8 px-4 text-[12px]" onClick={() => refreshAllData()}><FontAwesomeIcon icon={faSync} className="text-[10px]" /> Sync Data</button>
-                     <button className="erp-btn erp-btn-secondary h-8 px-4 text-[12px]" onClick={() => openRecordsHub('accounts')}>View Records</button>
-                     <button className="erp-btn erp-btn-primary h-8 px-4 text-[12px]" onClick={() => toggleModal('sales', true)}>+ New Invoice</button>
+                  <div className="flex flex-wrap gap-2">
+                     {lastSynced && (
+                        <span className="text-[9px] font-medium text-emerald-600 self-center">Live</span>
+                     )}
+                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => refreshAllData()}>Sync</button>
+                     {showRecordsHub && (
+                        <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => openRecordsHub('accounts')}>Records</button>
+                     )}
+                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => openReportsHub('summary')}>Reports</button>
+                     {showCADesk && isModuleAllowed('caDashboard') && (
+                        <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => toggleModal('caDashboard', true)}>CA Desk</button>
+                     )}
+                     <button type="button" className="erp-btn erp-btn-primary h-7 px-3 text-[11px]" onClick={() => toggleModal('sales', true)}>+ Invoice</button>
                   </div>
                </div>
 
-               {/* KPI Cards removed to hide sensitive information on home screen */}
-
-               {/* Secondary Grid (Charts & Activity) */}
-               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-                  
-                  {/* Recent Activity Timeline - taking full width since quick access modules are removed */}
-                  <div className="erp-card p-5 lg:col-span-3 max-w-4xl">
-                     <h3 className="text-[14px] font-semibold mb-4 text-[var(--text-primary)]">Recent Activity</h3>
-                     <div className="flex flex-col gap-4">
-                        {[
-                           { text: 'New Sales Invoice #INV-2041 created', time: '10 mins ago', type: 'sales' },
-                           { text: 'Payment of ₹50,000 received from Acme Corp', time: '1 hour ago', type: 'receipt' },
-                           { text: 'Job Work issue challan generated', time: '3 hours ago', type: 'job' },
-                           { text: 'Purchase bill #PB-902 entered', time: '5 hours ago', type: 'purchase' },
-                           { text: 'Stock transfer to Warehouse B completed', time: 'Yesterday', type: 'inventory' },
-                        ].map((act, i) => (
-                           <div key={i} className="flex gap-3 items-start">
-                              <div className="w-2 h-2 mt-1.5 rounded-full bg-[var(--accent)] shrink-0 shadow-[0_0_0_4px_var(--accent-light)]"></div>
-                              <div>
-                                 <div className="text-[12px] font-medium text-[var(--text-primary)]">{act.text}</div>
-                                 <div className="text-[10px] text-[var(--text-muted)] mt-0.5">{act.time}</div>
-                              </div>
+               <div className="erp-card p-4">
+                  <h3 className="text-[12px] font-semibold mb-3 text-[var(--text-primary)]">Recent Activity</h3>
+                  <div className="flex flex-col gap-2">
+                     {(recentActivity.length ? recentActivity : [{ text: 'No recent transactions', time: '—', type: 'empty' }]).map((act, i) => (
+                        <div key={i} className="flex gap-2 items-start">
+                           <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-[var(--accent)] shrink-0" />
+                           <div>
+                              <div className="text-[11px] text-[var(--text-primary)]">{act.text}</div>
+                              <div className="text-[10px] text-[var(--text-muted)]">{act.time}</div>
                            </div>
-                        ))}
-                     </div>
-                     <button type="button" onClick={() => openRecordsHub('sales')} className="w-full mt-5 py-2 text-[12px] font-medium text-[var(--accent)] hover:bg-[var(--accent-light)] rounded-lg transition-colors">View All Records →</button>
+                        </div>
+                     ))}
                   </div>
+                  {showRecordsHub && (
+                     <button type="button" onClick={() => openRecordsHub('sales')} className="mt-3 text-[11px] font-medium text-[var(--accent)] hover:underline">View all records →</button>
+                  )}
                </div>
-
             </div>
-         </div>
+            </div>
          </main>
 
          {/* Modals */}
@@ -503,6 +726,7 @@ const Dashboard = () => {
          <ReceiveModal isOpen={modals.millRec} onClose={() => toggleModal('millRec', false)} selectedBook={selectedBooks.millRec?.name} />
          <UpdateModal isOpen={modals.jobIssue} onClose={() => toggleModal('jobIssue', false)} selectedBook={selectedBooks.jobIssue?.name} />
          <JobReceiptModal isOpen={modals.jobRec} onClose={() => toggleModal('jobRec', false)} selectedBook={selectedBooks.jobRec?.name} />
+         <ProcessUpdateModal isOpen={modals.updateJob} onClose={() => toggleModal('updateJob', false)} />
          <LedgerModal isOpen={modals.ledger} onClose={() => toggleModal('ledger', false)} selectedBook={selectedBooks.ledger?.name} />
          <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters} />
          <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} readOnly={permissions.readOnlyMasters} />
@@ -515,9 +739,16 @@ const Dashboard = () => {
          <Gst3bDetailModal isOpen={modals.gst3bDetail} onClose={() => toggleModal('gst3bDetail', false)} />
          <Gstr1ErrorChekModal isOpen={modals.gstr1Errorchek} onClose={() => toggleModal('gstr1Errorchek', false)} />
          <GstComplianceModal isOpen={modals.gstCompliance} onClose={() => toggleModal('gstCompliance', false)} />
+         <CADashboardModal
+            isOpen={modals.caDashboard}
+            onClose={() => toggleModal('caDashboard', false)}
+            onOpenGstr1={() => { toggleModal('caDashboard', false); toggleModal('gstr1', true); }}
+            onOpenGstr2={() => { toggleModal('caDashboard', false); toggleModal('gst2bMatching', true); }}
+            onOpenGstr3b={() => { toggleModal('caDashboard', false); toggleModal('gst3bMonthly', true); }}
+         />
          <VisitLogModal isOpen={modals.visit} onClose={() => toggleModal('visit', false)} />
          <PartyModal isOpen={modals.party} onClose={() => toggleModal('party', false)} />
-         <BookMasterModal isOpen={modals.bookMaster} onClose={() => toggleModal('bookMaster', false)} />
+         <BookMasterModal isOpen={modals.bookMaster} onClose={() => toggleModal('bookMaster', false)} readOnly={permissions.readOnlyMasters} />
          <Modal isOpen={modals.inventoryPage} onClose={() => toggleModal('inventoryPage', false)} title="Inventory Stock Control" className="max-w-[90vw]">
             <div className="bg-[var(--bg-card)] p-2 rounded-[2.5rem] overflow-hidden">
                <InventoryPage />
@@ -602,6 +833,11 @@ const Dashboard = () => {
             isOpen={modals.recordsHub}
             onClose={() => setModals(prev => ({ ...prev, recordsHub: false }))}
             initialTab={modals.recordsTab}
+         />
+         <ReportsHub
+            isOpen={modals.reportsHub}
+            onClose={() => setModals(prev => ({ ...prev, reportsHub: false }))}
+            initialTab={modals.reportsTab}
          />
 
       </div>

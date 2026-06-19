@@ -89,6 +89,7 @@ export const normalizeUser = (user) => {
   return {
     ...user,
     id: user._id || user.id,
-    companyRole: user.companyRole || 'owner'
+    companyRole: user.companyRole || 'owner',
+    companyName: user.companyName || user.company?.name || user.settings?.legalName || ''
   };
 };

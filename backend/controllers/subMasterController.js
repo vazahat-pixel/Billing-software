@@ -1,4 +1,5 @@
 const SubMaster = require('../models/SubMaster');
+const SUB_MASTER_TYPES = SubMaster.SUB_MASTER_TYPES || [];
 
 exports.createSubMaster = async (req, res) => {
   try {
@@ -7,6 +8,13 @@ exports.createSubMaster = async (req, res) => {
 
     if (!type || !name) {
       return res.status(400).json({ success: false, message: 'Type and Name are required' });
+    }
+
+    if (!SUB_MASTER_TYPES.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid sub-master type "${type}". Allowed: ${SUB_MASTER_TYPES.join(', ')}`
+      });
     }
 
     const subMaster = await SubMaster.create({

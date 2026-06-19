@@ -1,74 +1,176 @@
-import React, { useEffect } from 'react';
-import { CreditCard, Calendar, Clock, ArrowUpRight, Zap } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CreditCard, Calendar, Clock, ArrowUpRight, Zap, X, TrendingUp, RefreshCw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
 
-const Subscriptions = () => {
-    const { subscriptions, fetchSubscriptions, loading } = useAdminStore();
+const statusColors = { active: '#10b981', suspended: '#ef4444', expired: '#f59e0b' };
 
-    useEffect(() => {
-        fetchSubscriptions();
-    }, [fetchSubscriptions]);
+const Subscriptions = () => {
+    const { subscriptions, fetchSubscriptions, updateSubscription, plans, fetchPlans } = useAdminStore();
+    const [editingSub, setEditingSub] = useState(null);
+    const [subForm, setSubForm] = useState({ planId: '', billingCycle: 'monthly', endDate: '', status: 'active' });
+
+    useEffect(() => { fetchSubscriptions(); fetchPlans(); }, [fetchSubscriptions, fetchPlans]);
+
+    const startEdit = (sub) => {
+        setEditingSub(sub);
+        setSubForm({
+            planId: sub.planId?._id || '',
+            billingCycle: sub.billingCycle || 'monthly',
+            endDate: sub.endDate ? new Date(sub.endDate).toISOString().substring(0, 10) : '',
+            status: sub.status || 'active'
+        });
+    };
+
+    const handleSave = async (e) => {
+        e.preventDefault();
+        try {
+            await updateSubscription(editingSub.companyId?._id, subForm);
+            setEditingSub(null);
+        } catch (err) { alert(err.message || 'Failed to update'); }
+    };
+
+    const daysLeft = (endDate) => {
+        const diff = Math.ceil((new Date(endDate) - new Date()) / 86400000);
+        return diff;
+    };
 
     return (
-        <div className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {subscriptions.map((sub) => (
-                    <div key={sub._id} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:shadow-xl hover:shadow-indigo-100 transition-all duration-500">
-                        <div className="p-10 border-b border-slate-50 relative">
-                            <div className="absolute top-8 right-8 p-3 bg-indigo-50 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-500">
-                                <Zap size={24} />
-                            </div>
-                            <p className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-2">{sub.planId?.name} Plan</p>
-                            <h3 className="text-2xl font-black text-slate-900 mb-1">{sub.companyId?.name}</h3>
-                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${
-                                sub.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100'
-                            }`}>
-                                <Clock size={10} /> {sub.status}
-                            </div>
-                        </div>
-
-                        <div className="p-10 flex-1 space-y-6">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <p className="text-xs font-bold text-slate-400 uppercase">Billing Cycle</p>
-                                    <p className="font-black text-slate-800 capitalize">{sub.billingCycle}</p>
-                                </div>
-                                <div className="text-right space-y-1">
-                                    <p className="text-xs font-bold text-slate-400 uppercase">Price</p>
-                                    <p className="font-black text-slate-900">₹{sub.billingCycle === 'monthly' ? sub.planId?.priceMonthly : sub.planId?.priceYearly}</p>
-                                </div>
-                            </div>
-
-                            <div className="p-6 bg-slate-50 rounded-[1.5rem] space-y-4">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-slate-500 font-medium">Started On</span>
-                                    <span className="font-bold text-slate-800">{new Date(sub.startDate).toLocaleDateString()}</span>
-                                </div>
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-slate-500 font-medium">Next Renewal</span>
-                                    <span className="font-bold text-slate-800">{new Date(sub.endDate).toLocaleDateString()}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="px-10 pb-10">
-                            <button className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-colors">
-                                Manage Billing <ArrowUpRight size={18} />
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-            
-            {subscriptions.length === 0 && (
-                <div className="bg-white rounded-[3rem] p-20 text-center border-2 border-dashed border-slate-200">
-                    <div className="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-6 text-slate-300">
-                        <CreditCard size={40} />
-                    </div>
-                    <h3 className="text-xl font-black text-slate-900 mb-2">No Active Subscriptions</h3>
-                    <p className="text-slate-500 max-w-sm mx-auto">Active subscriptions will appear here once companies start choosing their plans.</p>
+        <div className="space-y-5">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-lg font-black text-white">Subscriptions</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">{subscriptions.length} active billing cycles</p>
                 </div>
-            )}
+            </motion.div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                {subscriptions.map((sub, idx) => {
+                    const days = daysLeft(sub.endDate);
+                    const isExpiring = days <= 30;
+                    return (
+                        <motion.div
+                            key={sub._id}
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.06 }}
+                            whileHover={{ y: -3 }}
+                            className="sub-card"
+                        >
+                            <div className="sub-card__glow" style={{ opacity: isExpiring ? 0.15 : 0.08 }} />
+
+                            <div className="flex items-start justify-between mb-4">
+                                <div>
+                                    <span className="sub-plan-tag">{sub.planId?.name || 'No'} Plan</span>
+                                    <h3 className="text-base font-black text-white mt-1">{sub.companyId?.name || 'Unknown'}</h3>
+                                </div>
+                                <div className="sub-status-dot" style={{ background: statusColors[sub.status] || '#94a3b8', boxShadow: `0 0 8px ${statusColors[sub.status] || '#94a3b8'}` }} />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                <div className="sub-info-box">
+                                    <p className="sub-info-label">Billing</p>
+                                    <p className="sub-info-val capitalize">{sub.billingCycle}</p>
+                                </div>
+                                <div className="sub-info-box">
+                                    <p className="sub-info-label">Amount</p>
+                                    <p className="sub-info-val text-violet-400">
+                                        ₹{sub.billingCycle === 'monthly' ? sub.planId?.priceMonthly : sub.planId?.priceYearly}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="sub-dates">
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-600">Started</span>
+                                    <span className="text-slate-400 font-bold">{new Date(sub.startDate).toLocaleDateString('en-IN')}</span>
+                                </div>
+                                <div className="flex justify-between text-xs mt-1.5">
+                                    <span className="text-slate-600">Expires</span>
+                                    <span className={`font-bold ${isExpiring ? 'text-amber-400' : 'text-slate-400'}`}>
+                                        {new Date(sub.endDate).toLocaleDateString('en-IN')}
+                                        {isExpiring && <span className="ml-1 text-[10px] text-amber-500">({days}d left)</span>}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <button onClick={() => startEdit(sub)} className="sub-manage-btn">
+                                <RefreshCw size={13} /> Manage Billing <ArrowUpRight size={13} />
+                            </button>
+                        </motion.div>
+                    );
+                })}
+
+                {subscriptions.length === 0 && (
+                    <div className="col-span-full glass-card p-16 flex flex-col items-center justify-center text-center">
+                        <CreditCard size={40} className="text-slate-700 mb-4" />
+                        <h3 className="text-sm font-black text-slate-400">No Active Subscriptions</h3>
+                        <p className="text-xs text-slate-600 mt-1">Subscriptions appear here once companies are assigned a plan</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Edit Modal */}
+            <AnimatePresence>
+                {editingSub && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/75 backdrop-blur-xl z-50 flex items-center justify-center p-4"
+                        onClick={(e) => e.target === e.currentTarget && setEditingSub(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.92, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.92, y: 20 }}
+                            className="dark-modal"
+                        >
+                            <div className="dark-modal__header">
+                                <div>
+                                    <h3 className="dark-modal__title">Manage Billing</h3>
+                                    <p className="dark-modal__subtitle">{editingSub.companyId?.name}</p>
+                                </div>
+                                <button onClick={() => setEditingSub(null)} className="dark-modal__close"><X size={16} /></button>
+                            </div>
+                            <div className="dark-modal__body">
+                                <form onSubmit={handleSave} className="space-y-4">
+                                    <div>
+                                        <label className="dark-input__label">Subscription Plan</label>
+                                        <select className="dark-input" value={subForm.planId} onChange={e => setSubForm({ ...subForm, planId: e.target.value })}>
+                                            {plans.map(p => <option key={p._id} value={p._id}>{p.name} Plan</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="dark-input__label">Billing Cycle</label>
+                                            <select className="dark-input" value={subForm.billingCycle} onChange={e => setSubForm({ ...subForm, billingCycle: e.target.value })}>
+                                                <option value="monthly">Monthly</option>
+                                                <option value="yearly">Yearly</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="dark-input__label">Status</label>
+                                            <select className="dark-input" value={subForm.status} onChange={e => setSubForm({ ...subForm, status: e.target.value })}>
+                                                <option value="active">Active</option>
+                                                <option value="suspended">Suspended</option>
+                                                <option value="expired">Expired</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="dark-input__label">Expiration Date</label>
+                                        <input type="date" className="dark-input" value={subForm.endDate} onChange={e => setSubForm({ ...subForm, endDate: e.target.value })} required />
+                                    </div>
+                                    <button type="submit" className="dark-submit-btn w-full">
+                                        <RefreshCw size={14} /> Apply Changes
+                                    </button>
+                                </form>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

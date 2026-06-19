@@ -9,8 +9,7 @@ const AccountingEntrySchema = new mongoose.Schema({
   },
   entryNo: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
   entryDate: {
     type: Date,
@@ -111,6 +110,7 @@ AccountingEntrySchema.index({ companyId: 1, entryDate: 1 });
 AccountingEntrySchema.index({ companyId: 1, voucherType: 1 });
 AccountingEntrySchema.index({ companyId: 1, isReversed: 1 });
 AccountingEntrySchema.index({ 'lines.ledgerId': 1 });
+AccountingEntrySchema.index({ entryNo: 1, companyId: 1 }, { unique: true });
 
 module.exports = mongoose.model('AccountingEntry', AccountingEntrySchema);
 

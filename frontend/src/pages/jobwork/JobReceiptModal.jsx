@@ -114,295 +114,282 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Embroidery Job Receive" className="max-w-[95vw] h-[90vh] p-0 overflow-hidden">
-      
-      {/* Dynamic Tab Navigation */}
-      <div className="flex border-b-2 border-black p-0 bg-white gap-0 shrink-0">
-         {['Job Receive', 'View Job Rec'].map(tab => (
+    <Modal isOpen={isOpen} onClose={onClose} title="Embroidery Job Receive" className="max-w-[95vw] h-[90vh] classic-erp-window p-0 border-0">
+      <div className="classic-erp-window flex flex-col h-full overflow-hidden">
+        {/* Title Bar */}
+        <div className="classic-erp-header shrink-0">
+          <span>Embroidery Job Receive [ {selectedBook || 'RECEIVE BOOK'} ]</span>
+          <button className="classic-erp-close-btn" onClick={onClose}>X</button>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="classic-erp-tabs shrink-0">
+          {['Job Receive', 'View Job Rec'].map(tab => (
             <button 
              key={tab}
              type="button"
              onClick={() => setActiveTab(tab)}
-             className={`px-8 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${
-                activeTab === tab 
-                   ? 'bg-black text-white' 
-                   : 'text-slate-400 hover:bg-slate-50'
-             }`}
+             className={`classic-erp-tab-button ${activeTab === tab ? 'active' : ''}`}
             >
               {tab}
             </button>
-         ))}
-      </div>
+          ))}
+        </div>
 
-      <div className="flex flex-col h-full overflow-hidden bg-white">
-        
-        {activeTab === 'Job Receive' ? (
-          <div className="flex-1 flex overflow-hidden">
-             {/* Left Form Column (70%) */}
-             <form onSubmit={handleSubmit} className="flex-[3] flex flex-col overflow-y-auto p-5 space-y-4 no-scrollbar">
-                
-                <div className="flex items-center gap-3">
-                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap">Receive Specs & Logistics</span>
-                   <div className="h-[2px] flex-1 bg-black" />
-                </div>
+        <div className="flex-1 flex flex-col overflow-hidden bg-[#d4d0c8] p-2">
+          {activeTab === 'Job Receive' ? (
+            <div className="flex-1 flex overflow-hidden gap-2">
+               {/* Left Form Column (70%) */}
+               <form onSubmit={handleSubmit} className="flex-[3] flex flex-col overflow-y-auto space-y-2 no-scrollbar pb-16 relative">
+                  
+                  <div className="classic-erp-frame space-y-2">
+                     <div className="classic-erp-frame-title">Receive Specs & Logistics</div>
 
-                {/* Form Info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black uppercase text-black tracking-widest">Pending Embroidery Job Cards</label>
-                      <ERPSelect 
-                        className="w-full h-11 border-2 border-slate-100 focus:border-black font-bold text-black"
-                        value={selectedJobId}
-                        onChange={(e) => setSelectedJobId(e.target.value)}
-                        options={[
-                          { value: '', label: 'Select Job Card' },
-                          ...pendingJobs.map(j => ({
-                            value: j._id,
-                            label: `${j.jobCardNo} - ${j.workerId?.name} (Qty: ${j.issueQty}m)`
-                          }))
-                        ]}
-                        required
-                      />
-                   </div>
+                     {/* Form Info */}
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="flex items-center gap-2">
+                           <span className="classic-erp-label w-36">Pending Job Card:</span>
+                           <select 
+                             className="classic-erp-select flex-1"
+                             value={selectedJobId}
+                             onChange={(e) => setSelectedJobId(e.target.value)}
+                             required
+                           >
+                             <option value="">- Select Job Card -</option>
+                             {pendingJobs.map(j => (
+                               <option key={j._id} value={j._id}>
+                                 {j.jobCardNo} - {j.workerId?.name} (Qty: {j.issueQty}m)
+                               </option>
+                             ))}
+                           </select>
+                        </div>
 
-                   <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black uppercase text-black tracking-widest">Receive Date</label>
-                      <input 
-                        type="date" 
-                        className="w-full h-11 px-3 border-2 border-slate-100 focus:border-black outline-none font-bold text-sm bg-white transition-all" 
-                        defaultValue={new Date().toISOString().substring(0, 10)} 
-                        readOnly
-                      />
-                   </div>
-                </div>
-
-                {selectedJob && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 pt-2">
-                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-black whitespace-nowrap">Job Card Original vs Received Allocation</span>
-                       <div className="h-[2px] flex-1 bg-black" />
-                    </div>
-
-                    <div className="bg-slate-50 p-4 border border-slate-200 rounded-xl grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                      <div>
-                        <p className="text-slate-400 font-bold uppercase">Issued Lot Ref</p>
-                        <p className="text-black font-black uppercase mt-1">{selectedJob.lotId?.lotId || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-400 font-bold uppercase">Worker / Unit</p>
-                        <p className="text-black font-black uppercase mt-1">{selectedJob.workerId?.name || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-400 font-bold uppercase">Original Issued Pcs</p>
-                        <p className="text-black font-black mt-1">{selectedJob.issuePcs} Pcs</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-400 font-bold uppercase">Original Issued Meters</p>
-                        <p className="text-black font-black mt-1">{selectedJob.issueQty} Mtrs</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                      <div className="flex flex-col gap-1">
-                         <label className="text-[10px] font-black uppercase text-black tracking-widest">Rec Pcs</label>
-                         <input 
-                            type="number" 
-                            className="h-11 px-3 border-2 border-slate-100 focus:border-black outline-none font-bold text-sm bg-white" 
-                            value={receivedPcs} 
-                            onChange={e => setReceivedPcs(e.target.value)}
-                            max={selectedJob.issuePcs}
-                            placeholder="0"
-                         />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                         <label className="text-[10px] font-black uppercase text-black tracking-widest">Rec Meters</label>
-                         <input 
-                            type="number" 
-                            className="h-11 px-3 border-2 border-slate-100 focus:border-black outline-none font-bold text-sm bg-white" 
-                            value={receivedQty} 
-                            onChange={e => setReceivedQty(e.target.value)}
-                            max={selectedJob.issueQty}
-                            placeholder="0.00"
-                            required
-                         />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                         <label className="text-[10px] font-black uppercase text-black tracking-widest">Processing Rate (₹)</label>
-                         <input 
-                            type="number" 
-                            className="h-11 px-3 border-2 border-slate-100 focus:border-black outline-none font-bold text-sm bg-white" 
-                            value={rate} 
-                            onChange={e => setRate(e.target.value)}
-                            placeholder="0.00"
-                         />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                         <label className="text-[10px] font-black uppercase text-black tracking-widest">GST Rate (%)</label>
-                         <ERPSelect 
-                            className="h-11 border-2 border-slate-100 focus:border-black font-bold" 
-                            value={gstPercent} 
-                            onChange={e => setGstPercent(e.target.value)}
-                            options={[
-                              { value: '0', label: '0%' },
-                              { value: '5', label: '5%' },
-                              { value: '12', label: '12%' },
-                              { value: '18', label: '18%' },
-                            ]}
-                         />
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-bold text-slate-500">
-                      <div>
-                         <p className="uppercase">Base Job Cost</p>
-                         <p className="text-black font-black text-sm mt-1">₹ {charges.toFixed(2)}</p>
-                      </div>
-                      <div>
-                         <p className="uppercase">GST Amount</p>
-                         <p className="text-black font-black text-sm mt-1">₹ {gstAmount.toFixed(2)}</p>
-                      </div>
-                      <div>
-                         <p className="uppercase">Total charges</p>
-                         <p className="text-black font-black text-sm mt-1">₹ {totalAmount.toFixed(2)}</p>
-                      </div>
-                      <div>
-                         <p className="uppercase">Calculated Wastage</p>
-                         <p className="text-red-600 font-black text-sm mt-1">{calculatedWastage.toFixed(2)} Mtrs</p>
-                      </div>
-                    </div>
+                        <div className="flex items-center gap-2">
+                           <span className="classic-erp-label w-24">Receive Date:</span>
+                           <input 
+                             type="date" 
+                             className="classic-erp-input flex-1" 
+                             defaultValue={new Date().toISOString().substring(0, 10)} 
+                             readOnly
+                           />
+                        </div>
+                     </div>
                   </div>
-                )}
 
-                {selectedJobId === '' && (
-                  <div className="py-16 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 font-semibold uppercase tracking-widest text-[11px]">
-                     Select a pending embroidery job card from the dropdown to continue
+                  {selectedJob ? (
+                    <div className="classic-erp-frame space-y-2">
+                      <div className="classic-erp-frame-title">Job Card Original vs Received Allocation</div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono border-b border-[#808080] pb-2">
+                        <div>
+                          <span className="classic-erp-label text-slate-800">Issued Lot Ref:</span>
+                          <span className="font-bold text-black uppercase ml-1">{selectedJob.lotId?.lotId || 'N/A'}</span>
+                        </div>
+                        <div>
+                          <span className="classic-erp-label text-slate-800">Worker / Unit:</span>
+                          <span className="font-bold text-black uppercase ml-1">{selectedJob.workerId?.name || 'N/A'}</span>
+                        </div>
+                        <div>
+                          <span className="classic-erp-label text-slate-800">Original Issued Pcs:</span>
+                          <span className="font-bold text-black ml-1">{selectedJob.issuePcs} Pcs</span>
+                        </div>
+                        <div>
+                          <span className="classic-erp-label text-slate-800">Original Issued Mts:</span>
+                          <span className="font-bold text-black ml-1">{selectedJob.issueQty} Mtrs</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
+                        <div className="flex items-center gap-1">
+                           <span className="classic-erp-label text-[11px] w-12">Rec Pcs:</span>
+                           <input 
+                              type="number" 
+                              className="classic-erp-input flex-1 font-bold text-right" 
+                              value={receivedPcs} 
+                              onChange={e => setReceivedPcs(e.target.value)}
+                              max={selectedJob.issuePcs}
+                              placeholder="0"
+                           />
+                        </div>
+                        <div className="flex items-center gap-1">
+                           <span className="classic-erp-label red-label text-[11px] w-12">Rec Mts:</span>
+                           <input 
+                              type="number" 
+                              className="classic-erp-input flex-1 font-bold text-right" 
+                              value={receivedQty} 
+                              onChange={e => setReceivedQty(e.target.value)}
+                              max={selectedJob.issueQty}
+                              placeholder="0.00"
+                              required
+                           />
+                        </div>
+                        <div className="flex items-center gap-1">
+                           <span className="classic-erp-label text-[11px] w-16">Proc Rate:</span>
+                           <input 
+                              type="number" 
+                              className="classic-erp-input flex-1 text-right" 
+                              value={rate} 
+                              onChange={e => setRate(e.target.value)}
+                              placeholder="0.00"
+                           />
+                        </div>
+                        <div className="flex items-center gap-1">
+                           <span className="classic-erp-label text-[11px] w-16">GST Slab:</span>
+                           <select 
+                              className="classic-erp-select flex-1" 
+                              value={gstPercent} 
+                              onChange={e => setGstPercent(e.target.value)}
+                           >
+                              <option value="0">0%</option>
+                              <option value="5">5%</option>
+                              <option value="12">12%</option>
+                              <option value="18">18%</option>
+                           </select>
+                        </div>
+                      </div>
+
+                      <div className="border border-[#808080] p-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono bg-[#d4d0c8] mt-2">
+                        <div>
+                           <span className="classic-erp-label text-slate-800">Base Cost:</span>
+                           <span className="font-bold text-black mt-1 block">₹{charges.toFixed(2)}</span>
+                        </div>
+                        <div>
+                           <span className="classic-erp-label text-slate-800">GST Amt:</span>
+                           <span className="font-bold text-black mt-1 block">₹{gstAmount.toFixed(2)}</span>
+                        </div>
+                        <div>
+                           <span className="classic-erp-label text-slate-800">Total Chg:</span>
+                           <span className="font-bold text-blue-900 mt-1 block">₹{totalAmount.toFixed(2)}</span>
+                        </div>
+                        <div>
+                           <span className="classic-erp-label text-slate-800">Wastage:</span>
+                           <span className="font-bold text-red-800 mt-1 block">{calculatedWastage.toFixed(2)} Mts</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center text-red-800 font-bold uppercase tracking-wider text-[11px] bg-white border border-[#808080]">
+                       SELECT A PENDING EMBROIDERY CHALLAN FROM THE DROPDOWN TO CONTINUE
+                    </div>
+                  )}
+
+                  {/* Footer Actions inside form */}
+                  <div className="classic-erp-form-footer absolute bottom-0 left-0 w-full shrink-0">
+                     <button 
+                        type="button" 
+                        onClick={onClose}
+                        className="classic-erp-btn"
+                     >
+                        Cancel
+                     </button>
+                     <button 
+                        type="submit"
+                        disabled={saving || !selectedJobId}
+                        onClick={handleSubmit}
+                        className="classic-erp-btn btn-blue"
+                     >
+                        {saving ? 'Saving...' : 'Save Receipt (F12)'}
+                     </button>
                   </div>
-                )}
 
-                {/* Action Footer inside form */}
-                <div className="p-6 bg-white border-t border-slate-100 flex justify-end gap-4 shrink-0 mt-6">
-                   <button 
-                      type="button" 
-                      onClick={onClose}
-                      className="px-8 py-2 bg-transparent border border-black text-black text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all rounded-lg"
-                   >
-                      Cancel
-                   </button>
-                   <button 
-                      type="submit"
-                      disabled={saving || !selectedJobId}
-                      className="px-12 py-2 bg-black text-white text-[11px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all rounded-lg disabled:opacity-50"
-                   >
-                      {saving ? 'Saving...' : 'Save Receipt (F12)'}
-                   </button>
-                </div>
+               </form>
 
-             </form>
+               {/* Yield & Wastage Monitor (Right Column 30%) */}
+               <div className="flex-1 flex flex-col w-80 shrink-0 classic-erp-frame p-0 overflow-hidden bg-white">
+                  <div className="classic-erp-header bg-black text-white text-xs px-2 h-7 flex justify-between items-center font-bold uppercase shrink-0">
+                     <span>Yield & Wastage Monitor</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-2 space-y-3 no-scrollbar font-mono">
+                      
+                      <div className="border border-[#808080] p-2 space-y-1.5 bg-[#d4d0c8]">
+                         <span className="text-[10px] font-bold uppercase text-blue-900 block">Metrics Overview</span>
+                         
+                         <div className="flex justify-between items-center text-xs">
+                            <span className="classic-erp-label text-slate-700">Issued:</span>
+                            <span className="font-bold text-black">{selectedJob ? selectedJob.issueQty.toFixed(2) : '0.00'} mts</span>
+                         </div>
 
-             {/* Yield & Wastage Monitor (Right Column 30%) */}
-             <div className="flex-1 flex flex-col bg-white border-l-2 border-black overflow-hidden">
-                <div className="bg-black text-white text-[10px] px-6 h-[56px] flex justify-between items-center font-black uppercase tracking-widest shrink-0">
-                   <span>Yield & Wastage Monitor</span>
-                   <span className="px-3 py-1 bg-white text-black rounded-none">Real-time audit</span>
-                </div>
-                <div className="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar">
-                   
-                    <div className="bg-white border-2 border-black p-5 space-y-4 shadow-none">
-                       <span className="text-[10px] font-black uppercase text-black tracking-[0.2em]">Metrics Overview</span>
-                       
-                       <div className="flex justify-between items-center py-1">
-                          <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Issued (Grey Fabric)</span>
-                          <span className="text-sm font-black text-black">{selectedJob ? selectedJob.issueQty.toFixed(2) : '0.00'} mts</span>
-                       </div>
+                         <div className="flex justify-between items-center text-xs border-t border-[#808080] pt-1">
+                            <span className="classic-erp-label text-slate-700">Received:</span>
+                            <span className="font-bold text-black">{receivedQty ? Number(receivedQty).toFixed(2) : '0.00'} mts</span>
+                         </div>
+                      </div>
 
-                       <div className="flex justify-between items-center py-1 border-t border-slate-100">
-                          <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Received (Finished)</span>
-                          <span className="text-sm font-black text-black">{receivedQty ? Number(receivedQty).toFixed(2) : '0.00'} mts</span>
-                       </div>
-                    </div>
-
-                    <div className={`border-2 p-5 transition-all ${
-                       wastagePercent > 10 
-                          ? 'bg-black border-black text-white' 
-                          : 'bg-white border-black text-black'
-                    }`}>
-                       <div className="flex items-center justify-between mb-3">
-                          <span className="text-[10px] font-black uppercase tracking-widest">Computed Wastage</span>
-                          {wastagePercent > 10 ? (
-                             <span className="px-3 py-1 bg-white text-black text-[9px] font-black uppercase tracking-widest animate-pulse">
-                                CRITICAL ({'>'}10%)
-                             </span>
-                          ) : (
-                             <span className="px-3 py-1 bg-black text-white text-[9px] font-black uppercase tracking-widest">
-                                OPTIMAL
-                             </span>
-                          )}
-                       </div>
-
-                       <div className="text-4xl font-black mb-2">
-                          {wastagePercent.toFixed(1)}%
-                       </div>
-                       <p className={`text-[10px] font-black uppercase tracking-widest leading-relaxed ${wastagePercent > 10 ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Wastage quantity is {calculatedWastage.toFixed(2)} meters of issued fabric.
-                       </p>
-                    </div>
-
-                    {/* Diagnostic Helper Info */}
-                    <div className="bg-slate-50 border-2 border-slate-100 p-5 text-[10px] text-slate-500 font-black uppercase tracking-widest leading-relaxed">
-                       <p className="text-black mb-2 border-b border-slate-200 pb-2">Wastage Tolerance Policy:</p>
-                       Maximum allowable shrinkage/wastage during process is 10%. Over-wastage will deduct processing charges automatically.
-                    </div>
-
-                </div>
-             </div>
-          </div>
-        ) : (
-          // View Embroidery Job Rec list tab
-          <div className="flex-1 p-6 overflow-y-auto">
-             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                <table className="w-full text-xs text-left border-collapse">
-                   <thead className="bg-slate-50 text-slate-500 uppercase tracking-widest text-[9px] border-b border-slate-200">
-                      <tr className="h-10">
-                         <th className="px-4 py-3">Date</th>
-                         <th className="px-4 py-3">Job Card No</th>
-                         <th className="px-4 py-3">Embroidery Partner</th>
-                         <th className="px-4 py-3 text-right">Issued Qty</th>
-                         <th className="px-4 py-3 text-right">Received Qty</th>
-                         <th className="px-4 py-3 text-right">Wastage Qty</th>
-                         <th className="px-4 py-3 text-center">Status</th>
-                      </tr>
-                   </thead>
-                   <tbody className="divide-y divide-slate-100 text-[11px]">
-                      {receivedJobs.map((job) => (
-                         <tr key={job._id} className="hover:bg-slate-50/50">
-                            <td className="px-4 py-3 text-slate-500 font-medium">{job.receiveDate ? new Date(job.receiveDate).toLocaleDateString() : 'N/A'}</td>
-                            <td className="px-4 py-3 font-bold text-black uppercase">{job.jobCardNo}</td>
-                            <td className="px-4 py-3 font-semibold uppercase">{job.workerId?.name || 'N/A'}</td>
-                            <td className="px-4 py-3 text-right font-bold">{job.issueQty} Mtrs</td>
-                            <td className="px-4 py-3 text-right font-black text-green-700">{job.receivedQty} Mtrs</td>
-                            <td className="px-4 py-3 text-right font-black text-red-600">{job.wastage} Mtrs</td>
-                            <td className="px-4 py-3 text-center">
-                               <span className="px-2.5 py-0.5 rounded text-[9px] font-black uppercase bg-black text-white">
-                                  {job.status}
+                      <div className="border border-[#808080] p-2" style={{ backgroundColor: wastagePercent > 10 ? '#ffffe1' : '#ffffff' }}>
+                         <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-bold uppercase text-slate-700">Computed Wastage:</span>
+                            {wastagePercent > 10 ? (
+                               <span className="px-1 bg-red-800 text-white text-[9px] font-bold uppercase animate-pulse">
+                                  CRITICAL
                                </span>
-                            </td>
-                         </tr>
-                      ))}
-                      {receivedJobs.length === 0 && (
+                            ) : (
+                               <span className="px-1 bg-green-800 text-white text-[9px] font-bold uppercase">
+                                  OPTIMAL
+                               </span>
+                            )}
+                         </div>
+
+                         <div className="text-3xl font-black text-slate-900">
+                            {wastagePercent.toFixed(1)}%
+                         </div>
+                         <p className="text-[10px] text-slate-600 leading-normal mt-1">
+                            Wastage quantity is <span className="font-bold text-black">{calculatedWastage.toFixed(2)}</span> meters.
+                         </p>
+                      </div>
+
+                      <div className="bg-[#eff6ff] border border-blue-300 p-2 text-[10px] text-slate-700 leading-relaxed font-sans">
+                         <span className="font-bold text-blue-900 block mb-1">Wastage Tolerance Policy</span>
+                         Maximum allowable shrinkage/wastage during process is 10%. Over-wastage will deduct processing charges automatically.
+                      </div>
+                  </div>
+               </div>
+            </div>
+          ) : (
+            // View Embroidery Job Rec list tab
+            <div className="flex-1 flex flex-col overflow-hidden">
+               <div className="classic-erp-table-container flex-1">
+                  <table className="classic-erp-table">
+                     <thead>
                         <tr>
-                          <td colSpan="7" className="px-4 py-12 text-center text-slate-400 font-bold uppercase tracking-widest">
-                            No Received Embroidery Receipts Found
-                          </td>
+                           <th className="w-24">Date</th>
+                           <th className="w-32">Job Card No</th>
+                           <th>Embroidery Partner</th>
+                           <th className="w-28 text-right">Issued Qty</th>
+                           <th className="w-28 text-right">Received Qty</th>
+                           <th className="w-28 text-right">Wastage Qty</th>
+                           <th className="w-24 text-center">Status</th>
                         </tr>
-                      )}
-                   </tbody>
-                </table>
-             </div>
-          </div>
-        )}
-
+                     </thead>
+                     <tbody>
+                        {receivedJobs.map((job) => (
+                           <tr key={job._id}>
+                              <td className="font-mono">{job.receiveDate ? new Date(job.receiveDate).toLocaleDateString() : 'N/A'}</td>
+                              <td className="font-bold text-blue-900">{job.jobCardNo}</td>
+                              <td className="font-bold uppercase">{job.workerId?.name || 'N/A'}</td>
+                              <td className="text-right font-mono">{job.issueQty} Mts</td>
+                              <td className="text-right font-mono font-bold text-green-800">{job.receivedQty} Mts</td>
+                              <td className="text-right font-mono font-bold text-red-800">{job.wastage} Mts</td>
+                              <td className="text-center font-bold">
+                                 <span className="px-1 bg-black text-white text-[9px] uppercase">
+                                    {job.status}
+                                 </span>
+                              </td>
+                           </tr>
+                        ))}
+                        {receivedJobs.length === 0 && (
+                          <tr>
+                            <td colSpan="7" className="py-8 text-center text-slate-400 font-bold uppercase">
+                              No Received Embroidery Receipts Found
+                            </td>
+                          </tr>
+                        )}
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+          )}
+        </div>
       </div>
-
     </Modal>
   );
 };

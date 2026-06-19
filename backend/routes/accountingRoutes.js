@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const accountingController = require('../controllers/accountingController');
+const { guard } = require('../utils/featureGuard');
+
+router.use(guard('accounting'));
 
 // Ledger Routes
 router.post('/ledgers', accountingController.createLedger);

@@ -121,7 +121,24 @@ exports.createBook = async (req, res) => {
       name: name.toUpperCase(),
       code,
       module,
-      companyId: companyId || null
+      companyId: companyId || null,
+      bookType: req.body.bookType || 'SALES BOOK',
+      groupHead: req.body.groupHead || '',
+      opBalance: Number(req.body.opBalance || 0),
+      retailTax: req.body.retailTax || '',
+      detailJobWork: req.body.detailJobWork || 'D',
+      rowFinishMaterial: req.body.rowFinishMaterial || 'F',
+      incExcVat: req.body.incExcVat || '',
+      effectOnStock: req.body.effectOnStock || 'N',
+      address1: req.body.address1 || '',
+      address2: req.body.address2 || '',
+      dist: req.body.dist || '',
+      state: req.body.state || '',
+      head1: req.body.head1 || 'Pcs',
+      head2: req.body.head2 || 'Qty',
+      jobWorkBook: !!req.body.jobWorkBook,
+      tdsHead: req.body.tdsHead || '',
+      tdsCode: Number(req.body.tdsCode || 0)
     });
 
     await newBook.save();

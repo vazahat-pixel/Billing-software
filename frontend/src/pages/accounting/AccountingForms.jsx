@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import useStore from '../../store/useStore';
+import { useConfig } from '../../context/ConfigContext';
+import { isFlagEnabled } from '../../utils/configHelpers';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import api from '../../api/client';
 import { Save, X, Banknote, History, Plus, Trash2 } from 'lucide-react';
@@ -25,6 +27,8 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
     fetchVouchers,
     vouchers
   } = useStore();
+  const { bundle } = useConfig();
+  const allowSplitPayment = isFlagEnabled(bundle, 'split_payment', true);
 
   const [activeTab, setActiveTab] = useState('Entry');
   const [type, setType] = useState(initialType);
@@ -448,6 +452,7 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
                      </div>
                   </div>
 
+                  {allowSplitPayment && (
                   <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
                      <input
                         type="checkbox"
@@ -463,8 +468,9 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
                         Split Payment (Cash + Card + UPI mix)
                      </label>
                   </div>
+                  )}
 
-                  {useSplitPayment ? (
+                  {allowSplitPayment && useSplitPayment ? (
                     <div className="space-y-3">
                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payment Breakdown</label>
                        {paymentSplits.map((split, index) => (

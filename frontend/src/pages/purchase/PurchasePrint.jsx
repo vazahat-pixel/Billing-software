@@ -92,7 +92,39 @@ const PurchasePrint = ({ invoiceId, onClose }) => {
 
         <div className="flex justify-end border-2 border-black">
            <div className="w-1/3 flex flex-col text-[11px]">
-              <div className="flex justify-between p-1.5 border-b border-slate-200 font-bold">
+              <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                 <span>Gross Subtotal</span>
+                 <span className="font-mono">{((invoice.taxableAmount || invoice.totals?.subtotal || 0) 
+                   - (invoice.discountSign === '+' ? 1 : -1) * (invoice.discountAmt || 0)
+                   - (invoice.lessSign === '+' ? 1 : -1) * (invoice.lessAmt || 0)
+                   - (invoice.addSign === '+' ? 1 : -1) * (invoice.addAmt || 0)
+                   - (invoice.octroiSign === '+' ? 1 : -1) * (invoice.octroi || 0)).toFixed(2)}</span>
+              </div>
+              {invoice.discountAmt > 0 && (
+                <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                   <span>Discount ({invoice.discountSign})</span>
+                   <span className="font-mono">{invoice.discountAmt.toFixed(2)}</span>
+                </div>
+              )}
+              {invoice.lessAmt > 0 && (
+                <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                   <span>Less ({invoice.lessSign})</span>
+                   <span className="font-mono">{invoice.lessAmt.toFixed(2)}</span>
+                </div>
+              )}
+              {invoice.addAmt > 0 && (
+                <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                   <span>Add ({invoice.addSign})</span>
+                   <span className="font-mono">{invoice.addAmt.toFixed(2)}</span>
+                </div>
+              )}
+              {invoice.octroi > 0 && (
+                <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                   <span>Octroi ({invoice.octroiSign})</span>
+                   <span className="font-mono">{invoice.octroi.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between p-1.5 border-b border-slate-200 font-bold bg-slate-50">
                  <span>Taxable Base</span>
                  <span className="font-mono">{(invoice.taxableAmount || invoice.totals?.subtotal || 0).toFixed(2)}</span>
               </div>
@@ -100,6 +132,18 @@ const PurchasePrint = ({ invoiceId, onClose }) => {
                  <span>GST Total</span>
                  <span className="font-mono">{(invoice.gstAmount || 0).toFixed(2)}</span>
               </div>
+              {invoice.rcmCharge > 0 && (
+                <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                   <span>RCM ({invoice.rcmChargeSign})</span>
+                   <span className="font-mono">{invoice.rcmCharge.toFixed(2)}</span>
+                </div>
+              )}
+              {invoice.roundOff > 0 && (
+                <div className="flex justify-between p-1.5 border-b border-slate-200 text-slate-600">
+                   <span>Round Off</span>
+                   <span className="font-mono">{invoice.roundOff.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between p-2 font-black text-sm bg-slate-100">
                  <span>Net Total</span>
                  <span className="font-mono">₹ {(invoice.netAmount || invoice.totals?.total || 0).toFixed(2)}</span>

@@ -1,5 +1,21 @@
 const mongoose = require('mongoose');
 
+const SUB_MASTER_TYPES = [
+  'AccountGroup',
+  'AccountHead',
+  'BookType',
+  'ItemGroup',
+  'Unit',
+  'ItemTaxSlab',
+  'City',
+  'Transport',
+  'Type',
+  'OtherMaster',
+  'Color',
+  'Design',
+  'HSN',
+];
+
 const SubMasterSchema = new mongoose.Schema({
   companyId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -9,7 +25,7 @@ const SubMasterSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['AccountGroup', 'ItemGroup', 'City', 'Transport', 'Color', 'Design', 'HSN'],
+    enum: SUB_MASTER_TYPES,
     required: true,
     index: true
   },
@@ -30,3 +46,4 @@ const SubMasterSchema = new mongoose.Schema({
 SubMasterSchema.index({ companyId: 1, type: 1, name: 1 }, { unique: true });
 
 module.exports = mongoose.model('SubMaster', SubMasterSchema);
+module.exports.SUB_MASTER_TYPES = SUB_MASTER_TYPES;
