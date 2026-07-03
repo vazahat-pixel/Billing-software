@@ -93,3 +93,31 @@ export const normalizeUser = (user) => {
     companyName: user.companyName || user.company?.name || user.settings?.legalName || ''
   };
 };
+
+export const normalizeVoucher = (voucher) => {
+  if (!voucher) return voucher;
+  const id = voucher._id || voucher.id;
+  const type = voucher.type || (voucher.voucherNo?.startsWith('RV') ? 'Receipt' : 'Payment');
+  return {
+    ...voucher,
+    _id: id,
+    id,
+    type,
+    voucherNo: voucher.voucherNo || voucher.invoiceNo || '',
+    amount: voucher.amount ?? voucher.totalAmount ?? 0,
+    offlinePending: !!voucher.offlinePending
+  };
+};
+
+export const normalizeInventoryLot = (lot) => {
+  if (!lot) return lot;
+  const id = lot._id || lot.id;
+  return {
+    ...lot,
+    _id: id,
+    id,
+    itemName: lot.itemName || lot.itemId?.name || lot.name || '',
+    qty: lot.qty ?? lot.quantity ?? lot.balanceQty ?? 0,
+    balanceQty: lot.balanceQty ?? lot.qty ?? lot.quantity ?? 0
+  };
+};

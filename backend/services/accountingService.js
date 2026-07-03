@@ -230,7 +230,7 @@ class AccountingService {
     }
   }
 
-  // 5. Job Work Charges — FIXED: Split GST correctly into CGST+SGST (was only CGST before)
+  // 5. Job Work Charges — FIXED: Split GST correctly into CGST+SGST or IGST based on location
   async onJobWorkChargesPost(receive) {
     try {
       const companyId = receive.companyId;
@@ -239,6 +239,7 @@ class AccountingService {
       const jobChargesLedger = await this.getSystemLedger(companyId, 'Job Work Charges');
       const cgstInputLedger = await this.getSystemLedger(companyId, 'CGST Input');
       const sgstInputLedger = await this.getSystemLedger(companyId, 'SGST Input');
+      const igstInputLedger = await this.getSystemLedger(companyId, 'IGST Input');
       const millLedger = await this.getOrCreatePartyLedger(companyId, receive.millId);
 
       const charges = parseFloat(receive.charges || receive.totalAmount || 0);
@@ -247,12 +248,36 @@ class AccountingService {
       const otherHalfGst = parseFloat((totalGst - halfGst).toFixed(2));
       const total = charges + totalGst;
 
+      // Determine GST Type (CGST+SGST or IGST)
+      const millParty = await Party.findById(receive.millId);
+      const CompanySettings = require('../models/CompanySettings');
+      const companySettings = await CompanySettings.findOne({ companyId });
+      
+      let isInterState = false;
+      if (millParty && millParty.gstin && companySettings && companySettings.gstin) {
+        const millStateCode = millParty.gstin.substring(0, 2);
+        const companyStateCode = companySettings.gstin.substring(0, 2);
+        if (millStateCode !== companyStateCode) {
+          isInterState = true;
+        }
+      } else if (millParty && millParty.state && companySettings && companySettings.state) {
+        if (millParty.state.toLowerCase() !== companySettings.state.toLowerCase()) {
+          isInterState = true;
+        }
+      }
+
       const lines = [
         { ledgerId: jobChargesLedger._id, ledgerName: jobChargesLedger.name, type: 'Dr', amount: charges, narration: 'Job Work Charges on Receipt' }
       ];
 
-      if (halfGst > 0) lines.push({ ledgerId: cgstInputLedger._id, ledgerName: cgstInputLedger.name, type: 'Dr', amount: halfGst, narration: 'CGST Input on Job Work' });
-      if (otherHalfGst > 0) lines.push({ ledgerId: sgstInputLedger._id, ledgerName: sgstInputLedger.name, type: 'Dr', amount: otherHalfGst, narration: 'SGST Input on Job Work' });
+      if (totalGst > 0) {
+        if (isInterState) {
+          lines.push({ ledgerId: igstInputLedger._id, ledgerName: igstInputLedger.name, type: 'Dr', amount: totalGst, narration: 'IGST Input on Job Work' });
+        } else {
+          if (halfGst > 0) lines.push({ ledgerId: cgstInputLedger._id, ledgerName: cgstInputLedger.name, type: 'Dr', amount: halfGst, narration: 'CGST Input on Job Work' });
+          if (otherHalfGst > 0) lines.push({ ledgerId: sgstInputLedger._id, ledgerName: sgstInputLedger.name, type: 'Dr', amount: otherHalfGst, narration: 'SGST Input on Job Work' });
+        }
+      }
 
       lines.push({ ledgerId: millLedger._id, ledgerName: millLedger.name, type: 'Cr', amount: total, narration: 'Job Work Payable to Mill' });
 

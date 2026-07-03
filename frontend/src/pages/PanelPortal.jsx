@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { LayoutDashboard, Shield, ArrowRight, Layers } from 'lucide-react';
 import useStore from '../store/useStore';
+import { isOffline } from '../utils/offlineHelpers';
 
 const PanelCard = ({ title, subtitle, description, features, icon: Icon, accent, onClick, delay, badge }) => (
     <button
@@ -48,6 +49,12 @@ const PanelPortal = () => {
 
     const isLoggedIn = Boolean(token);
     const isSuperAdmin = role === 'super_admin';
+
+    useEffect(() => {
+        if (!isLoggedIn && isOffline()) {
+            navigate('/login', { replace: true });
+        }
+    }, [isLoggedIn, navigate]);
 
     return (
         <div className="portal-shell">

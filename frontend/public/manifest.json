@@ -1,0 +1,44 @@
+{
+  "name": "Textile ERP - Billing SaaS",
+  "short_name": "Textile ERP",
+  "description": "Premium billing, inventory, and job work management with offline support",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FDFCF9",
+  "theme_color": "#000000",
+  "orientation": "any",
+  "shortcuts": [
+    {
+      "name": "Login",
+      "short_name": "Login",
+      "description": "Direct login — works offline after first online sign-in",
+      "url": "/login",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

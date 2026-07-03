@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch, faTimes, faBookOpen, faChevronRight, faPlus, faCheck } from '@fortawesome/free-solid-svg-icons';
+import { getDefaultBooksForModule } from '../utils/defaultBooks';
 import useStore from '../store/useStore';
 
 const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook }) => {
-  const { fetchBooksByModule, createBook, theme } = useStore();
+  const { fetchBooksByModule, createBook, theme, books: storeBooks } = useStore();
   const [books, setBooks] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,16 +26,20 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook }) => {
       setLoading(true);
       fetchBooksByModule(moduleName)
         .then((data) => {
-          setBooks(data || []);
+          const list = (data && data.length > 0)
+            ? data
+            : storeBooks.filter((b) => b.module === moduleName);
+          setBooks(list || []);
           setSelectedIdx(0);
           setLoading(false);
         })
-        .catch((err) => {
-          console.error(err);
+        .catch(() => {
+          const fromStore = storeBooks.filter((b) => b.module === moduleName);
+          setBooks(fromStore.length > 0 ? fromStore : getDefaultBooksForModule(moduleName));
           setLoading(false);
         });
     }
-  }, [isOpen, moduleName, fetchBooksByModule]);
+  }, [isOpen, moduleName, fetchBooksByModule, storeBooks]);
 
   const handleCreateBook = async (e) => {
     e.preventDefault();

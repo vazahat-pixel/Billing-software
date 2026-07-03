@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { LayoutDashboard, Lock, Mail, Loader2, ArrowRight, Building, User } from 'lucide-react';
 import api from '../../utils/api';
 import useStore from '../../store/useStore';
+import { saveOfflineCredential } from '../../utils/offlineAuth';
 
 const SignupPage = () => {
     const [formData, setFormData] = useState({
@@ -37,7 +38,8 @@ const SignupPage = () => {
             });
             const { token, user } = response.data;
             
-            setAuth({ token, user });
+            await saveOfflineCredential(formData.email, formData.password, { token, user });
+            await setAuth({ token, user });
             navigate('/');
         } catch (err) {
             setError(err.response?.data?.message || 'Registration failed. Please try again.');

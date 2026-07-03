@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { isOffline, markServerReachable, markServerUnreachable } from '../utils/networkStatus';
+import { isNetworkError } from '../utils/offlineHelpers';
 
 const getBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) {
@@ -10,33 +12,52 @@ const getBaseUrl = () => {
 
 const client = axios.create({
   baseURL: getBaseUrl(),
+  timeout: 8000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Attach JWT token to every request
+const hasStoredSession = () =>
+  !!(localStorage.getItem('token') && localStorage.getItem('user'));
+
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // WiFi off — skip waiting for hung requests; use IndexedDB instead
+  if (isOffline() && !config.forceNetwork) {
+    const err = new Error('Network Error');
+    err.code = 'ERR_NETWORK';
+    err.config = config;
+    err.isOfflineBlocked = true;
+    return Promise.reject(err);
+  }
+
   return config;
 });
 
-// Global error handling
 client.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    markServerReachable();
+    return response;
+  },
   (error) => {
-    if (error.response?.status === 401) {
-      // Import store dynamically to avoid circular dependencies
-      import('../store/useStore').then(({ default: useStore }) => {
-        useStore.getState().logout();
-        if (typeof window !== 'undefined' && !['/portal', '/login', '/admin/login'].includes(window.location.pathname)) {
-          window.location.href = '/portal';
-        }
-      });
+    if (isNetworkError(error)) {
+      markServerUnreachable();
     }
+
+    if (error.response?.status === 401 && !error.config?.skipAuthRedirect) {
+      const url = String(error.config?.url || '');
+      const isAuthMe = url.includes('/auth/me');
+
+      if (isOffline() || (hasStoredSession() && !isAuthMe)) {
+        return Promise.reject(error);
+      }
+    }
+
     return Promise.reject(error);
   }
 );

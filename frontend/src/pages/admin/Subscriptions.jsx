@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, Calendar, Clock, ArrowUpRight, Zap, X, TrendingUp, RefreshCw } from 'lucide-react';
+import { CreditCard, Calendar, Clock, ArrowUpRight, Zap, X, TrendingUp, RefreshCw, Wifi } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
 
@@ -8,7 +8,7 @@ const statusColors = { active: '#10b981', suspended: '#ef4444', expired: '#f59e0
 const Subscriptions = () => {
     const { subscriptions, fetchSubscriptions, updateSubscription, plans, fetchPlans } = useAdminStore();
     const [editingSub, setEditingSub] = useState(null);
-    const [subForm, setSubForm] = useState({ planId: '', billingCycle: 'monthly', endDate: '', status: 'active' });
+    const [subForm, setSubForm] = useState({ planId: '', billingCycle: 'monthly', endDate: '', status: 'active', offlineModeEnabled: false });
 
     useEffect(() => { fetchSubscriptions(); fetchPlans(); }, [fetchSubscriptions, fetchPlans]);
 
@@ -18,7 +18,8 @@ const Subscriptions = () => {
             planId: sub.planId?._id || '',
             billingCycle: sub.billingCycle || 'monthly',
             endDate: sub.endDate ? new Date(sub.endDate).toISOString().substring(0, 10) : '',
-            status: sub.status || 'active'
+            status: sub.status || 'active',
+            offlineModeEnabled: !!sub.offlineModeEnabled
         });
     };
 
@@ -162,6 +163,10 @@ const Subscriptions = () => {
                                         <label className="dark-input__label">Expiration Date</label>
                                         <input type="date" className="dark-input" value={subForm.endDate} onChange={e => setSubForm({ ...subForm, endDate: e.target.value })} required />
                                     </div>
+                                    <label className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl cursor-pointer">
+                                        <span className="text-xs font-bold text-slate-300 flex items-center gap-2"><Wifi size={13} /> Offline Mode</span>
+                                        <input type="checkbox" checked={subForm.offlineModeEnabled} onChange={e => setSubForm({ ...subForm, offlineModeEnabled: e.target.checked })} />
+                                    </label>
                                     <button type="submit" className="dark-submit-btn w-full">
                                         <RefreshCw size={14} /> Apply Changes
                                     </button>

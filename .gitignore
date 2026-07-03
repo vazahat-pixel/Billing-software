@@ -52,6 +52,22 @@ dump/
 temp_*.bat
 branch_structure.json
 
+# Test output / e2e / playwright
+test-results/
+frontend/test-results/
+frontend/e2e/
+frontend/playwright.config.js
+frontend/scripts/
+
+# Backend scratch / dev scripts
+backend/scratch/
+backend/scripts/seedFeatureSetup.js
+backend/scripts/testOfflineFeature.js
+backend/scripts/testOfflineIntegration.js
+
+# PDF / binary assets not needed in repo
+*.pdf
+
 # Optional local tooling
 .cursor/
 *.pem

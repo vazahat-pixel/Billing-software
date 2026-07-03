@@ -20,6 +20,7 @@ import AdminUserManagement from './pages/admin/UserManagement';
 import AdminCompanyConfig from './pages/admin/CompanyConfig';
 import AdminDynamicConfig from './pages/admin/DynamicConfig';
 import PanelPortal from './pages/PanelPortal';
+import FallbackRedirect from './components/auth/FallbackRedirect';
 import { ConfigProvider } from './context/ConfigContext';
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
       <Routes>
         <Route path="/portal" element={<PanelPortal />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/offline-login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
@@ -42,6 +44,8 @@ function App() {
             </AuthBootstrap>
           </ProtectedRoute>
         } />
+
+        <Route path="/app" element={<Navigate to="/" replace />} />
 
         {/* Admin Panel Routes */}
         <Route path="/admin" element={
@@ -63,7 +67,7 @@ function App() {
           <Route path="config" element={<AdminCompanyConfig />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/portal" replace />} />
+        <Route path="*" element={<FallbackRedirect />} />
       </Routes>
     </Router>
   );

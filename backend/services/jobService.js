@@ -164,7 +164,7 @@ class JobService {
     if (status) query.status = status;
     return await Job.find(query)
       .populate('lotId')
-      .populate('workerId', 'name')
+      .populate('workerId', 'name gstin state')
       .sort({ createdAt: -1 });
   }
 }

@@ -48,7 +48,8 @@ const CompanySettingsSchema = new mongoose.Schema({
     customField1Label: { type: String, default: '' },
     customField2Label: { type: String, default: '' },
     customField3Label: { type: String, default: '' },
-    // Limit Overrides (null = use plan defaults)
+  // Limit Overrides (null = use plan defaults)
+    offlineModeEnabled: { type: Boolean, default: false },
     maxUsers: { type: Number, default: null },
     maxInvoices: { type: Number, default: null },
     maxStorage: { type: Number, default: null },

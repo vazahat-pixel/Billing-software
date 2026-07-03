@@ -121,6 +121,9 @@ const SalesPage = () => {
                            <td className="px-8 py-6">
                               <p className="text-[11px] font-black text-black uppercase tracking-widest">{sale.invoiceNo}</p>
                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{sale.date}</p>
+                              {sale.offlinePending && (
+                                 <span className="text-[8px] font-bold text-amber-600 uppercase tracking-wider">Pending Sync</span>
+                              )}
                            </td>
                            <td className="px-8 py-6">
                               <p className="text-[10px] font-bold text-black uppercase tracking-widest">{parties.find(p => p.id === sale.customerId)?.name || 'UNREGISTERED'}</p>

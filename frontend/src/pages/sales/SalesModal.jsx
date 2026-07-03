@@ -11,7 +11,7 @@ import ItemMasterModal from '../masters/ItemMasterModal';
 const today = () => new Date().toISOString().split('T')[0];
 
 const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, readOnly = false }) => {
-  const { parties, items, addSale, deleteSale, sales, fetchParties, fetchItems, fetchSales, plan, user } = useStore();
+  const { parties, items, addSale, updateSale, deleteSale, sales, fetchParties, fetchItems, fetchSales, plan, user } = useStore();
   const { bundle } = useConfig();
   const { showBroker, showChallan } = resolveSalesFieldVisibility(bundle, user, plan);
   const [rowLots, setRowLots] = useState({});
@@ -112,7 +112,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     setGridItems(inv.items.map((item, idx) => ({
       id: idx + 1,
       itemId: item.itemId?._id || item.itemId || '',
-      itemName: item.itemId?.itemName || '',
+      itemName: item.itemName || item.itemId?.itemName || item.itemId?.name || '',
       desc: item.desc || '',
       lotId: item.lotId || '',
       fold: item.fold || 0,
@@ -369,8 +369,15 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         igst: calculations.igst
       };
 
-      await addSale(payload);
-      alert('Sales Invoice saved successfully!');
+      const saved =
+        mode === 'Edit' && selectedInvoiceId
+          ? await updateSale(selectedInvoiceId, payload)
+          : await addSale(payload);
+      alert(saved?.offlinePending
+        ? (mode === 'Edit' && !String(selectedInvoiceId).startsWith('local-')
+          ? 'Invoice updated offline on this device. Sync when online for server bills.'
+          : 'Invoice saved offline. It will sync when you are back online.')
+        : 'Sales Invoice saved successfully!');
       setMode('View');
       fetchSales();
     } catch (err) {
@@ -437,21 +444,41 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             <div className="col-span-8 flex flex-col gap-2">
               <div className="flex gap-2">
                 <span className="classic-erp-label red-label w-16">Party:</span>
-                <select 
-                  className="classic-erp-select flex-1" 
-                  value={header.party} 
-                  onChange={e => {
-                    const val = e.target.value;
-                    const p = parties.find(x => x._id === val || x.id === val);
-                    setHeader({ ...header, party: val, add: p?.address || '', gstin: p?.gstin || '', city: p?.station || p?.city || '' });
-                  }}
-                  disabled={locked}
-                >
-                  <option value="">- Select Party / Customer -</option>
-                  {parties.filter(p => p.type !== 'Broker').map(p => (
-                    <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
-                  ))}
-                </select>
+                <div className="flex-1 flex gap-1 items-center">
+                  <select 
+                    className="classic-erp-select flex-1" 
+                    value={header.party} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === 'NEW_PARTY') {
+                        handleCreateAccount('');
+                        return;
+                      }
+                      const p = parties.find(x => x._id === val || x.id === val);
+                      setHeader({ ...header, party: val, add: p?.address || '', gstin: p?.gstin || '', city: p?.station || p?.city || '' });
+                    }}
+                    disabled={locked}
+                  >
+                    <option value="">- Select Party / Customer -</option>
+                    {!locked && (
+                      <option value="NEW_PARTY" className="text-blue-600 font-bold bg-blue-50">+ Add New Party / Customer...</option>
+                    )}
+                    {parties.filter(p => p.type !== 'Broker').map(p => (
+                      <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  {!locked && (
+                    <button
+                      type="button"
+                      onClick={() => handleCreateAccount('')}
+                      className="classic-erp-btn p-0 w-8 flex items-center justify-center shrink-0"
+                      style={{ height: '30px', minHeight: '30px' }}
+                      title="Add New Party / Customer"
+                    >
+                      <Plus size={14} strokeWidth={2.5} />
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex gap-2">
@@ -494,14 +521,42 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           {/* Broker/Haste Toolbar Frame */}
           <div className="classic-erp-frame grid grid-cols-3 gap-3">
             {showBroker ? (
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
                 <span className="classic-erp-label w-16">Broker:</span>
-                <select className="classic-erp-select flex-1" value={header.broker} onChange={e => setHeader({ ...header, broker: e.target.value })} disabled={locked}>
-                  <option value="">- Select Broker -</option>
-                  {parties.filter(p => p.type === 'Broker').map(p => (
-                    <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
-                  ))}
-                </select>
+                <div className="flex-1 flex gap-1 items-center">
+                  <select 
+                    className="classic-erp-select flex-1" 
+                    value={header.broker} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === 'NEW_BROKER') {
+                        handleCreateBroker('');
+                        return;
+                      }
+                      setHeader({ ...header, broker: val });
+                    }} 
+                    disabled={locked}
+                  >
+                    <option value="">- Select Broker -</option>
+                    {!locked && (
+                      <option value="NEW_BROKER" className="text-blue-600 font-bold bg-blue-50">+ Add New Broker...</option>
+                    )}
+                    {parties.filter(p => p.type === 'Broker').map(p => (
+                      <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  {!locked && (
+                    <button
+                      type="button"
+                      onClick={() => handleCreateBroker('')}
+                      className="classic-erp-btn p-0 w-8 flex items-center justify-center shrink-0"
+                      style={{ height: '30px', minHeight: '30px' }}
+                      title="Add New Broker"
+                    >
+                      <Plus size={14} strokeWidth={2.5} />
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div />
@@ -544,23 +599,43 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                   <tr key={row.id || idx}>
                     <td className="text-center font-bold">{idx + 1}</td>
                     <td>
-                      <select
-                        className="classic-erp-select w-full border-0"
-                        value={row.itemId}
-                        onChange={e => {
-                          const val = e.target.value;
-                          const item = items.find(i => i._id === val || i.id === val);
-                          const updated = [...gridItems];
-                          updated[idx] = { ...updated[idx], itemId: val, itemName: item?.itemName || '', saleRate: item?.salesRate || 0 };
-                          setGridItems(updated);
-                        }}
-                        disabled={locked}
-                      >
-                        <option value="">- Select Item -</option>
-                        {items.map(i => (
-                          <option key={i._id || i.id} value={i._id || i.id}>{i.itemName}</option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-1 w-full px-1">
+                        <select
+                          className="classic-erp-select flex-1 border-0"
+                          style={{ height: '30px' }}
+                          value={row.itemId}
+                          onChange={e => {
+                            const val = e.target.value;
+                            if (val === 'NEW_ITEM') {
+                              handleCreateItem('', idx);
+                              return;
+                            }
+                            const item = items.find(i => i._id === val || i.id === val);
+                            const updated = [...gridItems];
+                            updated[idx] = { ...updated[idx], itemId: val, itemName: item?.itemName || '', saleRate: item?.salesRate || 0 };
+                            setGridItems(updated);
+                          }}
+                          disabled={locked}
+                        >
+                          <option value="">- Select Item -</option>
+                          {!locked && (
+                            <option value="NEW_ITEM" className="text-blue-600 font-bold bg-blue-50">+ Add New Item...</option>
+                          )}
+                          {items.map(i => (
+                            <option key={i._id || i.id} value={i._id || i.id}>{i.itemName}</option>
+                          ))}
+                        </select>
+                        {!locked && (
+                          <button
+                            type="button"
+                            onClick={() => handleCreateItem('', idx)}
+                            className="text-blue-600 hover:text-blue-800 p-1 flex items-center justify-center shrink-0"
+                            title="Add New Item"
+                          >
+                            <Plus size={14} strokeWidth={2.5} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <input type="text" className="classic-erp-input w-full border-0" value={row.desc} onChange={e => {
@@ -634,7 +709,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             </table>
           </div>
 
-          <div className="flex justify-between items-center bg-[#d4d0c8] p-1.5 border border-white">
+          <div className="flex justify-between items-center bg-[var(--bg-subtle)] p-1.5 border border-[var(--border)] rounded-md">
             <button
               type="button"
               onClick={() => setGridItems([...gridItems, { id: Date.now(), itemId: '', itemName: '', desc: '', lotId: '', fold: 0, cut: 0, pcs: 0, mts: 0, saleRate: 0, amount: 0, dis1Per: 0, dis1Amt: 0 }])}
@@ -684,7 +759,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 </div>
               ))}
               
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#808080]">
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[var(--border)]">
                 <div className="flex gap-1 items-center">
                   <span className="classic-erp-label text-[10px]">DueDays:</span>
                   <input type="number" className="classic-erp-input w-16 text-center" value={footer.dueDays} onChange={e => setFooter({ ...footer, dueDays: Number(e.target.value) })} disabled={locked} />
@@ -741,7 +816,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             </div>
 
             {/* Right Totals & GST Summary Column */}
-            <div className="col-span-4 classic-erp-frame space-y-1 p-2 bg-[#ece9d8]">
+            <div className="col-span-4 classic-erp-frame space-y-1 p-2 bg-[var(--accent-light)]">
               <div className="flex justify-between items-center font-bold">
                 <span className="classic-erp-label text-slate-800">TaxableAmt:</span>
                 <span className="font-mono text-black">₹{calculations.taxable.toFixed(2)}</span>
@@ -786,7 +861,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 <span className="font-mono text-black">₹{calculations.tcsAmt.toFixed(2)}</span>
               </div>
 
-              <div className="flex justify-between items-center font-bold border-t border-[#808080] pt-1">
+              <div className="flex justify-between items-center font-bold border-t border-[var(--border)] pt-1">
                 <span className="classic-erp-label text-slate-800">Gross Amt:</span>
                 <span className="font-mono text-black">₹{calculations.gross.toFixed(2)}</span>
               </div>

@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import api from '../api/client';
 import useStore from '../store/useStore';
 import { buildModuleConfig } from '../utils/configHelpers';
+import { isOffline } from '../utils/networkStatus';
 
 const ConfigContext = createContext(null);
 
@@ -19,7 +20,7 @@ export const ConfigProvider = ({ children }) => {
   const fetchingRef = useRef(false);
 
   const fetchBundle = useCallback(async () => {
-    if (!token || fetchingRef.current) return null;
+    if (!token || fetchingRef.current || isOffline()) return null;
     fetchingRef.current = true;
     try {
       const res = await api.get('/config/active');
@@ -40,7 +41,7 @@ export const ConfigProvider = ({ children }) => {
   }, [token, syncActiveConfig]);
 
   const pollVersion = useCallback(async () => {
-    if (!token) return;
+    if (!token || isOffline()) return;
     try {
       const res = await api.get('/config/version');
       const remoteHash = res.data?.data?.configHash;
@@ -58,6 +59,19 @@ export const ConfigProvider = ({ children }) => {
       return undefined;
     }
 
+    if (isOffline()) {
+      if (user?.activeConfig) {
+        setBundle({
+          ...user.activeConfig,
+          bundleVersion: user.configVersion,
+          configHash: user.configHash
+        });
+        hashRef.current = user.configHash || null;
+      }
+      setLoading(false);
+      return undefined;
+    }
+
     let mounted = true;
     (async () => {
       await fetchBundle();
@@ -69,7 +83,7 @@ export const ConfigProvider = ({ children }) => {
       mounted = false;
       clearInterval(intervalId);
     };
-  }, [token, fetchBundle, pollVersion]);
+  }, [token, user?.activeConfig, user?.configVersion, user?.configHash, fetchBundle, pollVersion]);
 
   const moduleConfig = buildModuleConfig(bundle, user?.moduleConfig);
 

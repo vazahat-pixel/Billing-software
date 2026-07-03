@@ -1,17 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { LayoutDashboard, Lock, Mail, Loader2, ArrowRight } from 'lucide-react';
-import api from '../../utils/api';
+import { LayoutDashboard, Lock, Mail, Loader2, ArrowRight, WifiOff } from 'lucide-react';
 import useStore from '../../store/useStore';
+import { loginWithOfflineSupport } from '../../utils/loginService';
+import { listOfflineProfiles } from '../../utils/offlineAuth';
+import { isOffline } from '../../utils/offlineHelpers';
+import { subscribeNetworkStatus } from '../../utils/networkStatus';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [offlineMode, setOfflineMode] = useState(isOffline());
+    const [savedProfiles, setSavedProfiles] = useState([]);
     
     const navigate = useNavigate();
     const setAuth = useStore(state => state.setAuth);
+
+    useEffect(() => {
+        const unsub = subscribeNetworkStatus(({ isOffline: offline }) => {
+            setOfflineMode(offline);
+        });
+        listOfflineProfiles().then(setSavedProfiles).catch(() => {});
+        return unsub;
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -19,24 +32,22 @@ const LoginPage = () => {
         setError('');
 
         try {
-            const response = await api.post('/auth/login', { email, password });
-            const { token, user } = response.data;
-            
-            // 1. Save to global state
-            setAuth({ token, user });
-
-            // 2. Redirect to ERP panel (super_admin can switch to admin from header)
+            const { token, user } = await loginWithOfflineSupport({ email, password });
+            await setAuth({ token, user });
             navigate('/');
         } catch (err) {
-            setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+            setError(err.message || 'Login failed. Please check your credentials.');
         } finally {
             setLoading(false);
         }
     };
 
+    const pickProfile = (profile) => {
+        setEmail(profile.email);
+    };
+
     return (
         <div className="min-h-screen bg-white flex items-center justify-center p-6 relative overflow-hidden">
-            {/* Background Decorative Elements */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
                 <div className="absolute -top-24 -left-24 w-96 h-96 bg-black/5 rounded-full blur-3xl"></div>
                 <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-black/5 rounded-full blur-3xl"></div>
@@ -51,6 +62,43 @@ const LoginPage = () => {
                         <h1 className="text-2xl font-bold text-black tracking-tight uppercase">Welcome Back</h1>
                         <p className="text-slate-400 mt-1 text-xs font-bold uppercase tracking-widest">SaaS ERP Management System</p>
                     </div>
+
+                    {offlineMode && (
+                        <div className="mb-5 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2">
+                            <WifiOff size={16} className="text-amber-700 mt-0.5 shrink-0" />
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-wider text-amber-800">Offline login</p>
+                                <p className="text-[10px] text-amber-700 mt-1">
+                                    Bookmark this page: <strong>{typeof window !== 'undefined' ? `${window.location.origin}/login` : '/login'}</strong>
+                                </p>
+                                <p className="text-[10px] text-amber-600 mt-1">
+                                    Same email & password from your last online sign-in.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {savedProfiles.length > 0 && (
+                        <div className="mb-5">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Saved on this device</p>
+                            <div className="flex flex-wrap gap-2">
+                                {savedProfiles.slice(0, 4).map((profile) => (
+                                    <button
+                                        key={profile.email}
+                                        type="button"
+                                        onClick={() => pickProfile(profile)}
+                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${
+                                            email === profile.email
+                                                ? 'bg-black text-white border-black'
+                                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-400'
+                                        }`}
+                                    >
+                                        {profile.name || profile.email}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {error && (
@@ -89,11 +137,13 @@ const LoginPage = () => {
                             </div>
                         </div>
 
-                        <div className="flex justify-end">
-                            <Link to="/forgot-password" summerized="true" className="text-xs font-bold text-slate-400 hover:text-black transition-colors uppercase tracking-widest">
-                                Forgot Password?
-                            </Link>
-                        </div>
+                        {!offlineMode && (
+                            <div className="flex justify-end">
+                                <Link to="/forgot-password" className="text-xs font-bold text-slate-400 hover:text-black transition-colors uppercase tracking-widest">
+                                    Forgot Password?
+                                </Link>
+                            </div>
+                        )}
 
                         <button 
                             disabled={loading}
@@ -102,7 +152,7 @@ const LoginPage = () => {
                         >
                             {loading ? <Loader2 className="animate-spin" size={20} /> : (
                                 <>
-                                    Sign In 
+                                    {offlineMode ? 'Sign In Offline' : 'Sign In'}
                                     <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                                 </>
                             )}
@@ -110,10 +160,12 @@ const LoginPage = () => {
                     </form>
 
                     <div className="mt-8 pt-8 border-t border-white/5 text-center">
-                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-                            Don't have a business account? 
-                            <Link to="/signup" className="text-black font-black hover:underline ml-1.5">Create Account</Link>
-                        </p>
+                        {!offlineMode && (
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                                Don't have a business account? 
+                                <Link to="/signup" className="text-black font-black hover:underline ml-1.5">Create Account</Link>
+                            </p>
+                        )}
                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-3">
                             <Link to="/portal" className="text-slate-500 hover:text-black transition-colors">← Back to Panel Selection</Link>
                         </p>

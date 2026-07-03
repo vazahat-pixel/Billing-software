@@ -1,14 +1,19 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
    faFileInvoiceDollar, faCartFlatbed, faMoneyCheckDollar,
    faHandHoldingDollar, faTruckArrowRight, faWarehouse,
    faScrewdriverWrench, faClipboardCheck, faChartPie,
    faChevronDown, faSync, faSearch, faBell,
-   faTriangleExclamation, faHandshake, faUserTie
+   faTriangleExclamation, faHandshake, faUserTie,
+   faRightFromBracket
 } from '@fortawesome/free-solid-svg-icons';
 import useStore from '../store/useStore';
 import PanelSwitcher from '../components/PanelSwitcher';
+import OfflineIndicator from '../components/OfflineIndicator';
+import FailedSyncModal from '../components/FailedSyncModal';
+import PwaInstallPrompt from '../components/PwaInstallPrompt';
 import Modal from '../components/ui/Modal';
 
 // Legacy Modals
@@ -102,12 +107,18 @@ const MODULE_SUBMENU_MAP = {
 };
 
 const Dashboard = () => {
-   const { user, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items, plan } = useStore();
+   const navigate = useNavigate();
+   const { user, logout, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items, plan } = useStore();
    const { bundle, moduleConfig: liveModuleConfig, lastSynced } = useConfig();
    const moduleConfig = liveModuleConfig || user?.moduleConfig;
    const showRecordsHub = isFlagEnabled(bundle, 'records_hub', true);
    const showCADesk = isFlagEnabled(bundle, 'ca_desk', true);
    const permissions = useMemo(() => getPermissions(user?.companyRole, user?.role), [user?.companyRole, user?.role]);
+
+   const handleLogout = async () => {
+      await logout();
+      navigate('/login');
+   };
 
    /** Show menu unless admin explicitly disabled (opt-out). Plan does not hide menus. */
    const isParentModuleEnabled = (parentKey) => {
@@ -242,6 +253,7 @@ const Dashboard = () => {
    });
 
    const [placeholderName, setPlaceholderName] = useState('');
+   const [syncModalOpen, setSyncModalOpen] = useState(false);
    const [bookSelection, setBookSelection] = useState({
       isOpen: false,
       module: null
@@ -571,8 +583,8 @@ const Dashboard = () => {
                   onClick={() => { setActiveMenuKey(mod.key); toggleModal(mod.key, true); }}
                   className={`mx-1.5 flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer ${
                      activeMenuKey === mod.key
-                        ? 'bg-[var(--accent)] text-white'
-                        : 'text-[var(--text-secondary)] hover:bg-[var(--bg-base)]'
+                        ? 'bg-[var(--accent)] text-white shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)]'
                   }`}
                >
                   <FontAwesomeIcon icon={mod.icon} className="text-[11px] w-3.5 shrink-0" />
@@ -600,13 +612,14 @@ const Dashboard = () => {
                   <div className="hidden md:flex flex-1 max-w-xs mx-2">
                      <div className="relative w-full">
                         <FontAwesomeIcon icon={faSearch} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-[10px]" />
-                        <input type="text" placeholder="Search..." className="w-full h-7 bg-[var(--bg-base)] border border-[var(--border)] rounded-md py-0 pl-7 pr-2 text-[11px] focus:outline-none focus:border-[var(--accent)]" />
+                        <input type="text" placeholder="Search..." className="w-full h-7 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-md py-0 pl-7 pr-2 text-[11px] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20" />
                      </div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
+                     <OfflineIndicator onOpenSync={() => setSyncModalOpen(true)} />
                      <PanelSwitcher variant="light" />
-                     <button type="button" onClick={() => refreshAllData()} className="h-7 px-2 text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border)] rounded-md bg-[var(--bg-base)]">
+                     <button type="button" onClick={() => refreshAllData()} className="h-7 px-2 text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border)] rounded-md bg-white hover:bg-[var(--bg-subtle)]">
                         <FontAwesomeIcon icon={faSync} className="text-[9px] mr-1" />Sync
                      </button>
                      <button type="button" className="relative w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)]">
@@ -620,14 +633,21 @@ const Dashboard = () => {
                         <div className="w-7 h-7 rounded-md bg-[var(--accent-light)] text-[var(--accent)] flex items-center justify-center font-semibold text-[10px]">
                            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
                         </div>
+                        <button
+                           type="button"
+                           onClick={handleLogout}
+                           title="Sign out"
+                           className="h-7 px-2.5 flex items-center gap-1.5 text-[10px] font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 rounded-md transition-colors"
+                        >
+                           <FontAwesomeIcon icon={faRightFromBracket} className="text-[9px]" />
+                           <span className="hidden sm:inline">Logout</span>
+                        </button>
                      </div>
                   </div>
                </div>
 
-               <div
-                  ref={menuBarRef}
-                  className="flex flex-wrap items-center gap-1 px-3 min-h-9 py-1 border-t border-[var(--border-subtle)] overflow-visible"
-               >
+               {/* Menu Bar */}
+               <div ref={menuBarRef} className="erp-menu-bar select-none">
                   {Object.keys(visibleMenuData).map((section) => {
                      const isOpen = openMenuSection === section;
                      return (
@@ -635,41 +655,83 @@ const Dashboard = () => {
                         <button
                            type="button"
                            onClick={() => setOpenMenuSection(isOpen ? null : section)}
-                           className={`flex items-center gap-1 px-2.5 h-7 rounded-md text-[10px] font-semibold uppercase tracking-wide cursor-pointer ${
-                              isOpen
-                                 ? 'text-[var(--accent)] bg-[var(--accent-light)]'
-                                 : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent-light)]'
-                           }`}
+                           className={`erp-menu-trigger ${isOpen ? 'erp-menu-trigger--open' : ''}`}
                         >
                            {section}
-                           <FontAwesomeIcon icon={faChevronDown} className={`text-[8px] opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                         </button>
                         {isOpen && (
-                           <div className="absolute top-full left-0 mt-0.5 w-52 z-[200]">
-                              <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-md)] overflow-y-auto max-h-[70vh] py-1">
+                           <div className="erp-menu-dropdown">
                                  {visibleMenuData[section].map((item, idx) => {
                                     const label = typeof item === 'object' ? item.label : item;
                                     const { badge, text } = parseMenuLabel(label);
+                                    const needsSeparator = text === 'Closing / UnClosing Year' || text === 'Voucher Relndex';
                                     return (
-                                       <button
-                                          key={idx}
-                                          type="button"
-                                          onClick={() => {
-                                             setOpenMenuSection(null);
-                                             handleMenuItemClick(item);
-                                          }}
-                                          className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-left text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--blue-bg)] cursor-pointer"
-                                       >
-                                          {badge && <span className="text-[9px] text-white bg-[var(--accent)] px-1 rounded font-mono">{badge}</span>}
-                                          <span className="truncate">{text}</span>
-                                       </button>
+                                       <React.Fragment key={idx}>
+                                          {needsSeparator && <div className="erp-menu-separator" />}
+                                          <button
+                                             type="button"
+                                             onClick={() => {
+                                                setOpenMenuSection(null);
+                                                handleMenuItemClick(item);
+                                             }}
+                                             className="erp-menu-item"
+                                          >
+                                             {badge && (
+                                                <span className="text-[9px] text-white bg-[var(--accent)] px-1 rounded font-mono shrink-0">
+                                                   {badge}
+                                                </span>
+                                             )}
+                                             <span className="truncate">{text}</span>
+                                          </button>
+                                       </React.Fragment>
                                     );
                                  })}
-                              </div>
                            </div>
                         )}
                      </div>
                   );})}
+                  <button
+                     type="button"
+                     className="erp-menu-trigger ml-auto text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                     onClick={handleLogout}
+                  >
+                     Exit
+                  </button>
+               </div>
+
+               {/* Keyboard shortcuts */}
+               <div className="erp-shortcut-bar select-none no-scrollbar">
+                  {[
+                     { label: '1 Sales', action: () => toggleModal('sales', true) },
+                     { label: '2 Pur', action: () => toggleModal('purchase', true) },
+                     { label: '3 Rec', action: () => toggleModal('receipt', true) },
+                     { label: '4 Pay', action: () => toggleModal('payment', true) },
+                     { label: 'Ledger', action: () => toggleModal('ledger', true) },
+                     { label: 'Z Trail', action: () => openReportsHub('summary') },
+                     { label: '5 M.Iss', action: () => toggleModal('millIssue', true) },
+                     { label: '6 M.Rec', action: () => toggleModal('millRec', true) },
+                     { label: '7 J.Iss', action: () => toggleModal('jobIssue', true) },
+                     { label: '8 J.Rec', action: () => toggleModal('jobRec', true) },
+                     { label: '9 Debt O/s', action: () => toggleModal('outstanding', true) },
+                     { label: 'F10 Help', action: () => alert('ERP System Help Update Desk: Active') }
+                  ].map((btn, idx, arr) => (
+                     <React.Fragment key={btn.label}>
+                        <button
+                           type="button"
+                           onClick={btn.action}
+                           className="erp-shortcut-btn"
+                        >
+                           {btn.label}
+                        </button>
+                        {idx < arr.length - 1 && <span className="erp-shortcut-divider">|</span>}
+                     </React.Fragment>
+                  ))}
+                  <div className="ml-auto flex gap-3 text-slate-400 text-[10px] font-medium">
+                     <span>Update</span>
+                     <span>Help</span>
+                     <span>E-Way</span>
+                     <span>Desk</span>
+                  </div>
                </div>
             </header>
 
@@ -719,7 +781,16 @@ const Dashboard = () => {
 
          {/* Modals */}
          <SalesModal isOpen={modals.sales} onClose={() => toggleModal('sales', false)} selectedBook={selectedBooks.sales?.name} readOnly={!permissions.canSave} />
-         <PurchaseModal isOpen={modals.purchase} onClose={() => toggleModal('purchase', false)} selectedBook={selectedBooks.purchase?.name} readOnly={!permissions.canSave} />
+         <PurchaseModal 
+            isOpen={modals.purchase} 
+            onClose={() => toggleModal('purchase', false)} 
+            selectedBook={selectedBooks.purchase?.name} 
+            readOnly={!permissions.canSave} 
+            onOpenSales={() => { toggleModal('purchase', false); toggleModal('sales', true); }}
+            onOpenJobIssue={() => { toggleModal('purchase', false); toggleModal('jobIssue', true); }}
+            onOpenMillIssue={() => { toggleModal('purchase', false); toggleModal('millIssue', true); }}
+         />
+
          <AccountingModal isOpen={modals.receipt} onClose={() => toggleModal('receipt', false)} initialType="Receipt" selectedBook={selectedBooks.receipt?.name} />
          <AccountingModal isOpen={modals.payment} onClose={() => toggleModal('payment', false)} initialType="Payment" selectedBook={selectedBooks.payment?.name} />
          <IssueModal isOpen={modals.millIssue} onClose={() => toggleModal('millIssue', false)} selectedBook={selectedBooks.millIssue?.name} />
@@ -839,6 +910,9 @@ const Dashboard = () => {
             onClose={() => setModals(prev => ({ ...prev, reportsHub: false }))}
             initialTab={modals.reportsTab}
          />
+
+         <FailedSyncModal isOpen={syncModalOpen} onClose={() => setSyncModalOpen(false)} />
+         <PwaInstallPrompt />
 
       </div>
    );

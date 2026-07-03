@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, Check, Shield, Package, Database, Users as UsersIcon, Trash2, Plus, Zap, X, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, FileText, ShoppingCart, Wrench, Calculator, BarChart2, Receipt, Settings } from 'lucide-react';
+import { CreditCard, Check, Shield, Package, Database, Users as UsersIcon, Trash2, Plus, Zap, X, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, FileText, ShoppingCart, Wrench, Calculator, BarChart2, Receipt, Settings, Wifi } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
 
@@ -46,6 +46,7 @@ const Toggle = ({ checked, onChange }) => (
 /* ── Plan Card ── */
 const PlanCard = ({ plan, onEdit, onDelete }) => {
     const activeModules = Object.entries(plan.features?.modules || {}).filter(([_, v]) => v).map(([k]) => k);
+    const hasOffline = plan.features?.offlineMode || plan.features?.modules?.offline;
 
     return (
         <motion.div
@@ -73,6 +74,9 @@ const PlanCard = ({ plan, onEdit, onDelete }) => {
 
             {/* Active Modules */}
             <div className="plan-card__modules">
+                {hasOffline && (
+                    <span className="module-pill"><Wifi size={10} /> offline</span>
+                )}
                 {activeModules.length > 0 ? activeModules.map(mod => {
                     const Icon = moduleIcons[mod] || Package;
                     return (
@@ -118,6 +122,20 @@ const PlanCard = ({ plan, onEdit, onDelete }) => {
 const PlanBuilderModal = ({ plan, onClose, onSave }) => {
     const [form, setForm] = useState(plan);
     const [expandedModule, setExpandedModule] = useState(null);
+
+    const toggleFeature = (key) => {
+        setForm(prev => ({
+            ...prev,
+            features: {
+                ...prev.features,
+                [key]: !prev.features[key],
+                modules: {
+                    ...prev.features.modules,
+                    ...(key === 'offlineMode' ? { offline: !prev.features.offlineMode } : {})
+                }
+            }
+        }));
+    };
 
     const toggleModule = (module) => {
         setForm(prev => ({
@@ -222,6 +240,17 @@ const PlanBuilderModal = ({ plan, onClose, onSave }) => {
                                 </div>
                                 <Toggle checked={form.isActive} onChange={() => setForm({ ...form, isActive: !form.isActive })} />
                             </div>
+
+                            <div className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/[0.04] rounded-xl">
+                                <div className="flex items-center gap-2">
+                                    <Wifi size={13} className="text-emerald-400" />
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-300">Offline Mode</p>
+                                        <p className="text-[9px] text-slate-600">Work without internet</p>
+                                    </div>
+                                </div>
+                                <Toggle checked={!!form.features?.offlineMode} onChange={() => toggleFeature('offlineMode')} />
+                            </div>
                         </div>
 
                         {/* Right: Module Gating */}
@@ -315,7 +344,8 @@ const Plans = () => {
         priceMonthly: 0,
         priceYearly: 0,
         features: {
-            modules: { purchase: false, inventory: false, jobWork: false, sales: false, accounting: false, gst: false, reports: false, masters: false, utilities: false },
+            offlineMode: false,
+            modules: { purchase: false, inventory: false, jobWork: false, sales: false, accounting: false, gst: false, reports: false, masters: false, utilities: false, offline: false },
             fields: {
                 purchase: { broker: false, lrNo: false, discount2: false },
                 sales: { bale: false, weight: false, challan: false }

@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Shield, Lock, Mail, Loader2, ArrowRight, Eye, EyeOff, LayoutGrid } from 'lucide-react';
-import api from '../../utils/api';
+import { Shield, Lock, Mail, Loader2, ArrowRight, Eye, EyeOff, LayoutGrid, WifiOff } from 'lucide-react';
 import useStore from '../../store/useStore';
+import { loginWithOfflineSupport } from '../../utils/loginService';
+import { listOfflineProfiles } from '../../utils/offlineAuth';
+import { isOffline } from '../../utils/offlineHelpers';
 
 const AdminLogin = () => {
     const [email, setEmail] = useState('');
@@ -10,22 +12,42 @@ const AdminLogin = () => {
     const [showPass, setShowPass] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [offlineMode, setOfflineMode] = useState(isOffline());
 
     const navigate = useNavigate();
     const setAuth = useStore(state => state.setAuth);
+
+    useEffect(() => {
+        const refresh = () => setOfflineMode(isOffline());
+        window.addEventListener('online', refresh);
+        window.addEventListener('offline', refresh);
+        refresh();
+        listOfflineProfiles()
+            .then((profiles) => {
+                const admin = profiles.find((p) => p.role === 'super_admin');
+                if (admin) setEmail(admin.email);
+            })
+            .catch(() => {});
+        return () => {
+            window.removeEventListener('online', refresh);
+            window.removeEventListener('offline', refresh);
+        };
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
         try {
-            const response = await api.post('/auth/login', { email, password });
-            const { token, user } = response.data;
-            if (user.role !== 'super_admin') throw new Error('Access denied: Not a super admin');
-            setAuth({ token, user });
+            const { token, user } = await loginWithOfflineSupport({
+                email,
+                password,
+                adminOnly: true
+            });
+            await setAuth({ token, user });
             navigate('/admin/dashboard');
         } catch (err) {
-            setError(err.response?.data?.message || err.message);
+            setError(err.message || 'Login failed');
         } finally {
             setLoading(false);
         }
@@ -43,6 +65,13 @@ const AdminLogin = () => {
                         ERP Command Center · Super Admin Access
                     </p>
                 </div>
+
+                {offlineMode && (
+                    <div className="mb-4 p-3 rounded-lg flex items-center gap-2" style={{ background: 'var(--admin-warning-bg, #fff7ed)', border: '1px solid #fed7aa' }}>
+                        <WifiOff size={14} className="text-amber-700 shrink-0" />
+                        <p className="text-[10px] font-semibold text-amber-800">Offline admin login — same password as last online sign-in</p>
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {error && (
@@ -90,7 +119,7 @@ const AdminLogin = () => {
                         {loading ? (
                             <Loader2 className="animate-spin" size={16} />
                         ) : (
-                            <>Sign In <ArrowRight size={15} /></>
+                            <>{offlineMode ? 'Sign In Offline' : 'Sign In'} <ArrowRight size={15} /></>
                         )}
                     </button>
                 </form>

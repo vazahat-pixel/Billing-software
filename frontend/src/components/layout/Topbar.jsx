@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { Search, Bell, User, ChevronDown, Calendar, Building, LogOut, Settings } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import useStore from '../../store/useStore';
+import OfflineIndicator from '../OfflineIndicator';
 
 const Topbar = () => {
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
@@ -34,6 +35,7 @@ const Topbar = () => {
       </div>
 
       <div className="flex items-center gap-6">
+        <OfflineIndicator />
         {/* Modern Search Bar */}
         <div className="hidden lg:flex items-center gap-3 px-5 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl w-80 group focus-within:border-black transition-all">
            <Search size={16} className="text-slate-300 group-focus-within:text-black transition-colors" />

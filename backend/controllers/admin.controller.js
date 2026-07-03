@@ -59,7 +59,7 @@ exports.createCompany = async (req, res) => {
             await configService.seedCompanyDefaults(company._id, user._id);
             await require('../models/CompanySettings').findOneAndUpdate(
               { companyId: company._id },
-              { legalName: name },
+              { legalName: name, offlineModeEnabled: true },
               { upsert: true }
             );
         } catch (seedErr) {
@@ -77,7 +77,8 @@ exports.createCompany = async (req, res) => {
             startDate: trialStart,
             endDate: trialEnd,
             billingCycle: 'monthly',
-            autoRenew: false
+            autoRenew: false,
+            offlineModeEnabled: true
         });
 
         // 7. Create License
@@ -189,7 +190,26 @@ exports.getAllSubscriptions = async (req, res) => {
 exports.updateSubscription = async (req, res) => {
     try {
         const { companyId } = req.params;
-        const updated = await Subscription.findOneAndUpdate({ companyId }, req.body, { new: true, upsert: true });
+        const { offlineModeEnabled, ...rest } = req.body;
+
+        const updateData = { companyId, ...rest };
+        if (offlineModeEnabled !== undefined) updateData.offlineModeEnabled = offlineModeEnabled;
+
+        const updated = await Subscription.findOneAndUpdate(
+            { companyId },
+            updateData,
+            { new: true, upsert: true }
+        ).populate('companyId').populate('planId');
+
+        if (offlineModeEnabled !== undefined) {
+            const CompanySettings = require('../models/CompanySettings');
+            await CompanySettings.findOneAndUpdate(
+                { companyId },
+                { offlineModeEnabled },
+                { upsert: true }
+            );
+        }
+
         res.status(200).json(updated);
     } catch (err) {
         res.status(500).json({ message: err.message });

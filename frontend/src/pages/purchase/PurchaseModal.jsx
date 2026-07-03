@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
 import { useConfig } from '../../context/ConfigContext';
@@ -7,16 +8,29 @@ import api from '../../utils/api';
 import { Trash2, Plus } from 'lucide-react';
 import AccountMasterModal from '../masters/AccountMasterModal';
 import ItemMasterModal from '../masters/ItemMasterModal';
+import BillSaveNextActions from '../../components/BillSaveNextActions';
+import PurchasePrint from './PurchasePrint';
 
 const today = () => new Date().toISOString().split('T')[0];
 
-const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false }) => {
-  const { parties, items, purchases, addPurchase, deletePurchase, fetchParties, fetchItems, fetchPurchases, plan, user } = useStore();
+const PurchaseModal = ({
+  isOpen,
+  onClose,
+  selectedBook = null,
+  readOnly = false,
+  onOpenSales,
+  onOpenJobIssue,
+  onOpenMillIssue
+}) => {
+  const { parties, items, purchases, addPurchase, updatePurchase, deletePurchase, fetchParties, fetchItems, fetchPurchases, plan, user } = useStore();
   const { bundle } = useConfig();
   const { showBroker, showDiscount2 } = resolvePurchaseFieldVisibility(bundle, user, plan);
   const [mode, setMode] = useState('View');
   const [selectedPurchaseId, setSelectedPurchaseId] = useState('');
   const [error, setError] = useState('');
+  const [saveNextActions, setSaveNextActions] = useState(null);
+  const [printInvoiceId, setPrintInvoiceId] = useState(null);
+  const openedOnceRef = useRef(false);
 
   const [header, setHeader] = useState({
     party: '',
@@ -56,15 +70,27 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false 
   });
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      openedOnceRef.current = false;
+      setSaveNextActions(null);
+      setPrintInvoiceId(null);
+      return;
+    }
+
     fetchParties();
     fetchItems();
     fetchPurchases();
-    if (readOnly) {
-      setMode('View');
-    } else {
-      setSelectedPurchaseId('');
-      handleNew();
+
+    if (!openedOnceRef.current) {
+      openedOnceRef.current = true;
+      setSaveNextActions(null);
+      setPrintInvoiceId(null);
+      if (readOnly) {
+        setMode('View');
+      } else {
+        setSelectedPurchaseId('');
+        handleNew();
+      }
     }
   }, [isOpen, readOnly, selectedBook, fetchParties, fetchItems, fetchPurchases]);
 
@@ -291,8 +317,19 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false 
         igst: header.type === 'INVOICE OUT OF STATE' ? calculations.gstAmt : 0,
       };
 
-      await addPurchase(payload);
-      alert('Purchase Invoice saved successfully!');
+      const saved =
+        mode === 'Edit' && selectedPurchaseId
+          ? await updatePurchase(selectedPurchaseId, payload)
+          : await addPurchase(payload);
+      const savedId = saved?._id || saved?.id;
+      if (savedId) {
+        setSelectedPurchaseId(savedId);
+      }
+      setSaveNextActions({
+        id: savedId,
+        invoiceNo: saved?.invoiceNo || header.vNo,
+        offlinePending: !!saved?.offlinePending
+      });
       setMode('View');
       fetchPurchases();
     } catch (err) {
@@ -325,7 +362,35 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false 
 
   const locked = readOnly || mode === 'View';
 
+  const nextStepActions = [
+    onOpenSales && {
+      key: 'sales',
+      label: '1. Sales Bill',
+      onClick: () => {
+        setSaveNextActions(null);
+        onOpenSales();
+      }
+    },
+    onOpenMillIssue && {
+      key: 'millIssue',
+      label: '2. Mill Issue',
+      onClick: () => {
+        setSaveNextActions(null);
+        onOpenMillIssue();
+      }
+    },
+    onOpenJobIssue && {
+      key: 'jobIssue',
+      label: '3. Job Issue',
+      onClick: () => {
+        setSaveNextActions(null);
+        onOpenJobIssue();
+      }
+    }
+  ].filter(Boolean);
+
   return (
+    <>
     <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-7xl">
       <div className="classic-erp-window flex flex-col h-full">
         {/* Title Bar */}
@@ -354,21 +419,41 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false 
             <div className="col-span-8 flex flex-col gap-2">
               <div className="flex gap-2">
                 <span className="classic-erp-label red-label w-16">Vendor:</span>
-                <select 
-                  className="classic-erp-select flex-1 font-bold" 
-                  value={header.party} 
-                  onChange={e => {
-                    const val = e.target.value;
-                    const p = parties.find(x => x._id === val || x.id === val);
-                    setHeader({ ...header, party: val, add: p?.address || '', gstin: p?.gstin || '', city: p?.station || p?.city || '' });
-                  }}
-                  disabled={locked}
-                >
-                  <option value="">- Select Vendor / Supplier -</option>
-                  {parties.filter(p => p.type !== 'Broker').map(p => (
-                    <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
-                  ))}
-                </select>
+                <div className="flex-1 flex gap-1 items-center">
+                  <select 
+                    className="classic-erp-select flex-1 font-bold" 
+                    value={header.party} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === 'NEW_VENDOR') {
+                        handleCreateAccount('');
+                        return;
+                      }
+                      const p = parties.find(x => x._id === val || x.id === val);
+                      setHeader({ ...header, party: val, add: p?.address || '', gstin: p?.gstin || '', city: p?.station || p?.city || '' });
+                    }}
+                    disabled={locked}
+                  >
+                    <option value="">- Select Vendor / Supplier -</option>
+                    {!locked && (
+                      <option value="NEW_VENDOR" className="text-blue-600 font-bold bg-blue-50">+ Add New Vendor...</option>
+                    )}
+                    {parties.filter(p => p.type !== 'Broker').map(p => (
+                      <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  {!locked && (
+                    <button
+                      type="button"
+                      onClick={() => handleCreateAccount('')}
+                      className="classic-erp-btn p-0 w-8 flex items-center justify-center shrink-0"
+                      style={{ height: '30px', minHeight: '30px' }}
+                      title="Add New Vendor / Supplier"
+                    >
+                      <Plus size={14} strokeWidth={2.5} />
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex gap-2">
@@ -405,14 +490,42 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false 
           {/* Broker/Type Frame */}
           <div className="classic-erp-frame grid grid-cols-4 gap-3">
             {showBroker ? (
-              <div className="flex gap-2 col-span-2">
+              <div className="flex gap-2 col-span-2 items-center">
                 <span className="classic-erp-label w-16">Broker:</span>
-                <select className="classic-erp-select flex-1" value={header.broker} onChange={e => setHeader({ ...header, broker: e.target.value })} disabled={locked}>
-                  <option value="">- Select Broker -</option>
-                  {parties.filter(p => p.type === 'Broker').map(p => (
-                    <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
-                  ))}
-                </select>
+                <div className="flex-1 flex gap-1 items-center">
+                  <select 
+                    className="classic-erp-select flex-1" 
+                    value={header.broker} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === 'NEW_BROKER') {
+                        handleCreateBroker('');
+                        return;
+                      }
+                      setHeader({ ...header, broker: val });
+                    }} 
+                    disabled={locked}
+                  >
+                    <option value="">- Select Broker -</option>
+                    {!locked && (
+                      <option value="NEW_BROKER" className="text-blue-600 font-bold bg-blue-50">+ Add New Broker...</option>
+                    )}
+                    {parties.filter(p => p.type === 'Broker').map(p => (
+                      <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  {!locked && (
+                    <button
+                      type="button"
+                      onClick={() => handleCreateBroker('')}
+                      className="classic-erp-btn p-0 w-8 flex items-center justify-center shrink-0"
+                      style={{ height: '30px', minHeight: '30px' }}
+                      title="Add New Broker"
+                    >
+                      <Plus size={14} strokeWidth={2.5} />
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="col-span-2" />
@@ -475,23 +588,43 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false 
                     <tr key={row.id || idx}>
                       <td className="text-center font-bold">{idx + 1}</td>
                       <td>
-                        <select
-                          className="classic-erp-select w-full border-0"
-                          value={row.itemId}
-                          onChange={e => {
-                            const val = e.target.value;
-                            const item = items.find(i => i._id === val || i.id === val);
-                            const updated = [...gridItems];
-                            updated[idx] = { ...updated[idx], itemId: val, itemName: item?.itemName || '', rate: item?.purRate || 0, gstPer: item?.gstRate || 5 };
-                            setGridItems(updated);
-                          }}
-                          disabled={locked}
-                        >
-                          <option value="">- Select Item -</option>
-                          {items.map(i => (
-                            <option key={i._id || i.id} value={i._id || i.id}>{i.itemName}</option>
-                          ))}
-                        </select>
+                        <div className="flex items-center gap-1 w-full px-1">
+                          <select
+                            className="classic-erp-select flex-1 border-0"
+                            style={{ height: '30px' }}
+                            value={row.itemId}
+                            onChange={e => {
+                              const val = e.target.value;
+                              if (val === 'NEW_ITEM') {
+                                handleCreateItem('', idx);
+                                return;
+                              }
+                              const item = items.find(i => i._id === val || i.id === val);
+                              const updated = [...gridItems];
+                              updated[idx] = { ...updated[idx], itemId: val, itemName: item?.itemName || '', rate: item?.purRate || 0, gstPer: item?.gstRate || 5 };
+                              setGridItems(updated);
+                            }}
+                            disabled={locked}
+                          >
+                            <option value="">- Select Item -</option>
+                            {!locked && (
+                              <option value="NEW_ITEM" className="text-blue-600 font-bold bg-blue-50">+ Add New Item...</option>
+                            )}
+                            {items.map(i => (
+                              <option key={i._id || i.id} value={i._id || i.id}>{i.itemName}</option>
+                            ))}
+                          </select>
+                          {!locked && (
+                            <button
+                              type="button"
+                              onClick={() => handleCreateItem('', idx)}
+                              className="text-blue-600 hover:text-blue-800 p-1 flex items-center justify-center shrink-0"
+                              title="Add New Item"
+                            >
+                              <Plus size={14} strokeWidth={2.5} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <input type="text" className="classic-erp-input w-full border-0" value={row.desc || ''} onChange={e => updateRow('desc', e.target.value)} disabled={locked} />
@@ -543,7 +676,7 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false 
             </table>
           </div>
 
-          <div className="flex justify-between items-center bg-[#d4d0c8] p-1.5 border border-white">
+          <div className="flex justify-between items-center bg-[var(--bg-subtle)] p-1.5 border border-[var(--border)] rounded-md">
             <button
               type="button"
               onClick={() => setGridItems([...gridItems, { id: Date.now(), itemId: '', itemName: '', desc: '', fold: 0, cut: 0, pcs: 0, mts: 0, rate: 0, amount: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0, gstPer: 5, gstAmt: 0 }])}
@@ -592,7 +725,7 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false 
                 </div>
               ))}
               
-              <div className="flex gap-2 items-center pt-2 border-t border-[#808080]">
+              <div className="flex gap-2 items-center pt-2 border-t border-[var(--border)]">
                 <span className="classic-erp-label w-24">ITC Eligibility:</span>
                 <select className="classic-erp-select flex-1" value={footer.itcEligibility} onChange={e => setFooter({ ...footer, itcEligibility: e.target.value })} disabled={locked}>
                   <option value="Inputs">Inputs</option>
@@ -616,7 +749,7 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false 
             </div>
 
             {/* Right Totals Column */}
-            <div className="col-span-4 classic-erp-frame space-y-1 p-2 bg-[#ece9d8]">
+            <div className="col-span-4 classic-erp-frame space-y-1 p-2 bg-[var(--accent-light)]">
               <div className="flex justify-between items-center font-bold">
                 <span className="classic-erp-label text-slate-800">TaxableAmt:</span>
                 <span className="font-mono text-black">₹{calculations.taxable.toFixed(2)}</span>
@@ -662,7 +795,7 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false 
                 />
               </div>
 
-              <div className="flex justify-between items-center font-bold border-t border-[#808080] pt-1">
+              <div className="flex justify-between items-center font-bold border-t border-[var(--border)] pt-1">
                 <span className="classic-erp-label text-slate-800">Gross Amt:</span>
                 <span className="font-mono text-black">₹{calculations.gross.toFixed(2)}</span>
               </div>
@@ -705,6 +838,14 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false 
           <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked}>Cancel</button>
           <button className="classic-erp-btn" type="button" onClick={() => setMode('View')} disabled={readOnly || mode === 'View'}>Find</button>
           <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || !selectedPurchaseId}>Delete</button>
+          <button
+            className="classic-erp-btn btn-blue"
+            type="button"
+            onClick={() => selectedPurchaseId && setPrintInvoiceId(selectedPurchaseId)}
+            disabled={!selectedPurchaseId}
+          >
+            Print
+          </button>
           <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
         </div>
 
@@ -724,6 +865,31 @@ const PurchaseModal = ({ isOpen, onClose, selectedBook = null, readOnly = false 
         onSuccess={handleItemSuccess}
       />
     </Modal>
+
+    {typeof document !== 'undefined' && saveNextActions && createPortal(
+      <BillSaveNextActions
+        open
+        title="Purchase Saved"
+        invoiceNo={saveNextActions.invoiceNo}
+        offlinePending={saveNextActions.offlinePending}
+        actions={nextStepActions}
+        onPrint={() => {
+          if (saveNextActions.id) setPrintInvoiceId(saveNextActions.id);
+        }}
+        onNew={() => {
+          setSaveNextActions(null);
+          handleNew();
+        }}
+        onClose={() => setSaveNextActions(null)}
+      />,
+      document.body
+    )}
+
+    {typeof document !== 'undefined' && printInvoiceId && createPortal(
+      <PurchasePrint invoiceId={printInvoiceId} onClose={() => setPrintInvoiceId(null)} />,
+      document.body
+    )}
+    </>
   );
 };
 

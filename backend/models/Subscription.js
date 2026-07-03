@@ -24,7 +24,8 @@ const subscriptionSchema = new mongoose.Schema({
         required: true 
     },
     autoRenew: { type: Boolean, default: true },
-    lastPaymentAt: { type: Date }
+    lastPaymentAt: { type: Date },
+    offlineModeEnabled: { type: Boolean, default: false }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Subscription', subscriptionSchema);

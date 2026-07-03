@@ -37,7 +37,8 @@ exports.register = async (name, email, password, companyName) => {
             priceMonthly: 29,
             priceYearly: 290,
             features: {
-                modules: { purchase: true, inventory: true, sales: true, jobWork: false, accounting: false, gst: false, reports: false }
+                offlineMode: true,
+                modules: { purchase: true, inventory: true, sales: true, jobWork: false, accounting: false, gst: false, reports: false, offline: true }
             },
             limits: { users: 5, invoicesPerMonth: 100, storageMb: 500 }
         });
@@ -79,7 +80,8 @@ exports.register = async (name, email, password, companyName) => {
         startDate: trialStart,
         endDate: trialEnd,
         billingCycle: 'monthly',
-        autoRenew: false
+        autoRenew: false,
+        offlineModeEnabled: true
     });
 
     // 8. AUTO-CREATE trial License — required by subscription middleware
@@ -110,7 +112,7 @@ exports.register = async (name, email, password, companyName) => {
     if (companyName) {
       await CompanySettings.findOneAndUpdate(
         { companyId: company._id },
-        { legalName: companyName },
+        { legalName: companyName, offlineModeEnabled: true },
         { new: true }
       );
       settings.legalName = companyName;

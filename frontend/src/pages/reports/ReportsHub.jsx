@@ -133,6 +133,54 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary' }) => {
     (data?.stockReport || []).map((r) => [r.lotId, r.itemName, r.remainingPcs, r.remainingMtrs, r.status, r.source])
   );
 
+  const exportTrialBalance = () => downloadCsv('trial-balance.csv',
+    ['Ledger', 'Debit', 'Credit'],
+    trialBalance.map(r => [r.ledger?.name || r.name, r.debit || r.debitBalance || 0, r.credit || r.creditBalance || 0])
+  );
+
+  const exportStockByItem = () => downloadCsv('stock-by-item.csv',
+    ['Item', 'Group', 'Lots', 'Pcs', 'Mtrs Rem', 'Used Mtrs'],
+    (data?.stockByItem || []).map(r => [r.itemName, r.group, r.lotCount, r.remainingPcs, r.remainingMtrs, r.usedMtrs])
+  );
+
+  const exportJobWork = () => downloadCsv('job-work-report.csv',
+    ['Job Card', 'Issue Date', 'Worker', 'Process', 'Issued Qty', 'Received Qty', 'Wastage%', 'Status'],
+    (data?.jobWorkReport || []).map(r => [r.jobCardNo, fmtDate(r.issueDate), r.workerName, r.processType, r.issueQty, r.receivedQty, `${r.wastagePct}%`, r.status])
+  );
+
+  const exportDailyTransactions = () => downloadCsv('daily-transactions.csv',
+    ['Date', 'Type', 'Doc No', 'Party', 'Debit', 'Credit'],
+    (data?.dailyTransactions || []).map(r => [fmtDate(r.date), r.type, r.docNo, r.party, r.debit || 0, r.credit || 0])
+  );
+
+  const exportAccounts = () => downloadCsv('master-accounts.csv',
+    ['Name', 'Type', 'Group', 'City', 'Mobile'],
+    (data?.masterSummary?.accounts || []).map(r => [r.name, r.type, r.group, r.city, r.mobile])
+  );
+
+  const exportItems = () => downloadCsv('master-items.csv',
+    ['Item', 'Group', 'HSN', 'Sale Rate', 'Pur Rate'],
+    (data?.masterSummary?.items || []).map(r => [r.itemName, r.group, r.hsnCode, r.salesRate, r.purRate])
+  );
+
+  const exportProfitLoss = () => {
+    const pl = data?.profitLoss || {};
+    downloadCsv(`profit-loss-${month}.csv`,
+      ['Particulars', 'Amount'],
+      [
+        ['Sales (Taxable)', pl.revenue],
+        ['Sales GST', pl.salesGst],
+        ['Sales Net', pl.salesNet],
+        ['Purchase (Taxable / COGS)', pl.cogs],
+        ['Purchase GST', pl.purchaseGst],
+        ['Purchase Net', pl.purchaseNet],
+        ['Gross Profit', pl.grossProfit],
+        ['Net Profit (approx)', pl.netProfit]
+      ]
+    );
+  };
+
+
   const handlePrint = () => window.print();
 
   const renderContent = () => {
@@ -162,6 +210,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary' }) => {
                   ]}
                   rows={trialBalance.slice(0, 20).map((r, i) => ({ ...r, _key: i }))}
                   emptyText="No trial balance"
+                  onExport={exportTrialBalance}
                 />
               </div>
             )}
@@ -228,6 +277,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary' }) => {
             ]}
             rows={(data.stockByItem || []).map((r, i) => ({ ...r, _key: i }))}
             emptyText="No stock by item"
+            onExport={exportStockByItem}
           />
         );
 
@@ -284,6 +334,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary' }) => {
             ]}
             rows={(data.jobWorkReport || []).map((r, i) => ({ ...r, _key: i }))}
             emptyText="No job work in period"
+            onExport={exportJobWork}
           />
         );
 
@@ -291,7 +342,12 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary' }) => {
         const pl = data.profitLoss || {};
         return (
           <div className="max-w-lg erp-card p-4">
-            <h3 className="text-sm font-bold mb-4">Profit & Loss — {month}</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-bold">Profit & Loss — {month}</h3>
+              <button type="button" onClick={exportProfitLoss} className="erp-btn erp-btn-secondary h-7 px-3 text-[10px] gap-1">
+                <Download size={12} /> Export CSV
+              </button>
+            </div>
             <table className="w-full text-[11px]">
               <tbody className="divide-y divide-[var(--border-subtle)]">
                 {[
@@ -328,6 +384,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary' }) => {
             ]}
             rows={(data.dailyTransactions || []).map((r, i) => ({ ...r, _key: i }))}
             emptyText="No transactions in period"
+            onExport={exportDailyTransactions}
           />
         );
 
@@ -346,6 +403,8 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary' }) => {
                 ]}
                 rows={(data.masterSummary?.accounts || []).map((r, i) => ({ ...r, _key: `a${i}` }))}
                 emptyText="No accounts"
+                onExport={exportAccounts}
+                exportLabel="Export Accounts"
               />
             </div>
             <div>
@@ -360,6 +419,8 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary' }) => {
                 ]}
                 rows={(data.masterSummary?.items || []).map((r, i) => ({ ...r, _key: `i${i}` }))}
                 emptyText="No items"
+                onExport={exportItems}
+                exportLabel="Export Items"
               />
             </div>
           </div>

@@ -4,7 +4,12 @@ import useStore from '../../store/useStore';
 const PurchasePrint = ({ invoiceId, onClose }) => {
   const { purchases, parties } = useStore();
   const invoice = purchases.find(p => p.id === invoiceId || p._id === invoiceId);
-  const party = parties.find(p => p.id === invoice?.supplierId || p._id === invoice?.supplierId);
+  const supplierRef = invoice?.supplierId;
+  const supplierId =
+    typeof supplierRef === 'object' ? supplierRef?._id || supplierRef?.id : supplierRef;
+  const party =
+    parties.find(p => p.id === supplierId || p._id === supplierId) ||
+    (typeof supplierRef === 'object' ? supplierRef : null);
   
   if (!invoice) return null;
 
