@@ -90,6 +90,8 @@ const useStore = create((set, get) => ({
   setAuth: async (data) => {
     const user = normalizeUser(data.user);
     await prepareCompanyCache(user.companyId);
+    // Explicitly set companyId BEFORE any cache hydration
+    if (user.companyId) setActiveCompanyId(user.companyId);
     localStorage.setItem('token', data.token);
     localStorage.setItem('role', user.role);
     localStorage.setItem('user', JSON.stringify(user));
@@ -106,7 +108,11 @@ const useStore = create((set, get) => ({
       if (isOffline()) {
         get().hydrateFromCache().catch(() => {});
       } else {
-        get().refreshAllData().catch(() => {});
+        get().refreshAllData().catch((err) => {
+          // If online fetch fails, fallback to cached data
+          console.warn('[setAuth] refreshAllData failed, falling back to cache:', err?.message);
+          get().hydrateFromCache().catch(() => {});
+        });
       }
     });
   },
@@ -171,6 +177,13 @@ const useStore = create((set, get) => ({
 
     // Always restore local session first — required for offline refresh after login
     const hasLocal = applyLocalSession();
+
+    // CRITICAL: Ensure companyId is in localStorage BEFORE hydrating from cache
+    // Race condition fix: if savedUser has companyId but setActiveCompanyId was missed
+    if (hasLocal && savedUser?.companyId) {
+      setActiveCompanyId(savedUser.companyId);
+    }
+
     if (isOffline()) {
       if (hasLocal) await get().hydrateFromCache();
       return;
@@ -187,11 +200,14 @@ const useStore = create((set, get) => ({
       localStorage.setItem('role', user.role);
       localStorage.setItem('user', JSON.stringify(user));
       const plan = user.plan || savedUser?.plan || null;
+      persistOfflineFlag(user, plan);
+      if (user.companyId) setActiveCompanyId(user.companyId);
       set({ user, role: user.role, plan });
       await updateOfflineSession(user.email, { token, user });
     } catch (err) {
       handleNetworkFailure(err);
       if (isNetworkError(err) && hasLocal) {
+        // Server unreachable — fallback to IndexedDB cache
         await get().hydrateFromCache();
       }
       console.warn('[Session] Using cached login — server refresh failed:', err.message);
@@ -234,7 +250,12 @@ const useStore = create((set, get) => ({
       await get().hydrateFromCache();
       return;
     }
-    await get().refreshAllData();
+    try {
+      await get().refreshAllData();
+    } catch (err) {
+      console.warn('[bootstrapMasters] refreshAllData failed, loading from cache:', err?.message);
+      await get().hydrateFromCache();
+    }
   },
 
   hydrateFromCache: async () => {

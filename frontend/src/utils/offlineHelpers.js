@@ -30,10 +30,8 @@ export const persistOfflineFlag = (user, plan) => {
   }
   const effectivePlan = plan || user.plan;
   const settings = getCompanySettings(user);
-  const planAllows = !!(effectivePlan?.offlineMode || effectivePlan?.modules?.offline);
-  const enabled =
-    canUseOfflineMode(effectivePlan, settings) ||
-    (planAllows && settings?.offlineModeEnabled !== false);
+  // Default: allow offline for all logged-in users unless explicitly disabled
+  const enabled = canUseOfflineMode(effectivePlan, settings);
   localStorage.setItem(OFFLINE_FLAG_KEY, enabled ? 'true' : 'false');
   return enabled;
 };
@@ -41,13 +39,12 @@ export const persistOfflineFlag = (user, plan) => {
 export const readOfflineEnabled = () =>
   localStorage.getItem(OFFLINE_FLAG_KEY) === 'true';
 
-/** Logged-in users can queue data locally when offline or on network failure */
+/**
+ * Any authenticated user can save data offline.
+ * Only unauthenticated users are blocked.
+ */
 export const canSaveOffline = (get) => {
   const { user, token } = get();
   if (!user || !token) return false;
-  if (isOffline()) return true;
-  if (readOfflineEnabled()) return true;
-  const settings = getCompanySettings(user);
-  const plan = get().plan || user.plan;
-  return canUseOfflineMode(plan, settings);
+  return true;
 };
