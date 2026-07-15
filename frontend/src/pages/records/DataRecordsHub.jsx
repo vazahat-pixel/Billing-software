@@ -246,7 +246,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             { key: 'payment', label: 'Payment Mode', render: r => <span className="text-[10px] font-medium">{getSalePayments(r._id)}</span> },
             { key: 'status', label: 'Status', align: 'center', render: r => <StatusBadge status={r.status} /> },
             { key: 'actions', label: '', align: 'center', render: r => (
-                <button type="button" onClick={() => setPrintSalesId(r._id || r.id)} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="Print Invoice">
+                <button type="button" onClick={() => setPrintSalesId(r._id || r.id)} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="PDF / Print Invoice">
                   <FontAwesomeIcon icon={faPrint} />
                 </button>
             ) },
@@ -281,7 +281,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             { key: 'payment', label: 'Payment Mode', render: r => <span className="text-[10px] font-medium">{getPurchasePayments(r._id)}</span> },
             { key: 'status', label: 'Status', align: 'center', render: r => <StatusBadge status={r.status} /> },
             { key: 'actions', label: '', align: 'center', render: r => (
-                <button type="button" onClick={() => setPrintPurchaseId(r._id || r.id)} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="Print Bill">
+                <button type="button" onClick={() => setPrintPurchaseId(r._id || r.id)} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="PDF / Print Bill">
                   <FontAwesomeIcon icon={faPrint} />
                 </button>
             ) },

@@ -25,18 +25,29 @@ class ItemService {
       design: itemData.design || itemData.designNo || itemData.designName || '',
       color: itemData.color || '',
       size: itemData.size || '',
+      brand: itemData.brand || '',
+      pattern: itemData.pattern || '',
+      quality: itemData.quality || '',
+      shade: itemData.shade || '',
       hsnCode: itemData.hsnCode || '',
       gstRate: Number(itemData.gstRate || itemData.taxRate || 5),
       unit: itemData.unit || 'MTRS',
       purchaseRate: Number(itemData.purchaseRate || itemData.purRate || 0),
       salesRate: Number(itemData.salesRate || itemData.saleRate || 0),
       openingStock: Number(itemData.openingStock || itemData.opStock || 0),
+      reorderLevel: Number(itemData.reorderLevel || 0),
+      minLevel: Number(itemData.minLevel || 0),
+      maxLevel: Number(itemData.maxLevel || 0),
+      itemGroupId: itemData.itemGroupId || null,
+      defaultWarehouseId: itemData.defaultWarehouseId || null,
+      barcode: itemData.barcode || '',
+      isFavorite: !!itemData.isFavorite,
       companyId: itemData.companyId
     };
 
-    const existing = await Item.findOne({ 
-      name: normalized.name, 
-      companyId: normalized.companyId 
+    const existing = await Item.findOne({
+      name: normalized.name,
+      companyId: normalized.companyId
     });
 
     if (existing) {
@@ -47,8 +58,10 @@ class ItemService {
     return await item.save();
   }
 
-  async getItems(companyId) {
-    return await Item.find({ companyId }).sort({ name: 1 });
+  async getItems(companyId, { favorites } = {}) {
+    const filter = { companyId };
+    if (favorites) filter.isFavorite = true;
+    return await Item.find(filter).sort({ name: 1 });
   }
 
   async searchItems(query, companyId) {
@@ -57,10 +70,13 @@ class ItemService {
       filter.$or = [
         { name: { $regex: query, $options: 'i' } },
         { hsnCode: { $regex: query, $options: 'i' } },
-        { design: { $regex: query, $options: 'i' } }
+        { design: { $regex: query, $options: 'i' } },
+        { barcode: { $regex: query, $options: 'i' } },
+        { brand: { $regex: query, $options: 'i' } },
+        { quality: { $regex: query, $options: 'i' } }
       ];
     }
-    return await Item.find(filter).limit(10).sort({ name: 1 });
+    return await Item.find(filter).limit(10).sort({ lastUsedAt: -1, name: 1 });
   }
 
   async getItemById(id, companyId) {
@@ -68,16 +84,31 @@ class ItemService {
   }
 
   async updateItem(id, companyId, updateData) {
+    const allowed = [
+      'name', 'category', 'fabricType', 'design', 'color', 'size', 'brand', 'pattern',
+      'quality', 'shade', 'hsnCode', 'gstRate', 'unit', 'purchaseRate', 'salesRate',
+      'openingStock', 'reorderLevel', 'minLevel', 'maxLevel', 'itemGroupId',
+      'defaultWarehouseId', 'barcode', 'isFavorite', 'lastUsedAt', 'group'
+    ];
+    const patch = {};
+    allowed.forEach((k) => {
+      if (updateData[k] !== undefined) patch[k] = updateData[k];
+    });
     return await Item.findOneAndUpdate(
       { _id: id, companyId },
-      updateData,
+      patch,
       { new: true, runValidators: true }
     );
   }
 
   async deleteItem(id, companyId) {
-    return await Item.findOneAndDelete({ _id: id, companyId });
+    return await Item.findOneAndUpdate(
+      { _id: id, companyId },
+      { isDeleted: true, deletedAt: new Date() },
+      { new: true }
+    );
   }
 }
 
 module.exports = new ItemService();
+

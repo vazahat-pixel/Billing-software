@@ -29,7 +29,17 @@ export const isFieldEnabled = (bundle, moduleKey, fieldKey, fallback = true) => 
 
 export const isFlagEnabled = (bundle, flagKey, fallback = true) => {
   if (!bundle?.featureFlags) return fallback;
-  return bundle.featureFlags[flagKey] !== false;
+  const flags = bundle.featureFlags;
+  if (Array.isArray(flags)) {
+    const hit = flags.find((f) => (f.flagKey || f.key) === flagKey);
+    if (!hit) return fallback;
+    return hit.enabled !== false;
+  }
+  if (typeof flags === 'object') {
+    if (!(flagKey in flags)) return fallback;
+    return flags[flagKey] !== false;
+  }
+  return fallback;
 };
 
 export const isBillFieldVisible = (bundle, billType, fieldKey, section = 'header', fallback = true) => {

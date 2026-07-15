@@ -1,3 +1,8 @@
+/**
+ * @deprecated DEAD CODE — Sprint 1.2
+ * NOT mounted in routes. Live stack: controllers/purchaseController.js + services/purchaseService.js
+ * Do not import this file.
+ */
 const purchaseService = require('../services/purchase.service');
 
 exports.createPurchase = async (req, res) => {

@@ -1,0 +1,67 @@
+Stage 1
+
+Foundation Stabilization (1.1–1.4) ✅
+
+        ↓
+
+Stage 2
+
+Business Engine (10 sprints) ✅ ENGINEERING COMPLETE
+
+  2.1 Master Data ✅
+
+  2.2 Purchase ✅
+
+  2.3 Inventory ✅
+
+  2.4 Production & Job Work ✅
+
+  2.5 Sales ✅
+
+  2.6 Automation ✅
+
+  2.7 Documents ✅
+
+  2.8 Workflow ✅
+
+  2.9 Validation ✅
+
+  2.10 Certification ✅
+
+  → Business Simulation Week (gate) ⏳
+
+        ↓
+
+Stage 3
+
+Financial Engine
+
+        ↓
+
+Stage 4
+
+Compliance Engine
+
+        ↓
+
+Stage 5
+
+SaaS Platform
+
+        ↓
+
+Stage 6
+
+Enterprise Features
+
+        ↓
+
+Stage 7
+
+Security & Performance
+
+        ↓
+
+Stage 8
+
+QA, UAT & Production Launch

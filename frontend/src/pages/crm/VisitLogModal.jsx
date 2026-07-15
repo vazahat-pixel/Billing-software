@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Modal from '../../components/ui/Modal';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
-import api from '../../utils/api';
+import { visitsApi } from '../../api';
+import { toast } from '../../store/useToastStore';
 import { Calendar, User, MessageSquare, ClipboardCheck, ArrowRight } from 'lucide-react';
 
 const VisitLogModal = ({ isOpen, onClose, onSuccess }) => {
@@ -29,18 +30,19 @@ const VisitLogModal = ({ isOpen, onClose, onSuccess }) => {
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
         if (!formData.partyId || !formData.discussion) {
-            alert('Please fill in required fields');
+            toast.warning('Please fill in required fields');
             return;
         }
 
         setLoading(true);
         try {
-            const response = await api.post('/visits', formData);
-            if (onSuccess) onSuccess(response.data);
+            const created = await visitsApi.create(formData);
+            if (onSuccess) onSuccess(created);
             fetchVisits();
             setActiveTab('View');
+            toast.success('Visit saved');
         } catch (err) {
-            alert('Error saving visit: ' + (err.response?.data?.message || err.message));
+            toast.error('Error saving visit: ' + (err.response?.data?.message || err.message));
         } finally {
             setLoading(false);
         }

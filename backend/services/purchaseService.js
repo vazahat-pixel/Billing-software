@@ -10,11 +10,56 @@ class PurchaseService {
     session.startTransaction();
 
     try {
-      // Auto-generate Voucher Number as invoiceNo
+      // Strip offline / client-only ids — Mongo ObjectId cannot be "local-…"
+      const {
+        _id: _dropId,
+        id: _dropId2,
+        localId: _dropLocal,
+        accountingEntryId: _dropAcct,
+        ...safeData
+      } = purchaseData || {};
+      purchaseData = safeData;
+      if (Array.isArray(purchaseData.items)) {
+        purchaseData.items = purchaseData.items.map((it) => {
+          const { _id, id, lotId, ...rest } = it || {};
+          // Keep server ObjectId lotId only; drop local lot stubs
+          const keepLot =
+            lotId && mongoose.Types.ObjectId.isValid(lotId) && String(lotId).length === 24
+              ? { lotId }
+              : {};
+          return { ...rest, ...keepLot };
+        });
+      }
+
+      // Referential checks (same company) before mutating stock/accounts
+      const Party = require('../models/Party');
+      const Item = require('../models/Item');
+      const { assertRefs } = require('../utils/refIntegrity');
+      await assertRefs(purchaseData.companyId, [
+        { Model: Party, id: purchaseData.supplierId, label: 'Supplier' },
+        ...((purchaseData.items || []).map((it) => ({ Model: Item, id: it.itemId, label: 'Item' }))),
+      ]);
+
+      const { assertBusinessValid } = require('./validateBusinessService');
+      await assertBusinessValid({
+        module: 'purchase',
+        action: 'create',
+        companyId: purchaseData.companyId,
+        payload: purchaseData,
+      });
+
       const Counter = require('../models/Counter');
-      const counterId = `PUR-${purchaseData.companyId}`;
-      const seq = await Counter.nextSeq(counterId);
-      purchaseData.invoiceNo = purchaseData.invoiceNo && purchaseData.invoiceNo !== 'AUTO' ? purchaseData.invoiceNo : `PUR-${seq}`;
+      if (!purchaseData.invoiceNo || purchaseData.invoiceNo === 'AUTO') {
+        try {
+          const voucherSeriesService = require('./voucherSeriesService');
+          const allocated = await voucherSeriesService.allocateNext(purchaseData.companyId, 'purchase', { session });
+          purchaseData.invoiceNo = allocated.number;
+        } catch {
+          const counterId = `PUR-${purchaseData.companyId}`;
+          const seq = await Counter.nextSeq(counterId, session);
+          purchaseData.invoiceNo = `PUR-${seq}`;
+        }
+      }
 
       // Generate Lot IDs for each item before saving
       const purchase = new Purchase(purchaseData);
@@ -26,6 +71,7 @@ class PurchaseService {
       await purchase.save({ session });
 
       // 2. Create Inventory Lots and Stock Movements inside transaction
+      // Stock increases in selected warehouse (or company default godown if none).
       for (const item of purchase.items) {
         const lot = new InventoryLot({
           lotId: item.lotId,
@@ -35,6 +81,8 @@ class PurchaseService {
           remainingPcs: item.pcs || 0,
           totalMtrs: item.mts || 0,
           remainingMtrs: item.mts || 0,
+          rate: item.rate || 0,
+          warehouseId: purchase.warehouseId || null,
           status: 'Available',
           source: 'purchase',
           companyId: purchase.companyId
@@ -48,13 +96,14 @@ class PurchaseService {
           qtyMtrs: item.mts || 0,
           balanceMtrs: item.mts || 0,
           referenceId: purchase._id,
+          idempotencyKey: `PURCHASE:${purchase._id}:${item.lotId}`,
           remarks: `Purchase Bill: ${purchase.invoiceNo}`,
           companyId: purchase.companyId
         });
         await movement.save({ session });
       }
 
-      // 3. FIXED: Accounting posting INSIDE transaction (was outside before — silent failures)
+      // 3. Accounting posting INSIDE transaction
       const accountingService = require('./accountingService');
       const entry = await accountingService.onPurchaseBillPost(purchase, session);
 
@@ -63,6 +112,16 @@ class PurchaseService {
       await purchase.save({ session });
 
       await session.commitTransaction();
+      try {
+        const eventBus = require('../events/eventBus');
+        eventBus.emitSafe('purchase.created', {
+          companyId: purchase.companyId?.toString?.() || purchase.companyId,
+          purchaseId: purchase._id?.toString?.(),
+          invoiceNo: purchase.invoiceNo,
+          netAmount: purchase.netAmount,
+          supplierId: purchase.supplierId?.toString?.() || purchase.supplierId,
+        });
+      } catch { /* optional */ }
       return purchase;
     } catch (error) {
       await session.abortTransaction();
@@ -135,7 +194,7 @@ class PurchaseService {
           const originalEntry = await AccountingEntry.findById(purchase.accountingEntryId).session(session);
           if (originalEntry && !originalEntry.isReversed) {
             const accountingService = require('./accountingService');
-            const entryNo = await accountingService.generateEntryNo(companyId, 'JNL');
+            const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
 
             const reversalLines = originalEntry.lines.map(line => ({
               ledgerId: line.ledgerId,
@@ -171,9 +230,13 @@ class PurchaseService {
         return purchase;
       }
 
-      await Purchase.findOneAndDelete({ _id: id, companyId }).session(session);
+      await Purchase.findOneAndUpdate(
+        { _id: id, companyId },
+        { isDeleted: true, deletedAt: new Date() },
+        { session }
+      );
       await session.commitTransaction();
-      return { message: 'Purchase deleted' };
+      return { message: 'Purchase soft-deleted' };
     } catch (error) {
       await session.abortTransaction();
       throw error;

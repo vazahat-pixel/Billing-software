@@ -86,9 +86,14 @@ export const normalizePurchase = (purchase) => {
 
 export const normalizeUser = (user) => {
   if (!user) return user;
+  const platformRole =
+    user.role === 'super_admin' || user.role === 'user'
+      ? user.role
+      : 'user';
   return {
     ...user,
     id: user._id || user.id,
+    role: platformRole,
     companyRole: user.companyRole || 'owner',
     companyName: user.companyName || user.company?.name || user.settings?.legalName || ''
   };

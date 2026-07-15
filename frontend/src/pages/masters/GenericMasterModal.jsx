@@ -40,6 +40,15 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
       case 'Color': return 'Color Master Registry';
       case 'Design': return 'Design Master Registry';
       case 'HSN': return 'HSN Code Registry';
+      case 'Quality': return 'Quality Master Registry';
+      case 'Pattern': return 'Pattern Master Registry';
+      case 'Brand': return 'Brand Master Registry';
+      case 'Shade': return 'Shade Master Registry';
+      case 'Process': return 'Process Master Registry';
+      case 'Machine': return 'Machine Master Registry';
+      case 'Department': return 'Department Master Registry';
+      case 'PaymentTerms': return 'Payment Terms Registry';
+      case 'Currency': return 'Currency Registry';
       default: return type ? `${type} Registry` : 'Master Registry';
     }
   }, [type]);

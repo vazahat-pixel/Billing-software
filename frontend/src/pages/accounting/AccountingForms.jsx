@@ -3,9 +3,9 @@ import useStore from '../../store/useStore';
 import { useConfig } from '../../context/ConfigContext';
 import { isFlagEnabled } from '../../utils/configHelpers';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
-import api from '../../api/client';
 import { Save, X, Banknote, History, Plus, Trash2 } from 'lucide-react';
 import { formatPaymentSplits, PAYMENT_MODE_OPTIONS, buildSplitsPayload } from '../../utils/paymentFormat';
+import { toast } from '../../store/useToastStore';
 
 const DEFAULT_SPLITS = () => ([
   { mode: 'Cash', amount: '', reference: '' },
@@ -73,15 +73,16 @@ export const PaymentForm = ({ isOpen, onClose, initialType = 'Receipt', selected
 
   useEffect(() => {
     if (isOpen) {
-      api.get('/accounting/payments')
-        .then(res => {
-          setVouchersList(res.data.data || []);
+      fetchVouchers()
+        .then((list) => {
+          setVouchersList(Array.isArray(list) ? list : []);
         })
-        .catch(err => {
+        .catch((err) => {
           console.error('Error fetching vouchers:', err);
+          toast.error(err.message || 'Failed to load vouchers');
         });
     }
-  }, [isOpen, vouchers]);
+  }, [isOpen, vouchers, fetchVouchers]);
 
   // Fallback / Filter Cash and Bank accounts from ledgers
   const bankCashLedgers = useMemo(() => {

@@ -77,13 +77,17 @@ exports.deleteSubMaster = async (req, res) => {
     const companyId = req.companyId;
     const { id } = req.params;
 
-    const subMaster = await SubMaster.findOneAndDelete({ _id: id, companyId });
+    const subMaster = await SubMaster.findOneAndUpdate(
+      { _id: id, companyId },
+      { isDeleted: true, deletedAt: new Date() },
+      { new: true }
+    );
 
     if (!subMaster) {
       return res.status(404).json({ success: false, message: 'Record not found' });
     }
 
-    res.status(200).json({ success: true, message: 'Record deleted successfully' });
+    res.status(200).json({ success: true, message: 'Record deleted successfully', data: subMaster });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

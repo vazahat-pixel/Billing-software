@@ -1,32 +1,5 @@
-import axios from 'axios';
-
-const getBaseUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  if (typeof window === 'undefined') return '/api';
-  return window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
-};
-
-const api = axios.create({
-  baseURL: getBaseUrl(),
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add a request interceptor to include JWT token if available
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-export default api;
+/**
+ * Single Axios instance — all modules must import from here or from ../api/client.
+ * Dual client (this file vs api/client) removed; one interceptor chain for JWT + offline.
+ */
+export { default, onApiLoadingChange } from '../api/client';

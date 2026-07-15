@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { enterpriseIntegrityPlugin } = require('./mixins/enterpriseMetaSchema');
 
 const AccountingEntrySchema = new mongoose.Schema({
   companyId: {
@@ -111,6 +112,9 @@ AccountingEntrySchema.index({ companyId: 1, voucherType: 1 });
 AccountingEntrySchema.index({ companyId: 1, isReversed: 1 });
 AccountingEntrySchema.index({ 'lines.ledgerId': 1 });
 AccountingEntrySchema.index({ entryNo: 1, companyId: 1 }, { unique: true });
+AccountingEntrySchema.index({ companyId: 1, refId: 1, voucherType: 1 });
+
+AccountingEntrySchema.plugin(enterpriseIntegrityPlugin, { softDelete: true, versionField: true });
 
 module.exports = mongoose.model('AccountingEntry', AccountingEntrySchema);
 

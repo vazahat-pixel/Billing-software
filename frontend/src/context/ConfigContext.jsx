@@ -1,35 +1,52 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import api from '../api/client';
+import { configApi } from '../api';
 import useStore from '../store/useStore';
+import useConfigStore from '../store/useConfigStore';
 import { buildModuleConfig } from '../utils/configHelpers';
 import { isOffline } from '../utils/networkStatus';
 
 const ConfigContext = createContext(null);
 
-const POLL_MS = 5000;
+const POLL_MS = 15000;
 
 export const ConfigProvider = ({ children }) => {
   const token = useStore((s) => s.token);
   const user = useStore((s) => s.user);
   const syncActiveConfig = useStore((s) => s.syncActiveConfig);
+  const syncBundle = useConfigStore((s) => s.syncBundle);
 
   const [bundle, setBundle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastSynced, setLastSynced] = useState(null);
   const hashRef = useRef(null);
   const fetchingRef = useRef(false);
+  const bootedForTokenRef = useRef(null);
+
+  const applyBundle = useCallback(
+    (data) => {
+      if (!data) return false;
+      const nextHash = data.configHash || null;
+      // Same hash → do not touch user store (avoids Effect loops + top-bar spam)
+      if (nextHash && nextHash === hashRef.current) {
+        return false;
+      }
+      hashRef.current = nextHash;
+      setBundle(data);
+      syncActiveConfig(data);
+      syncBundle(data);
+      setLastSynced(new Date());
+      return true;
+    },
+    [syncActiveConfig, syncBundle]
+  );
 
   const fetchBundle = useCallback(async () => {
     if (!token || fetchingRef.current || isOffline()) return null;
     fetchingRef.current = true;
     try {
-      const res = await api.get('/config/active');
-      if (res.data?.success && res.data.data) {
-        const data = res.data.data;
-        setBundle(data);
-        hashRef.current = data.configHash;
-        syncActiveConfig(data);
-        setLastSynced(new Date());
+      const data = await configApi.active({ silent: true });
+      if (data) {
+        applyBundle(data);
         return data;
       }
     } catch (err) {
@@ -38,13 +55,13 @@ export const ConfigProvider = ({ children }) => {
       fetchingRef.current = false;
     }
     return null;
-  }, [token, syncActiveConfig]);
+  }, [token, applyBundle]);
 
   const pollVersion = useCallback(async () => {
-    if (!token || isOffline()) return;
+    if (!token || isOffline() || fetchingRef.current) return;
     try {
-      const res = await api.get('/config/version');
-      const remoteHash = res.data?.data?.configHash;
+      const data = await configApi.version({ silent: true });
+      const remoteHash = data?.configHash;
       if (remoteHash && remoteHash !== hashRef.current) {
         await fetchBundle();
       }
@@ -53,20 +70,25 @@ export const ConfigProvider = ({ children }) => {
     }
   }, [token, fetchBundle]);
 
+  // Boot once per token. Never depend on user.activeConfig — that caused infinite reload.
   useEffect(() => {
     if (!token) {
+      bootedForTokenRef.current = null;
+      hashRef.current = null;
+      setBundle(null);
       setLoading(false);
       return undefined;
     }
 
     if (isOffline()) {
-      if (user?.activeConfig) {
+      const cachedUser = useStore.getState().user;
+      if (cachedUser?.activeConfig) {
         setBundle({
-          ...user.activeConfig,
-          bundleVersion: user.configVersion,
-          configHash: user.configHash
+          ...cachedUser.activeConfig,
+          bundleVersion: cachedUser.configVersion,
+          configHash: cachedUser.configHash,
         });
-        hashRef.current = user.configHash || null;
+        hashRef.current = cachedUser.configHash || null;
       }
       setLoading(false);
       return undefined;
@@ -74,7 +96,10 @@ export const ConfigProvider = ({ children }) => {
 
     let mounted = true;
     (async () => {
-      await fetchBundle();
+      if (bootedForTokenRef.current !== token) {
+        bootedForTokenRef.current = token;
+        await fetchBundle();
+      }
       if (mounted) setLoading(false);
     })();
 
@@ -83,7 +108,7 @@ export const ConfigProvider = ({ children }) => {
       mounted = false;
       clearInterval(intervalId);
     };
-  }, [token, user?.activeConfig, user?.configVersion, user?.configHash, fetchBundle, pollVersion]);
+  }, [token, fetchBundle, pollVersion]);
 
   const moduleConfig = buildModuleConfig(bundle, user?.moduleConfig);
 
@@ -94,7 +119,7 @@ export const ConfigProvider = ({ children }) => {
     moduleConfig,
     refreshConfig: fetchBundle,
     configVersion: bundle?.bundleVersion || user?.configVersion || 0,
-    configHash: bundle?.configHash || user?.configHash || null
+    configHash: bundle?.configHash || user?.configHash || null,
   };
 
   return (
@@ -114,7 +139,7 @@ export const useConfig = () => {
       moduleConfig: null,
       refreshConfig: async () => null,
       configVersion: 0,
-      configHash: null
+      configHash: null,
     };
   }
   return ctx;

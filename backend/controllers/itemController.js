@@ -1,67 +1,44 @@
 const itemService = require('../services/itemService');
+const asyncHandler = require('../utils/asyncHandler');
+const { ok, created } = require('../utils/apiResponse');
+const AppError = require('../utils/AppError');
 
-exports.createItem = async (req, res) => {
-  try {
-    req.body.companyId = req.companyId;
-    const item = await itemService.createItem(req.body);
-    res.status(201).json({ success: true, data: item });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
+exports.createItem = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const item = await itemService.createItem({ ...req.body, companyId: req.companyId });
+  return created(res, item, 'Item created');
+});
 
-exports.getItems = async (req, res) => {
-  try {
-    const companyId = req.companyId || req.query.companyId;
-    const items = await itemService.getItems(companyId);
-    res.status(200).json({ success: true, data: items });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+exports.getItems = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const items = await itemService.getItems(req.companyId);
+  return ok(res, items);
+});
 
-exports.searchItems = async (req, res) => {
-  try {
-    const { q } = req.query;
-    const companyId = req.companyId || req.query.companyId;
-    const items = await itemService.searchItems(q, companyId);
-    res.status(200).json({ success: true, data: items });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+exports.searchItems = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const items = await itemService.searchItems(req.query.q, req.companyId);
+  return ok(res, items);
+});
 
-exports.getItem = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const companyId = req.companyId || req.query.companyId;
-    const item = await itemService.getItemById(id, companyId);
-    if (!item) return res.status(404).json({ success: false, message: 'Item not found' });
-    res.status(200).json({ success: true, data: item });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+exports.getItem = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const item = await itemService.getItemById(req.params.id, req.companyId);
+  if (!item) throw AppError.notFound('Item not found');
+  return ok(res, item);
+});
 
-exports.updateItem = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const companyId = req.companyId || req.body.companyId || req.query.companyId;
-    req.body.companyId = companyId;
-    const item = await itemService.updateItem(id, companyId, req.body);
-    res.status(200).json({ success: true, data: item });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
+exports.updateItem = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const item = await itemService.updateItem(req.params.id, req.companyId, {
+    ...req.body,
+    companyId: req.companyId,
+  });
+  return ok(res, item, 'Item updated');
+});
 
-exports.deleteItem = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const companyId = req.companyId || req.query.companyId;
-    await itemService.deleteItem(id, companyId);
-    res.status(200).json({ success: true, message: 'Item deleted' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+exports.deleteItem = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  await itemService.deleteItem(req.params.id, req.companyId);
+  return ok(res, null, 'Item deleted');
+});

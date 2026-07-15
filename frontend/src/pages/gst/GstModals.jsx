@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
+import { toast } from '../../store/useToastStore';
 import { downloadJson, getMonthDateRange, buildGstr1Filename } from '../../utils/gstExport';
 import {
    Check,
@@ -354,101 +355,113 @@ export const Gstr1Modal = ({ isOpen, onClose }) => {
 // ==========================================
 export const Gst2bMatchingModal = ({ isOpen, onClose }) => {
    const { purchases, fetchPurchases } = useStore();
-   const [activeTab, setActiveTab] = useState('all');
-   const [scanning, setScanning] = useState(false);
-   const [reconciled, setReconciled] = useState(false);
+   const [loading, setLoading] = useState(false);
 
    useEffect(() => {
-      if (isOpen) fetchPurchases();
+      if (!isOpen) return;
+      setLoading(true);
+      fetchPurchases()
+         .catch(() => {})
+         .finally(() => setLoading(false));
    }, [isOpen, fetchPurchases]);
 
+   /** ERP purchase register only — portal GSTR-2B matching is NOT connected (Sprint 4). */
    const listData = useMemo(() => {
-      return purchases.map((p, index) => ({
-         id: p.id,
-         invoiceNo: p.invoiceNo,
+      return (purchases || []).map((p) => ({
+         id: p._id || p.id,
+         invoiceNo: p.invoiceNo || p.billNo || '—',
          date: p.date,
-         supplier: p.supplierId?.name || 'Supplier LLC',
-         gstin: p.supplierId?.gstin || '24SPLY1234F1Z5',
-         erpTaxable: parseFloat(p.totalAmount || 0),
-         portalTaxable: parseFloat(p.totalAmount || 0),
-         status: reconciled ? (index % 3 === 0 ? 'MATCHED' : 'MISMATCH') : 'PENDING'
+         supplier: p.supplierId?.name || p.supplierName || 'Supplier',
+         gstin: p.supplierId?.gstin || '—',
+         erpTaxable: parseFloat(p.taxableAmount ?? p.totalAmount ?? 0),
+         erpGst: parseFloat(p.gstAmount || 0),
+         status: 'ERP_ONLY'
       }));
-   }, [purchases, reconciled]);
+   }, [purchases]);
 
-   const handleScan = () => {
-      setScanning(true);
-      setTimeout(() => { setScanning(false); setReconciled(true); }, 2000);
-   };
+   const totals = useMemo(() => {
+      return listData.reduce(
+         (acc, row) => {
+            acc.count += 1;
+            acc.taxable += row.erpTaxable || 0;
+            acc.gst += row.erpGst || 0;
+            return acc;
+         },
+         { count: 0, taxable: 0, gst: 0 }
+      );
+   }, [listData]);
 
    return (
       <Modal isOpen={isOpen} onClose={onClose} title="GSTR-2B ITC Matching" className="max-w-6xl h-[92vh] bg-white rounded-[2.5rem] p-0 border-none shadow-2xl">
          <div className="flex flex-col h-full p-10 space-y-8">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
                <div>
-                  <h2 className="text-4xl font-black text-black tracking-tight italic">ITC Reconciliation<span className="text-slate-300">.</span></h2>
-                  <p className="text-slate-400 text-[11px] font-bold uppercase tracking-[0.2em] mt-2">Audit Intelligence • Portal Verification</p>
+                  <h2 className="text-4xl font-black text-black tracking-tight italic">Purchase GST Register<span className="text-slate-300">.</span></h2>
+                  <p className="text-slate-400 text-[11px] font-bold uppercase tracking-[0.2em] mt-2">ERP source of truth · Portal matching not connected</p>
                </div>
                <button
-                  onClick={handleScan}
-                  disabled={scanning}
-                  className="px-8 py-3 bg-black text-white rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center gap-3 hover:bg-slate-800 transition-all"
+                  type="button"
+                  onClick={() => toast.unavailable('GSTR-2B portal reconciliation')}
+                  className="px-8 py-3 bg-slate-200 text-slate-600 rounded-xl text-[11px] font-bold uppercase tracking-widest flex items-center gap-3 cursor-not-allowed"
+                  title="Requires GSTN/GSP integration (Stage 4)"
                >
-                  {scanning ? <RefreshCw className="animate-spin" size={14} /> : <ShieldCheck size={14} />}
-                  {scanning ? 'Auditing...' : 'Run Audit Engine'}
+                  <ShieldCheck size={14} />
+                  Portal Match (Soon)
                </button>
             </div>
 
-            <div className="grid grid-cols-4 gap-6">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-[12px] text-amber-900 font-medium">
+               Fake match scores and fabricated portal values have been removed. This screen lists live purchase invoices from your company database. GSTR-2B portal download &amp; matching ships in the Compliance Engine stage.
+            </div>
+
+            <div className="grid grid-cols-3 gap-6">
                {[
-                  { label: 'Verified', val: '24', color: 'text-black' },
-                  { label: 'Mismatch', val: '02', color: 'text-slate-400' },
-                  { label: 'Missing', val: '01', color: 'text-slate-300' },
-                  { label: 'Net ITC', val: '₹ 84K', color: 'text-black' }
+                  { label: 'ERP Bills', val: String(totals.count) },
+                  { label: 'ERP Taxable', val: `₹ ${totals.taxable.toLocaleString('en-IN')}` },
+                  { label: 'ERP GST', val: `₹ ${totals.gst.toLocaleString('en-IN')}` }
                ].map((s, idx) => (
                   <div key={idx} className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
                      <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-400">{s.label}</span>
-                     <p className={`text-4xl font-black mt-2 tracking-tighter ${s.color}`}>{s.val}</p>
+                     <p className="text-3xl font-black mt-2 tracking-tighter text-black">{s.val}</p>
                   </div>
                ))}
             </div>
 
             <div className="flex-1 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
                <div className="overflow-auto flex-1 custom-scrollbar">
+                  {loading && <p className="p-8 text-[12px] text-slate-400">Loading purchases…</p>}
+                  {!loading && listData.length === 0 && (
+                     <p className="p-8 text-[12px] text-slate-400 text-center">No purchase invoices found for this company.</p>
+                  )}
                   <table className="w-full text-left">
                      <thead>
                         <tr className="border-b border-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                            <th className="px-8 py-5">Reference</th>
                            <th className="px-8 py-5">Supplier</th>
-                           <th className="px-8 py-5 text-right">ERP Value</th>
-                           <th className="px-8 py-5 text-right">Portal Value</th>
-                           <th className="px-8 py-5 text-center">Status</th>
+                           <th className="px-8 py-5">GSTIN</th>
+                           <th className="px-8 py-5 text-right">ERP Taxable</th>
+                           <th className="px-8 py-5 text-right">ERP GST</th>
+                           <th className="px-8 py-5 text-center">Portal</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-50">
-                        {listData.map((row, idx) => {
-                           const isMismatch = row.status === 'MISMATCH';
-                           const isMatched = row.status === 'MATCHED';
-
-                           return (
-                              <tr key={idx} className={`hover:bg-slate-50/50 transition-all group border-l-4 ${isMatched ? 'border-black' : isMismatch ? 'border-amber-500' : 'border-transparent'}`}>
+                        {listData.map((row) => (
+                              <tr key={row.id} className="hover:bg-slate-50/50 transition-all border-l-4 border-transparent">
                                  <td className="px-8 py-5">
                                     <p className="text-[11px] font-black text-black uppercase tracking-widest">{row.invoiceNo}</p>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{row.date}</p>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{row.date ? String(row.date).slice(0, 10) : '—'}</p>
                                  </td>
                                  <td className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase">{row.supplier}</td>
-                                 <td className={`px-8 py-5 text-right font-bold text-[11px] ${isMismatch ? 'text-amber-600' : 'text-black'}`}>₹ {row.erpTaxable.toLocaleString()}</td>
-                                 <td className={`px-8 py-5 text-right font-bold text-[11px] ${isMismatch ? 'text-rose-600' : 'text-slate-400'}`}>₹ {row.portalTaxable.toLocaleString()}</td>
+                                 <td className="px-8 py-5 text-[10px] font-mono text-slate-500">{row.gstin}</td>
+                                 <td className="px-8 py-5 text-right font-bold text-[11px] text-black">₹ {row.erpTaxable.toLocaleString('en-IN')}</td>
+                                 <td className="px-8 py-5 text-right font-bold text-[11px] text-black">₹ {row.erpGst.toLocaleString('en-IN')}</td>
                                  <td className="px-8 py-5 text-center">
-                                    <span className={`px-4 py-1 text-[9px] font-bold uppercase rounded-lg border transition-all ${isMatched ? 'bg-black text-white border-black' :
-                                       isMismatch ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                                          'bg-slate-50 text-slate-400 border-slate-100'
-                                       }`}>
-                                       {row.status}
+                                    <span className="px-4 py-1 text-[9px] font-bold uppercase rounded-lg border bg-slate-50 text-slate-400 border-slate-100">
+                                       Not linked
                                     </span>
                                  </td>
                               </tr>
-                           )
-                        })}
+                        ))}
                      </tbody>
                   </table>
                </div>

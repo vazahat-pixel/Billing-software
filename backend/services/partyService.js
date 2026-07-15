@@ -1,4 +1,5 @@
 const Party = require('../models/Party');
+const LedgerMaster = require('../models/LedgerMaster');
 
 class PartyService {
   async createParty(partyData) {
@@ -14,9 +15,12 @@ class PartyService {
       else if (g.includes('DEBTOR')) type = 'Customer';
       else if (g.includes('BROKER')) type = 'Broker';
       else if (g.includes('JOB') || g.includes('WORKER')) type = 'Job Worker';
+      else if (g.includes('TRANSPORT')) type = 'Transport';
+      else if (g.includes('EMPLOYEE')) type = 'Employee';
+      else if (g.includes('SALESMAN') || g.includes('SALES')) type = 'Salesman';
+      else if (g.includes('AGENT')) type = 'Agent';
     }
 
-    // Find next accd for this company
     const highest = await Party.findOne({ companyId: partyData.companyId }).sort({ accd: -1 });
     const nextAccd = highest && typeof highest.accd === 'number' ? highest.accd + 1 : 1001;
 
@@ -35,7 +39,6 @@ class PartyService {
       openingBalance: Number(partyData.openingBalance || 0),
       openingBalanceType: partyData.openingBalanceType || 'Dr',
       companyId: partyData.companyId,
-      // Replicated fields
       mainGroup: !!partyData.mainGroup,
       mainGroupId: partyData.mainGroupId || '',
       phoneO: partyData.phoneO || '',
@@ -62,24 +65,70 @@ class PartyService {
       maxLevel: Number(partyData.maxLevel || 0),
       minLevel: Number(partyData.minLevel || 0),
       tdsPer: Number(partyData.tdsPer || 0),
-      tcsPer: Number(partyData.tcsPer || 0)
+      tcsPer: Number(partyData.tcsPer || 0),
+      paymentTermsId: partyData.paymentTermsId || null,
+      isFavorite: !!partyData.isFavorite,
     };
 
-    const existing = await Party.findOne({ 
-      name: normalized.name, 
-      companyId: normalized.companyId 
+    const existing = await Party.findOne({
+      name: normalized.name,
+      companyId: normalized.companyId
     });
-    
+
     if (existing) {
       throw new Error('Party with this name already exists in your company.');
     }
 
     const party = new Party(normalized);
-    return await party.save();
+    const saved = await party.save();
+
+    // Sync opening to LedgerMaster when opening amount present
+    if (saved.openingBalance) {
+      await this.syncOpeningToLedger(saved);
+    }
+    return saved;
   }
 
-  async getParties(companyId) {
-    return await Party.find({ companyId }).sort({ name: 1 });
+  /**
+   * Keep Party.openingBalance and linked LedgerMaster in lockstep (Sprint 2.1).
+   */
+  async syncOpeningToLedger(party) {
+    if (!party?._id || !party.companyId) return null;
+    let ledger = await LedgerMaster.findOne({
+      companyId: party.companyId,
+      linkedPartyId: party._id,
+    });
+
+    const isCreditor = ['Supplier', 'Both', 'Job Worker', 'Broker', 'Transport', 'Agent'].includes(party.type);
+    const group = isCreditor ? 'Liabilities' : 'Assets';
+    const subGroup = isCreditor ? 'Sundry Creditors' : 'Sundry Debtors';
+    const openingBalance = Number(party.openingBalance || 0);
+    const openingBalanceType = party.openingBalanceType || (isCreditor ? 'Cr' : 'Dr');
+
+    if (!ledger) {
+      ledger = await LedgerMaster.create({
+        companyId: party.companyId,
+        name: party.name,
+        group,
+        subGroup,
+        linkedPartyId: party._id,
+        openingBalance,
+        openingBalanceType,
+      });
+    } else {
+      ledger.name = party.name;
+      ledger.openingBalance = openingBalance;
+      ledger.openingBalanceType = openingBalanceType;
+      await ledger.save();
+    }
+    return ledger;
+  }
+
+  async getParties(companyId, { type, favorites } = {}) {
+    const filter = { companyId };
+    if (type) filter.type = type;
+    if (favorites) filter.isFavorite = true;
+    return await Party.find(filter).sort({ name: 1 });
   }
 
   async searchParties(query, companyId) {
@@ -91,7 +140,7 @@ class PartyService {
         { mobile: { $regex: query, $options: 'i' } }
       ];
     }
-    return await Party.find(filter).limit(10).sort({ name: 1 });
+    return await Party.find(filter).limit(10).sort({ lastUsedAt: -1, name: 1 });
   }
 
   async getPartyById(id, companyId) {
@@ -106,7 +155,7 @@ class PartyService {
       'tinCstNo', 'tinGstNo', 'status', 'updateInAllFirm', 'updateInAllYear',
       'aadharNo', 'stateCode', 'stateName', 'gstType', 'udyamAadhar', 'msmeType',
       'dueDays', 'rdRate', 'disc1', 'disc2', 'addPer', 'intPer', 'commi',
-      'maxLevel', 'minLevel', 'tdsPer', 'tcsPer'
+      'maxLevel', 'minLevel', 'tdsPer', 'tcsPer', 'paymentTermsId', 'isFavorite', 'lastUsedAt'
     ];
     const patch = {};
     allowed.forEach((key) => {
@@ -118,19 +167,37 @@ class PartyService {
       if (g.includes('CREDITOR')) patch.type = 'Supplier';
       else if (g.includes('BROKER')) patch.type = 'Broker';
       else if (g.includes('JOB') || g.includes('WORKER')) patch.type = 'Job Worker';
+      else if (g.includes('TRANSPORT')) patch.type = 'Transport';
       else patch.type = 'Customer';
     }
     if (patch.openingBalance !== undefined) patch.openingBalance = Number(patch.openingBalance);
-    return await Party.findOneAndUpdate(
+
+    const party = await Party.findOneAndUpdate(
       { _id: id, companyId },
       patch,
       { new: true, runValidators: true }
     );
+    if (!party) return null;
+
+    if (
+      patch.openingBalance !== undefined ||
+      patch.openingBalanceType !== undefined ||
+      patch.name !== undefined ||
+      patch.type !== undefined
+    ) {
+      await this.syncOpeningToLedger(party);
+    }
+    return party;
   }
 
   async deleteParty(id, companyId) {
-    return await Party.findOneAndDelete({ _id: id, companyId });
+    return await Party.findOneAndUpdate(
+      { _id: id, companyId },
+      { isDeleted: true, deletedAt: new Date(), status: 'Inactive' },
+      { new: true }
+    );
   }
 }
 
 module.exports = new PartyService();
+

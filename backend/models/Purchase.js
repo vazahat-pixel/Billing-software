@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { enterpriseIntegrityPlugin } = require('./mixins/enterpriseMetaSchema');
 
 const PurchaseSchema = new mongoose.Schema({
   companyId: {
@@ -106,13 +107,57 @@ const PurchaseSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'AccountingEntry',
     default: null
-  }
+  },
+  /** Purchase Engine linkage (Sprint 2.2) */
+  purchaseOrderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Order',
+    default: null,
+    index: true,
+  },
+  grnId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Grn',
+    default: null,
+    index: true,
+  },
+  freightAmount: { type: Number, default: 0, min: 0 },
+  otherCharges: { type: Number, default: 0, min: 0 },
+  tdsAmount: { type: Number, default: 0, min: 0 },
+  vehicleNo: { type: String, default: '' },
+  lrNo: { type: String, default: '' },
+  transport: { type: String, default: '' },
+  ewayBillNo: { type: String, default: '' },
+  /** Godown where purchase lots are received */
+  warehouseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Warehouse',
+    default: null,
+    index: true,
+  },
+  /** Optional metadata from Auto Bill Fill (supplier PDF/photo scan) */
+  billAttachment: {
+    fileName: { type: String, default: '' },
+    mimeType: { type: String, default: '' },
+    extractedAt: { type: Date, default: null },
+  },
 }, {
   timestamps: true
 });
 
 // Per-company unique invoice number
 PurchaseSchema.index({ invoiceNo: 1, companyId: 1 }, { unique: true });
+PurchaseSchema.index(
+  { companyId: 1, supplierId: 1, supplierInvoiceNo: 1 },
+  {
+    unique: true,
+    name: 'uniq_supplier_invoice',
+    partialFilterExpression: { supplierInvoiceNo: { $type: 'string', $gt: '' } },
+  }
+);
+PurchaseSchema.index({ companyId: 1, date: -1, status: 1 });
+
+PurchaseSchema.plugin(enterpriseIntegrityPlugin);
 
 module.exports = mongoose.model('Purchase', PurchaseSchema);
 

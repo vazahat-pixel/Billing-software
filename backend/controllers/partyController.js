@@ -1,70 +1,44 @@
 const partyService = require('../services/partyService');
+const asyncHandler = require('../utils/asyncHandler');
+const { ok, created } = require('../utils/apiResponse');
+const AppError = require('../utils/AppError');
 
-exports.createParty = async (req, res) => {
-  try {
-    if (!req.companyId) {
-      return res.status(400).json({ success: false, message: 'No company context. Log in with a company user account.' });
-    }
-    req.body.companyId = req.companyId;
-    const party = await partyService.createParty(req.body);
-    res.status(201).json({ success: true, data: party });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
+exports.createParty = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context. Log in with a company user account.');
+  const party = await partyService.createParty({ ...req.body, companyId: req.companyId });
+  return created(res, party, 'Party created');
+});
 
-exports.getParties = async (req, res) => {
-  try {
-    const companyId = req.companyId || req.query.companyId;
-    const parties = await partyService.getParties(companyId);
-    res.status(200).json({ success: true, data: parties });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+exports.getParties = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const parties = await partyService.getParties(req.companyId);
+  return ok(res, parties);
+});
 
-exports.searchParties = async (req, res) => {
-  try {
-    const { q } = req.query;
-    const companyId = req.companyId || req.query.companyId;
-    const parties = await partyService.searchParties(q, companyId);
-    res.status(200).json({ success: true, data: parties });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+exports.searchParties = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const parties = await partyService.searchParties(req.query.q, req.companyId);
+  return ok(res, parties);
+});
 
-exports.getParty = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const companyId = req.companyId || req.query.companyId;
-    const party = await partyService.getPartyById(id, companyId);
-    if (!party) return res.status(404).json({ success: false, message: 'Party not found' });
-    res.status(200).json({ success: true, data: party });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+exports.getParty = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const party = await partyService.getPartyById(req.params.id, req.companyId);
+  if (!party) throw AppError.notFound('Party not found');
+  return ok(res, party);
+});
 
-exports.updateParty = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const companyId = req.companyId || req.body.companyId || req.query.companyId;
-    req.body.companyId = companyId;
-    const party = await partyService.updateParty(id, companyId, req.body);
-    res.status(200).json({ success: true, data: party });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
+exports.updateParty = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const party = await partyService.updateParty(req.params.id, req.companyId, {
+    ...req.body,
+    companyId: req.companyId,
+  });
+  return ok(res, party, 'Party updated');
+});
 
-exports.deleteParty = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const companyId = req.companyId || req.query.companyId;
-    await partyService.deleteParty(id, companyId);
-    res.status(200).json({ success: true, message: 'Party deleted' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+exports.deleteParty = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  await partyService.deleteParty(req.params.id, req.companyId);
+  return ok(res, null, 'Party deleted');
+});

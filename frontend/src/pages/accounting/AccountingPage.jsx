@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import useStore from '../../store/useStore';
 import { ERPSelect } from '../../components/forms/FormElements';
-import api from '../../api/client';
+import { accountingApi } from '../../api';
 import { Banknote, FileText, Search, ArrowUpRight, ArrowDownLeft, ArrowRight, X } from 'lucide-react';
 import { PaymentForm } from './AccountingForms';
 
@@ -16,21 +16,24 @@ const AccountingPage = () => {
     fetchParties();
   }, []);
 
+  const resolveLedgerForParty = async (partyId) => {
+    const ledgers = await accountingApi.listLedgers({ partyId });
+    return ledgers?.[0] || null;
+  };
+
   // Fetch the ledger statement when selected party changes
   useEffect(() => {
     if (selectedPartyId) {
-      api.get(`/accounting/ledgers?partyId=${selectedPartyId}`)
-        .then(res => {
-          const ledger = res.data.data?.[0];
+      resolveLedgerForParty(selectedPartyId)
+        .then((ledger) => {
           if (ledger) {
             fetchLedgerStatement({ ledgerId: ledger._id });
           } else {
-            // Reset if no ledger matches
             useStore.setState({ currentLedgerStatement: null });
           }
         })
-        .catch(err => {
-          console.error("Error fetching ledger for party:", err);
+        .catch((err) => {
+          console.error('Error fetching ledger for party:', err);
           useStore.setState({ currentLedgerStatement: null });
         });
     } else {
@@ -55,13 +58,11 @@ const AccountingPage = () => {
 
   const refreshStatement = () => {
     if (selectedPartyId) {
-      api.get(`/accounting/ledgers?partyId=${selectedPartyId}`)
-        .then(res => {
-          const ledger = res.data.data?.[0];
-          if (ledger) {
-            fetchLedgerStatement({ ledgerId: ledger._id });
-          }
-        });
+      resolveLedgerForParty(selectedPartyId).then((ledger) => {
+        if (ledger) {
+          fetchLedgerStatement({ ledgerId: ledger._id });
+        }
+      });
     }
   };
 

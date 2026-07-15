@@ -22,7 +22,8 @@ const SYSTEM_LEDGER_TEMPLATES = [
   { name: 'Retained Earnings', group: 'Capital', subGroup: 'Retained Earnings' },
   { name: 'GRN Clearing A/c', group: 'Liabilities', subGroup: 'Current Liabilities' },
   { name: 'Sales Return A/c', group: 'Income', subGroup: 'Direct Income' },
-  { name: 'Purchase Return A/c', group: 'Expenses', subGroup: 'Direct Expenses' }
+  { name: 'Purchase Return A/c', group: 'Expenses', subGroup: 'Direct Expenses' },
+  { name: 'Round Off', group: 'Expenses', subGroup: 'Indirect Expenses' },
 ];
 
 class AccountingService {
@@ -68,7 +69,7 @@ class AccountingService {
         throw new Error(`Party with ID ${partyId} not found`);
       }
       // Fix: 'Both' type parties are treated as Supplier (Creditor)
-      const isCreditor = ['Supplier', 'Both', 'Job Worker', 'Broker'].includes(party.type);
+      const isCreditor = ['Supplier', 'Both', 'Job Worker', 'Broker', 'Transport', 'Agent'].includes(party.type);
       const group = isCreditor ? 'Liabilities' : 'Assets';
       const subGroup = isCreditor ? 'Sundry Creditors' : 'Sundry Debtors';
 
@@ -79,7 +80,7 @@ class AccountingService {
         subGroup,
         linkedPartyId: partyId,
         openingBalance: party.openingBalance || 0,
-        openingBalanceType: isCreditor ? 'Cr' : 'Dr'
+        openingBalanceType: party.openingBalanceType || (isCreditor ? 'Cr' : 'Dr')
       });
     }
     return ledger;
@@ -90,12 +91,12 @@ class AccountingService {
    * Old: countDocuments + 1 (duplicate keys under concurrency)
    * New: MongoDB atomic $inc
    */
-  async generateEntryNo(companyId, prefix) {
+  async generateEntryNo(companyId, prefix, session = null) {
     const currentYear = new Date().getFullYear().toString().substring(2);
     const nextYear = (new Date().getFullYear() + 1).toString().substring(2);
     const fy = `${currentYear}-${nextYear}`;
     const counterId = `${prefix}-${fy}-${companyId}`;
-    const seq = await Counter.nextSeq(counterId);
+    const seq = await Counter.nextSeq(counterId, session);
     return `${prefix}-${fy}-${seq.toString().padStart(4, '0')}`;
   }
 
@@ -103,7 +104,7 @@ class AccountingService {
   async onSalesInvoicePost(invoice, session = null) {
     try {
       const companyId = invoice.companyId;
-      const entryNo = await this.generateEntryNo(companyId, 'JNL');
+      const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
 
       const customerLedger = await this.getOrCreatePartyLedger(companyId, invoice.customerId);
       const salesLedger = await this.getSystemLedger(companyId, 'Sales A/c');
@@ -111,11 +112,13 @@ class AccountingService {
       const sgstLedger = await this.getSystemLedger(companyId, 'SGST Output');
       const igstLedger = await this.getSystemLedger(companyId, 'IGST Output');
 
-      const netAmount = parseFloat(invoice.netAmount || 0);
-      const taxableAmount = parseFloat(invoice.taxableAmount || 0);
-      const cgst = parseFloat(invoice.cgst || invoice.totals?.cgst || 0);
-      const sgst = parseFloat(invoice.sgst || invoice.totals?.sgst || 0);
-      const igst = parseFloat(invoice.igst || invoice.totals?.igst || 0);
+      const round2 = (n) => Number(Number(n || 0).toFixed(2));
+      const netAmount = round2(invoice.netAmount);
+      const taxableAmount = round2(invoice.taxableAmount);
+      const cgst = round2(invoice.cgst || invoice.totals?.cgst);
+      const sgst = round2(invoice.sgst || invoice.totals?.sgst);
+      const igst = round2(invoice.igst || invoice.totals?.igst);
+      const roundOff = round2(invoice.roundOff);
 
       const lines = [
         {
@@ -138,6 +141,15 @@ class AccountingService {
       if (sgst > 0) lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Cr', amount: sgst, narration: `SGST Output #${invoice.invoiceNo}` });
       if (igst > 0) lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Cr', amount: igst, narration: `IGST Output #${invoice.invoiceNo}` });
 
+      if (Math.abs(roundOff) >= 0.01) {
+        const roundLedger = await this.getSystemLedger(companyId, 'Round Off');
+        // Sales: net = taxable + gst + roundOff → opposite purchase sides
+        if (roundOff > 0) {
+          lines.push({ ledgerId: roundLedger._id, ledgerName: roundLedger.name, type: 'Cr', amount: Math.abs(roundOff), narration: `Round off #${invoice.invoiceNo}` });
+        } else {
+          lines.push({ ledgerId: roundLedger._id, ledgerName: roundLedger.name, type: 'Dr', amount: Math.abs(roundOff), narration: `Round off #${invoice.invoiceNo}` });
+        }
+      }
       const data = { companyId, entryNo, entryDate: invoice.date || new Date(), voucherType: 'SalesAuto', refType: 'SalesInvoice', refId: invoice._id, lines, narration: `Auto posted Sales Invoice #${invoice.invoiceNo}` };
       const entry = session ? await AccountingEntry.create([data], { session }) : await AccountingEntry.create(data);
       return Array.isArray(entry) ? entry[0] : entry;
@@ -151,7 +163,7 @@ class AccountingService {
   async onPurchaseBillPost(bill, session = null) {
     try {
       const companyId = bill.companyId;
-      const entryNo = await this.generateEntryNo(companyId, 'JNL');
+      const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
 
       const supplierLedger = await this.getOrCreatePartyLedger(companyId, bill.supplierId);
       const purchaseLedger = await this.getSystemLedger(companyId, 'Purchase A/c');
@@ -159,12 +171,13 @@ class AccountingService {
       const sgstLedger = await this.getSystemLedger(companyId, 'SGST Input');
       const igstLedger = await this.getSystemLedger(companyId, 'IGST Input');
 
-      // Fix: standardized — was bill.totalAmount / bill.totals?.taxableValue (inconsistent)
-      const netAmount = parseFloat(bill.netAmount || 0);
-      const taxableAmount = parseFloat(bill.taxableAmount || 0);
-      const cgst = parseFloat(bill.cgst || bill.totals?.cgst || 0);
-      const sgst = parseFloat(bill.sgst || bill.totals?.sgst || 0);
-      const igst = parseFloat(bill.igst || bill.totals?.igst || 0);
+      const round2 = (n) => Number(Number(n || 0).toFixed(2));
+      const netAmount = round2(bill.netAmount);
+      const taxableAmount = round2(bill.taxableAmount);
+      const cgst = round2(bill.cgst || bill.totals?.cgst);
+      const sgst = round2(bill.sgst || bill.totals?.sgst);
+      const igst = round2(bill.igst || bill.totals?.igst);
+      const roundOff = round2(bill.roundOff);
 
       const lines = [
         { ledgerId: purchaseLedger._id, ledgerName: purchaseLedger.name, type: 'Dr', amount: taxableAmount, narration: `Purchase value for Bill #${bill.invoiceNo}` }
@@ -174,7 +187,58 @@ class AccountingService {
       if (sgst > 0) lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Dr', amount: sgst, narration: `SGST Input #${bill.invoiceNo}` });
       if (igst > 0) lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Dr', amount: igst, narration: `IGST Input #${bill.invoiceNo}` });
 
+      // Round off bridges taxable+GST vs net (e.g. Harshika bill −0.20)
+      if (Math.abs(roundOff) >= 0.01) {
+        const roundLedger = await this.getSystemLedger(companyId, 'Round Off');
+        if (roundOff > 0) {
+          lines.push({
+            ledgerId: roundLedger._id,
+            ledgerName: roundLedger.name,
+            type: 'Dr',
+            amount: Math.abs(roundOff),
+            narration: `Round off #${bill.invoiceNo}`,
+          });
+        } else {
+          lines.push({
+            ledgerId: roundLedger._id,
+            ledgerName: roundLedger.name,
+            type: 'Cr',
+            amount: Math.abs(roundOff),
+            narration: `Round off #${bill.invoiceNo}`,
+          });
+        }
+      }
+
       lines.push({ ledgerId: supplierLedger._id, ledgerName: supplierLedger.name, type: 'Cr', amount: netAmount, narration: `Purchase Bill #${bill.invoiceNo}` });
+
+      // Safety: absorb residual float (≤ ₹1) into Round Off so Save never fails on 0.01–0.02 drifts
+      let dr = 0;
+      let cr = 0;
+      lines.forEach((l) => {
+        if (l.type === 'Dr') dr += l.amount;
+        else cr += l.amount;
+      });
+      const gap = round2(dr - cr);
+      if (Math.abs(gap) >= 0.01 && Math.abs(gap) <= 1) {
+        const roundLedger = await this.getSystemLedger(companyId, 'Round Off');
+        if (gap > 0) {
+          lines.push({
+            ledgerId: roundLedger._id,
+            ledgerName: roundLedger.name,
+            type: 'Cr',
+            amount: Math.abs(gap),
+            narration: `Balance adjust #${bill.invoiceNo}`,
+          });
+        } else {
+          lines.push({
+            ledgerId: roundLedger._id,
+            ledgerName: roundLedger.name,
+            type: 'Dr',
+            amount: Math.abs(gap),
+            narration: `Balance adjust #${bill.invoiceNo}`,
+          });
+        }
+      }
 
       const data = { companyId, entryNo, entryDate: bill.date || new Date(), voucherType: 'PurchaseAuto', refType: 'PurchaseBill', refId: bill._id, lines, narration: `Auto posted Purchase Bill #${bill.invoiceNo}` };
       const entry = session ? await AccountingEntry.create([data], { session }) : await AccountingEntry.create(data);
@@ -231,10 +295,10 @@ class AccountingService {
   }
 
   // 5. Job Work Charges — FIXED: Split GST correctly into CGST+SGST or IGST based on location
-  async onJobWorkChargesPost(receive) {
+  async onJobWorkChargesPost(receive, session = null) {
     try {
       const companyId = receive.companyId;
-      const entryNo = await this.generateEntryNo(companyId, 'JNL');
+      const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
 
       const jobChargesLedger = await this.getSystemLedger(companyId, 'Job Work Charges');
       const cgstInputLedger = await this.getSystemLedger(companyId, 'CGST Input');
@@ -281,16 +345,22 @@ class AccountingService {
 
       lines.push({ ledgerId: millLedger._id, ledgerName: millLedger.name, type: 'Cr', amount: total, narration: 'Job Work Payable to Mill' });
 
-      return await AccountingEntry.create({ companyId, entryNo, entryDate: receive.date || new Date(), voucherType: 'JobWorkAuto', refType: 'JobReceive', refId: receive._id, lines, narration: 'Auto posted Job Work Charges' });
+      const data = { companyId, entryNo, entryDate: receive.date || new Date(), voucherType: 'JobWorkAuto', refType: 'JobReceive', refId: receive._id, lines, narration: 'Auto posted Job Work Charges' };
+      if (session) {
+        const entry = await AccountingEntry.create([data], { session });
+        return entry[0];
+      }
+      return await AccountingEntry.create(data);
     } catch (err) {
       console.error('Failed auto job work charges posting:', err);
+      if (session) throw err;
     }
   }
 
   // 6. Abnormal Wastage posting — costPerUnit now passed from actual lot data
-  async onAbnormalWastagePost(companyId, qty, costPerUnit, refId = null) {
+  async onAbnormalWastagePost(companyId, qty, costPerUnit, refId = null, session = null) {
     try {
-      const entryNo = await this.generateEntryNo(companyId, 'JNL');
+      const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
       const lossLedger = await this.getSystemLedger(companyId, 'Production Loss A/c');
       const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c');
       const amount = Number((parseFloat(qty) * parseFloat(costPerUnit)).toFixed(2));
@@ -300,9 +370,15 @@ class AccountingService {
         { ledgerId: stockLedger._id, ledgerName: stockLedger.name, type: 'Cr', amount, narration: 'Stock reduction for wastage' }
       ];
 
-      return await AccountingEntry.create({ companyId, entryNo, entryDate: new Date(), voucherType: 'WastageAuto', refType: 'Journal', refId, lines, narration: 'Auto posted Abnormal Wastage Entry' });
+      const data = { companyId, entryNo, entryDate: new Date(), voucherType: 'WastageAuto', refType: 'Journal', refId, lines, narration: 'Auto posted Abnormal Wastage Entry' };
+      if (session) {
+        const entry = await AccountingEntry.create([data], { session });
+        return entry[0];
+      }
+      return await AccountingEntry.create(data);
     } catch (err) {
       console.error('Failed auto wastage posting:', err);
+      if (session) throw err;
     }
   }
 }

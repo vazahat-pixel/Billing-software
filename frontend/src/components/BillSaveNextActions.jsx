@@ -10,6 +10,8 @@ const BillSaveNextActions = ({
   offlinePending,
   actions = [],
   onPrint,
+  onPdf,
+  onWhatsApp,
   onNew,
   onClose
 }) => {
@@ -34,27 +36,44 @@ const BillSaveNextActions = ({
               Offline save — will sync when you are back online.
             </p>
           )}
-          <p className="text-[11px] text-[var(--text-muted)] font-medium">What would you like to do next?</p>
 
-          <div className="grid grid-cols-1 gap-2">
-            {actions.map((action) => (
-              <button
-                key={action.key}
-                type="button"
-                onClick={action.onClick}
-                className="erp-btn erp-btn-primary w-full justify-start h-9 text-[12px]"
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--border)]">
-            {onPrint && (
-              <button type="button" onClick={onPrint} className="erp-btn erp-btn-secondary flex-1 min-w-[100px] h-8 text-[11px]">
-                Print
+          <div className="grid grid-cols-2 gap-2">
+            {onPdf && (
+              <button type="button" onClick={onPdf} className="erp-btn erp-btn-primary h-10 text-[11px] col-span-2">
+                📄 Open Invoice PDF (Download / Print)
               </button>
             )}
+            {onPrint && (
+              <button type="button" onClick={onPrint} className="erp-btn erp-btn-secondary h-9 text-[11px]">
+                🖨 Print
+              </button>
+            )}
+            {onWhatsApp && (
+              <button type="button" onClick={onWhatsApp} className="h-9 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold">
+                WhatsApp
+              </button>
+            )}
+          </div>
+
+          {actions.length > 0 && (
+            <>
+              <p className="text-[11px] text-[var(--text-muted)] font-medium pt-1">Continue to</p>
+              <div className="grid grid-cols-1 gap-2">
+                {actions.map((action) => (
+                  <button
+                    key={action.key}
+                    type="button"
+                    onClick={action.onClick}
+                    className="erp-btn erp-btn-secondary w-full justify-start h-9 text-[12px]"
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="flex flex-wrap gap-2 pt-2 border-t border-[var(--border)]">
             {onNew && (
               <button type="button" onClick={onNew} className="erp-btn erp-btn-secondary flex-1 min-w-[100px] h-8 text-[11px]">
                 New Bill

@@ -19,6 +19,12 @@ import Modal from '../components/ui/Modal';
 // Legacy Modals
 import SalesModal from './sales/SalesModal';
 import PurchaseModal from './purchase/PurchaseModal';
+import PurchaseEngineModal from './purchase/PurchaseEngineModal';
+import InventoryEngineModal from './inventory/InventoryEngineModal';
+import ProductionEngineModal from './jobwork/ProductionEngineModal';
+import SalesEngineModal from './sales/SalesEngineModal';
+import AutomationEngineModal from './admin/AutomationEngineModal';
+import Stage2OpsModal from './admin/Stage2OpsModal';
 import { PaymentForm as AccountingModal } from './accounting/AccountingForms';
 import IssueModal from './jobwork/IssueModal';
 import ReceiveModal from './jobwork/ReceiveModal';
@@ -49,6 +55,8 @@ import BookSelectionModal from '../components/BookSelectionModal';
 
 // New Database Modals
 import GenericMasterModal from './masters/GenericMasterModal';
+import WarehouseMasterModal from './masters/WarehouseMasterModal';
+import MergeMasterModal from './masters/MergeMasterModal';
 import OrderModal from './transactions/OrderModal';
 import ReturnModal from './transactions/ReturnModal';
 import NoteModal from './transactions/NoteModal';
@@ -61,6 +69,7 @@ import ReportsHub from './reports/ReportsHub';
 import { getPermissions } from '../utils/permissions';
 import { useConfig } from '../context/ConfigContext';
 import { isFlagEnabled } from '../utils/configHelpers';
+import { toast } from '../store/useToastStore';
 
 const MODULE_PARENT_MAP = {
   sales: 'sales',
@@ -108,7 +117,7 @@ const MODULE_SUBMENU_MAP = {
 
 const Dashboard = () => {
    const navigate = useNavigate();
-   const { user, logout, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items, plan } = useStore();
+   const { user, logout, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items, plan, fetchDashboardSummary, dashboardSummary, dashboardLoading } = useStore();
    const { bundle, moduleConfig: liveModuleConfig, lastSynced } = useConfig();
    const moduleConfig = liveModuleConfig || user?.moduleConfig;
    const showRecordsHub = isFlagEnabled(bundle, 'records_hub', true);
@@ -236,6 +245,14 @@ const Dashboard = () => {
       // New database-connected modals
       genericMaster: false,
       genericMasterType: '',
+      warehouseMaster: false,
+      mergeMaster: false,
+      purchaseEngine: false,
+      inventoryEngine: false,
+      productionEngine: false,
+      salesEngine: false,
+      automationEngine: false,
+      stage2Ops: false,
       order: false,
       orderType: 'Sales',
       returnInv: false,
@@ -272,6 +289,26 @@ const Dashboard = () => {
       document.addEventListener('mousedown', onDocMouseDown);
       return () => document.removeEventListener('mousedown', onDocMouseDown);
    }, []);
+
+   useEffect(() => {
+      const onOpen = (e) => {
+         const modal = e.detail?.modal;
+         if (!modal) return;
+         if (modal === 'reportsHub') {
+            openReportsHub('summary');
+            return;
+         }
+         toggleModal(modal, true);
+      };
+      window.addEventListener('erp:open-modal', onOpen);
+      return () => window.removeEventListener('erp:open-modal', onOpen);
+   }, []);
+
+   useEffect(() => {
+      if (user?.companyId || user?.role === 'super_admin') {
+         fetchDashboardSummary();
+      }
+   }, [user?.companyId, user?.role, fetchDashboardSummary]);
 
    const parseMenuLabel = (label) => {
       const match = label.match(/^(\d+)\s+(.+)$/);
@@ -420,13 +457,25 @@ const Dashboard = () => {
          { label: 'Item TaxSlab', action: () => openGenericMaster('ItemTaxSlab') },
          { label: 'Station', action: () => openGenericMaster('City') },
          { label: 'Transport', action: () => openGenericMaster('Transport') },
+         { label: 'Color', action: () => openGenericMaster('Color') },
+         { label: 'Design', action: () => openGenericMaster('Design') },
+         { label: 'Quality', action: () => openGenericMaster('Quality') },
+         { label: 'Pattern', action: () => openGenericMaster('Pattern') },
+         { label: 'Brand', action: () => openGenericMaster('Brand') },
+         { label: 'Shade', action: () => openGenericMaster('Shade') },
+         { label: 'Process', action: () => openGenericMaster('Process') },
+         { label: 'Machine', action: () => openGenericMaster('Machine') },
+         { label: 'Department', action: () => openGenericMaster('Department') },
+         { label: 'Payment Terms', action: () => openGenericMaster('PaymentTerms') },
+         { label: 'Currency', action: () => openGenericMaster('Currency') },
+         { label: 'Warehouse', action: () => setModals(prev => ({ ...prev, warehouseMaster: true })) },
          { label: 'Type', action: () => openGenericMaster('Type') },
          { label: 'OtherMaster', action: () => openGenericMaster('OtherMaster') },
          { label: 'Job Worker', action: () => setModals(prev => ({ ...prev, jobWorker: true })) },
          { label: 'Lastyear BillEntry', action: () => openRecordsHub('sales') },
          { label: 'Opening Balance', action: () => setModals(prev => ({ ...prev, openingBalance: true })) },
          { label: 'Opening StockEntry', action: () => setModals(prev => ({ ...prev, openingStock: true })) },
-         { label: 'Merge Event', action: () => refreshAllData().then(() => alert('Data merged and refreshed.')) },
+         { label: 'Merge Event', action: () => setModals(prev => ({ ...prev, mergeMaster: true })) },
          { label: 'Item Rate Master', action: () => toggleModal('itemMaster', true) }
       ],
       Transaction: [
@@ -441,8 +490,12 @@ const Dashboard = () => {
          { label: 'Job Purchase', action: () => toggleModal('purchase', true) },
          { label: 'Sales Return', action: () => openReturn('Sales') },
          { label: 'Purchase Return', action: () => openReturn('Purchase') },
-         { label: 'Purchase Order', action: () => openOrder('Purchase') },
-         { label: 'Sales Order', action: () => openOrder('Sales') },
+         { label: 'Purchase Order', action: () => setModals(prev => ({ ...prev, purchaseEngine: true })) },
+         { label: 'Purchase Engine', action: () => setModals(prev => ({ ...prev, purchaseEngine: true })) },
+         { label: 'GRN / QC', action: () => setModals(prev => ({ ...prev, purchaseEngine: true })) },
+         { label: 'Sales Order', action: () => setModals(prev => ({ ...prev, salesEngine: true })) },
+         { label: 'Sales Engine', action: () => setModals(prev => ({ ...prev, salesEngine: true })) },
+         { label: 'Delivery Challan', action: () => setModals(prev => ({ ...prev, salesEngine: true })) },
          { label: 'Stock Transfer (Jv)', action: () => openJournal() }
       ],
       Inventory: [
@@ -452,6 +505,10 @@ const Dashboard = () => {
          { label: 'Job Receive', key: 'jobRec' },
          { label: 'Update Job', key: 'updateJob' },
          { label: 'Stock Ledger', key: 'inventoryPage' },
+         { label: 'Inventory Engine', action: () => setModals(prev => ({ ...prev, inventoryEngine: true })) },
+         { label: 'Production Engine', action: () => setModals(prev => ({ ...prev, productionEngine: true })) },
+         { label: 'Stock Transfer', action: () => setModals(prev => ({ ...prev, inventoryEngine: true })) },
+         { label: 'Reservation', action: () => setModals(prev => ({ ...prev, inventoryEngine: true })) },
          { label: 'Process', action: () => toggleModal('millIssue', true) },
          { label: 'Work Process', action: () => toggleModal('millIssue', true) },
          { label: 'Cutting Entry', action: () => toggleModal('millIssue', true) },
@@ -480,35 +537,39 @@ const Dashboard = () => {
          { label: 'Brokreg Statment', action: () => openReportsHub('outstanding') },
          { label: 'Daily Transaction', action: () => openReportsHub('daily') },
          { label: 'Master List', action: () => openReportsHub('masters') },
-         { label: 'Letter Pad', action: () => alert('Letter pad generator ready.') },
+         { label: 'Letter Pad', action: () => toast.unavailable('Letter Pad') },
          { label: 'Zoom Item Ledger', action: () => openReportsHub('stockItem') },
          { label: 'Others Reports', action: () => openReportsHub('summary') },
          { label: 'Old Reports', action: () => openReportsHub('summary') }
       ],
       Utilities: [
-         { label: 'Backup', action: () => alert('System Backup written to cloud successfully.') },
-         { label: 'Restore', action: () => alert('System Restore successfully finalized.') },
-         { label: 'Closing / UnClosing Year', action: () => alert('Financial year closed.') },
-         { label: 'New A/c. Year ( Auto )', action: () => alert('New Accounting Year created automatically.') },
-         { label: 'New A/c. Year ( Manual )', action: () => alert('New Accounting Year created manually.') },
-         { label: 'Transfer To Next Year', action: () => alert('Balances transferred to new year.') },
-         { label: 'Voucher Relndex', action: () => alert('Vouchers reindexed successfully.') },
-         { label: 'Missing Series', action: () => alert('No missing invoice series found.') },
-         { label: 'Auto Expense Entry', action: () => alert('Auto expense calculations completed.') },
+         { label: 'Business Automation', action: () => setModals(prev => ({ ...prev, automationEngine: true })) },
+         { label: 'Stage 2 Ops / Certification', action: () => setModals(prev => ({ ...prev, stage2Ops: true })) },
+         { label: 'Documents / Workflow', action: () => setModals(prev => ({ ...prev, stage2Ops: true })) },
+         { label: 'Backup', action: () => toast.unavailable('Cloud Backup') },
+         { label: 'Restore', action: () => toast.unavailable('Restore') },
+         { label: 'Closing / UnClosing Year', action: () => toast.unavailable('Year Closing') },
+         { label: 'New A/c. Year ( Auto )', action: () => toast.unavailable('New A/c Year (Auto)') },
+         { label: 'New A/c. Year ( Manual )', action: () => toast.unavailable('New A/c Year (Manual)') },
+         { label: 'Transfer To Next Year', action: () => toast.unavailable('Transfer To Next Year') },
+         { label: 'Voucher Relndex', action: () => toast.unavailable('Voucher Reindex') },
+         { label: 'Missing Series', action: () => toast.unavailable('Missing Series check') },
+         { label: 'Auto Expense Entry', action: () => toast.unavailable('Auto Expense Entry') },
          { label: 'Update Main Account Master', action: () => toggleModal('accountMaster', true) },
-         { label: 'MisMatch Data Scanner', action: () => refreshAllData().then(() => alert('Data scan complete. All records refreshed.')) },
-         { label: 'Email Option', action: () => alert('Email notification dispatch complete.') },
-         { label: 'Missing Views Code', action: () => alert('Database views up-to-date.') },
+         { label: 'MisMatch Data Scanner', action: () => refreshAllData().then(() => toast.success('Data scan complete. All records refreshed.')) },
+         { label: 'Email Option', action: () => toast.unavailable('Email Option') },
+         { label: 'Missing Views Code', action: () => toast.unavailable('Missing Views') },
          { label: 'Gst Updation', action: () => toggleModal('caDashboard', true) },
-         { label: 'Backup Script Wise', action: () => alert('Local schema backup completed.') },
-         { label: 'Single Firm Backup/Restore', action: () => alert('Firm database backed up.') },
-         { label: 'Application Sync', action: () => refreshAllData().then(() => alert('All data refreshed.')) },
-         { label: 'Bulk Whatsapp', action: () => alert('WhatsApp dispatch worker initialized.') }
+         { label: 'Backup Script Wise', action: () => toast.unavailable('Schema Backup') },
+         { label: 'Single Firm Backup/Restore', action: () => toast.unavailable('Firm Backup/Restore') },
+         { label: 'Application Sync', action: () => refreshAllData().then(() => toast.success('All data refreshed.')) },
+         { label: 'Bulk Whatsapp', action: () => toast.unavailable('Bulk WhatsApp') }
       ],
       'Setup System': [
          { label: 'Setting', action: () => setModals(prev => ({ ...prev, userRights: true })) },
-         { label: 'Extra Event', action: () => alert('Event pipeline active.') },
-         { label: 'Extra Event DetailData', action: () => alert('Pipeline events loaded.') },
+         { label: 'Business Automation', action: () => setModals(prev => ({ ...prev, automationEngine: true })) },
+         { label: 'Extra Event', action: () => toast.unavailable('Extra Event') },
+         { label: 'Extra Event DetailData', action: () => toast.unavailable('Extra Event Detail') },
          { label: 'User Setup', action: () => setModals(prev => ({ ...prev, userRights: true })) }
       ],
       Records: showRecordsHub ? [
@@ -520,12 +581,12 @@ const Dashboard = () => {
          { label: 'Item Records', action: () => openRecordsHub('items') }
       ] : [],
       Company: [
-         { label: 'Change Company -F3', action: () => alert('Use F3 key to select company workspace.') },
-         { label: 'Change Year -F2', action: () => alert('Use F2 key to shift financial year.') },
+         { label: 'Change Company -F3', action: () => toast.unavailable('Multi-company switcher') },
+         { label: 'Change Year -F2', action: () => toast.unavailable('Financial year switcher') },
          { label: 'Company Master', action: () => setModals(prev => ({ ...prev, userRights: true })) },
-         { label: 'Information', action: () => alert('System Version: v12.4 ERP Enterprise.') },
-         { label: 'Complain Form', action: () => alert('Feedback report ticket dispatched.') },
-         { label: 'Update DataBase', action: () => alert('Database schema up-to-date.') }
+         { label: 'Information', action: () => toast.info('Textile ERP SaaS — build from package.json') },
+         { label: 'Complain Form', action: () => toast.unavailable('Complain Form') },
+         { label: 'Update DataBase', action: () => toast.unavailable('Database migration tool') }
       ]
    };
 
@@ -713,7 +774,7 @@ const Dashboard = () => {
                      { label: '7 J.Iss', action: () => toggleModal('jobIssue', true) },
                      { label: '8 J.Rec', action: () => toggleModal('jobRec', true) },
                      { label: '9 Debt O/s', action: () => toggleModal('outstanding', true) },
-                     { label: 'F10 Help', action: () => alert('ERP System Help Update Desk: Active') }
+                     { label: 'F10 Help', action: () => toast.info('Ctrl+K opens global search. Use the Quick rail for core modules.') }
                   ].map((btn, idx, arr) => (
                      <React.Fragment key={btn.label}>
                         <button
@@ -746,7 +807,7 @@ const Dashboard = () => {
                      {lastSynced && (
                         <span className="text-[9px] font-medium text-emerald-600 self-center">Live</span>
                      )}
-                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => refreshAllData()}>Sync</button>
+                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => { refreshAllData(); fetchDashboardSummary(); }}>Sync</button>
                      {showRecordsHub && (
                         <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => openRecordsHub('accounts')}>Records</button>
                      )}
@@ -756,6 +817,29 @@ const Dashboard = () => {
                      )}
                      <button type="button" className="erp-btn erp-btn-primary h-7 px-3 text-[11px]" onClick={() => toggleModal('sales', true)}>+ Invoice</button>
                   </div>
+               </div>
+
+               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                  {[
+                     { label: 'Sales Today', value: dashboardSummary?.salesToday?.amount, sub: dashboardSummary?.salesToday?.count != null ? `${dashboardSummary.salesToday.count} bills` : null },
+                     { label: 'Purchase Today', value: dashboardSummary?.purchaseToday?.amount, sub: dashboardSummary?.purchaseToday?.count != null ? `${dashboardSummary.purchaseToday.count} bills` : null },
+                     { label: 'Cash / Receipts', value: dashboardSummary?.cashToday },
+                     { label: 'Receivable', value: dashboardSummary?.receivable },
+                     { label: 'Payable', value: dashboardSummary?.payable },
+                     { label: 'Low Stock Lots', value: dashboardSummary?.lowStockLots, raw: true },
+                  ].map((card) => (
+                     <div key={card.label} className="erp-card p-3">
+                        <p className="text-[9px] uppercase tracking-wide text-[var(--text-muted)] font-semibold">{card.label}</p>
+                        <p className="text-[14px] font-bold text-[var(--text-primary)] mt-1 tabular-nums">
+                          {dashboardLoading && dashboardSummary == null
+                            ? '…'
+                            : card.raw
+                              ? (card.value ?? '—')
+                              : `₹ ${Number(card.value || 0).toLocaleString('en-IN')}`}
+                        </p>
+                        {card.sub && <p className="text-[9px] text-[var(--text-muted)] mt-0.5">{card.sub}</p>}
+                     </div>
+                  ))}
                </div>
 
                <div className="erp-card p-4">
@@ -875,6 +959,39 @@ const Dashboard = () => {
             isOpen={modals.openingStock}
             onClose={() => setModals(prev => ({ ...prev, openingStock: false }))}
             readOnly={permissions.readOnlyMasters}
+         />
+         <WarehouseMasterModal
+            isOpen={modals.warehouseMaster}
+            onClose={() => setModals(prev => ({ ...prev, warehouseMaster: false }))}
+            readOnly={permissions.readOnlyMasters}
+         />
+         <MergeMasterModal
+            isOpen={modals.mergeMaster}
+            onClose={() => setModals(prev => ({ ...prev, mergeMaster: false }))}
+         />
+         <PurchaseEngineModal
+            isOpen={modals.purchaseEngine}
+            onClose={() => setModals(prev => ({ ...prev, purchaseEngine: false }))}
+         />
+         <InventoryEngineModal
+            isOpen={modals.inventoryEngine}
+            onClose={() => setModals(prev => ({ ...prev, inventoryEngine: false }))}
+         />
+         <ProductionEngineModal
+            isOpen={modals.productionEngine}
+            onClose={() => setModals(prev => ({ ...prev, productionEngine: false }))}
+         />
+         <SalesEngineModal
+            isOpen={modals.salesEngine}
+            onClose={() => setModals(prev => ({ ...prev, salesEngine: false }))}
+         />
+         <AutomationEngineModal
+            isOpen={modals.automationEngine}
+            onClose={() => setModals(prev => ({ ...prev, automationEngine: false }))}
+         />
+         <Stage2OpsModal
+            isOpen={modals.stage2Ops}
+            onClose={() => setModals(prev => ({ ...prev, stage2Ops: false }))}
          />
          <OrderModal 
             isOpen={modals.order} 

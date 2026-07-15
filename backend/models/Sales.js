@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { enterpriseIntegrityPlugin } = require('./mixins/enterpriseMetaSchema');
 
 const SalesSchema = new mongoose.Schema({
   companyId: {
@@ -28,8 +29,17 @@ const SalesSchema = new mongoose.Schema({
   },
   orderNo: { type: String, default: '' },
   orderDate: { type: Date, default: null },
+  orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null, index: true },
   challanNo: { type: String, default: '' },
   chDate: { type: Date, default: null },
+  challanId: { type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryChallan', default: null, index: true },
+  /** When true, stock already posted at challan — do not deduct again */
+  stockFromChallan: { type: Boolean, default: false },
+  invoiceType: {
+    type: String,
+    enum: ['Tax', 'Retail', 'BOS', 'Proforma'],
+    default: 'Tax',
+  },
   brokerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', default: null },
   haste: { type: String, default: '' },
   type: { type: String, default: '' },
@@ -131,6 +141,9 @@ const SalesSchema = new mongoose.Schema({
 
 // Per-company unique invoice number — fixes cross-tenant collision bug
 SalesSchema.index({ invoiceNo: 1, companyId: 1 }, { unique: true });
+SalesSchema.index({ companyId: 1, date: -1, status: 1 });
+
+SalesSchema.plugin(enterpriseIntegrityPlugin);
 
 module.exports = mongoose.model('Sales', SalesSchema);
 

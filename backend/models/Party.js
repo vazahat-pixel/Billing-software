@@ -8,7 +8,7 @@ const PartySchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['Customer', 'Supplier', 'Both', 'Broker', 'Job Worker'],
+    enum: ['Customer', 'Supplier', 'Both', 'Broker', 'Job Worker', 'Transport', 'Employee', 'Salesman', 'Agent'],
     required: true
   },
   gstin: {
@@ -46,6 +46,10 @@ const PartySchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  /** Cached outstanding — refreshed by Sprint 2.6 automation */
+  outstandingReceivable: { type: Number, default: 0 },
+  outstandingPayable: { type: Number, default: 0 },
+  outstandingRefreshedAt: { type: Date, default: null },
   openingBalance: {
     type: Number,
     default: 0
@@ -169,6 +173,20 @@ const PartySchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  paymentTermsId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'SubMaster',
+    default: null
+  },
+  isFavorite: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  lastUsedAt: {
+    type: Date,
+    default: null
+  },
   companyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',
@@ -181,6 +199,24 @@ const PartySchema = new mongoose.Schema({
 
 // Duplicate prevention per company
 PartySchema.index({ name: 1, companyId: 1 }, { unique: true });
-PartySchema.index({ accd: 1, companyId: 1 }, { unique: true, sparse: true });
+PartySchema.index(
+  { accd: 1, companyId: 1 },
+  {
+    unique: true,
+    name: 'uniq_party_accd',
+    partialFilterExpression: { accd: { $type: 'number', $gt: 0 } },
+  }
+);
+PartySchema.index(
+  { companyId: 1, gstin: 1 },
+  {
+    unique: true,
+    name: 'uniq_company_gstin',
+    partialFilterExpression: { gstin: { $type: 'string', $gt: '' } },
+  }
+);
+
+const { enterpriseIntegrityPlugin } = require('./mixins/enterpriseMetaSchema');
+PartySchema.plugin(enterpriseIntegrityPlugin);
 
 module.exports = mongoose.model('Party', PartySchema);

@@ -9,5 +9,10 @@ router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
 router.get('/me', authMiddleware, authController.getMe);
 
+// Prevent unmatched /auth/* from falling through to global authMiddleware
+router.use((req, res) => {
+  res.status(405).json({ success: false, message: `Cannot ${req.method} ${req.path}` });
+});
+
 module.exports = router;
 

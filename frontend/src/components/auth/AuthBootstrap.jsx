@@ -1,19 +1,22 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import useStore from '../../store/useStore';
 import { initSyncListener } from '../../utils/syncQueue';
 import { subscribeNetworkStatus } from '../../utils/networkStatus';
 
 const AuthBootstrap = ({ children }) => {
-  const { sessionReady, restoreSession, bootstrapMasters, token } = useStore();
+  const { sessionReady, bootstrapMasters, token } = useStore();
+  const mastersBootedRef = useRef(false);
+
+  // restoreSession runs once in AppProviders — do not call again here (double refresh)
 
   useEffect(() => {
-    restoreSession();
-  }, [restoreSession]);
-
-  useEffect(() => {
-    if (sessionReady && token) {
-      bootstrapMasters();
+    if (!sessionReady || !token) {
+      mastersBootedRef.current = false;
+      return;
     }
+    if (mastersBootedRef.current) return;
+    mastersBootedRef.current = true;
+    bootstrapMasters();
   }, [sessionReady, token, bootstrapMasters]);
 
   useEffect(() => {

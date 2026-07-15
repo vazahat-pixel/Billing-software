@@ -25,8 +25,13 @@ export const loginWithOfflineSupport = async ({
   }
 
   try {
-    const response = await api.post('/auth/login', { email: emailNorm, password });
-    const { token, user } = response.data;
+    const response = await api.post('/auth/login', { email: emailNorm, password }, { skipAuthRedirect: true });
+    const body = response.data || {};
+    const payload = body.data && (body.data.token || body.data.user) ? body.data : body;
+    const { token, user } = payload;
+    if (!token || !user) {
+      throw new Error(body.message || 'Login failed: invalid server response');
+    }
     assertRole(user);
     await saveOfflineCredential(emailNorm, password, { token, user });
     return { token, user };

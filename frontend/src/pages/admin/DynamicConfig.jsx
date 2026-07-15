@@ -5,7 +5,7 @@ import {
   ChevronDown, ChevronUp, Zap, AlertCircle
 } from 'lucide-react';
 import useAdminStore from '../../store/useAdminStore';
-import api from '../../utils/api';
+import { adminApi } from '../../api';
 
 const TABS = [
   { id: 'bills', label: 'Bill Fields', icon: FileText },
@@ -89,8 +89,8 @@ const DynamicConfig = () => {
     if (!selectedCompany) return;
     setLoading(true);
     try {
-      const res = await api.get(`/admin/company/${selectedCompany}/config/bills/${billType}`);
-      setBillConfig(res.data.data);
+      const data = await adminApi.billConfig(selectedCompany, billType);
+      setBillConfig(data);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
@@ -102,8 +102,7 @@ const DynamicConfig = () => {
     if (!selectedCompany) return;
     setLoading(true);
     try {
-      const res = await api.get(`/admin/company/${selectedCompany}/config/columns`);
-      const list = res.data.data || [];
+      const list = await adminApi.columnConfigs(selectedCompany);
       const found = list.find((c) => c.tableKey === columnTable);
       setColumnConfig(found || { tableKey: columnTable, columns: [] });
     } catch (err) {
@@ -117,8 +116,8 @@ const DynamicConfig = () => {
     if (!selectedCompany) return;
     setLoading(true);
     try {
-      const res = await api.get(`/admin/company/${selectedCompany}/config/feature-flags`);
-      setFlags(res.data.data || []);
+      const data = await adminApi.featureFlags(selectedCompany);
+      setFlags(data || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
@@ -130,8 +129,8 @@ const DynamicConfig = () => {
     if (!selectedCompany) return;
     setLoading(true);
     try {
-      const res = await api.get(`/admin/company/${selectedCompany}/config/permissions`);
-      setPermissions(res.data.data);
+      const data = await adminApi.permissions(selectedCompany);
+      setPermissions(data);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
@@ -143,8 +142,8 @@ const DynamicConfig = () => {
     if (!selectedCompany) return;
     setLoading(true);
     try {
-      const res = await api.get(`/admin/company/${selectedCompany}/config/logs?limit=30`);
-      setLogs(res.data.data || []);
+      const data = await adminApi.configLogs(selectedCompany, { limit: 30 });
+      setLogs(data || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
@@ -166,7 +165,7 @@ const DynamicConfig = () => {
     if (!billConfig) return;
     setSaving(true);
     try {
-      await api.put(`/admin/company/${selectedCompany}/config/bills/${billType}`, billConfig);
+      await adminApi.saveBillConfig(selectedCompany, billType, billConfig);
       flashSaved();
     } catch (err) {
       alert('Save failed: ' + (err.response?.data?.message || err.message));
@@ -179,7 +178,7 @@ const DynamicConfig = () => {
     if (!columnConfig) return;
     setSaving(true);
     try {
-      await api.put(`/admin/company/${selectedCompany}/config/columns/${columnTable}`, columnConfig);
+      await adminApi.saveColumnConfig(selectedCompany, columnTable, columnConfig);
       flashSaved();
     } catch (err) {
       alert('Save failed: ' + (err.response?.data?.message || err.message));
@@ -191,7 +190,7 @@ const DynamicConfig = () => {
   const saveFlag = async (flag) => {
     setSaving(true);
     try {
-      await api.put(`/admin/company/${selectedCompany}/config/feature-flags/${flag.flagKey}`, flag);
+      await adminApi.saveFeatureFlag(selectedCompany, flag.flagKey, flag);
       flashSaved();
     } catch (err) {
       alert('Save failed: ' + (err.response?.data?.message || err.message));
@@ -204,7 +203,7 @@ const DynamicConfig = () => {
     if (!permissions) return;
     setSaving(true);
     try {
-      await api.put(`/admin/company/${selectedCompany}/config/permissions`, permissions);
+      await adminApi.savePermissions(selectedCompany, permissions);
       flashSaved();
     } catch (err) {
       alert('Save failed: ' + (err.response?.data?.message || err.message));

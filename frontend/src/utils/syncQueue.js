@@ -59,6 +59,14 @@ const renameInvoiceNo = (payload) => {
 const runCreate = async (item) => {
   const endpoint = ENDPOINTS[item.entityType];
   let payload = { ...item.payload };
+  // Offline drafts use local-* ids — never send those as Mongo _id
+  if (isLocalId(payload._id) || isLocalId(payload.id)) {
+    const { _id, id, localId, ...rest } = payload;
+    payload = rest;
+  }
+  if (payload.invoiceNo && String(payload.invoiceNo).startsWith('local-')) {
+    payload = { ...payload, invoiceNo: 'AUTO' };
+  }
   try {
     return await api.post(endpoint, payload, { forceNetwork: true });
   } catch (err) {

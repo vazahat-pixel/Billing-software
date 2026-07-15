@@ -1,5 +1,25 @@
 import { create } from 'zustand';
-import api from '../api/client';
+import {
+  authApi,
+  partiesApi,
+  itemsApi,
+  salesApi,
+  purchasesApi,
+  inventoryApi,
+  jobsApi,
+  accountingApi,
+  ledgerApi,
+  gstApi,
+  reportsApi,
+  booksApi,
+  usersApi,
+  visitsApi,
+  ordersApi,
+  returnsApi,
+  notesApi,
+  subMastersApi,
+  dashboardApi,
+} from '../api';
 import {
   normalizeParty,
   normalizeItem,
@@ -49,7 +69,18 @@ const useStore = create((set, get) => ({
     }
   })(),
   token: localStorage.getItem('token') || null,
-  role: localStorage.getItem('role') || null,
+  role: (() => {
+    const ls = localStorage.getItem('role');
+    if (ls === 'super_admin' || ls === 'user') return ls;
+    try {
+      const saved = JSON.parse(localStorage.getItem('user') || 'null');
+      if (saved?.role === 'super_admin' || saved?.role === 'user') return saved.role;
+    } catch {
+      /* ignore */
+    }
+    // Token without role still gets ERP access after hydrate
+    return localStorage.getItem('token') ? 'user' : null;
+  })(),
   plan: null,
   theme: 'light',
 
@@ -77,6 +108,8 @@ const useStore = create((set, get) => ({
   vouchers: [],
   companyUsers: [],
   sessionReady: false,
+  dashboardSummary: null,
+  dashboardLoading: false,
   // FIXED: Per-entity loading states instead of one shared boolean
   loading: false,
   partiesLoading: false,
@@ -89,18 +122,23 @@ const useStore = create((set, get) => ({
   // --- AUTH ACTIONS ---
   setAuth: async (data) => {
     const user = normalizeUser(data.user);
+    const platformRole = user.role === 'super_admin' ? 'super_admin' : 'user';
     await prepareCompanyCache(user.companyId);
     // Explicitly set companyId BEFORE any cache hydration
     if (user.companyId) setActiveCompanyId(user.companyId);
     localStorage.setItem('token', data.token);
-    localStorage.setItem('role', user.role);
-    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('role', platformRole);
+    localStorage.setItem('user', JSON.stringify({ ...user, role: platformRole }));
     const plan = user.plan;
     persistOfflineFlag(user, plan);
+    try {
+      const { default: useConfigStore } = await import('./useConfigStore');
+      useConfigStore.getState().hydrateFromAuth(user, plan);
+    } catch { /* config store optional during early boot */ }
     set({ 
       token: data.token, 
-      user, 
-      role: user.role, 
+      user: { ...user, role: platformRole }, 
+      role: platformRole, 
       plan,
       sessionReady: true
     });
@@ -122,6 +160,14 @@ const useStore = create((set, get) => ({
     if (!bundle) return;
     const current = get().user;
     if (!current) return;
+    // Skip no-op updates — ConfigProvider used to loop forever rewriting the same hash
+    if (
+      bundle.configHash &&
+      current.configHash &&
+      bundle.configHash === current.configHash
+    ) {
+      return;
+    }
     const updated = normalizeUser({
       ...current,
       moduleConfig: {
@@ -159,16 +205,21 @@ const useStore = create((set, get) => ({
 
     const applyLocalSession = () => {
       if (!savedUser) {
-        set({ token, sessionReady: true });
+        // Stale token without user → still mark ready; platform role defaults to user for ERP
+        localStorage.setItem('role', 'user');
+        set({ token, role: 'user', sessionReady: true });
         return false;
       }
       const user = normalizeUser(savedUser);
+      const platformRole = user.role === 'super_admin' ? 'super_admin' : 'user';
       persistOfflineFlag(user, user.plan);
       if (user.companyId) setActiveCompanyId(user.companyId);
+      localStorage.setItem('role', platformRole);
+      localStorage.setItem('user', JSON.stringify({ ...user, role: platformRole }));
       set({
         token,
-        user,
-        role: user.role || localStorage.getItem('role'),
+        user: { ...user, role: platformRole },
+        role: platformRole,
         plan: user.plan || null,
         sessionReady: true
       });
@@ -195,7 +246,8 @@ const useStore = create((set, get) => ({
 
     // Online: refresh profile in background; never clear session on failure
     try {
-      const res = await api.get('/auth/me', { skipAuthRedirect: true, forceNetwork: true });
+      const me = await authApi.me();
+      const res = { data: { data: me, user: me, success: true } };
       const user = normalizeUser(res.data.user);
       localStorage.setItem('role', user.role);
       localStorage.setItem('user', JSON.stringify(user));
@@ -220,6 +272,10 @@ const useStore = create((set, get) => ({
     localStorage.removeItem('token');
     localStorage.removeItem('role');
     localStorage.removeItem('user');
+    try {
+      const { default: useConfigStore } = await import('./useConfigStore');
+      useConfigStore.getState().reset();
+    } catch { /* ignore */ }
     // FIXED: Clear ALL entity state on logout to prevent data leakage
     set({
       token: null,
@@ -345,7 +401,8 @@ const useStore = create((set, get) => ({
       return;
     }
     try {
-      const res = await api.get('/parties');
+      const _parties = await partiesApi.listRaw();
+      const res = { data: { data: _parties } };
       const raw = res.data.data || res.data || [];
       const parties = (Array.isArray(raw) ? raw : []).map(normalizeParty);
       await cacheEntities('parties', parties);
@@ -376,7 +433,8 @@ const useStore = create((set, get) => ({
       throw new Error('Please log in while online first, then you can work offline.');
     }
     try {
-      const res = await api.post('/parties', partyData);
+      const _party = await partiesApi.create(partyData);
+      const res = { data: { data: _party } };
       const newParty = normalizeParty(res.data.data || res.data);
       set((state) => ({ parties: [...state.parties, newParty] }));
       return newParty;
@@ -397,7 +455,8 @@ const useStore = create((set, get) => ({
     };
     if (isOffline() && canSaveOffline(get)) return applyLocal();
     try {
-      const res = await api.put(`/parties/${id}`, partyData);
+      const _party = await partiesApi.update(id, partyData);
+      const res = { data: { data: _party } };
       const updatedParty = normalizeParty(res.data.data || res.data);
       set((state) => ({
         parties: state.parties.map((p) => (String(p._id) === String(id) ? updatedParty : p))
@@ -418,7 +477,7 @@ const useStore = create((set, get) => ({
     };
     if (isOffline() && canSaveOffline(get)) return applyLocal();
     try {
-      await api.delete(`/parties/${id}`);
+      await partiesApi.remove(id);
       set((state) => ({
         parties: state.parties.filter((p) => p._id !== id)
       }));
@@ -441,7 +500,8 @@ const useStore = create((set, get) => ({
       );
     }
     try {
-      const res = await api.get(`/parties/search?q=${query}`);
+      const _sp = await partiesApi.search(query);
+      const res = { data: { data: _sp } };
       const results = res.data.data || res.data || [];
       return (Array.isArray(results) ? results : []).map(normalizeParty);
     } catch (err) {
@@ -458,7 +518,8 @@ const useStore = create((set, get) => ({
       return;
     }
     try {
-      const res = await api.get('/items');
+      const _items = await itemsApi.listRaw();
+      const res = { data: { data: _items } };
       const raw = res.data.data || res.data || [];
       const items = (Array.isArray(raw) ? raw : []).map(normalizeItem);
       await cacheEntities('items', items);
@@ -489,7 +550,8 @@ const useStore = create((set, get) => ({
       throw new Error('Please log in while online first, then you can work offline.');
     }
     try {
-      const res = await api.post('/items', itemData);
+      const _item = await itemsApi.create(itemData);
+      const res = { data: { data: _item } };
       const newItem = normalizeItem(res.data.data || res.data);
       set((state) => ({ items: [...state.items, newItem] }));
       return newItem;
@@ -510,7 +572,8 @@ const useStore = create((set, get) => ({
     };
     if (isOffline() && canSaveOffline(get)) return applyLocal();
     try {
-      const res = await api.put(`/items/${id}`, itemData);
+      const _item = await itemsApi.update(id, itemData);
+      const res = { data: { data: _item } };
       const updatedItem = normalizeItem(res.data.data || res.data);
       set((state) => ({
         items: state.items.map((i) => (i._id === id ? updatedItem : i))
@@ -531,7 +594,7 @@ const useStore = create((set, get) => ({
     };
     if (isOffline() && canSaveOffline(get)) return applyLocal();
     try {
-      await api.delete(`/items/${id}`);
+      await itemsApi.remove(id);
       set((state) => ({
         items: state.items.filter((i) => i._id !== id)
       }));
@@ -554,7 +617,8 @@ const useStore = create((set, get) => ({
       );
     }
     try {
-      const res = await api.get(`/items/search?q=${query}`);
+      const _si = await itemsApi.search(query);
+      const res = { data: { data: _si } };
       const results = res.data.data || res.data || [];
       return (Array.isArray(results) ? results : []).map(normalizeItem);
     } catch (err) {
@@ -579,7 +643,8 @@ const useStore = create((set, get) => ({
     }
     try {
       const queryParams = new URLSearchParams(params).toString();
-      const res = await api.get(`/purchases${queryParams ? '?' + queryParams : ''}`);
+      const _purchases = await purchasesApi.listRaw(Object.fromEntries(new URLSearchParams(queryParams || '')));
+      const res = { data: { data: _purchases } };
       const raw = res.data.data?.purchases || res.data.data || res.data || [];
       const purchases = await linkPurchases(await mergePending('purchases', raw, normalizePurchase));
       await cacheEntities('purchases', purchases.filter((p) => !p.offlinePending));
@@ -627,7 +692,8 @@ const useStore = create((set, get) => ({
       throw new Error('Please log in while online first, then you can work offline.');
     }
     try {
-      const res = await api.post('/purchases', enriched);
+      const _purchase = await purchasesApi.create(enriched);
+      const res = { data: { data: _purchase } };
       const newPurchase = normalizePurchase(res.data.data || res.data);
       set((state) => ({ purchases: [newPurchase, ...state.purchases] }));
       get().fetchInventory();
@@ -648,7 +714,8 @@ const useStore = create((set, get) => ({
     };
     if (isOffline() && canSaveOffline(get)) return applyLocal();
     try {
-      const res = await api.delete(`/purchases/${id}`);
+      const _delP = await purchasesApi.remove(id);
+      const res = { data: { data: _delP } };
       const result = res.data.data;
       if (result?.status === 'cancelled' || result?._id) {
         set(state => ({
@@ -685,7 +752,8 @@ const useStore = create((set, get) => ({
     };
     if (isOffline() && canSaveOffline(get)) return applyLocal();
     try {
-      const res = await api.put(`/purchases/${id}`, enriched);
+      const _upP = await purchasesApi.update(id, enriched);
+      const res = { data: { data: _upP } };
       const updated = normalizePurchase(res.data.data || res.data);
       set((state) => ({
         purchases: state.purchases.map((p) => (p._id === id || p.id === id ? updated : p))
@@ -710,7 +778,8 @@ const useStore = create((set, get) => ({
     };
     if (isOffline() && canSaveOffline(get)) return applyLocal();
     try {
-      const res = await api.put(`/purchases/${id}/status`, { status });
+      const _stP = await purchasesApi.updateStatus(id, status);
+      const res = { data: { data: _stP } };
       const updated = normalizePurchase(res.data.data);
       set(state => ({
         purchases: state.purchases.map(p => (p._id === id || p.id === id ? updated : p))
@@ -723,7 +792,8 @@ const useStore = create((set, get) => ({
   },
 
   createOpeningStock: async (data) => {
-    const res = await api.post('/inventory/opening-stock', data);
+    const _op = await inventoryApi.openingStock(data);
+    const res = { data: { data: _op } };
     get().fetchInventory();
     return res.data.data;
   },
@@ -743,7 +813,8 @@ const useStore = create((set, get) => ({
       return;
     }
     try {
-      const res = await api.get('/sales');
+      const _sales = await salesApi.listRaw();
+      const res = { data: { data: _sales } };
       const raw = res.data.data?.sales || res.data.data || res.data || [];
       const sales = await linkSales(await mergePending('sales', raw, normalizeSale));
       await cacheEntities('sales', sales.filter((s) => !s.offlinePending));
@@ -791,7 +862,8 @@ const useStore = create((set, get) => ({
       throw new Error('Please log in while online first, then you can work offline.');
     }
     try {
-      const res = await api.post('/sales', enriched);
+      const _sale = await salesApi.create(enriched);
+      const res = { data: { data: _sale } };
       const newSale = normalizeSale(res.data.data || res.data);
       set((state) => ({ sales: [newSale, ...state.sales] }));
       get().fetchInventory();
@@ -812,7 +884,8 @@ const useStore = create((set, get) => ({
     };
     if (isOffline() && canSaveOffline(get)) return applyLocal();
     try {
-      const res = await api.delete(`/sales/${id}`);
+      const _delS = await salesApi.remove(id);
+      const res = { data: { data: _delS } };
       const result = res.data.data;
       if (result?.status === 'cancelled' || result?._id) {
         set(state => ({
@@ -849,7 +922,8 @@ const useStore = create((set, get) => ({
     };
     if (isOffline() && canSaveOffline(get)) return applyLocal();
     try {
-      const res = await api.put(`/sales/${id}`, enriched);
+      const _upS = await salesApi.update(id, enriched);
+      const res = { data: { data: _upS } };
       const updated = normalizeSale(res.data.data || res.data);
       set((state) => ({
         sales: state.sales.map((s) => (s._id === id || s.id === id ? updated : s))
@@ -874,7 +948,8 @@ const useStore = create((set, get) => ({
     };
     if (isOffline() && canSaveOffline(get)) return applyLocal();
     try {
-      const res = await api.put(`/sales/${id}/status`, { status });
+      const _stS = await salesApi.updateStatus(id, status);
+      const res = { data: { data: _stS } };
       const updated = normalizeSale(res.data.data);
       set(state => ({
         sales: state.sales.map(s => (s._id === id || s.id === id ? updated : s))
@@ -887,17 +962,20 @@ const useStore = create((set, get) => ({
   },
 
   fetchGstr1: async (startDate, endDate) => {
-    const res = await api.get(`/gst/gstr1?startDate=${startDate || ''}&endDate=${endDate || ''}`);
+    const _g1 = await gstApi.gstr1({ startDate: startDate || '', endDate: endDate || '' });
+    const res = { data: { data: _g1 } };
     return res.data.data;
   },
 
   fetchGstr2: async (startDate, endDate) => {
-    const res = await api.get(`/gst/gstr2?startDate=${startDate || ''}&endDate=${endDate || ''}`);
+    const _g2 = await gstApi.gstr2({ startDate: startDate || '', endDate: endDate || '' });
+    const res = { data: { data: _g2 } };
     return res.data.data;
   },
 
   fetchCADashboard: async (startDate, endDate) => {
-    const res = await api.get(`/gst/ca-dashboard?startDate=${startDate || ''}&endDate=${endDate || ''}`);
+    const _ca = await gstApi.caDashboard({ startDate: startDate || '', endDate: endDate || '' });
+    const res = { data: { data: _ca } };
     return res.data.data;
   },
 
@@ -913,7 +991,8 @@ const useStore = create((set, get) => ({
       return cached;
     }
     try {
-      const res = await api.get('/inventory');
+      const _inv = await inventoryApi.list();
+      const res = { data: { data: _inv } };
       const lots = (res.data.data || res.data || []).map(normalizeInventoryLot);
       await cacheEntities('inventory', lots);
       set({ inventoryLots: lots, loading: false });
@@ -938,7 +1017,8 @@ const useStore = create((set, get) => ({
       return cached;
     }
     try {
-      const res = await api.get('/jobs');
+      const _jobs = await jobsApi.list();
+      const res = { data: { data: _jobs } };
       const data = res.data.data || res.data || [];
       const list = Array.isArray(data) ? data : [];
       await cacheEntities('jobs', list);
@@ -957,7 +1037,8 @@ const useStore = create((set, get) => ({
 
   issueToMill: async (issueData) => {
     try {
-      const res = await api.post('/jobs/issue', issueData);
+      const _ji = await jobsApi.issue(issueData);
+      const res = { data: { data: _ji } };
       set((state) => ({ jobWorkEntries: [res.data.data || res.data, ...state.jobWorkEntries] }));
       return res.data;
     } catch (err) {
@@ -967,7 +1048,8 @@ const useStore = create((set, get) => ({
 
   receiveFromMill: async (receiveData) => {
     try {
-      const res = await api.post('/jobs/receive', receiveData);
+      const _jr = await jobsApi.receive(receiveData);
+      const res = { data: { data: _jr } };
       await get().fetchJobs();
       await get().fetchInventory();
       return res.data.data;
@@ -978,7 +1060,8 @@ const useStore = create((set, get) => ({
 
   updateJobProcess: async (jobId, status) => {
     try {
-      const res = await api.put('/jobs/process', { jobId, status });
+      const _jp = await jobsApi.process({ jobId, status });
+      const res = { data: { data: _jp } };
       const updated = res.data.data;
       set((state) => ({
         jobWorkEntries: state.jobWorkEntries.map((j) =>
@@ -995,7 +1078,8 @@ const useStore = create((set, get) => ({
   fetchLedger: async (partyId) => {
     set({ loading: true });
     try {
-      const res = await api.get(`/ledgers/${partyId}`);
+      const _pl = await ledgerApi.partyLedger(partyId);
+      const res = { data: { data: _pl } };
       set({ ledgerEntries: res.data.data || res.data, loading: false });
     } catch (err) {
       set({ error: err.message, loading: false });
@@ -1010,7 +1094,8 @@ const useStore = create((set, get) => ({
     }
     try {
       const companyId = get().user?.companyId;
-      const res = await api.get(`/accounting/ledgers?companyId=${companyId}&group=${group}&search=${search}`);
+      const _ledgers = await accountingApi.listLedgers({ group, search });
+      const res = { data: { data: _ledgers } };
       const data = res.data.data || [];
       await cacheEntities('ledgers', data);
       set({ ledgers: data });
@@ -1028,10 +1113,11 @@ const useStore = create((set, get) => ({
 
   addLedger: async (ledgerData) => {
     try {
-      const res = await api.post('/accounting/ledgers', {
+      const _cl = await accountingApi.createLedger({
         ...ledgerData,
         companyId: get().user?.companyId
       });
+      const res = { data: { data: _cl } };
       const newLedger = res.data.data;
       set(state => ({ ledgers: [...state.ledgers, newLedger] }));
       return newLedger;
@@ -1065,10 +1151,11 @@ const useStore = create((set, get) => ({
     set({ loading: true });
     if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
-      const res = await api.post('/accounting/payments', {
+      const _pay = await accountingApi.payments({
         ...data,
         companyId: get().user?.companyId
       });
+      const res = { data: { data: _pay } };
       const newVoucher = normalizeVoucher(res.data.data);
       set(state => ({ 
         payments: [newVoucher, ...state.payments],
@@ -1111,10 +1198,11 @@ const useStore = create((set, get) => ({
     set({ loading: true });
     if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
-      const res = await api.post('/accounting/receipts', {
+      const _rcp = await accountingApi.receipts({
         ...data,
         companyId: get().user?.companyId
       });
+      const res = { data: { data: _rcp } };
       const newVoucher = normalizeVoucher(res.data.data);
       set(state => ({ 
         receipts: [newVoucher, ...state.receipts],
@@ -1135,7 +1223,8 @@ const useStore = create((set, get) => ({
   fetchLedgerStatement: async ({ ledgerId, from, to }) => {
     set({ loading: true });
     try {
-      const res = await api.get(`/accounting/ledgers/${ledgerId}/statement?from=${from || ''}&to=${to || ''}`);
+      const _stmt = await accountingApi.statement(ledgerId, { from: from || '', to: to || '' });
+      const res = { data: { data: _stmt } };
       set({ currentLedgerStatement: res.data.data, loading: false });
       return res.data.data;
     } catch (err) {
@@ -1147,7 +1236,8 @@ const useStore = create((set, get) => ({
     set({ loading: true });
     try {
       const companyId = get().user?.companyId;
-      const res = await api.get(`/accounting/trial-balance?companyId=${companyId}&asOn=${asOn || ''}`);
+      const _tb = await accountingApi.trialBalance({ asOn: asOn || '' });
+      const res = { data: { data: _tb } };
       const data = res.data.data || [];
       set({ trialBalance: data, loading: false });
       return data;
@@ -1161,7 +1251,8 @@ const useStore = create((set, get) => ({
     set({ loading: true });
     try {
       const companyId = get().user?.companyId;
-      const res = await api.get(`/accounting/profit-loss?companyId=${companyId}&from=${from || ''}&to=${to || ''}`);
+      const _pl = await accountingApi.profitLoss({ from: from || '', to: to || '' });
+      const res = { data: { data: _pl } };
       set({ profitLoss: res.data.data, loading: false });
     } catch (err) {
       set({ error: err.message, loading: false });
@@ -1172,7 +1263,8 @@ const useStore = create((set, get) => ({
     set({ loading: true });
     try {
       const companyId = get().user?.companyId;
-      const res = await api.get(`/accounting/outstanding?companyId=${companyId}&type=${type}&asOn=${asOn || ''}`);
+      const _os = await accountingApi.outstanding({ type, asOn: asOn || '' });
+      const res = { data: { data: _os } };
       set({ outstandingReport: res.data.data || [], loading: false });
       return res.data.data;
     } catch (err) {
@@ -1183,7 +1275,8 @@ const useStore = create((set, get) => ({
 
   fetchReportsBundle: async (startDate, endDate) => {
     try {
-      const res = await api.get(`/reports/bundle?startDate=${startDate || ''}&endDate=${endDate || ''}`);
+      const _rb = await reportsApi.bundle({ startDate: startDate || '', endDate: endDate || '' });
+      const res = { data: { data: _rb } };
       return res.data.data;
     } catch (err) {
       console.error('Reports bundle failed:', err);
@@ -1192,7 +1285,8 @@ const useStore = create((set, get) => ({
   },
 
   fetchStockReport: async () => {
-    const res = await api.get('/reports/stock');
+    const _st = await reportsApi.stock();
+    const res = { data: { data: _st } };
     return res.data.data;
   },
 
@@ -1212,7 +1306,8 @@ const useStore = create((set, get) => ({
     }
     try {
       const companyId = get().user?.companyId;
-      const res = await api.get(`/books?companyId=${companyId}`);
+      const _books = await booksApi.list();
+      const res = { data: { data: _books } };
       const raw = res.data.data || [];
       const books = Array.isArray(raw) ? raw : [];
       await cacheEntities('books', books.map((b) => ({ ...b, id: b._id || b.id })));
@@ -1243,7 +1338,8 @@ const useStore = create((set, get) => ({
     }
 
     try {
-      const res = await api.get(`/books/module/${moduleName}`);
+      const _bm = await booksApi.byModule(moduleName);
+      const res = { data: { data: _bm } };
       const data = res.data.data || [];
       if (data.length > 0) {
         await cacheEntities('books', data.map((b) => ({ ...b, id: b._id || b.id })));
@@ -1261,10 +1357,11 @@ const useStore = create((set, get) => ({
 
   createBook: async (bookData) => {
     try {
-      const res = await api.post('/books', {
+      const _nb = await booksApi.create({
         ...bookData,
         companyId: get().user?.companyId
       });
+      const res = { data: { data: _nb } };
       return res.data.data;
     } catch (err) {
       console.error('Create book failed:', err);
@@ -1274,7 +1371,7 @@ const useStore = create((set, get) => ({
 
   deleteBook: async (id) => {
     try {
-      await api.delete(`/books/${id}`);
+      await booksApi.remove(id);
     } catch (err) {
       console.error('Delete book failed:', err);
       throw err;
@@ -1290,7 +1387,8 @@ const useStore = create((set, get) => ({
       return filtered;
     }
     try {
-      const res = await api.get(`/submasters?type=${type}`);
+      const _sm = await subMastersApi.list({ type });
+      const res = { data: { data: _sm } };
       const data = res.data.data || [];
       if (!type) await cacheEntities('subMasters', data);
       set({ subMasters: data });
@@ -1308,7 +1406,8 @@ const useStore = create((set, get) => ({
 
   addSubMaster: async (data) => {
     try {
-      const res = await api.post('/submasters', data);
+      const _smc = await subMastersApi.create(data);
+      const res = { data: { data: _smc } };
       const newRecord = res.data.data;
       set(state => ({ subMasters: [...state.subMasters, newRecord] }));
       return newRecord;
@@ -1320,7 +1419,7 @@ const useStore = create((set, get) => ({
 
   deleteSubMaster: async (id) => {
     try {
-      await api.delete(`/submasters/${id}`);
+      await subMastersApi.remove(id);
       set(state => ({ subMasters: state.subMasters.filter(sm => sm._id !== id) }));
     } catch (err) {
       console.error('Delete sub-master failed:', err);
@@ -1330,7 +1429,8 @@ const useStore = create((set, get) => ({
 
   updateSubMaster: async (id, data) => {
     try {
-      const res = await api.put(`/submasters/${id}`, data);
+      const _smu = await subMastersApi.update(id, data);
+      const res = { data: { data: _smu } };
       const updated = res.data.data;
       set((state) => ({
         subMasters: state.subMasters.map((sm) => (sm._id === id ? updated : sm))
@@ -1351,7 +1451,8 @@ const useStore = create((set, get) => ({
       return filtered;
     }
     try {
-      const res = await api.get(`/orders?orderType=${orderType}`);
+      const _ord = await ordersApi.list({ orderType });
+      const res = { data: { data: _ord } };
       const data = res.data.data || [];
       if (!orderType) await cacheEntities('orders', data);
       set({ orders: data });
@@ -1369,7 +1470,8 @@ const useStore = create((set, get) => ({
 
   addOrder: async (data) => {
     try {
-      const res = await api.post('/orders', data);
+      const _oc = await ordersApi.create(data);
+      const res = { data: { data: _oc } };
       const newOrder = res.data.data;
       set(state => ({ orders: [newOrder, ...state.orders] }));
       return newOrder;
@@ -1388,7 +1490,8 @@ const useStore = create((set, get) => ({
       return filtered;
     }
     try {
-      const res = await api.get(`/returns?returnType=${returnType}`);
+      const _ret = await returnsApi.list({ returnType });
+      const res = { data: { data: _ret } };
       const data = res.data.data || [];
       if (!returnType) await cacheEntities('returns', data);
       set({ returns: data });
@@ -1406,7 +1509,8 @@ const useStore = create((set, get) => ({
 
   addReturn: async (data) => {
     try {
-      const res = await api.post('/returns', data);
+      const _rc = await returnsApi.create(data);
+      const res = { data: { data: _rc } };
       const newReturn = res.data.data;
       set(state => ({ returns: [newReturn, ...state.returns] }));
       return newReturn;
@@ -1425,7 +1529,8 @@ const useStore = create((set, get) => ({
       return filtered;
     }
     try {
-      const res = await api.get(`/notes?noteType=${noteType}`);
+      const _notes = await notesApi.list({ noteType });
+      const res = { data: { data: _notes } };
       const data = res.data.data || [];
       if (!noteType) await cacheEntities('notes', data);
       set({ notes: data });
@@ -1443,7 +1548,8 @@ const useStore = create((set, get) => ({
 
   addNote: async (data) => {
     try {
-      const res = await api.post('/notes', data);
+      const _nc = await notesApi.create(data);
+      const res = { data: { data: _nc } };
       const newNote = res.data.data;
       set(state => ({ notes: [newNote, ...state.notes] }));
       return newNote;
@@ -1461,7 +1567,8 @@ const useStore = create((set, get) => ({
       return cached;
     }
     try {
-      const res = await api.get('/visits');
+      const _v = await visitsApi.list();
+      const res = { data: { data: _v } };
       const raw = res.data.data || res.data || [];
       const list = Array.isArray(raw) ? raw : [];
       await cacheEntities('visits', list);
@@ -1491,7 +1598,8 @@ const useStore = create((set, get) => ({
     }
     try {
       const query = type ? `?type=${type}` : '';
-      const res = await api.get(`/accounting/payments${query}`);
+      const _vq = await accountingApi.listVouchers(Object.fromEntries(new URLSearchParams((query || '').replace(/^\?/, ''))));
+      const res = { data: { data: _vq } };
       const raw = res.data.data || [];
       const vouchers = (Array.isArray(raw) ? raw : []).map(normalizeVoucher);
       const payments = vouchers.filter((v) => v.type === 'Payment');
@@ -1517,7 +1625,8 @@ const useStore = create((set, get) => ({
   // --- MANUAL JOURNAL ---
   addJournalEntry: async (entryData) => {
     try {
-      const res = await api.post('/accounting/journal', entryData);
+      const _je = await accountingApi.journal(entryData);
+      const res = { data: { data: _je } };
       return res.data.data;
     } catch (err) {
       console.error('Add journal entry failed:', err);
@@ -1528,7 +1637,8 @@ const useStore = create((set, get) => ({
   // --- COMPANY USERS ---
   fetchCompanyUsers: async () => {
     try {
-      const res = await api.get('/users');
+      const _users = await usersApi.list();
+      const res = { data: { data: _users } };
       const users = (res.data.data || []).map(normalizeUser);
       set({ companyUsers: users });
       return users;
@@ -1539,14 +1649,16 @@ const useStore = create((set, get) => ({
   },
 
   addCompanyUser: async (userData) => {
-    const res = await api.post('/users', userData);
+    const _nu = await usersApi.create(userData);
+    const res = { data: { data: _nu } };
     const user = normalizeUser(res.data.data);
     set(state => ({ companyUsers: [...state.companyUsers, user] }));
     return user;
   },
 
   updateCompanyUser: async (id, userData) => {
-    const res = await api.put(`/users/${id}`, userData);
+    const _uu = await usersApi.update(id, userData);
+    const res = { data: { data: _uu } };
     const user = normalizeUser(res.data.data);
     set(state => ({
       companyUsers: state.companyUsers.map(u => (u._id === id || u.id === id ? user : u))
@@ -1555,7 +1667,7 @@ const useStore = create((set, get) => ({
   },
 
   deactivateCompanyUser: async (id) => {
-    await api.delete(`/users/${id}`);
+    await usersApi.remove(id);
     set(state => ({
       companyUsers: state.companyUsers.filter(u => u._id !== id && u.id !== id)
     }));
@@ -1563,8 +1675,19 @@ const useStore = create((set, get) => ({
 
   // --- UI ACTIONS ---
   toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
-  clearError: () => set({ error: null })
-  // --- END ---
+  clearError: () => set({ error: null }),
+
+  fetchDashboardSummary: async () => {
+    set({ dashboardLoading: true });
+    try {
+      const data = await dashboardApi.summary();
+      set({ dashboardSummary: data, dashboardLoading: false });
+      return data;
+    } catch (err) {
+      set({ dashboardLoading: false, error: err.message });
+      return null;
+    }
+  },
 }));
 
 export default useStore;

@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
-import api from '../../utils/api';
+import { adminApi } from '../../api';
+import { toast } from '../../store/useToastStore';
 
 // ── Complete Module + SubMenu + Field definitions matching the user Dashboard ──
 const ALL_MODULES = [
@@ -213,8 +214,8 @@ const ModuleControl = () => {
 
     const loadConfig = async (companyId) => {
         try {
-            const res = await api.get(`/admin/company/${companyId}/module-config`);
-            setConfig(res.data);
+            const data = await adminApi.moduleConfig(companyId);
+            setConfig(data);
         } catch {
             // Initialize default config
             const defaultModules = {};
@@ -260,11 +261,11 @@ const ModuleControl = () => {
         if (!selectedCompany) return;
         setSaving(true);
         try {
-            await api.put(`/admin/company/${selectedCompany}/module-config`, config);
+            await adminApi.saveModuleConfig(selectedCompany, config);
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
         } catch (err) {
-            alert('Failed to save: ' + (err.response?.data?.message || err.message));
+            toast.error('Failed to save: ' + (err.response?.data?.message || err.message));
         } finally {
             setSaving(false);
         }

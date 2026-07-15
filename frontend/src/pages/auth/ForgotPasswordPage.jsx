@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Loader2, ArrowRight, LayoutDashboard, ArrowLeft } from 'lucide-react';
-import api from '../../utils/api';
+import { authApi } from '../../api';
 
 const ForgotPasswordPage = () => {
     const [email, setEmail] = useState('');
@@ -16,8 +16,7 @@ const ForgotPasswordPage = () => {
         setMessage('');
 
         try {
-            // This endpoint might not exist yet, but we'll wire it up
-            await api.post('/auth/forgot-password', { email });
+            await authApi.forgotPassword({ email });
             setMessage('If an account exists with this email, you will receive password reset instructions.');
         } catch (err) {
             setError(err.response?.data?.message || 'Something went wrong. Please try again.');

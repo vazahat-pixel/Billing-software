@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
-import api from '../../utils/api';
+import { adminApi } from '../../api';
+import { toast } from '../../store/useToastStore';
 
 const ROLES = [
     { value: 'owner', label: 'Owner', color: '#f59e0b', desc: 'Full access, can add users' },
@@ -67,8 +68,8 @@ const UserManagement = () => {
     const loadUsers = async () => {
         setLoading(true);
         try {
-            const res = await api.get(`/admin/company/${selectedCompany}/users`);
-            setUsers(res.data || []);
+            const list = await adminApi.companyUsers(selectedCompany);
+            setUsers(list || []);
         } catch {
             setUsers([]);
         } finally {
@@ -79,40 +80,40 @@ const UserManagement = () => {
     const handleAddUser = async (e) => {
         e.preventDefault();
         try {
-            await api.post(`/admin/company/${selectedCompany}/user`, { ...addForm, companyId: selectedCompany });
+            await adminApi.addCompanyUser(selectedCompany, { ...addForm, companyId: selectedCompany });
             setIsAddOpen(false);
             setAddForm({ name: '', email: '', password: '', companyRole: 'accountant', isActive: true });
             loadUsers();
         } catch (err) {
-            alert(err.response?.data?.message || 'Failed to add user');
+            toast.error(err.response?.data?.message || 'Failed to add user');
         }
     };
 
     const handleUpdateRole = async (userId, newRole) => {
         try {
-            await api.put(`/admin/user/${userId}/role`, { companyRole: newRole });
+            await adminApi.updateUserRole(userId, { companyRole: newRole });
             loadUsers();
         } catch (err) {
-            alert(err.response?.data?.message || 'Failed to update role');
+            toast.error(err.response?.data?.message || 'Failed to update role');
         }
     };
 
     const handleToggleActive = async (userId, currentStatus) => {
         try {
-            await api.put(`/admin/user/${userId}/toggle-active`);
+            await adminApi.toggleUserActive(userId);
             loadUsers();
         } catch (err) {
-            alert(err.response?.data?.message || 'Failed to update status');
+            toast.error(err.response?.data?.message || 'Failed to update status');
         }
     };
 
     const handleDeleteUser = async (userId, name) => {
         if (!window.confirm(`Remove user "${name}" from this company?`)) return;
         try {
-            await api.delete(`/admin/user/${userId}`);
+            await adminApi.deleteCompanyUser(userId);
             loadUsers();
         } catch (err) {
-            alert(err.response?.data?.message || 'Failed to delete');
+            toast.error(err.response?.data?.message || 'Failed to delete');
         }
     };
 

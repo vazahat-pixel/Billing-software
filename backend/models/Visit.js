@@ -54,5 +54,6 @@ const visitSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 visitSchema.index({ location: '2dsphere' });
+visitSchema.index({ companyId: 1, visitDate: -1 });
 
 module.exports = mongoose.model('Visit', visitSchema);

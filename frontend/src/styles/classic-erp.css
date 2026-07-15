@@ -115,63 +115,64 @@
 .classic-erp-select,
 .classic-erp-textarea {
   font-family: 'Inter', system-ui, sans-serif !important;
-  font-size: 12px !important;
+  font-size: 12.5px !important;
   font-weight: 500 !important;
   background: var(--bg-card) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border-strong) !important;
+  border: 1px solid var(--border) !important;
   border-radius: var(--radius-input) !important;
-  height: 30px !important;
-  padding: 0 8px !important;
+  height: 34px !important;
+  padding: 0 10px !important;
   box-sizing: border-box;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .classic-erp-textarea {
   height: auto !important;
   min-height: 56px;
-  padding: 6px 8px !important;
+  padding: 8px 10px !important;
 }
 
 .classic-erp-input:focus,
 .classic-erp-select:focus,
 .classic-erp-textarea:focus {
   border-color: var(--accent) !important;
-  box-shadow: var(--shadow-glow) !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
   background: var(--bg-card) !important;
 }
 
 .classic-erp-input[readonly],
 .classic-erp-input:disabled,
 .classic-erp-select:disabled {
-  background: var(--bg-base) !important;
+  background: var(--bg-subtle) !important;
   color: var(--text-muted) !important;
   cursor: not-allowed;
 }
 
 .classic-erp-table-container {
   border: 1px solid var(--border) !important;
-  border-radius: var(--radius-input) !important;
+  border-radius: var(--radius-card) !important;
   background: var(--bg-card) !important;
   overflow: auto;
+  box-shadow: var(--shadow-sm);
 }
 
 .classic-erp-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px !important;
+  font-size: 11.5px !important;
 }
 
 .classic-erp-table th {
-  background: var(--bg-base) !important;
-  color: var(--text-muted) !important;
-  font-weight: 700 !important;
-  font-size: 9px !important;
+  background: var(--bg-subtle) !important;
+  color: var(--text-secondary) !important;
+  font-weight: 600 !important;
+  font-size: 10px !important;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   border-bottom: 1px solid var(--border) !important;
-  padding: 6px 8px !important;
+  padding: 8px 10px !important;
   text-align: left;
   white-space: nowrap;
   position: sticky;
@@ -181,7 +182,7 @@
 
 .classic-erp-table td {
   border-bottom: 1px solid var(--border-subtle) !important;
-  padding: 4px 6px !important;
+  padding: 6px 10px !important;
   background: var(--bg-card);
   color: var(--text-primary);
   vertical-align: middle;
@@ -193,26 +194,27 @@
 
 .classic-erp-btn {
   font-family: 'Inter', system-ui, sans-serif !important;
-  font-size: 11px !important;
+  font-size: 12px !important;
   font-weight: 600 !important;
-  color: var(--text-primary) !important;
+  color: var(--text-secondary) !important;
   background: var(--bg-card) !important;
   border: 1px solid var(--border-strong) !important;
   border-radius: var(--radius-input) !important;
-  height: 28px !important;
-  padding: 0 12px !important;
+  height: 32px !important;
+  padding: 0 14px !important;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   box-sizing: border-box;
-  transition: all 0.15s;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .classic-erp-btn:hover {
   background: var(--bg-card-hover) !important;
   border-color: var(--accent) !important;
+  color: var(--text-primary) !important;
 }
 
 .classic-erp-btn:disabled {
@@ -226,10 +228,22 @@
   border-color: var(--accent) !important;
 }
 
+.classic-erp-btn.btn-blue:hover {
+  background: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
+  box-shadow: var(--shadow-sm);
+}
+
 .classic-erp-btn.btn-red {
   color: var(--red) !important;
-  border-color: var(--red-bg) !important;
+  border-color: rgba(225, 29, 72, 0.15) !important;
   background: var(--red-bg) !important;
+}
+
+.classic-erp-btn.btn-red:hover {
+  background: var(--red) !important;
+  border-color: var(--red) !important;
+  color: #fff !important;
 }
 
 .classic-erp-tabs {
@@ -452,5 +466,401 @@
   border-bottom: 2px solid #d4d0c8;
   margin-bottom: -1.5px;
   z-index: 2;
+}
+
+/* ============================================================
+   ALIGNED FIELD SYSTEM — Sales / Purchase / Mill / Job
+   Use .classic-erp-field for label|control pairs (fixed label col).
+   ============================================================ */
+
+.classic-erp-field {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.classic-erp-field--lg {
+  grid-template-columns: 100px minmax(0, 1fr);
+}
+
+.classic-erp-field > .classic-erp-label {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  justify-content: flex-end !important;
+  text-align: right !important;
+  white-space: nowrap !important;
+}
+
+.classic-erp-field > .classic-erp-input,
+.classic-erp-field > .classic-erp-select,
+.classic-erp-field > .classic-erp-textarea,
+.classic-erp-field > .classic-erp-control {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  flex: none !important;
+}
+
+.classic-erp-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.classic-erp-control > .classic-erp-input,
+.classic-erp-control > .classic-erp-select {
+  flex: 1 1 auto;
+  min-width: 0 !important;
+  width: auto !important;
+}
+
+.classic-erp-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.classic-erp-meta-grid--3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.classic-erp-header-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .classic-erp-header-split,
+  .classic-erp-meta-grid--3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.classic-erp-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.classic-erp-total-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+}
+
+.classic-erp-total-row > .classic-erp-label {
+  width: auto !important;
+  min-width: 0 !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+.classic-erp-total-row > .font-mono,
+.classic-erp-total-row > .classic-erp-input {
+  justify-self: end;
+  text-align: right;
+}
+
+.classic-erp-adj-row {
+  display: grid;
+  grid-template-columns: 88px 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.classic-erp-adj-row > .classic-erp-label {
+  width: 100% !important;
+  min-width: 0 !important;
+  justify-content: flex-end !important;
+  text-align: right !important;
+}
+
+/* Override earlier blanket label max-content which broke columns */
+.classic-erp-window .classic-erp-field > .classic-erp-label,
+.classic-erp-window .classic-erp-adj-row > .classic-erp-label {
+  min-width: 0 !important;
+}
+
+.classic-erp-window .classic-erp-label {
+  min-width: 0 !important;
+}
+
+.classic-erp-window .classic-erp-label:not(.classic-erp-field > *):not(.classic-erp-adj-row > *):not(.classic-erp-total-row > *) {
+  /* free-form labels outside field grid */
+  width: auto !important;
+}
+
+/* ============================================================
+   GLOBAL FORM READABILITY FIX (Sales / Purchase / Mill / Job)
+   ============================================================ */
+
+.classic-erp-window {
+  max-height: calc(100vh - 24px) !important;
+}
+
+.classic-erp-body {
+  padding: 12px 14px 16px !important;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.classic-erp-window .classic-erp-label,
+.classic-erp-label {
+  flex-shrink: 0 !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0.01em;
+}
+
+.classic-erp-window .classic-erp-label.classic-erp-label--fixed {
+  width: 92px !important;
+  min-width: 92px !important;
+}
+
+.classic-erp-window .classic-erp-label.classic-erp-label--fixed-sm {
+  width: 72px !important;
+  min-width: 72px !important;
+}
+
+/* Label + control rows — keep label readable, let field grow */
+.classic-erp-window .flex.gap-1,
+.classic-erp-window .flex.gap-2,
+.classic-erp-window .flex.gap-3 {
+  align-items: center;
+  min-width: 0;
+}
+
+.classic-erp-window .flex.gap-1 > .classic-erp-input,
+.classic-erp-window .flex.gap-1 > .classic-erp-select,
+.classic-erp-window .flex.gap-2 > .classic-erp-input,
+.classic-erp-window .flex.gap-2 > .classic-erp-select,
+.classic-erp-window .flex.gap-3 > .classic-erp-input,
+.classic-erp-window .flex.gap-3 > .classic-erp-select,
+.classic-erp-window .flex.gap-1 > .flex-1,
+.classic-erp-window .flex.gap-2 > .flex-1,
+.classic-erp-window .flex.gap-3 > .flex-1 {
+  min-width: 0 !important;
+  flex: 1 1 auto;
+}
+
+/* Totals / amount rows — space between without crushing text */
+.classic-erp-window .flex.justify-between {
+  gap: 10px !important;
+  align-items: center !important;
+  min-height: 28px;
+}
+
+.classic-erp-window .flex.justify-between > .classic-erp-label,
+.classic-erp-window .flex.justify-between > span:first-child {
+  flex: 0 1 auto;
+  overflow: visible !important;
+}
+
+.classic-erp-window .flex.justify-between > .font-mono,
+.classic-erp-window .flex.justify-between > span:last-child {
+  flex: 0 0 auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* 2-col grids (transport / due days) — stop label/input collision */
+.classic-erp-window .grid.grid-cols-2 {
+  gap: 8px 10px !important;
+  align-items: center;
+}
+
+.classic-erp-window .grid.grid-cols-2 > .flex {
+  min-width: 0;
+  width: 100%;
+  align-items: center;
+  gap: 6px !important;
+}
+
+.classic-erp-window .grid.grid-cols-2 .classic-erp-label {
+  min-width: 3.5rem !important;
+}
+
+.classic-erp-window .grid.grid-cols-2 .classic-erp-input,
+.classic-erp-window .grid.grid-cols-2 .classic-erp-select {
+  flex: 1 1 0% !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100%;
+}
+
+/* Fixed-width Tiny inputs should not clip text */
+.classic-erp-window .classic-erp-input,
+.classic-erp-window .classic-erp-select,
+.classic-erp-window .classic-erp-textarea {
+  min-height: 32px !important;
+  line-height: 1.3 !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.classic-erp-window .classic-erp-input.w-10,
+.classic-erp-window .classic-erp-select.w-10 {
+  width: 2.75rem !important;
+  min-width: 2.75rem !important;
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+}
+
+.classic-erp-window .classic-erp-input.w-12,
+.classic-erp-window .classic-erp-select.w-12 {
+  width: 3.5rem !important;
+  min-width: 3.5rem !important;
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+}
+
+.classic-erp-window .classic-erp-input.w-16 {
+  width: 4.25rem !important;
+  min-width: 4.25rem !important;
+}
+
+.classic-erp-window .classic-erp-input.w-20 {
+  width: 5.25rem !important;
+  min-width: 5rem !important;
+}
+
+.classic-erp-window .classic-erp-input.w-28 {
+  width: 7.5rem !important;
+  min-width: 6.5rem !important;
+}
+
+.classic-erp-window .classic-erp-input.w-32 {
+  width: 8.5rem !important;
+  min-width: 7.5rem !important;
+}
+
+/* Select text not cut by arrow */
+.classic-erp-window .classic-erp-select {
+  padding-right: 28px !important;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
+}
+
+/* Item grids — readable headers + cells */
+.classic-erp-table-container {
+  overflow: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.classic-erp-table {
+  table-layout: auto;
+  min-width: 980px;
+}
+
+.classic-erp-table th {
+  padding: 8px 8px !important;
+  font-size: 10px !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+}
+
+.classic-erp-table td {
+  padding: 4px 6px !important;
+  overflow: visible;
+}
+
+.classic-erp-table td .classic-erp-input,
+.classic-erp-table td .classic-erp-select {
+  width: 100% !important;
+  min-width: 52px !important;
+  height: 30px !important;
+  padding: 0 6px !important;
+}
+
+.classic-erp-table th.w-8 { min-width: 2.25rem; width: auto !important; }
+.classic-erp-table th.w-12 { min-width: 3.25rem; width: auto !important; }
+.classic-erp-table th.w-14 { min-width: 3.5rem; width: auto !important; }
+.classic-erp-table th.w-16 { min-width: 4rem; width: auto !important; }
+.classic-erp-table th.w-20 { min-width: 5rem; width: auto !important; }
+.classic-erp-table th.w-24 { min-width: 5.5rem; width: auto !important; }
+
+/* Frames must not clip footer totals */
+.classic-erp-frame {
+  overflow: visible !important;
+  min-width: 0;
+}
+
+.classic-erp-form-footer {
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  padding: 10px 14px 12px !important;
+}
+
+.classic-erp-form-footer .classic-erp-btn {
+  white-space: nowrap;
+  min-height: 32px;
+}
+
+/* Bottom 3-col bill footer (adj | transport | totals) */
+.classic-erp-window .grid.grid-cols-12 {
+  align-items: start;
+  gap: 10px !important;
+}
+
+.classic-erp-window .grid.grid-cols-12 > .classic-erp-frame {
+  padding: 10px 12px !important;
+}
+
+/* NET AMOUNT line — never clipped */
+.classic-erp-window .classic-erp-label.text-sm,
+.classic-erp-window .classic-erp-label.text-blue-900 {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  padding-bottom: 2px;
+}
+
+/* Field rows with justify-between packing too many labels */
+.classic-erp-window .flex.items-center.justify-between {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.classic-erp-window .flex.items-center.justify-between > .classic-erp-input,
+.classic-erp-window .flex.items-center.justify-between > .classic-erp-select {
+  flex: 1 1 auto;
+  max-width: none;
+}
+
+/* Master / secondary forms using same class language */
+.erp-field .erp-label {
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.3;
+}
+
+.erp-input,
+.erp-select {
+  text-overflow: ellipsis;
+}
+
+/* Bare modals that host classic ERP bills need full viewport height room */
+.max-w-7xl.classic-erp-host,
+.relative.flex.flex-col.max-w-7xl {
+  max-height: calc(100vh - 16px) !important;
 }
 

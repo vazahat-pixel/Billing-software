@@ -92,4 +92,16 @@ const BookSchema = new mongoose.Schema({
   timestamps: true
 });
 
+BookSchema.index(
+  { companyId: 1, code: 1 },
+  {
+    unique: true,
+    name: 'uniq_book_code',
+    partialFilterExpression: { companyId: { $type: 'objectId' } },
+  }
+);
+
+const { enterpriseIntegrityPlugin } = require('./mixins/enterpriseMetaSchema');
+BookSchema.plugin(enterpriseIntegrityPlugin);
+
 module.exports = mongoose.model('Book', BookSchema);

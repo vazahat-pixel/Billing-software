@@ -5,59 +5,138 @@ const StockMovement = require('../models/StockMovement');
 const AccountingEntry = require('../models/AccountingEntry');
 
 class SalesService {
-  async createInvoice(salesData) {
+  /**
+   * @param {object} salesData
+   * @param {{ skipStock?: boolean }} options — skipStock when challan already deducted stock
+   */
+  async createInvoice(salesData, options = {}) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
       const { companyId, items } = salesData;
+      const skipStock = options.skipStock === true || salesData.stockFromChallan === true;
+
+      // Strip offline local-* ids before Mongo create
+      const {
+        _id: _dropId,
+        id: _dropId2,
+        localId: _dropLocal,
+        accountingEntryId: _dropAcct,
+        ...clean
+      } = salesData || {};
+      salesData = clean;
+      const safeItems = Array.isArray(items)
+        ? items.map((it) => {
+            const { _id, id, ...rest } = it || {};
+            if (rest.lotId && String(rest.lotId).startsWith('local-')) delete rest.lotId;
+            return rest;
+          })
+        : items;
+      salesData.items = safeItems;
+
+      const Party = require('../models/Party');
+      const Item = require('../models/Item');
+      const { assertRefs } = require('../utils/refIntegrity');
+      const { recalcSalesTotals } = require('../utils/salesTotals');
+
+      await assertRefs(companyId, [
+        { Model: Party, id: salesData.customerId, label: 'Customer' },
+        ...((safeItems || []).map((it) => ({ Model: Item, id: it.itemId, label: 'Item' }))),
+      ]);
+
+      // Sprint 2.9: central business validation (blocking errors)
+      if (!options.skipValidation) {
+        const { assertBusinessValid } = require('./validateBusinessService');
+        await assertBusinessValid({
+          module: 'sales',
+          action: 'create',
+          companyId,
+          payload: salesData,
+          options: {
+            allowCreditOverride: options.allowCreditOverride === true || salesData.allowCreditOverride === true,
+            skipDuplicate: !!skipStock, // challan→invoice already unique path
+          },
+        });
+      }
+
+      // Sprint 2.5: server-validate totals (do not trust client net/gst blindly)
+      let gstRate = salesData.gstRate;
+      if (gstRate == null && items?.[0]?.itemId) {
+        const it = await Item.findOne({ _id: items[0].itemId, companyId }).select('gstRate').session(session);
+        gstRate = it?.gstRate ?? 5;
+      }
+      const totals = recalcSalesTotals(items || [], {
+        gstType: salesData.gstType || 'CGST+SGST',
+        gstRate: gstRate ?? 5,
+        extras: salesData,
+      });
+      salesData.items = totals.items;
+      salesData.taxableAmount = totals.taxableAmount;
+      salesData.gstType = totals.gstType;
+      salesData.cgst = totals.cgst;
+      salesData.sgst = totals.sgst;
+      salesData.igst = totals.igst;
+      salesData.gstAmount = totals.gstAmount;
+      salesData.netAmount = totals.netAmount;
 
       const Counter = require('../models/Counter');
-      const counterId = `INV-${companyId}`;
-      const seq = await Counter.nextSeq(counterId);
-      salesData.invoiceNo = salesData.invoiceNo && salesData.invoiceNo !== 'AUTO' ? salesData.invoiceNo : `INV-${seq}`;
-
-      // 1. Create the Sales Record inside transaction
-      const sales = new Sales(salesData);
-      await sales.save({ session });
-
-      // 2. Reduce Stock and Log Movements (inside transaction)
-      for (const item of items) {
-        if (item.lotId) {
-          const lot = await InventoryLot.findOne({ _id: item.lotId, companyId }).session(session);
-          if (!lot) throw new Error(`Lot not found`);
-          if (lot.remainingMtrs < (item.mts || 0)) {
-            throw new Error(`Insufficient stock in Lot ${lot.lotId}. Available: ${lot.remainingMtrs} mtrs`);
-          }
-
-          lot.remainingMtrs = parseFloat((lot.remainingMtrs - (item.mts || 0)).toFixed(4));
-          lot.remainingPcs = Math.max(0, (lot.remainingPcs || 0) - (item.pcs || 0));
-          lot.status = lot.remainingMtrs <= 0 ? 'Closed' : 'Partially Used';
-          await lot.save({ session });
-
-          const movement = new StockMovement({
-            lotId: lot._id,
-            type: 'SALE',
-            qtyPcs: -(item.pcs || 0),
-            qtyMtrs: -(item.mts || 0),
-            balanceMtrs: lot.remainingMtrs,
-            referenceId: sales._id,
-            remarks: `Sales Inv: ${sales.invoiceNo}`,
-            companyId
-          });
-          await movement.save({ session });
+      if (!salesData.invoiceNo || salesData.invoiceNo === 'AUTO') {
+        try {
+          const voucherSeriesService = require('./voucherSeriesService');
+          const allocated = await voucherSeriesService.allocateNext(companyId, 'sales', { session });
+          salesData.invoiceNo = allocated.number;
+        } catch {
+          const counterId = `INV-${companyId}`;
+          const seq = await Counter.nextSeq(counterId, session);
+          salesData.invoiceNo = `INV-${seq}`;
         }
       }
 
-      // 3. FIXED: Auto-accounting posting INSIDE transaction so it rolls back if it fails
+      const sales = new Sales(salesData);
+      await sales.save({ session });
+
+      // Stock: deduct only if not already posted via delivery challan
+      if (!skipStock) {
+        const { applyLotMovement, loadLotForUpdate } = require('../utils/inventoryStockHelper');
+        for (const item of salesData.items) {
+          if (item.lotId) {
+            const lot = await loadLotForUpdate(session, item.lotId, companyId);
+            await applyLotMovement({
+              session,
+              lot,
+              companyId,
+              deltaMts: -(item.mts || 0),
+              deltaPcs: -(item.pcs || 0),
+              type: 'SALE',
+              referenceId: sales._id,
+              idempotencyKey: `SALE:${sales._id}:${lot._id}`,
+              remarks: `Sales Inv: ${sales.invoiceNo}`,
+            });
+          }
+        }
+      }
+
       const accountingService = require('./accountingService');
       const entry = await accountingService.onSalesInvoicePost(sales, session);
-      
-      // Store accounting entry reference on invoice
+
       sales.accountingEntryId = entry?._id;
       await sales.save({ session });
 
       await session.commitTransaction();
+      try {
+        const eventBus = require('../events/eventBus');
+        eventBus.emitSafe('sales.created', {
+          companyId: sales.companyId?.toString?.() || sales.companyId,
+          salesId: sales._id?.toString?.(),
+          invoiceNo: sales.invoiceNo,
+          netAmount: sales.netAmount,
+          customerId: sales.customerId?.toString?.() || sales.customerId,
+          stockFromChallan: skipStock,
+        });
+      } catch {
+        /* event bus optional */
+      }
       return sales;
     } catch (error) {
       await session.abortTransaction();
@@ -133,7 +212,7 @@ class SalesService {
           const originalEntry = await AccountingEntry.findById(sale.accountingEntryId).session(session);
           if (originalEntry && !originalEntry.isReversed) {
             const accountingService = require('./accountingService');
-            const entryNo = await accountingService.generateEntryNo(companyId, 'JNL');
+            const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
 
             // Flip Dr/Cr for reversal
             const reversalLines = originalEntry.lines.map(line => ({
@@ -172,7 +251,11 @@ class SalesService {
       }
 
       // Hard delete if already cancelled
-      await Sales.findOneAndDelete({ _id: id, companyId }).session(session);
+      await Sales.findOneAndUpdate(
+        { _id: id, companyId },
+        { isDeleted: true, deletedAt: new Date() },
+        { session }
+      );
       await session.commitTransaction();
       return { message: 'Sale deleted' };
     } catch (error) {

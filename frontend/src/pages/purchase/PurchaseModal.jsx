@@ -4,12 +4,15 @@ import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
 import { useConfig } from '../../context/ConfigContext';
 import { resolvePurchaseFieldVisibility } from '../../utils/configHelpers';
-import api from '../../utils/api';
+import { toast } from '../../store/useToastStore';
 import { Trash2, Plus } from 'lucide-react';
 import AccountMasterModal from '../masters/AccountMasterModal';
 import ItemMasterModal from '../masters/ItemMasterModal';
 import BillSaveNextActions from '../../components/BillSaveNextActions';
+import BillAutoFill from '../../components/BillAutoFill';
 import PurchasePrint from './PurchasePrint';
+import { warehousesApi } from '../../api';
+import { resolveParty, buildWhatsAppMessage, openWhatsAppShare } from '../../utils/invoiceHelpers';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -32,6 +35,9 @@ const PurchaseModal = ({
   const [printInvoiceId, setPrintInvoiceId] = useState(null);
   const openedOnceRef = useRef(false);
 
+  const [warehouses, setWarehouses] = useState([]);
+  const [billAttachment, setBillAttachment] = useState(null);
+
   const [header, setHeader] = useState({
     party: '',
     add: '',
@@ -46,7 +52,8 @@ const PurchaseModal = ({
     chDate: today(),
     type: 'INVOICE IN STATE',
     gstType: 'CGST+SGST',
-    reverseCharge: 'No'
+    reverseCharge: 'No',
+    warehouseId: ''
   });
 
   const [gridItems, setGridItems] = useState([
@@ -80,11 +87,16 @@ const PurchaseModal = ({
     fetchParties();
     fetchItems();
     fetchPurchases();
+    warehousesApi
+      .list()
+      .then((list) => setWarehouses(Array.isArray(list) ? list : []))
+      .catch(() => setWarehouses([]));
 
     if (!openedOnceRef.current) {
       openedOnceRef.current = true;
       setSaveNextActions(null);
       setPrintInvoiceId(null);
+      setBillAttachment(null);
       if (readOnly) {
         setMode('View');
       } else {
@@ -95,6 +107,7 @@ const PurchaseModal = ({
   }, [isOpen, readOnly, selectedBook, fetchParties, fetchItems, fetchPurchases]);
 
   const loadPurchaseData = (pur) => {
+    setBillAttachment(pur.billAttachment || null);
     setHeader({
       party: pur.supplierId?._id || pur.supplierId || '',
       add: pur.narration || '',
@@ -109,7 +122,8 @@ const PurchaseModal = ({
       chDate: pur.challanDate ? pur.challanDate.split('T')[0] : today(),
       type: pur.gstType === 'IGST' ? 'INVOICE OUT OF STATE' : 'INVOICE IN STATE',
       gstType: pur.gstType || 'CGST+SGST',
-      reverseCharge: pur.reverseCharge || 'No'
+      reverseCharge: pur.reverseCharge || 'No',
+      warehouseId: pur.warehouseId?._id || pur.warehouseId || ''
     });
 
     setGridItems(pur.items.map((item, idx) => ({
@@ -200,6 +214,13 @@ const PurchaseModal = ({
     return { gross, taxable, gstAmt, net, totalAdd, totalLess };
   }, [gridItems, footer, header.type]);
 
+  useEffect(() => {
+    if (!isOpen || readOnly || mode === 'View') return;
+    if (!warehouses.length || header.warehouseId) return;
+    const first = warehouses[0]?._id || warehouses[0]?.id;
+    if (first) setHeader((h) => ({ ...h, warehouseId: first }));
+  }, [isOpen, readOnly, mode, warehouses, header.warehouseId]);
+
   const handleCreateAccount = (search) => setInlineModal({ type: 'account', target: 'party', initialData: { name: search, group: 'SUNDRY CREDITORS' } });
   const handleCreateBroker = (search) => setInlineModal({ type: 'account', target: 'broker', initialData: { name: search, group: 'BROKER' } });
   const handleCreateItem = (search, index) => setInlineModal({ type: 'item', initialData: { itemName: search }, rowIndex: index });
@@ -226,6 +247,7 @@ const PurchaseModal = ({
   };
 
   const handleNew = () => {
+    setBillAttachment(null);
     setHeader({
       party: '',
       add: '',
@@ -240,7 +262,8 @@ const PurchaseModal = ({
       chDate: today(),
       type: 'INVOICE IN STATE',
       gstType: 'CGST+SGST',
-      reverseCharge: 'No'
+      reverseCharge: 'No',
+      warehouseId: warehouses[0]?._id || warehouses[0]?.id || ''
     });
     setGridItems([
       { id: 1, itemId: '', itemName: '', desc: '', fold: 0, cut: 0, pcs: 0, mts: 0, rate: 0, amount: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0, gstPer: 5, gstAmt: 0 }
@@ -263,9 +286,73 @@ const PurchaseModal = ({
     setMode('Add');
   };
 
+  const handleBillAutoApply = ({ header: h, gridItems: rows, attachment, footer: f }) => {
+    setHeader((prev) => {
+      // Prefer party from draft; when party set, also pull gstin/city from masters if draft incomplete
+      let party = h.party || prev.party;
+      let gstin = h.gstin || prev.gstin;
+      let city = h.city || prev.city;
+      let add = h.add || prev.add;
+      if (party) {
+        const p = parties.find((x) => x._id === party || x.id === party);
+        if (p) {
+          gstin = gstin || p.gstin || '';
+          city = city || p.station || p.city || '';
+          add = add || p.address || '';
+        }
+      }
+      return {
+        ...prev,
+        party,
+        gstin,
+        city,
+        add,
+        billNo: h.billNo != null && h.billNo !== '' ? h.billNo : prev.billNo,
+        billDate: h.billDate || prev.billDate,
+        type: h.type || prev.type,
+        gstType: h.gstType || prev.gstType,
+      };
+    });
+    if (rows?.length) {
+      // Collapse OCR duplicate rows (same item + qty + rate)
+      const seen = new Map();
+      for (const r of rows) {
+        const key = `${r.itemId || r.itemName || ''}|${Number(r.mts || 0)}|${Number(r.rate || 0)}`;
+        if (!seen.has(key)) seen.set(key, r);
+      }
+      const unique = [...seen.values()];
+      setGridItems(
+        unique.map((r, idx) => ({
+          ...r,
+          id: idx + 1,
+          // ensure numbers so calc / save work
+          pcs: Number(r.pcs || 0),
+          mts: Number(r.mts || 0),
+          rate: Number(r.rate || 0),
+          amount: Number(r.amount || 0),
+          gstPer: Number(r.gstPer || 5),
+          gstAmt: Number(r.gstAmt || 0),
+        }))
+      );
+    }
+    if (f && (f.roundOff != null || f.roundOff === 0)) {
+      setFooter((prev) => ({ ...prev, roundOff: Number(f.roundOff) || 0 }));
+    }
+    if (attachment) {
+      setBillAttachment({
+        fileName: attachment.fileName || '',
+        mimeType: attachment.mimeType || '',
+        extractedAt: attachment.extractedAt || new Date().toISOString(),
+      });
+    }
+    if (mode === 'View') setMode('Add');
+  };
+
   const handleSave = async (e) => {
     if (e) e.preventDefault();
-    if (!header.party) return alert('Please select a party');
+    if (!header.party) return toast.error('Please select a party');
+    const lineItems = gridItems.filter((i) => i.itemId);
+    if (!lineItems.length) return toast.error('Add at least one item with qty');
     
     try {
       const payload = {
@@ -279,6 +366,14 @@ const PurchaseModal = ({
         brokerId: header.broker || null,
         type: header.type,
         reverseCharge: header.reverseCharge,
+        warehouseId: header.warehouseId || null,
+        billAttachment: billAttachment
+          ? {
+              fileName: billAttachment.fileName || '',
+              mimeType: billAttachment.mimeType || '',
+              extractedAt: billAttachment.extractedAt || null,
+            }
+          : undefined,
         narration: footer.remarks,
         discountAmt: footer.discountAmt,
         discountSign: footer.discountSign,
@@ -292,7 +387,7 @@ const PurchaseModal = ({
         roundOff: footer.roundOff,
         rcmCharge: footer.rcmCharge,
         rcmChargeSign: footer.rcmChargeSign,
-        items: gridItems.filter(i => i.itemId).map(i => ({
+        items: lineItems.map(i => ({
           itemId: i.itemId,
           desc: i.desc,
           fold: Number(i.fold || 0),
@@ -325,29 +420,31 @@ const PurchaseModal = ({
       if (savedId) {
         setSelectedPurchaseId(savedId);
       }
+      toast.success('Purchase saved — stock increased in warehouse');
       setSaveNextActions({
         id: savedId,
         invoiceNo: saved?.invoiceNo || header.vNo,
-        offlinePending: !!saved?.offlinePending
+        offlinePending: !!saved?.offlinePending,
+        invoice: saved
       });
       setMode('View');
       fetchPurchases();
     } catch (err) {
-      alert('Failed to save purchase: ' + err.message);
+      toast.error('Failed to save purchase: ' + err.message);
     }
   };
 
   const handleDelete = async () => {
     const id = selectedPurchaseId;
-    if (!id) return alert('Select a purchase bill first');
+    if (!id) return toast.error('Select a purchase bill first');
     if (window.confirm('Are you sure you want to cancel/delete this purchase bill?')) {
       try {
         await deletePurchase(id);
-        alert('Purchase bill cancelled!');
+        toast.success('Purchase bill cancelled!');
         handleNew();
         fetchPurchases();
       } catch (err) {
-        alert('Failed to delete: ' + err.message);
+        toast.error('Failed to delete: ' + err.message);
       }
     }
   };
@@ -365,7 +462,7 @@ const PurchaseModal = ({
   const nextStepActions = [
     onOpenSales && {
       key: 'sales',
-      label: '1. Sales Bill',
+      label: '1. Open Sales Bill',
       onClick: () => {
         setSaveNextActions(null);
         onOpenSales();
@@ -373,7 +470,7 @@ const PurchaseModal = ({
     },
     onOpenMillIssue && {
       key: 'millIssue',
-      label: '2. Mill Issue',
+      label: '2. Mill Issue (from purchased stock)',
       onClick: () => {
         setSaveNextActions(null);
         onOpenMillIssue();
@@ -381,7 +478,7 @@ const PurchaseModal = ({
     },
     onOpenJobIssue && {
       key: 'jobIssue',
-      label: '3. Job Issue',
+      label: '3. Job Issue (from purchased stock)',
       onClick: () => {
         setSaveNextActions(null);
         onOpenJobIssue();
@@ -414,14 +511,26 @@ const PurchaseModal = ({
             </div>
           )}
 
+          {!locked && (
+            <BillAutoFill
+              parties={parties}
+              items={items}
+              disabled={locked}
+              onApply={handleBillAutoApply}
+              onMastersChanged={async () => {
+                await Promise.all([fetchParties(), fetchItems()]);
+              }}
+            />
+          )}
+
           {/* Header Block */}
-          <div className="classic-erp-frame grid grid-cols-12 gap-3">
-            <div className="col-span-8 flex flex-col gap-2">
-              <div className="flex gap-2">
-                <span className="classic-erp-label red-label w-16">Vendor:</span>
-                <div className="flex-1 flex gap-1 items-center">
+          <div className="classic-erp-frame classic-erp-header-split">
+            <div className="classic-erp-stack">
+              <div className="classic-erp-field classic-erp-field--lg">
+                <span className="classic-erp-label red-label">Vendor:</span>
+                <div className="classic-erp-control">
                   <select 
-                    className="classic-erp-select flex-1 font-bold" 
+                    className="classic-erp-select font-bold" 
                     value={header.party} 
                     onChange={e => {
                       const val = e.target.value;
@@ -447,7 +556,7 @@ const PurchaseModal = ({
                       type="button"
                       onClick={() => handleCreateAccount('')}
                       className="classic-erp-btn p-0 w-8 flex items-center justify-center shrink-0"
-                      style={{ height: '30px', minHeight: '30px' }}
+                      style={{ height: '32px', minHeight: '32px' }}
                       title="Add New Vendor / Supplier"
                     >
                       <Plus size={14} strokeWidth={2.5} />
@@ -455,46 +564,71 @@ const PurchaseModal = ({
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-16">Gstin:</span>
-                  <input type="text" className="classic-erp-input flex-1" value={header.gstin} readOnly />
+
+              <div className="classic-erp-meta-grid">
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Gstin:</span>
+                  <input type="text" className="classic-erp-input" value={header.gstin} readOnly />
                 </div>
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-12">City:</span>
-                  <input type="text" className="classic-erp-input flex-1" value={header.city} readOnly />
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">City:</span>
+                  <input type="text" className="classic-erp-input" value={header.city} readOnly />
                 </div>
+              </div>
+
+              <div className="classic-erp-field classic-erp-field--lg">
+                <span className="classic-erp-label red-label">Godown:</span>
+                <select
+                  className="classic-erp-select"
+                  value={header.warehouseId}
+                  onChange={(e) => setHeader({ ...header, warehouseId: e.target.value })}
+                  disabled={locked}
+                >
+                  <option value="">- Default / Unassigned -</option>
+                  {warehouses.map((w) => (
+                    <option key={w._id || w.id} value={w._id || w.id}>
+                      {w.code ? `${w.code} — ` : ''}
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            <div className="col-span-4 space-y-1">
-              <div className="flex gap-2 items-center justify-between">
-                <span className="classic-erp-label red-label">Voucher No:</span>
-                <input type="text" className="classic-erp-input w-28" value={header.vNo} readOnly />
-                <span className="classic-erp-label">Date:</span>
-                <input type="date" className="classic-erp-input w-32" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
-              </div>
-              <div className="flex gap-2 items-center justify-between">
-                <span className="classic-erp-label">Supp. Bill:</span>
-                <input type="text" className="classic-erp-input w-28" value={header.billNo} onChange={e => setHeader({ ...header, billNo: e.target.value })} disabled={locked} />
-              </div>
-              <div className="flex gap-2 items-center justify-between">
-                <span className="classic-erp-label">ChNo:</span>
-                <input type="text" className="classic-erp-input w-28" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
-                <span className="classic-erp-label">Date:</span>
-                <input type="date" className="classic-erp-input w-32" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
+            <div className="classic-erp-stack">
+              <div className="classic-erp-meta-grid">
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label red-label">Voucher:</span>
+                  <input type="text" className="classic-erp-input" value={header.vNo} readOnly />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Date:</span>
+                  <input type="date" className="classic-erp-input" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Supp. Bill:</span>
+                  <input type="text" className="classic-erp-input" value={header.billNo} onChange={e => setHeader({ ...header, billNo: e.target.value })} disabled={locked} />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Challan:</span>
+                  <input type="text" className="classic-erp-input" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Ch Date:</span>
+                  <input type="date" className="classic-erp-input" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Broker/Type Frame */}
-          <div className="classic-erp-frame grid grid-cols-4 gap-3">
+          {/* Broker / RCM / Type */}
+          <div className="classic-erp-frame classic-erp-meta-grid--3">
             {showBroker ? (
-              <div className="flex gap-2 col-span-2 items-center">
-                <span className="classic-erp-label w-16">Broker:</span>
-                <div className="flex-1 flex gap-1 items-center">
+              <div className="classic-erp-field">
+                <span className="classic-erp-label">Broker:</span>
+                <div className="classic-erp-control">
                   <select 
-                    className="classic-erp-select flex-1" 
+                    className="classic-erp-select" 
                     value={header.broker} 
                     onChange={e => {
                       const val = e.target.value;
@@ -519,7 +653,7 @@ const PurchaseModal = ({
                       type="button"
                       onClick={() => handleCreateBroker('')}
                       className="classic-erp-btn p-0 w-8 flex items-center justify-center shrink-0"
-                      style={{ height: '30px', minHeight: '30px' }}
+                      style={{ height: '32px', minHeight: '32px' }}
                       title="Add New Broker"
                     >
                       <Plus size={14} strokeWidth={2.5} />
@@ -528,18 +662,18 @@ const PurchaseModal = ({
                 </div>
               </div>
             ) : (
-              <div className="col-span-2" />
+              <div />
             )}
-            <div className="flex gap-2">
-              <span className="classic-erp-label w-16">RCM:</span>
-              <select className="classic-erp-select flex-1" value={header.reverseCharge} onChange={e => setHeader({ ...header, reverseCharge: e.target.value })} disabled={locked}>
+            <div className="classic-erp-field">
+              <span className="classic-erp-label">RCM:</span>
+              <select className="classic-erp-select" value={header.reverseCharge} onChange={e => setHeader({ ...header, reverseCharge: e.target.value })} disabled={locked}>
                 <option value="No">No</option>
                 <option value="Yes">Yes</option>
               </select>
             </div>
-            <div className="flex gap-2">
-              <span className="classic-erp-label w-16">Type:</span>
-              <select className="classic-erp-select flex-1" value={header.type} onChange={e => setHeader({ ...header, type: e.target.value })} disabled={locked}>
+            <div className="classic-erp-field">
+              <span className="classic-erp-label">Type:</span>
+              <select className="classic-erp-select" value={header.type} onChange={e => setHeader({ ...header, type: e.target.value })} disabled={locked}>
                 <option value="INVOICE IN STATE">INVOICE IN STATE</option>
                 <option value="INVOICE OUT OF STATE">INVOICE OUT OF STATE</option>
               </select>
@@ -694,40 +828,37 @@ const PurchaseModal = ({
           {/* Footer Grid / Calculations */}
           <div className="grid grid-cols-12 gap-3">
             
-            {/* Left Adjustments Column */}
-            <div className="col-span-4 classic-erp-frame space-y-1.5 p-2">
+            <div className="col-span-4 classic-erp-frame classic-erp-stack p-2">
               {[
                 { label: 'DISCOUNT', key: 'discountAmt', signKey: 'discountSign' },
                 { label: 'LESS', key: 'lessAmt', signKey: 'lessSign' },
                 { label: 'ADD', key: 'addAmt', signKey: 'addSign' },
                 { label: 'OCTROI', key: 'octroi', signKey: 'octroiSign' }
               ].map(adj => (
-                <div key={adj.key} className="flex items-center justify-between gap-2">
-                  <span className="classic-erp-label w-24">{adj.label}:</span>
-                  <div className="flex gap-1 items-center flex-1">
-                    <select
-                      className="classic-erp-select w-10 text-center font-bold"
-                      value={footer[adj.signKey]}
-                      onChange={e => setFooter({ ...footer, [adj.signKey]: e.target.value })}
-                      disabled={locked}
-                    >
-                      <option value="-">-</option>
-                      <option value="+">+</option>
-                    </select>
-                    <input
-                      type="number"
-                      className="classic-erp-input flex-1 text-right"
-                      value={footer[adj.key] || ''}
-                      onChange={e => setFooter({ ...footer, [adj.key]: Number(e.target.value) })}
-                      disabled={locked}
-                    />
-                  </div>
+                <div key={adj.key} className="classic-erp-adj-row">
+                  <span className="classic-erp-label">{adj.label}:</span>
+                  <select
+                    className="classic-erp-select text-center font-bold"
+                    value={footer[adj.signKey]}
+                    onChange={e => setFooter({ ...footer, [adj.signKey]: e.target.value })}
+                    disabled={locked}
+                  >
+                    <option value="-">-</option>
+                    <option value="+">+</option>
+                  </select>
+                  <input
+                    type="number"
+                    className="classic-erp-input text-right"
+                    value={footer[adj.key] || ''}
+                    onChange={e => setFooter({ ...footer, [adj.key]: Number(e.target.value) })}
+                    disabled={locked}
+                  />
                 </div>
               ))}
               
-              <div className="flex gap-2 items-center pt-2 border-t border-[var(--border)]">
-                <span className="classic-erp-label w-24">ITC Eligibility:</span>
-                <select className="classic-erp-select flex-1" value={footer.itcEligibility} onChange={e => setFooter({ ...footer, itcEligibility: e.target.value })} disabled={locked}>
+              <div className="classic-erp-field classic-erp-field--lg pt-2 border-t border-[var(--border)]">
+                <span className="classic-erp-label">ITC:</span>
+                <select className="classic-erp-select" value={footer.itcEligibility} onChange={e => setFooter({ ...footer, itcEligibility: e.target.value })} disabled={locked}>
                   <option value="Inputs">Inputs</option>
                   <option value="Capital Goods">Capital Goods</option>
                   <option value="None">None</option>
@@ -735,11 +866,10 @@ const PurchaseModal = ({
               </div>
             </div>
 
-            {/* Middle Narration Column */}
-            <div className="col-span-4 classic-erp-frame space-y-1 p-2">
+            <div className="col-span-4 classic-erp-frame classic-erp-stack p-2">
               <span className="classic-erp-frame-title">Remarks / Narration</span>
               <textarea 
-                className="classic-erp-input w-full p-2 resize-none text-[12px] classic-erp-textarea" 
+                className="classic-erp-textarea w-full resize-none text-[12px]" 
                 rows={5}
                 value={footer.remarks} 
                 onChange={e => setFooter({ ...footer, remarks: e.target.value })} 
@@ -748,82 +878,79 @@ const PurchaseModal = ({
               />
             </div>
 
-            {/* Right Totals Column */}
-            <div className="col-span-4 classic-erp-frame space-y-1 p-2 bg-[var(--accent-light)]">
-              <div className="flex justify-between items-center font-bold">
-                <span className="classic-erp-label text-slate-800">TaxableAmt:</span>
+            <div className="col-span-4 classic-erp-frame classic-erp-stack p-2 bg-[var(--accent-light)] pb-3">
+              <div className="classic-erp-total-row font-bold">
+                <span className="classic-erp-label text-slate-800">Taxable Amt:</span>
                 <span className="font-mono text-black">₹{calculations.taxable.toFixed(2)}</span>
               </div>
 
               {header.type === 'INVOICE IN STATE' ? (
                 <>
-                  <div className="flex justify-between items-center font-bold">
+                  <div className="classic-erp-total-row font-bold">
                     <span className="classic-erp-label text-slate-800">CGST (2.5%):</span>
                     <span className="font-mono text-black">₹{(calculations.gstAmt / 2).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between items-center font-bold">
+                  <div className="classic-erp-total-row font-bold">
                     <span className="classic-erp-label text-slate-800">SGST (2.5%):</span>
                     <span className="font-mono text-black">₹{(calculations.gstAmt / 2).toFixed(2)}</span>
                   </div>
                 </>
               ) : (
-                <div className="flex justify-between items-center font-bold">
+                <div className="classic-erp-total-row font-bold">
                   <span className="classic-erp-label text-slate-800">IGST (5%):</span>
                   <span className="font-mono text-black">₹{calculations.gstAmt.toFixed(2)}</span>
                 </div>
               )}
 
-              <div className="flex justify-between items-center font-bold">
-                <div className="flex items-center gap-1">
-                  <span className="classic-erp-label text-slate-800">RCM Charge:</span>
-                  <select
-                    className="classic-erp-select w-10 text-center font-bold"
-                    value={footer.rcmChargeSign}
-                    onChange={e => setFooter({ ...footer, rcmChargeSign: e.target.value })}
-                    disabled={locked}
-                  >
-                    <option value="-">-</option>
-                    <option value="+">+</option>
-                  </select>
-                </div>
+              <div className="classic-erp-adj-row font-bold">
+                <span className="classic-erp-label text-slate-800">RCM:</span>
+                <select
+                  className="classic-erp-select text-center font-bold"
+                  value={footer.rcmChargeSign}
+                  onChange={e => setFooter({ ...footer, rcmChargeSign: e.target.value })}
+                  disabled={locked}
+                >
+                  <option value="-">-</option>
+                  <option value="+">+</option>
+                </select>
                 <input
                   type="number"
-                  className="classic-erp-input w-20 text-right font-mono"
+                  className="classic-erp-input text-right font-mono"
                   value={footer.rcmCharge}
                   onChange={e => setFooter({ ...footer, rcmCharge: Number(e.target.value) })}
                   disabled={locked}
                 />
               </div>
 
-              <div className="flex justify-between items-center font-bold border-t border-[var(--border)] pt-1">
+              <div className="classic-erp-total-row font-bold border-t border-[var(--border)] pt-1">
                 <span className="classic-erp-label text-slate-800">Gross Amt:</span>
                 <span className="font-mono text-black">₹{calculations.gross.toFixed(2)}</span>
               </div>
 
-              <div className="flex justify-between items-center font-bold">
+              <div className="classic-erp-total-row font-bold">
                 <span className="classic-erp-label text-slate-800">Total Add:</span>
                 <span className="font-mono text-green-700">₹{calculations.totalAdd.toFixed(2)}</span>
               </div>
 
-              <div className="flex justify-between items-center font-bold">
+              <div className="classic-erp-total-row font-bold">
                 <span className="classic-erp-label text-slate-800">Total Less:</span>
                 <span className="font-mono text-red-700">₹{calculations.totalLess.toFixed(2)}</span>
               </div>
 
-              <div className="flex justify-between items-center font-bold">
+              <div className="classic-erp-total-row font-bold">
                 <span className="classic-erp-label text-slate-800">Round Off:</span>
                 <input
                   type="number"
-                  className="classic-erp-input w-20 text-right font-mono"
+                  className="classic-erp-input w-24 text-right font-mono"
                   value={footer.roundOff}
                   onChange={e => setFooter({ ...footer, roundOff: Number(e.target.value) })}
                   disabled={locked}
                 />
               </div>
 
-              <div className="flex justify-between items-center font-bold pt-2 border-t-2 border-[#000] mt-1">
+              <div className="classic-erp-total-row font-bold pt-2 border-t-2 border-[#000] mt-1">
                 <span className="classic-erp-label text-blue-900 text-sm">NET AMOUNT:</span>
-                <span className="font-mono text-blue-900 text-lg">₹{calculations.net.toFixed(2)}</span>
+                <span className="font-mono text-blue-900 text-lg shrink-0">₹{calculations.net.toFixed(2)}</span>
               </div>
             </div>
 
@@ -844,7 +971,7 @@ const PurchaseModal = ({
             onClick={() => selectedPurchaseId && setPrintInvoiceId(selectedPurchaseId)}
             disabled={!selectedPurchaseId}
           >
-            Print
+            PDF / Print
           </button>
           <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
         </div>
@@ -873,8 +1000,17 @@ const PurchaseModal = ({
         invoiceNo={saveNextActions.invoiceNo}
         offlinePending={saveNextActions.offlinePending}
         actions={nextStepActions}
+        onPdf={() => {
+          if (saveNextActions.id) setPrintInvoiceId(saveNextActions.id);
+        }}
         onPrint={() => {
           if (saveNextActions.id) setPrintInvoiceId(saveNextActions.id);
+        }}
+        onWhatsApp={() => {
+          const inv = saveNextActions.invoice || purchases.find((p) => p._id === saveNextActions.id || p.id === saveNextActions.id);
+          if (!inv) return;
+          const party = resolveParty(inv.supplierId, parties);
+          openWhatsAppShare(buildWhatsAppMessage({ type: 'purchase', invoice: inv, party }), party?.phone || party?.mobile);
         }}
         onNew={() => {
           setSaveNextActions(null);

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'billing-erp-v4';
+const CACHE_NAME = 'billing-erp-v5';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -43,10 +43,10 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Never intercept API calls — let them go to the server (or fail gracefully in JS)
+  // Never intercept API calls
   if (url.pathname.startsWith('/api')) return;
 
-  // App navigation: network-first, fallback to cache, then index.html
+  // App navigation: network-first
   if (isAppNavigation(request)) {
     event.respondWith(
       fetch(request)
@@ -64,24 +64,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets (JS/CSS/images): cache-first for offline performance
+  // CSS/JS: network-first so style updates are never stuck behind stale cache
   if (isStaticAsset(url)) {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
+      fetch(request)
+        .then((response) => {
           if (response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
-        });
-      })
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }
 
-  // Everything else: network-first, cache fallback
   event.respondWith(
     fetch(request)
       .then((response) => {

@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
-import api from '../../utils/api';
+import { adminApi } from '../../api';
+import { toast } from '../../store/useToastStore';
 
 const FINANCIAL_YEARS = ['2023-24', '2024-25', '2025-26', '2026-27'];
 const GST_SCHEMES = ['Regular (Monthly)', 'QRMP (Quarterly)', 'Composition', 'Exempt'];
@@ -68,8 +69,8 @@ const CompanyConfig = () => {
 
     const loadConfig = async (companyId) => {
         try {
-            const res = await api.get(`/admin/company/${companyId}/config`);
-            setConfig({ ...defaultConfig, ...res.data });
+            const data = await adminApi.companyConfig(companyId);
+            setConfig({ ...defaultConfig, ...(data || {}) });
         } catch {
             setConfig({ ...defaultConfig });
         }
@@ -81,11 +82,11 @@ const CompanyConfig = () => {
         if (!selectedCompany) return;
         setSaving(true);
         try {
-            await api.put(`/admin/company/${selectedCompany}/config`, config);
+            await adminApi.saveCompanyConfig(selectedCompany, config);
             setSaved(true);
             setTimeout(() => setSaved(false), 3000);
         } catch (err) {
-            alert('Failed to save: ' + (err.response?.data?.message || err.message));
+            toast.error('Failed to save: ' + (err.response?.data?.message || err.message));
         } finally {
             setSaving(false);
         }

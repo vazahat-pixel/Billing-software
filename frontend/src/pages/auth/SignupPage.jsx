@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { LayoutDashboard, Lock, Mail, Loader2, ArrowRight, Building, User } from 'lucide-react';
-import api from '../../utils/api';
+import { authApi } from '../../api';
 import useStore from '../../store/useStore';
 import { saveOfflineCredential } from '../../utils/offlineAuth';
 
@@ -30,13 +30,14 @@ const SignupPage = () => {
         setError('');
 
         try {
-            const response = await api.post('/auth/register', {
+            const data = await authApi.register({
                 name: `${formData.firstName} ${formData.lastName}`,
                 email: formData.email,
                 password: formData.password,
                 companyName: formData.companyName
             });
-            const { token, user } = response.data;
+            const token = data?.token || data?.data?.token;
+            const user = data?.user || data?.data?.user;
             
             await saveOfflineCredential(formData.email, formData.password, { token, user });
             await setAuth({ token, user });

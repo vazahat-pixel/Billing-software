@@ -22,10 +22,14 @@ import AdminDynamicConfig from './pages/admin/DynamicConfig';
 import PanelPortal from './pages/PanelPortal';
 import FallbackRedirect from './components/auth/FallbackRedirect';
 import { ConfigProvider } from './context/ConfigContext';
+import ApiLoader from './components/ui/ApiLoader';
+import AppProviders from './providers/AppProviders';
 
 function App() {
   return (
     <Router>
+      <AppProviders>
+      <ApiLoader />
       <Routes>
         <Route path="/portal" element={<PanelPortal />} />
         <Route path="/login" element={<LoginPage />} />
@@ -69,6 +73,7 @@ function App() {
 
         <Route path="*" element={<FallbackRedirect />} />
       </Routes>
+      </AppProviders>
     </Router>
   );
 }

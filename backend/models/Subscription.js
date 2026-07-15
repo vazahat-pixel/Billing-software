@@ -28,4 +28,7 @@ const subscriptionSchema = new mongoose.Schema({
     offlineModeEnabled: { type: Boolean, default: false }
 }, { timestamps: true });
 
+subscriptionSchema.index({ companyId: 1, status: 1 });
+subscriptionSchema.index({ companyId: 1 }, { unique: false });
+
 module.exports = mongoose.model('Subscription', subscriptionSchema);

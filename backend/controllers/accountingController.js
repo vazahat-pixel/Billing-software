@@ -78,13 +78,13 @@ function normalizePaymentDetails(body) {
 }
 
 // Helper to generate voucher numbers — FIXED: uses atomic Counter to prevent race conditions
-async function generateVoucherNo(companyId, type) {
+async function generateVoucherNo(companyId, type, session = null) {
   const prefix = type === 'Payment' ? 'PV' : 'RV';
   const currentYear = new Date().getFullYear().toString().substring(2);
   const nextYear = (new Date().getFullYear() + 1).toString().substring(2);
   const fy = `${currentYear}-${nextYear}`;
   const counterId = `${prefix}-${fy}-${companyId}`;
-  const seq = await Counter.nextSeq(counterId);
+  const seq = await Counter.nextSeq(counterId, session);
   return `${prefix}-${fy}-${seq.toString().padStart(4, '0')}`;
 }
 
@@ -236,7 +236,7 @@ exports.createPaymentVoucher = async (req, res) => {
       throw new Error('Invalid party or bank ledger selection');
     }
 
-    const voucherNo = await generateVoucherNo(companyId, 'Payment');
+    const voucherNo = await generateVoucherNo(companyId, 'Payment', session);
 
     const voucher = new PaymentVoucher({
       companyId,
@@ -259,7 +259,7 @@ exports.createPaymentVoucher = async (req, res) => {
 
     if (status === 'Posted') {
       // Create double-entry journal lines
-      const entryNo = await accountingService.generateEntryNo(companyId, 'JNL');
+      const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
       const accountingEntry = await AccountingEntry.create([{
         companyId,
         entryNo,
@@ -363,7 +363,7 @@ exports.createReceiptVoucher = async (req, res) => {
       throw new Error('Invalid party or bank ledger selection');
     }
 
-    const voucherNo = await generateVoucherNo(companyId, 'Receipt');
+    const voucherNo = await generateVoucherNo(companyId, 'Receipt', session);
 
     const voucher = new PaymentVoucher({
       companyId,
@@ -385,7 +385,7 @@ exports.createReceiptVoucher = async (req, res) => {
     });
 
     if (status === 'Posted') {
-      const entryNo = await accountingService.generateEntryNo(companyId, 'JNL');
+      const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
       const accountingEntry = await AccountingEntry.create([{
         companyId,
         entryNo,
@@ -490,7 +490,7 @@ exports.createJournalEntry = async (req, res) => {
     const { entryDate, lines, narration } = req.body;
     await checkPeriodLocked(companyId, entryDate);
 
-    const entryNo = await accountingService.generateEntryNo(companyId, 'JNL');
+    const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
 
     const entry = await AccountingEntry.create({
       companyId,

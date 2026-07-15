@@ -1,54 +1,49 @@
 const salesService = require('../services/salesService');
 const auditService = require('../services/auditService');
+const asyncHandler = require('../utils/asyncHandler');
+const { ok, created } = require('../utils/apiResponse');
+const AppError = require('../utils/AppError');
 
-exports.createInvoice = async (req, res) => {
-  try {
-    req.body.companyId = req.companyId;
-    const sales = await salesService.createInvoice(req.body);
-    await auditService.log(req, 'CREATE_INVOICE', 'Sales', sales._id, null, { invoiceNo: sales.invoiceNo, amount: sales.netAmount });
-    res.status(201).json({ success: true, data: sales });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
+exports.createInvoice = asyncHandler(async (req, res) => {
+  const sales = await salesService.createInvoice({ ...req.body, companyId: req.companyId });
+  await auditService.log(req, 'CREATE_INVOICE', 'Sales', sales._id, null, {
+    invoiceNo: sales.invoiceNo,
+    amount: sales.netAmount,
+  });
+  return created(res, sales, 'Sales invoice created');
+});
 
-exports.getSales = async (req, res) => {
-  try {
-    const companyId = req.companyId || req.query.companyId;
-    // Updated to support pagination if salesService supports it, though for now passing full req.query
-    const sales = await salesService.getSales(companyId, req.query || {});
-    res.status(200).json({ success: true, data: sales });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+exports.getSales = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const result = await salesService.getSales(req.companyId, req.query || {});
+  const totalPages = Math.max(1, Math.ceil((result.total || 0) / (result.limit || 100)));
+  return ok(res, result.sales, '', {
+    pagination: {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages,
+    },
+  });
+});
 
-exports.getSale = async (req, res) => {
-  try {
-    const sale = await salesService.getSaleById(req.params.id, req.companyId);
-    res.status(200).json({ success: true, data: sale });
-  } catch (error) {
-    res.status(404).json({ success: false, message: error.message });
-  }
-};
+exports.getSale = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const sale = await salesService.getSaleById(req.params.id, req.companyId);
+  if (!sale) throw AppError.notFound('Sale not found');
+  return ok(res, sale);
+});
 
-exports.updateSaleStatus = async (req, res) => {
-  try {
-    const sale = await salesService.updateSaleStatus(req.params.id, req.companyId, req.body.status);
-    await auditService.log(req, 'UPDATE_STATUS', 'Sales', sale._id, { status: 'UNKNOWN' }, { status: sale.status });
-    res.status(200).json({ success: true, data: sale });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
+exports.updateSaleStatus = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const sale = await salesService.updateSaleStatus(req.params.id, req.companyId, req.body.status);
+  await auditService.log(req, 'UPDATE_STATUS', 'Sales', sale._id, null, { status: sale.status });
+  return ok(res, sale, 'Status updated');
+});
 
-exports.deleteSale = async (req, res) => {
-  try {
-    const result = await salesService.deleteSale(req.params.id, req.companyId);
-    await auditService.log(req, 'DELETE_INVOICE', 'Sales', req.params.id, result, null);
-    res.status(200).json({ success: true, data: result });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-};
-
+exports.deleteSale = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const result = await salesService.deleteSale(req.params.id, req.companyId);
+  await auditService.log(req, 'DELETE_INVOICE', 'Sales', req.params.id, result, null);
+  return ok(res, result, 'Invoice cancelled');
+});

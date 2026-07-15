@@ -6,12 +6,12 @@ const StockMovement = require('../models/StockMovement');
 const Counter = require('../models/Counter');
 const accountingService = require('../services/accountingService');
 
-async function generateReturnNo(companyId, type) {
+async function generateReturnNo(companyId, type, session = null) {
   const prefix = type === 'Sales' ? 'SR' : 'PR';
   const currentYear = new Date().getFullYear().toString().substring(2);
   const fy = `${currentYear}-${(parseInt(currentYear) + 1)}`;
   const counterId = `${prefix}-${fy}-${companyId}`;
-  const seq = await Counter.nextSeq(counterId);
+  const seq = await Counter.nextSeq(counterId, session);
   return `${prefix}-${fy}-${seq.toString().padStart(4, '0')}`;
 }
 
@@ -29,7 +29,7 @@ exports.createReturn = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Type, party, items, and amounts are required' });
     }
 
-    const finalInvoiceNo = invoiceNo || await generateReturnNo(companyId, returnType);
+    const finalInvoiceNo = invoiceNo || await generateReturnNo(companyId, returnType, session);
 
     const returnInvoice = await ReturnInvoice.create([{
       companyId,
@@ -118,7 +118,7 @@ exports.createReturn = async (req, res) => {
     // =====================================================================
     // Post accounting entries (fixed refType to use 'SalesReturn'/'PurchaseReturn')
     // =====================================================================
-    const entryNo = await accountingService.generateEntryNo(companyId, 'JNL');
+    const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
     const partyLedger = await accountingService.getOrCreatePartyLedger(companyId, partyId);
     const gstAmt = parseFloat(gstAmount || 0);
     const taxableAmt = parseFloat(taxableAmount);

@@ -1,3 +1,8 @@
+/**
+ * @deprecated DEAD CODE — Sprint 1.2
+ * Writes legacy Inventory model. Live inventory uses InventoryLot via purchaseService.js.
+ * Do not import this file.
+ */
 const Purchase = require('../models/Purchase');
 const Inventory = require('../models/Inventory');
 

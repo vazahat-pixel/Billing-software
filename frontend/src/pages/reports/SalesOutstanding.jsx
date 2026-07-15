@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useStore from '../../store/useStore';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import { Layout, FileText, ArrowRight, Printer, X, Monitor, ChevronLeft } from 'lucide-react';
+import { toast } from '../../store/useToastStore';
+import useConfigStore from '../../store/useConfigStore';
 
 const SalesOutstanding = ({ isOpen, onClose }) => {
   const { parties, fetchOutstanding } = useStore();
+  const companyName = useConfigStore(
+    (s) => s.companySettings?.legalName || s.company?.name || 'Company'
+  );
   const [showPreview, setShowPreview] = useState(false);
   const [reportData, setReportData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -12,7 +17,7 @@ const SalesOutstanding = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
     fromDate: '2026-04-01',
     toDate: '2026-06-06',
-    company: 'MAHAVEER IMPEX',
+    company: '',
     book: '--Select Sale Type--',
     selectParty: '',
     group: '',
@@ -34,6 +39,12 @@ const SalesOutstanding = ({ isOpen, onClose }) => {
     salesMan: '',
     orderNo: ''
   });
+
+  useEffect(() => {
+    if (companyName) {
+      setFormData((prev) => ({ ...prev, company: companyName }));
+    }
+  }, [companyName]);
 
   const checkboxes = [
     { label: 'Show Adjustment Entry', checked: true },
@@ -58,7 +69,7 @@ const SalesOutstanding = ({ isOpen, onClose }) => {
       setReportData(data || []);
       setShowPreview(true);
     } catch (err) {
-      alert(err.message || 'Failed to generate report');
+      toast.error(err.message || 'Failed to generate report');
     } finally {
       setLoading(false);
     }
@@ -189,7 +200,7 @@ const SalesOutstanding = ({ isOpen, onClose }) => {
 
                    <div className="flex items-center gap-4">
                       <label className="w-32 text-[10px] font-black text-black uppercase tracking-widest text-right">Legal Entity :</label>
-                      <ERPSelect className="flex-1 h-10 border-2 border-black font-black uppercase text-[10px]" value={formData.company} options={[{value: 'MAHAVEER IMPEX', label: 'MAHAVEER IMPEX'}]} />
+                      <ERPSelect className="flex-1 h-10 border-2 border-black font-black uppercase text-[10px]" value={formData.company} options={[{value: formData.company || companyName, label: formData.company || companyName}]} />
                    </div>
 
                    <div className="flex items-center gap-4">

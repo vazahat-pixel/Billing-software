@@ -38,12 +38,26 @@ const PanelPortal = () => {
     const { token, role, user } = useStore();
 
     const openErp = () => {
-        if (token) navigate('/');
-        else navigate('/login');
+        const state = useStore.getState();
+        const tok = state.token || localStorage.getItem('token');
+        if (tok) {
+            // Ensure platform role exists before ProtectedRoute check
+            if (!state.role || (state.role !== 'user' && state.role !== 'super_admin')) {
+                const r = state.user?.role === 'super_admin' ? 'super_admin' : 'user';
+                localStorage.setItem('role', r);
+                useStore.setState({ role: r });
+            }
+            navigate('/');
+        } else {
+            navigate('/login');
+        }
     };
 
     const openAdmin = () => {
-        if (token && role === 'super_admin') navigate('/admin/dashboard');
+        const state = useStore.getState();
+        const tok = state.token || localStorage.getItem('token');
+        const r = state.role || state.user?.role || localStorage.getItem('role');
+        if (tok && r === 'super_admin') navigate('/admin/dashboard');
         else navigate('/admin/login');
     };
 

@@ -49,6 +49,22 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
     setActiveTab('Add');
   };
 
+  const handleCopy = (item) => {
+    // Copy all fields but clear ID (new item) and prefix item name
+    setEditId(null);
+    setFormData({
+      itemName: 'Copy of ' + (item.itemName || item.name || ''),
+      group: item.group || 'GREY',
+      unit: item.unit || 'MTRS',
+      hsnCode: item.hsnCode || '',
+      taxRate: String(item.taxRate ?? item.gstRate ?? '5'),
+      salesRate: String(item.salesRate || 0),
+      purRate: String(item.purRate || item.purchaseRate || 0),
+      opStock: String(item.opStock || 0)
+    });
+    setActiveTab('Add');
+  };
+
   const handleSave = async () => {
     if (!formData.itemName) return alert('Item name is required');
     try {
@@ -134,6 +150,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                 <th className="py-2 pr-3 text-right">Sale</th>
                 <th className="py-2 pr-3 text-right">Pur</th>
                 {!readOnly && <th className="py-2 text-right">Actions</th>}
+                <th className="py-2 text-right">Copy</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
@@ -150,6 +167,14 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                       <button type="button" className="text-[10px] font-semibold text-[var(--red)]" onClick={() => handleDelete(item._id)}>Del</button>
                     </td>
                   )}
+                  <td className="py-2 text-right">
+                    <button
+                      type="button"
+                      title="Copy this item"
+                      className="text-[10px] font-semibold text-[var(--green,#22c55e)] hover:underline"
+                      onClick={() => handleCopy(item)}
+                    >📋 Copy</button>
+                  </td>
                 </tr>
               ))}
               {items.length === 0 && (
