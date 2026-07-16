@@ -1,4 +1,5 @@
 import { get, post, unwrap, asArray } from './http';
+import { stage3Api } from './stage3.api';
 
 export const accountingApi = {
   listLedgers: (params) => unwrap(get('/accounting/ledgers', params)).then((d) => asArray(d, ['ledgers'])),
@@ -12,6 +13,8 @@ export const accountingApi = {
   balanceSheet: (params) => unwrap(get('/accounting/balance-sheet', params)),
   outstanding: (params) => unwrap(get('/accounting/outstanding', params)),
   journal: (body) => unwrap(post('/accounting/journal', body)),
+  /** Stage 3 financial engine */
+  stage3: stage3Api,
 };
 
 export const ledgerApi = {
@@ -21,4 +24,5 @@ export const ledgerApi = {
   list: (params) => accountingApi.listLedgers(params),
 };
 
+export { stage3Api };
 export default accountingApi;

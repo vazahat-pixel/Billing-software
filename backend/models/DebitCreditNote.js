@@ -31,6 +31,16 @@ const DebitCreditNoteSchema = new mongoose.Schema({
     required: true,
     min: 0.01
   },
+  /** Stage 4 — GST components (backend-driven) */
+  taxableAmount: { type: Number, default: 0 },
+  gstType: { type: String, default: 'CGST+SGST' },
+  gstRate: { type: Number, default: 0 },
+  cgst: { type: Number, default: 0 },
+  sgst: { type: Number, default: 0 },
+  igst: { type: Number, default: 0 },
+  cess: { type: Number, default: 0 },
+  gstAmount: { type: Number, default: 0 },
+  netAmount: { type: Number, default: 0 },
   againstInvoiceNo: {
     type: String
   },

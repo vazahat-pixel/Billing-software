@@ -81,7 +81,7 @@ app.get('/health', (req, res) => {
 
 app.use(errorHandler);
 
-if (!process.env.VERCEL) {
+if (!process.env.VERCEL && require.main === module) {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
     logger.info(`Server listening on http://localhost:${PORT}`);

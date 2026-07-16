@@ -85,12 +85,15 @@ const SalesSchema = new mongoose.Schema({
   },
   gstType: {
     type: String,
-    enum: ['CGST+SGST', 'IGST'],
+    enum: ['CGST+SGST', 'IGST', 'Exempt', 'NilRated', 'ZeroRated', 'Export'],
     default: 'CGST+SGST'
   },
+  gstRate: { type: Number, default: 0 },
   cgst: { type: Number, default: 0 },
   sgst: { type: Number, default: 0 },
   igst: { type: Number, default: 0 },
+  cess: { type: Number, default: 0 },
+  reverseCharge: { type: Boolean, default: false },
   gstAmount: {
     type: Number,
     required: true,

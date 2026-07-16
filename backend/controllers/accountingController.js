@@ -133,76 +133,13 @@ exports.getLedgerStatement = async (req, res) => {
   try {
     const { id } = req.params;
     const { from, to } = req.query;
-    
-    const ledger = await LedgerMaster.findById(id);
-    if (!ledger) {
-      return res.status(404).json({ success: false, message: 'Ledger not found' });
-    }
-
-    const companyId = req.companyId || ledger.companyId;
-    if (ledger.companyId.toString() !== companyId.toString()) {
-      return res.status(403).json({ success: false, message: 'Unauthorized access to this ledger' });
-    }
-
-    // Filter by dates
-    const entryFilter = {
-      companyId,
-      isReversed: false,
-      'lines.ledgerId': ledger._id
-    };
-
-    if (from || to) {
-      entryFilter.entryDate = {};
-      if (from) entryFilter.entryDate.$gte = new Date(from);
-      if (to) entryFilter.entryDate.$lte = new Date(to);
-    }
-
-    // Fetch matching journal entries
-    const entries = await AccountingEntry.find(entryFilter).sort({ entryDate: 1, createdAt: 1 });
-
-    // Compute Running Balance starting from Opening Balance
-    let currentBalance = 0;
-    if (ledger.openingBalanceType === 'Dr') {
-      currentBalance = ledger.openingBalance || 0;
-    } else {
-      currentBalance = -(ledger.openingBalance || 0);
-    }
-
-    const statementLines = entries.map(entry => {
-      const activeLine = entry.lines.find(l => l.ledgerId.toString() === ledger._id.toString());
-      
-      if (activeLine.type === 'Dr') {
-        currentBalance += activeLine.amount;
-      } else {
-        currentBalance -= activeLine.amount;
-      }
-
-      return {
-        _id: entry._id,
-        date: entry.entryDate,
-        voucherNo: entry.entryNo,
-        voucherType: entry.voucherType,
-        narration: activeLine.narration || entry.narration,
-        debit: activeLine.type === 'Dr' ? activeLine.amount : 0,
-        credit: activeLine.type === 'Cr' ? activeLine.amount : 0,
-        runningBalance: Math.abs(currentBalance),
-        balanceType: currentBalance >= 0 ? 'Dr' : 'Cr'
-      };
-    });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        ledger,
-        openingBalance: ledger.openingBalance,
-        openingBalanceType: ledger.openingBalanceType,
-        closingBalance: Math.abs(currentBalance),
-        closingBalanceType: currentBalance >= 0 ? 'Dr' : 'Cr',
-        statement: statementLines
-      }
-    });
+    const companyId = req.companyId;
+    const ledgerEngine = require('../services/ledgerEngineService');
+    const data = await ledgerEngine.getStatement(companyId, id, { from, to });
+    res.status(200).json({ success: true, data });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    const status = error.message === 'Ledger not found' ? 404 : 500;
+    res.status(status).json({ success: false, message: error.message });
   }
 };
 
@@ -487,20 +424,15 @@ exports.listVouchers = async (req, res) => {
 exports.createJournalEntry = async (req, res) => {
   try {
     const companyId = req.companyId || req.body.companyId;
-    const { entryDate, lines, narration } = req.body;
-    await checkPeriodLocked(companyId, entryDate);
-
-    const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
-
-    const entry = await AccountingEntry.create({
-      companyId,
-      entryNo,
+    const { entryDate, lines, narration, voucherType } = req.body;
+    const journalEngine = require('../services/journalEngineService');
+    const entry = await journalEngine.postJournal(companyId, {
       entryDate,
-      voucherType: 'Journal',
-      refType: 'Journal',
       lines,
-      narration
-    });
+      narration,
+      voucherType: voucherType || 'Journal',
+      refType: 'Journal',
+    }, { userId: req.user?._id || req.user?.id });
 
     res.status(201).json({ success: true, data: entry });
   } catch (error) {
@@ -569,74 +501,34 @@ async function computeRunningBalances(companyId, asOnDate, fromDate = null) {
 // 8. Trial Balance
 exports.getTrialBalance = async (req, res) => {
   try {
-    const companyId = req.companyId;
-    const { asOn } = req.query;
-    const balances = await computeRunningBalances(companyId, asOn);
-    res.status(200).json({ success: true, data: balances });
+    const financialReports = require('../services/financialReportsService');
+    const data = await financialReports.trialBalance(req.companyId, { asOn: req.query.asOn });
+    res.status(200).json({ success: true, data: data.lines, meta: { isBalanced: data.isBalanced, totalDebit: data.totalDebit, totalCredit: data.totalCredit } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
 // 9. Profit & Loss Report (Income vs Expense ledgers)
-// FIXED: Now correctly applies `from` date to exclude prior-year balances
 exports.getProfitLoss = async (req, res) => {
   try {
-    const companyId = req.companyId;
-    const { from, to } = req.query;
-    // Pass BOTH from and to so P&L only covers the requested period
-    const balances = await computeRunningBalances(companyId, to, from);
-
-    const incomeLedgers = balances.filter(b => b.ledger.group === 'Income');
-    const expenseLedgers = balances.filter(b => b.ledger.group === 'Expenses');
-
-    const totalIncome = incomeLedgers.reduce((sum, b) => sum + b.balance, 0);
-    const totalExpenses = expenseLedgers.reduce((sum, b) => sum + b.balance, 0);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        period: { from: from || 'all', to: to || 'all' },
-        income: incomeLedgers,
-        expenses: expenseLedgers,
-        totalIncome: parseFloat(totalIncome.toFixed(2)),
-        totalExpenses: parseFloat(totalExpenses.toFixed(2)),
-        netProfit: parseFloat((totalIncome - totalExpenses).toFixed(2))
-      }
-    });
+    const financialReports = require('../services/financialReportsService');
+    const data = await financialReports.profitAndLoss(req.companyId, { from: req.query.from, to: req.query.to });
+    res.status(200).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// 10. Balance Sheet Report (Assets vs Liabilities + Capital)
+// 10. Balance Sheet Report (Assets vs Liabilities + Capital + P&L plug)
 exports.getBalanceSheet = async (req, res) => {
   try {
-    const companyId = req.companyId || req.query.companyId;
-    const { asOn } = req.query;
-    const balances = await computeRunningBalances(companyId, asOn);
-
-    const assets = balances.filter(b => b.ledger.group === 'Assets');
-    const liabilities = balances.filter(b => b.ledger.group === 'Liabilities');
-    const capital = balances.filter(b => b.ledger.group === 'Capital');
-
-    const totalAssets = assets.reduce((sum, b) => sum + b.balance, 0);
-    const totalLiabilities = liabilities.reduce((sum, b) => sum + b.balance, 0);
-    const totalCapital = capital.reduce((sum, b) => sum + b.balance, 0);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        assets,
-        liabilities,
-        capital,
-        totalAssets,
-        totalLiabilities,
-        totalCapital,
-        equity: totalCapital,
-        isBalanced: Math.abs(totalAssets - (totalLiabilities + totalCapital)) < 0.01
-      }
+    const financialReports = require('../services/financialReportsService');
+    const data = await financialReports.balanceSheet(req.companyId, {
+      asOn: req.query.asOn,
+      from: req.query.from,
     });
+    res.status(200).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -645,81 +537,12 @@ exports.getBalanceSheet = async (req, res) => {
 // 11. Party-wise Outstanding with Aging Reports (receivable/payable)
 exports.getOutstandingReport = async (req, res) => {
   try {
-    const companyId = req.companyId || req.query.companyId;
-    const { type, asOn } = req.query;
-    const isReceivable = type === 'receivable';
-
-    // Fetch matching customers or suppliers
-    const partyGroup = isReceivable ? 'Customer' : 'Supplier';
-    const parties = await Party.find({ companyId, type: { $in: [partyGroup, 'Both'] } });
-
-    const outstandingLines = [];
-    const asOnDate = asOn ? new Date(asOn) : new Date();
-
-    for (const party of parties) {
-      // Find invoices/bills
-      let documents = [];
-      if (isReceivable) {
-        documents = await Sales.find({ companyId, customerId: party._id });
-      } else {
-        documents = await Purchase.find({ companyId, supplierId: party._id });
-      }
-
-      let partyTotalOutstanding = 0;
-      const aging = {
-        bucket30: 0,
-        bucket60: 0,
-        bucket90: 0,
-        bucket90Plus: 0
-      };
-
-      for (const doc of documents) {
-        // Calculate paid amount from vouchers
-        const vouchers = await PaymentVoucher.find({
-          companyId,
-          status: 'Posted',
-          'againstInvoices.invoiceId': doc._id
-        });
-
-        const paid = vouchers.reduce((sum, v) => {
-          const invMatch = v.againstInvoices.find(item => item.invoiceId.toString() === doc._id.toString());
-          return sum + (invMatch ? invMatch.amount : 0);
-        }, 0);
-
-        const docTotal = parseFloat(doc.totals?.total || doc.totalAmount || doc.netAmount || 0);
-        const outstanding = docTotal - paid;
-
-        if (outstanding > 0.01) {
-          partyTotalOutstanding += outstanding;
-          
-          // Calculate aging days
-          const docDate = new Date(doc.date);
-          const ageInDays = Math.floor((asOnDate - docDate) / (1000 * 60 * 60 * 24));
-
-          if (ageInDays <= 30) {
-            aging.bucket30 += outstanding;
-          } else if (ageInDays <= 60) {
-            aging.bucket60 += outstanding;
-          } else if (ageInDays <= 90) {
-            aging.bucket90 += outstanding;
-          } else {
-            aging.bucket90Plus += outstanding;
-          }
-        }
-      }
-
-      if (partyTotalOutstanding > 0.01) {
-        outstandingLines.push({
-          partyId: party._id,
-          partyName: party.name,
-          phone: party.phone,
-          totalOutstanding: partyTotalOutstanding,
-          aging
-        });
-      }
-    }
-
-    res.status(200).json({ success: true, data: outstandingLines });
+    const outstandingEngine = require('../services/outstandingEngineService');
+    const data = await outstandingEngine.outstandingReport(req.companyId, {
+      type: req.query.type || 'receivable',
+      asOn: req.query.asOn,
+    });
+    res.status(200).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

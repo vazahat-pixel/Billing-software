@@ -31,7 +31,8 @@ const PurchaseSchema = new mongoose.Schema({
     type: String,
     default: null
   },
-  reverseCharge: { type: String, default: 'No' },
+  reverseCharge: { type: String, enum: ['Yes', 'No'], default: 'No' },
+  rcmCharge: { type: Boolean, default: false },
   challanNo: { type: String, default: '' },
   challanDate: { type: Date, default: null },
   brokerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party', default: null },
@@ -69,12 +70,14 @@ const PurchaseSchema = new mongoose.Schema({
   },
   gstType: {
     type: String,
-    enum: ['CGST+SGST', 'IGST'],
+    enum: ['CGST+SGST', 'IGST', 'Exempt', 'NilRated', 'ZeroRated'],
     default: 'CGST+SGST'
   },
+  gstRate: { type: Number, default: 0 },
   cgst: { type: Number, default: 0 },
   sgst: { type: Number, default: 0 },
   igst: { type: Number, default: 0 },
+  cess: { type: Number, default: 0 },
   gstAmount: {
     type: Number,
     default: 0,

@@ -79,6 +79,13 @@ export const ERPSearchableSelect = ({
     <div className={`relative ${className}`} ref={dropdownRef}>
       <div
         onClick={() => setIsOpen(!isOpen)}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            setIsOpen(true);
+          }
+        }}
         className={`erp-input cursor-pointer flex justify-between items-center ${isOpen ? 'border-[rgba(0,0,0,0.4)]' : ''}`}
       >
         <span className={selectedOption ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}>
@@ -97,6 +104,15 @@ export const ERPSearchableSelect = ({
               placeholder={`Search ${entityLabel.toLowerCase()}...`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && filteredOptions.length > 0) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onChange(filteredOptions[0].value);
+                  setIsOpen(false);
+                  setSearch('');
+                }
+              }}
             />
           </div>
 

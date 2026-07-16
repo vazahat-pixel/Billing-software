@@ -60,16 +60,32 @@ class SalesService {
         });
       }
 
-      // Sprint 2.5: server-validate totals (do not trust client net/gst blindly)
+      // Sprint 2.5 / Stage 4: server-validate totals (do not trust client net/gst)
       let gstRate = salesData.gstRate;
       if (gstRate == null && items?.[0]?.itemId) {
         const it = await Item.findOne({ _id: items[0].itemId, companyId }).select('gstRate').session(session);
         gstRate = it?.gstRate ?? 5;
       }
+      const customer = await Party.findOne({ _id: salesData.customerId, companyId }).session(session);
+      let companyGstin = '';
+      let companyStateCode = '';
+      try {
+        const gstConfigService = require('./gstConfigService');
+        const cfg = await gstConfigService.getOrCreate(companyId);
+        companyGstin = cfg.gstin;
+        companyStateCode = cfg.stateCode;
+        await gstConfigService.assertPeriodOpen(companyId, salesData.date || new Date());
+      } catch (err) {
+        if (err.message && err.message.includes('GST period')) throw err;
+      }
       const totals = recalcSalesTotals(items || [], {
         gstType: salesData.gstType || 'CGST+SGST',
         gstRate: gstRate ?? 5,
         extras: salesData,
+        companyGstin,
+        companyStateCode,
+        partyGstin: customer?.gstin,
+        partyStateCode: customer?.stateCode,
       });
       salesData.items = totals.items;
       salesData.taxableAmount = totals.taxableAmount;
@@ -79,6 +95,7 @@ class SalesService {
       salesData.igst = totals.igst;
       salesData.gstAmount = totals.gstAmount;
       salesData.netAmount = totals.netAmount;
+      if (totals.cess != null) salesData.cess = totals.cess;
 
       const Counter = require('../models/Counter');
       if (!salesData.invoiceNo || salesData.invoiceNo === 'AUTO') {

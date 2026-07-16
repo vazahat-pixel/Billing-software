@@ -127,33 +127,48 @@ exports.createReturn = async (req, res) => {
     const lines = [];
 
     if (returnType === 'Sales') {
-      const salesLedger = await accountingService.getSystemLedger(companyId, 'Sales A/c');
+      const salesReturnLedger = await accountingService.getSystemLedger(companyId, 'Sales Return A/c');
       const cgstLedger = await accountingService.getSystemLedger(companyId, 'CGST Output');
       const sgstLedger = await accountingService.getSystemLedger(companyId, 'SGST Output');
+      const igstLedger = await accountingService.getSystemLedger(companyId, 'IGST Output');
 
-      lines.push({ ledgerId: salesLedger._id, ledgerName: salesLedger.name, type: 'Dr', amount: taxableAmt, narration: `Sales Return #${finalInvoiceNo}` });
+      // Contra-income: Dr Sales Return (not Sales A/c) so gross sales stay intact
+      lines.push({ ledgerId: salesReturnLedger._id, ledgerName: salesReturnLedger.name, type: 'Dr', amount: taxableAmt, narration: `Sales Return #${finalInvoiceNo}` });
 
-      if (gstAmt > 0) {
-        const halfGst = parseFloat((gstAmt / 2).toFixed(2));
-        const otherHalf = parseFloat((gstAmt - halfGst).toFixed(2));
-        lines.push({ ledgerId: cgstLedger._id, ledgerName: cgstLedger.name, type: 'Dr', amount: halfGst, narration: 'CGST Output reversal on Sales Return' });
-        lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Dr', amount: otherHalf, narration: 'SGST Output reversal on Sales Return' });
+      const cgst = parseFloat(req.body.cgst || 0);
+      const sgst = parseFloat(req.body.sgst || 0);
+      const igst = parseFloat(req.body.igst || 0);
+      if (igst > 0 || (gstAmt > 0 && req.body.gstType === 'IGST')) {
+        const igstAmt = igst > 0 ? igst : gstAmt;
+        lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Dr', amount: igstAmt, narration: 'IGST Output reversal on Sales Return' });
+      } else if (gstAmt > 0) {
+        const cgstAmt = cgst > 0 ? cgst : parseFloat((gstAmt / 2).toFixed(2));
+        const sgstAmt = sgst > 0 ? sgst : parseFloat((gstAmt - cgstAmt).toFixed(2));
+        if (cgstAmt > 0) lines.push({ ledgerId: cgstLedger._id, ledgerName: cgstLedger.name, type: 'Dr', amount: cgstAmt, narration: 'CGST Output reversal on Sales Return' });
+        if (sgstAmt > 0) lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Dr', amount: sgstAmt, narration: 'SGST Output reversal on Sales Return' });
       }
 
       lines.push({ ledgerId: partyLedger._id, ledgerName: partyLedger.name, type: 'Cr', amount: netAmt, narration: `Credit to Customer for Return #${finalInvoiceNo}` });
     } else {
-      const purchaseLedger = await accountingService.getSystemLedger(companyId, 'Purchase A/c');
+      const purchaseReturnLedger = await accountingService.getSystemLedger(companyId, 'Purchase Return A/c');
       const cgstLedger = await accountingService.getSystemLedger(companyId, 'CGST Input');
       const sgstLedger = await accountingService.getSystemLedger(companyId, 'SGST Input');
+      const igstLedger = await accountingService.getSystemLedger(companyId, 'IGST Input');
 
       lines.push({ ledgerId: partyLedger._id, ledgerName: partyLedger.name, type: 'Dr', amount: netAmt, narration: `Debit to Supplier for Return #${finalInvoiceNo}` });
-      lines.push({ ledgerId: purchaseLedger._id, ledgerName: purchaseLedger.name, type: 'Cr', amount: taxableAmt, narration: `Purchase Return #${finalInvoiceNo}` });
+      lines.push({ ledgerId: purchaseReturnLedger._id, ledgerName: purchaseReturnLedger.name, type: 'Cr', amount: taxableAmt, narration: `Purchase Return #${finalInvoiceNo}` });
 
-      if (gstAmt > 0) {
-        const halfGst = parseFloat((gstAmt / 2).toFixed(2));
-        const otherHalf = parseFloat((gstAmt - halfGst).toFixed(2));
-        lines.push({ ledgerId: cgstLedger._id, ledgerName: cgstLedger.name, type: 'Cr', amount: halfGst, narration: 'CGST Input reversal on Purchase Return' });
-        lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Cr', amount: otherHalf, narration: 'SGST Input reversal on Purchase Return' });
+      const cgst = parseFloat(req.body.cgst || 0);
+      const sgst = parseFloat(req.body.sgst || 0);
+      const igst = parseFloat(req.body.igst || 0);
+      if (igst > 0 || (gstAmt > 0 && req.body.gstType === 'IGST')) {
+        const igstAmt = igst > 0 ? igst : gstAmt;
+        lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Cr', amount: igstAmt, narration: 'IGST Input reversal on Purchase Return' });
+      } else if (gstAmt > 0) {
+        const cgstAmt = cgst > 0 ? cgst : parseFloat((gstAmt / 2).toFixed(2));
+        const sgstAmt = sgst > 0 ? sgst : parseFloat((gstAmt - cgstAmt).toFixed(2));
+        if (cgstAmt > 0) lines.push({ ledgerId: cgstLedger._id, ledgerName: cgstLedger.name, type: 'Cr', amount: cgstAmt, narration: 'CGST Input reversal on Purchase Return' });
+        if (sgstAmt > 0) lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Cr', amount: sgstAmt, narration: 'SGST Input reversal on Purchase Return' });
       }
     }
 

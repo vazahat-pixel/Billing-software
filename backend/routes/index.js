@@ -47,6 +47,8 @@ router.use('/production-engine', require('./productionEngine.routes'));
 router.use('/sales-engine', require('./salesEngine.routes'));
 router.use('/business-automation', require('./businessAutomation.routes'));
 router.use('/stage2', require('./stage2Ops.routes'));
+router.use('/stage3', require('./stage3Finance.routes'));
+router.use('/stage4', require('./stage4Compliance.routes'));
 router.use('/purchases', purchaseRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/admin', adminRoutes);
@@ -72,5 +74,6 @@ router.use('/returns', returnRoutes);
 router.use('/notes', noteRoutes);
 router.use('/users', userRoutes);
 router.use('/config', configRoutes);
+router.use('/developer/qa', require('../developer/routes/qa.routes'));
 
 module.exports = router;

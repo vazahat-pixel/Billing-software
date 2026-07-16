@@ -15,6 +15,13 @@ const FinancialYearSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: false, index: true },
   isLocked: { type: Boolean, default: false },
   lockedUntilDate: { type: Date, default: null },
+  /** Month locks: ISO month keys 'YYYY-MM' → locked */
+  lockedMonths: [{ type: String }],
+  isClosed: { type: Boolean, default: false },
+  closedAt: { type: Date, default: null },
+  closedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  closingRunId: { type: mongoose.Schema.Types.ObjectId, ref: 'FinancialClosingRun', default: null },
+  openingBalancesCarried: { type: Boolean, default: false },
 }, { timestamps: true });
 
 FinancialYearSchema.index({ companyId: 1, code: 1 }, { unique: true });

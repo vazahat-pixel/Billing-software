@@ -27,19 +27,10 @@ const SYSTEM_LEDGER_TEMPLATES = [
 ];
 
 class AccountingService {
-  // Pre-seed system ledgers for a company
+  // Pre-seed system ledgers for a company (delegates to Stage 3 CoA engine)
   async seedSystemLedgers(companyId) {
-    for (const template of SYSTEM_LEDGER_TEMPLATES) {
-      try {
-        await LedgerMaster.findOneAndUpdate(
-          { companyId, name: template.name },
-          { ...template, isSystemLedger: true },
-          { upsert: true, new: true }
-        );
-      } catch (err) {
-        console.error(`Failed to seed system ledger: ${template.name}`, err);
-      }
-    }
+    const chartOfAccounts = require('./chartOfAccountsService');
+    return chartOfAccounts.seedSystemLedgers(companyId);
   }
 
   // Get or auto-create system ledger
@@ -79,6 +70,8 @@ class AccountingService {
         group,
         subGroup,
         linkedPartyId: partyId,
+        accountType: 'Party',
+        nature: isCreditor ? 'Cr' : 'Dr',
         openingBalance: party.openingBalance || 0,
         openingBalanceType: party.openingBalanceType || (isCreditor ? 'Cr' : 'Dr')
       });

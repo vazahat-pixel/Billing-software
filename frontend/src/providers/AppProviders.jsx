@@ -4,6 +4,7 @@ import CommandPalette from '../components/CommandPalette';
 import useConfigStore from '../store/useConfigStore';
 import useStore from '../store/useStore';
 import useUiStore from '../store/useUiStore';
+import { useFormEnterNavigation } from '../hooks/useFormEnterNavigation';
 
 /**
  * App-level providers glue — keeps existing Router in App.jsx.
@@ -18,6 +19,9 @@ export function AppProviders({ children }) {
   const hydrateFromAuth = useConfigStore((s) => s.hydrateFromAuth);
   const resetConfig = useConfigStore((s) => s.reset);
   const toggleCommandPalette = useUiStore((s) => s.toggleCommandPalette);
+  const commandPaletteOpen = useUiStore((s) => s.commandPaletteOpen);
+
+  useFormEnterNavigation(!commandPaletteOpen);
 
   useEffect(() => {
     restoreSession();

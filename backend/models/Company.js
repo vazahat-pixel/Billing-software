@@ -34,7 +34,10 @@ const companySchema = new mongoose.Schema({
         lockedUntilDate: { type: Date, default: null },   // Period lock — no entries before this date
         financialYearStart: { type: String, default: 'April' }, // April or January
         defaultGstType: { type: String, enum: ['CGST+SGST', 'IGST'], default: 'CGST+SGST' }
-    }
+    },
+    /** Developer QA engine tenant markers — never set on production customer companies */
+    isQaTenant: { type: Boolean, default: false, index: true },
+    qaProfile: { type: String, default: null, trim: true }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Company', companySchema);

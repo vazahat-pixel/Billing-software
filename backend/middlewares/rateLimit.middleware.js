@@ -4,7 +4,9 @@ const ErrorCodes = require('../constants/errorCodes');
 /**
  * Global API rate limit — auth routes get a stricter bucket.
  */
-const apiLimiter = rateLimit({
+const apiLimiter = process.env.QA_TESTING === 'true'
+  ? (req, res, next) => next()
+  : rateLimit({
   windowMs: 15 * 60 * 1000,
   max: Number(process.env.RATE_LIMIT_MAX || 1000),
   standardHeaders: true,

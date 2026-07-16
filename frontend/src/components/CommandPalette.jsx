@@ -147,7 +147,7 @@ export default function CommandPalette() {
   };
 
   return (
-    <div className="fixed inset-0 z-[99998] flex items-start justify-center pt-[12vh] bg-black/40" onClick={close}>
+    <div className="fixed inset-0 z-[99998] flex items-start justify-center pt-[12vh] bg-black/40" data-command-palette onClick={close}>
       <div
         className="w-[min(640px,92vw)] bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}

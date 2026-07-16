@@ -48,6 +48,53 @@ class PurchaseService {
         payload: purchaseData,
       });
 
+      // Stage 4: server-side GST — never trust client tax amounts
+      const { recalcPurchaseTotals } = require('../utils/purchaseTotals');
+      const supplier = await Party.findOne({
+        _id: purchaseData.supplierId,
+        companyId: purchaseData.companyId,
+      }).session(session);
+      let companyGstin = '';
+      let companyStateCode = '';
+      try {
+        const gstConfigService = require('./gstConfigService');
+        const cfg = await gstConfigService.getOrCreate(purchaseData.companyId);
+        companyGstin = cfg.gstin;
+        companyStateCode = cfg.stateCode;
+        await gstConfigService.assertPeriodOpen(purchaseData.companyId, purchaseData.date || new Date());
+      } catch (err) {
+        if (err.message && err.message.includes('GST period')) throw err;
+      }
+      let gstRate = purchaseData.gstRate || purchaseData.gstPer;
+      if (gstRate == null && purchaseData.items?.[0]?.itemId) {
+        const it = await Item.findOne({
+          _id: purchaseData.items[0].itemId,
+          companyId: purchaseData.companyId,
+        }).select('gstRate').session(session);
+        gstRate = it?.gstRate ?? 5;
+      }
+      const totals = recalcPurchaseTotals(purchaseData.items || [], {
+        gstType: purchaseData.gstType || 'CGST+SGST',
+        gstRate: gstRate ?? 5,
+        extras: purchaseData,
+        companyGstin,
+        companyStateCode,
+        partyGstin: supplier?.gstin,
+        partyStateCode: supplier?.stateCode,
+        reverseCharge: purchaseData.reverseCharge === 'Yes' || purchaseData.reverseCharge === true || !!purchaseData.rcmCharge,
+      });
+      purchaseData.items = totals.items;
+      purchaseData.taxableAmount = totals.taxableAmount;
+      purchaseData.gstType = totals.gstType;
+      purchaseData.cgst = totals.cgst;
+      purchaseData.sgst = totals.sgst;
+      purchaseData.igst = totals.igst;
+      purchaseData.gstAmount = totals.gstAmount;
+      purchaseData.netAmount = totals.netAmount;
+      purchaseData.tdsAmount = totals.tdsAmount;
+      purchaseData.reverseCharge = totals.reverseCharge ? 'Yes' : 'No';
+      purchaseData.rcmCharge = !!totals.reverseCharge;
+
       const Counter = require('../models/Counter');
       if (!purchaseData.invoiceNo || purchaseData.invoiceNo === 'AUTO') {
         try {

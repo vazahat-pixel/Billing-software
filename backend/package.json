@@ -11,7 +11,18 @@
     "seed:config": "node scripts/seedDynamicConfig.js",
     "seed:features": "node scripts/seedFeatureSetup.js",
     "test:offline": "node scripts/testOfflineFeature.js",
-    "test:offline:deep": "node scripts/testOfflineIntegration.js"
+    "test:offline:deep": "node scripts/testOfflineIntegration.js",
+    "seed:masters": "node scripts/seed/seedMasters.js",
+    "seed:inventory": "node scripts/seed/seedInventory.js",
+    "seed:users": "node scripts/seed/seedUsers.js",
+    "seed:all": "node scripts/seed/seedAll.js",
+    "simulate": "node scripts/simulator/simulate.js",
+    "verify": "node scripts/verifier/verify.js",
+    "benchmark": "node scripts/benchmark/benchmark.js",
+    "clean": "node scripts/cleanup/clean.js",
+    "reset": "node scripts/cleanup/reset.js",
+    "truncate": "node scripts/cleanup/truncate.js",
+    "qa": "node scripts/qa/run.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -29,6 +40,8 @@
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "autocannon": "^8.0.0",
+    "nodemon": "^3.1.0",
+    "supertest": "^7.1.0"
   }
 }
