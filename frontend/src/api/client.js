@@ -55,7 +55,8 @@ const getBaseUrl = () => {
 
 const client = axios.create({
   baseURL: getBaseUrl(),
-  timeout: 8000,
+  // Vercel serverless + Mongo cold start often exceeds 8s
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS) || 30000,
   headers: {
     'Content-Type': 'application/json',
   },

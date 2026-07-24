@@ -32,6 +32,12 @@ export const loginWithOfflineSupport = async ({
       skipAuthRedirect: true,
       forceNetwork: true,   // bypass any offline gate in Axios interceptor
     });
+    const contentType = String(response.headers?.['content-type'] || '');
+    if (contentType.includes('text/html')) {
+      throw new Error(
+        'API not reachable on this host (got HTML instead of JSON). On Vercel set Root Directory to repo root, enable api/index.js, and add MONGO_URI + JWT_SECRET (32+ chars).'
+      );
+    }
     const body = response.data || {};
     const payload = body.data && (body.data.token || body.data.user) ? body.data : body;
     const { token, user } = payload;
