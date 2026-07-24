@@ -28,5 +28,6 @@ router.get('/outstanding', read, accountingController.getOutstandingReport);
 
 // Manual Journal Entries
 router.post('/journal', write, accountingController.createJournalEntry);
+router.get('/entries', read, accountingController.listEntries);
 
 module.exports = router;

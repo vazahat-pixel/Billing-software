@@ -44,6 +44,16 @@ exports.getItemStock = async (req, res) => {
   }
 };
 
+exports.getStockSummary = async (req, res) => {
+  try {
+    const companyId = req.companyId || req.query.companyId;
+    const summary = await inventoryService.getStockSummary(companyId);
+    res.status(200).json({ success: true, data: summary });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.createOpeningStock = async (req, res) => {
   try {
     const lot = await inventoryService.createOpeningStock({

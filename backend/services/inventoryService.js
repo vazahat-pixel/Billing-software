@@ -29,6 +29,56 @@ class InventoryService {
     return { totalMtrs, totalPcs, lotCount: lots.length };
   }
 
+  async getStockSummary(companyId) {
+    const rows = await InventoryLot.aggregate([
+      {
+        $match: {
+          companyId: new mongoose.Types.ObjectId(String(companyId)),
+          $or: [{ remainingMtrs: { $gt: 0 } }, { remainingPcs: { $gt: 0 } }],
+        },
+      },
+      {
+        $group: {
+          _id: '$itemId',
+          lotCount: { $sum: 1 },
+          totalMtrs: { $sum: '$remainingMtrs' },
+          totalPcs: { $sum: '$remainingPcs' },
+        },
+      },
+      {
+        $lookup: {
+          from: 'items',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'item',
+        },
+      },
+      { $unwind: { path: '$item', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          itemId: '$_id',
+          name: '$item.name',
+          category: '$item.category',
+          lotCount: 1,
+          totalMtrs: 1,
+          totalPcs: 1,
+        },
+      },
+      { $sort: { name: 1 } },
+    ]);
+
+    return {
+      items: rows,
+      totals: {
+        itemCount: rows.length,
+        lotCount: rows.reduce((a, r) => a + (r.lotCount || 0), 0),
+        totalMtrs: rows.reduce((a, r) => a + (r.totalMtrs || 0), 0),
+        totalPcs: rows.reduce((a, r) => a + (r.totalPcs || 0), 0),
+      },
+    };
+  }
+
   async createOpeningStock({
     companyId,
     itemId,

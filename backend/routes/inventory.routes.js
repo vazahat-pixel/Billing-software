@@ -11,6 +11,7 @@ const write = requirePermission('inventory', 'create');
 
 router.post('/opening-stock', write, inventoryController.createOpeningStock);
 router.get('/', read, inventoryController.getInventory);
+router.get('/stock-summary', read, inventoryController.getStockSummary);
 router.get('/lots', read, inventoryController.getLotsByItem);
 router.get('/lot/:lotId', read, inventoryController.getLotDetails);
 router.get('/stock/:itemId', read, inventoryController.getItemStock);

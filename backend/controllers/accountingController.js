@@ -556,6 +556,18 @@ exports.createJournalEntry = async (req, res) => {
   }
 };
 
+/** List accounting journal entries (manifest: GET /api/accounting/entries). */
+exports.listEntries = async (req, res) => {
+  try {
+    const companyId = req.companyId || req.query.companyId;
+    const journalEngine = require('../services/journalEngineService');
+    const entries = await journalEngine.listJournals(companyId, req.query);
+    res.status(200).json({ success: true, data: entries });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 /**
  * FIXED: Uses MongoDB aggregation (single query) instead of N+1 per-ledger queries.
  * Supports optional date range (from/to) for period-specific P&L.
