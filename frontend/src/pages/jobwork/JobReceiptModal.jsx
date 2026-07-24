@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../../components/ui/Modal';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
+import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 
 const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
   const { 
@@ -26,11 +27,27 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
   }, [isOpen, fetchJobs]);
 
   const pendingJobs = useMemo(() => {
-    return jobWorkEntries.filter(j => j.status === 'Issued' && j.processType === 'Embroidery');
+    return jobWorkEntries.filter(j => j.status === 'Issued');
   }, [jobWorkEntries]);
 
+  const jobOptions = useMemo(
+    () =>
+      pendingJobs.map((j) => ({
+        value: j._id,
+        label: `${j.jobCardNo} - ${j.workerId?.name || 'Worker'} (${j.processType || 'Process'} · Qty: ${j.issueQty}m)`,
+      })),
+    [pendingJobs]
+  );
+
+  const gstOptions = [
+    { value: '0', label: '0%' },
+    { value: '5', label: '5%' },
+    { value: '12', label: '12%' },
+    { value: '18', label: '18%' },
+  ];
+
   const receivedJobs = useMemo(() => {
-    return jobWorkEntries.filter(j => j.status === 'Received' && j.processType === 'Embroidery');
+    return jobWorkEntries.filter(j => j.status === 'Received');
   }, [jobWorkEntries]);
 
   const selectedJob = useMemo(() => {
@@ -83,11 +100,11 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedJobId) {
-      alert('Please select a pending embroidery job card');
+      notifyWarning('Please select a pending embroidery job card');
       return;
     }
     if (!receivedQty || parseFloat(receivedQty) <= 0) {
-      alert('Please enter a valid received quantity');
+      notifyWarning('Please enter a valid received quantity');
       return;
     }
 
@@ -101,13 +118,13 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
         charges: Number(charges),
         gstAmount: Number(gstAmount)
       });
-      alert('Embroidery job received and finished lots added to stock!');
+      notifySuccess('Embroidery job received and finished lots added to stock!');
       setSelectedJobId('');
       setActiveTab('View Job Rec');
       fetchJobs();
       fetchInventory();
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Failed to receive job');
+      notifyError(err, 'Failed to receive job');
     } finally {
       setSaving(false);
     }
@@ -149,19 +166,14 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="flex items-center gap-2">
                            <span className="classic-erp-label w-36">Pending Job Card:</span>
-                           <select 
+                           <ERPSelect
                              className="classic-erp-select flex-1"
                              value={selectedJobId}
                              onChange={(e) => setSelectedJobId(e.target.value)}
-                             required
-                           >
-                             <option value="">- Select Job Card -</option>
-                             {pendingJobs.map(j => (
-                               <option key={j._id} value={j._id}>
-                                 {j.jobCardNo} - {j.workerId?.name} (Qty: {j.issueQty}m)
-                               </option>
-                             ))}
-                           </select>
+                             options={jobOptions}
+                             placeholder="- Select Job Card -"
+                             recentKey="emb-receive-job"
+                           />
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -235,16 +247,12 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                         </div>
                         <div className="flex items-center gap-1">
                            <span className="classic-erp-label text-[11px] w-16">GST Slab:</span>
-                           <select 
-                              className="classic-erp-select flex-1" 
-                              value={gstPercent} 
-                              onChange={e => setGstPercent(e.target.value)}
-                           >
-                              <option value="0">0%</option>
-                              <option value="5">5%</option>
-                              <option value="12">12%</option>
-                              <option value="18">18%</option>
-                           </select>
+                           <ERPSelect
+                              className="classic-erp-select flex-1"
+                              value={gstPercent}
+                              onChange={(e) => setGstPercent(e.target.value)}
+                              options={gstOptions}
+                           />
                         </div>
                       </div>
 

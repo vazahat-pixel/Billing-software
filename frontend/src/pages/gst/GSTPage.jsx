@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import useStore from '../../store/useStore';
 import { downloadJson, getMonthDateRange, buildGstr1Filename } from '../../utils/gstExport';
 import { FileText, Download, TrendingUp, TrendingDown, Landmark, PieChart, ArrowRight } from 'lucide-react';
+import { notifyError } from '../../utils/notify';
 
 const GSTPage = () => {
   const { sales, purchases, fetchGstr1 } = useStore();
@@ -14,7 +15,7 @@ const GSTPage = () => {
       const data = await fetchGstr1(startDate, endDate);
       downloadJson(data, buildGstr1Filename(startDate, endDate));
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'GSTR-1 export failed');
+      notifyError(err, 'GSTR-1 export failed');
     } finally {
       setExporting(false);
     }

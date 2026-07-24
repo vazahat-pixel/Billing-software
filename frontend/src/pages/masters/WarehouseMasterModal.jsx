@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../../components/ui/Modal';
 import { Plus, Trash2, Search } from 'lucide-react';
+import { ERPSelect } from '../../components/forms/FormElements';
+import { SkeletonTable } from '../../components/ui/loaders';
 import { warehousesApi } from '../../api';
 import { toast } from '../../store/useToastStore';
+import { erpConfirm } from '../../utils/confirm';
 
-const LOCATION_TYPES = ['Warehouse', 'Godown', 'Rack', 'Bin'];
+const LOCATION_TYPES = ['Warehouse', 'Godown', 'Rack', 'Bin'].map((t) => ({ value: t, label: t }));
 
 const WarehouseMasterModal = ({ isOpen, onClose, readOnly = false }) => {
   const [rows, setRows] = useState([]);
@@ -21,7 +24,7 @@ const WarehouseMasterModal = ({ isOpen, onClose, readOnly = false }) => {
       const list = await warehousesApi.list();
       setRows(Array.isArray(list) ? list : []);
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message);
+      toast.error(err);
     } finally {
       setLoading(false);
     }
@@ -57,20 +60,25 @@ const WarehouseMasterModal = ({ isOpen, onClose, readOnly = false }) => {
       setCode('');
       await load();
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message);
+      toast.error(err);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Soft-delete this location?')) return;
+    if (!(await erpConfirm({
+      title: 'Delete Location',
+      message: 'Soft-delete this location?',
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return;
     try {
       await warehousesApi.remove(id);
       toast.success('Deleted');
       await load();
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message);
+      toast.error(err);
     }
   };
 
@@ -89,11 +97,12 @@ const WarehouseMasterModal = ({ isOpen, onClose, readOnly = false }) => {
             </div>
             <div>
               <label className="text-[10px] font-black uppercase text-slate-400">Type</label>
-              <select className="w-full border border-slate-200 px-2 py-2 text-sm" value={type} onChange={(e) => setType(e.target.value)}>
-                {LOCATION_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+              <ERPSelect
+                className="w-full"
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                options={LOCATION_TYPES}
+              />
             </div>
             <button type="submit" disabled={isSubmitting} className="h-10 bg-black text-white text-[10px] font-black uppercase flex items-center justify-center gap-1">
               <Plus size={14} /> {isSubmitting ? '…' : 'Add'}
@@ -113,7 +122,7 @@ const WarehouseMasterModal = ({ isOpen, onClose, readOnly = false }) => {
 
         <div className="border border-slate-200 max-h-72 overflow-auto">
           {loading ? (
-            <p className="p-4 text-xs text-slate-400">Loading…</p>
+            <SkeletonTable rows={6} cols={4} />
           ) : filtered.length === 0 ? (
             <p className="p-4 text-xs text-slate-400">No locations yet</p>
           ) : (
@@ -151,4 +160,4 @@ const WarehouseMasterModal = ({ isOpen, onClose, readOnly = false }) => {
 };
 
 export default WarehouseMasterModal;
-
+

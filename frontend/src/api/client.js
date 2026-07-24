@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { isOffline, markServerReachable, markServerUnreachable } from '../utils/networkStatus';
 import { isNetworkError } from '../utils/offlineHelpers';
+import { parseApiError } from '../utils/errors';
 
 let activeRequests = 0;
 let activeMutatingRequests = 0;
@@ -33,6 +34,15 @@ const updateActiveRequests = (delta, isMutating = false) => {
   if (isMutating) {
     activeMutatingRequests = Math.max(0, activeMutatingRequests + delta);
   }
+  // Guard against stuck SAVING… badge from unbalanced counters
+  if (activeRequests === 0) activeMutatingRequests = 0;
+  notifyListeners();
+};
+
+/** Reset stuck loading badge (e.g. after offline recovery) */
+export const resetApiLoadingState = () => {
+  activeRequests = 0;
+  activeMutatingRequests = 0;
   notifyListeners();
 };
 
@@ -40,8 +50,7 @@ const getBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  if (typeof window === 'undefined') return '/api';
-  return window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
+  return '/api';
 };
 
 const client = axios.create({
@@ -78,7 +87,8 @@ client.interceptors.request.use((config) => {
         : `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
-  if (isOffline() && !config.forceNetwork) {
+  const isAuthRequest = (config.url || '').includes('/auth/');
+  if (isOffline() && !config.forceNetwork && !isAuthRequest && typeof navigator !== 'undefined' && !navigator.onLine) {
     if (!silent) updateActiveRequests(-1, mutating);
     const err = new Error('Network Error');
     err.code = 'ERR_NETWORK';
@@ -103,7 +113,9 @@ client.interceptors.response.use(
     const mutating = cfg._isMutating || false;
     if (!cfg._silent) updateActiveRequests(-1, mutating);
 
-    if (isNetworkError(error)) {
+    if (error.response) {
+      markServerReachable();
+    } else if (isNetworkError(error)) {
       markServerUnreachable();
     }
 
@@ -127,6 +139,7 @@ client.interceptors.response.use(
       }
     }
 
+    error.friendlyMessage = parseApiError(error);
     return Promise.reject(error);
   }
 );

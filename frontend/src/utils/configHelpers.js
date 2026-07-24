@@ -114,3 +114,16 @@ export const resolvePurchaseFieldVisibility = (bundle, user, plan) => {
 
   return { showBroker, showDiscount2 };
 };
+
+/** Generic bill field visibility map for any bill type (sales, purchase, millIssue, …) */
+export const buildBillFieldVisibility = (bundle, billType) => {
+  const vis = (key, section = 'header', fallback = true) =>
+    isBillFieldVisible(bundle, billType, key, section, fallback);
+
+  return {
+    show: vis,
+    header: (key, fallback = true) => vis(key, 'header', fallback),
+    footer: (key, fallback = true) => vis(key, 'footer', fallback),
+    line: (key, fallback = true) => vis(key, 'line', fallback),
+  };
+};

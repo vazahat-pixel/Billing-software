@@ -1,0 +1,54 @@
+@keyframes erp-skeleton-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 0.85; }
+}
+
+.erp-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--border-subtle) 0%,
+    var(--border) 50%,
+    var(--border-subtle) 100%
+  );
+  background-size: 200% 100%;
+  animation: erp-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes erp-skeleton-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.erp-loader-bar {
+  height: 4px;
+  background: var(--border-subtle);
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.erp-loader-bar__track {
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-warning));
+  animation: erp-loader-slide 1s ease-in-out infinite;
+}
+
+@keyframes erp-loader-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+.erp-sync-badge {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(8px);
+}
+
+.erp-sync-badge__icon {
+  color: var(--color-primary);
+}
+
+.erp-sync-badge__label {
+  color: var(--text-secondary);
+}

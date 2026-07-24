@@ -36,7 +36,7 @@ const BillConfigSchema = new mongoose.Schema({
   },
   billType: {
     type: String,
-    enum: ['sales', 'purchase'],
+    enum: ['sales', 'purchase', 'millIssue', 'millReceive', 'jobIssue', 'jobReceive'],
     required: true
   },
   label: { type: String, default: '' },

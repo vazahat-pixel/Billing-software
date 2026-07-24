@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
 import { adminApi } from '../../api';
 import { toast } from '../../store/useToastStore';
+import { erpConfirm } from '../../utils/confirm';
 
 const ROLES = [
     { value: 'owner', label: 'Owner', color: '#f59e0b', desc: 'Full access, can add users' },
@@ -85,7 +86,7 @@ const UserManagement = () => {
             setAddForm({ name: '', email: '', password: '', companyRole: 'accountant', isActive: true });
             loadUsers();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to add user');
+            toast.error(err, { fallback: 'Failed to add user' });
         }
     };
 
@@ -94,7 +95,7 @@ const UserManagement = () => {
             await adminApi.updateUserRole(userId, { companyRole: newRole });
             loadUsers();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to update role');
+            toast.error(err, { fallback: 'Failed to update role' });
         }
     };
 
@@ -103,17 +104,22 @@ const UserManagement = () => {
             await adminApi.toggleUserActive(userId);
             loadUsers();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to update status');
+            toast.error(err, { fallback: 'Failed to update status' });
         }
     };
 
     const handleDeleteUser = async (userId, name) => {
-        if (!window.confirm(`Remove user "${name}" from this company?`)) return;
+        if (!(await erpConfirm({
+            title: 'Remove User',
+            message: `Remove user "${name}" from this company?`,
+            confirmLabel: 'Remove',
+            danger: true,
+        }))) return;
         try {
             await adminApi.deleteCompanyUser(userId);
             loadUsers();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to delete');
+            toast.error(err, { fallback: 'Failed to delete user' });
         }
     };
 

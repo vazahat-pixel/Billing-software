@@ -1,0 +1,10 @@
+RewriteEngine On
+RewriteBase /
+
+# Don't rewrite real files/folders
+RewriteRule ^index\.html$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# SPA fallback (React Router)
+RewriteRule . /index.html [L]

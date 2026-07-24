@@ -25,6 +25,7 @@ class GstReturnService {
     return Sales.find({
       companyId,
       status: { $ne: 'cancelled' },
+      isDeleted: { $ne: true },
       date: { $gte: startDate, $lte: endDate },
     })
       .populate('customerId', 'name gstin state stateCode')
@@ -35,6 +36,8 @@ class GstReturnService {
   async _purchasesInPeriod(companyId, startDate, endDate) {
     return Purchase.find({
       companyId,
+      status: { $ne: 'cancelled' },
+      isDeleted: { $ne: true },
       date: { $gte: startDate, $lte: endDate },
     })
       .populate('supplierId', 'name gstin state stateCode')
@@ -42,11 +45,24 @@ class GstReturnService {
       .lean();
   }
 
+  async _cancelledSalesInPeriod(companyId, startDate, endDate) {
+    return Sales.find({
+      companyId,
+      status: 'cancelled',
+      isDeleted: { $ne: true },
+      date: { $gte: startDate, $lte: endDate },
+    })
+      .select('invoiceNo date')
+      .lean();
+  }
+
   async _returnsInPeriod(companyId, startDate, endDate) {
     return ReturnInvoice.find({
       companyId,
       date: { $gte: startDate, $lte: endDate },
-    }).lean();
+    })
+      .populate('partyId', 'name gstin')
+      .lean();
   }
 
   async _notesInPeriod(companyId, startDate, endDate) {
@@ -54,7 +70,28 @@ class GstReturnService {
       companyId,
       status: 'Posted',
       date: { $gte: startDate, $lte: endDate },
-    }).lean();
+    })
+      .populate({
+        path: 'partyLedgerId',
+        select: 'name linkedPartyId',
+        populate: { path: 'linkedPartyId', select: 'gstin name' },
+      })
+      .lean();
+  }
+
+  _isImportPurchase(p) {
+    const type = String(p.type || '').toUpperCase();
+    const itc = String(p.itcEligibility || '').toUpperCase();
+    const gstType = String(p.gstType || '').toUpperCase();
+    if (itc.includes('IMPS') || type.includes('IMPORT SERVICE') || type === 'IMPS') return 'IMPS';
+    if (
+      itc.includes('IMPG')
+      || itc.includes('IMPORT')
+      || type.includes('IMPORT')
+      || type === 'IMPG'
+      || gstType === 'IMPORT'
+    ) return 'IMPG';
+    return 'OTH';
   }
 
   /**
@@ -64,15 +101,22 @@ class GstReturnService {
     const cfg = await this._companyCtx(companyId);
     const { startDate, endDate } = periodBounds(period);
     const sales = await this._salesInPeriod(companyId, startDate, endDate);
+    const cancelledSales = await this._cancelledSalesInPeriod(companyId, startDate, endDate);
     const returns = await this._returnsInPeriod(companyId, startDate, endDate);
     const notes = await this._notesInPeriod(companyId, startDate, endDate);
 
     const b2b = [];
     const b2cl = [];
     const b2csMap = {};
-    const cdnr = [];
+    const cdnrByCtin = {};
     const hsnMap = {};
     const companyPos = cfg.stateCode || stateCodeFromGstin(cfg.gstin);
+
+    const pushCdnr = (ctin, note) => {
+      const key = (ctin || '').toUpperCase() || '_UNREG';
+      if (!cdnrByCtin[key]) cdnrByCtin[key] = { ctin: key === '_UNREG' ? '' : key, nt: [] };
+      cdnrByCtin[key].nt.push(note);
+    };
 
     for (const s of sales) {
       const gstin = (s.customerId?.gstin || '').toUpperCase();
@@ -81,6 +125,7 @@ class GstReturnService {
       const cgst = round2(s.cgst);
       const sgst = round2(s.sgst);
       const igst = round2(s.igst);
+      const invVal = round2(s.netAmount);
       const pos = placeOfSupply({
         partyGstin: gstin,
         partyStateCode: s.customerId?.stateCode,
@@ -90,7 +135,7 @@ class GstReturnService {
       const inv = {
         inum: s.invoiceNo,
         idt: s.date ? new Date(s.date).toISOString().slice(0, 10) : '',
-        val: round2(s.netAmount),
+        val: invVal,
         pos,
         rchrg: s.reverseCharge ? 'Y' : 'N',
         inv_typ: s.gstType === 'Export' || s.gstType === 'ZeroRated' ? 'SEWP' : 'R',
@@ -115,7 +160,8 @@ class GstReturnService {
         }
         party.inv.push(inv);
       } else if (taxable > 250000 && igst > 0) {
-        b2cl.push(inv);
+        // B2CL — invoice value must be net (same as inv.val)
+        b2cl.push({ ...inv, val: invVal });
       } else {
         const rate = inv.itms[0].itm_det.rt;
         const key = `${pos}|${rate}`;
@@ -168,10 +214,16 @@ class GstReturnService {
       }
     }
 
-    // Credit / Debit notes → CDNR
+    // Credit / Debit notes → CDNR (grouped by party CTIN when GSTIN available)
     for (const n of notes) {
       if (!n.taxableAmount && !n.amount) continue;
-      cdnr.push({
+      const ctin = (
+        n.partyLedgerId?.linkedPartyId?.gstin
+        || n.partyGstin
+        || n.ctin
+        || ''
+      ).toUpperCase();
+      pushCdnr(ctin, {
         ntty: n.noteType === 'Credit' ? 'C' : 'D',
         nt_num: n.noteNo,
         nt_dt: n.date ? new Date(n.date).toISOString().slice(0, 10) : '',
@@ -186,7 +238,8 @@ class GstReturnService {
 
     for (const r of returns) {
       if (r.returnType !== 'Sales') continue;
-      cdnr.push({
+      const ctin = (r.partyId?.gstin || r.partyGstin || '').toUpperCase();
+      pushCdnr(ctin, {
         ntty: 'C',
         nt_num: r.invoiceNo || r.returnNo,
         nt_dt: r.date ? new Date(r.date).toISOString().slice(0, 10) : '',
@@ -199,6 +252,14 @@ class GstReturnService {
       });
     }
 
+    const cdnr = Object.values(cdnrByCtin).filter((g) => g.nt.length);
+    const cancelCount = cancelledSales.length;
+    const totnum = sales.length + cancelCount;
+    const allDocNos = [
+      ...sales.map((s) => s.invoiceNo).filter(Boolean),
+      ...cancelledSales.map((s) => s.invoiceNo).filter(Boolean),
+    ];
+
     const payload = {
       gstin: cfg.gstin,
       fp: filingPeriodFp(period),
@@ -207,18 +268,18 @@ class GstReturnService {
       b2b,
       b2cl,
       b2cs: Object.values(b2csMap),
-      cdnr: cdnr.length ? [{ nt: cdnr }] : [],
+      cdnr,
       hsn: { data: Object.values(hsnMap) },
       doc_issue: {
         doc_det: [{
           doc_num: 1,
           docs: [{
             num: 1,
-            from: sales[0]?.invoiceNo || '',
-            to: sales[sales.length - 1]?.invoiceNo || '',
-            totnum: sales.length,
-            cancel: 0,
-            net_issue: sales.length,
+            from: allDocNos[0] || sales[0]?.invoiceNo || '',
+            to: allDocNos[allDocNos.length - 1] || sales[sales.length - 1]?.invoiceNo || '',
+            totnum,
+            cancel: cancelCount,
+            net_issue: totnum - cancelCount,
           }],
         }],
       },
@@ -267,6 +328,16 @@ class GstReturnService {
       igst: round2(rcm.reduce((s, x) => s + (x.igst || 0), 0)),
     };
 
+    const itcByTy = { IMPG: { iamt: 0, camt: 0, samt: 0, csamt: 0 }, IMPS: { iamt: 0, camt: 0, samt: 0, csamt: 0 }, OTH: { iamt: 0, camt: 0, samt: 0, csamt: 0 } };
+    for (const p of purchases) {
+      // RCM ITC is claimed under ISRC in portal terms; keep in OTH bucket for domestic unless import
+      const ty = this._isImportPurchase(p);
+      itcByTy[ty].iamt = round2(itcByTy[ty].iamt + (p.igst || 0));
+      itcByTy[ty].camt = round2(itcByTy[ty].camt + (p.cgst || 0));
+      itcByTy[ty].samt = round2(itcByTy[ty].samt + (p.sgst || 0));
+      itcByTy[ty].csamt = round2(itcByTy[ty].csamt + (p.cess || 0));
+    }
+
     const itcAvailable = {
       cgst: inward.cgst,
       sgst: inward.sgst,
@@ -280,6 +351,13 @@ class GstReturnService {
       igst: round2(outward.igst + rcmTax.igst - itcAvailable.igst),
       cess: round2(outward.cess - itcAvailable.cess),
     };
+
+    const itcAvl = Object.entries(itcByTy)
+      .filter(([, v]) => v.iamt || v.camt || v.samt || v.csamt)
+      .map(([ty, v]) => ({ ty, iamt: v.iamt, camt: v.camt, samt: v.samt, csamt: v.csamt }));
+    if (!itcAvl.length) {
+      itcAvl.push({ ty: 'OTH', iamt: 0, camt: 0, samt: 0, csamt: 0 });
+    }
 
     const payload = {
       gstin: cfg.gstin,
@@ -304,13 +382,7 @@ class GstReturnService {
       },
       inter_sup: {},
       itc_elg: {
-        itc_avl: [{
-          ty: 'IMPG',
-          iamt: itcAvailable.igst,
-          camt: itcAvailable.cgst,
-          samt: itcAvailable.sgst,
-          csamt: itcAvailable.cess,
-        }],
+        itc_avl: itcAvl,
       },
       inward_sup: {
         isup_details: [{

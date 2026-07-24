@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../../components/ui/Modal';
+import { ERPSelect } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
+import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
+import { ButtonLoader } from '../../components/ui/loaders';
 
 const STATUSES = ['Issued', 'In-Process', 'Received', 'Cancelled'];
 
@@ -19,6 +22,20 @@ const ProcessUpdateModal = ({ isOpen, onClose }) => {
     [jobWorkEntries]
   );
 
+  const jobOptions = useMemo(
+    () =>
+      activeJobs.map((j) => ({
+        value: j._id,
+        label: `${j.jobCardNo} — ${j.workerId?.name || 'Worker'} (${j.status})`,
+      })),
+    [activeJobs]
+  );
+
+  const statusOptions = useMemo(
+    () => STATUSES.map((s) => ({ value: s, label: s })),
+    []
+  );
+
   const selectedJob = useMemo(
     () => jobWorkEntries.find((j) => j._id === selectedJobId),
     [selectedJobId, jobWorkEntries]
@@ -30,15 +47,15 @@ const ProcessUpdateModal = ({ isOpen, onClose }) => {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!selectedJobId) return alert('Select a job card');
+    if (!selectedJobId) return notifyWarning('Select a job card');
     setSaving(true);
     try {
       await updateJobProcess(selectedJobId, status);
-      alert('Job status updated');
+      notifySuccess('Job status updated');
       setSelectedJobId('');
       fetchJobs();
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Update failed');
+      notifyError(err, 'Update failed');
     } finally {
       setSaving(false);
     }
@@ -49,19 +66,14 @@ const ProcessUpdateModal = ({ isOpen, onClose }) => {
       <form onSubmit={handleSave} className="erp-modal-body space-y-4">
         <div className="erp-field">
           <label className="erp-label">Job Card</label>
-          <select
-            className="erp-select"
+          <ERPSelect
+            className="w-full"
             value={selectedJobId}
             onChange={(e) => setSelectedJobId(e.target.value)}
-            required
-          >
-            <option value="">— Select job card —</option>
-            {activeJobs.map((j) => (
-              <option key={j._id} value={j._id}>
-                {j.jobCardNo} — {j.workerId?.name || 'Worker'} ({j.status})
-              </option>
-            ))}
-          </select>
+            options={jobOptions}
+            placeholder="— Select job card —"
+            recentKey="job-status-card"
+          />
         </div>
 
         {selectedJob && (
@@ -75,17 +87,18 @@ const ProcessUpdateModal = ({ isOpen, onClose }) => {
 
         <div className="erp-field">
           <label className="erp-label">New Status</label>
-          <select className="erp-select" value={status} onChange={(e) => setStatus(e.target.value)}>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+          <ERPSelect
+            className="w-full"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            options={statusOptions}
+          />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" className="erp-btn erp-btn-secondary" onClick={onClose}>Cancel</button>
           <button type="submit" className="erp-btn erp-btn-primary" disabled={saving || !selectedJobId}>
-            {saving ? 'Saving...' : 'Update Status'}
+            {saving ? <ButtonLoader label="Saving…" /> : 'Update Status'}
           </button>
         </div>
       </form>

@@ -113,24 +113,29 @@ class SalesService {
       const sales = new Sales(salesData);
       await sales.save({ session });
 
-      // Stock: deduct only if not already posted via delivery challan
+      // Stock: every sold line must deduct from a lot (prevents books without stock movement)
       if (!skipStock) {
         const { applyLotMovement, loadLotForUpdate } = require('../utils/inventoryStockHelper');
-        for (const item of salesData.items) {
-          if (item.lotId) {
-            const lot = await loadLotForUpdate(session, item.lotId, companyId);
-            await applyLotMovement({
-              session,
-              lot,
-              companyId,
-              deltaMts: -(item.mts || 0),
-              deltaPcs: -(item.pcs || 0),
-              type: 'SALE',
-              referenceId: sales._id,
-              idempotencyKey: `SALE:${sales._id}:${lot._id}`,
-              remarks: `Sales Inv: ${sales.invoiceNo}`,
-            });
+        for (const item of salesData.items || []) {
+          const qty = Number(item.mts || 0) || Number(item.pcs || 0);
+          if (qty <= 0 && !item.itemId && !item.desc) continue;
+          if (!item.lotId) {
+            throw new Error(
+              'Stock lot is required on every sales line. Select a lot so stock and ledger stay correct.'
+            );
           }
+          const lot = await loadLotForUpdate(session, item.lotId, companyId);
+          await applyLotMovement({
+            session,
+            lot,
+            companyId,
+            deltaMts: -(item.mts || 0),
+            deltaPcs: -(item.pcs || 0),
+            type: 'SALE',
+            referenceId: sales._id,
+            idempotencyKey: `SALE:${sales._id}:${lot._id}`,
+            remarks: `Sales Inv: ${sales.invoiceNo}`,
+          });
         }
       }
 
@@ -139,6 +144,13 @@ class SalesService {
 
       sales.accountingEntryId = entry?._id;
       await sales.save({ session });
+
+      try {
+        const outstandingEngine = require('./outstandingEngineService');
+        await outstandingEngine.syncBillFromSales(companyId, sales, session);
+      } catch (syncErr) {
+        console.warn('BillSettlement sync after sales:', syncErr.message);
+      }
 
       await session.commitTransaction();
       try {
@@ -201,6 +213,9 @@ class SalesService {
   async updateSaleStatus(id, companyId, status) {
     const validStatuses = ['active', 'cancelled', 'paid', 'partial'];
     if (!validStatuses.includes(status)) throw new Error(`Invalid status: ${status}`);
+    if (status === 'cancelled') {
+      return this.deleteSale(id, companyId);
+    }
     const sale = await Sales.findOneAndUpdate(
       { _id: id, companyId },
       { status },
@@ -211,10 +226,8 @@ class SalesService {
   }
 
   /**
-   * FIXED: Cancel now creates a proper accounting reversal entry.
-   * The original entry is NOT deleted — a new reversal entry is posted.
-   * Inventory stock is NOT restored on cancellation (goods already dispatched).
-   * For stock restoration, use Sales Return workflow.
+   * Cancel creates accounting reversal and restores inventory when stock was deducted.
+   * For goods already dispatched without lot tracking, use Sales Return workflow.
    */
   async deleteSale(id, companyId) {
     const session = await mongoose.startSession();
@@ -223,58 +236,71 @@ class SalesService {
       const sale = await Sales.findOne({ _id: id, companyId }).session(session);
       if (!sale) throw new Error('Sale not found');
 
-      if (sale.status === 'active' || sale.status === 'partial') {
-        // Post reversal accounting entry
-        if (sale.accountingEntryId) {
-          const originalEntry = await AccountingEntry.findById(sale.accountingEntryId).session(session);
-          if (originalEntry && !originalEntry.isReversed) {
-            const accountingService = require('./accountingService');
-            const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
-
-            // Flip Dr/Cr for reversal
-            const reversalLines = originalEntry.lines.map(line => ({
-              ledgerId: line.ledgerId,
-              ledgerName: line.ledgerName,
-              type: line.type === 'Dr' ? 'Cr' : 'Dr',
-              amount: line.amount,
-              narration: `Reversal: ${line.narration || ''}`
-            }));
-
-            const reversalEntry = await AccountingEntry.create([{
-              companyId,
-              entryNo,
-              entryDate: new Date(),
-              voucherType: 'SalesAuto',
-              refType: 'SalesInvoice',
-              refId: sale._id,
-              lines: reversalLines,
-              narration: `Reversal of Sales Invoice #${sale.invoiceNo}`,
-              isReversed: false
-            }], { session });
-
-            // Mark original entry as reversed
-            await AccountingEntry.findByIdAndUpdate(
-              originalEntry._id,
-              { isReversed: true, reversalEntryId: reversalEntry[0]._id },
-              { session }
-            );
-          }
-        }
-
-        sale.status = 'cancelled';
-        await sale.save({ session });
+      if (sale.status === 'cancelled') {
+        // Hard delete if already cancelled
+        await Sales.findOneAndUpdate(
+          { _id: id, companyId },
+          { isDeleted: true, deletedAt: new Date() },
+          { session }
+        );
         await session.commitTransaction();
-        return sale;
+        return { message: 'Sale deleted' };
       }
 
-      // Hard delete if already cancelled
-      await Sales.findOneAndUpdate(
-        { _id: id, companyId },
-        { isDeleted: true, deletedAt: new Date() },
-        { session }
-      );
+      if (Number(sale.paidAmount || 0) > 0.01) {
+        throw new Error(
+          'Cannot cancel invoice with receipts applied. Reverse cash/bank receipts against this bill first.'
+        );
+      }
+
+      // Reverse journals + stock for any non-cancelled status (including paid)
+      if (sale.accountingEntryId) {
+        const originalEntry = await AccountingEntry.findById(sale.accountingEntryId).session(session);
+        if (originalEntry && !originalEntry.isReversed) {
+          const accountingService = require('./accountingService');
+          const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
+
+          const reversalLines = originalEntry.lines.map(line => ({
+            ledgerId: line.ledgerId,
+            ledgerName: line.ledgerName,
+            type: line.type === 'Dr' ? 'Cr' : 'Dr',
+            amount: line.amount,
+            narration: `Reversal: ${line.narration || ''}`
+          }));
+
+          const reversalEntry = await AccountingEntry.create([{
+            companyId,
+            entryNo,
+            entryDate: new Date(),
+            voucherType: 'SalesAuto',
+            refType: 'SalesInvoice',
+            refId: sale._id,
+            lines: reversalLines,
+            narration: `Reversal of Sales Invoice #${sale.invoiceNo}`,
+            isReversed: false
+          }], { session });
+
+          await AccountingEntry.findByIdAndUpdate(
+            originalEntry._id,
+            { isReversed: true, reversalEntryId: reversalEntry[0]._id },
+            { session }
+          );
+        }
+      }
+
+      if (!sale.stockFromChallan) {
+        const { reverseSaleStock } = require('../utils/inventoryStockHelper');
+        await reverseSaleStock(session, sale, companyId);
+      }
+
+      sale.status = 'cancelled';
+      await sale.save({ session });
+
+      const outstandingEngine = require('./outstandingEngineService');
+      await outstandingEngine.syncBillFromSales(companyId, sale, session);
+
       await session.commitTransaction();
-      return { message: 'Sale deleted' };
+      return sale;
     } catch (error) {
       await session.abortTransaction();
       throw error;

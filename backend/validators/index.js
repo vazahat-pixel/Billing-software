@@ -12,7 +12,8 @@ const partyCreate = validateBody({
 });
 
 const itemCreate = validateBody({
-  name: { required: true, type: 'string' },
+  name: { required: false, type: 'string' },
+  itemName: { required: false, type: 'string' },
   category: { required: false, type: 'string', enum: ITEM_CATEGORIES },
   gstRate: { required: false, type: 'number', min: 0, max: 28 },
 });

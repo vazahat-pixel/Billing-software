@@ -24,7 +24,27 @@ class OutstandingEngineService {
     return aging;
   }
 
-  async syncBillFromSales(companyId, sale) {
+  async syncBillFromSales(companyId, sale, session = null) {
+    if (!sale || sale.status === 'cancelled') {
+      // Mark settlement closed / zero so outstanding drops
+      if (sale?._id) {
+        const opts = { upsert: false, new: true };
+        if (session) opts.session = session;
+        await BillSettlement.findOneAndUpdate(
+          { companyId, billType: 'SalesInvoice', billId: sale._id },
+          {
+            $set: {
+              outstandingAmount: 0,
+              settledAmount: round2(sale.paidAmount || 0),
+              status: 'Settled',
+              billAmount: round2(sale.netAmount || sale.totals?.total || 0),
+            },
+          },
+          opts
+        );
+      }
+      return null;
+    }
     const billAmount = round2(sale.netAmount || sale.totals?.total || 0);
     const paid = round2(sale.paidAmount || 0);
     const outstanding = round2(Math.max(0, billAmount - paid));
@@ -32,6 +52,8 @@ class OutstandingEngineService {
     const dueDate = new Date(sale.date || sale.createdAt);
     dueDate.setDate(dueDate.getDate() + creditDays);
 
+    const opts = { upsert: true, new: true };
+    if (session) opts.session = session;
     return BillSettlement.findOneAndUpdate(
       { companyId, billType: 'SalesInvoice', billId: sale._id },
       {
@@ -48,11 +70,30 @@ class OutstandingEngineService {
         creditDays,
         status: outstanding < 0.01 ? 'Settled' : paid > 0 ? 'Partial' : 'Open',
       },
-      { upsert: true, new: true }
+      opts
     );
   }
 
-  async syncBillFromPurchase(companyId, bill) {
+  async syncBillFromPurchase(companyId, bill, session = null) {
+    if (!bill || bill.status === 'cancelled') {
+      if (bill?._id) {
+        const opts = { upsert: false, new: true };
+        if (session) opts.session = session;
+        await BillSettlement.findOneAndUpdate(
+          { companyId, billType: 'PurchaseBill', billId: bill._id },
+          {
+            $set: {
+              outstandingAmount: 0,
+              settledAmount: round2(bill.paidAmount || 0),
+              status: 'Settled',
+              billAmount: round2(bill.netAmount || bill.totals?.total || 0),
+            },
+          },
+          opts
+        );
+      }
+      return null;
+    }
     const billAmount = round2(bill.netAmount || bill.totals?.total || 0);
     const paid = round2(bill.paidAmount || 0);
     const outstanding = round2(Math.max(0, billAmount - paid));
@@ -60,6 +101,8 @@ class OutstandingEngineService {
     const dueDate = new Date(bill.date || bill.createdAt);
     dueDate.setDate(dueDate.getDate() + creditDays);
 
+    const opts = { upsert: true, new: true };
+    if (session) opts.session = session;
     return BillSettlement.findOneAndUpdate(
       { companyId, billType: 'PurchaseBill', billId: bill._id },
       {
@@ -76,16 +119,51 @@ class OutstandingEngineService {
         creditDays,
         status: outstanding < 0.01 ? 'Settled' : paid > 0 ? 'Partial' : 'Open',
       },
-      { upsert: true, new: true }
+      opts
     );
   }
 
   async rebuildSettlements(companyId) {
-    const sales = await Sales.find({ companyId });
-    const purchases = await Purchase.find({ companyId });
+    const sales = await Sales.find({
+      companyId,
+      status: { $nin: ['cancelled'] },
+    });
+    const purchases = await Purchase.find({
+      companyId,
+      status: { $nin: ['cancelled'] },
+    });
     for (const s of sales) await this.syncBillFromSales(companyId, s);
     for (const p of purchases) await this.syncBillFromPurchase(companyId, p);
+
+    // Zero out settlements for cancelled docs still sitting Open/Partial
+    const cancelledSales = await Sales.find({ companyId, status: 'cancelled' }).select('_id paidAmount netAmount').lean();
+    for (const s of cancelledSales) {
+      await BillSettlement.updateOne(
+        { companyId, billType: 'SalesInvoice', billId: s._id },
+        { $set: { outstandingAmount: 0, status: 'Settled', settledAmount: round2(s.paidAmount || 0) } }
+      );
+    }
+    const cancelledPurchases = await Purchase.find({ companyId, status: 'cancelled' }).select('_id paidAmount netAmount').lean();
+    for (const p of cancelledPurchases) {
+      await BillSettlement.updateOne(
+        { companyId, billType: 'PurchaseBill', billId: p._id },
+        { $set: { outstandingAmount: 0, status: 'Settled', settledAmount: round2(p.paidAmount || 0) } }
+      );
+    }
+
     return { sales: sales.length, purchases: purchases.length };
+  }
+
+  /**
+   * After cash/bank against-invoice allocation — keep BillSettlement in sync with paidAmount.
+   */
+  async syncAfterInvoicePayment(companyId, invoiceId, session = null) {
+    if (!invoiceId) return null;
+    const sale = await Sales.findOne({ _id: invoiceId, companyId }).session(session || null);
+    if (sale) return this.syncBillFromSales(companyId, sale, session);
+    const purchase = await Purchase.findOne({ _id: invoiceId, companyId }).session(session || null);
+    if (purchase) return this.syncBillFromPurchase(companyId, purchase, session);
+    return null;
   }
 
   async outstandingReport(companyId, { type = 'receivable', asOn } = {}) {
@@ -93,22 +171,15 @@ class OutstandingEngineService {
     const isReceivable = type === 'receivable';
     const billType = isReceivable ? 'SalesInvoice' : 'PurchaseBill';
 
-    let bills = await BillSettlement.find({
+    // Always rebuild from live paidAmount so Outstanding stays accurate after receipts/payments
+    await this.rebuildSettlements(companyId);
+
+    const bills = await BillSettlement.find({
       companyId,
       billType,
       status: { $in: ['Open', 'Partial'] },
       outstandingAmount: { $gt: 0.01 },
     }).lean();
-
-    if (!bills.length) {
-      await this.rebuildSettlements(companyId);
-      bills = await BillSettlement.find({
-        companyId,
-        billType,
-        status: { $in: ['Open', 'Partial'] },
-        outstandingAmount: { $gt: 0.01 },
-      }).lean();
-    }
 
     const byParty = {};
     for (const bill of bills) {
@@ -128,6 +199,7 @@ class OutstandingEngineService {
       byParty[key].aging.bucket90 += aging.bucket90;
       byParty[key].aging.bucket90Plus += aging.bucket90Plus;
       byParty[key].bills.push({
+        settlementId: bill._id,
         billId: bill.billId,
         billNo: bill.billNo,
         billDate: bill.billDate,

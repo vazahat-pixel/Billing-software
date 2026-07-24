@@ -111,6 +111,12 @@ class LedgerEngineService {
     const statement = [];
 
     for (const entry of entries) {
+      const contraNames = entry.lines
+        .filter((l) => l.ledgerId && l.ledgerId.toString() !== ledger._id.toString())
+        .map((l) => l.ledgerName)
+        .filter(Boolean);
+      const contra = [...new Set(contraNames)].join(', ');
+
       for (const line of entry.lines) {
         if (line.ledgerId.toString() !== ledger._id.toString()) continue;
         if (line.type === 'Dr') current += line.amount;
@@ -120,7 +126,9 @@ class LedgerEngineService {
           date: entry.entryDate,
           voucherNo: entry.entryNo,
           voucherType: entry.voucherType,
-          narration: line.narration || entry.narration,
+          narration: line.narration || entry.narration || '',
+          particulars: line.narration || entry.narration || contra || entry.refType || '',
+          contraAccount: contra,
           debit: line.type === 'Dr' ? line.amount : 0,
           credit: line.type === 'Cr' ? line.amount : 0,
           runningBalance: round2(Math.abs(current)),
@@ -133,6 +141,7 @@ class LedgerEngineService {
 
     return {
       ledger,
+      ledgerName: ledger.name,
       openingBalance: round2(Math.abs(openingSigned)),
       openingBalanceType: openingSigned >= 0 ? 'Dr' : 'Cr',
       closingBalance: round2(Math.abs(current)),

@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
+import { ERPSelect } from '../../components/forms/FormElements';
+import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
+import { erpConfirm } from '../../utils/confirm';
+import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 
 const EMPTY_ACCOUNT = {
   name: '',
@@ -52,16 +56,28 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   const [activeTab, setActiveTab] = useState('Account');
   const [mode, setMode] = useState('View'); // 'View', 'Add', 'Edit'
   const [selectedPartyId, setSelectedPartyId] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [bootLoading, setBootLoading] = useState(false);
   
   const [formData, setFormData] = useState({ ...EMPTY_ACCOUNT });
 
   useEffect(() => {
-    if (!isOpen) return;
-    fetchParties();
+    if (!isOpen) {
+      setBootLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setBootLoading(true);
+    Promise.resolve(fetchParties())
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setBootLoading(false);
+      });
     if (initialData) {
       setFormData({ ...EMPTY_ACCOUNT, ...initialData });
       setSelectedPartyId(initialData._id || initialData.id || '');
-      setMode(readOnly ? 'View' : 'Edit');
+      const hasId = !!(initialData._id || initialData.id);
+      setMode(readOnly ? 'View' : hasId ? 'Edit' : 'Add');
     } else if (readOnly) {
       setMode('View');
     } else {
@@ -69,6 +85,9 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       setSelectedPartyId('');
       setMode('Add');
     }
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen, initialData, readOnly, fetchParties]);
 
   // Derive State Details from GSTIN
@@ -95,7 +114,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   }, [formData.gstin]);
 
   const handleSelectParty = (e) => {
-    const id = e.target.value;
+    const id = e?.target?.value ?? e;
     setSelectedPartyId(id);
     if (id) {
       const party = parties.find(p => p._id === id || p.id === id);
@@ -113,7 +132,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   };
 
   const handleEdit = () => {
-    if (!formData._id && !formData.id) return alert('Please select an account first');
+    if (!formData._id && !formData.id) return notifyWarning('Please select an account first');
     setMode('Edit');
   };
 
@@ -131,7 +150,9 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   };
 
   const handleSave = async () => {
-    if (!formData.name) return alert('Account name is required');
+    if (saving) return;
+    if (!formData.name?.trim()) return notifyWarning('Account name is required');
+    setSaving(true);
     try {
       let type = 'Customer';
       const g = (formData.group || '').toUpperCase();
@@ -139,41 +160,60 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       else if (g.includes('BROKER')) type = 'Broker';
       else if (g.includes('JOB') || g.includes('WORKER')) type = 'Job Worker';
       
-      const payload = { ...formData, type };
+      const payload = { ...formData, name: formData.name.trim(), type };
       
       let result;
       if (mode === 'Edit' && (formData._id || formData.id)) {
         result = await updateParty(formData._id || formData.id, payload);
-        alert('Account updated successfully!');
+        notifySuccess('Account updated successfully!');
       } else {
         result = await addParty(payload);
-        alert('Account saved successfully!');
+        notifySuccess('Account saved successfully!');
       }
       
       if (onSuccess) onSuccess(result);
       fetchParties();
       setMode('View');
     } catch (err) {
-      alert('Failed to save account: ' + (err.response?.data?.message || err.message));
+      notifyError(err, 'Failed to save account');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
     const id = formData._id || formData.id;
-    if (!id) return alert('Please select an account to delete');
-    if (window.confirm(`Are you sure you want to delete ${formData.name}?`)) {
+    if (!id) return notifyWarning('Please select an account to delete');
+    if (!(await erpConfirm({
+      title: 'Delete Account',
+      message: `Are you sure you want to delete ${formData.name}?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return;
       try {
         await deleteParty(id);
-        alert('Account deleted!');
+        notifySuccess('Account deleted!');
         handleNew();
         fetchParties();
       } catch (err) {
-        alert('Failed to delete: ' + (err.response?.data?.message || err.message));
+        notifyError(err, 'Failed to delete account');
       }
-    }
   };
 
   const locked = readOnly || mode === 'View';
+
+  const partyOptions = useMemo(
+    () => parties.map((p) => ({ value: p._id || p.id, label: `${p.name} (${p.accd || 'No Code'})` })),
+    [parties]
+  );
+
+  const brokerOptions = useMemo(
+    () => [
+      { value: '', label: '- Direct/No Broker -' },
+      ...parties.filter((p) => p.type === 'Broker').map((p) => ({ value: p._id || p.id, label: p.name })),
+    ],
+    [parties]
+  );
 
   const setField = (key) => (e) => {
     const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -183,6 +223,8 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   return (
     <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-5xl">
       <div className="classic-erp-window">
+        <ErpBusyOverlay show={bootLoading} message="Loading accounts…" />
+        <ErpBusyOverlay show={!bootLoading && saving} message="Saving account…" />
         <div className="classic-erp-header">
           <span>Account Master — {formData.group || 'SUNDRY DEBTORS'}</span>
           <div className="flex items-center gap-2">
@@ -203,12 +245,14 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
             <div className="classic-erp-frame mb-3">
               <div className="classic-erp-field-row">
                 <span className="classic-erp-label blue-label classic-erp-label--fixed">Find Party</span>
-                <select className="classic-erp-select flex-1" value={selectedPartyId} onChange={handleSelectParty}>
-                  <option value="">Select party to view or edit</option>
-                  {parties.map(p => (
-                    <option key={p._id || p.id} value={p._id || p.id}>{p.name} ({p.accd || 'No Code'})</option>
-                  ))}
-                </select>
+                <ERPSelect
+                  className="classic-erp-select flex-1"
+                  value={selectedPartyId}
+                  onChange={handleSelectParty}
+                  options={partyOptions}
+                  placeholder="Select party to view or edit"
+                  recentKey="account-party"
+                />
               </div>
             </div>
           )}
@@ -290,12 +334,15 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                   </div>
                   <div className="classic-erp-field-row">
                     <span className="classic-erp-label classic-erp-label--fixed">Broker</span>
-                    <select className="classic-erp-select flex-1" value={formData.brokerId} onChange={setField('brokerId')} disabled={locked}>
-                      <option value="">- Direct/No Broker -</option>
-                      {parties.filter(p => p.type === 'Broker').map(p => (
-                        <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
-                      ))}
-                    </select>
+                    <ERPSelect
+                      className="classic-erp-select flex-1"
+                      value={formData.brokerId}
+                      onChange={setField('brokerId')}
+                      disabled={locked}
+                      options={brokerOptions}
+                      placeholder="- Direct/No Broker -"
+                      recentKey="account-broker"
+                    />
                   </div>
                   <div className="classic-erp-field-row">
                     <span className="classic-erp-label classic-erp-label--fixed">Transport</span>
@@ -448,13 +495,15 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
 
         {/* Action Button Bar */}
         <div className="classic-erp-form-footer">
-          <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View'}>New</button>
-          <button className="classic-erp-btn" type="button" onClick={handleEdit} disabled={readOnly || mode !== 'View'}>Edit</button>
-          <button className="classic-erp-btn btn-blue" type="button" onClick={handleSave} disabled={locked}>Save</button>
-          <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked}>Cancel</button>
-          <button className="classic-erp-btn" type="button" onClick={() => setMode('View')} disabled={readOnly || mode === 'View'}>Find</button>
-          <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || !(formData._id || formData.id)}>Delete</button>
-          <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
+          <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving}>New</button>
+          <button className="classic-erp-btn" type="button" onClick={handleEdit} disabled={readOnly || mode !== 'View' || saving}>Edit</button>
+          <button className="classic-erp-btn btn-blue" type="button" onClick={handleSave} disabled={locked || saving || bootLoading}>
+            <SaveButtonLabel saving={saving} />
+          </button>
+          <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked || saving}>Cancel</button>
+          <button className="classic-erp-btn" type="button" onClick={() => setMode('View')} disabled={readOnly || mode === 'View' || saving}>Find</button>
+          <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || saving || !(formData._id || formData.id)}>Delete</button>
+          <button className="classic-erp-btn" type="button" onClick={onClose} disabled={saving}>Exit</button>
         </div>
       </div>
     </Modal>

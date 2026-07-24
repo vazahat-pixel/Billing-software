@@ -110,10 +110,11 @@ class PurchaseService {
 
       // Generate Lot IDs for each item before saving
       const purchase = new Purchase(purchaseData);
-      for (const item of purchase.items) {
+      for (let i = 0; i < purchase.items.length; i += 1) {
+        const item = purchase.items[i];
         const timestamp = Date.now();
         const random = Math.floor(Math.random() * 9000) + 1000;
-        item.lotId = `LOT-${timestamp}-${random}`;
+        item.lotId = `LOT-${timestamp}-${i}-${random}`;
       }
       await purchase.save({ session });
 
@@ -158,6 +159,13 @@ class PurchaseService {
       purchase.accountingEntryId = entry?._id;
       await purchase.save({ session });
 
+      try {
+        const outstandingEngine = require('./outstandingEngineService');
+        await outstandingEngine.syncBillFromPurchase(purchaseData.companyId, purchase, session);
+      } catch (syncErr) {
+        console.warn('BillSettlement sync after purchase:', syncErr.message);
+      }
+
       await session.commitTransaction();
       try {
         const eventBus = require('../events/eventBus');
@@ -172,6 +180,29 @@ class PurchaseService {
       return purchase;
     } catch (error) {
       await session.abortTransaction();
+      if (error && error.code === 11000) {
+        const AppError = require('../utils/AppError');
+        const fields = Object.keys(error.keyPattern || {});
+        const field = fields[0] || '';
+        const dupValue = error.keyValue ? error.keyValue[field] : null;
+        if (field === 'invoiceNo' || fields.includes('invoiceNo')) {
+          const no = dupValue != null ? ` "${dupValue}"` : '';
+          throw AppError.conflict(
+            `This purchase bill number${no} is already saved. Click New and try again — a new voucher number will be created.`
+          );
+        }
+        if (field === 'lotId' || fields.includes('lotId')) {
+          throw AppError.conflict('Stock lot conflict while saving. Please click Save once more.');
+        }
+        if (fields.includes('idempotencyKey')) {
+          throw AppError.conflict(
+            'This purchase was already processed. Refresh the purchase list, or click New for a fresh bill.'
+          );
+        }
+        throw AppError.conflict(
+          'This purchase could not be saved because a duplicate record already exists. Click New and try again.'
+        );
+      }
       throw error;
     } finally {
       session.endSession();
@@ -216,6 +247,9 @@ class PurchaseService {
   async updatePurchaseStatus(id, companyId, status) {
     const validStatuses = ['active', 'cancelled', 'paid', 'partial'];
     if (!validStatuses.includes(status)) throw new Error(`Invalid status: ${status}`);
+    if (status === 'cancelled') {
+      return this.deletePurchase(id, companyId);
+    }
     const purchase = await Purchase.findOneAndUpdate(
       { _id: id, companyId },
       { status },
@@ -235,55 +269,68 @@ class PurchaseService {
       const purchase = await Purchase.findOne({ _id: id, companyId }).session(session);
       if (!purchase) throw new Error('Purchase not found');
 
-      if (purchase.status === 'active' || purchase.status === 'partial') {
-        // Post reversal accounting entry if original entry exists
-        if (purchase.accountingEntryId) {
-          const originalEntry = await AccountingEntry.findById(purchase.accountingEntryId).session(session);
-          if (originalEntry && !originalEntry.isReversed) {
-            const accountingService = require('./accountingService');
-            const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
-
-            const reversalLines = originalEntry.lines.map(line => ({
-              ledgerId: line.ledgerId,
-              ledgerName: line.ledgerName,
-              type: line.type === 'Dr' ? 'Cr' : 'Dr',
-              amount: line.amount,
-              narration: `Reversal: ${line.narration || ''}`
-            }));
-
-            const reversalEntry = await AccountingEntry.create([{
-              companyId,
-              entryNo,
-              entryDate: new Date(),
-              voucherType: 'PurchaseAuto',
-              refType: 'PurchaseBill',
-              refId: purchase._id,
-              lines: reversalLines,
-              narration: `Reversal of Purchase Bill #${purchase.invoiceNo}`,
-              isReversed: false
-            }], { session });
-
-            await AccountingEntry.findByIdAndUpdate(
-              originalEntry._id,
-              { isReversed: true, reversalEntryId: reversalEntry[0]._id },
-              { session }
-            );
-          }
-        }
-
-        purchase.status = 'cancelled';
-        await purchase.save({ session });
+      if (purchase.status === 'cancelled') {
+        await Purchase.findOneAndUpdate(
+          { _id: id, companyId },
+          { isDeleted: true, deletedAt: new Date() },
+          { session }
+        );
         await session.commitTransaction();
-        return purchase;
+        return { message: 'Purchase soft-deleted' };
       }
 
-      await Purchase.findOneAndUpdate(
-        { _id: id, companyId },
-        { isDeleted: true, deletedAt: new Date() },
-        { session }
-      );
+      if (Number(purchase.paidAmount || 0) > 0.01) {
+        throw new Error(
+          'Cannot cancel bill with payments applied. Reverse cash/bank payments against this bill first.'
+        );
+      }
+
+      // Reverse journals + stock for any non-cancelled status (including paid)
+      if (purchase.accountingEntryId) {
+        const originalEntry = await AccountingEntry.findById(purchase.accountingEntryId).session(session);
+        if (originalEntry && !originalEntry.isReversed) {
+          const accountingService = require('./accountingService');
+          const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
+
+          const reversalLines = originalEntry.lines.map(line => ({
+            ledgerId: line.ledgerId,
+            ledgerName: line.ledgerName,
+            type: line.type === 'Dr' ? 'Cr' : 'Dr',
+            amount: line.amount,
+            narration: `Reversal: ${line.narration || ''}`
+          }));
+
+          const reversalEntry = await AccountingEntry.create([{
+            companyId,
+            entryNo,
+            entryDate: new Date(),
+            voucherType: 'PurchaseAuto',
+            refType: 'PurchaseBill',
+            refId: purchase._id,
+            lines: reversalLines,
+            narration: `Reversal of Purchase Bill #${purchase.invoiceNo}`,
+            isReversed: false
+          }], { session });
+
+          await AccountingEntry.findByIdAndUpdate(
+            originalEntry._id,
+            { isReversed: true, reversalEntryId: reversalEntry[0]._id },
+            { session }
+          );
+        }
+      }
+
+      const { reversePurchaseStock } = require('../utils/inventoryStockHelper');
+      await reversePurchaseStock(session, purchase, companyId);
+
+      purchase.status = 'cancelled';
+      await purchase.save({ session });
+
+      const outstandingEngine = require('./outstandingEngineService');
+      await outstandingEngine.syncBillFromPurchase(companyId, purchase, session);
+
       await session.commitTransaction();
-      return { message: 'Purchase soft-deleted' };
+      return purchase;
     } catch (error) {
       await session.abortTransaction();
       throw error;

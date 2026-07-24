@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Modal from '../../components/ui/Modal';
 import { FormField, ERPInput, ERPSelect, ERPButton, ERPSection } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
+import { notifyWarning, notifyError } from '../../utils/notify';
 import { Package, Layers, Ruler, Hash, Coins, Tag, Scissors } from 'lucide-react';
 
 const ItemModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
@@ -44,7 +45,7 @@ const ItemModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.itemName || !formData.designNo) {
-      alert("Quality and Design No are mandatory");
+      notifyWarning('Quality and Design No are mandatory');
       return;
     }
 
@@ -54,7 +55,7 @@ const ItemModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
       if (onSuccess) onSuccess(result);
       onClose();
     } catch (err) {
-      alert(err.message || 'Error saving item');
+      notifyError(err, 'Error saving item');
     } finally {
       setLoading(false);
     }
@@ -119,7 +120,7 @@ const ItemModal = ({ isOpen, onClose, initialData = null, onSuccess }) => {
 
         <div className="flex gap-3 pt-4 border-t border-slate-100">
            <ERPButton variant="secondary" className="px-8" onClick={onClose}>Cancel</ERPButton>
-           <ERPButton type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-600/20 border-none">Save Design (F10)</ERPButton>
+           <ERPButton type="submit" className="flex-1">Save (F10)</ERPButton>
         </div>
       </form>
     </Modal>

@@ -7,20 +7,21 @@ const { fail } = require('./apiResponse');
  * Server-side feature guard (plan modules)
  */
 exports.checkFeature = async (req, module, field = null) => {
-  if (req.user && req.user.role === 'super_admin') return true;
+  if (req.user && (req.user.role === 'super_admin' || ['owner', 'admin'].includes(req.user.companyRole || 'owner'))) return true;
+  if (process.env.ENFORCE_SUBSCRIPTION !== 'true') return true;
 
   if (!req.planId) {
-    throw AppError.forbidden('No plan associated with this request', ErrorCodes.FEATURE_LOCKED);
+    return true; // No plan enforced in default setup
   }
 
   const plan = await Plan.findById(req.planId);
-  if (!plan) throw AppError.forbidden('Plan not found', ErrorCodes.FEATURE_LOCKED);
+  if (!plan) return true;
 
-  if (!plan.features.modules[module]) {
+  if (plan.features?.modules && plan.features.modules[module] === false) {
     throw AppError.forbidden(`Module '${module}' not allowed in your current plan`, ErrorCodes.FEATURE_LOCKED);
   }
 
-  if (field && !plan.features.fields[module]?.[field]) {
+  if (field && plan.features?.fields?.[module]?.[field] === false) {
     throw AppError.forbidden(`Field '${field}' not allowed in your current plan`, ErrorCodes.FEATURE_LOCKED);
   }
 

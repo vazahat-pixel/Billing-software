@@ -26,6 +26,31 @@ const BookSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  opBalanceType: {
+    type: String,
+    enum: ['DR', 'CR'],
+    default: 'DR'
+  },
+  accountNo: {
+    type: String,
+    default: ''
+  },
+  gstinNo: {
+    type: String,
+    default: ''
+  },
+  stateCode: {
+    type: String,
+    default: '0'
+  },
+  stateName: {
+    type: String,
+    default: ''
+  },
+  gstType: {
+    type: String,
+    default: ''
+  },
   retailTax: {
     type: String,
     default: ''
@@ -69,6 +94,14 @@ const BookSchema = new mongoose.Schema({
   head2: {
     type: String,
     default: 'Qty'
+  },
+  createDate: {
+    type: Date,
+    default: Date.now
+  },
+  notes: {
+    type: String,
+    default: ''
   },
   jobWorkBook: {
     type: Boolean,

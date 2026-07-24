@@ -6,6 +6,7 @@ import {
   RefreshCw, Download, FileText, AlertTriangle, CheckCircle2,
   Calculator, TrendingUp, TrendingDown, Scale, ShieldCheck
 } from 'lucide-react';
+import { SkeletonDashboard } from '../../components/ui/loaders';
 
 const fmt = (n) => `₹ ${(Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-IN') : '—');
@@ -193,7 +194,7 @@ const CADashboardModal = ({ isOpen, onClose, onOpenGstr1, onOpenGstr2, onOpenGst
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {loading && !data && (
-            <p className="text-center text-[var(--text-muted)] text-sm py-12">Loading CA data...</p>
+            <SkeletonDashboard cards={6} />
           )}
 
           {activeTab === 'overview' && data && (

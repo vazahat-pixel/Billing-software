@@ -7,9 +7,10 @@ import {
    faScrewdriverWrench, faClipboardCheck, faChartPie,
    faChevronDown, faSync, faSearch, faBell,
    faTriangleExclamation, faHandshake, faUserTie,
-   faRightFromBracket
+   faRightFromBracket, faBook, faCircleQuestion, faGear
 } from '@fortawesome/free-solid-svg-icons';
 import useStore from '../store/useStore';
+import useConfigStore from '../store/useConfigStore';
 import PanelSwitcher from '../components/PanelSwitcher';
 import OfflineIndicator from '../components/OfflineIndicator';
 import FailedSyncModal from '../components/FailedSyncModal';
@@ -25,7 +26,14 @@ import ProductionEngineModal from './jobwork/ProductionEngineModal';
 import SalesEngineModal from './sales/SalesEngineModal';
 import AutomationEngineModal from './admin/AutomationEngineModal';
 import Stage2OpsModal from './admin/Stage2OpsModal';
-import { PaymentForm as AccountingModal } from './accounting/AccountingForms';
+import EnterprisePlatformModal from './enterprise/EnterprisePlatformModal';
+import InfrastructureModal from './infrastructure/InfrastructureModal';
+import CommercialReleaseModal from './commercial/CommercialReleaseModal';
+import EnterpriseTestingDashboard from './commercial/EnterpriseTestingDashboard';
+import OnboardingWizard from './commercial/OnboardingWizard';
+import useUiStore from '../store/useUiStore';
+import { stage8Api } from '../api/stage8.api';
+import CashBankBookModal from './accounting/CashBankBookModal';
 import IssueModal from './jobwork/IssueModal';
 import ReceiveModal from './jobwork/ReceiveModal';
 import UpdateModal from './jobwork/UpdateModal';
@@ -61,7 +69,7 @@ import OrderModal from './transactions/OrderModal';
 import ReturnModal from './transactions/ReturnModal';
 import NoteModal from './transactions/NoteModal';
 import JournalEntryModal from './transactions/JournalEntryModal';
-import UserRightsModal from './admin/UserRightsModal';
+import CompanySettingsModal from './settings/CompanySettingsModal';
 import OpeningBalanceModal from './masters/OpeningBalanceModal';
 import OpeningStockModal from './masters/OpeningStockModal';
 import DataRecordsHub from './records/DataRecordsHub';
@@ -70,12 +78,15 @@ import { getPermissions } from '../utils/permissions';
 import { useConfig } from '../context/ConfigContext';
 import { isFlagEnabled } from '../utils/configHelpers';
 import { toast } from '../store/useToastStore';
+import { CardGridLoader, InlineLoader } from '../components/ui/loaders';
 
 const MODULE_PARENT_MAP = {
   sales: 'sales',
   purchase: 'purchase',
   receipt: 'accounting',
   payment: 'accounting',
+  cashBook: 'accounting',
+  bankBook: 'accounting',
   millIssue: 'jobWork',
   millRec: 'jobWork',
   jobIssue: 'jobWork',
@@ -98,6 +109,8 @@ const MODULE_SUBMENU_MAP = {
   purchase: 'Purchase Bill',
   receipt: 'Bank Receipt',
   payment: 'Bank Payment',
+  cashBook: 'Cash Book',
+  bankBook: 'Bank Book',
   millIssue: 'Mill Issue',
   millRec: 'Mill Receive',
   jobIssue: 'Job Issue',
@@ -118,7 +131,25 @@ const MODULE_SUBMENU_MAP = {
 const Dashboard = () => {
    const navigate = useNavigate();
    const { user, logout, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items, plan, fetchDashboardSummary, dashboardSummary, dashboardLoading } = useStore();
+   const companySettings = useConfigStore((s) => s.companySettings);
+   const companyMeta = useConfigStore((s) => s.company);
+
+   const setupGaps = useMemo(() => {
+      const st = companySettings || {};
+      const meta = companyMeta?.meta || {};
+      const gaps = [];
+      const name = st.legalName || st.shortName || companyMeta?.name || '';
+      if (!name || name === 'Company' || name === 'My Company') gaps.push('Company legal name');
+      if (!(st.gstin || meta.gstin)) gaps.push('GSTIN');
+      if (!(st.address || meta.address)) gaps.push('Address');
+      if (!(st.stateCode || meta.stateCode)) gaps.push('State code');
+      if (!(st.bankName || st.accountNo)) gaps.push('Bank details');
+      return gaps;
+   }, [companySettings, companyMeta]);
    const { bundle, moduleConfig: liveModuleConfig, lastSynced } = useConfig();
+   const openCommandPalette = useUiStore((s) => s.openCommandPalette);
+   const openNotificationCenter = useUiStore((s) => s.openNotificationCenter);
+   const notificationUnread = useUiStore((s) => s.notificationUnread);
    const moduleConfig = liveModuleConfig || user?.moduleConfig;
    const showRecordsHub = isFlagEnabled(bundle, 'records_hub', true);
    const showCADesk = isFlagEnabled(bundle, 'ca_desk', true);
@@ -220,6 +251,8 @@ const Dashboard = () => {
       purchase: false,
       receipt: false,
       payment: false,
+      cashBook: false,
+      bankBook: false,
       millIssue: false,
       millRec: false,
       jobIssue: false,
@@ -253,6 +286,11 @@ const Dashboard = () => {
       salesEngine: false,
       automationEngine: false,
       stage2Ops: false,
+      enterprisePlatform: false,
+      infrastructure: false,
+      commercialRelease: false,
+      enterpriseTesting: false,
+      onboardingWizard: false,
       order: false,
       orderType: 'Sales',
       returnInv: false,
@@ -260,7 +298,9 @@ const Dashboard = () => {
       note: false,
       noteType: 'Credit',
       journal: false,
-      userRights: false,
+      companySettings: false,
+      settingsTab: 'appearance',
+      settingsBillType: 'sales',
       openingBalance: false,
       openingStock: false,
       recordsHub: false,
@@ -273,12 +313,35 @@ const Dashboard = () => {
    const [syncModalOpen, setSyncModalOpen] = useState(false);
    const [bookSelection, setBookSelection] = useState({
       isOpen: false,
-      module: null
+      module: null,
+      bookModule: null,
    });
    const [selectedBooks, setSelectedBooks] = useState({});
    const [activeMenuKey, setActiveMenuKey] = useState(null);
    const [openMenuSection, setOpenMenuSection] = useState(null);
+   const [isRefreshing, setIsRefreshing] = useState(false);
    const menuBarRef = useRef(null);
+
+   const showDashboardSkeleton = dashboardLoading || isRefreshing;
+
+   const openSettings = (tab = 'appearance', billType = 'sales') => {
+      const resolved = tab === 'fields' ? (billType || 'sales') : tab;
+      setModals((prev) => ({
+         ...prev,
+         companySettings: true,
+         settingsTab: resolved,
+         settingsBillType: billType,
+      }));
+   };
+
+   const handleSync = async () => {
+      setIsRefreshing(true);
+      try {
+         await Promise.all([refreshAllData(), fetchDashboardSummary()]);
+      } finally {
+         setIsRefreshing(false);
+      }
+   };
 
    useEffect(() => {
       const onDocMouseDown = (e) => {
@@ -298,6 +361,10 @@ const Dashboard = () => {
             openReportsHub('summary');
             return;
          }
+         if (modal === 'companySettings') {
+            openSettings(e.detail?.tab || 'appearance', e.detail?.billType || 'sales');
+            return;
+         }
          toggleModal(modal, true);
       };
       window.addEventListener('erp:open-modal', onOpen);
@@ -310,18 +377,38 @@ const Dashboard = () => {
       }
    }, [user?.companyId, user?.role, fetchDashboardSummary]);
 
+   useEffect(() => {
+      if (!user?.companyId || user?.role === 'super_admin') return;
+      const dismissed = sessionStorage.getItem('erp_onboarding_dismissed');
+      if (dismissed) return;
+      stage8Api
+         .onboarding()
+         .then((s) => {
+            if (s?.status === 'pending' || ((s?.progressPct || 0) < 100 && s?.status !== 'skipped' && s?.status !== 'completed')) {
+               setModals((prev) => ({ ...prev, onboardingWizard: true }));
+            }
+         })
+         .catch(() => {});
+   }, [user?.companyId, user?.role]);
+
    const parseMenuLabel = (label) => {
       const match = label.match(/^(\d+)\s+(.+)$/);
       if (match) return { badge: match[1], text: match[2] };
       return { badge: null, text: label };
    };
-   const CORE_MODULES_WITH_BOOKS = ['sales', 'purchase', 'receipt', 'payment', 'millIssue', 'millRec', 'jobIssue', 'jobRec', 'ledger'];
+   const CORE_MODULES_WITH_BOOKS = ['sales', 'purchase', 'receipt', 'payment', 'cashBook', 'bankBook', 'millIssue', 'millRec', 'jobIssue', 'jobRec', 'ledger'];
+
+   const BOOK_MODULE_ALIAS = {
+      cashBook: 'receipt',
+      bankBook: 'receipt',
+   };
 
    const toggleModal = (key, val) => {
       if (val === true && CORE_MODULES_WITH_BOOKS.includes(key)) {
          setBookSelection({
             isOpen: true,
-            module: key
+            module: key,
+            bookModule: BOOK_MODULE_ALIAS[key] || key,
          });
          return;
       }
@@ -344,7 +431,7 @@ const Dashboard = () => {
    const handleSelectBook = (book) => {
       const key = bookSelection.module;
       setSelectedBooks(prev => ({ ...prev, [key]: book }));
-      setBookSelection({ isOpen: false, module: null });
+      setBookSelection({ isOpen: false, module: null, bookModule: null });
       setModals(prev => ({ ...prev, [key]: true }));
    };
 
@@ -479,24 +566,16 @@ const Dashboard = () => {
          { label: 'Item Rate Master', action: () => toggleModal('itemMaster', true) }
       ],
       Transaction: [
-         { label: 'Cash Book', action: () => toggleModal('receipt', true) },
-         { label: 'Bank Book', action: () => toggleModal('receipt', true) },
-         { label: 'Voucher Entry', action: () => toggleModal('receipt', true) },
-         { label: 'Journal (GST)', action: () => openJournal() },
-         { label: 'Debit/Credit Note', action: () => openNote('Credit') },
-         { label: 'Tds Entry', action: () => toggleModal('payment', true) },
          { label: 'Sales', key: 'sales' },
          { label: 'Purchase', key: 'purchase' },
-         { label: 'Job Purchase', action: () => toggleModal('purchase', true) },
+         { label: 'Cash Book', action: () => toggleModal('cashBook', true) },
+         { label: 'Bank Book', action: () => toggleModal('bankBook', true) },
+         { label: 'Bank Receipt', action: () => toggleModal('receipt', true) },
+         { label: 'Bank Payment', action: () => toggleModal('payment', true) },
+         { label: 'Journal (GST)', action: () => openJournal() },
+         { label: 'Debit/Credit Note', action: () => openNote('Credit') },
          { label: 'Sales Return', action: () => openReturn('Sales') },
          { label: 'Purchase Return', action: () => openReturn('Purchase') },
-         { label: 'Purchase Order', action: () => setModals(prev => ({ ...prev, purchaseEngine: true })) },
-         { label: 'Purchase Engine', action: () => setModals(prev => ({ ...prev, purchaseEngine: true })) },
-         { label: 'GRN / QC', action: () => setModals(prev => ({ ...prev, purchaseEngine: true })) },
-         { label: 'Sales Order', action: () => setModals(prev => ({ ...prev, salesEngine: true })) },
-         { label: 'Sales Engine', action: () => setModals(prev => ({ ...prev, salesEngine: true })) },
-         { label: 'Delivery Challan', action: () => setModals(prev => ({ ...prev, salesEngine: true })) },
-         { label: 'Stock Transfer (Jv)', action: () => openJournal() }
       ],
       Inventory: [
          { label: 'Mill Issue', key: 'millIssue' },
@@ -505,72 +584,44 @@ const Dashboard = () => {
          { label: 'Job Receive', key: 'jobRec' },
          { label: 'Update Job', key: 'updateJob' },
          { label: 'Stock Ledger', key: 'inventoryPage' },
-         { label: 'Inventory Engine', action: () => setModals(prev => ({ ...prev, inventoryEngine: true })) },
-         { label: 'Production Engine', action: () => setModals(prev => ({ ...prev, productionEngine: true })) },
-         { label: 'Stock Transfer', action: () => setModals(prev => ({ ...prev, inventoryEngine: true })) },
-         { label: 'Reservation', action: () => setModals(prev => ({ ...prev, inventoryEngine: true })) },
-         { label: 'Process', action: () => toggleModal('millIssue', true) },
-         { label: 'Work Process', action: () => toggleModal('millIssue', true) },
-         { label: 'Cutting Entry', action: () => toggleModal('millIssue', true) },
-         { label: 'Beam Entry', action: () => toggleModal('millRec', true) },
-         { label: 'Production', action: () => toggleModal('millRec', true) },
-         { label: 'Looms Report', action: () => openReportsHub('jobwork') }
       ],
       Reports: [
          { label: 'All Reports Hub', action: () => openReportsHub('summary') },
-         { label: 'Fas Reports', action: () => openReportsHub('summary') },
-         { label: 'Final Reports', action: () => openReportsHub('pl') },
-         { label: 'Sales', action: () => openReportsHub('sales') },
-         { label: 'Purchase', action: () => openReportsHub('purchase') },
-         { label: 'Process Reports', action: () => openReportsHub('jobwork') },
-         { label: 'JobWork Reports', action: () => openReportsHub('jobwork') },
-         { label: 'Monthly Reports', action: () => openReportsHub('summary') },
-         { label: 'Tds Reports', action: () => openReportsHub('daily') },
-         { label: 'Tcs Reports', action: () => openReportsHub('sales') },
-         { label: 'Gst Reports', key: 'gstr1' },
+         { label: 'Sales Reports', action: () => openReportsHub('sales') },
+         { label: 'Purchase Reports', action: () => openReportsHub('purchase') },
+         { label: 'Job Work Reports', action: () => openReportsHub('jobwork') },
+         { label: 'Stock Reports', action: () => openReportsHub('stock') },
+         { label: 'Outstanding', key: 'outstanding' },
+         { label: 'GSTR-1', key: 'gstr1' },
          { label: 'CA Desk', key: 'caDashboard' },
-         { label: 'Inv Stock Ledger', action: () => openReportsHub('stock') }
       ],
       'Others Reports': [
          { label: 'Outstanding Zoom', key: 'outstanding' },
-         { label: 'Outstanding', action: () => openReportsHub('outstanding') },
-         { label: 'Brokreg Statment', action: () => openReportsHub('outstanding') },
          { label: 'Daily Transaction', action: () => openReportsHub('daily') },
          { label: 'Master List', action: () => openReportsHub('masters') },
-         { label: 'Letter Pad', action: () => toast.unavailable('Letter Pad') },
-         { label: 'Zoom Item Ledger', action: () => openReportsHub('stockItem') },
-         { label: 'Others Reports', action: () => openReportsHub('summary') },
-         { label: 'Old Reports', action: () => openReportsHub('summary') }
+         { label: 'Item Ledger', action: () => openReportsHub('stockItem') },
+      ],
+      Advanced: [
+         { label: 'Purchase Order / GRN', action: () => setModals(prev => ({ ...prev, purchaseEngine: true })) },
+         { label: 'Sales Order / Challan', action: () => setModals(prev => ({ ...prev, salesEngine: true })) },
+         { label: 'Inventory Engine', action: () => setModals(prev => ({ ...prev, inventoryEngine: true })) },
+         { label: 'Production Engine', action: () => setModals(prev => ({ ...prev, productionEngine: true })) },
+         { label: 'Business Automation', action: () => setModals(prev => ({ ...prev, automationEngine: true })) },
+         { label: 'Enterprise Platform', action: () => setModals(prev => ({ ...prev, enterprisePlatform: true })) },
+         { label: 'Infrastructure & Security', action: () => setModals(prev => ({ ...prev, infrastructure: true })) },
+         { label: 'Welcome Wizard', action: () => setModals(prev => ({ ...prev, onboardingWizard: true })) },
+         { label: 'Stage 2 Ops', action: () => setModals(prev => ({ ...prev, stage2Ops: true })) },
+         { label: 'Refresh All Data', action: () => refreshAllData().then(() => toast.success('All data refreshed.')) },
       ],
       Utilities: [
-         { label: 'Business Automation', action: () => setModals(prev => ({ ...prev, automationEngine: true })) },
-         { label: 'Stage 2 Ops / Certification', action: () => setModals(prev => ({ ...prev, stage2Ops: true })) },
-         { label: 'Documents / Workflow', action: () => setModals(prev => ({ ...prev, stage2Ops: true })) },
-         { label: 'Backup', action: () => toast.unavailable('Cloud Backup') },
-         { label: 'Restore', action: () => toast.unavailable('Restore') },
-         { label: 'Closing / UnClosing Year', action: () => toast.unavailable('Year Closing') },
-         { label: 'New A/c. Year ( Auto )', action: () => toast.unavailable('New A/c Year (Auto)') },
-         { label: 'New A/c. Year ( Manual )', action: () => toast.unavailable('New A/c Year (Manual)') },
-         { label: 'Transfer To Next Year', action: () => toast.unavailable('Transfer To Next Year') },
-         { label: 'Voucher Relndex', action: () => toast.unavailable('Voucher Reindex') },
-         { label: 'Missing Series', action: () => toast.unavailable('Missing Series check') },
-         { label: 'Auto Expense Entry', action: () => toast.unavailable('Auto Expense Entry') },
          { label: 'Update Main Account Master', action: () => toggleModal('accountMaster', true) },
-         { label: 'MisMatch Data Scanner', action: () => refreshAllData().then(() => toast.success('Data scan complete. All records refreshed.')) },
-         { label: 'Email Option', action: () => toast.unavailable('Email Option') },
-         { label: 'Missing Views Code', action: () => toast.unavailable('Missing Views') },
          { label: 'Gst Updation', action: () => toggleModal('caDashboard', true) },
-         { label: 'Backup Script Wise', action: () => toast.unavailable('Schema Backup') },
-         { label: 'Single Firm Backup/Restore', action: () => toast.unavailable('Firm Backup/Restore') },
          { label: 'Application Sync', action: () => refreshAllData().then(() => toast.success('All data refreshed.')) },
-         { label: 'Bulk Whatsapp', action: () => toast.unavailable('Bulk WhatsApp') }
       ],
       'Setup System': [
-         { label: 'Setting', action: () => setModals(prev => ({ ...prev, userRights: true })) },
-         { label: 'Business Automation', action: () => setModals(prev => ({ ...prev, automationEngine: true })) },
-         { label: 'Extra Event', action: () => toast.unavailable('Extra Event') },
-         { label: 'Extra Event DetailData', action: () => toast.unavailable('Extra Event Detail') },
-         { label: 'User Setup', action: () => setModals(prev => ({ ...prev, userRights: true })) }
+         { label: 'Setting', action: () => openSettings('appearance') },
+         { label: 'Company Info', action: () => openSettings('company') },
+         { label: 'User Setup', action: () => openSettings('users') },
       ],
       Records: showRecordsHub ? [
          { label: 'All Records Hub', action: () => openRecordsHub('accounts') },
@@ -581,12 +632,8 @@ const Dashboard = () => {
          { label: 'Item Records', action: () => openRecordsHub('items') }
       ] : [],
       Company: [
-         { label: 'Change Company -F3', action: () => toast.unavailable('Multi-company switcher') },
-         { label: 'Change Year -F2', action: () => toast.unavailable('Financial year switcher') },
-         { label: 'Company Master', action: () => setModals(prev => ({ ...prev, userRights: true })) },
-         { label: 'Information', action: () => toast.info('Textile ERP SaaS — build from package.json') },
-         { label: 'Complain Form', action: () => toast.unavailable('Complain Form') },
-         { label: 'Update DataBase', action: () => toast.unavailable('Database migration tool') }
+         { label: 'Company Master', action: () => openSettings('company') },
+         { label: 'Information', action: () => toast.info('Textile ERP — use Setup → Setting for company GSTIN, bank & print.') },
       ]
    };
 
@@ -652,6 +699,36 @@ const Dashboard = () => {
                   <span className="text-[11px] font-medium truncate leading-tight">{mod.label}</span>
                </button>
             ))}
+            <div className="mt-auto pt-2 border-t border-[var(--border)] mx-1.5">
+               <button
+                  type="button"
+                  onClick={() => { setActiveMenuKey('ledger'); toggleModal('ledger', true); }}
+                  className={`w-full flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer ${
+                     activeMenuKey === 'ledger'
+                        ? 'bg-[var(--accent)] text-white shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)]'
+                  }`}
+               >
+                  <FontAwesomeIcon icon={faBook} className="text-[11px] w-3.5 shrink-0" />
+                  <span className="text-[11px] font-medium truncate leading-tight">Ledger</span>
+               </button>
+               <button
+                  type="button"
+                  onClick={() => openSettings('appearance')}
+                  className="w-full flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
+               >
+                  <FontAwesomeIcon icon={faGear} className="text-[11px] w-3.5 shrink-0" />
+                  <span className="text-[11px] font-medium truncate leading-tight">Settings</span>
+               </button>
+               <button
+                  type="button"
+                  onClick={() => toast.info('Ctrl+K or Ctrl+Space opens Command Center. Bell opens Notifications. Enterprise button opens Stage 6 platform.')}
+                  className="w-full flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
+               >
+                  <FontAwesomeIcon icon={faCircleQuestion} className="text-[11px] w-3.5 shrink-0" />
+                  <span className="text-[11px] font-medium truncate leading-tight">Help</span>
+               </button>
+            </div>
          </aside>
 
          {/* Main area */}
@@ -673,7 +750,13 @@ const Dashboard = () => {
                   <div className="hidden md:flex flex-1 max-w-xs mx-2">
                      <div className="relative w-full">
                         <FontAwesomeIcon icon={faSearch} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-[10px]" />
-                        <input type="text" placeholder="Search..." className="w-full h-7 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-md py-0 pl-7 pr-2 text-[11px] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20" />
+                        <button
+                           type="button"
+                           onClick={() => openCommandPalette()}
+                           className="w-full h-7 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-md py-0 pl-7 pr-2 text-[11px] text-left text-[var(--text-muted)] hover:border-[var(--accent)]"
+                        >
+                           Search… <span className="text-[9px] opacity-70">Ctrl+K</span>
+                        </button>
                      </div>
                   </div>
 
@@ -681,10 +764,20 @@ const Dashboard = () => {
                      <OfflineIndicator onOpenSync={() => setSyncModalOpen(true)} />
                      <PanelSwitcher variant="light" />
                      <button type="button" onClick={() => refreshAllData()} className="h-7 px-2 text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border)] rounded-md bg-white hover:bg-[var(--bg-subtle)]">
-                        <FontAwesomeIcon icon={faSync} className="text-[9px] mr-1" />Sync
+                        <FontAwesomeIcon icon={faSync} className={`text-[9px] mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />Sync
                      </button>
-                     <button type="button" className="relative w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+                     <button
+                        type="button"
+                        onClick={() => openNotificationCenter()}
+                        className="relative w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                        title="Notifications"
+                     >
                         <FontAwesomeIcon icon={faBell} className="text-[12px]" />
+                        {notificationUnread > 0 && (
+                           <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-rose-600 text-white text-[8px] font-bold flex items-center justify-center">
+                              {notificationUnread > 99 ? '99+' : notificationUnread}
+                           </span>
+                        )}
                      </button>
                      <div className="flex items-center gap-2 pl-2 border-l border-[var(--border)]">
                         <div className="text-right hidden sm:block">
@@ -760,54 +853,43 @@ const Dashboard = () => {
                   </button>
                </div>
 
-               {/* Keyboard shortcuts */}
-               <div className="erp-shortcut-bar select-none no-scrollbar">
-                  {[
-                     { label: '1 Sales', action: () => toggleModal('sales', true) },
-                     { label: '2 Pur', action: () => toggleModal('purchase', true) },
-                     { label: '3 Rec', action: () => toggleModal('receipt', true) },
-                     { label: '4 Pay', action: () => toggleModal('payment', true) },
-                     { label: 'Ledger', action: () => toggleModal('ledger', true) },
-                     { label: 'Z Trail', action: () => openReportsHub('summary') },
-                     { label: '5 M.Iss', action: () => toggleModal('millIssue', true) },
-                     { label: '6 M.Rec', action: () => toggleModal('millRec', true) },
-                     { label: '7 J.Iss', action: () => toggleModal('jobIssue', true) },
-                     { label: '8 J.Rec', action: () => toggleModal('jobRec', true) },
-                     { label: '9 Debt O/s', action: () => toggleModal('outstanding', true) },
-                     { label: 'F10 Help', action: () => toast.info('Ctrl+K opens global search. Use the Quick rail for core modules.') }
-                  ].map((btn, idx, arr) => (
-                     <React.Fragment key={btn.label}>
-                        <button
-                           type="button"
-                           onClick={btn.action}
-                           className="erp-shortcut-btn"
-                        >
-                           {btn.label}
-                        </button>
-                        {idx < arr.length - 1 && <span className="erp-shortcut-divider">|</span>}
-                     </React.Fragment>
-                  ))}
-                  <div className="ml-auto flex gap-3 text-slate-400 text-[10px] font-medium">
-                     <span>Update</span>
-                     <span>Help</span>
-                     <span>E-Way</span>
-                     <span>Desk</span>
-                  </div>
-               </div>
             </header>
 
             <div className="flex-1 overflow-y-auto p-4">
                <div className="max-w-6xl mx-auto flex flex-col gap-4">
+               {setupGaps.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-3 px-3 py-2.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-950">
+                     <FontAwesomeIcon icon={faTriangleExclamation} className="text-amber-600 text-[12px] shrink-0" />
+                     <div className="flex-1 min-w-[200px]">
+                        <p className="text-[12px] font-semibold">Complete Company Setup before live billing</p>
+                        <p className="text-[11px] text-amber-800/90 mt-0.5">
+                           Missing: {setupGaps.join(' · ')}. Fill these so invoices & ledger look correct.
+                        </p>
+                     </div>
+                     <button
+                        type="button"
+                        className="erp-btn erp-btn-primary h-7 px-3 text-[11px] shrink-0"
+                        onClick={() => openSettings('company')}
+                     >
+                        Open Settings
+                     </button>
+                  </div>
+               )}
                <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
                      <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Dashboard</h2>
-                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Business overview</p>
+                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                        Daily flow: Purchase → Mill → Sales → Cash/Bank → Ledger
+                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                      {lastSynced && (
                         <span className="text-[9px] font-medium text-emerald-600 self-center">Live</span>
                      )}
-                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => { refreshAllData(); fetchDashboardSummary(); }}>Sync</button>
+                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={handleSync} disabled={showDashboardSkeleton}>
+                        <FontAwesomeIcon icon={faSync} className={`text-[9px] mr-1 ${showDashboardSkeleton ? 'animate-spin' : ''}`} />
+                        {showDashboardSkeleton ? 'Syncing…' : 'Sync'}
+                     </button>
                      {showRecordsHub && (
                         <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => openRecordsHub('accounts')}>Records</button>
                      )}
@@ -815,10 +897,14 @@ const Dashboard = () => {
                      {showCADesk && isModuleAllowed('caDashboard') && (
                         <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => toggleModal('caDashboard', true)}>CA Desk</button>
                      )}
+                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => toggleModal('ledger', true)}>Ledger</button>
                      <button type="button" className="erp-btn erp-btn-primary h-7 px-3 text-[11px]" onClick={() => toggleModal('sales', true)}>+ Invoice</button>
                   </div>
                </div>
 
+               {showDashboardSkeleton ? (
+                  <CardGridLoader count={6} />
+               ) : (
                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
                   {[
                      { label: 'Sales Today', value: dashboardSummary?.salesToday?.amount, sub: dashboardSummary?.salesToday?.count != null ? `${dashboardSummary.salesToday.count} bills` : null },
@@ -831,9 +917,7 @@ const Dashboard = () => {
                      <div key={card.label} className="erp-card p-3">
                         <p className="text-[9px] uppercase tracking-wide text-[var(--text-muted)] font-semibold">{card.label}</p>
                         <p className="text-[14px] font-bold text-[var(--text-primary)] mt-1 tabular-nums">
-                          {dashboardLoading && dashboardSummary == null
-                            ? '…'
-                            : card.raw
+                          {card.raw
                               ? (card.value ?? '—')
                               : `₹ ${Number(card.value || 0).toLocaleString('en-IN')}`}
                         </p>
@@ -841,8 +925,14 @@ const Dashboard = () => {
                      </div>
                   ))}
                </div>
+               )}
 
-               <div className="erp-card p-4">
+               <div className="erp-card p-4 relative">
+                  {showDashboardSkeleton && (
+                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--bg-card)]/80 rounded-[inherit]">
+                        <InlineLoader message="Loading activity…" />
+                     </div>
+                  )}
                   <h3 className="text-[12px] font-semibold mb-3 text-[var(--text-primary)]">Recent Activity</h3>
                   <div className="flex flex-col gap-2">
                      {(recentActivity.length ? recentActivity : [{ text: 'No recent transactions', time: '—', type: 'empty' }]).map((act, i) => (
@@ -875,8 +965,38 @@ const Dashboard = () => {
             onOpenMillIssue={() => { toggleModal('purchase', false); toggleModal('millIssue', true); }}
          />
 
-         <AccountingModal isOpen={modals.receipt} onClose={() => toggleModal('receipt', false)} initialType="Receipt" selectedBook={selectedBooks.receipt?.name} />
-         <AccountingModal isOpen={modals.payment} onClose={() => toggleModal('payment', false)} initialType="Payment" selectedBook={selectedBooks.payment?.name} />
+         <CashBankBookModal
+            isOpen={modals.cashBook}
+            onClose={() => toggleModal('cashBook', false)}
+            bookKind="cash"
+            initialType="Receipt"
+            selectedBook={selectedBooks.cashBook}
+            readOnly={!permissions.canSave}
+         />
+         <CashBankBookModal
+            isOpen={modals.bankBook}
+            onClose={() => toggleModal('bankBook', false)}
+            bookKind="bank"
+            initialType="Receipt"
+            selectedBook={selectedBooks.bankBook}
+            readOnly={!permissions.canSave}
+         />
+         <CashBankBookModal
+            isOpen={modals.receipt}
+            onClose={() => toggleModal('receipt', false)}
+            bookKind="bank"
+            initialType="Receipt"
+            selectedBook={selectedBooks.receipt}
+            readOnly={!permissions.canSave}
+         />
+         <CashBankBookModal
+            isOpen={modals.payment}
+            onClose={() => toggleModal('payment', false)}
+            bookKind="bank"
+            initialType="Payment"
+            selectedBook={selectedBooks.payment}
+            readOnly={!permissions.canSave}
+         />
          <IssueModal isOpen={modals.millIssue} onClose={() => toggleModal('millIssue', false)} selectedBook={selectedBooks.millIssue?.name} />
          <ReceiveModal isOpen={modals.millRec} onClose={() => toggleModal('millRec', false)} selectedBook={selectedBooks.millRec?.name} />
          <UpdateModal isOpen={modals.jobIssue} onClose={() => toggleModal('jobIssue', false)} selectedBook={selectedBooks.jobIssue?.name} />
@@ -938,9 +1058,16 @@ const Dashboard = () => {
          {/* Book Selection Modal */}
          <BookSelectionModal
             isOpen={bookSelection.isOpen}
-            onClose={() => setBookSelection({ isOpen: false, module: null })}
-            moduleName={bookSelection.module}
+            onClose={() => setBookSelection({ isOpen: false, module: null, bookModule: null })}
+            moduleName={bookSelection.bookModule || bookSelection.module}
             onSelectBook={handleSelectBook}
+            bookFilter={
+              bookSelection.module === 'cashBook'
+                ? (b) => /cash/i.test(b.name || '')
+                : bookSelection.module === 'bankBook'
+                  ? (b) => /bank/i.test(b.name || '') && !/cash/i.test(b.name || '')
+                  : null
+            }
          />
 
          {/* New Database-Connected Modals */}
@@ -993,6 +1120,26 @@ const Dashboard = () => {
             isOpen={modals.stage2Ops}
             onClose={() => setModals(prev => ({ ...prev, stage2Ops: false }))}
          />
+         <EnterprisePlatformModal
+            isOpen={modals.enterprisePlatform}
+            onClose={() => setModals(prev => ({ ...prev, enterprisePlatform: false }))}
+         />
+         <InfrastructureModal
+            isOpen={modals.infrastructure}
+            onClose={() => setModals(prev => ({ ...prev, infrastructure: false }))}
+         />
+         <CommercialReleaseModal
+            isOpen={modals.commercialRelease}
+            onClose={() => setModals(prev => ({ ...prev, commercialRelease: false }))}
+         />
+         <EnterpriseTestingDashboard
+            isOpen={modals.enterpriseTesting}
+            onClose={() => setModals(prev => ({ ...prev, enterpriseTesting: false }))}
+         />
+         <OnboardingWizard
+            isOpen={modals.onboardingWizard}
+            onClose={() => setModals(prev => ({ ...prev, onboardingWizard: false }))}
+         />
          <OrderModal 
             isOpen={modals.order} 
             onClose={() => setModals(prev => ({ ...prev, order: false }))} 
@@ -1012,9 +1159,17 @@ const Dashboard = () => {
             isOpen={modals.journal} 
             onClose={() => setModals(prev => ({ ...prev, journal: false }))} 
          />
-         <UserRightsModal
-            isOpen={modals.userRights}
-            onClose={() => setModals(prev => ({ ...prev, userRights: false }))}
+         <CompanySettingsModal
+            isOpen={modals.companySettings}
+            onClose={() => setModals(prev => ({ ...prev, companySettings: false }))}
+            initialTab={modals.settingsTab}
+            initialBillType={modals.settingsBillType}
+            onAction={(action) => {
+               if (action === 'books') toggleModal('bookMaster', true);
+               else if (action === 'automation') setModals(prev => ({ ...prev, automationEngine: true }));
+               else if (action === 'openingBalance') setModals(prev => ({ ...prev, openingBalance: true }));
+               else if (action === 'openingStock') setModals(prev => ({ ...prev, openingStock: true }));
+            }}
          />
 
          <DataRecordsHub

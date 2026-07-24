@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ShieldCheck, Copy, CheckCircle2, XCircle, X, Key, RefreshCw, Plus, Fingerprint } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
+import { notifyWarning, notifyError } from '../../utils/notify';
 
 const Licenses = () => {
     const { companies, fetchCompanies, generateLicense, renewLicense } = useAdminStore();
@@ -20,20 +21,20 @@ const Licenses = () => {
 
     const handleIssueKey = async (e) => {
         e.preventDefault();
-        if (!expiryDate) return alert('Please select an expiry date');
+        if (!expiryDate) return notifyWarning('Please select an expiry date');
         try {
             await generateLicense({ companyId: selectedCompany._id, expiresAt: expiryDate });
             setExpiryDate(''); setSelectedCompany(null);
-        } catch (err) { alert(err.message || 'Failed to issue license'); }
+        } catch (err) { notifyError(err, 'Failed to issue license'); }
     };
 
     const handleRenewKey = async (e) => {
         e.preventDefault();
-        if (!expiryDate) return alert('Please select a date');
+        if (!expiryDate) return notifyWarning('Please select a date');
         try {
             await renewLicense(renewingCompany._id, { expiresAt: expiryDate });
             setExpiryDate(''); setRenewingCompany(null);
-        } catch (err) { alert(err.message || 'Failed to renew'); }
+        } catch (err) { notifyError(err, 'Failed to renew'); }
     };
 
     const licensed = companies.filter(c => c.licenseKey);

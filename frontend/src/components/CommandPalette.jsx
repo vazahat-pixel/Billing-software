@@ -1,11 +1,30 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useUiStore from '../store/useUiStore';
 import useStore from '../store/useStore';
 import useConfigStore from '../store/useConfigStore';
+import ThemePicker from './ui/ThemePicker';
+import { stage6Api } from '../api/stage6.api';
+
+const RECENT_KEY = 'erp_cmd_recent_searches';
+
+function loadLocalRecent() {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalRecent(query) {
+  const q = String(query || '').trim();
+  if (!q) return;
+  const prev = loadLocalRecent().filter((x) => x !== q);
+  localStorage.setItem(RECENT_KEY, JSON.stringify([q, ...prev].slice(0, 8)));
+}
 
 /**
- * Enterprise Ctrl+K search — navigates by opening Dashboard modals via custom event.
- * Does not redesign chrome; overlays existing shell.
+ * Stage 6.1 — Global Search & Command Center (Ctrl+K / Ctrl+Space).
+ * Server-backed search with offline local fallback.
  */
 export default function CommandPalette() {
   const open = useUiStore((s) => s.commandPaletteOpen);
@@ -19,85 +38,99 @@ export default function CommandPalette() {
   const sales = useStore((s) => s.sales);
   const purchases = useStore((s) => s.purchases);
   const companyName = useConfigStore((s) => s.company?.name || s.companySettings?.legalName || 'Company');
+  const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
 
   const [active, setActive] = useState(0);
+  const [remote, setRemote] = useState([]);
+  const [pinned, setPinned] = useState([]);
+  const [recentDocs, setRecentDocs] = useState([]);
+  const [recentSearches, setRecentSearches] = useState(loadLocalRecent);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
       setQuery('');
       setActive(0);
+      setRemote([]);
+      setRecentSearches(loadLocalRecent());
       setTimeout(() => inputRef.current?.focus(), 50);
+      stage6Api
+        .productivity()
+        .then((d) => {
+          setPinned(d?.prefs?.pinnedRecords || []);
+          setRecentDocs(d?.prefs?.recentDocuments || d?.recentBills || []);
+        })
+        .catch(() => {});
     }
   }, [open, setQuery]);
 
-  const actions = useMemo(
+  const staticActions = useMemo(
     () => [
-      { id: 'sales', label: 'Sales Billing', group: 'Modules', event: 'erp:open-modal', payload: 'sales' },
-      { id: 'purchase', label: 'Purchase Bill', group: 'Modules', event: 'erp:open-modal', payload: 'purchase' },
-      { id: 'receipt', label: 'Bank Receipt', group: 'Modules', event: 'erp:open-modal', payload: 'receipt' },
-      { id: 'payment', label: 'Bank Payment', group: 'Modules', event: 'erp:open-modal', payload: 'payment' },
-      { id: 'inventory', label: 'Stock Ledger', group: 'Modules', event: 'erp:open-modal', payload: 'inventoryPage' },
-      { id: 'outstanding', label: 'Outstanding', group: 'Reports', event: 'erp:open-modal', payload: 'outstanding' },
-      { id: 'gstr1', label: 'GSTR-1', group: 'GST', event: 'erp:open-modal', payload: 'gstr1' },
-      { id: 'ca', label: 'CA Desk', group: 'GST', event: 'erp:open-modal', payload: 'caDashboard' },
-      { id: 'ledger', label: 'Ledger Statement', group: 'Accounting', event: 'erp:open-modal', payload: 'ledger' },
-      { id: 'party', label: 'Account Master', group: 'Masters', event: 'erp:open-modal', payload: 'accountMaster' },
-      { id: 'item', label: 'Item Master', group: 'Masters', event: 'erp:open-modal', payload: 'itemMaster' },
-      { id: 'reports', label: 'Reports Hub', group: 'Reports', event: 'erp:open-modal', payload: 'reportsHub' },
+      { id: 'sales', label: 'Open Sales', group: 'Modules', modal: 'sales', kind: 'action' },
+      { id: 'purchase', label: 'Open Purchase', group: 'Modules', modal: 'purchase', kind: 'action' },
+      { id: 'receipt', label: 'Bank Receipt', group: 'Modules', modal: 'receipt', kind: 'action' },
+      { id: 'payment', label: 'Bank Payment', group: 'Modules', modal: 'payment', kind: 'action' },
+      { id: 'inventory', label: 'Stock Ledger', group: 'Modules', modal: 'inventoryPage', kind: 'action' },
+      { id: 'outstanding', label: 'Outstanding', group: 'Reports', modal: 'outstanding', kind: 'action' },
+      { id: 'gstr1', label: 'GSTR-1', group: 'GST', modal: 'gstr1', kind: 'action' },
+      { id: 'ca', label: 'CA Desk', group: 'GST', modal: 'caDashboard', kind: 'action' },
+      { id: 'ledger', label: 'Open Ledger', group: 'Accounting', modal: 'ledger', kind: 'action' },
+      { id: 'party', label: 'Create Party', group: 'Masters', modal: 'accountMaster', kind: 'action' },
+      { id: 'item', label: 'Create Item', group: 'Masters', modal: 'itemMaster', kind: 'action' },
+      { id: 'reports', label: 'Reports Hub', group: 'Reports', modal: 'reportsHub', kind: 'action' },
+      { id: 'enterprise', label: 'Enterprise Platform', group: 'Analytics', modal: 'enterprisePlatform', kind: 'action' },
+      { id: 'settings', label: 'Company Settings', group: 'Setup', modal: 'companySettings', kind: 'action' },
     ],
     []
   );
 
-  const q = query.trim().toLowerCase();
-
-  const results = useMemo(() => {
+  const localResults = useMemo(() => {
+    const q = query.trim().toLowerCase();
     const rows = [];
-    actions.forEach((a) => {
+    staticActions.forEach((a) => {
       if (!q || a.label.toLowerCase().includes(q) || a.group.toLowerCase().includes(q)) {
-        rows.push({ ...a, kind: 'action' });
+        rows.push(a);
       }
     });
     if (q.length >= 1) {
-      parties.slice(0, 80).forEach((p) => {
-        const name = p.name || '';
-        if (name.toLowerCase().includes(q)) {
+      parties.slice(0, 40).forEach((p) => {
+        if ((p.name || '').toLowerCase().includes(q)) {
           rows.push({
             id: `party-${p._id || p.id}`,
-            label: name,
+            label: p.name,
             group: 'Parties',
             kind: 'party',
-            event: 'erp:open-modal',
-            payload: 'accountMaster',
+            modal: 'accountMaster',
+            recordId: p._id || p.id,
           });
         }
       });
-      items.slice(0, 80).forEach((it) => {
-        const name = it.name || '';
-        if (name.toLowerCase().includes(q)) {
+      items.slice(0, 40).forEach((it) => {
+        if ((it.name || '').toLowerCase().includes(q)) {
           rows.push({
             id: `item-${it._id || it.id}`,
-            label: name,
+            label: it.name,
             group: 'Items',
             kind: 'item',
-            event: 'erp:open-modal',
-            payload: 'itemMaster',
+            modal: 'itemMaster',
+            recordId: it._id || it.id,
           });
         }
       });
-      sales.slice(0, 40).forEach((s) => {
+      sales.slice(0, 20).forEach((s) => {
         const no = String(s.invoiceNo || '');
         if (no.toLowerCase().includes(q)) {
           rows.push({
             id: `sale-${s._id || s.id}`,
             label: `Sale ${no}`,
             group: 'Sales',
-            kind: 'sale',
-            event: 'erp:open-modal',
-            payload: 'sales',
+            kind: 'sales',
+            modal: 'sales',
+            recordId: s._id || s.id,
           });
         }
       });
-      purchases.slice(0, 40).forEach((p) => {
+      purchases.slice(0, 20).forEach((p) => {
         const no = String(p.invoiceNo || p.billNo || '');
         if (no.toLowerCase().includes(q)) {
           rows.push({
@@ -105,24 +138,110 @@ export default function CommandPalette() {
             label: `Purchase ${no}`,
             group: 'Purchases',
             kind: 'purchase',
-            event: 'erp:open-modal',
-            payload: 'purchase',
+            modal: 'purchase',
+            recordId: p._id || p.id,
           });
         }
       });
     }
-    return rows.slice(0, 40);
-  }, [actions, q, parties, items, sales, purchases]);
+    return rows;
+  }, [staticActions, query, parties, items, sales, purchases]);
+
+  const fetchRemote = useCallback(
+    async (q) => {
+      if (!q || q.length < 1 || !isOnline) {
+        setRemote([]);
+        return;
+      }
+      setLoading(true);
+      try {
+        const data = await stage6Api.search(q, { limit: 10 });
+        const items = (data?.items || []).map((r) => ({
+          id: r.id || `${r.kind}-${r.label}`,
+          label: r.label,
+          group: r.group || r.kind,
+          kind: r.kind,
+          modal: r.modal,
+          meta: r.meta,
+          recordId: r.id,
+        }));
+        setRemote(items);
+      } catch {
+        setRemote([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [isOnline]
+  );
+
+  useEffect(() => {
+    const q = query.trim();
+    const t = setTimeout(() => fetchRemote(q), 220);
+    return () => clearTimeout(t);
+  }, [query, fetchRemote]);
+
+  const results = useMemo(() => {
+    const q = query.trim();
+    if (!q) {
+      const pins = pinned.map((p) => ({
+        id: `pin-${p.id}`,
+        label: p.label || 'Pinned',
+        group: 'Pinned',
+        kind: p.kind,
+        modal: p.modal || 'accountMaster',
+        recordId: p.id,
+      }));
+      const recent = recentDocs.slice(0, 8).map((d) => ({
+        id: `doc-${d.id}`,
+        label: d.label || 'Document',
+        group: 'Recent Documents',
+        kind: d.kind,
+        modal: d.modal || (d.kind === 'purchase' ? 'purchase' : 'sales'),
+        recordId: d.id,
+      }));
+      const searches = recentSearches.map((s) => ({
+        id: `rs-${s}`,
+        label: s,
+        group: 'Recent Searches',
+        kind: 'search',
+        modal: null,
+        isSearchReplay: true,
+      }));
+      return [...pins, ...recent, ...searches, ...staticActions].slice(0, 40);
+    }
+    const seen = new Set();
+    const merged = [];
+    for (const row of [...remote, ...localResults]) {
+      const key = String(row.id);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(row);
+    }
+    return merged.slice(0, 40);
+  }, [query, remote, localResults, pinned, recentDocs, recentSearches, staticActions]);
 
   useEffect(() => {
     setActive(0);
-  }, [query]);
+  }, [query, results.length]);
 
   if (!open) return null;
 
   const run = (row) => {
     if (!row) return;
-    window.dispatchEvent(new CustomEvent(row.event, { detail: { modal: row.payload, row } }));
+    if (row.isSearchReplay) {
+      setQuery(row.label);
+      return;
+    }
+    if (query.trim()) saveLocalRecent(query.trim());
+    if (row.recordId && row.kind && row.kind !== 'action') {
+      stage6Api.touch({ kind: row.kind, id: row.recordId, label: row.label, modal: row.modal }).catch(() => {});
+    }
+    if (row.modal) {
+      window.dispatchEvent(
+        new CustomEvent('erp:open-modal', { detail: { modal: row.modal, row } })
+      );
+    }
     close();
   };
 
@@ -147,7 +266,11 @@ export default function CommandPalette() {
   };
 
   return (
-    <div className="fixed inset-0 z-[99998] flex items-start justify-center pt-[12vh] bg-black/40" data-command-palette onClick={close}>
+    <div
+      className="fixed inset-0 z-[99998] flex items-start justify-center pt-[12vh] bg-black/40"
+      data-command-palette
+      onClick={close}
+    >
       <div
         className="w-[min(640px,92vw)] bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -160,10 +283,13 @@ export default function CommandPalette() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={`Search ${companyName} — parties, items, invoices, modules…`}
+            placeholder={`Search ${companyName} — parties, items, invoices, lots, modules…`}
             className="w-full text-[13px] font-medium outline-none bg-transparent"
           />
-          <p className="mt-1 text-[10px] text-slate-400 uppercase tracking-wider">Ctrl+K · Esc to close</p>
+          <p className="mt-1 text-[10px] text-slate-400 uppercase tracking-wider">
+            Ctrl+K · Ctrl+Space · Esc to close
+            {loading ? ' · Searching…' : !isOnline ? ' · Offline local' : ''}
+          </p>
         </div>
         <ul className="max-h-[50vh] overflow-y-auto py-1">
           {results.length === 0 && (
@@ -179,14 +305,28 @@ export default function CommandPalette() {
                 onMouseEnter={() => setActive(idx)}
                 onClick={() => run(row)}
               >
-                <span className="font-semibold truncate">{row.label}</span>
-                <span className={`text-[10px] uppercase tracking-wide shrink-0 ${idx === active ? 'text-slate-300' : 'text-slate-400'}`}>
+                <span className="font-semibold truncate">
+                  {row.label}
+                  {row.meta ? (
+                    <span className={`ml-2 font-normal ${idx === active ? 'text-slate-300' : 'text-slate-400'}`}>
+                      {row.meta}
+                    </span>
+                  ) : null}
+                </span>
+                <span
+                  className={`text-[10px] uppercase tracking-wide shrink-0 ${
+                    idx === active ? 'text-slate-300' : 'text-slate-400'
+                  }`}
+                >
                   {row.group}
                 </span>
               </button>
             </li>
           ))}
         </ul>
+        <div className="px-4 py-3 border-t border-[var(--border-subtle)] bg-[var(--bg-subtle)]">
+          <ThemePicker />
+        </div>
       </div>
     </div>
   );

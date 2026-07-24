@@ -8,6 +8,7 @@ export const accountingApi = {
   payments: (body) => unwrap(post('/accounting/payments', body)),
   receipts: (body) => unwrap(post('/accounting/receipts', body)),
   listVouchers: (params) => unwrap(get('/accounting/payments', params)).then((d) => asArray(d, ['vouchers', 'payments'])),
+  reverseVoucher: (id, body = {}) => unwrap(post(`/accounting/payments/${id}/reverse`, body)),
   trialBalance: (params) => unwrap(get('/accounting/trial-balance', params)),
   profitLoss: (params) => unwrap(get('/accounting/profit-loss', params)),
   balanceSheet: (params) => unwrap(get('/accounting/balance-sheet', params)),

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import useStore from '../../store/useStore';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import { X, Save, Edit } from 'lucide-react';
@@ -16,6 +16,11 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit' }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const partyOptions = useMemo(
+    () => parties.map((p) => ({ value: p._id, label: `${p.name} (${p.type})` })),
+    [parties]
+  );
+
   useEffect(() => {
     if (isOpen) {
       setType(initialType);
@@ -28,7 +33,7 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit' }) => {
       setReason('');
       setErrorMsg('');
     }
-  }, [isOpen, initialType]);
+  }, [isOpen, initialType, fetchParties]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -85,16 +90,14 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit' }) => {
         <form onSubmit={handleSave} className="p-3 space-y-3 bg-[#d4d0c8] flex-1">
           <div className="classic-erp-frame flex items-center gap-2">
             <span className="classic-erp-label red-label w-24">Counterparty:</span>
-            <select 
-              value={partyId}
-              onChange={e => setPartyId(e.target.value)}
+            <ERPSelect
               className="classic-erp-select flex-1"
-            >
-              <option value="">- Select Party / Account -</option>
-              {parties.map(p => (
-                <option key={p._id} value={p._id}>{p.name} ({p.type})</option>
-              ))}
-            </select>
+              value={partyId}
+              onChange={(e) => setPartyId(e.target.value)}
+              options={partyOptions}
+              placeholder="- Select Party / Account -"
+              recentKey="note-party"
+            />
           </div>
 
           <div className="classic-erp-frame grid grid-cols-2 gap-3">

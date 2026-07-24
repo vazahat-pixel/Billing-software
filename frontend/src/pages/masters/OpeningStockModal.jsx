@@ -4,6 +4,7 @@ import { ERPInput } from '../../components/forms/FormElements';
 import { ERPSearchableSelect } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
 import { warehousesApi } from '../../api';
+import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 
 const OpeningStockModal = ({ isOpen, onClose, readOnly = false }) => {
   const { items, fetchItems, createOpeningStock } = useStore();
@@ -30,8 +31,8 @@ const OpeningStockModal = ({ isOpen, onClose, readOnly = false }) => {
   }, [isOpen, fetchItems]);
 
   const handleSave = async () => {
-    if (!itemId) return alert('Select an item');
-    if (!mts || Number(mts) <= 0) return alert('Enter quantity in meters');
+    if (!itemId) return notifyWarning('Select an item');
+    if (!mts || Number(mts) <= 0) return notifyWarning('Enter quantity in meters');
     setSaving(true);
     try {
       await createOpeningStock({
@@ -42,10 +43,10 @@ const OpeningStockModal = ({ isOpen, onClose, readOnly = false }) => {
         warehouseId: warehouseId || undefined,
         remarks
       });
-      alert('Opening stock lot created');
+      notifySuccess('Opening stock lot created');
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || err.message);
+      notifyError(err, 'Failed to create opening stock');
     } finally {
       setSaving(false);
     }
@@ -110,4 +111,4 @@ const OpeningStockModal = ({ isOpen, onClose, readOnly = false }) => {
 };
 
 export default OpeningStockModal;
-
+

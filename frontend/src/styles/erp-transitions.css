@@ -1,0 +1,64 @@
+/* Enterprise motion — fast, subtle, desktop-grade */
+
+.erp-motion-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.erp-motion-scale-in {
+  animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.erp-motion-slide-down {
+  animation: erpSlideDown 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes erpSlideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.erp-toast-enter {
+  animation: erpToastIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes erpToastIn {
+  from { opacity: 0; transform: translateX(12px) scale(0.98); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+.erp-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+[data-theme='dark-pro'] .erp-rail {
+  background: var(--bg-sidebar);
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme='dark-pro'] .erp-menu-bar {
+  background: var(--bg-sidebar);
+}
+
+[data-theme='dark-pro'] .erp-menu-dropdown {
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+[data-theme='classic'] .erp-card {
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme='classic'] .erp-card:hover {
+  transform: none;
+}
+
+[data-theme='high-contrast'] .erp-card {
+  border-width: 2px;
+  box-shadow: none;
+}
+
+[data-theme='high-contrast'] .erp-btn-primary {
+  border: 2px solid var(--color-primary);
+}

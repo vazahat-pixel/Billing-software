@@ -4,6 +4,7 @@ import { ERPSearchableSelect } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
 import { masterDataApi } from '../../api';
 import { toast } from '../../store/useToastStore';
+import { erpConfirm } from '../../utils/confirm';
 
 const MergeMasterModal = ({ isOpen, onClose }) => {
   const { parties, items, fetchParties, fetchItems } = useStore();
@@ -39,7 +40,12 @@ const MergeMasterModal = ({ isOpen, onClose }) => {
       toast.warning('Source and target must differ');
       return;
     }
-    if (!window.confirm('Merge will re-point transactions and soft-delete the source. Continue?')) return;
+    if (!(await erpConfirm({
+      title: 'Merge Records',
+      message: 'Merge will re-point transactions and soft-delete the source. Continue?',
+      confirmLabel: 'Merge',
+      danger: true,
+    }))) return;
     setSaving(true);
     try {
       if (entity === 'party') {
@@ -53,7 +59,7 @@ const MergeMasterModal = ({ isOpen, onClose }) => {
       setSourceId('');
       setTargetId('');
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message);
+      toast.error(err);
     } finally {
       setSaving(false);
     }
@@ -80,7 +86,7 @@ const MergeMasterModal = ({ isOpen, onClose }) => {
       await fetchParties();
       await fetchItems();
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message);
+      toast.error(err);
     }
   };
 
@@ -143,4 +149,4 @@ const MergeMasterModal = ({ isOpen, onClose }) => {
 };
 
 export default MergeMasterModal;
-
+

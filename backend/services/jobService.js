@@ -97,6 +97,10 @@ class JobService {
         remarks: `Job Issued: ${job.jobCardNo}`,
       });
 
+      // Ledger: Stock → Job Work In Progress (mill issue track)
+      const accountingService = require('./accountingService');
+      await accountingService.onJobIssuePost(job, lot, session);
+
       await session.commitTransaction();
       return job;
     } catch (error) {
@@ -231,6 +235,14 @@ class JobService {
       await job.save({ session });
 
       const accountingService = require('./accountingService');
+
+      // Ledger: WIP → Stock (material return from mill)
+      await accountingService.onJobReceiveStockPost(
+        job,
+        { greyCostPerMtr, receivedQty },
+        session
+      );
+
       if (charges > 0 || gstAmount > 0) {
         await accountingService.onJobWorkChargesPost(
           {
@@ -344,7 +356,96 @@ class JobService {
   async updateProcess(jobId, status, companyId) {
     const validStatuses = ['Issued', 'In-Process', 'Received', 'Cancelled'];
     if (!validStatuses.includes(status)) throw AppError.badRequest(`Invalid job status: ${status}`);
-    return Job.findOneAndUpdate({ _id: jobId, companyId }, { status }, { new: true });
+
+    if (status !== 'Cancelled') {
+      return Job.findOneAndUpdate({ _id: jobId, companyId }, { status }, { new: true });
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const job = await Job.findOne({ _id: jobId, companyId }).session(session);
+      if (!job) throw AppError.notFound('Job not found');
+      if (job.status === 'Cancelled') {
+        await session.commitTransaction();
+        return job;
+      }
+      if (job.status === 'Received') {
+        throw AppError.badRequest('Cannot cancel a received job. Reverse the receive first.');
+      }
+
+      // Issued / In-Process: restore lot qty taken at issue
+      if (job.lotId && Number(job.issueQty || 0) > 0) {
+        const lot = await loadLotForUpdate(session, job.lotId, companyId);
+        const key = `ISSUE_CANCEL:${job._id}:${lot._id}`;
+        const StockMovement = require('../models/StockMovement');
+        const exists = await StockMovement.findOne({ companyId, idempotencyKey: key }).session(session);
+        if (!exists) {
+          // Temporarily reopen closed lots so restore can apply
+          if (lot.status === 'Closed') lot.status = 'Available';
+          await applyLotMovement({
+            session,
+            lot,
+            companyId,
+            deltaMts: job.issueQty || 0,
+            deltaPcs: job.issuePcs || 0,
+            type: 'ADJUSTMENT',
+            referenceId: job._id,
+            idempotencyKey: key,
+            remarks: `Cancel Job Issue: ${job.jobCardNo}`,
+          });
+        }
+      }
+
+      // Reverse JobIssue accounting entry if present
+      const AccountingEntry = require('../models/AccountingEntry');
+      const originalEntry = await AccountingEntry.findOne({
+        companyId,
+        refType: 'JobIssue',
+        refId: job._id,
+        isReversed: { $ne: true },
+      }).session(session);
+
+      if (originalEntry) {
+        const accountingService = require('./accountingService');
+        const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
+        const reversalLines = originalEntry.lines.map((line) => ({
+          ledgerId: line.ledgerId,
+          ledgerName: line.ledgerName,
+          type: line.type === 'Dr' ? 'Cr' : 'Dr',
+          amount: line.amount,
+          narration: `Reversal: ${line.narration || ''}`,
+        }));
+
+        const reversalEntry = await AccountingEntry.create([{
+          companyId,
+          entryNo,
+          entryDate: new Date(),
+          voucherType: 'JobWorkAuto',
+          refType: 'JobIssue',
+          refId: job._id,
+          lines: reversalLines,
+          narration: `Reversal of Job Issue ${job.jobCardNo}`,
+          isReversed: false,
+        }], { session });
+
+        await AccountingEntry.findByIdAndUpdate(
+          originalEntry._id,
+          { isReversed: true, reversalEntryId: reversalEntry[0]._id },
+          { session }
+        );
+      }
+
+      job.status = 'Cancelled';
+      await job.save({ session });
+      await session.commitTransaction();
+      return job;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 
   async getJobs(companyId, { status } = {}) {

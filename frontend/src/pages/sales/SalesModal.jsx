@@ -3,14 +3,21 @@ import { createPortal } from 'react-dom';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
 import { useConfig } from '../../context/ConfigContext';
-import { resolveSalesFieldVisibility } from '../../utils/configHelpers';
+import { resolveSalesFieldVisibility, buildBillFieldVisibility } from '../../utils/configHelpers';
 import { toast } from '../../store/useToastStore';
+import { notifyError } from '../../utils/notify';
 import { Trash2, Plus } from 'lucide-react';
 import AccountMasterModal from '../masters/AccountMasterModal';
 import ItemMasterModal from '../masters/ItemMasterModal';
 import BillSaveNextActions from '../../components/BillSaveNextActions';
 import SalesPrint from './SalesPrint';
+import { ERPCombobox } from '../../components/erp';
+import { erpConfirm } from '../../utils/confirm';
 import { resolveParty, buildWhatsAppMessage, openWhatsAppShare } from '../../utils/invoiceHelpers';
+import { getFocusableElements } from '../../utils/formEnterNavigation';
+import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
+import useConfigStore from '../../store/useConfigStore';
+import { resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -19,7 +26,6 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     parties,
     items,
     addSale,
-    updateSale,
     deleteSale,
     sales,
     inventoryLots,
@@ -30,14 +36,19 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     plan,
     user,
   } = useStore();
+  const companySettings = useConfigStore((s) => s.companySettings);
   const { bundle } = useConfig();
   const { showBroker, showChallan } = resolveSalesFieldVisibility(bundle, user, plan);
+  const billFields = useMemo(() => buildBillFieldVisibility(bundle, 'sales'), [bundle]);
   const [activeItemId, setActiveItemId] = useState('');
   const [mode, setMode] = useState('View');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [bootLoading, setBootLoading] = useState(false);
   const [saveNextActions, setSaveNextActions] = useState(null);
   const [printInvoiceId, setPrintInvoiceId] = useState(null);
   const openedOnceRef = useRef(false);
+  const modalContainerRef = useRef(null);
 
   const [header, setHeader] = useState({
     party: '',
@@ -99,12 +110,22 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       openedOnceRef.current = false;
       setSaveNextActions(null);
       setPrintInvoiceId(null);
+      setBootLoading(false);
       return;
     }
-    fetchParties();
-    fetchItems();
-    fetchSales();
-    fetchInventory();
+    let cancelled = false;
+    setBootLoading(true);
+    Promise.all([
+      fetchParties(),
+      fetchItems(),
+      fetchSales(),
+      fetchInventory(),
+    ])
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setBootLoading(false);
+      });
+
     if (!openedOnceRef.current) {
       openedOnceRef.current = true;
       setSaveNextActions(null);
@@ -120,6 +141,22 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         handleNew();
       }
     }
+
+    const t = setTimeout(() => {
+      if (modalContainerRef.current) {
+        const focusables = getFocusableElements(modalContainerRef.current);
+        if (focusables.length > 0) {
+          focusables[0].focus();
+          if (typeof focusables[0].select === 'function') {
+            try { focusables[0].select(); } catch {}
+          }
+        }
+      }
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [isOpen, initialData, readOnly, selectedBook, fetchParties, fetchItems, fetchSales, fetchInventory]);
 
   const loadInvoiceData = (inv) => {
@@ -395,7 +432,15 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
   const handleSave = async (e) => {
     if (e) e.preventDefault();
-    if (!header.party) return toast.error('Please select a customer');
+    if (saving) return;
+    if (!header.party) return toast.error('Please select a customer first');
+    const validLines = gridItems.filter(i => (i.itemId || i.desc) && (Number(i.mts || i.pcs || 0) > 0 || Number(i.saleRate || i.rate || 0) > 0));
+    if (validLines.length === 0) return toast.error('Please add at least one line item with Quantity and Sale Rate');
+    const missingLot = validLines.find((i) => !i.lotId);
+    if (missingLot) {
+      return toast.error('Select Stock Lot on every line. Without lot, stock will not reduce correctly.');
+    }
+    setSaving(true);
 
     try {
       const payload = {
@@ -436,7 +481,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         roundOff: footer.roundOff,
         totalAdd: calculations.totalAdd,
         totalLess: calculations.totalLess,
-        items: gridItems.filter(i => i.itemId).map(i => ({
+        items: validLines.map(i => ({
           lotId: i.lotId || null,
           itemId: i.itemId,
           desc: i.desc,
@@ -444,7 +489,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           cut: Number(i.cut || 0),
           pcs: Number(i.pcs || 0),
           mts: Number(i.mts || 0),
-          rate: Number(i.saleRate || 0),
+          rate: Number(i.saleRate || i.rate || 0),
           mrp: Number(i.mrp || 0),
           rdPer: Number(i.rdPer || 0),
           amount: Number(i.amount || 0),
@@ -464,7 +509,11 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
       const saved =
         mode === 'Edit' && selectedInvoiceId
-          ? await updateSale(selectedInvoiceId, payload)
+          ? (() => {
+              throw new Error(
+                'Posted sales bills cannot be edited. Cancel this bill (Delete) then create a new one — Edit would break stock and ledger.'
+              );
+            })()
           : await addSale(payload);
       const savedId = saved?._id || saved?.id;
       if (savedId) setSelectedInvoiceId(savedId);
@@ -477,14 +526,21 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       setMode('View');
       fetchSales();
     } catch (err) {
-      toast.error('Failed to save sales: ' + (err.response?.data?.message || err.message));
+      notifyError(err, 'Failed to save sale bill');
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
     const id = initialData?._id || selectedInvoiceId;
     if (!id) return toast.error('Select an invoice to delete');
-    if (window.confirm('Are you sure you want to delete/cancel this invoice?')) {
+    if (!(await erpConfirm({
+      title: 'Cancel Invoice',
+      message: 'Are you sure you want to delete/cancel this invoice?',
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return;
       try {
         await deleteSale(id);
         toast.success('Invoice deleted/cancelled!');
@@ -493,7 +549,6 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       } catch (err) {
         toast.error('Failed to delete: ' + (err.response?.data?.message || err.message));
       }
-    }
   };
 
   const handlePrint = () => {
@@ -524,10 +579,121 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
   const locked = readOnly || mode === 'View';
 
+  const partyOptions = useMemo(
+    () =>
+      parties
+        .filter((p) => p.type !== 'Broker')
+        .map((p) => ({
+          value: p._id || p.id,
+          label: p.name,
+          meta: [p.gstin, p.station || p.city].filter(Boolean).join(' · '),
+        })),
+    [parties]
+  );
+
+  const brokerOptions = useMemo(
+    () =>
+      parties
+        .filter((p) => p.type === 'Broker')
+        .map((p) => ({
+          value: p._id || p.id,
+          label: p.name,
+          meta: p.mobile || p.phone || '',
+        })),
+    [parties]
+  );
+
+  const itemOptions = useMemo(
+    () =>
+      items.map((i) => ({
+        value: i._id || i.id,
+        label: i.itemName || i.name,
+        meta: i.hsnCode ? `HSN ${i.hsnCode}` : '',
+      })),
+    [items]
+  );
+
+  const onPartySelect = (val, opt) => {
+    if (!val) {
+      setHeader({ ...header, party: '', add: '', gstin: '', city: '' });
+      return;
+    }
+    const p = parties.find((x) => (x._id || x.id) === val);
+    const autoType = resolveInvoiceSupplyType({
+      partyGstin: p?.gstin,
+      partyStateCode: p?.stateCode || p?.state,
+      companyGstin: companySettings?.gstin || companySettings?.GSTIN,
+      companyStateCode: companySettings?.stateCode || companySettings?.state,
+    });
+    setHeader({
+      ...header,
+      party: val,
+      add: p?.address || '',
+      gstin: p?.gstin || '',
+      city: p?.station || p?.city || '',
+      ...(autoType ? { type: autoType } : {}),
+    });
+  };
+
+  const onGridItemSelect = (val, idx) => {
+    if (!val) return;
+    const item = items.find((i) => (i._id || i.id) === val);
+    const openLots = (inventoryLots || [])
+      .filter((lot) => {
+        const lid = lot.itemId?._id || lot.itemId || '';
+        if (String(lid) !== String(val)) return false;
+        const st = String(lot.status || 'Available').toLowerCase();
+        if (st === 'closed' || st === 'exhausted') return false;
+        return Number(lot.remainingMtrs ?? lot.mts ?? 0) > 0;
+      })
+      .sort(
+        (a, b) =>
+          Number(b.remainingMtrs ?? b.mts ?? 0) - Number(a.remainingMtrs ?? a.mts ?? 0)
+      );
+    const best = openLots[0];
+    const updated = [...gridItems];
+    updated[idx] = {
+      ...updated[idx],
+      itemId: val,
+      itemName: item?.itemName || item?.name || '',
+      saleRate: item?.salesRate || best?.rate || updated[idx].saleRate || 0,
+      lotId: best?._id || best?.id || '',
+    };
+    setGridItems(updated);
+    setActiveItemId(val);
+  };
+
+  const openLotsForItem = (itemId) => {
+    if (!itemId) return [];
+    return (inventoryLots || [])
+      .filter((lot) => {
+        const lid = lot.itemId?._id || lot.itemId || '';
+        if (String(lid) !== String(itemId)) return false;
+        const st = String(lot.status || 'Available').toLowerCase();
+        if (st === 'closed' || st === 'exhausted' || st === 'reserved') return false;
+        const mts = Number(lot.remainingMtrs ?? lot.mts ?? lot.qty ?? 0);
+        const pcs = Number(lot.remainingPcs ?? lot.pcs ?? 0);
+        return mts > 0 || pcs > 0;
+      })
+      .sort(
+        (a, b) =>
+          Number(b.remainingMtrs ?? b.mts ?? 0) - Number(a.remainingMtrs ?? a.mts ?? 0)
+      );
+  };
+
+  const lotOptionLabel = (lot) => {
+    const no = lot.lotId || lot.lotNo || String(lot._id || lot.id).slice(-6);
+    const mts = Number(lot.remainingMtrs ?? lot.mts ?? 0).toFixed(2);
+    const pcs = Number(lot.remainingPcs ?? lot.pcs ?? 0);
+    return `${no} · ${mts} mts${pcs ? ` / ${pcs} pcs` : ''}`;
+  };
+
   return (
     <>
     <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-7xl">
-      <div className="classic-erp-window flex flex-col h-full">
+      <div className="classic-erp-window erp-density flex flex-col h-full">
+        <ErpBusyOverlay show={bootLoading} message="Loading sales bill…" />
+        <ErpBusyOverlay show={!bootLoading && saving} message="Saving invoice…" />
         {/* Title Bar */}
         <div className="classic-erp-header">
           <span>Sales Invoice [ {header.book} ]</span>
@@ -540,7 +706,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         </div>
 
         {/* Form Body */}
-        <div className="classic-erp-body flex-1 overflow-y-auto space-y-3">
+        <div ref={modalContainerRef} className="classic-erp-body flex-1 overflow-y-auto space-y-3 erp-bill-layout">
           
           {mode === 'View' && (
             <div className="classic-erp-frame flex gap-3 items-center">
@@ -554,43 +720,47 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             </div>
           )}
 
-          {/* Header Block */}
+          {/* Header Block — tab order: Bill No → Date → Party → rest */}
           <div className="classic-erp-frame classic-erp-header-split">
-            <div className="classic-erp-stack">
+            <div className="classic-erp-stack classic-erp-header-bill">
+              <div className="classic-erp-meta-grid">
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label red-label">Bill No:</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input"
+                    value={header.billNo}
+                    onChange={e => setHeader({ ...header, billNo: e.target.value })}
+                    disabled={locked}
+                    autoFocus={!locked}
+                  />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Date:</span>
+                  <input type="date" className="classic-erp-input" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
+                </div>
+              </div>
+            </div>
+
+            <div className="classic-erp-stack classic-erp-header-party">
               <div className="classic-erp-field classic-erp-field--lg">
                 <span className="classic-erp-label red-label">Party:</span>
-                <div className="classic-erp-control">
-                  <select 
-                    className="classic-erp-select" 
-                    value={header.party} 
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val === 'NEW_PARTY') {
-                        handleCreateAccount('');
-                        return;
-                      }
-                      const p = parties.find(x => x._id === val || x.id === val);
-                      setHeader({ ...header, party: val, add: p?.address || '', gstin: p?.gstin || '', city: p?.station || p?.city || '' });
-                    }}
+                <div className="classic-erp-control" style={{display:'flex',alignItems:'center',gap:4}}>
+                  <ERPCombobox
+                    value={header.party}
+                    onChange={onPartySelect}
+                    options={partyOptions}
+                    placeholder="Search party / customer…"
                     disabled={locked}
-                  >
-                    <option value="">- Select Party / Customer -</option>
-                    {!locked && (
-                      <option value="NEW_PARTY" className="text-blue-600 font-bold bg-blue-50">+ Add New Party / Customer...</option>
-                    )}
-                    {parties.filter(p => p.type !== 'Broker').map(p => (
-                      <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                    recentKey="sales-party"
+                    onCreateNew={!locked ? (q) => handleCreateAccount(q) : undefined}
+                    createLabel="Party"
+                    inputClassName="border-0 flex-1"
+                  />
                   {!locked && (
-                    <button
-                      type="button"
-                      onClick={() => handleCreateAccount('')}
-                      className="classic-erp-btn p-0 w-8 flex items-center justify-center shrink-0"
-                      style={{ height: '32px', minHeight: '32px' }}
-                      title="Add New Party / Customer"
-                    >
-                      <Plus size={14} strokeWidth={2.5} />
+                    <button type="button" title="Add new party" onClick={() => handleCreateAccount('')}
+                      style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:2,padding:'3px 8px',fontSize:11,fontWeight:700,color:'#fff',background:'#16a34a',border:'none',borderRadius:4,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      <Plus size={11}/> Add
                     </button>
                   )}
                 </div>
@@ -606,77 +776,57 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="classic-erp-stack">
-              <div className="classic-erp-meta-grid">
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label red-label">Bill No:</span>
-                  <input type="text" className="classic-erp-input" value={header.billNo} readOnly />
-                </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Date:</span>
-                  <input type="date" className="classic-erp-input" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
-                </div>
-                {showChallan ? (
-                  <>
-                    <div className="classic-erp-field">
-                      <span className="classic-erp-label">Challan:</span>
-                      <input type="text" className="classic-erp-input" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
-                    </div>
-                    <div className="classic-erp-field">
-                      <span className="classic-erp-label">Ch Date:</span>
-                      <input type="date" className="classic-erp-input" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
-                    </div>
-                  </>
-                ) : null}
+          {(showChallan || billFields.header('orderNo') || billFields.header('orderDate')) ? (
+            <div className="classic-erp-frame classic-erp-meta-grid">
+              {showChallan ? (
+                <>
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">Challan:</span>
+                    <input type="text" className="classic-erp-input" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
+                  </div>
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">Ch Date:</span>
+                    <input type="date" className="classic-erp-input" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
+                  </div>
+                </>
+              ) : null}
+              {billFields.header('orderNo') ? (
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Order No:</span>
                   <input type="text" className="classic-erp-input" value={header.orderNo} onChange={e => setHeader({ ...header, orderNo: e.target.value })} disabled={locked} />
                 </div>
+              ) : null}
+              {billFields.header('orderDate') ? (
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Ord Date:</span>
                   <input type="date" className="classic-erp-input" value={header.orderDate} onChange={e => setHeader({ ...header, orderDate: e.target.value })} disabled={locked} />
                 </div>
-              </div>
+              ) : null}
             </div>
-          </div>
+          ) : null}
 
           {/* Broker / Haste / Type */}
           <div className="classic-erp-frame classic-erp-meta-grid--3">
             {showBroker ? (
               <div className="classic-erp-field">
                 <span className="classic-erp-label">Broker:</span>
-                <div className="classic-erp-control">
-                  <select 
-                    className="classic-erp-select" 
-                    value={header.broker} 
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val === 'NEW_BROKER') {
-                        handleCreateBroker('');
-                        return;
-                      }
-                      setHeader({ ...header, broker: val });
-                    }} 
+                <div style={{display:'flex',alignItems:'center',gap:4}}>
+                  <ERPCombobox
+                    value={header.broker}
+                    onChange={(val) => setHeader({ ...header, broker: val })}
+                    options={brokerOptions}
+                    placeholder="Search broker…"
                     disabled={locked}
-                  >
-                    <option value="">- Select Broker -</option>
-                    {!locked && (
-                      <option value="NEW_BROKER" className="text-blue-600 font-bold bg-blue-50">+ Add New Broker...</option>
-                    )}
-                    {parties.filter(p => p.type === 'Broker').map(p => (
-                      <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                    recentKey="sales-broker"
+                    onCreateNew={!locked ? (q) => handleCreateBroker(q) : undefined}
+                    createLabel="Broker"
+                  />
                   {!locked && (
-                    <button
-                      type="button"
-                      onClick={() => handleCreateBroker('')}
-                      className="classic-erp-btn p-0 w-8 flex items-center justify-center shrink-0"
-                      style={{ height: '32px', minHeight: '32px' }}
-                      title="Add New Broker"
-                    >
-                      <Plus size={14} strokeWidth={2.5} />
+                    <button type="button" title="Add new broker" onClick={() => handleCreateBroker('')}
+                      style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:2,padding:'3px 8px',fontSize:11,fontWeight:700,color:'#fff',background:'#16a34a',border:'none',borderRadius:4,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      <Plus size={11}/> Add
                     </button>
                   )}
                 </div>
@@ -684,10 +834,14 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             ) : (
               <div />
             )}
+            {billFields.header('haste') ? (
             <div className="classic-erp-field">
               <span className="classic-erp-label">Haste:</span>
               <input type="text" className="classic-erp-input" value={header.haste} onChange={e => setHeader({ ...header, haste: e.target.value })} disabled={locked} />
             </div>
+            ) : (
+              <div />
+            )}
             <div className="classic-erp-field">
               <span className="classic-erp-label">Type:</span>
               <select className="classic-erp-select" value={header.type} onChange={e => setHeader({ ...header, type: e.target.value })} disabled={locked}>
@@ -698,13 +852,14 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           </div>
 
           {/* Item Grid Table */}
-          <div className="classic-erp-table-container max-h-64">
+          <div className="classic-erp-table-container erp-grid-panel">
             <table className="classic-erp-table">
               <thead>
                 <tr>
                   <th className="w-8 text-center">SrNo</th>
-                  <th>Item Name</th>
-                  <th className="w-24">Desc</th>
+                  <th className="col-item">Item Name</th>
+                  <th className="w-36 text-center" title="Stock lot is mandatory for sale">Lot *</th>
+                  <th className="col-desc">Desc</th>
                   <th className="w-16 text-center">Fold</th>
                   <th className="w-16 text-center">Cut</th>
                   <th className="w-16 text-center">Pcs</th>
@@ -725,68 +880,88 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 {gridItems.map((row, idx) => (
                   <tr key={row.id || idx}>
                     <td className="text-center font-bold">{idx + 1}</td>
-                    <td>
-                      <div className="flex items-center gap-1 w-full px-1">
-                        <select
-                          className="classic-erp-select flex-1 border-0"
-                          style={{ height: '30px' }}
+                    <td className="col-item" style={{position:'relative'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:2}}>
+                        <ERPCombobox
                           value={row.itemId}
-                          onChange={e => {
-                            const val = e.target.value;
-                            if (val === 'NEW_ITEM') {
-                              handleCreateItem('', idx);
-                              return;
-                            }
-                            const item = items.find(i => i._id === val || i.id === val);
-                            const updated = [...gridItems];
-                            // Prefer largest available lot for this item so sale deducts inventory
-                            const openLots = (inventoryLots || [])
-                              .filter((lot) => {
-                                const lid = lot.itemId?._id || lot.itemId || '';
-                                if (String(lid) !== String(val)) return false;
-                                const st = String(lot.status || 'Available').toLowerCase();
-                                if (st === 'closed' || st === 'exhausted') return false;
-                                return Number(lot.remainingMtrs ?? lot.mts ?? 0) > 0;
-                              })
-                              .sort(
-                                (a, b) =>
-                                  Number(b.remainingMtrs ?? b.mts ?? 0) -
-                                  Number(a.remainingMtrs ?? a.mts ?? 0)
-                              );
-                            const best = openLots[0];
-                            updated[idx] = {
-                              ...updated[idx],
-                              itemId: val,
-                              itemName: item?.itemName || item?.name || '',
-                              saleRate: item?.salesRate || best?.rate || updated[idx].saleRate || 0,
-                              lotId: best?._id || best?.id || '',
-                            };
-                            setGridItems(updated);
-                            setActiveItemId(val);
-                          }}
+                          onChange={(val) => onGridItemSelect(val, idx)}
+                          options={itemOptions}
+                          placeholder="Search item…"
                           disabled={locked}
-                        >
-                          <option value="">- Select Item -</option>
-                          {!locked && (
-                            <option value="NEW_ITEM" className="text-blue-600 font-bold bg-blue-50">+ Add New Item...</option>
-                          )}
-                          {items.map(i => (
-                            <option key={i._id || i.id} value={i._id || i.id}>{i.itemName}</option>
-                          ))}
-                        </select>
+                          recentKey="sales-item"
+                          onCreateNew={!locked ? (q) => handleCreateItem(q, idx) : undefined}
+                          createLabel="Item"
+                          inputClassName="border-0"
+                        />
                         {!locked && (
-                          <button
-                            type="button"
-                            onClick={() => handleCreateItem('', idx)}
-                            className="text-blue-600 hover:text-blue-800 p-1 flex items-center justify-center shrink-0"
-                            title="Add New Item"
-                          >
-                            <Plus size={14} strokeWidth={2.5} />
+                          <button type="button" title="Add new item" onClick={() => handleCreateItem('', idx)}
+                            style={{flexShrink:0,display:'inline-flex',alignItems:'center',padding:'2px 5px',fontSize:10,fontWeight:700,color:'#16a34a',background:'transparent',border:'1px solid #16a34a',borderRadius:4,cursor:'pointer',whiteSpace:'nowrap'}}>
+                            <Plus size={10}/>
                           </button>
                         )}
                       </div>
                     </td>
-                    <td>
+                    <td
+                      className="text-center"
+                      style={{
+                        background: row.itemId && !row.lotId ? 'rgba(185, 28, 28, 0.12)' : 'rgba(180, 83, 9, 0.08)',
+                        minWidth: 140,
+                      }}
+                    >
+                      <select
+                        className="classic-erp-input w-full border-0 text-xs font-bold"
+                        value={row.lotId || ''}
+                        disabled={locked || !row.itemId}
+                        title={!row.itemId ? 'Select item first' : 'Select stock lot'}
+                        onChange={(e) => {
+                          const lotId = e.target.value;
+                          const lot = (inventoryLots || []).find(
+                            (l) => String(l._id || l.id) === String(lotId)
+                          );
+                          const updated = [...gridItems];
+                          updated[idx] = {
+                            ...updated[idx],
+                            lotId,
+                            saleRate: lot?.rate || updated[idx].saleRate || 0,
+                          };
+                          setGridItems(updated);
+                          setActiveItemId(row.itemId);
+                        }}
+                        onFocus={() => row.itemId && setActiveItemId(row.itemId)}
+                        style={{
+                          color: row.lotId ? '#1e3a5f' : '#b91c1c',
+                          fontWeight: 700,
+                        }}
+                      >
+                        <option value="">
+                          {row.itemId
+                            ? openLotsForItem(row.itemId).length
+                              ? '— Select Lot —'
+                              : 'No open lot'
+                            : 'Item first'}
+                        </option>
+                        {(() => {
+                          const open = openLotsForItem(row.itemId);
+                          const ids = new Set(open.map((l) => String(l._id || l.id)));
+                          const extras = [];
+                          if (row.lotId && !ids.has(String(row.lotId))) {
+                            const cur = (inventoryLots || []).find(
+                              (l) => String(l._id || l.id) === String(row.lotId)
+                            );
+                            if (cur) extras.push(cur);
+                          }
+                          return [...extras, ...open].map((lot) => {
+                            const id = lot._id || lot.id;
+                            return (
+                              <option key={id} value={id}>
+                                {lotOptionLabel(lot)}
+                              </option>
+                            );
+                          });
+                        })()}
+                      </select>
+                    </td>
+                    <td className="col-desc">
                       <input type="text" className="classic-erp-input w-full border-0" value={row.desc} onChange={e => {
                         const updated = [...gridItems]; updated[idx].desc = e.target.value; setGridItems(updated);
                       }} disabled={locked} />
@@ -908,6 +1083,12 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             </div>
           )}
 
+          {gridItems.some((r) => r.itemId && !r.lotId) && !locked && (
+            <div className="text-xs font-bold px-3 py-1.5 rounded-md border border-red-300 text-red-800 bg-red-50">
+              Lot * column is required on every item line — without lot, stock will not reduce correctly.
+            </div>
+          )}
+
           {/* Lot / Bill History Sub-table */}
           {lotHistory.length > 0 && (
             <div className="classic-erp-table-container max-h-36">
@@ -967,7 +1148,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 { label: 'DISCOUNT', key: 'discountAmt', signKey: 'discountSign' },
                 { label: 'LESS', key: 'lessAmt', signKey: 'lessSign' },
                 { label: 'ADD', key: 'addAmt', signKey: 'addSign' }
-              ].map(adj => (
+              ].filter((adj) => billFields.footer(adj.key)).map(adj => (
                 <div key={adj.key} className="classic-erp-adj-row">
                   <span className="classic-erp-label">{adj.label}:</span>
                   <select
@@ -1002,35 +1183,44 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             </div>
 
             {/* Middle Transport Details Column */}
+            {(billFields.footer('transport') || billFields.footer('lrNo') || billFields.footer('bale')) && (
             <div className="col-span-4 classic-erp-frame classic-erp-stack p-2">
               <span className="classic-erp-frame-title">Transport Details</span>
               
+              {billFields.footer('transport') && (
               <div className="classic-erp-field classic-erp-field--lg">
                 <span className="classic-erp-label">Transport:</span>
                 <input type="text" className="classic-erp-input" value={footer.transport} onChange={e => setFooter({ ...footer, transport: e.target.value })} disabled={locked} />
               </div>
+              )}
               <div className="classic-erp-field classic-erp-field--lg">
                 <span className="classic-erp-label">City:</span>
                 <input type="text" className="classic-erp-input" value={footer.station} onChange={e => setFooter({ ...footer, station: e.target.value })} disabled={locked} />
               </div>
 
               <div className="classic-erp-meta-grid">
+                {billFields.footer('lrNo') && (
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Lr No:</span>
                   <input type="text" className="classic-erp-input" value={footer.lrNo} onChange={e => setFooter({ ...footer, lrNo: e.target.value })} disabled={locked} />
                 </div>
+                )}
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Lr Dt:</span>
                   <input type="date" className="classic-erp-input" value={footer.lrDate} onChange={e => setFooter({ ...footer, lrDate: e.target.value })} disabled={locked} />
                 </div>
+                {billFields.footer('bale') && (
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Bale:</span>
                   <input type="text" className="classic-erp-input" value={footer.baleNo} onChange={e => setFooter({ ...footer, baleNo: e.target.value })} disabled={locked} />
                 </div>
+                )}
+                {billFields.footer('weight') && (
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Weight:</span>
                   <input type="number" className="classic-erp-input" value={footer.weight || ''} onChange={e => setFooter({ ...footer, weight: Number(e.target.value) })} disabled={locked} />
                 </div>
+                )}
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Freight:</span>
                   <input type="number" className="classic-erp-input" value={footer.freight || ''} onChange={e => setFooter({ ...footer, freight: Number(e.target.value) })} disabled={locked} />
@@ -1038,6 +1228,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 <button className="classic-erp-btn btn-red w-full" type="button" disabled>E-Way Bill</button>
               </div>
             </div>
+            )}
 
             {/* Right Totals & GST Summary Column */}
             <div className="col-span-4 classic-erp-frame classic-erp-stack p-2 bg-[var(--accent-light)] pb-3">
@@ -1123,11 +1314,16 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
         {/* Form Footer Action Toolbar */}
         <div className="classic-erp-form-footer">
-          <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View'}>New</button>
-          <button className="classic-erp-btn btn-blue" type="button" onClick={handleSave} disabled={locked}>Save</button>
-          <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked}>Cancel</button>
-          <button className="classic-erp-btn" type="button" onClick={() => setMode('View')} disabled={readOnly || mode === 'View'}>Find</button>
-          <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || !selectedInvoiceId}>Delete</button>
+          <span className="text-[10px] text-[var(--text-muted)] mr-auto hidden sm:inline">
+            Enter → next field · Ctrl+Enter save · Alt+S save · Esc close
+          </span>
+          <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving}>New</button>
+          <button className="classic-erp-btn btn-blue" type="button" data-enter-save onClick={handleSave} disabled={locked || saving || bootLoading}>
+            <SaveButtonLabel saving={saving} />
+          </button>
+          <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked || saving}>Cancel</button>
+          <button className="classic-erp-btn" type="button" onClick={() => setMode('View')} disabled={readOnly || mode === 'View' || saving}>Find</button>
+          <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || saving || !selectedInvoiceId}>Delete</button>
           <button className="classic-erp-btn btn-blue" type="button" onClick={handlePrint} disabled={!selectedInvoiceId && !initialData}>PDF / Print</button>
           <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
         </div>

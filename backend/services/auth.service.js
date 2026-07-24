@@ -25,6 +25,10 @@ const generateToken = (user) => {
 };
 
 exports.register = async (name, email, password, companyName) => {
+    const securityConfigService = require('./securityConfigService');
+    const check = securityConfigService.validatePassword(password);
+    if (!check.ok) throw new Error(`Password policy: ${check.gaps.join(', ')}`);
+
     // 1. Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) throw new Error('Email already registered');
@@ -38,7 +42,16 @@ exports.register = async (name, email, password, companyName) => {
             priceYearly: 290,
             features: {
                 offlineMode: true,
-                modules: { purchase: true, inventory: true, sales: true, jobWork: false, accounting: false, gst: false, reports: false, offline: true }
+                modules: {
+                    purchase: true,
+                    inventory: true,
+                    sales: true,
+                    jobWork: true,
+                    accounting: true,
+                    gst: true,
+                    reports: true,
+                    offline: true,
+                },
             },
             limits: { users: 5, invoicesPerMonth: 100, storageMb: 500 }
         });
@@ -136,15 +149,54 @@ exports.register = async (name, email, password, companyName) => {
     };
 };
 
-exports.login = async (email, password) => {
-    const user = await User.findOne({ email }).select('+password');
-    if (!user || !(await user.comparePassword(password))) {
+exports.login = async (email, password, req = null) => {
+    const securityConfigService = require('./securityConfigService');
+    const sessionService = require('./sessionService');
+
+    const user = await User.findOne({ email }).select('+password +failedLoginAttempts +lockUntil');
+    if (!user) {
+        if (req) await sessionService.recordLogin(null, 'login_failed', req, { success: false, reason: 'unknown_user', meta: { email } });
+        throw new Error('Invalid credentials');
+    }
+
+    if (user.isLocked && user.isLocked()) {
+        await sessionService.recordLogin(user, 'lockout', req || {}, { success: false, reason: 'account_locked' });
+        throw new Error('Account temporarily locked due to failed attempts. Try again later.');
+    }
+
+    if (!(await user.comparePassword(password))) {
+        const cfg = await securityConfigService.getOrCreate(user.companyId);
+        const max = cfg.lockout?.maxFailedAttempts || 5;
+        const mins = cfg.lockout?.lockoutMinutes || 30;
+        user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+        user.lastFailedLoginAt = new Date();
+        if (user.failedLoginAttempts >= max) {
+            user.lockUntil = new Date(Date.now() + mins * 60 * 1000);
+            user.failedLoginAttempts = 0;
+        }
+        await user.save();
+        await sessionService.recordLogin(user, 'login_failed', req || {}, { success: false, reason: 'bad_password' });
         throw new Error('Invalid credentials');
     }
 
     if (!user.isActive) throw new Error('Account deactivated. Please contact support.');
 
-    const token = generateToken(user);
+    // Clear lockout on success
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    user.lastLoginAt = new Date();
+    user.lastLoginIp = req?.ip || '';
+    await user.save();
+
+    const sessionBundle = await sessionService.createSession(user, req || {});
+    const suspicious = await sessionService.detectSuspicious(user, req || {});
+    await sessionService.recordLogin(user, 'login_success', req || {}, {
+        sessionId: sessionBundle.session.sessionId,
+        success: true,
+        meta: suspicious,
+    });
+
+    const token = sessionBundle.accessToken;
 
     // Fetch company/plan details for user
     let planFeatures = null;
@@ -203,6 +255,10 @@ exports.login = async (email, password) => {
 
     return {
         token,
+        refreshToken: sessionBundle.refreshToken,
+        sessionId: sessionBundle.session.sessionId,
+        expiresAt: sessionBundle.expiresAt,
+        suspicious: suspicious.suspicious || false,
         user: {
             id: user._id,
             name: user.name,
@@ -248,6 +304,7 @@ exports.forgotPassword = async (email) => {
  * Validates a reset token and updates the password.
  */
 exports.resetPassword = async (token, newPassword) => {
+    const securityConfigService = require('./securityConfigService');
     const hashed = crypto.createHash('sha256').update(token).digest('hex');
     const user = await User.findOne({
         passwordResetToken: hashed,
@@ -256,10 +313,24 @@ exports.resetPassword = async (token, newPassword) => {
 
     if (!user) throw new Error('Password reset token is invalid or has expired.');
 
+    const cfg = await securityConfigService.getOrCreate(user.companyId);
+    const check = securityConfigService.validatePassword(newPassword, cfg.passwordPolicy);
+    if (!check.ok) throw new Error(`Password policy: ${check.gaps.join(', ')}`);
+
     user.password = newPassword;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
     await user.save();
+
+    try {
+        const sessionService = require('./sessionService');
+        await sessionService.revokeAll(user._id, null, 'password_reset');
+        await sessionService.recordLogin(user, 'password_reset', {}, { success: true });
+    } catch {
+        /* optional */
+    }
 
     return { message: 'Password has been reset successfully.' };
 };

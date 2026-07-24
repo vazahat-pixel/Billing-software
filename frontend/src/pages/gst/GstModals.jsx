@@ -2,7 +2,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
 import { toast } from '../../store/useToastStore';
+import { SkeletonTable } from '../../components/ui/loaders';
+import { notifyError } from '../../utils/notify';
 import { downloadJson, getMonthDateRange, buildGstr1Filename } from '../../utils/gstExport';
+import { stage4Api } from '../../api/stage4.api';
 import {
    Check,
    AlertTriangle,
@@ -24,78 +27,59 @@ import {
 // 1. GSTR-3B MONTHLY COMPLIANCE MODAL
 // ==========================================
 export const Gst3bMonthlyModal = ({ isOpen, onClose }) => {
-   const { sales, purchases, fetchSales, fetchPurchases } = useStore();
-   const [selectedMonth, setSelectedMonth] = useState('2026-05');
+   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
    const [isFiling, setIsFiling] = useState(false);
    const [filedStatus, setFiledStatus] = useState(false);
+   const [loading, setLoading] = useState(false);
+   const [reportData, setReportData] = useState(null);
 
    useEffect(() => {
-      if (isOpen) {
-         fetchSales();
-         fetchPurchases();
-      }
-   }, [isOpen, fetchSales, fetchPurchases]);
+      if (!isOpen) return;
+      setLoading(true);
+      setFiledStatus(false);
+      stage4Api.gstr3b({ period: selectedMonth })
+         .then((data) => {
+            const outward = data?.outward || {};
+            const inward = data?.inward || {};
+            const net = data?.netPayable || {};
+            setReportData({
+               salesTaxable: outward.taxable || 0,
+               salesCgst: outward.cgst || 0,
+               salesSgst: outward.sgst || 0,
+               salesIgst: outward.igst || 0,
+               salesTotalGst: (outward.cgst || 0) + (outward.sgst || 0) + (outward.igst || 0),
+               purchasesTaxable: inward.taxable || 0,
+               purchasesCgst: inward.cgst || 0,
+               purchasesSgst: inward.sgst || 0,
+               purchasesIgst: inward.igst || 0,
+               purchasesTotalGst: (inward.cgst || 0) + (inward.sgst || 0) + (inward.igst || 0),
+               netCgst: net.cgst || 0,
+               netSgst: net.sgst || 0,
+               netIgst: net.igst || 0,
+               netTotal: (net.cgst || 0) + (net.sgst || 0) + (net.igst || 0) + (net.cess || 0),
+            });
+         })
+         .catch((err) => notifyError(err, 'Failed to load GSTR-3B'))
+         .finally(() => setLoading(false));
+   }, [isOpen, selectedMonth]);
 
-   const reportData = useMemo(() => {
-      let totalSalesTaxable = 0;
-      let outwardCgst = 0;
-      let outwardSgst = 0;
-      let outwardIgst = 0;
+   const display = reportData || {
+      salesTaxable: 0, salesCgst: 0, salesSgst: 0, salesIgst: 0, salesTotalGst: 0,
+      purchasesTaxable: 0, purchasesCgst: 0, purchasesSgst: 0, purchasesIgst: 0, purchasesTotalGst: 0,
+      netCgst: 0, netSgst: 0, netIgst: 0, netTotal: 0,
+   };
 
-      sales.forEach(s => {
-         const taxable = parseFloat(s.totals?.taxable || s.totals?.subtotal || 0);
-         const gst = parseFloat(s.totals?.gst || s.totals?.gstAmt || 0);
-         totalSalesTaxable += taxable;
-         const hasGstin = s.gstin && s.gstin.trim().length >= 2;
-         const isOutstate = hasGstin && !s.gstin.startsWith('24');
-         if (isOutstate) outwardIgst += gst;
-         else { outwardCgst += gst / 2; outwardSgst += gst / 2; }
-      });
-
-      let totalPurchasesTaxable = 0;
-      let inwardCgst = 0;
-      let inwardSgst = 0;
-      let inwardIgst = 0;
-
-      purchases.forEach(p => {
-         const taxable = parseFloat(p.totalAmount || p.totals?.subtotal || 0);
-         const gst = parseFloat(p.gstAmount || p.totals?.gst || 0);
-         totalPurchasesTaxable += taxable;
-         const hasGstin = p.supplierId?.gstin && p.supplierId.gstin.trim().length >= 2;
-         const isOutstate = hasGstin && !p.supplierId.gstin.startsWith('24');
-         if (isOutstate) inwardIgst += gst;
-         else { inwardCgst += gst / 2; inwardSgst += gst / 2; }
-      });
-
-      const netCgstPayable = outwardCgst - inwardCgst;
-      const netSgstPayable = outwardSgst - inwardSgst;
-      const netIgstPayable = outwardIgst - inwardIgst;
-      const netTotalPayable = netCgstPayable + netSgstPayable + netIgstPayable;
-
-      return {
-         salesTaxable: totalSalesTaxable,
-         salesCgst: outwardCgst,
-         salesSgst: outwardSgst,
-         salesIgst: outwardIgst,
-         salesTotalGst: outwardCgst + outwardSgst + outwardIgst,
-         purchasesTaxable: totalPurchasesTaxable,
-         purchasesCgst: inwardCgst,
-         purchasesSgst: inwardSgst,
-         purchasesIgst: inwardIgst,
-         purchasesTotalGst: inwardCgst + inwardSgst + inwardIgst,
-         netCgst: netCgstPayable,
-         netSgst: netSgstPayable,
-         netIgst: netIgstPayable,
-         netTotal: netTotalPayable
-      };
-   }, [sales, purchases, selectedMonth]);
-
-   const handleFileReturn = () => {
+   const handleFileReturn = async () => {
       setIsFiling(true);
-      setTimeout(() => {
-         setIsFiling(false);
+      try {
+         await stage4Api.snapshotReturn({ returnType: 'GSTR3B', period: selectedMonth });
          setFiledStatus(true);
-      }, 2000);
+         toast.success('GSTR-3B snapshot saved — ready for GST portal upload');
+      } catch (err) {
+         notifyError(err, 'GSTR-3B snapshot failed');
+      } finally {
+         setIsFiling(false);
+      }
    };
 
    return (
@@ -124,7 +108,7 @@ export const Gst3bMonthlyModal = ({ isOpen, onClose }) => {
                         }`}
                   >
                      {isFiling ? <RefreshCw size={14} className="animate-spin" /> : filedStatus ? <CheckCircle2 size={14} /> : <Play size={14} />}
-                     {isFiling ? 'Processing...' : filedStatus ? 'Return Filed' : 'Execute Filing'}
+                     {isFiling ? 'Processing...' : filedStatus ? 'Snapshot Saved' : 'Save Filing Snapshot'}
                   </button>
                </div>
             </div>
@@ -141,21 +125,21 @@ export const Gst3bMonthlyModal = ({ isOpen, onClose }) => {
                      <div className="space-y-4">
                         <div className="flex justify-between items-center text-[11px] font-bold text-slate-400 uppercase">
                            <span>Taxable Turnover</span>
-                           <span className="text-black font-black">₹ {reportData.salesTaxable.toLocaleString()}</span>
+                           <span className="text-black font-black">₹ {display.salesTaxable.toLocaleString()}</span>
                         </div>
                         <div className="space-y-2 pt-4">
                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
                               <span>IGST</span>
-                              <span className="text-black">₹ {reportData.salesIgst.toLocaleString()}</span>
+                              <span className="text-black">₹ {display.salesIgst.toLocaleString()}</span>
                            </div>
                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
                               <span>CGST / SGST</span>
-                              <span className="text-black">₹ {reportData.salesCgst.toLocaleString()} × 2</span>
+                              <span className="text-black">₹ {display.salesCgst.toLocaleString()} × 2</span>
                            </div>
                         </div>
                         <div className="pt-6 border-t border-slate-50">
                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Gross Liability</span>
-                           <h3 className="text-3xl font-black text-black tracking-tight">₹ {reportData.salesTotalGst.toLocaleString()}</h3>
+                           <h3 className="text-3xl font-black text-black tracking-tight">₹ {display.salesTotalGst.toLocaleString()}</h3>
                         </div>
                      </div>
                   </div>
@@ -168,21 +152,21 @@ export const Gst3bMonthlyModal = ({ isOpen, onClose }) => {
                      <div className="space-y-4">
                         <div className="flex justify-between items-center text-[11px] font-bold text-slate-400 uppercase">
                            <span>Inward Turnover</span>
-                           <span className="text-black font-black">₹ {reportData.purchasesTaxable.toLocaleString()}</span>
+                           <span className="text-black font-black">₹ {display.purchasesTaxable.toLocaleString()}</span>
                         </div>
                         <div className="space-y-2 pt-4">
                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
                               <span>IGST</span>
-                              <span className="text-black">₹ {reportData.purchasesIgst.toLocaleString()}</span>
+                              <span className="text-black">₹ {display.purchasesIgst.toLocaleString()}</span>
                            </div>
                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
                               <span>CGST / SGST</span>
-                              <span className="text-black">₹ {reportData.purchasesCgst.toLocaleString()} × 2</span>
+                              <span className="text-black">₹ {display.purchasesCgst.toLocaleString()} × 2</span>
                            </div>
                         </div>
                         <div className="pt-6 border-t border-slate-50">
                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">ITC Available</span>
-                           <h3 className="text-3xl font-black text-black tracking-tight">₹ {reportData.purchasesTotalGst.toLocaleString()}</h3>
+                           <h3 className="text-3xl font-black text-black tracking-tight">₹ {display.purchasesTotalGst.toLocaleString()}</h3>
                         </div>
                      </div>
                   </div>
@@ -194,16 +178,16 @@ export const Gst3bMonthlyModal = ({ isOpen, onClose }) => {
                   <div className="relative z-10">
                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.4em] mb-4">Compliance Status</p>
                      <h2 className="text-5xl font-black text-white tracking-tighter">
-                        ₹ {Math.abs(reportData.netTotal).toLocaleString()}
+                        ₹ {Math.abs(display.netTotal).toLocaleString()}
                      </h2>
-                     <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest mt-2">{reportData.netTotal < 0 ? 'Surplus Credit' : 'Net Tax Payable'}</p>
+                     <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest mt-2">{display.netTotal < 0 ? 'Surplus Credit' : 'Net Tax Payable'}</p>
                   </div>
 
                   <div className="relative z-10 grid grid-cols-3 gap-4 pt-10 border-t border-white/10">
                      {['CGST', 'SGST', 'IGST'].map(tax => (
                         <div key={tax}>
                            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">{tax}</p>
-                           <p className="text-[11px] font-black text-white tracking-tight">₹ {Math.abs(reportData.netTotal / 3).toFixed(0)}</p>
+                           <p className="text-[11px] font-black text-white tracking-tight">₹ {Math.abs(display.netTotal / 3).toFixed(0)}</p>
                         </div>
                      ))}
                   </div>
@@ -220,91 +204,149 @@ export const Gst3bMonthlyModal = ({ isOpen, onClose }) => {
 // 2. GSTR-1 OUTWARD SUPPLIES RETURN MODAL
 // ==========================================
 export const Gstr1Modal = ({ isOpen, onClose }) => {
-   const { sales, fetchSales, fetchGstr1 } = useStore();
+   const { fetchGstr1 } = useStore();
    const [activeTab, setActiveTab] = useState('b2b');
    const [exporting, setExporting] = useState(false);
-   const { startDate, endDate } = getMonthDateRange();
+   const [loading, setLoading] = useState(false);
+   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+   const [gstr1Data, setGstr1Data] = useState(null);
+
+   const { startDate, endDate } = useMemo(
+      () => getMonthDateRange(new Date(`${selectedMonth}-01T12:00:00`)),
+      [selectedMonth]
+   );
 
    useEffect(() => {
-      if (isOpen) fetchSales();
-   }, [isOpen, fetchSales]);
+      if (!isOpen) return;
+      setLoading(true);
+      fetchGstr1(startDate, endDate)
+         .then((data) => setGstr1Data(data || null))
+         .catch((err) => {
+            notifyError(err, 'Failed to load GSTR-1');
+            setGstr1Data(null);
+         })
+         .finally(() => setLoading(false));
+   }, [isOpen, startDate, endDate, fetchGstr1]);
 
    const handleDownloadJson = async () => {
       setExporting(true);
       try {
-         const data = await fetchGstr1(startDate, endDate);
-         downloadJson(data, buildGstr1Filename(startDate, endDate));
+         const data = gstr1Data || (await fetchGstr1(startDate, endDate));
+         // Portal-shaped payload only (gstin, fp, b2b, b2cl, b2cs, hsn, …)
+         const {
+            invoices: _inv,
+            period: _period,
+            totals: _totals,
+            ...payload
+         } = data || {};
+         const clean = data?.payload || payload;
+         downloadJson(clean, buildGstr1Filename(startDate, endDate));
+         toast.success(`GSTR-1 JSON exported for ${selectedMonth}`);
       } catch (err) {
-         alert(err.response?.data?.message || err.message || 'GSTR-1 export failed');
+         notifyError(err, 'GSTR-1 export failed');
       } finally {
          setExporting(false);
       }
    };
 
    const invoiceData = useMemo(() => {
+      const payload = gstr1Data?.payload || gstr1Data || {};
       const b2b = [];
-      const b2cLarge = [];
-      const b2cSmall = [];
-      const hsnSummary = {};
-      let totalTaxable = 0;
-      let totalGst = 0;
-
-      sales.forEach(s => {
-         const isRegistered = s.gstin && s.gstin.trim().length >= 15;
-         const taxable = parseFloat(s.totals?.taxable || s.totals?.subtotal || 0);
-         const gst = parseFloat(s.totals?.gst || s.totals?.gstAmt || 0);
-         const isInterState = s.gstin && !s.gstin.startsWith('24');
-
-         const row = {
-            id: s.id, invoiceNo: s.invoiceNo, date: s.date,
-            partyName: s.partyName || s.customerId?.name || 'Cash Customer',
-            gstin: s.gstin || s.customerId?.gstin || 'N/A',
-            taxable, total: taxable + gst, hsn: s.items?.[0]?.hsn || '5208'
-         };
-
-         if (isRegistered) {
-            b2b.push(row);
-         } else {
-            if (isInterState && taxable > 250000) b2cLarge.push(row);
-            else b2cSmall.push(row);
+      for (const party of payload.b2b || []) {
+         for (const inv of party.inv || []) {
+            const det = inv.itms?.[0]?.itm_det || {};
+            b2b.push({
+               invoiceNo: inv.inum,
+               date: inv.idt,
+               partyName: party.ctin,
+               gstin: party.ctin,
+               taxable: det.txval || 0,
+               total: inv.val || 0,
+            });
          }
-
-         const hsn = row.hsn;
-         if (!hsnSummary[hsn]) hsnSummary[hsn] = { hsn, taxable: 0, gst: 0, qty: 0 };
-         hsnSummary[hsn].taxable += taxable;
-         hsnSummary[hsn].gst += gst;
+      }
+      const b2cLarge = (payload.b2cl || []).map((inv) => {
+         const det = inv.itms?.[0]?.itm_det || {};
+         return {
+            invoiceNo: inv.inum,
+            date: inv.idt,
+            partyName: 'B2C Large',
+            gstin: inv.pos || 'N/A',
+            taxable: det.txval || 0,
+            total: inv.val || 0,
+         };
       });
-
-      return { b2b, b2cLarge, b2cSmall, hsn: Object.values(hsnSummary), totalTaxable, totalGst };
-   }, [sales]);
+      const b2cSmall = (payload.b2cs || []).map((row) => ({
+         invoiceNo: `${row.sply_ty || 'OE'} @ ${row.rt || 0}%`,
+         date: 'Aggregate',
+         partyName: `POS ${row.pos || '—'}`,
+         gstin: row.sply_ty || 'B2CS',
+         taxable: row.txval || 0,
+         total: (row.txval || 0) + (row.iamt || 0) + (row.camt || 0) + (row.samt || 0),
+      }));
+      const hsn = (payload.hsn?.data || []).map((h) => ({
+         hsn: h.hsn_sc,
+         invoiceNo: h.hsn_sc,
+         date: h.desc || 'HSN',
+         partyName: h.desc || 'HSN',
+         gstin: `Qty ${h.qty || 0}`,
+         taxable: h.txval || 0,
+         total: (h.txval || 0) + (h.iamt || 0) + (h.camt || 0) + (h.samt || 0),
+         gst: (h.iamt || 0) + (h.camt || 0) + (h.samt || 0),
+      }));
+      const totals = gstr1Data?.totals || {};
+      return {
+         b2b,
+         b2cLarge,
+         b2cSmall,
+         hsn,
+         totalTaxable: totals.taxable || 0,
+         totalGst: (totals.cgst || 0) + (totals.sgst || 0) + (totals.igst || 0),
+         invoiceCount: totals.invoiceCount || b2b.length + b2cLarge.length,
+      };
+   }, [gstr1Data]);
 
    return (
       <Modal isOpen={isOpen} onClose={onClose} title="GSTR-1 Outward Supplies" className="max-w-[95vw] h-[92vh] bg-white rounded-[2.5rem] p-0 border-none shadow-2xl">
          <div className="flex flex-col h-full p-10 space-y-8">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-4">
                <div>
                   <h2 className="text-4xl font-black text-black tracking-tight italic">GSTR-1 Registry<span className="text-slate-300">.</span></h2>
-                  <p className="text-slate-400 text-[11px] font-bold uppercase tracking-[0.2em] mt-2">Sales Inbound • Government Schema Export</p>
+                  <p className="text-slate-400 text-[11px] font-bold uppercase tracking-[0.2em] mt-2">
+                     {selectedMonth} · Taxable ₹{(invoiceData.totalTaxable || 0).toLocaleString('en-IN')} · GST ₹{(invoiceData.totalGst || 0).toLocaleString('en-IN')} · {invoiceData.invoiceCount || 0} inv
+                  </p>
                </div>
-               <button
-                  type="button"
-                  onClick={handleDownloadJson}
-                  disabled={exporting}
-                  className="px-8 py-3 bg-black text-white rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center gap-3 hover:bg-slate-800 transition-all disabled:opacity-50"
-               >
-                  <Download size={14} /> {exporting ? 'Exporting...' : 'Download JSON Schema'}
-               </button>
+               <div className="flex gap-3 items-center">
+                  <div className="flex items-center gap-3 px-5 py-3 bg-white border border-slate-100 rounded-xl">
+                     <Calendar className="text-slate-300" size={16} />
+                     <input
+                        type="month"
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        className="text-[11px] font-bold uppercase tracking-widest bg-transparent outline-none text-black"
+                     />
+                  </div>
+                  <button
+                     type="button"
+                     onClick={handleDownloadJson}
+                     disabled={exporting || loading}
+                     className="px-8 py-3 bg-black text-white rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center gap-3 hover:bg-slate-800 transition-all disabled:opacity-50"
+                  >
+                     <Download size={14} /> {exporting ? 'Exporting...' : 'Download JSON'}
+                  </button>
+               </div>
             </div>
 
             <div className="flex gap-4 p-1 bg-slate-100 rounded-xl self-start">
                {[
-                  { id: 'b2b', label: 'B2B (4A/4B/4C)' },
-                  { id: 'b2cLarge', label: 'B2C Large (5A/5B)' },
-                  { id: 'b2cSmall', label: 'B2C Small (7)' },
-                  { id: 'hsn', label: 'HSN Summary (12)' }
+                  { id: 'b2b', label: `B2B (${invoiceData.b2b?.length || 0})` },
+                  { id: 'b2cLarge', label: `B2C Large (${invoiceData.b2cLarge?.length || 0})` },
+                  { id: 'b2cSmall', label: `B2C Small (${invoiceData.b2cSmall?.length || 0})` },
+                  { id: 'hsn', label: `HSN (${invoiceData.hsn?.length || 0})` }
                ].map(tab => (
                   <button
                      key={tab.id}
+                     type="button"
                      onClick={() => setActiveTab(tab.id)}
                      className={`px-8 py-2 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all ${activeTab === tab.id ? 'bg-white text-black shadow-sm' : 'text-slate-400 hover:text-black'
                         }`}
@@ -315,18 +357,28 @@ export const Gstr1Modal = ({ isOpen, onClose }) => {
             </div>
 
             <div className="flex-1 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+               {loading ? (
+                  <div className="p-8"><SkeletonTable rows={10} cols={5} /></div>
+               ) : (
                <div className="overflow-auto flex-1 custom-scrollbar">
                   <table className="w-full text-left">
                      <thead>
                         <tr className="border-b border-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                            <th className="px-8 py-5">Reference & Date</th>
                            <th className="px-8 py-5">Counterparty</th>
-                           <th className="px-8 py-5">GSTIN ID</th>
+                           <th className="px-8 py-5">GSTIN / POS</th>
                            <th className="px-8 py-5 text-right">Taxable Value</th>
                            <th className="px-8 py-5 text-right">Gross Total</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-slate-50">
+                        {(invoiceData[activeTab] || []).length === 0 && (
+                           <tr>
+                              <td colSpan={5} className="px-8 py-16 text-center text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                                 No rows for {selectedMonth} in this section
+                              </td>
+                           </tr>
+                        )}
                         {invoiceData[activeTab]?.map((inv, index) => (
                            <tr key={index} className="hover:bg-slate-50/50 transition-all group border-l-4 border-transparent hover:border-black">
                               <td className="px-8 py-5">
@@ -335,13 +387,14 @@ export const Gstr1Modal = ({ isOpen, onClose }) => {
                               </td>
                               <td className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase">{inv.partyName || (activeTab === 'hsn' ? 'HSN Classification' : 'Unregistered')}</td>
                               <td className="px-8 py-5 text-[10px] font-bold text-black tracking-widest">{inv.gstin}</td>
-                              <td className="px-8 py-5 text-right font-bold text-slate-400 text-[11px]">₹ {(inv.taxable || 0).toLocaleString()}</td>
-                              <td className="px-8 py-5 text-right font-black text-black text-[12px]">₹ {(inv.total || inv.gst || 0).toLocaleString()}</td>
+                              <td className="px-8 py-5 text-right font-bold text-slate-400 text-[11px]">₹ {(inv.taxable || 0).toLocaleString('en-IN')}</td>
+                              <td className="px-8 py-5 text-right font-black text-black text-[12px]">₹ {(inv.total || inv.gst || 0).toLocaleString('en-IN')}</td>
                            </tr>
                         ))}
                      </tbody>
                   </table>
                </div>
+               )}
             </div>
          </div>
       </Modal>
@@ -429,7 +482,7 @@ export const Gst2bMatchingModal = ({ isOpen, onClose }) => {
 
             <div className="flex-1 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
                <div className="overflow-auto flex-1 custom-scrollbar">
-                  {loading && <p className="p-8 text-[12px] text-slate-400">Loading purchases…</p>}
+                  {loading && <SkeletonTable rows={8} cols={5} className="m-4" />}
                   {!loading && listData.length === 0 && (
                      <p className="p-8 text-[12px] text-slate-400 text-center">No purchase invoices found for this company.</p>
                   )}
@@ -557,22 +610,46 @@ export const Gstr1ErrorChekModal = ({ isOpen, onClose }) => {
       if (isOpen) fetchSales();
    }, [isOpen, fetchSales]);
 
-   const runAudit = () => {
+   const runAudit = async () => {
       setScanning(true);
       setFixedStatus(false);
-      setTimeout(() => {
-         setScanning(false);
+      try {
+         const period = new Date().toISOString().slice(0, 7);
+         const result = await stage4Api.certificationRun({ period });
+         const gaps = result?.gaps || result?.run?.gaps || [];
+         const issues = gaps.map((g, i) => {
+            const msg = typeof g === 'string' ? g : (g.message || g.code || 'Compliance gap');
+            return {
+               id: String(i),
+               invoiceNo: g.invoiceNo || '—',
+               partyName: g.partyName || 'Compliance',
+               type: (g.severity === 'error' || g.level === 'error') ? 'ERROR' : 'WARNING',
+               code: g.code || 'GSTR_GAP',
+               message: msg,
+            };
+         });
+         setIssuesList(issues);
          setAudited(true);
-         setIssuesList([
-            { id: '1', invoiceNo: 'SI-204', partyName: 'Suresh Fabrics', type: 'ERROR', code: 'GSTIN_INVALID', message: 'GSTIN structure is malformed.' },
-            { id: '2', invoiceNo: 'SI-209', partyName: 'Om Textiles', type: 'WARNING', code: 'HSN_MISSING', message: 'HSN code is missing for item: Cotton Yarn.' }
-         ]);
-      }, 2000);
+         if (issues.length === 0) toast.success('No compliance issues found');
+      } catch (err) {
+         notifyError(err, 'Compliance audit failed');
+      } finally {
+         setScanning(false);
+      }
    };
 
-   const handleAutoFix = () => {
+   const handleAutoFix = async () => {
       setScanning(true);
-      setTimeout(() => { setScanning(false); setFixedStatus(true); setIssuesList([]); }, 1500);
+      try {
+         await stage4Api.hsnSync();
+         setFixedStatus(true);
+         setIssuesList([]);
+         toast.success('HSN codes synced from items');
+      } catch (err) {
+         notifyError(err, 'Auto-fix failed');
+      } finally {
+         setScanning(false);
+      }
    };
 
    const errorsCount = issuesList.filter(i => i.type === 'ERROR').length;
@@ -673,14 +750,19 @@ export const GstComplianceModal = ({ isOpen, onClose }) => {
    return (
       <Modal isOpen={isOpen} onClose={onClose} title="Executive Compliance Scorecard" className="max-w-5xl h-[85vh] bg-white rounded-[2.5rem] p-0 border-none shadow-2xl overflow-hidden">
          <div className="flex flex-col h-full">
+            <div className="px-10 pt-6">
+               <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-[11px] font-bold uppercase tracking-widest px-4 py-3">
+                  Demo / stub screen — scores below are not calculated from your books. Use CA Desk + GSTR-1 / GSTR-3B for real data.
+               </div>
+            </div>
             <div className="p-10 bg-black text-white flex justify-between items-center">
                <div>
                   <h2 className="text-3xl font-black tracking-tighter uppercase">GST Health Score<span className="text-slate-500">.</span></h2>
-                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.3em] mt-2">Compliance Performance Index: A+</p>
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.3em] mt-2">Placeholder UI — not live compliance</p>
                </div>
                <div className="text-right">
-                  <h3 className="text-5xl font-black tracking-tighter">98.2</h3>
-                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Aggregate Rating</p>
+                  <h3 className="text-5xl font-black tracking-tighter text-slate-500">N/A</h3>
+                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Not computed</p>
                </div>
             </div>
 

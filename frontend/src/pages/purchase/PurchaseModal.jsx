@@ -5,6 +5,7 @@ import useStore from '../../store/useStore';
 import { useConfig } from '../../context/ConfigContext';
 import { resolvePurchaseFieldVisibility } from '../../utils/configHelpers';
 import { toast } from '../../store/useToastStore';
+import { notifyError } from '../../utils/notify';
 import { Trash2, Plus } from 'lucide-react';
 import AccountMasterModal from '../masters/AccountMasterModal';
 import ItemMasterModal from '../masters/ItemMasterModal';
@@ -12,7 +13,13 @@ import BillSaveNextActions from '../../components/BillSaveNextActions';
 import BillAutoFill from '../../components/BillAutoFill';
 import PurchasePrint from './PurchasePrint';
 import { warehousesApi } from '../../api';
+import { ERPCombobox } from '../../components/erp';
+import { erpConfirm } from '../../utils/confirm';
 import { resolveParty, buildWhatsAppMessage, openWhatsAppShare } from '../../utils/invoiceHelpers';
+import { getFocusableElements } from '../../utils/formEnterNavigation';
+import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
+import useConfigStore from '../../store/useConfigStore';
+import { resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -25,15 +32,20 @@ const PurchaseModal = ({
   onOpenJobIssue,
   onOpenMillIssue
 }) => {
-  const { parties, items, purchases, addPurchase, updatePurchase, deletePurchase, fetchParties, fetchItems, fetchPurchases, plan, user } = useStore();
+  const { parties, items, purchases, addPurchase, deletePurchase, fetchParties, fetchItems, fetchPurchases, plan, user } = useStore();
   const { bundle } = useConfig();
+  const companySettings = useConfigStore((s) => s.companySettings);
   const { showBroker, showDiscount2 } = resolvePurchaseFieldVisibility(bundle, user, plan);
   const [mode, setMode] = useState('View');
   const [selectedPurchaseId, setSelectedPurchaseId] = useState('');
   const [error, setError] = useState('');
   const [saveNextActions, setSaveNextActions] = useState(null);
   const [printInvoiceId, setPrintInvoiceId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [bootLoading, setBootLoading] = useState(false);
   const openedOnceRef = useRef(false);
+  const modalContainerRef = useRef(null);
+  const suppBillRef = useRef(null);
 
   const [warehouses, setWarehouses] = useState([]);
   const [billAttachment, setBillAttachment] = useState(null);
@@ -81,16 +93,22 @@ const PurchaseModal = ({
       openedOnceRef.current = false;
       setSaveNextActions(null);
       setPrintInvoiceId(null);
+      setBootLoading(false);
       return;
     }
 
-    fetchParties();
-    fetchItems();
-    fetchPurchases();
-    warehousesApi
-      .list()
-      .then((list) => setWarehouses(Array.isArray(list) ? list : []))
-      .catch(() => setWarehouses([]));
+    let cancelled = false;
+    setBootLoading(true);
+    Promise.all([
+      fetchParties(),
+      fetchItems(),
+      fetchPurchases(),
+      warehousesApi.list().then((list) => setWarehouses(Array.isArray(list) ? list : [])).catch(() => setWarehouses([])),
+    ])
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setBootLoading(false);
+      });
 
     if (!openedOnceRef.current) {
       openedOnceRef.current = true;
@@ -104,6 +122,25 @@ const PurchaseModal = ({
         handleNew();
       }
     }
+
+    const t = setTimeout(() => {
+      if (suppBillRef.current && !locked) {
+        suppBillRef.current.focus();
+        try { suppBillRef.current.select(); } catch {}
+      } else if (modalContainerRef.current) {
+        const focusables = getFocusableElements(modalContainerRef.current);
+        if (focusables.length > 0) {
+          focusables[0].focus();
+          if (typeof focusables[0].select === 'function') {
+            try { focusables[0].select(); } catch {}
+          }
+        }
+      }
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [isOpen, readOnly, selectedBook, fetchParties, fetchItems, fetchPurchases]);
 
   const loadPurchaseData = (pur) => {
@@ -350,20 +387,22 @@ const PurchaseModal = ({
 
   const handleSave = async (e) => {
     if (e) e.preventDefault();
-    if (!header.party) return toast.error('Please select a party');
-    const lineItems = gridItems.filter((i) => i.itemId);
-    if (!lineItems.length) return toast.error('Add at least one item with qty');
-    
+    if (saving) return;
+    if (!header.party) return toast.error('Please select a Supplier/Party first');
+    const validLines = gridItems.filter(i => (i.itemId || i.desc) && (Number(i.mts || i.pcs || 0) > 0 || Number(i.rate || 0) > 0));
+    if (validLines.length === 0) return toast.error('Please add at least one line item with Quantity and Rate');
+    setSaving(true);
     try {
       const payload = {
         supplierId: header.party,
+        supplierName: parties.find(p => p._id === header.party || p.id === header.party)?.name || '',
+        invoiceNo: header.vNo === 'AUTO' ? undefined : header.vNo,
         supplierInvoiceNo: header.billNo,
-        invoiceNo: header.vNo,
         date: header.billDate,
-        bookId: header.book,
         challanNo: header.challanNo,
         challanDate: header.chDate,
-        brokerId: header.broker || null,
+        bookId: header.book,
+        brokerId: header.broker || undefined,
         type: header.type,
         reverseCharge: header.reverseCharge,
         warehouseId: header.warehouseId || null,
@@ -387,7 +426,7 @@ const PurchaseModal = ({
         roundOff: footer.roundOff,
         rcmCharge: footer.rcmCharge,
         rcmChargeSign: footer.rcmChargeSign,
-        items: lineItems.map(i => ({
+        items: validLines.map(i => ({
           itemId: i.itemId,
           desc: i.desc,
           fold: Number(i.fold || 0),
@@ -414,7 +453,11 @@ const PurchaseModal = ({
 
       const saved =
         mode === 'Edit' && selectedPurchaseId
-          ? await updatePurchase(selectedPurchaseId, payload)
+          ? (() => {
+              throw new Error(
+                'Posted purchase bills cannot be edited. Cancel this bill (Delete) then create a new one — Edit would break stock and ledger.'
+              );
+            })()
           : await addPurchase(payload);
       const savedId = saved?._id || saved?.id;
       if (savedId) {
@@ -430,23 +473,36 @@ const PurchaseModal = ({
       setMode('View');
       fetchPurchases();
     } catch (err) {
-      toast.error('Failed to save purchase: ' + err.message);
+      const status = err.response?.status || err.status;
+      const code = err.response?.data?.errorCode;
+      notifyError(err, 'Failed to save purchase bill');
+      // Duplicate voucher — reset to AUTO so next Save gets a fresh number
+      if (status === 409 || code === 'CONFLICT') {
+        setHeader((h) => ({ ...h, vNo: 'AUTO' }));
+        if (mode !== 'Edit') setMode('Add');
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
     const id = selectedPurchaseId;
     if (!id) return toast.error('Select a purchase bill first');
-    if (window.confirm('Are you sure you want to cancel/delete this purchase bill?')) {
+    if (!(await erpConfirm({
+      title: 'Cancel Purchase',
+      message: 'Are you sure you want to cancel/delete this purchase bill?',
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return;
       try {
         await deletePurchase(id);
         toast.success('Purchase bill cancelled!');
         handleNew();
         fetchPurchases();
       } catch (err) {
-        toast.error('Failed to delete: ' + err.message);
+        toast.error(err, { fallback: 'Failed to delete purchase bill' });
       }
-    }
   };
 
   const handleCancel = () => {
@@ -458,6 +514,82 @@ const PurchaseModal = ({
   };
 
   const locked = readOnly || mode === 'View';
+
+  const vendorOptions = useMemo(
+    () =>
+      parties
+        .filter((p) => p.type !== 'Broker')
+        .map((p) => ({
+          value: p._id || p.id,
+          label: p.name,
+          meta: [p.gstin, p.station || p.city].filter(Boolean).join(' · '),
+        })),
+    [parties]
+  );
+
+  const brokerOptions = useMemo(
+    () =>
+      parties
+        .filter((p) => p.type === 'Broker')
+        .map((p) => ({ value: p._id || p.id, label: p.name })),
+    [parties]
+  );
+
+  const warehouseOptions = useMemo(
+    () =>
+      warehouses.map((w) => ({
+        value: w._id || w.id,
+        label: w.name,
+        meta: w.code || '',
+      })),
+    [warehouses]
+  );
+
+  const itemOptions = useMemo(
+    () =>
+      items.map((i) => ({
+        value: i._id || i.id,
+        label: i.itemName || i.name,
+        meta: i.hsnCode ? `HSN ${i.hsnCode}` : '',
+      })),
+    [items]
+  );
+
+  const onVendorSelect = (val) => {
+    if (!val) {
+      setHeader({ ...header, party: '', add: '', gstin: '', city: '' });
+      return;
+    }
+    const p = parties.find((x) => (x._id || x.id) === val);
+    const autoType = resolveInvoiceSupplyType({
+      partyGstin: p?.gstin,
+      partyStateCode: p?.stateCode || p?.state,
+      companyGstin: companySettings?.gstin || companySettings?.GSTIN,
+      companyStateCode: companySettings?.stateCode || companySettings?.state,
+    });
+    setHeader({
+      ...header,
+      party: val,
+      add: p?.address || '',
+      gstin: p?.gstin || '',
+      city: p?.station || p?.city || '',
+      ...(autoType ? { type: autoType } : {}),
+    });
+  };
+
+  const onPurchaseItemSelect = (val, idx) => {
+    if (!val) return;
+    const item = items.find((i) => (i._id || i.id) === val);
+    const updated = [...gridItems];
+    updated[idx] = {
+      ...updated[idx],
+      itemId: val,
+      itemName: item?.itemName || '',
+      rate: item?.purRate || item?.purchaseRate || 0,
+      gstPer: item?.gstRate || 5,
+    };
+    setGridItems(updated);
+  };
 
   const nextStepActions = [
     onOpenSales && {
@@ -489,7 +621,9 @@ const PurchaseModal = ({
   return (
     <>
     <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-7xl">
-      <div className="classic-erp-window flex flex-col h-full">
+      <div className="classic-erp-window erp-density flex flex-col h-full">
+        <ErpBusyOverlay show={bootLoading} message="Loading purchase bill…" />
+        <ErpBusyOverlay show={!bootLoading && saving} message="Saving purchase…" />
         {/* Title Bar */}
         <div className="classic-erp-header">
           <span>Purchase Invoice [ PURCHASE BOOK ]</span>
@@ -497,7 +631,7 @@ const PurchaseModal = ({
         </div>
 
         {/* Form Body */}
-        <div className="classic-erp-body flex-1 overflow-y-auto space-y-3">
+        <div ref={modalContainerRef} className="classic-erp-body flex-1 overflow-y-auto space-y-3 erp-bill-layout">
           
           {mode === 'View' && (
             <div className="classic-erp-frame flex gap-3 items-center">
@@ -523,43 +657,43 @@ const PurchaseModal = ({
             />
           )}
 
-          {/* Header Block */}
+          {/* Header Block — Sequence: Supp. Bill -> Date -> Vendor -> Gstin/City -> Godown */}
           <div className="classic-erp-frame classic-erp-header-split">
-            <div className="classic-erp-stack">
+            <div className="classic-erp-stack classic-erp-header-bill">
+              <div className="classic-erp-meta-grid">
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label red-label">Supp. Bill:</span>
+                  <input ref={suppBillRef} type="text" className="classic-erp-input" value={header.billNo} placeholder="Supp Bill No…" onChange={e => setHeader({ ...header, billNo: e.target.value })} disabled={locked} />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Date:</span>
+                  <input type="date" className="classic-erp-input" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Voucher:</span>
+                  <input type="text" className="classic-erp-input" value={header.vNo} readOnly />
+                </div>
+              </div>
+            </div>
+
+            <div className="classic-erp-stack classic-erp-header-party">
               <div className="classic-erp-field classic-erp-field--lg">
                 <span className="classic-erp-label red-label">Vendor:</span>
-                <div className="classic-erp-control">
-                  <select 
-                    className="classic-erp-select font-bold" 
-                    value={header.party} 
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val === 'NEW_VENDOR') {
-                        handleCreateAccount('');
-                        return;
-                      }
-                      const p = parties.find(x => x._id === val || x.id === val);
-                      setHeader({ ...header, party: val, add: p?.address || '', gstin: p?.gstin || '', city: p?.station || p?.city || '' });
-                    }}
+                <div style={{display:'flex',alignItems:'center',gap:4}}>
+                  <ERPCombobox
+                    value={header.party}
+                    onChange={onVendorSelect}
+                    options={vendorOptions}
+                    placeholder="Search vendor / supplier…"
                     disabled={locked}
-                  >
-                    <option value="">- Select Vendor / Supplier -</option>
-                    {!locked && (
-                      <option value="NEW_VENDOR" className="text-blue-600 font-bold bg-blue-50">+ Add New Vendor...</option>
-                    )}
-                    {parties.filter(p => p.type !== 'Broker').map(p => (
-                      <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                    recentKey="purchase-vendor"
+                    onCreateNew={!locked ? (q) => handleCreateAccount(q) : undefined}
+                    createLabel="Vendor"
+                  />
                   {!locked && (
-                    <button
-                      type="button"
-                      onClick={() => handleCreateAccount('')}
-                      className="classic-erp-btn p-0 w-8 flex items-center justify-center shrink-0"
-                      style={{ height: '32px', minHeight: '32px' }}
-                      title="Add New Vendor / Supplier"
-                    >
-                      <Plus size={14} strokeWidth={2.5} />
+                    <button type="button" title="Add new vendor" onClick={() => handleCreateAccount('')}
+                      style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:2,padding:'3px 8px',fontSize:11,fontWeight:700,color:'#fff',background:'#16a34a',border:'none',borderRadius:4,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      <Plus size={11}/> Add
                     </button>
                   )}
                 </div>
@@ -573,41 +707,6 @@ const PurchaseModal = ({
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">City:</span>
                   <input type="text" className="classic-erp-input" value={header.city} readOnly />
-                </div>
-              </div>
-
-              <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label red-label">Godown:</span>
-                <select
-                  className="classic-erp-select"
-                  value={header.warehouseId}
-                  onChange={(e) => setHeader({ ...header, warehouseId: e.target.value })}
-                  disabled={locked}
-                >
-                  <option value="">- Default / Unassigned -</option>
-                  {warehouses.map((w) => (
-                    <option key={w._id || w.id} value={w._id || w.id}>
-                      {w.code ? `${w.code} — ` : ''}
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="classic-erp-stack">
-              <div className="classic-erp-meta-grid">
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label red-label">Voucher:</span>
-                  <input type="text" className="classic-erp-input" value={header.vNo} readOnly />
-                </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Date:</span>
-                  <input type="date" className="classic-erp-input" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
-                </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Supp. Bill:</span>
-                  <input type="text" className="classic-erp-input" value={header.billNo} onChange={e => setHeader({ ...header, billNo: e.target.value })} disabled={locked} />
                 </div>
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Challan:</span>
@@ -626,37 +725,21 @@ const PurchaseModal = ({
             {showBroker ? (
               <div className="classic-erp-field">
                 <span className="classic-erp-label">Broker:</span>
-                <div className="classic-erp-control">
-                  <select 
-                    className="classic-erp-select" 
-                    value={header.broker} 
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val === 'NEW_BROKER') {
-                        handleCreateBroker('');
-                        return;
-                      }
-                      setHeader({ ...header, broker: val });
-                    }} 
+                <div style={{display:'flex',alignItems:'center',gap:4}}>
+                  <ERPCombobox
+                    value={header.broker}
+                    onChange={(val) => setHeader({ ...header, broker: val })}
+                    options={brokerOptions}
+                    placeholder="Search broker…"
                     disabled={locked}
-                  >
-                    <option value="">- Select Broker -</option>
-                    {!locked && (
-                      <option value="NEW_BROKER" className="text-blue-600 font-bold bg-blue-50">+ Add New Broker...</option>
-                    )}
-                    {parties.filter(p => p.type === 'Broker').map(p => (
-                      <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                    recentKey="purchase-broker"
+                    onCreateNew={!locked ? (q) => handleCreateBroker(q) : undefined}
+                    createLabel="Broker"
+                  />
                   {!locked && (
-                    <button
-                      type="button"
-                      onClick={() => handleCreateBroker('')}
-                      className="classic-erp-btn p-0 w-8 flex items-center justify-center shrink-0"
-                      style={{ height: '32px', minHeight: '32px' }}
-                      title="Add New Broker"
-                    >
-                      <Plus size={14} strokeWidth={2.5} />
+                    <button type="button" title="Add new broker" onClick={() => handleCreateBroker('')}
+                      style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:2,padding:'3px 8px',fontSize:11,fontWeight:700,color:'#fff',background:'#16a34a',border:'none',borderRadius:4,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      <Plus size={11}/> Add
                     </button>
                   )}
                 </div>
@@ -681,13 +764,13 @@ const PurchaseModal = ({
           </div>
 
           {/* Item Grid Table */}
-          <div className="classic-erp-table-container max-h-64">
+          <div className="classic-erp-table-container erp-grid-panel">
             <table className="classic-erp-table">
               <thead>
                 <tr>
                   <th className="w-8 text-center">SrNo</th>
-                  <th>Item Name</th>
-                  <th className="w-20">Desc</th>
+                  <th className="col-item">Item Name</th>
+                  <th className="col-desc">Desc</th>
                   <th className="w-16 text-center">Fold</th>
                   <th className="w-16 text-center">Cut</th>
                   <th className="w-16 text-center">Pcs</th>
@@ -721,46 +804,28 @@ const PurchaseModal = ({
                   return (
                     <tr key={row.id || idx}>
                       <td className="text-center font-bold">{idx + 1}</td>
-                      <td>
-                        <div className="flex items-center gap-1 w-full px-1">
-                          <select
-                            className="classic-erp-select flex-1 border-0"
-                            style={{ height: '30px' }}
+                      <td className="col-item" style={{position:'relative'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:2}}>
+                          <ERPCombobox
                             value={row.itemId}
-                            onChange={e => {
-                              const val = e.target.value;
-                              if (val === 'NEW_ITEM') {
-                                handleCreateItem('', idx);
-                                return;
-                              }
-                              const item = items.find(i => i._id === val || i.id === val);
-                              const updated = [...gridItems];
-                              updated[idx] = { ...updated[idx], itemId: val, itemName: item?.itemName || '', rate: item?.purRate || 0, gstPer: item?.gstRate || 5 };
-                              setGridItems(updated);
-                            }}
+                            onChange={(val) => onPurchaseItemSelect(val, idx)}
+                            options={itemOptions}
+                            placeholder="Search item…"
                             disabled={locked}
-                          >
-                            <option value="">- Select Item -</option>
-                            {!locked && (
-                              <option value="NEW_ITEM" className="text-blue-600 font-bold bg-blue-50">+ Add New Item...</option>
-                            )}
-                            {items.map(i => (
-                              <option key={i._id || i.id} value={i._id || i.id}>{i.itemName}</option>
-                            ))}
-                          </select>
+                            recentKey="purchase-item"
+                            onCreateNew={!locked ? (q) => handleCreateItem(q, idx) : undefined}
+                            createLabel="Item"
+                            inputClassName="border-0"
+                          />
                           {!locked && (
-                            <button
-                              type="button"
-                              onClick={() => handleCreateItem('', idx)}
-                              className="text-blue-600 hover:text-blue-800 p-1 flex items-center justify-center shrink-0"
-                              title="Add New Item"
-                            >
-                              <Plus size={14} strokeWidth={2.5} />
+                            <button type="button" title="Add new item" onClick={() => handleCreateItem('', idx)}
+                              style={{flexShrink:0,display:'inline-flex',alignItems:'center',padding:'2px 5px',fontSize:10,fontWeight:700,color:'#16a34a',background:'transparent',border:'1px solid #16a34a',borderRadius:4,cursor:'pointer',whiteSpace:'nowrap'}}>
+                              <Plus size={10}/>
                             </button>
                           )}
                         </div>
                       </td>
-                      <td>
+                      <td className="col-desc">
                         <input type="text" className="classic-erp-input w-full border-0" value={row.desc || ''} onChange={e => updateRow('desc', e.target.value)} disabled={locked} />
                       </td>
                       <td>
@@ -960,11 +1025,13 @@ const PurchaseModal = ({
 
         {/* Form Footer Action Toolbar */}
         <div className="classic-erp-form-footer">
-          <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View'}>New</button>
-          <button className="classic-erp-btn btn-blue" type="button" onClick={handleSave} disabled={locked}>Save</button>
-          <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked}>Cancel</button>
-          <button className="classic-erp-btn" type="button" onClick={() => setMode('View')} disabled={readOnly || mode === 'View'}>Find</button>
-          <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || !selectedPurchaseId}>Delete</button>
+          <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving}>New</button>
+          <button className="classic-erp-btn btn-blue" type="button" data-enter-save onClick={handleSave} disabled={locked || saving || bootLoading}>
+            <SaveButtonLabel saving={saving} />
+          </button>
+          <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked || saving}>Cancel</button>
+          <button className="classic-erp-btn" type="button" onClick={() => setMode('View')} disabled={readOnly || mode === 'View' || saving}>Find</button>
+          <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || saving || !selectedPurchaseId}>Delete</button>
           <button
             className="classic-erp-btn btn-blue"
             type="button"

@@ -104,10 +104,70 @@ async function loadLotForUpdate(session, lotOid, companyId) {
   return lot;
 }
 
+async function reverseSaleStock(session, sale, companyId) {
+  if (sale.stockFromChallan) return;
+  for (const item of sale.items || []) {
+    if (!item.lotId) continue;
+    const key = `SALE_CANCEL:${sale._id}:${item.lotId}`;
+    const exists = await StockMovement.findOne({ companyId, idempotencyKey: key }).session(session);
+    if (exists) continue;
+    const lot = await loadLotForUpdate(session, item.lotId, companyId);
+    await applyLotMovement({
+      session,
+      lot,
+      companyId,
+      deltaMts: item.mts || 0,
+      deltaPcs: item.pcs || 0,
+      type: 'SALE_CANCEL',
+      referenceId: sale._id,
+      idempotencyKey: key,
+      remarks: `Cancel Sales Inv: ${sale.invoiceNo}`,
+    });
+  }
+}
+
+async function reversePurchaseStock(session, purchase, companyId) {
+  const lots = await InventoryLot.find({
+    purchaseId: purchase._id,
+    companyId,
+    isDeleted: { $ne: true },
+  }).session(session);
+
+  for (const lot of lots) {
+    const used = (lot.totalMtrs || 0) - (lot.remainingMtrs || 0);
+    if (used > 0.0001) {
+      throw new Error(
+        `Cannot cancel purchase: lot ${lot.lotId} already used (${used.toFixed(2)} mtrs issued)`
+      );
+    }
+    const key = `PURCHASE_CANCEL:${purchase._id}:${lot._id}`;
+    const exists = await StockMovement.findOne({ companyId, idempotencyKey: key }).session(session);
+    if (exists) continue;
+    if ((lot.remainingMtrs || 0) > 0 || (lot.remainingPcs || 0) > 0) {
+      await applyLotMovement({
+        session,
+        lot,
+        companyId,
+        deltaMts: -(lot.remainingMtrs || 0),
+        deltaPcs: -(lot.remainingPcs || 0),
+        type: 'PURCHASE_CANCEL',
+        referenceId: purchase._id,
+        idempotencyKey: key,
+        remarks: `Cancel Purchase: ${purchase.invoiceNo}`,
+      });
+    }
+    lot.isDeleted = true;
+    lot.status = 'Closed';
+    await lot.save({ session });
+  }
+}
+
 module.exports = {
   availableMtrs,
   availablePcs,
   assertLotIssuable,
   applyLotMovement,
   loadLotForUpdate,
+  reverseSaleStock,
+  reversePurchaseStock,
 };

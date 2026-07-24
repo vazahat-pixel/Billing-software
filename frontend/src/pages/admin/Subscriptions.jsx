@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CreditCard, Calendar, Clock, ArrowUpRight, Zap, X, TrendingUp, RefreshCw, Wifi } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
+import { notifyError } from '../../utils/notify';
 
 const statusColors = { active: '#10b981', suspended: '#ef4444', expired: '#f59e0b' };
 
@@ -28,7 +29,7 @@ const Subscriptions = () => {
         try {
             await updateSubscription(editingSub.companyId?._id, subForm);
             setEditingSub(null);
-        } catch (err) { alert(err.message || 'Failed to update'); }
+        } catch (err) { notifyError(err, 'Failed to update'); }
     };
 
     const daysLeft = (endDate) => {

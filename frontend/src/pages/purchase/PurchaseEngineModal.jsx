@@ -174,7 +174,7 @@ const PurchaseEngineModal = ({ isOpen, onClose }) => {
       await refreshPipeline();
       await loadLists();
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message);
+      toast.error(err);
     } finally {
       setBusy(false);
     }
@@ -478,4 +478,4 @@ const PurchaseEngineModal = ({ isOpen, onClose }) => {
 };
 
 export default PurchaseEngineModal;
-
+

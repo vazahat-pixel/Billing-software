@@ -11,6 +11,8 @@ import {
   Percent
 } from 'lucide-react';
 import useStore from '../../store/useStore';
+import { notifyWarning, notifyError } from '../../utils/notify';
+import { erpConfirm } from '../../utils/confirm';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import FormInput from '../../components/ui/FormInput';
@@ -63,7 +65,7 @@ const JobWorkerMaster = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name) {
-      alert('Worker name is required');
+      notifyWarning('Worker name is required');
       return;
     }
 
@@ -98,7 +100,7 @@ const JobWorkerMaster = () => {
       setContact('');
       setInstructions('');
     } catch (err) {
-      alert(err.message || 'Failed to save worker');
+      notifyError(err, 'Failed to save worker');
     }
   };
 
@@ -112,13 +114,17 @@ const JobWorkerMaster = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this job worker?')) {
+    if (!(await erpConfirm({
+      title: 'Delete Job Worker',
+      message: 'Are you sure you want to delete this job worker?',
+      confirmLabel: 'Delete',
+      danger: true,
+    }))) return;
       try {
         await deleteParty(id);
       } catch (err) {
-        alert(err.message || 'Failed to delete worker');
+        notifyError(err, 'Failed to delete worker');
       }
-    }
   };
 
   return (

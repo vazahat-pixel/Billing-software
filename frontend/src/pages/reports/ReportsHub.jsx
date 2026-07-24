@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
+import { notifyError } from '../../utils/notify';
 import { downloadCsv, getMonthRange, fmtAmt, fmtDate } from '../../utils/reportExport';
+import { ReportLoader } from '../../components/ui/loaders';
 import { RefreshCw, Download, Printer, BarChart3, FileText, Warehouse, Users, Briefcase } from 'lucide-react';
 
 const TABS = [
@@ -87,7 +89,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary' }) => {
       setTrialBalance(Array.isArray(tb) ? tb : []);
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || err.message || 'Failed to load reports');
+      notifyError(err, 'Failed to load reports');
     } finally {
       setLoading(false);
     }
@@ -184,7 +186,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary' }) => {
   const handlePrint = () => window.print();
 
   const renderContent = () => {
-    if (!data && loading) return <p className="text-center py-12 text-[var(--text-muted)]">Loading reports from database...</p>;
+    if (!data && loading) return <ReportLoader />;
     if (!data) return null;
 
     switch (activeTab) {

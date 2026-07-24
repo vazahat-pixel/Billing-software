@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../../components/ui/Modal';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
+import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 
 const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
   const { 
@@ -43,6 +44,11 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
     return parties.filter(p => p.type === 'Job Worker');
   }, [parties]);
 
+  const workerOptions = useMemo(
+    () => workers.map((w) => ({ value: w._id || w.id, label: w.name })),
+    [workers]
+  );
+
   const availableLots = useMemo(() => {
     return inventoryLots.filter(lot => lot.remainingMtrs > 0 && lot.status !== 'Closed');
   }, [inventoryLots]);
@@ -59,15 +65,15 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedLot) {
-      alert('Please select an available lot from the right panel first.');
+      notifyWarning('Please select an available lot from the right panel first.');
       return;
     }
     if (!header.workerId) {
-      alert('Please select a Job Worker party.');
+      notifyWarning('Please select a Job Worker party.');
       return;
     }
     if (!header.issueQty || parseFloat(header.issueQty) <= 0) {
-      alert('Please enter a valid issue quantity.');
+      notifyWarning('Please enter a valid issue quantity.');
       return;
     }
 
@@ -81,7 +87,7 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
         issueQty: Number(header.issueQty),
         issueDate: new Date(header.date)
       });
-      alert('Embroidery job issued successfully!');
+      notifySuccess('Embroidery job issued successfully!');
       setSelectedLot(null);
       // Reset form
       setHeader(prev => ({
@@ -95,7 +101,7 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
       fetchInventory();
       fetchJobs();
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Failed to issue lot');
+      notifyError(err, 'Failed to issue lot');
     }
   };
 
@@ -157,17 +163,14 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
 
                         <div className="flex items-center gap-2">
                            <span className="classic-erp-label red-label w-24">Emb. Unit:</span>
-                           <select 
-                             className="classic-erp-select flex-1" 
+                           <ERPSelect
+                             className="classic-erp-select flex-1"
                              value={header.workerId}
                              onChange={(e) => setHeader({...header, workerId: e.target.value})}
-                             required
-                           >
-                             <option value="">- Select Embroidery Partner -</option>
-                             {workers.map(w => (
-                               <option key={w._id} value={w._id}>{w.name}</option>
-                             ))}
-                           </select>
+                             options={workerOptions}
+                             placeholder="- Select Embroidery Partner -"
+                             recentKey="emb-worker"
+                           />
                         </div>
 
                         <div className="flex items-center gap-2">

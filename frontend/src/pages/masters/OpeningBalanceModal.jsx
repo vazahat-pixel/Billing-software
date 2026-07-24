@@ -3,6 +3,7 @@ import Modal from '../../components/ui/Modal';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import { ERPSearchableSelect } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
+import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 
 const OpeningBalanceModal = ({ isOpen, onClose, readOnly = false }) => {
   const { parties, fetchParties, updateParty } = useStore();
@@ -30,18 +31,18 @@ const OpeningBalanceModal = ({ isOpen, onClose, readOnly = false }) => {
   }, [partyId, parties]);
 
   const handleSave = async () => {
-    if (!partyId) return alert('Select a party');
-    if (!amount) return alert('Enter opening balance amount');
+    if (!partyId) return notifyWarning('Select a party');
+    if (!amount) return notifyWarning('Enter opening balance amount');
     setSaving(true);
     try {
       await updateParty(partyId, {
         openingBalance: Number(amount),
         openingBalanceType: balanceType
       });
-      alert('Opening balance saved');
+      notifySuccess('Opening balance saved');
       onClose();
     } catch (err) {
-      alert(err.response?.data?.message || err.message);
+      notifyError(err, 'Failed to save opening balance');
     } finally {
       setSaving(false);
     }

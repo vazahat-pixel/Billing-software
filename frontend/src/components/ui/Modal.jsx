@@ -1,9 +1,37 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
-const Modal = ({ isOpen, onClose, title, children, className, footer, bare = false }) => {
+const Modal = ({ isOpen, onClose, title, children, className, footer, bare = false, enableEscape = true }) => {
+  const contentRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen || !enableEscape || !onClose) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (e.target.closest('[data-command-palette]')) return;
+      if (e.target.closest('.erp-combobox-dropdown')) return;
+      e.preventDefault();
+      onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose, enableEscape]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const t = setTimeout(() => {
+      const root = contentRef.current;
+      if (!root) return;
+      const first = root.querySelector(
+        'input:not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]), [data-erp-combobox-input]'
+      );
+      first?.focus();
+    }, 120);
+    return () => clearTimeout(t);
+  }, [isOpen]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -44,7 +72,7 @@ const Modal = ({ isOpen, onClose, title, children, className, footer, bare = fal
               </div>
             )}
 
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col" data-form-enter-nav>
+            <div ref={contentRef} className="flex-1 min-h-0 overflow-hidden flex flex-col" data-form-enter-nav>
               {children}
             </div>
 

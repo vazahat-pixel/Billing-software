@@ -14,6 +14,7 @@ const authMiddleware = async (req, res, next) => {
       '/auth/register',
       '/auth/forgot-password',
       '/auth/reset-password',
+      '/auth/refresh',
     ];
     if (publicAuth.includes(path) || publicAuth.some((p) => path.endsWith(p))) {
       return next();
@@ -35,8 +36,25 @@ const authMiddleware = async (req, res, next) => {
       return next(AppError.unauthorized('User not found'));
     }
 
+    if (!user.isActive) {
+      return next(AppError.forbidden('Account deactivated. Contact your administrator.'));
+    }
+
+    // Stage 7.2 — revoke check for session-bound tokens (legacy tokens without sid still work)
+    if (decoded.sid) {
+      const sessionService = require('../services/sessionService');
+      const valid = await sessionService.isSessionValid(decoded.sid);
+      if (!valid) {
+        return next(AppError.unauthorized('Session revoked or expired'));
+      }
+      req.sessionId = decoded.sid;
+      user.sessionId = decoded.sid;
+      sessionService.touch(decoded.sid).catch(() => {});
+    }
+
     req.user = user;
     req.companyId = user.companyId;
+    req.branchId = req.headers['x-branch-id'] || null;
 
     // Super admin without company: prefer X-Company-Id (set later by companyIsolation),
     // otherwise fall back to oldest company (logged — avoid silent cross-tenant ops).

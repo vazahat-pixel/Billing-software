@@ -8,12 +8,14 @@ import {
 export const isOffline = networkIsOffline;
 
 export const isNetworkError = (err) => {
-  if (isOffline() || isBrowserOffline()) return true;
+  // Queue-blocked while already offline is NOT a new network failure —
+  // treating it as one caused sticky Offline that never recovers.
+  if (err?.isQueueBlocked) return false;
+  if (isBrowserOffline()) return true;
   if (!err) return false;
   if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') return true;
   if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) return true;
   if (!err.response && err.request) return true;
-  if (err.isOfflineBlocked) return true;
   return false;
 };
 

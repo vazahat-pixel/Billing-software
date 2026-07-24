@@ -1,9 +1,9 @@
 import api from '../api/client';
-import { isOffline, isNetworkError } from './offlineHelpers';
 import { saveOfflineCredential, tryOfflineLogin } from './offlineAuth';
 
 /**
- * Login online when possible; fall back to verified offline credentials.
+ * Login online when possible; fall back to verified offline credentials
+ * ONLY when the browser itself reports no internet connectivity.
  */
 export const loginWithOfflineSupport = async ({
   email,
@@ -19,13 +19,19 @@ export const loginWithOfflineSupport = async ({
     return user;
   };
 
-  if (isOffline()) {
+  // Only use offline login when the browser itself has NO internet
+  const browserHasNoInternet = typeof navigator !== 'undefined' && !navigator.onLine;
+  if (browserHasNoInternet) {
     const session = await tryOfflineLogin(emailNorm, password, { adminOnly });
     return { token: session.token, user: assertRole(session.user) };
   }
 
+  // Browser has internet — always attempt the real network login
   try {
-    const response = await api.post('/auth/login', { email: emailNorm, password }, { skipAuthRedirect: true });
+    const response = await api.post('/auth/login', { email: emailNorm, password }, {
+      skipAuthRedirect: true,
+      forceNetwork: true,   // bypass any offline gate in Axios interceptor
+    });
     const body = response.data || {};
     const payload = body.data && (body.data.token || body.data.user) ? body.data : body;
     const { token, user } = payload;
@@ -36,11 +42,18 @@ export const loginWithOfflineSupport = async ({
     await saveOfflineCredential(emailNorm, password, { token, user });
     return { token, user };
   } catch (err) {
-    if (isNetworkError(err)) {
-      const session = await tryOfflineLogin(emailNorm, password, { adminOnly });
-      return { token: session.token, user: assertRole(session.user) };
+    // Only silently fall back to offline if browser suddenly lost connectivity
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      try {
+        const session = await tryOfflineLogin(emailNorm, password, { adminOnly });
+        return { token: session.token, user: assertRole(session.user) };
+      } catch {
+        // ignore offline fallback error, throw original
+      }
     }
-    const message = err.response?.data?.message || err.message || 'Login failed';
+    // Throw the real server error message
+    const message = err.response?.data?.message || err.message || 'Login failed. Please check your credentials.';
     throw new Error(message);
   }
 };
+

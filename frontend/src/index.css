@@ -3,6 +3,10 @@
 @import "tailwindcss";
 @import "./styles/erp-forms.css";
 @import "./styles/classic-erp.css";
+@import "./styles/erp-combobox.css";
+@import "./styles/erp-density.css";
+@import "./styles/erp-loaders.css";
+@import "./styles/erp-transitions.css";
 @import "./styles/admin-theme.css";
 
 @theme {
@@ -11,43 +15,55 @@
 }
 
 :root {
-  /* Enterprise Light Theme */
-  --bg-base: #ffffff;
+  /* Fallback tokens — ThemeProvider overrides from theme engine (light-pro default) */
+  --bg-base: #f4f4f5;
   --bg-sidebar: #ffffff;
   --bg-card: #ffffff;
-  --bg-card-hover: #f8fafc;
-  --bg-subtle: #f8fafc;
-  
-  --border-subtle: #f1f5f9;
-  --border: #e2e8f0; 
-  --border-strong: #cbd5e1; 
-  
-  --text-primary: #0f172a; /* Slate 900 */
-  --text-secondary: #475569; /* Slate 600 */
-  --text-muted: #94a3b8; /* Slate 400 */
-  
-  /* Accent (Professional corporate blue) */
-  --accent: #1d4ed8;
-  --accent-hover: #1e40af;
-  --accent-light: #eff6ff;
-  --accent-gradient: linear-gradient(135deg, #1e40af, #2563eb);
-  
-  /* Status Colors */
+  --bg-card-hover: #fafafa;
+  --bg-subtle: #f4f4f5;
+  --bg-elevated: #ffffff;
+
+  --border-subtle: #f4f4f5;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #a1a1aa;
+
+  --color-primary: #292524;
+  --color-primary-hover: #1c1917;
+  --color-primary-light: #f5f5f4;
+  --color-secondary: #57534e;
+  --color-success: #059669;
+  --color-success-bg: #ecfdf5;
+  --color-warning: #d97706;
+  --color-warning-bg: #fffbeb;
+  --color-danger: #e11d48;
+  --color-danger-bg: #fff1f2;
+  --color-info: #0d9488;
+  --color-info-bg: #f0fdfa;
+
+  --accent: #292524;
+  --accent-hover: #1c1917;
+  --accent-light: #f5f5f4;
+  --accent-gradient: linear-gradient(135deg, #1c1917 0%, #44403c 100%);
+
   --green: #059669;
   --green-bg: #ecfdf5;
   --amber: #d97706;
   --amber-bg: #fffbeb;
   --red: #e11d48;
   --red-bg: #fff1f2;
-  --blue: #2563eb;
-  --blue-bg: #eff6ff;
-  
-  /* Premium Deep Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.06), 0 4px 6px -4px rgba(15, 23, 42, 0.06);
-  --shadow-float: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
-  --shadow-glow: 0 0 0 2px rgba(255, 255, 255, 1), 0 0 0 4px rgba(30, 41, 59, 0.15);
+  --blue: #44403c;
+  --blue-bg: #f5f5f4;
+
+  --shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.04);
+  --shadow-md: 0 4px 8px rgba(24, 24, 27, 0.06);
+  --shadow-lg: 0 8px 24px rgba(24, 24, 27, 0.08);
+  --shadow-float: 0 16px 40px rgba(24, 24, 27, 0.12);
+  --shadow-glow: 0 0 0 2px #fff, 0 0 0 4px rgba(41, 37, 36, 0.2);
+  --focus-ring: 0 0 0 3px rgba(41, 37, 36, 0.15);
 }
 
 @layer base {
@@ -163,7 +179,7 @@
 .erp-menu-trigger--open {
   background: var(--accent-light);
   color: var(--accent);
-  border-color: rgba(37, 99, 235, 0.1);
+  border-color: color-mix(in srgb, var(--accent) 12%, transparent);
   box-shadow: var(--shadow-sm);
 }
 
@@ -264,8 +280,8 @@
 }
 
 .erp-card:hover { 
-  border-color: rgba(37, 99, 235, 0.15); 
-  box-shadow: 0 10px 20px -3px rgba(15, 23, 42, 0.04), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--border-subtle)); 
+  box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
 
@@ -332,4 +348,9 @@
 
 @media print {
   .no-print { display: none !important; }
+}
+
+/* Replace hardcoded Tailwind blue in ERP modals with theme tokens */
+.text-blue-900 {
+  color: var(--text-primary) !important;
 }

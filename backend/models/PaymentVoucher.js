@@ -56,11 +56,37 @@ const PaymentVoucherSchema = new mongoose.Schema({
   chequeNo: String,
   chequeDate: Date,
   utrNo: String,
+  slipNo: String,
+  intBillNo: String,
+  intBillFlag: { type: String, default: 'N' },
+  partyBank: String,
+  accBill: { type: String, default: 'B' },
+  finance: { type: Number, default: 0 },
+  financeFlag: { type: Boolean, default: false },
+  remark2: String,
+  bookId: { type: mongoose.Schema.Types.ObjectId, ref: 'Book' },
+  bookName: String,
+  bookKind: { type: String, enum: ['cash', 'bank', ''], default: '' },
   narration: String,
   againstInvoices: [{
     invoiceId: mongoose.Schema.Types.ObjectId,
     invoiceNo: String,
-    amount: Number
+    billDate: Date,
+    billAmt: Number,
+    partRc: Number,
+    rg: Number,
+    tds: Number,
+    osDy: Number,
+    billType: { type: String, default: '' },
+    osAmt: Number,
+    amount: Number,
+    jvDis: Number,
+    pq: String,
+    disPer: Number,
+    discount: Number,
+    bc: String,
+    netOs: Number,
+    nSlash: String
   }],
   accountingEntryId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -68,9 +94,20 @@ const PaymentVoucherSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Draft', 'Posted'],
+    enum: ['Draft', 'Posted', 'Reversed'],
     default: 'Draft'
-  }
+  },
+  isReversed: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  reversalEntryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AccountingEntry',
+  },
+  reversedAt: Date,
+  reverseReason: String,
 }, {
   timestamps: true
 });

@@ -3,17 +3,18 @@ const router = express.Router();
 const gstController = require('../controllers/gstController');
 const stage4 = require('../controllers/stage4ComplianceController');
 const { guard } = require('../utils/featureGuard');
+const { requirePermission } = require('../middlewares/permission.middleware');
 
 router.use(guard('gst'));
 
-// Legacy + Stage 4 deepened surface under /api/gst
-router.get('/gstr1', gstController.getGstr1);
-router.get('/gstr2', gstController.getGstr2);
-router.get('/ca-dashboard', gstController.getCADashboard);
+const read = requirePermission('gst', 'read');
 
-router.get('/gstr3b', stage4.gstr3b);
-router.get('/hsn-summary', stage4.hsnSummary);
-router.get('/dashboard', stage4.dashboard);
-router.get('/config', stage4.getConfig);
+router.get('/gstr1', read, gstController.getGstr1);
+router.get('/gstr2', read, gstController.getGstr2);
+router.get('/ca-dashboard', read, gstController.getCADashboard);
+router.get('/gstr3b', read, stage4.gstr3b);
+router.get('/hsn-summary', read, stage4.hsnSummary);
+router.get('/dashboard', read, stage4.dashboard);
+router.get('/config', read, stage4.getConfig);
 
 module.exports = router;

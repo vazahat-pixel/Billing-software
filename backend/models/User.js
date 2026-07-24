@@ -31,6 +31,12 @@ const userSchema = new mongoose.Schema({
         default: null
     },
     isActive: { type: Boolean, default: true },
+    // Stage 7.1 — brute-force / lockout
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockUntil: { type: Date, default: null },
+    lastFailedLoginAt: { type: Date, default: null },
+    lastLoginAt: { type: Date, default: null },
+    lastLoginIp: { type: String, default: '' },
     // Password reset fields
     passwordResetToken: { type: String, select: false },
     passwordResetExpires: { type: Date, select: false }
@@ -44,6 +50,10 @@ userSchema.pre('save', async function(next) {
 
 userSchema.methods.comparePassword = async function(candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
+};
+
+userSchema.methods.isLocked = function() {
+    return !!(this.lockUntil && this.lockUntil > new Date());
 };
 
 module.exports = mongoose.model('User', userSchema);

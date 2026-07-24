@@ -187,6 +187,12 @@ const PartySchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  /** Party bank accounts for Cash/Bank Book P.Bank lookup */
+  banks: [{
+    name: { type: String, trim: true, default: '' },
+    accountNo: { type: String, trim: true, default: '' },
+    ifsc: { type: String, trim: true, uppercase: true, default: '' }
+  }],
   companyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',

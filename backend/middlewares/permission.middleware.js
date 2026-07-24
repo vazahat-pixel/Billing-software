@@ -37,8 +37,8 @@ const requirePermission = (moduleKey, action = 'read') => {
 
       return next();
     } catch (err) {
-      logger.warn('requirePermission failed open', { error: err.message });
-      return next();
+      logger.warn('requirePermission check failed', { error: err.message });
+      return next(AppError.forbidden('Permission check failed'));
     }
   };
 };

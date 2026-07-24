@@ -1,0 +1,53 @@
+{
+  "name": "textile-erp-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Textile ERP Desktop Shell (Electron)",
+  "main": "main.js",
+  "author": "Textile ERP",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.textileerp.desktop",
+    "productName": "Textile ERP",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "updater.js",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "TextileERP-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Textile ERP"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://updates.example.com/textile-erp/"
+      }
+    ]
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "optionalDependencies": {
+    "electron-updater": "^6.3.0"
+  }
+}

@@ -7,24 +7,41 @@ import { listOfflineProfiles } from '../../utils/offlineAuth';
 import { isOffline } from '../../utils/offlineHelpers';
 import { subscribeNetworkStatus } from '../../utils/networkStatus';
 
+/** Seeded by backend/seed.js — shown only in Vite dev for quick local login */
+const DEMO_USERS = [
+    {
+        label: 'Owner (Acme Textile)',
+        email: 'user@textileerp.com',
+        password: 'User@123',
+    },
+];
+
+const isDev = import.meta.env.DEV;
+
 const LoginPage = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState(() => (isDev ? DEMO_USERS[0].email : ''));
+    const [password, setPassword] = useState(() => (isDev ? DEMO_USERS[0].password : ''));
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [offlineMode, setOfflineMode] = useState(isOffline());
+    const [offlineMode, setOfflineMode] = useState(() => (typeof navigator !== 'undefined' ? !navigator.onLine : false));
     const [savedProfiles, setSavedProfiles] = useState([]);
     
     const navigate = useNavigate();
     const setAuth = useStore(state => state.setAuth);
 
     useEffect(() => {
-        const unsub = subscribeNetworkStatus(({ isOffline: offline }) => {
-            setOfflineMode(offline);
+        const unsub = subscribeNetworkStatus(({ isOffline: offline, browserOnline }) => {
+            setOfflineMode(!browserOnline ? true : offline);
         });
         listOfflineProfiles().then(setSavedProfiles).catch(() => {});
         return unsub;
     }, []);
+
+    const fillDemo = (user) => {
+        setEmail(user.email);
+        setPassword(user.password);
+        setError('');
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -62,6 +79,29 @@ const LoginPage = () => {
                         <h1 className="text-2xl font-bold text-black tracking-tight uppercase">Welcome Back</h1>
                         <p className="text-slate-400 mt-1 text-xs font-bold uppercase tracking-widest">SaaS ERP Management System</p>
                     </div>
+
+                    {isDev && (
+                        <div className="mb-5 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-800 mb-2">
+                                Dev demo login
+                            </p>
+                            {DEMO_USERS.map((user) => (
+                                <button
+                                    key={user.email}
+                                    type="button"
+                                    onClick={() => fillDemo(user)}
+                                    className="w-full text-left rounded-lg border border-emerald-200 bg-white hover:bg-emerald-50 px-3 py-2 transition-colors"
+                                >
+                                    <p className="text-[11px] font-bold text-slate-800">{user.label}</p>
+                                    <p className="text-[10px] text-slate-600 mt-0.5 font-mono">{user.email}</p>
+                                    <p className="text-[10px] text-slate-500 font-mono">Password: {user.password}</p>
+                                </button>
+                            ))}
+                            <p className="text-[9px] text-emerald-700/80 mt-2">
+                                Prefills fields — click Sign In. Seed via <code className="font-mono">backend/seed.js</code> if login fails.
+                            </p>
+                        </div>
+                    )}
 
                     {offlineMode && (
                         <div className="mb-5 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2">

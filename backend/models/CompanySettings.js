@@ -44,6 +44,18 @@ const CompanySettingsSchema = new mongoose.Schema({
     logoUrl: { type: String, default: '' },
     showLogo: { type: Boolean, default: true },
     printWatermark: { type: Boolean, default: false },
+    // Invoice print (additive — optional letterhead / template prefs)
+    bankName: { type: String, default: '' },
+    accountName: { type: String, default: '' },
+    accountNo: { type: String, default: '' },
+    ifsc: { type: String, default: '' },
+    bankBranch: { type: String, default: '' },
+    upiId: { type: String, default: '' },
+    invoiceTerms: { type: String, default: '' },
+    stateCode: { type: String, default: '' },
+    invoiceTemplateId: { type: String, default: 'gst-formal' },
+    autoFestiveTheme: { type: Boolean, default: false },
+    showFestivalGreeting: { type: Boolean, default: false },
     // Custom Fields
     customField1Label: { type: String, default: '' },
     customField2Label: { type: String, default: '' },

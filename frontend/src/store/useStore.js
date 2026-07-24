@@ -1220,15 +1220,37 @@ const useStore = create((set, get) => ({
     }
   },
 
-  fetchLedgerStatement: async ({ ledgerId, from, to }) => {
+  /** Reverse posted payment/receipt — ledger + bill paidAmount rolled back */
+  reverseVoucher: async (id, reason = '') => {
     set({ loading: true });
     try {
-      const _stmt = await accountingApi.statement(ledgerId, { from: from || '', to: to || '' });
-      const res = { data: { data: _stmt } };
-      set({ currentLedgerStatement: res.data.data, loading: false });
-      return res.data.data;
+      const data = await accountingApi.reverseVoucher(id, { reason });
+      const reversed = normalizeVoucher(data);
+      set((state) => ({
+        vouchers: state.vouchers.map((v) => ((v._id || v.id) === id ? reversed : v)),
+        payments: state.payments.map((v) => ((v._id || v.id) === id ? reversed : v)),
+        receipts: state.receipts.map((v) => ((v._id || v.id) === id ? reversed : v)),
+        loading: false,
+      }));
+      get().fetchVouchers();
+      get().fetchSales();
+      get().fetchPurchases();
+      return reversed;
     } catch (err) {
-      set({ error: err.message, loading: false });
+      set({ loading: false });
+      throw err;
+    }
+  },
+
+  fetchLedgerStatement: async ({ ledgerId, from, to }) => {
+    set({ loading: true, error: null });
+    try {
+      const data = await accountingApi.statement(ledgerId, { from: from || '', to: to || '' });
+      set({ currentLedgerStatement: data, loading: false });
+      return data;
+    } catch (err) {
+      set({ error: err.message, loading: false, currentLedgerStatement: null });
+      throw err;
     }
   },
 
@@ -1365,6 +1387,19 @@ const useStore = create((set, get) => ({
       return res.data.data;
     } catch (err) {
       console.error('Create book failed:', err);
+      throw err;
+    }
+  },
+
+  updateBook: async (id, bookData) => {
+    try {
+      const _ub = await booksApi.update(id, {
+        ...bookData,
+        companyId: get().user?.companyId
+      });
+      return _ub;
+    } catch (err) {
+      console.error('Update book failed:', err);
       throw err;
     }
   },
@@ -1678,12 +1713,19 @@ const useStore = create((set, get) => ({
   clearError: () => set({ error: null }),
 
   fetchDashboardSummary: async () => {
+    const started = Date.now();
     set({ dashboardLoading: true });
     try {
       const data = await dashboardApi.summary();
+      const elapsed = Date.now() - started;
+      const wait = Math.max(0, 450 - elapsed);
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       set({ dashboardSummary: data, dashboardLoading: false });
       return data;
     } catch (err) {
+      const elapsed = Date.now() - started;
+      const wait = Math.max(0, 450 - elapsed);
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       set({ dashboardLoading: false, error: err.message });
       return null;
     }

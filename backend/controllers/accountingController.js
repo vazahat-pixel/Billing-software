@@ -159,7 +159,7 @@ exports.createPaymentVoucher = async (req, res) => {
     const paymentDetails = normalizePaymentDetails(req.body);
     const { paymentMode, paymentSplits, chequeNo, utrNo, paymentNarration } = paymentDetails;
 
-    let partyLedger = await LedgerMaster.findById(partyLedgerId);
+    let partyLedger = await LedgerMaster.findOne({ _id: partyLedgerId, companyId });
     if (!partyLedger) {
       try {
         partyLedger = await accountingService.getOrCreatePartyLedger(companyId, partyLedgerId);
@@ -167,7 +167,7 @@ exports.createPaymentVoucher = async (req, res) => {
         // ignore and let next block throw if not found
       }
     }
-    const bankLedger = await LedgerMaster.findById(bankLedgerId);
+    const bankLedger = await LedgerMaster.findOne({ _id: bankLedgerId, companyId });
 
     if (!partyLedger || !bankLedger) {
       throw new Error('Invalid party or bank ledger selection');
@@ -189,6 +189,17 @@ exports.createPaymentVoucher = async (req, res) => {
       chequeNo,
       chequeDate,
       utrNo,
+      slipNo: req.body.slipNo || '',
+      intBillNo: req.body.intBillNo || '',
+      intBillFlag: req.body.intBillFlag || 'N',
+      partyBank: req.body.partyBank || '',
+      accBill: req.body.accBill || 'B',
+      finance: Number(req.body.finance || 0),
+      financeFlag: !!req.body.financeFlag,
+      remark2: req.body.remark2 || '',
+      bookId: req.body.bookId || undefined,
+      bookName: req.body.bookName || '',
+      bookKind: req.body.bookKind || '',
       narration,
       againstInvoices,
       status: status || 'Draft'
@@ -225,35 +236,38 @@ exports.createPaymentVoucher = async (req, res) => {
 
       voucher.accountingEntryId = accountingEntry[0]._id;
 
-      // FIXED: Update invoice paidAmount for partial payment tracking
-      // Old code blindly set both Sales and Purchase to 'Paid' for every invoiceId — wrong!
+      // Update invoice paidAmount + sync BillSettlement (Outstanding)
+      const outstandingEngine = require('../services/outstandingEngineService');
       if (againstInvoices && againstInvoices.length > 0) {
         for (const item of againstInvoices) {
           const paidNow = parseFloat(item.amount || 0);
+          if (paidNow <= 0) continue;
 
-          // Try Sales first
           const saleDoc = await Sales.findOne({ _id: item.invoiceId, companyId }).session(session);
           if (saleDoc) {
-            saleDoc.paidAmount = parseFloat(((saleDoc.paidAmount || 0) + paidNow).toFixed(2));
-            if (saleDoc.paidAmount >= saleDoc.netAmount) {
-              saleDoc.status = 'paid';
-            } else if (saleDoc.paidAmount > 0) {
-              saleDoc.status = 'partial';
+            const nextPaid = parseFloat(((saleDoc.paidAmount || 0) + paidNow).toFixed(2));
+            if (nextPaid > parseFloat(saleDoc.netAmount || 0) + 0.01) {
+              throw new Error(`Overpayment on Sales #${saleDoc.invoiceNo}: paid would exceed bill amount`);
             }
+            saleDoc.paidAmount = nextPaid;
+            if (saleDoc.paidAmount >= saleDoc.netAmount) saleDoc.status = 'paid';
+            else if (saleDoc.paidAmount > 0) saleDoc.status = 'partial';
             await saleDoc.save({ session });
-            continue; // found in Sales, skip Purchase check
+            await outstandingEngine.syncBillFromSales(companyId, saleDoc, session);
+            continue;
           }
 
-          // Try Purchase
           const purchaseDoc = await Purchase.findOne({ _id: item.invoiceId, companyId }).session(session);
           if (purchaseDoc) {
-            purchaseDoc.paidAmount = parseFloat(((purchaseDoc.paidAmount || 0) + paidNow).toFixed(2));
-            if (purchaseDoc.paidAmount >= purchaseDoc.netAmount) {
-              purchaseDoc.status = 'paid';
-            } else if (purchaseDoc.paidAmount > 0) {
-              purchaseDoc.status = 'partial';
+            const nextPaid = parseFloat(((purchaseDoc.paidAmount || 0) + paidNow).toFixed(2));
+            if (nextPaid > parseFloat(purchaseDoc.netAmount || 0) + 0.01) {
+              throw new Error(`Overpayment on Purchase #${purchaseDoc.invoiceNo}: paid would exceed bill amount`);
             }
+            purchaseDoc.paidAmount = nextPaid;
+            if (purchaseDoc.paidAmount >= purchaseDoc.netAmount) purchaseDoc.status = 'paid';
+            else if (purchaseDoc.paidAmount > 0) purchaseDoc.status = 'partial';
             await purchaseDoc.save({ session });
+            await outstandingEngine.syncBillFromPurchase(companyId, purchaseDoc, session);
           }
         }
       }
@@ -286,7 +300,7 @@ exports.createReceiptVoucher = async (req, res) => {
     const paymentDetails = normalizePaymentDetails(req.body);
     const { paymentMode, paymentSplits, chequeNo, utrNo, paymentNarration } = paymentDetails;
 
-    let partyLedger = await LedgerMaster.findById(partyLedgerId);
+    let partyLedger = await LedgerMaster.findOne({ _id: partyLedgerId, companyId });
     if (!partyLedger) {
       try {
         partyLedger = await accountingService.getOrCreatePartyLedger(companyId, partyLedgerId);
@@ -294,7 +308,7 @@ exports.createReceiptVoucher = async (req, res) => {
         // ignore and let next block throw if not found
       }
     }
-    const bankLedger = await LedgerMaster.findById(bankLedgerId);
+    const bankLedger = await LedgerMaster.findOne({ _id: bankLedgerId, companyId });
 
     if (!partyLedger || !bankLedger) {
       throw new Error('Invalid party or bank ledger selection');
@@ -316,6 +330,17 @@ exports.createReceiptVoucher = async (req, res) => {
       chequeNo,
       chequeDate,
       utrNo,
+      slipNo: req.body.slipNo || '',
+      intBillNo: req.body.intBillNo || '',
+      intBillFlag: req.body.intBillFlag || 'N',
+      partyBank: req.body.partyBank || '',
+      accBill: req.body.accBill || 'B',
+      finance: Number(req.body.finance || 0),
+      financeFlag: !!req.body.financeFlag,
+      remark2: req.body.remark2 || '',
+      bookId: req.body.bookId || undefined,
+      bookName: req.body.bookName || '',
+      bookKind: req.body.bookKind || '',
       narration,
       againstInvoices,
       status: status || 'Draft'
@@ -351,33 +376,37 @@ exports.createReceiptVoucher = async (req, res) => {
 
       voucher.accountingEntryId = accountingEntry[0]._id;
 
+      const outstandingEngine = require('../services/outstandingEngineService');
       if (againstInvoices && againstInvoices.length > 0) {
         for (const item of againstInvoices) {
           const paidNow = parseFloat(item.amount || 0);
+          if (paidNow <= 0) continue;
 
-          // Try Sales first
           const saleDoc = await Sales.findOne({ _id: item.invoiceId, companyId }).session(session);
           if (saleDoc) {
-            saleDoc.paidAmount = parseFloat(((saleDoc.paidAmount || 0) + paidNow).toFixed(2));
-            if (saleDoc.paidAmount >= saleDoc.netAmount) {
-              saleDoc.status = 'paid';
-            } else if (saleDoc.paidAmount > 0) {
-              saleDoc.status = 'partial';
+            const nextPaid = parseFloat(((saleDoc.paidAmount || 0) + paidNow).toFixed(2));
+            if (nextPaid > parseFloat(saleDoc.netAmount || 0) + 0.01) {
+              throw new Error(`Overpayment on Sales #${saleDoc.invoiceNo}: receipt would exceed bill amount`);
             }
+            saleDoc.paidAmount = nextPaid;
+            if (saleDoc.paidAmount >= saleDoc.netAmount) saleDoc.status = 'paid';
+            else if (saleDoc.paidAmount > 0) saleDoc.status = 'partial';
             await saleDoc.save({ session });
-            continue; // found in Sales, skip Purchase check
+            await outstandingEngine.syncBillFromSales(companyId, saleDoc, session);
+            continue;
           }
 
-          // Try Purchase
           const purchaseDoc = await Purchase.findOne({ _id: item.invoiceId, companyId }).session(session);
           if (purchaseDoc) {
-            purchaseDoc.paidAmount = parseFloat(((purchaseDoc.paidAmount || 0) + paidNow).toFixed(2));
-            if (purchaseDoc.paidAmount >= purchaseDoc.netAmount) {
-              purchaseDoc.status = 'paid';
-            } else if (purchaseDoc.paidAmount > 0) {
-              purchaseDoc.status = 'partial';
+            const nextPaid = parseFloat(((purchaseDoc.paidAmount || 0) + paidNow).toFixed(2));
+            if (nextPaid > parseFloat(purchaseDoc.netAmount || 0) + 0.01) {
+              throw new Error(`Overpayment on Purchase #${purchaseDoc.invoiceNo}: payment would exceed bill amount`);
             }
+            purchaseDoc.paidAmount = nextPaid;
+            if (purchaseDoc.paidAmount >= purchaseDoc.netAmount) purchaseDoc.status = 'paid';
+            else if (purchaseDoc.paidAmount > 0) purchaseDoc.status = 'partial';
             await purchaseDoc.save({ session });
+            await outstandingEngine.syncBillFromPurchase(companyId, purchaseDoc, session);
           }
         }
       }
@@ -417,6 +446,93 @@ exports.listVouchers = async (req, res) => {
     res.status(200).json({ success: true, data: vouchers });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Reverse a Posted Payment/Receipt voucher:
+ * - flips the accounting journal
+ * - rolls back against-invoice paidAmount / status
+ * - marks voucher Reversed (immutable history kept)
+ */
+exports.reverseVoucher = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const companyId = req.companyId || req.body.companyId;
+    const voucherId = req.params.id;
+    const reason = (req.body.reason || '').trim() || 'User reverse from Cash/Bank Book';
+
+    const voucher = await PaymentVoucher.findOne({ _id: voucherId, companyId }).session(session);
+    if (!voucher) throw new Error('Voucher not found');
+    if (voucher.status === 'Reversed' || voucher.isReversed) {
+      throw new Error('Voucher is already reversed');
+    }
+    if (voucher.status !== 'Posted') {
+      throw new Error('Only Posted vouchers can be reversed');
+    }
+
+    await checkPeriodLocked(companyId, new Date());
+
+    if (voucher.accountingEntryId) {
+      const journalEngine = require('../services/journalEngineService');
+      const reversal = await journalEngine.reverseJournal(companyId, voucher.accountingEntryId, {
+        session,
+        userId: req.user?._id || req.user?.id,
+        reason: `${reason} (${voucher.voucherType} #${voucher.voucherNo})`,
+      });
+      voucher.reversalEntryId = reversal._id;
+    }
+
+    if (Array.isArray(voucher.againstInvoices) && voucher.againstInvoices.length > 0) {
+      const outstandingEngine = require('../services/outstandingEngineService');
+      for (const item of voucher.againstInvoices) {
+        if (!item.invoiceId) continue;
+        const paidNow = parseFloat(item.amount || 0);
+        if (paidNow <= 0) continue;
+
+        const saleDoc = await Sales.findOne({ _id: item.invoiceId, companyId }).session(session);
+        if (saleDoc) {
+          saleDoc.paidAmount = parseFloat(Math.max(0, (saleDoc.paidAmount || 0) - paidNow).toFixed(2));
+          if (saleDoc.paidAmount <= 0.009) {
+            saleDoc.paidAmount = 0;
+            saleDoc.status = saleDoc.status === 'cancelled' ? saleDoc.status : 'active';
+          } else if (saleDoc.paidAmount < saleDoc.netAmount) {
+            saleDoc.status = 'partial';
+          }
+          await saleDoc.save({ session });
+          await outstandingEngine.syncBillFromSales(companyId, saleDoc, session);
+          continue;
+        }
+
+        const purchaseDoc = await Purchase.findOne({ _id: item.invoiceId, companyId }).session(session);
+        if (purchaseDoc) {
+          purchaseDoc.paidAmount = parseFloat(Math.max(0, (purchaseDoc.paidAmount || 0) - paidNow).toFixed(2));
+          if (purchaseDoc.paidAmount <= 0.009) {
+            purchaseDoc.paidAmount = 0;
+            purchaseDoc.status = purchaseDoc.status === 'cancelled' ? purchaseDoc.status : 'active';
+          } else if (purchaseDoc.paidAmount < purchaseDoc.netAmount) {
+            purchaseDoc.status = 'partial';
+          }
+          await purchaseDoc.save({ session });
+          await outstandingEngine.syncBillFromPurchase(companyId, purchaseDoc, session);
+        }
+      }
+    }
+
+    voucher.status = 'Reversed';
+    voucher.isReversed = true;
+    voucher.reversedAt = new Date();
+    voucher.reverseReason = reason;
+    await voucher.save({ session });
+
+    await session.commitTransaction();
+    res.status(200).json({ success: true, data: voucher, message: 'Voucher reversed' });
+  } catch (error) {
+    await session.abortTransaction();
+    res.status(400).json({ success: false, message: error.message });
+  } finally {
+    session.endSession();
   }
 };
 

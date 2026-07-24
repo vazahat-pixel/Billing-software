@@ -1,15 +1,18 @@
 import React, { useEffect } from 'react';
 import ToastHost from '../components/ui/ToastHost';
+import ConfirmDialogHost from '../components/ui/ConfirmDialogHost';
 import CommandPalette from '../components/CommandPalette';
+import NotificationCenter from '../components/NotificationCenter';
+import ThemeProvider from '../theme/ThemeProvider';
 import useConfigStore from '../store/useConfigStore';
 import useStore from '../store/useStore';
 import useUiStore from '../store/useUiStore';
 import { useFormEnterNavigation } from '../hooks/useFormEnterNavigation';
+import { installBrowserDialogGuard } from '../utils/browserDialogGuard';
+import { stage6Api } from '../api/stage6.api';
 
 /**
  * App-level providers glue — keeps existing Router in App.jsx.
- * Bridges auth → config store and registers Ctrl+K shortcut.
- * Restores session early so ProtectedRoute never blocks AuthBootstrap.
  */
 export function AppProviders({ children }) {
   const user = useStore((s) => s.user);
@@ -20,8 +23,13 @@ export function AppProviders({ children }) {
   const resetConfig = useConfigStore((s) => s.reset);
   const toggleCommandPalette = useUiStore((s) => s.toggleCommandPalette);
   const commandPaletteOpen = useUiStore((s) => s.commandPaletteOpen);
+  const setNotificationUnread = useUiStore((s) => s.setNotificationUnread);
 
   useFormEnterNavigation(!commandPaletteOpen);
+
+  useEffect(() => {
+    installBrowserDialogGuard();
+  }, []);
 
   useEffect(() => {
     restoreSession();
@@ -36,8 +44,24 @@ export function AppProviders({ children }) {
   }, [token, user, plan, hydrateFromAuth, resetConfig]);
 
   useEffect(() => {
+    if (!token || !user) return;
+    stage6Api
+      .notifUnread()
+      .then((d) => setNotificationUnread(d?.count || 0))
+      .catch(() => {});
+    const t = setInterval(() => {
+      stage6Api
+        .notifUnread()
+        .then((d) => setNotificationUnread(d?.count || 0))
+        .catch(() => {});
+    }, 60000);
+    return () => clearInterval(t);
+  }, [token, user, setNotificationUnread]);
+
+  useEffect(() => {
     const onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'k') {
+      const key = String(e.key).toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && (key === 'k' || e.code === 'Space' || key === ' ')) {
         e.preventDefault();
         toggleCommandPalette();
       }
@@ -47,11 +71,13 @@ export function AppProviders({ children }) {
   }, [toggleCommandPalette]);
 
   return (
-    <>
+    <ThemeProvider>
       {children}
       <ToastHost />
+      <ConfirmDialogHost />
       <CommandPalette />
-    </>
+      <NotificationCenter />
+    </ThemeProvider>
   );
 }
 

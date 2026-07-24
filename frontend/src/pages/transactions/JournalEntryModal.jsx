@@ -32,9 +32,19 @@ const JournalEntryModal = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
+  const ledgerOptions = useMemo(
+    () => ledgers.map((l) => ({ value: l._id, label: `${l.name} (${l.group})` })),
+    [ledgers]
+  );
+
   const selectedLedgerObj = useMemo(() => {
     return ledgers.find(l => l._id === selectedLedgerId);
   }, [ledgers, selectedLedgerId]);
+
+  const typeOptions = [
+    { value: 'Dr', label: 'Dr (Debit)' },
+    { value: 'Cr', label: 'Cr (Credit)' },
+  ];
 
   const handleAddLine = () => {
     if (!selectedLedgerId) return;
@@ -150,27 +160,23 @@ const JournalEntryModal = ({ isOpen, onClose }) => {
             <div className="grid grid-cols-12 gap-2 items-center">
               <div className="col-span-4 flex items-center gap-1">
                 <span className="classic-erp-label red-label text-[10px]">Ledger:</span>
-                <select 
-                  value={selectedLedgerId}
-                  onChange={e => setSelectedLedgerId(e.target.value)}
+                <ERPSelect
                   className="classic-erp-select flex-1"
-                >
-                  <option value="">- Select Ledger Account -</option>
-                  {ledgers.map(l => (
-                    <option key={l._id} value={l._id}>{l.name} ({l.group})</option>
-                  ))}
-                </select>
+                  value={selectedLedgerId}
+                  onChange={(e) => setSelectedLedgerId(e.target.value)}
+                  options={ledgerOptions}
+                  placeholder="- Select Ledger Account -"
+                  recentKey="journal-ledger"
+                />
               </div>
               <div className="col-span-2 flex items-center gap-1">
                 <span className="classic-erp-label red-label text-[10px]">Type:</span>
-                <select 
-                  value={type}
-                  onChange={e => setType(e.target.value)}
+                <ERPSelect
                   className="classic-erp-select flex-1"
-                >
-                  <option value="Dr">Dr (Debit)</option>
-                  <option value="Cr">Cr (Credit)</option>
-                </select>
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  options={typeOptions}
+                />
               </div>
               <div className="col-span-2 flex items-center gap-1">
                 <span className="classic-erp-label red-label text-[10px]">Amt:</span>

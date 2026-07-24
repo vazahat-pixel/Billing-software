@@ -13,6 +13,7 @@
   min-height: 0;
   max-height: calc(96vh - 2px);
   overflow: hidden;
+  position: relative;
 }
 
 .classic-erp-header {
@@ -541,6 +542,14 @@
   align-items: start;
 }
 
+/* DOM order = tab order (Bill No → Date → Party); visual: Party left, Bill right */
+.classic-erp-header-split > .classic-erp-header-bill {
+  order: 2;
+}
+.classic-erp-header-split > .classic-erp-header-party {
+  order: 1;
+}
+
 @media (max-width: 960px) {
   .classic-erp-header-split,
   .classic-erp-meta-grid--3 {
@@ -863,4 +872,343 @@
 .relative.flex.flex-col.max-w-7xl {
   max-height: calc(100vh - 16px) !important;
 }
+
+/* Cash & Bank Book — compact aligned header like Sale Bill */
+.cash-bank-form.classic-erp-body {
+  gap: 6px !important;
+  padding: 8px 10px !important;
+}
+.cash-bank-header.classic-erp-frame {
+  padding: 6px 8px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cash-bank-row {
+  display: grid;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+.cash-bank-row--1 {
+  grid-template-columns: minmax(200px, 1.1fr) minmax(180px, 1fr) minmax(120px, 0.7fr) auto;
+}
+.cash-bank-row--2 {
+  grid-template-columns: minmax(210px, 1.1fr) minmax(140px, 0.85fr) minmax(180px, 1fr) minmax(200px, 1.2fr);
+}
+.cash-bank-row--3 {
+  grid-template-columns: minmax(0, 1fr) 120px;
+}
+.cash-bank-row--4 {
+  grid-template-columns: minmax(140px, 0.7fr) minmax(110px, 0.55fr) minmax(180px, 1.2fr) minmax(130px, 0.7fr);
+}
+.cash-bank-row .classic-erp-field {
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 6px;
+}
+.cash-bank-row .classic-erp-field--sm {
+  grid-template-columns: 64px minmax(0, 1fr);
+}
+.cash-bank-row .classic-erp-field--xs {
+  grid-template-columns: 58px minmax(0, 1fr);
+}
+.cash-bank-meta-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  padding-right: 2px;
+}
+.cash-bank-day {
+  color: #15803d;
+  font-weight: 700;
+  font-size: 11px;
+  min-width: 28px;
+}
+.cash-bank-clbal {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.cash-bank-toolbar {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+.cash-bank-footer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr);
+  gap: 8px;
+  align-items: stretch;
+}
+.cash-bank-footer-grid .classic-erp-frame {
+  padding: 6px 8px !important;
+}
+.cash-bank-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 4px;
+}
+.cash-bank-flags .classic-erp-field {
+  width: auto;
+  grid-template-columns: auto minmax(72px, 90px);
+}
+.book-master-form.classic-erp-body {
+  gap: 8px !important;
+  padding: 8px 10px !important;
+}
+.book-master-form .classic-erp-field {
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 6px;
+}
+.book-master-form .classic-erp-field--lg {
+  grid-template-columns: 110px minmax(0, 1fr);
+}
+.book-master-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.book-master-flags .classic-erp-field {
+  width: auto;
+  grid-template-columns: auto 36px;
+}
+.book-master-gst-box {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  background: var(--bg-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Book Master — clean professional layout ── */
+.bm-body {
+  display: flex !important;
+  flex-direction: column;
+  gap: 10px !important;
+  padding: 12px 14px !important;
+}
+.bm-toolbar {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.9fr) minmax(0, 1.4fr) minmax(160px, 0.85fr) auto;
+  gap: 10px 12px;
+  align-items: end;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.bm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card, #fff);
+}
+.bm-field {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.bm-field--grow { min-width: 0; }
+.bm-field--module { min-width: 0; }
+.bm-field--find { min-width: 0; }
+.bm-field--addr {
+  align-items: start;
+}
+.bm-field--addr .bm-label {
+  padding-top: 6px;
+}
+.bm-label {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: var(--text-secondary) !important;
+  text-align: right;
+  white-space: nowrap;
+}
+.bm-label--req {
+  color: #b91c1c !important;
+}
+.bm-label--gst {
+  color: #b91c1c !important;
+}
+.bm-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+.bm-inline > .classic-erp-input,
+.bm-inline > .classic-erp-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bm-name-input {
+  background: #fff9c4 !important;
+}
+.bm-name-input:disabled {
+  background: var(--bg-subtle) !important;
+}
+.bm-ref-input {
+  max-width: 52px !important;
+  flex: 0 0 52px !important;
+  text-align: center;
+}
+.bm-drcr {
+  max-width: 64px !important;
+  flex: 0 0 64px !important;
+}
+.bm-code-input {
+  max-width: 48px !important;
+  flex: 0 0 48px !important;
+}
+.bm-row--id {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.55fr) minmax(0, 1.45fr);
+  gap: 10px 14px;
+}
+.bm-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+.bm-gst-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-subtle, #f8f7f5);
+}
+.bm-flags-row {
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px !important;
+}
+.bm-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.bm-flag-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.bm-flag-input {
+  width: 36px !important;
+  max-width: 36px !important;
+  text-align: center !important;
+  font-weight: 700 !important;
+}
+.bm-addr-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+.bm-meta-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+.bm-notes textarea,
+.bm-notes .classic-erp-input {
+  min-height: 72px;
+  width: 100%;
+  resize: vertical;
+}
+.bm-detail-tab {
+  max-width: 520px;
+  gap: 10px !important;
+}
+.bm-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.bm-error {
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin: 0;
+}
+.bm-loading {
+  font-size: 11px;
+  color: var(--text-muted);
+  align-self: end;
+  padding-bottom: 6px;
+}
+
+@media (max-width: 860px) {
+  .bm-toolbar,
+  .bm-split,
+  .bm-row--id,
+  .bm-meta-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+@media (max-width: 980px) {
+  .cash-bank-row--1,
+  .cash-bank-row--2,
+  .cash-bank-row--4 {
+    grid-template-columns: 1fr 1fr;
+  }
+  .cash-bank-row--3,
+  .cash-bank-footer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Cash & Bank Book bill adjustment grid — maroon header like legacy */
+.cash-bank-bill-grid thead th {
+  background: #8b1a1a !important;
+  color: #fff !important;
+  font-size: 10px !important;
+  letter-spacing: 0.02em;
+  padding: 5px 4px !important;
+  border-bottom: 1px solid #6b1212 !important;
+}
+.cash-bank-bill-grid tbody td {
+  background: #f5ecd8 !important;
+  padding: 2px 2px !important;
+}
+.cash-bank-bill-grid tbody tr:hover td {
+  background: #efe4c8 !important;
+}
+.cash-bank-bill-grid td .classic-erp-input {
+  min-height: 22px !important;
+  height: 22px !important;
+  font-size: 11px !important;
+}
+
+
 

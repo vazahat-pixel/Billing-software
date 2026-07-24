@@ -84,7 +84,7 @@ const ItemMaster = () => {
                <Plus size={14} /> Add (F2)
             </button>
             <button 
-              className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all"
+              className="flex items-center gap-2 px-6 py-2 bg-[#3d2914] hover:bg-[#2a1c0e] text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all"
               onClick={() => { if(selectedItem) setIsModalOpen(true); }}
             >
                <Edit2 size={14} /> Edit (F3)

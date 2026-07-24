@@ -14,7 +14,13 @@ const SYSTEM_LEDGER_TEMPLATES = [
   { name: 'CGST Output', group: 'Liabilities', subGroup: 'Tax' },
   { name: 'SGST Output', group: 'Liabilities', subGroup: 'Tax' },
   { name: 'IGST Output', group: 'Liabilities', subGroup: 'Tax' },
+  { name: 'CGST RCM', group: 'Liabilities', subGroup: 'Tax' },
+  { name: 'SGST RCM', group: 'Liabilities', subGroup: 'Tax' },
+  { name: 'IGST RCM', group: 'Liabilities', subGroup: 'Tax' },
+  { name: 'TDS Payable', group: 'Liabilities', subGroup: 'Current Liabilities' },
+  { name: 'TCS Payable', group: 'Liabilities', subGroup: 'Current Liabilities' },
   { name: 'Job Work Charges', group: 'Expenses', subGroup: 'Direct Expenses' },
+  { name: 'Job Work In Progress', group: 'Assets', subGroup: 'Current Assets' },
   { name: 'Production Loss A/c', group: 'Expenses', subGroup: 'Direct Expenses' },
   { name: 'Stock A/c', group: 'Assets', subGroup: 'Current Assets' },
   { name: 'Freight Charges', group: 'Expenses', subGroup: 'Indirect Expenses' },
@@ -111,7 +117,7 @@ class AccountingService {
       const cgst = round2(invoice.cgst || invoice.totals?.cgst);
       const sgst = round2(invoice.sgst || invoice.totals?.sgst);
       const igst = round2(invoice.igst || invoice.totals?.igst);
-      const roundOff = round2(invoice.roundOff);
+      const tcs = round2(invoice.tcsAmount || invoice.tcs || 0);
 
       const lines = [
         {
@@ -134,15 +140,34 @@ class AccountingService {
       if (sgst > 0) lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Cr', amount: sgst, narration: `SGST Output #${invoice.invoiceNo}` });
       if (igst > 0) lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Cr', amount: igst, narration: `IGST Output #${invoice.invoiceNo}` });
 
-      if (Math.abs(roundOff) >= 0.01) {
+      if (tcs > 0) {
+        const tcsLedger = await this.getSystemLedger(companyId, 'TCS Payable');
+        lines.push({
+          ledgerId: tcsLedger._id,
+          ledgerName: tcsLedger.name,
+          type: 'Cr',
+          amount: tcs,
+          narration: `TCS Payable #${invoice.invoiceNo}`,
+        });
+      }
+
+      // Guarantee 100% mathematical double-entry balance
+      let salesDr = 0;
+      let salesCr = 0;
+      lines.forEach((l) => {
+        if (l.type === 'Dr') salesDr += l.amount;
+        else salesCr += l.amount;
+      });
+      const salesGap = round2(salesDr - salesCr);
+      if (Math.abs(salesGap) >= 0.01) {
         const roundLedger = await this.getSystemLedger(companyId, 'Round Off');
-        // Sales: net = taxable + gst + roundOff → opposite purchase sides
-        if (roundOff > 0) {
-          lines.push({ ledgerId: roundLedger._id, ledgerName: roundLedger.name, type: 'Cr', amount: Math.abs(roundOff), narration: `Round off #${invoice.invoiceNo}` });
+        if (salesGap > 0) {
+          lines.push({ ledgerId: roundLedger._id, ledgerName: roundLedger.name, type: 'Cr', amount: round2(Math.abs(salesGap)), narration: `Round off #${invoice.invoiceNo}` });
         } else {
-          lines.push({ ledgerId: roundLedger._id, ledgerName: roundLedger.name, type: 'Dr', amount: Math.abs(roundOff), narration: `Round off #${invoice.invoiceNo}` });
+          lines.push({ ledgerId: roundLedger._id, ledgerName: roundLedger.name, type: 'Dr', amount: round2(Math.abs(salesGap)), narration: `Round off #${invoice.invoiceNo}` });
         }
       }
+
       const data = { companyId, entryNo, entryDate: invoice.date || new Date(), voucherType: 'SalesAuto', refType: 'SalesInvoice', refId: invoice._id, lines, narration: `Auto posted Sales Invoice #${invoice.invoiceNo}` };
       const entry = session ? await AccountingEntry.create([data], { session }) : await AccountingEntry.create(data);
       return Array.isArray(entry) ? entry[0] : entry;
@@ -152,7 +177,7 @@ class AccountingService {
     }
   }
 
-  // 2. Purchase Bill posting — FIXED: standardized field names, supports sessions
+  // 2. Purchase Bill posting — FIXED: RCM + TDS + guaranteed double-entry balance
   async onPurchaseBillPost(bill, session = null) {
     try {
       const companyId = bill.companyId;
@@ -170,41 +195,51 @@ class AccountingService {
       const cgst = round2(bill.cgst || bill.totals?.cgst);
       const sgst = round2(bill.sgst || bill.totals?.sgst);
       const igst = round2(bill.igst || bill.totals?.igst);
-      const roundOff = round2(bill.roundOff);
+      const tds = round2(bill.tdsAmount || bill.tds || 0);
+      const isRcm = bill.reverseCharge === 'Yes' || bill.reverseCharge === true || !!bill.rcmCharge;
 
       const lines = [
         { ledgerId: purchaseLedger._id, ledgerName: purchaseLedger.name, type: 'Dr', amount: taxableAmount, narration: `Purchase value for Bill #${bill.invoiceNo}` }
       ];
 
-      if (cgst > 0) lines.push({ ledgerId: cgstLedger._id, ledgerName: cgstLedger.name, type: 'Dr', amount: cgst, narration: `CGST Input #${bill.invoiceNo}` });
-      if (sgst > 0) lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Dr', amount: sgst, narration: `SGST Input #${bill.invoiceNo}` });
-      if (igst > 0) lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Dr', amount: igst, narration: `IGST Input #${bill.invoiceNo}` });
-
-      // Round off bridges taxable+GST vs net (e.g. Harshika bill −0.20)
-      if (Math.abs(roundOff) >= 0.01) {
-        const roundLedger = await this.getSystemLedger(companyId, 'Round Off');
-        if (roundOff > 0) {
-          lines.push({
-            ledgerId: roundLedger._id,
-            ledgerName: roundLedger.name,
-            type: 'Dr',
-            amount: Math.abs(roundOff),
-            narration: `Round off #${bill.invoiceNo}`,
-          });
-        } else {
-          lines.push({
-            ledgerId: roundLedger._id,
-            ledgerName: roundLedger.name,
-            type: 'Cr',
-            amount: Math.abs(roundOff),
-            narration: `Round off #${bill.invoiceNo}`,
-          });
+      if (isRcm) {
+        // RCM: Dr Input ITC + Cr RCM Liability; supplier payable = taxable (ex-GST) net of TDS
+        if (cgst > 0) {
+          const cgstRcm = await this.getSystemLedger(companyId, 'CGST RCM');
+          lines.push({ ledgerId: cgstLedger._id, ledgerName: cgstLedger.name, type: 'Dr', amount: cgst, narration: `CGST Input (RCM) #${bill.invoiceNo}` });
+          lines.push({ ledgerId: cgstRcm._id, ledgerName: cgstRcm.name, type: 'Cr', amount: cgst, narration: `CGST RCM Liability #${bill.invoiceNo}` });
         }
+        if (sgst > 0) {
+          const sgstRcm = await this.getSystemLedger(companyId, 'SGST RCM');
+          lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Dr', amount: sgst, narration: `SGST Input (RCM) #${bill.invoiceNo}` });
+          lines.push({ ledgerId: sgstRcm._id, ledgerName: sgstRcm.name, type: 'Cr', amount: sgst, narration: `SGST RCM Liability #${bill.invoiceNo}` });
+        }
+        if (igst > 0) {
+          const igstRcm = await this.getSystemLedger(companyId, 'IGST RCM');
+          lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Dr', amount: igst, narration: `IGST Input (RCM) #${bill.invoiceNo}` });
+          lines.push({ ledgerId: igstRcm._id, ledgerName: igstRcm.name, type: 'Cr', amount: igst, narration: `IGST RCM Liability #${bill.invoiceNo}` });
+        }
+      } else {
+        if (cgst > 0) lines.push({ ledgerId: cgstLedger._id, ledgerName: cgstLedger.name, type: 'Dr', amount: cgst, narration: `CGST Input #${bill.invoiceNo}` });
+        if (sgst > 0) lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Dr', amount: sgst, narration: `SGST Input #${bill.invoiceNo}` });
+        if (igst > 0) lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Dr', amount: igst, narration: `IGST Input #${bill.invoiceNo}` });
       }
 
+      // Supplier credit = net payable (already ex-GST under RCM / TDS-reduced via purchaseTotals)
       lines.push({ ledgerId: supplierLedger._id, ledgerName: supplierLedger.name, type: 'Cr', amount: netAmount, narration: `Purchase Bill #${bill.invoiceNo}` });
 
-      // Safety: absorb residual float (≤ ₹1) into Round Off so Save never fails on 0.01–0.02 drifts
+      if (tds > 0) {
+        const tdsLedger = await this.getSystemLedger(companyId, 'TDS Payable');
+        lines.push({
+          ledgerId: tdsLedger._id,
+          ledgerName: tdsLedger.name,
+          type: 'Cr',
+          amount: tds,
+          narration: `TDS Payable #${bill.invoiceNo}`,
+        });
+      }
+
+      // Guarantee 100% mathematical double-entry balance
       let dr = 0;
       let cr = 0;
       lines.forEach((l) => {
@@ -212,23 +247,23 @@ class AccountingService {
         else cr += l.amount;
       });
       const gap = round2(dr - cr);
-      if (Math.abs(gap) >= 0.01 && Math.abs(gap) <= 1) {
+      if (Math.abs(gap) >= 0.01) {
         const roundLedger = await this.getSystemLedger(companyId, 'Round Off');
         if (gap > 0) {
           lines.push({
             ledgerId: roundLedger._id,
             ledgerName: roundLedger.name,
             type: 'Cr',
-            amount: Math.abs(gap),
-            narration: `Balance adjust #${bill.invoiceNo}`,
+            amount: round2(Math.abs(gap)),
+            narration: `Round off #${bill.invoiceNo}`,
           });
         } else {
           lines.push({
             ledgerId: roundLedger._id,
             ledgerName: roundLedger.name,
             type: 'Dr',
-            amount: Math.abs(gap),
-            narration: `Balance adjust #${bill.invoiceNo}`,
+            amount: round2(Math.abs(gap)),
+            narration: `Round off #${bill.invoiceNo}`,
           });
         }
       }
@@ -284,6 +319,104 @@ class AccountingService {
       return await AccountingEntry.create({ companyId, entryNo, entryDate: bill.date || new Date(), voucherType: 'PurchaseAuto', refType: 'PurchaseBill', refId: bill._id, lines, narration: `Auto posted Linked Bill GRN #${bill.invoiceNo}` });
     } catch (err) {
       console.error('Failed auto purchase linked GRN posting:', err);
+    }
+  }
+
+  /**
+   * Mill / Job Issue — material sent for process (shows on Mill Party ledger).
+   * Dr Mill Party (goods with mill) / Cr Stock A/c
+   */
+  async onJobIssuePost(job, lot, session = null) {
+    try {
+      const companyId = job.companyId;
+      if (!job.workerId) return null;
+
+      const qty = parseFloat(job.issueQty || 0);
+      let rate = parseFloat(lot?.rate || 0);
+      if (!rate && lot?.purchaseId && lot.totalMtrs > 0) {
+        const purch = lot.purchaseId;
+        const taxable = parseFloat(purch.taxableAmount || purch.netAmount || 0);
+        if (taxable > 0) rate = taxable / lot.totalMtrs;
+      }
+      if (!rate) rate = 100;
+      const amount = Number((qty * rate).toFixed(2));
+      if (amount < 0.01) return null;
+
+      const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
+      const millLedger = await this.getOrCreatePartyLedger(companyId, job.workerId);
+      const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c');
+
+      const narr = `Mill Issue ${job.jobCardNo || ''} → ${millLedger.name} | ${job.processType || 'Process'} | ${qty} mts @ ₹${rate}/mtr`;
+      const lines = [
+        { ledgerId: millLedger._id, ledgerName: millLedger.name, type: 'Dr', amount, narration: narr },
+        { ledgerId: stockLedger._id, ledgerName: stockLedger.name, type: 'Cr', amount, narration: narr },
+      ];
+
+      const data = {
+        companyId,
+        entryNo,
+        entryDate: job.date || job.createdAt || new Date(),
+        voucherType: 'JobWorkAuto',
+        refType: 'JobIssue',
+        refId: job._id,
+        lines,
+        narration: narr,
+      };
+      if (session) {
+        const entry = await AccountingEntry.create([data], { session });
+        return entry[0];
+      }
+      return await AccountingEntry.create(data);
+    } catch (err) {
+      console.error('Failed auto job issue posting:', err);
+      if (session) throw err;
+    }
+  }
+
+  /**
+   * Mill / Job Receive — return material from mill to stock.
+   * Dr Stock A/c / Cr Mill Party (reverse goods-with-mill)
+   * Process charges still posted separately via onJobWorkChargesPost.
+   */
+  async onJobReceiveStockPost(job, { greyCostPerMtr, receivedQty }, session = null) {
+    try {
+      const companyId = job.companyId;
+      if (!job.workerId) return null;
+
+      const issueQty = parseFloat(job.issueQty || 0);
+      const rate = parseFloat(greyCostPerMtr || 0) || 100;
+      const amount = Number((issueQty * rate).toFixed(2));
+      if (amount < 0.01) return null;
+
+      const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
+      const millLedger = await this.getOrCreatePartyLedger(companyId, job.workerId);
+      const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c');
+
+      const recvQty = parseFloat(receivedQty || job.receivedQty || 0);
+      const narr = `Mill Receive ${job.jobCardNo || ''} from ${millLedger.name} | finished ${recvQty} mts | material back ${issueQty} mts`;
+      const lines = [
+        { ledgerId: stockLedger._id, ledgerName: stockLedger.name, type: 'Dr', amount, narration: narr },
+        { ledgerId: millLedger._id, ledgerName: millLedger.name, type: 'Cr', amount, narration: narr },
+      ];
+
+      const data = {
+        companyId,
+        entryNo,
+        entryDate: job.receiveDate || new Date(),
+        voucherType: 'JobWorkAuto',
+        refType: 'JobReceive',
+        refId: job._id,
+        lines,
+        narration: narr,
+      };
+      if (session) {
+        const entry = await AccountingEntry.create([data], { session });
+        return entry[0];
+      }
+      return await AccountingEntry.create(data);
+    } catch (err) {
+      console.error('Failed auto job receive stock posting:', err);
+      if (session) throw err;
     }
   }
 

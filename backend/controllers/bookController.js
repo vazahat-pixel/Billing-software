@@ -125,6 +125,12 @@ exports.createBook = async (req, res) => {
       bookType: req.body.bookType || 'SALES BOOK',
       groupHead: req.body.groupHead || '',
       opBalance: Number(req.body.opBalance || 0),
+      opBalanceType: req.body.opBalanceType === 'CR' ? 'CR' : 'DR',
+      accountNo: req.body.accountNo || '',
+      gstinNo: req.body.gstinNo || '',
+      stateCode: req.body.stateCode != null ? String(req.body.stateCode) : '0',
+      stateName: req.body.stateName || '',
+      gstType: req.body.gstType || '',
       retailTax: req.body.retailTax || '',
       detailJobWork: req.body.detailJobWork || 'D',
       rowFinishMaterial: req.body.rowFinishMaterial || 'F',
@@ -136,6 +142,8 @@ exports.createBook = async (req, res) => {
       state: req.body.state || '',
       head1: req.body.head1 || 'Pcs',
       head2: req.body.head2 || 'Qty',
+      createDate: req.body.createDate ? new Date(req.body.createDate) : new Date(),
+      notes: req.body.notes || '',
       jobWorkBook: !!req.body.jobWorkBook,
       tdsHead: req.body.tdsHead || '',
       tdsCode: Number(req.body.tdsCode || 0)
@@ -143,6 +151,51 @@ exports.createBook = async (req, res) => {
 
     await newBook.save();
     res.status(201).json({ success: true, data: newBook });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: 'A book with this name or code already exists' });
+    }
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+exports.updateBook = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const companyId = req.companyId;
+    const book = await Book.findById(id);
+
+    if (!book) {
+      return res.status(404).json({ success: false, message: 'Book not found' });
+    }
+    if (!book.companyId) {
+      return res.status(403).json({ success: false, message: 'Cannot edit system default books' });
+    }
+    if (book.companyId.toString() !== companyId?.toString()) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to edit this book' });
+    }
+
+    const fields = [
+      'name', 'code', 'module', 'bookType', 'groupHead', 'opBalance', 'opBalanceType',
+      'accountNo', 'gstinNo', 'stateCode', 'stateName', 'gstType', 'retailTax',
+      'detailJobWork', 'rowFinishMaterial', 'incExcVat', 'effectOnStock',
+      'address1', 'address2', 'dist', 'state', 'head1', 'head2', 'createDate',
+      'notes', 'jobWorkBook', 'tdsHead', 'tdsCode'
+    ];
+
+    for (const key of fields) {
+      if (req.body[key] === undefined) continue;
+      if (key === 'name') book.name = String(req.body.name).toUpperCase();
+      else if (key === 'opBalance' || key === 'tdsCode') book[key] = Number(req.body[key] || 0);
+      else if (key === 'opBalanceType') book.opBalanceType = req.body.opBalanceType === 'CR' ? 'CR' : 'DR';
+      else if (key === 'jobWorkBook') book.jobWorkBook = !!req.body.jobWorkBook;
+      else if (key === 'createDate') book.createDate = req.body.createDate ? new Date(req.body.createDate) : book.createDate;
+      else if (key === 'stateCode') book.stateCode = String(req.body.stateCode);
+      else book[key] = req.body[key];
+    }
+
+    await book.save();
+    res.status(200).json({ success: true, data: book });
   } catch (error) {
     if (error.code === 11000) {
       return res.status(400).json({ success: false, message: 'A book with this name or code already exists' });

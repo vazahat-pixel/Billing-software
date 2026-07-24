@@ -1,15 +1,18 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import useStore from '../../store/useStore';
 import { Package, Search, Filter, History, Plus, MoreVertical, TrendingUp } from 'lucide-react';
+import { CardGridLoader, SkeletonTable } from '../../components/ui/loaders';
 
 const InventoryPage = () => {
-   const { inventoryLots, fetchInventory } = useStore();
+   const { inventoryLots, fetchInventory, loading } = useStore();
    const [searchQuery, setSearchQuery] = useState('');
    const [activeTab, setActiveTab] = useState('ALL');
 
    useEffect(() => {
       fetchInventory();
    }, [fetchInventory]);
+
+   const initialLoad = loading && inventoryLots.length === 0;
 
    const stats = useMemo(() => {
       const totalWeight = inventoryLots.reduce((acc, l) => acc + (l.remainingMtrs || 0), 0);
@@ -60,6 +63,13 @@ const InventoryPage = () => {
             </div>
          </div>
 
+         {initialLoad ? (
+            <>
+               <CardGridLoader count={3} />
+               <SkeletonTable rows={10} cols={6} />
+            </>
+         ) : (
+         <>
          {/* Metric Cards Row */}
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden group">
@@ -174,6 +184,8 @@ const InventoryPage = () => {
                </table>
             </div>
          </div>
+         </>
+         )}
       </div>
    );
 };

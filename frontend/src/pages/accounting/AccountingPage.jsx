@@ -3,7 +3,7 @@ import useStore from '../../store/useStore';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { accountingApi } from '../../api';
 import { Banknote, FileText, Search, ArrowUpRight, ArrowDownLeft, ArrowRight, X } from 'lucide-react';
-import { PaymentForm } from './AccountingForms';
+import CashBankBookModal from './CashBankBookModal';
 
 const AccountingPage = () => {
   const { parties, currentLedgerStatement, fetchLedgerStatement, fetchParties } = useStore();
@@ -192,12 +192,13 @@ const AccountingPage = () => {
          </div>
       </div>
 
-      <PaymentForm 
-        isOpen={showPaymentModal} 
+      <CashBankBookModal
+        isOpen={showPaymentModal}
         onClose={() => {
           setShowPaymentModal(false);
           refreshStatement();
-        }} 
+        }}
+        bookKind="bank"
         initialType={paymentType === 'receipt' ? 'Receipt' : 'Payment'}
       />
     </div>

@@ -87,7 +87,7 @@ exports.seedCompanyDefaults = async (companyId, actorId = null, req = null) => {
     );
   }
 
-  for (const bill of [defaults.SALES_BILL_CONFIG, defaults.PURCHASE_BILL_CONFIG]) {
+  for (const bill of defaults.DEFAULT_BILL_CONFIGS) {
     await BillConfig.findOneAndUpdate(
       { companyId: companyObjectId, billType: bill.billType },
       { companyId: companyObjectId, ...bill, version: 1, publishedAt: new Date(), isActive: true },
@@ -199,7 +199,10 @@ exports.getActiveConfigBundle = async (companyId) => {
   const columnsMap = {};
   columns.forEach((c) => { columnsMap[c.tableKey] = c; });
 
-  const billsMap = { sales: null, purchase: null };
+  const billsMap = {};
+  defaults.DEFAULT_BILL_CONFIGS.forEach((def) => {
+    billsMap[def.billType] = { ...def };
+  });
   bills.forEach((b) => { billsMap[b.billType] = b; });
 
   const flagsMap = {};
@@ -278,6 +281,80 @@ exports.saveModuleConfig = async (companyId, body, actorId, req) => {
   return updated;
 };
 
+exports.getCompanySettings = async (companyId) => {
+  let settings = await CompanySettings.findOne({ companyId, isActive: true, deletedAt: null }).lean();
+  if (!settings) {
+    settings = await CompanySettings.findOneAndUpdate(
+      { companyId },
+      { companyId, version: 1, publishedAt: new Date(), isActive: true },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).lean();
+  }
+  return settings;
+};
+
+exports.saveCompanySettings = async (companyId, body, actorId, req) => {
+  const existing = await CompanySettings.findOne({ companyId });
+  const meta = bumpMeta(existing, actorId);
+  const {
+    legalName, shortName, gstin, pan, tan, phone, email, website,
+    address, city, state, pincode, financialYear, gstScheme, currency,
+    dateFormat, tdsEnabled, tcsEnabled, eway, eInvoice, businessType,
+    invoicePrefix, purchasePrefix, challanPrefix, receiptPrefix, paymentPrefix,
+    autoVoucherNo, notifyExpiry, notifyLowStock, notifyOverdue,
+    showLogo, printWatermark, primaryColor, logoUrl, offlineModeEnabled,
+    customField1Label, customField2Label, customField3Label
+  } = body;
+
+  const patch = {
+    legalName, shortName, gstin, pan, tan, phone, email, website,
+    address, city, state, pincode, financialYear, gstScheme, currency,
+    dateFormat, tdsEnabled, tcsEnabled, eway, eInvoice, businessType,
+    invoicePrefix, purchasePrefix, challanPrefix, receiptPrefix, paymentPrefix,
+    autoVoucherNo, notifyExpiry, notifyLowStock, notifyOverdue,
+    showLogo, printWatermark, primaryColor, logoUrl, offlineModeEnabled,
+    customField1Label, customField2Label, customField3Label
+  };
+  Object.keys(patch).forEach((k) => {
+    if (patch[k] === undefined) delete patch[k];
+  });
+
+  const updated = await CompanySettings.findOneAndUpdate(
+    { companyId },
+    { ...patch, companyId, ...meta, configHash: computeBundleHash(patch) },
+    { upsert: true, new: true }
+  );
+
+  await logConfigChange({
+    companyId,
+    configType: 'settings',
+    configKey: 'company',
+    configId: updated._id,
+    version: updated.version,
+    action: existing ? 'update' : 'create',
+    actorId,
+    before: existing?.toObject?.() || null,
+    after: updated.toObject(),
+    req
+  });
+
+  return updated;
+};
+
+exports.getBillConfigForCompany = async (companyId, billType) => {
+  const bill = await BillConfig.findOne({ companyId, billType, isActive: true, deletedAt: null }).lean();
+  if (bill) return bill;
+  const fallback = defaults.DEFAULT_BILL_CONFIGS.find((b) => b.billType === billType);
+  return fallback || null;
+};
+
+exports.listBillConfigsForCompany = async (companyId) => {
+  const stored = await BillConfig.find({ companyId, isActive: true, deletedAt: null }).lean();
+  const byType = {};
+  stored.forEach((b) => { byType[b.billType] = b; });
+  return defaults.DEFAULT_BILL_CONFIGS.map((def) => byType[def.billType] || def);
+};
+
 exports.saveBillConfig = async (companyId, billType, body, actorId, req) => {
   const existing = await BillConfig.findOne({ companyId, billType });
   const meta = bumpMeta(existing, actorId);
@@ -301,6 +378,49 @@ exports.saveBillConfig = async (companyId, billType, body, actorId, req) => {
   });
 
   return updated;
+};
+
+exports.getModuleConfigForCompany = async (companyId) => {
+  const doc = await CompanyModuleConfig.findOne({ companyId, isActive: true, deletedAt: null }).lean();
+  if (!doc) {
+    return {
+      modules: { ...defaults.DEFAULT_MODULES },
+      subMenus: { ...defaults.DEFAULT_SUB_MENUS },
+      fields: { ...defaults.DEFAULT_MODULE_FIELDS },
+    };
+  }
+  return {
+    modules: mapToObject(doc.modules) || defaults.DEFAULT_MODULES,
+    subMenus: mapToObject(doc.subMenus) || defaults.DEFAULT_SUB_MENUS,
+    fields: mapToObject(doc.fields) || defaults.DEFAULT_MODULE_FIELDS,
+  };
+};
+
+exports.listColumnConfigsForCompany = async (companyId) => {
+  const stored = await ColumnConfig.find({ companyId, isActive: true, deletedAt: null }).lean();
+  const byKey = {};
+  stored.forEach((c) => { byKey[c.tableKey] = c; });
+  return defaults.DEFAULT_COLUMN_CONFIGS.map((def) => byKey[def.tableKey] || def);
+};
+
+exports.listFeatureFlagsForCompany = async (companyId) => {
+  const stored = await FeatureFlag.find({ companyId, isActive: true, deletedAt: null }).lean();
+  const byKey = {};
+  stored.forEach((f) => { byKey[f.flagKey] = f; });
+  return defaults.DEFAULT_FEATURE_FLAGS.map((def) => {
+    const hit = byKey[def.flagKey];
+    return hit ? { ...def, ...hit, enabled: hit.enabled !== false } : def;
+  });
+};
+
+exports.saveFeatureFlagForCompany = async (companyId, flagKey, body, actorId) => {
+  const existing = await FeatureFlag.findOne({ companyId, flagKey });
+  const meta = bumpMeta(existing, actorId);
+  return FeatureFlag.findOneAndUpdate(
+    { companyId, flagKey },
+    { ...body, flagKey, companyId, ...meta },
+    { upsert: true, new: true }
+  );
 };
 
 exports.saveFormConfig = async (companyId, formKey, body, actorId, req) => {
@@ -355,5 +475,83 @@ exports.saveColumnConfig = async (companyId, tableKey, body, actorId, req) => {
 
 exports.getConfigChangeLogs = async (companyId, limit = 50) =>
   ConfigChangeLog.find({ companyId }).sort({ createdAt: -1 }).limit(limit).populate('actorId', 'name email');
+
+exports.getFormConfigForCompany = async (companyId, formKey) => {
+  const doc = await FormConfig.findOne({ companyId, formKey, isActive: true, deletedAt: null }).lean();
+  if (doc) return doc;
+  return defaults.DEFAULT_FORM_CONFIGS.find((f) => f.formKey === formKey) || null;
+};
+
+exports.listFormConfigsForCompany = async (companyId) => {
+  const stored = await FormConfig.find({ companyId, isActive: true, deletedAt: null }).lean();
+  const byKey = {};
+  stored.forEach((f) => { byKey[f.formKey] = f; });
+  return defaults.DEFAULT_FORM_CONFIGS.map((def) => byKey[def.formKey] || def);
+};
+
+exports.listReportConfigsForCompany = async (companyId) => {
+  const stored = await ReportConfig.find({ companyId, deletedAt: null }).lean();
+  const byKey = {};
+  stored.forEach((r) => { byKey[r.reportKey] = r; });
+  return defaults.DEFAULT_REPORT_CONFIGS.map((def) => byKey[def.reportKey] || def);
+};
+
+exports.saveReportConfigForCompany = async (companyId, reportKey, body, actorId) => {
+  const existing = await ReportConfig.findOne({ companyId, reportKey });
+  const meta = bumpMeta(existing, actorId);
+  return ReportConfig.findOneAndUpdate(
+    { companyId, reportKey },
+    { ...body, reportKey, companyId, ...meta },
+    { upsert: true, new: true }
+  );
+};
+
+exports.listNotificationRulesForCompany = async (companyId) => {
+  const stored = await NotificationConfig.find({ companyId, deletedAt: null }).lean();
+  const byKey = {};
+  stored.forEach((r) => { byKey[r.ruleKey] = r; });
+  return defaults.DEFAULT_NOTIFICATION_RULES.map((def) => byKey[def.ruleKey] || def);
+};
+
+exports.saveNotificationRuleForCompany = async (companyId, ruleKey, body, actorId) => {
+  const existing = await NotificationConfig.findOne({ companyId, ruleKey });
+  const meta = bumpMeta(existing, actorId);
+  return NotificationConfig.findOneAndUpdate(
+    { companyId, ruleKey },
+    { ...body, ruleKey, companyId, ...meta },
+    { upsert: true, new: true }
+  );
+};
+
+exports.getPermissionMatrixForCompany = async (companyId) => {
+  const doc = await PermissionMatrix.findOne({ companyId, isActive: true, deletedAt: null }).lean();
+  if (doc) {
+    return { roles: mapToObject(doc.roles), sections: mapToObject(doc.sections) };
+  }
+  return defaults.DEFAULT_PERMISSION_MATRIX;
+};
+
+exports.savePermissionMatrixForCompany = async (companyId, body, actorId, req) => {
+  const existing = await PermissionMatrix.findOne({ companyId });
+  const meta = bumpMeta(existing, actorId);
+  const updated = await PermissionMatrix.findOneAndUpdate(
+    { companyId },
+    { roles: body.roles, sections: body.sections, companyId, ...meta },
+    { upsert: true, new: true }
+  );
+  await logConfigChange({
+    companyId,
+    configType: 'permission',
+    configKey: 'matrix',
+    configId: updated._id,
+    version: updated.version,
+    action: existing ? 'update' : 'create',
+    actorId,
+    before: existing?.toObject?.() || null,
+    after: updated.toObject(),
+    req
+  });
+  return updated;
+};
 
 module.exports.mapToObject = mapToObject;

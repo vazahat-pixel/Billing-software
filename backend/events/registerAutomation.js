@@ -40,6 +40,20 @@ async function onSalesCreated(payload = {}) {
     } else {
       await outstandingRefresh.refreshCompanyOutstandingSummary(companyId);
     }
+    // Stage 6.3 — configurable automation pipelines
+    try {
+      const automationEngine = require('../services/automationRuleEngineService');
+      await automationEngine.runTrigger(companyId, 'sales.saved', {
+        module: 'sales',
+        referenceType: 'Sales',
+        referenceId: salesId,
+        referenceNo: invoiceNo,
+        amount: netAmount || 0,
+        partyId: customerId,
+      });
+    } catch (err) {
+      logger.debug('stage6.automation.sales skipped', { error: err.message });
+    }
     await markLatestProcessed(companyId, 'sales.created');
   } catch (err) {
     logger.warn('automation.sales.created failed', { error: err.message });
@@ -60,6 +74,19 @@ async function onPurchaseCreated(payload = {}) {
     });
     if (supplierId) {
       await outstandingRefresh.refreshPartyOutstanding(companyId, supplierId);
+    }
+    try {
+      const automationEngine = require('../services/automationRuleEngineService');
+      await automationEngine.runTrigger(companyId, 'purchase.saved', {
+        module: 'purchase',
+        referenceType: 'Purchase',
+        referenceId: purchaseId,
+        referenceNo: invoiceNo,
+        amount: netAmount || 0,
+        partyId: supplierId,
+      });
+    } catch (err) {
+      logger.debug('stage6.automation.purchase skipped', { error: err.message });
     }
     await markLatestProcessed(companyId, 'purchase.created');
   } catch (err) {
@@ -92,6 +119,17 @@ async function onJobReceived(payload = {}) {
       }
     } catch {
       /* optional */
+    }
+    try {
+      const automationEngine = require('../services/automationRuleEngineService');
+      await automationEngine.runTrigger(companyId, 'job.completed', {
+        module: 'job',
+        referenceType: 'Job',
+        referenceId: jobId,
+        referenceNo: jobCardNo,
+      });
+    } catch (err) {
+      logger.debug('stage6.automation.job skipped', { error: err.message });
     }
     await markLatestProcessed(companyId, 'job.received');
   } catch (err) {

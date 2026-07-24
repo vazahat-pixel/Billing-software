@@ -5,6 +5,7 @@ const ALL_SECTIONS = [
   'Reports',
   'Others Reports',
   'Ledger',
+  'Advanced',
   'Utilities',
   'Setup System',
   'Admin',
@@ -35,7 +36,7 @@ export const getPermissions = (companyRole = 'owner', systemRole = 'user') => {
     viewer: ['Records', 'Reports', 'Others Reports', 'Ledger']
   };
 
-  const canSave = !['viewer', 'accountant'].includes(role);
+  const canSave = !['viewer'].includes(role);
   const canManageUsers = ['owner', 'admin'].includes(role);
   const readOnlyMasters = ['viewer', 'accountant'].includes(role);
 

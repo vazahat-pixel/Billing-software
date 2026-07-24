@@ -44,6 +44,8 @@ Desktop.ini
 # Database / uploads / local data
 uploads/
 data/
+backend/backups/
+*.bak
 *.sqlite
 *.db
 dump/

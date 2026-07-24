@@ -1,5 +1,6 @@
 const FOCUSABLE_SELECTOR = [
   'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([disabled]):not([readonly]):not([tabindex="-1"])',
+  'input[data-erp-combobox-input]:not([disabled]):not([readonly])',
   'select:not([disabled]):not([tabindex="-1"])',
   'textarea:not([disabled]):not([readonly]):not([tabindex="-1"])',
 ].join(',');
@@ -96,6 +97,7 @@ export function shouldHandleFormEnter(e) {
   if (target.closest('[data-enter-nav="off"]')) return false;
   if (target.closest('[data-command-palette]')) return false;
   if (target.closest('[data-book-selection-modal]')) return false;
+  if (target.closest('[data-enter-skip]')) return false;
 
   return true;
 }

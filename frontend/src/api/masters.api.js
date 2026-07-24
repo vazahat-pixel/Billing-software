@@ -4,12 +4,33 @@ export const booksApi = {
   list: () => unwrap(get('/books')).then((d) => asArray(d, ['books'])),
   byModule: (moduleName) => unwrap(get(`/books/module/${moduleName}`)).then((d) => asArray(d, ['books'])),
   create: (body) => unwrap(post('/books', body)),
+  update: (id, body) => unwrap(put(`/books/${id}`, body)),
   remove: (id) => unwrap(del(`/books/${id}`)),
 };
 
 export const configApi = {
   active: (config) => unwrap(get('/config/active', undefined, config)),
   version: (config) => unwrap(get('/config/version', undefined, config)),
+  listBills: () => unwrap(get('/config/bills')).then((d) => asArray(d)),
+  billConfig: (billType) => unwrap(get(`/config/bills/${billType}`)),
+  saveBillConfig: (billType, body) => unwrap(put(`/config/bills/${billType}`, body)),
+  getSettings: () => unwrap(get('/config/settings')),
+  saveSettings: (body) => unwrap(put('/config/settings', body)),
+  getModules: () => unwrap(get('/config/modules')),
+  saveModules: (body) => unwrap(put('/config/modules', body)),
+  listColumns: () => unwrap(get('/config/columns')).then((d) => asArray(d)),
+  saveColumns: (tableKey, body) => unwrap(put(`/config/columns/${tableKey}`, body)),
+  listFeatures: () => unwrap(get('/config/features')).then((d) => asArray(d)),
+  saveFeature: (flagKey, body) => unwrap(put(`/config/features/${flagKey}`, body)),
+  listForms: () => unwrap(get('/config/forms')).then((d) => asArray(d)),
+  formConfig: (formKey) => unwrap(get(`/config/forms/${encodeURIComponent(formKey)}`)),
+  saveFormConfig: (formKey, body) => unwrap(put(`/config/forms/${encodeURIComponent(formKey)}`, body)),
+  listReports: () => unwrap(get('/config/reports')).then((d) => asArray(d)),
+  saveReport: (reportKey, body) => unwrap(put(`/config/reports/${reportKey}`, body)),
+  listNotifications: () => unwrap(get('/config/notifications')).then((d) => asArray(d)),
+  saveNotification: (ruleKey, body) => unwrap(put(`/config/notifications/${ruleKey}`, body)),
+  getPermissions: () => unwrap(get('/config/permissions')),
+  savePermissions: (body) => unwrap(put('/config/permissions', body)),
 };
 
 export const usersApi = {

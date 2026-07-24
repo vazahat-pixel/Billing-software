@@ -69,7 +69,7 @@ const ForgotPasswordPage = () => {
                             <button 
                                 disabled={loading}
                                 type="submit"
-                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 group"
+                                className="w-full bg-black hover:bg-slate-800 text-white font-bold py-4 rounded-xl shadow-lg shadow-black/20 transition-all flex items-center justify-center gap-2 group"
                             >
                                 {loading ? <Loader2 className="animate-spin" size={20} /> : (
                                     <>

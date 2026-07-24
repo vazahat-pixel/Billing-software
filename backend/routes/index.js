@@ -49,6 +49,9 @@ router.use('/business-automation', require('./businessAutomation.routes'));
 router.use('/stage2', require('./stage2Ops.routes'));
 router.use('/stage3', require('./stage3Finance.routes'));
 router.use('/stage4', require('./stage4Compliance.routes'));
+router.use('/stage6', require('./stage6Enterprise.routes'));
+router.use('/stage7', require('./stage7Infra.routes'));
+router.use('/stage8', require('./stage8Commercial.routes'));
 router.use('/purchases', purchaseRoutes);
 router.use('/inventory', inventoryRoutes);
 router.use('/admin', adminRoutes);
@@ -74,6 +77,7 @@ router.use('/returns', returnRoutes);
 router.use('/notes', noteRoutes);
 router.use('/users', userRoutes);
 router.use('/config', configRoutes);
+router.use('/festivals', require('./festival.routes'));
 router.use('/developer/qa', require('../developer/routes/qa.routes'));
 
 module.exports = router;

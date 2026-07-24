@@ -219,18 +219,27 @@ exports.updateSubscription = async (req, res) => {
 // LICENSE
 exports.generateLicense = async (req, res) => {
     try {
-        const { companyId, expiresAt } = req.body;
+        const crypto = require('crypto');
+        const { companyId, expiresAt, planTier, maxDevices } = req.body;
         const key = generateLicenseKey(companyId);
-        
+        const checksum = crypto
+            .createHash('sha256')
+            .update(`${companyId}:${key}:${process.env.JWT_SECRET || ''}`)
+            .digest('hex')
+            .substring(0, 16)
+            .toUpperCase();
+
         const license = await License.create({
             companyId,
             licenseKey: key,
             expiresAt,
-            checksum: 'CHECKSUM_PLACEHOLDER' // Ideally actual checksum
+            checksum,
+            planTier: planTier || 'pro',
+            maxDevices: maxDevices || 5,
         });
-        
+
         await Company.findByIdAndUpdate(companyId, { licenseKey: key });
-        
+
         res.status(201).json(license);
     } catch (err) {
         res.status(400).json({ message: err.message });

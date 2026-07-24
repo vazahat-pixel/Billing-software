@@ -125,7 +125,7 @@ const SALES_BILL_CONFIG = {
     gstTypeField: 'type',
     netAmountFormula: 'taxable + gst + tcs + add - less + roundOff'
   },
-  printTemplate: { templateId: 'classic', showLogo: true, watermark: false }
+  printTemplate: { templateId: 'classic-ledger', showLogo: true, watermark: false }
 };
 
 const PURCHASE_BILL_CONFIG = {
@@ -177,8 +177,114 @@ const PURCHASE_BILL_CONFIG = {
     gstTypeField: 'type',
     netAmountFormula: 'taxable + gst + rcm + add - less + roundOff'
   },
-  printTemplate: { templateId: 'classic', showLogo: true, watermark: false }
+  printTemplate: { templateId: 'classic-ledger', showLogo: true, watermark: false }
 };
+
+const MILL_ISSUE_BILL_CONFIG = {
+  billType: 'millIssue',
+  label: 'Mill Issue',
+  headerFields: [
+    { key: 'workerId', label: 'Mill Party', type: 'select', section: 'header', required: true, visible: true, order: 1 },
+    { key: 'gstin', label: 'GSTIN', type: 'readonly', section: 'header', visible: true, order: 2 },
+    { key: 'address', label: 'City', type: 'readonly', section: 'header', visible: true, order: 3 },
+    { key: 'processType', label: 'Process', type: 'select', section: 'header', required: true, visible: true, order: 4 },
+    { key: 'broker', label: 'Broker', type: 'text', section: 'header', visible: true, order: 5 },
+    { key: 'challanNo', label: 'Challan', type: 'text', section: 'header', visible: true, order: 6 },
+    { key: 'date', label: 'Date', type: 'date', section: 'header', required: true, visible: true, order: 7 },
+    { key: 'reFinish', label: 'Re-Finish', type: 'checkbox', section: 'header', visible: true, order: 8 }
+  ],
+  lineColumns: [
+    { key: 'lotId', label: 'Stock Lot', visible: true, order: 1 },
+    { key: 'issuePcs', label: 'Issue Pcs', visible: true, order: 2 },
+    { key: 'issueQty', label: 'Issue Qty', visible: true, order: 3 },
+    { key: 'chargesRate', label: 'Job Rate', visible: true, order: 4 }
+  ],
+  footerFields: [
+    { key: 'transport', label: 'Transport', type: 'text', section: 'footer', visible: true, order: 1 },
+    { key: 'lrNo', label: 'LR No', type: 'text', section: 'footer', visible: true, order: 2 },
+    { key: 'baleNo', label: 'Bale No', type: 'text', section: 'footer', visible: true, order: 3 },
+    { key: 'remark', label: 'Remark', type: 'text', section: 'footer', visible: true, order: 4 }
+  ],
+  calculations: {},
+  printTemplate: { templateId: 'classic-ledger', showLogo: true, watermark: false }
+};
+
+const MILL_RECEIVE_BILL_CONFIG = {
+  billType: 'millReceive',
+  label: 'Mill Receive',
+  headerFields: [
+    { key: 'workerId', label: 'Mill Party', type: 'select', section: 'header', required: true, visible: true, order: 1 },
+    { key: 'processType', label: 'Process', type: 'select', section: 'header', visible: true, order: 2 },
+    { key: 'challanNo', label: 'Challan', type: 'text', section: 'header', visible: true, order: 3 },
+    { key: 'date', label: 'Date', type: 'date', section: 'header', required: true, visible: true, order: 4 }
+  ],
+  lineColumns: [
+    { key: 'jobCardNo', label: 'Job Card', visible: true, order: 1 },
+    { key: 'receiveQty', label: 'Receive Qty', visible: true, order: 2 },
+    { key: 'receivePcs', label: 'Receive Pcs', visible: true, order: 3 },
+    { key: 'wastage', label: 'Wastage', visible: true, order: 4 },
+    { key: 'shortage', label: 'Shortage', visible: true, order: 5 }
+  ],
+  footerFields: [
+    { key: 'transport', label: 'Transport', type: 'text', section: 'footer', visible: true, order: 1 },
+    { key: 'lrNo', label: 'LR No', type: 'text', section: 'footer', visible: true, order: 2 },
+    { key: 'remark', label: 'Remark', type: 'text', section: 'footer', visible: true, order: 3 }
+  ],
+  calculations: {},
+  printTemplate: { templateId: 'classic-ledger', showLogo: true, watermark: false }
+};
+
+const JOB_ISSUE_BILL_CONFIG = {
+  billType: 'jobIssue',
+  label: 'Job Issue',
+  headerFields: [
+    { key: 'workerId', label: 'Job Worker', type: 'select', section: 'header', required: true, visible: true, order: 1 },
+    { key: 'processType', label: 'Process', type: 'select', section: 'header', visible: true, order: 2 },
+    { key: 'challanNo', label: 'Challan', type: 'text', section: 'header', visible: true, order: 3 },
+    { key: 'date', label: 'Date', type: 'date', section: 'header', required: true, visible: true, order: 4 }
+  ],
+  lineColumns: [
+    { key: 'lotId', label: 'Lot', visible: true, order: 1 },
+    { key: 'issueQty', label: 'Issue Qty', visible: true, order: 2 },
+    { key: 'issuePcs', label: 'Issue Pcs', visible: true, order: 3 },
+    { key: 'rate', label: 'Rate', visible: false, order: 4 }
+  ],
+  footerFields: [
+    { key: 'transport', label: 'Transport', type: 'text', section: 'footer', visible: true, order: 1 },
+    { key: 'remark', label: 'Remark', type: 'text', section: 'footer', visible: true, order: 2 }
+  ],
+  calculations: {},
+  printTemplate: { templateId: 'classic-ledger', showLogo: true, watermark: false }
+};
+
+const JOB_RECEIVE_BILL_CONFIG = {
+  billType: 'jobReceive',
+  label: 'Job Receive',
+  headerFields: [
+    { key: 'workerId', label: 'Job Worker', type: 'select', section: 'header', required: true, visible: true, order: 1 },
+    { key: 'date', label: 'Date', type: 'date', section: 'header', required: true, visible: true, order: 2 }
+  ],
+  lineColumns: [
+    { key: 'jobCardNo', label: 'Job Card', visible: true, order: 1 },
+    { key: 'receiveQty', label: 'Receive Qty', visible: true, order: 2 },
+    { key: 'receivePcs', label: 'Receive Pcs', visible: true, order: 3 },
+    { key: 'wastage', label: 'Wastage', visible: true, order: 4 }
+  ],
+  footerFields: [
+    { key: 'remark', label: 'Remark', type: 'text', section: 'footer', visible: true, order: 1 }
+  ],
+  calculations: {},
+  printTemplate: { templateId: 'classic-ledger', showLogo: true, watermark: false }
+};
+
+const DEFAULT_BILL_CONFIGS = [
+  SALES_BILL_CONFIG,
+  PURCHASE_BILL_CONFIG,
+  MILL_ISSUE_BILL_CONFIG,
+  MILL_RECEIVE_BILL_CONFIG,
+  JOB_ISSUE_BILL_CONFIG,
+  JOB_RECEIVE_BILL_CONFIG
+];
 
 const DEFAULT_COLUMN_CONFIGS = [
   {
@@ -344,6 +450,20 @@ const DEFAULT_FORM_CONFIGS = [
       { key: 'splitPayment', label: 'Split Payment', type: 'checkbox', visible: true, order: 6 },
       { key: 'narration', label: 'Narration', type: 'textarea', visible: true, order: 7 }
     ]
+  },
+  {
+    formKey: 'accounting.payment',
+    label: 'Bank Payment',
+    module: 'accounting',
+    fields: [
+      { key: 'partyId', label: 'Counterparty', type: 'select', required: true, visible: true, order: 1 },
+      { key: 'bankLedgerId', label: 'Settlement Ledger', type: 'select', required: true, visible: true, order: 2 },
+      { key: 'date', label: 'Date', type: 'date', required: true, visible: true, order: 3 },
+      { key: 'amount', label: 'Amount', type: 'number', required: true, visible: true, order: 4 },
+      { key: 'paymentMode', label: 'Payment Mode', type: 'select', visible: true, order: 5 },
+      { key: 'chequeNo', label: 'Cheque No', type: 'text', visible: true, order: 6 },
+      { key: 'narration', label: 'Narration', type: 'textarea', visible: true, order: 7 }
+    ]
   }
 ];
 
@@ -353,6 +473,11 @@ module.exports = {
   DEFAULT_MODULE_FIELDS,
   SALES_BILL_CONFIG,
   PURCHASE_BILL_CONFIG,
+  MILL_ISSUE_BILL_CONFIG,
+  MILL_RECEIVE_BILL_CONFIG,
+  JOB_ISSUE_BILL_CONFIG,
+  JOB_RECEIVE_BILL_CONFIG,
+  DEFAULT_BILL_CONFIGS,
   DEFAULT_COLUMN_CONFIGS,
   DEFAULT_FEATURE_FLAGS,
   DEFAULT_NOTIFICATION_RULES,

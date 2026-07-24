@@ -11,6 +11,14 @@ const useUiStore = create((set) => ({
 
   globalSearchQuery: '',
   setGlobalSearchQuery: (q) => set({ globalSearchQuery: String(q || '') }),
+
+  notificationCenterOpen: false,
+  openNotificationCenter: () => set({ notificationCenterOpen: true }),
+  closeNotificationCenter: () => set({ notificationCenterOpen: false }),
+  toggleNotificationCenter: () =>
+    set((s) => ({ notificationCenterOpen: !s.notificationCenterOpen })),
+  notificationUnread: 0,
+  setNotificationUnread: (n) => set({ notificationUnread: Number(n) || 0 }),
 }));
 
 export default useUiStore;

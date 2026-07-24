@@ -52,56 +52,80 @@ exports.createReturn = async (req, res) => {
     // For PURCHASE RETURN: Goods are being returned to supplier — reduce stock
     // =====================================================================
     if (returnType === 'Sales') {
-      // Restore stock for each returned item
+      // Restore stock for each returned item — prefer original lot if lotId sent
       for (const item of items) {
         if (!item.itemId || !item.mts) continue;
+        const qtyMtrs = parseFloat(item.mts || 0);
+        const qtyPcs = parseFloat(item.pcs || 0);
+
+        if (item.lotId) {
+          const lot = await InventoryLot.findOne({ _id: item.lotId, companyId }).session(session);
+          if (!lot) throw new Error(`Sales return lot not found: ${item.lotId}`);
+          if (lot.status === 'Closed') lot.status = 'Available';
+          lot.remainingMtrs = parseFloat(((lot.remainingMtrs || 0) + qtyMtrs).toFixed(3));
+          lot.remainingPcs = (lot.remainingPcs || 0) + qtyPcs;
+          await lot.save({ session });
+          await StockMovement.create([{
+            lotId: lot._id,
+            type: 'RETURN',
+            qtyPcs,
+            qtyMtrs,
+            balanceMtrs: lot.remainingMtrs,
+            referenceId: rInvoice._id,
+            remarks: `Sales Return: ${finalInvoiceNo} → lot ${lot.lotId}`,
+            companyId,
+          }], { session });
+          continue;
+        }
 
         const timestamp = Date.now();
         const random = Math.floor(Math.random() * 9000) + 1000;
         const newLotId = `RET-${timestamp}-${random}`;
 
-        // Create a new inventory lot for returned goods
         const newLot = new InventoryLot({
           lotId: newLotId,
           itemId: item.itemId,
           purchaseId: null,
           source: 'return',
-          totalPcs: item.pcs || 0,
-          remainingPcs: item.pcs || 0,
-          totalMtrs: item.mts || 0,
-          remainingMtrs: item.mts || 0,
+          totalPcs: qtyPcs,
+          remainingPcs: qtyPcs,
+          totalMtrs: qtyMtrs,
+          remainingMtrs: qtyMtrs,
           status: 'Available',
           companyId
         });
         await newLot.save({ session });
 
-        // Record stock movement for return receipt
-        const movement = new StockMovement({
+        await StockMovement.create([{
           lotId: newLot._id,
           type: 'RETURN',
-          qtyPcs: item.pcs || 0,
-          qtyMtrs: item.mts || 0,
-          balanceMtrs: item.mts || 0,
+          qtyPcs,
+          qtyMtrs,
+          balanceMtrs: qtyMtrs,
           referenceId: rInvoice._id,
           remarks: `Sales Return: ${finalInvoiceNo} (Orig: ${originalInvoiceNo || 'N/A'})`,
           companyId
-        });
-        await movement.save({ session });
+        }], { session });
       }
     } else if (returnType === 'Purchase') {
-      // Purchase Return: Reduce the original lot stock if lotId is provided
       for (const item of items) {
-        if (!item.lotId || !item.mts) continue;
+        if (!item.itemId || !item.mts) continue;
+        if (!item.lotId) {
+          throw new Error('Purchase Return requires Stock Lot on every line (select the purchase lot to reduce).');
+        }
         const lot = await InventoryLot.findOne({ _id: item.lotId, companyId }).session(session);
-        if (!lot) continue;
+        if (!lot) throw new Error(`Purchase return lot not found: ${item.lotId}`);
 
         const qtyToReturn = parseFloat(item.mts || 0);
+        if (qtyToReturn > Number(lot.remainingMtrs || 0) + 0.001) {
+          throw new Error(`Return qty ${qtyToReturn} exceeds remaining ${lot.remainingMtrs} on lot ${lot.lotId}`);
+        }
         lot.remainingMtrs = Math.max(0, lot.remainingMtrs - qtyToReturn);
         lot.remainingPcs = Math.max(0, (lot.remainingPcs || 0) - (item.pcs || 0));
         lot.status = lot.remainingMtrs <= 0 ? 'Closed' : 'Partially Used';
         await lot.save({ session });
 
-        const movement = new StockMovement({
+        await StockMovement.create([{
           lotId: lot._id,
           type: 'RETURN',
           qtyPcs: -(item.pcs || 0),
@@ -110,8 +134,7 @@ exports.createReturn = async (req, res) => {
           referenceId: rInvoice._id,
           remarks: `Purchase Return: ${finalInvoiceNo}`,
           companyId
-        });
-        await movement.save({ session });
+        }], { session });
       }
     }
 

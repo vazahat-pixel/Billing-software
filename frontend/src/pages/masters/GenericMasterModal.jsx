@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
 import { Plus, Trash2, Search } from 'lucide-react';
+import { erpConfirmDelete } from '../../utils/confirm';
+import { notifyError } from '../../utils/notify';
 
 const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
   const { subMasters, fetchSubMasters, addSubMaster, deleteSubMaster } = useStore();
@@ -98,11 +100,11 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this record?')) return;
+    if (!(await erpConfirmDelete('this record'))) return;
     try {
       await deleteSubMaster(id);
     } catch (err) {
-      alert(err.message || 'Failed to delete record');
+      notifyError(err, 'Failed to delete record');
     }
   };
 

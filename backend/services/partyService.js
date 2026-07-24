@@ -155,7 +155,8 @@ class PartyService {
       'tinCstNo', 'tinGstNo', 'status', 'updateInAllFirm', 'updateInAllYear',
       'aadharNo', 'stateCode', 'stateName', 'gstType', 'udyamAadhar', 'msmeType',
       'dueDays', 'rdRate', 'disc1', 'disc2', 'addPer', 'intPer', 'commi',
-      'maxLevel', 'minLevel', 'tdsPer', 'tcsPer', 'paymentTermsId', 'isFavorite', 'lastUsedAt'
+      'maxLevel', 'minLevel', 'tdsPer', 'tcsPer', 'paymentTermsId', 'isFavorite', 'lastUsedAt',
+      'banks'
     ];
     const patch = {};
     allowed.forEach((key) => {
@@ -200,4 +201,4 @@ class PartyService {
 }
 
 module.exports = new PartyService();
-
+

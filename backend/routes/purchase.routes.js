@@ -30,6 +30,12 @@ router.post(
   purchaseController.parseBill
 );
 router.get('/:id', requirePermission('purchase', 'read'), objectIdParam, purchaseController.getPurchase);
+router.put('/:id', requirePermission('purchase', 'update'), objectIdParam, (req, res) => {
+  res.status(400).json({
+    success: false,
+    message: 'Posted purchase bills cannot be edited. Cancel the bill then create a new purchase.',
+  });
+});
 router.put('/:id/status', requirePermission('purchase', 'update'), objectIdParam, purchaseStatus, purchaseController.updatePurchaseStatus);
 router.delete('/:id', requirePermission('purchase', 'delete'), objectIdParam, purchaseController.deletePurchase);
 

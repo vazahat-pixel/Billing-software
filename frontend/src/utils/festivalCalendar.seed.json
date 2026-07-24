@@ -1,0 +1,226 @@
+{
+  "years": {
+    "2025": [
+      {
+        "id": "makar-sankranti",
+        "name": "Makar Sankranti",
+        "greeting": "Shubh Makar Sankranti",
+        "start": "2025-01-13",
+        "end": "2025-01-15",
+        "motif": "marigold",
+        "accents": { "primary": "#c2410c", "secondary": "#f59e0b" }
+      },
+      {
+        "id": "holi",
+        "name": "Holi",
+        "greeting": "Happy Holi",
+        "start": "2025-03-13",
+        "end": "2025-03-15",
+        "motif": "rangoli",
+        "accents": { "primary": "#db2777", "secondary": "#7c3aed" }
+      },
+      {
+        "id": "gudi-padwa",
+        "name": "Gudi Padwa / Hindu New Year",
+        "greeting": "Shubh Gudi Padwa",
+        "start": "2025-03-29",
+        "end": "2025-03-31",
+        "motif": "marigold",
+        "accents": { "primary": "#b45309", "secondary": "#dc2626" }
+      },
+      {
+        "id": "raksha-bandhan",
+        "name": "Raksha Bandhan",
+        "greeting": "Shubh Raksha Bandhan",
+        "start": "2025-08-08",
+        "end": "2025-08-10",
+        "motif": "toran",
+        "accents": { "primary": "#be123c", "secondary": "#f59e0b" }
+      },
+      {
+        "id": "ganesh-chaturthi",
+        "name": "Ganesh Chaturthi",
+        "greeting": "Ganpati Bappa Morya",
+        "start": "2025-08-26",
+        "end": "2025-09-05",
+        "motif": "marigold",
+        "accents": { "primary": "#b45309", "secondary": "#dc2626" }
+      },
+      {
+        "id": "navratri",
+        "name": "Navratri",
+        "greeting": "Shubh Navratri",
+        "start": "2025-09-22",
+        "end": "2025-10-01",
+        "motif": "rangoli",
+        "accents": { "primary": "#15803d", "secondary": "#f59e0b" }
+      },
+      {
+        "id": "dussehra",
+        "name": "Dussehra",
+        "greeting": "Shubh Vijayadashami",
+        "start": "2025-10-01",
+        "end": "2025-10-03",
+        "motif": "marigold",
+        "accents": { "primary": "#b91c1c", "secondary": "#f59e0b" }
+      },
+      {
+        "id": "diwali",
+        "name": "Diwali",
+        "greeting": "Shubh Deepavali",
+        "start": "2025-10-18",
+        "end": "2025-10-24",
+        "motif": "diya",
+        "accents": { "primary": "#7f1d1d", "secondary": "#d97706" }
+      }
+    ],
+    "2026": [
+      {
+        "id": "makar-sankranti",
+        "name": "Makar Sankranti",
+        "greeting": "Shubh Makar Sankranti",
+        "start": "2026-01-13",
+        "end": "2026-01-15",
+        "motif": "marigold",
+        "accents": { "primary": "#c2410c", "secondary": "#f59e0b" }
+      },
+      {
+        "id": "holi",
+        "name": "Holi",
+        "greeting": "Happy Holi",
+        "start": "2026-03-02",
+        "end": "2026-03-04",
+        "motif": "rangoli",
+        "accents": { "primary": "#db2777", "secondary": "#7c3aed" }
+      },
+      {
+        "id": "gudi-padwa",
+        "name": "Gudi Padwa / Hindu New Year",
+        "greeting": "Shubh Gudi Padwa",
+        "start": "2026-03-18",
+        "end": "2026-03-20",
+        "motif": "marigold",
+        "accents": { "primary": "#b45309", "secondary": "#dc2626" }
+      },
+      {
+        "id": "raksha-bandhan",
+        "name": "Raksha Bandhan",
+        "greeting": "Shubh Raksha Bandhan",
+        "start": "2026-08-27",
+        "end": "2026-08-29",
+        "motif": "toran",
+        "accents": { "primary": "#be123c", "secondary": "#f59e0b" }
+      },
+      {
+        "id": "ganesh-chaturthi",
+        "name": "Ganesh Chaturthi",
+        "greeting": "Ganpati Bappa Morya",
+        "start": "2026-09-13",
+        "end": "2026-09-23",
+        "motif": "marigold",
+        "accents": { "primary": "#b45309", "secondary": "#dc2626" }
+      },
+      {
+        "id": "navratri",
+        "name": "Navratri",
+        "greeting": "Shubh Navratri",
+        "start": "2026-10-11",
+        "end": "2026-10-20",
+        "motif": "rangoli",
+        "accents": { "primary": "#15803d", "secondary": "#f59e0b" }
+      },
+      {
+        "id": "dussehra",
+        "name": "Dussehra",
+        "greeting": "Shubh Vijayadashami",
+        "start": "2026-10-19",
+        "end": "2026-10-21",
+        "motif": "marigold",
+        "accents": { "primary": "#b91c1c", "secondary": "#f59e0b" }
+      },
+      {
+        "id": "diwali",
+        "name": "Diwali",
+        "greeting": "Shubh Deepavali",
+        "start": "2026-11-06",
+        "end": "2026-11-12",
+        "motif": "diya",
+        "accents": { "primary": "#7f1d1d", "secondary": "#d97706" }
+      }
+    ],
+    "2027": [
+      {
+        "id": "makar-sankranti",
+        "name": "Makar Sankranti",
+        "greeting": "Shubh Makar Sankranti",
+        "start": "2027-01-14",
+        "end": "2027-01-16",
+        "motif": "marigold",
+        "accents": { "primary": "#c2410c", "secondary": "#f59e0b" }
+      },
+      {
+        "id": "holi",
+        "name": "Holi",
+        "greeting": "Happy Holi",
+        "start": "2027-03-21",
+        "end": "2027-03-23",
+        "motif": "rangoli",
+        "accents": { "primary": "#db2777", "secondary": "#7c3aed" }
+      },
+      {
+        "id": "gudi-padwa",
+        "name": "Gudi Padwa / Hindu New Year",
+        "greeting": "Shubh Gudi Padwa",
+        "start": "2027-04-06",
+        "end": "2027-04-08",
+        "motif": "marigold",
+        "accents": { "primary": "#b45309", "secondary": "#dc2626" }
+      },
+      {
+        "id": "raksha-bandhan",
+        "name": "Raksha Bandhan",
+        "greeting": "Shubh Raksha Bandhan",
+        "start": "2027-08-16",
+        "end": "2027-08-18",
+        "motif": "toran",
+        "accents": { "primary": "#be123c", "secondary": "#f59e0b" }
+      },
+      {
+        "id": "ganesh-chaturthi",
+        "name": "Ganesh Chaturthi",
+        "greeting": "Ganpati Bappa Morya",
+        "start": "2027-09-03",
+        "end": "2027-09-13",
+        "motif": "marigold",
+        "accents": { "primary": "#b45309", "secondary": "#dc2626" }
+      },
+      {
+        "id": "navratri",
+        "name": "Navratri",
+        "greeting": "Shubh Navratri",
+        "start": "2027-09-30",
+        "end": "2027-10-09",
+        "motif": "rangoli",
+        "accents": { "primary": "#15803d", "secondary": "#f59e0b" }
+      },
+      {
+        "id": "dussehra",
+        "name": "Dussehra",
+        "greeting": "Shubh Vijayadashami",
+        "start": "2027-10-09",
+        "end": "2027-10-11",
+        "motif": "marigold",
+        "accents": { "primary": "#b91c1c", "secondary": "#f59e0b" }
+      },
+      {
+        "id": "diwali",
+        "name": "Diwali",
+        "greeting": "Shubh Deepavali",
+        "start": "2027-10-27",
+        "end": "2027-11-02",
+        "motif": "diya",
+        "accents": { "primary": "#7f1d1d", "secondary": "#d97706" }
+      }
+    ]
+  }
+}

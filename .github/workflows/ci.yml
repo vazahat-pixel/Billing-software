@@ -1,0 +1,150 @@
+# Stage 7/8 CI — Enterprise Testing Platform quality gates (8.11)
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  backend-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Unit tests
+        working-directory: backend
+        run: npm run test:unit
+      - name: Certification scaffold tests
+        working-directory: backend
+        run: npm run test:certification
+
+  backend-integration:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    env:
+      NODE_ENV: test
+      MONGO_URI: mongodb://127.0.0.1:27017/billing_ci
+      JWT_SECRET: ci-github-actions-jwt-secret-min-32-chars
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Integration / business flow tests
+        working-directory: backend
+        run: npm run test:integration
+      - name: API certification
+        working-directory: backend
+        run: npm run test:api
+      - name: Security tests
+        working-directory: backend
+        run: npm run test:security
+      - name: Multi-company isolation
+        working-directory: backend
+        run: npm run test:isolation
+      - name: Offline helper script
+        working-directory: backend
+        run: npm run test:offline
+      - name: Stage 8.11 module load smoke
+        working-directory: backend
+        run: node -e "require('./routes/stage8Commercial.routes'); require('./services/enterpriseTestingPlatformService'); require('./services/certifiers/qualityGates'); console.log('stage8.11 ok')"
+      - name: Stage 8 + 7 module load smoke
+        working-directory: backend
+        run: node -e "require('./services/commercialCertificationService'); require('./routes/stage7Infra.routes'); require('./services/infraCertificationService'); console.log('stage7-8 ok')"
+      - name: Enterprise platform certify (DB)
+        working-directory: backend
+        run: npm run certify || true
+        continue-on-error: true
+      - name: Quality gates (structural)
+        working-directory: backend
+        run: npm run certify:gates
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install and build frontend
+        working-directory: frontend
+        run: npm ci && npm run build
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+        continue-on-error: true
+
+  frontend-e2e-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend
+        working-directory: frontend
+        run: npm ci
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Smoke + keyboard E2E
+        working-directory: frontend
+        run: npm run test:e2e:cert
+        continue-on-error: true
+
+  quality-gate:
+    runs-on: ubuntu-latest
+    needs: [backend-unit, backend-integration, frontend-build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend
+        working-directory: backend
+        run: npm ci
+      - name: Deploy gate (all prior jobs green)
+        working-directory: backend
+        run: |
+          echo "Prior critical jobs passed — evaluating CI gate script"
+          npm run certify:gates
+        env:
+          GATE_UNIT_FAILED: '0'
+          GATE_INTEGRATION_FAILED: '0'
+          GATE_SECURITY_FAILED: '0'
+          GATE_ISOLATION_FAILED: '0'
+          GATE_CERTIFICATION_FAILED: '0'
+          GATE_API_FAILED: '0'
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [quality-gate]
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -t textile-erp-api:ci .

@@ -19,7 +19,7 @@ exports.login = async (req, res) => {
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required' });
         }
-        const result = await authService.login(email, password);
+        const result = await authService.login(email, password, req);
         res.status(200).json(result);
     } catch (err) {
         res.status(401).json({ message: err.message });
@@ -103,6 +103,42 @@ exports.resetPassword = async (req, res) => {
         const { token, password } = req.body;
         if (!token || !password) return res.status(400).json({ message: 'Token and new password are required' });
         const result = await authService.resetPassword(token, password);
+        res.status(200).json(result);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+};
+
+exports.refresh = async (req, res) => {
+    try {
+        const sessionService = require('../services/sessionService');
+        const refreshToken = req.body.refreshToken || req.headers['x-refresh-token'];
+        const result = await sessionService.refresh(refreshToken, req);
+        res.status(200).json(result);
+    } catch (err) {
+        res.status(401).json({ message: err.message });
+    }
+};
+
+exports.logout = async (req, res) => {
+    try {
+        const sessionService = require('../services/sessionService');
+        const sessionId = req.body.sessionId || req.user?.sessionId;
+        if (sessionId && req.user) {
+            await sessionService.revokeSession(req.user._id, sessionId, 'logout');
+            await sessionService.recordLogin(req.user, 'logout', req, { sessionId, success: true });
+        }
+        res.status(200).json({ message: 'Logged out' });
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+};
+
+exports.logoutAll = async (req, res) => {
+    try {
+        const sessionService = require('../services/sessionService');
+        const result = await sessionService.revokeAll(req.user._id, null, 'logout_all');
+        await sessionService.recordLogin(req.user, 'logout_all', req, { success: true });
         res.status(200).json(result);
     } catch (err) {
         res.status(400).json({ message: err.message });

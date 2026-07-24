@@ -4,7 +4,7 @@ import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import { X, Save, Plus, Trash } from 'lucide-react';
 
 const ReturnModal = ({ isOpen, onClose, initialType = 'Sales' }) => {
-  const { parties, items, addReturn, fetchParties, fetchItems } = useStore();
+  const { parties, items, inventoryLots, addReturn, fetchParties, fetchItems, fetchInventory } = useStore();
   const [type, setType] = useState(initialType);
   const [partyId, setPartyId] = useState('');
   const [invoiceNo, setInvoiceNo] = useState('');
@@ -14,6 +14,7 @@ const ReturnModal = ({ isOpen, onClose, initialType = 'Sales' }) => {
   
   // Row Input State
   const [selectedItemId, setSelectedItemId] = useState('');
+  const [selectedLotId, setSelectedLotId] = useState('');
   const [pcs, setPcs] = useState('');
   const [mts, setMts] = useState('');
   const [rate, setRate] = useState('');
@@ -26,12 +27,14 @@ const ReturnModal = ({ isOpen, onClose, initialType = 'Sales' }) => {
       setType(initialType);
       fetchParties();
       fetchItems();
+      fetchInventory?.();
       setPartyId('');
       setInvoiceNo('');
       setOriginalInvoiceNo('');
       setDate(new Date().toISOString().split('T')[0]);
       setReturnItems([]);
       setSelectedItemId('');
+      setSelectedLotId('');
       setPcs('');
       setMts('');
       setRate('');
@@ -43,11 +46,27 @@ const ReturnModal = ({ isOpen, onClose, initialType = 'Sales' }) => {
     return items.find(i => i._id === selectedItemId);
   }, [items, selectedItemId]);
 
+  const openLotsForItem = useMemo(() => {
+    if (!selectedItemId) return [];
+    return (inventoryLots || []).filter((lot) => {
+      const lid = lot.itemId?._id || lot.itemId || '';
+      if (String(lid) !== String(selectedItemId)) return false;
+      const st = String(lot.status || 'Available').toLowerCase();
+      if (st === 'closed' || st === 'exhausted') return false;
+      return Number(lot.remainingMtrs ?? lot.mts ?? 0) > 0;
+    });
+  }, [inventoryLots, selectedItemId]);
+
   const handleAddItem = () => {
     if (!selectedItemId) return;
+    if (type === 'Purchase' && !selectedLotId) {
+      setErrorMsg('Purchase Return requires a Stock Lot on every line');
+      return;
+    }
     const numPcs = parseFloat(pcs) || 0;
     const numMts = parseFloat(mts) || 0;
     const numRate = parseFloat(rate) || parseFloat(selectedItemObj?.salesRate) || 0;
+    const lot = openLotsForItem.find((l) => String(l._id || l.id) === String(selectedLotId));
 
     const amount = numMts > 0 ? (numMts * numRate) : (numPcs * numRate);
 
@@ -55,6 +74,8 @@ const ReturnModal = ({ isOpen, onClose, initialType = 'Sales' }) => {
       ...prev,
       {
         itemId: selectedItemId,
+        lotId: selectedLotId || null,
+        lotLabel: lot ? (lot.lotId || String(lot._id).slice(-6)) : '',
         name: selectedItemObj?.name,
         pcs: numPcs,
         mts: numMts,
@@ -64,9 +85,11 @@ const ReturnModal = ({ isOpen, onClose, initialType = 'Sales' }) => {
     ]);
 
     setSelectedItemId('');
+    setSelectedLotId('');
     setPcs('');
     setMts('');
     setRate('');
+    setErrorMsg('');
   };
 
   const handleRemoveItem = (index) => {
@@ -96,6 +119,10 @@ const ReturnModal = ({ isOpen, onClose, initialType = 'Sales' }) => {
       setErrorMsg('Please add at least one item');
       return;
     }
+    if (type === 'Purchase' && returnItems.some((i) => !i.lotId)) {
+      setErrorMsg('Purchase Return: every line must have a Stock Lot');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -107,6 +134,7 @@ const ReturnModal = ({ isOpen, onClose, initialType = 'Sales' }) => {
         date,
         items: returnItems.map(item => ({
           itemId: item.itemId,
+          lotId: item.lotId || null,
           pcs: item.pcs,
           mts: item.mts,
           rate: item.rate,
@@ -199,15 +227,33 @@ const ReturnModal = ({ isOpen, onClose, initialType = 'Sales' }) => {
           {/* Add Item Form Grid */}
           <div className="space-y-4">
             <h3 className="text-[11px] font-bold text-black uppercase tracking-widest">Add Item Rows</h3>
-            <div className="grid grid-cols-5 gap-6 items-end">
+            <div className="grid grid-cols-6 gap-4 items-end">
               <div className="space-y-2 col-span-2">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Item Selector</label>
                 <ERPSelect 
                   value={selectedItemId}
-                  onChange={e => setSelectedItemId(e.target.value)}
+                  onChange={e => { setSelectedItemId(e.target.value); setSelectedLotId(''); }}
                   options={items.map(i => ({ value: i._id, label: `${i.name} (${i.category})` }))}
                   className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold uppercase text-[10px]"
                   label="Item"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Lot {type === 'Purchase' ? '*' : '(opt)'}
+                </label>
+                <ERPSelect
+                  value={selectedLotId}
+                  onChange={e => setSelectedLotId(e.target.value)}
+                  options={[
+                    { value: '', label: type === 'Purchase' ? '— Select Lot —' : 'New return lot' },
+                    ...openLotsForItem.map((l) => ({
+                      value: l._id || l.id,
+                      label: `${l.lotId || String(l._id).slice(-6)} · ${Number(l.remainingMtrs ?? 0).toFixed(2)} m`,
+                    })),
+                  ]}
+                  className="w-full h-12 bg-slate-50 border-none rounded-xl font-bold uppercase text-[10px]"
+                  label="Lot"
                 />
               </div>
               <div className="space-y-2">
@@ -258,6 +304,7 @@ const ReturnModal = ({ isOpen, onClose, initialType = 'Sales' }) => {
               <thead>
                 <tr className="border-b border-slate-100 text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-white">
                   <th className="px-8 py-4">Item Name</th>
+                  <th className="px-8 py-4">Lot</th>
                   <th className="px-8 py-4 text-center">Pieces</th>
                   <th className="px-8 py-4 text-center">Meters</th>
                   <th className="px-8 py-4 text-right">Rate</th>
@@ -269,6 +316,7 @@ const ReturnModal = ({ isOpen, onClose, initialType = 'Sales' }) => {
                 {returnItems.map((item, index) => (
                   <tr key={index} className="hover:bg-slate-50/50 transition-all">
                     <td className="px-8 py-4 font-bold text-black uppercase tracking-wider text-[10px]">{item.name}</td>
+                    <td className="px-8 py-4 font-bold text-slate-600 text-[10px]">{item.lotLabel || '—'}</td>
                     <td className="px-8 py-4 text-center font-bold text-slate-600 text-[10px]">{item.pcs || '-'}</td>
                     <td className="px-8 py-4 text-center font-bold text-slate-600 text-[10px]">{item.mts ? `${item.mts.toFixed(2)} M` : '-'}</td>
                     <td className="px-8 py-4 text-right font-bold text-black text-[10px]">₹ {item.rate.toFixed(2)}</td>

@@ -3,6 +3,7 @@ import { Building2, Lock, Unlock, ShieldCheck, Edit3, Plus, X, Search, Filter, U
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
 import { AdminPageHeader, AdminButton, AdminBadge } from '../../components/admin/AdminUI';
+import { notifyWarning, notifyError } from '../../utils/notify';
 
 /* ── Dark Glass Modal ── */
 const DarkModal = ({ isOpen, onClose, title, subtitle, children }) => (
@@ -80,13 +81,13 @@ const Companies = () => {
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!createForm.name || !createForm.ownerName || !createForm.ownerEmail || !createForm.ownerPassword || !createForm.planId) {
-            return alert('Please fill in all fields.');
+            return notifyWarning('Please fill in all fields.');
         }
         try {
             await createCompany(createForm);
             setIsCreateOpen(false);
             setCreateForm({ name: '', ownerName: '', ownerEmail: '', ownerPassword: '', planId: plans[0]?._id || '' });
-        } catch (err) { alert(err.message || 'Failed to create company'); }
+        } catch (err) { notifyError(err, 'Failed to create company'); }
     };
 
     const handleUpdate = async (e) => {
@@ -94,17 +95,17 @@ const Companies = () => {
         try {
             await updateCompany(editingCompany._id, editForm);
             setEditingCompany(null);
-        } catch (err) { alert(err.message || 'Failed to update'); }
+        } catch (err) { notifyError(err, 'Failed to update'); }
     };
 
     const handleLicenseGenerate = async (e) => {
         e.preventDefault();
-        if (!expiryDate) return alert('Please select an expiry date');
+        if (!expiryDate) return notifyWarning('Please select an expiry date');
         try {
             await generateLicense({ companyId: licenseCompany._id, expiresAt: expiryDate });
             setExpiryDate('');
             setLicenseCompany(null);
-        } catch (err) { alert(err.message || 'Failed to generate license'); }
+        } catch (err) { notifyError(err, 'Failed to generate license'); }
     };
 
     const startEdit = (company) => {

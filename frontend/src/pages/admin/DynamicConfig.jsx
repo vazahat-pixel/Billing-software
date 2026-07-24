@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import useAdminStore from '../../store/useAdminStore';
 import { adminApi } from '../../api';
+import { notifyError } from '../../utils/notify';
 
 const TABS = [
   { id: 'bills', label: 'Bill Fields', icon: FileText },
@@ -17,7 +18,11 @@ const TABS = [
 
 const BILL_TYPES = [
   { key: 'sales', label: 'Sales Invoice' },
-  { key: 'purchase', label: 'Purchase Bill' }
+  { key: 'purchase', label: 'Purchase Bill' },
+  { key: 'millIssue', label: 'Mill Issue' },
+  { key: 'millReceive', label: 'Mill Receive' },
+  { key: 'jobIssue', label: 'Job Issue' },
+  { key: 'jobReceive', label: 'Job Receive' },
 ];
 
 const COLUMN_TABLES = [
@@ -168,7 +173,7 @@ const DynamicConfig = () => {
       await adminApi.saveBillConfig(selectedCompany, billType, billConfig);
       flashSaved();
     } catch (err) {
-      alert('Save failed: ' + (err.response?.data?.message || err.message));
+      notifyError(err, 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -181,7 +186,7 @@ const DynamicConfig = () => {
       await adminApi.saveColumnConfig(selectedCompany, columnTable, columnConfig);
       flashSaved();
     } catch (err) {
-      alert('Save failed: ' + (err.response?.data?.message || err.message));
+      notifyError(err, 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -193,7 +198,7 @@ const DynamicConfig = () => {
       await adminApi.saveFeatureFlag(selectedCompany, flag.flagKey, flag);
       flashSaved();
     } catch (err) {
-      alert('Save failed: ' + (err.response?.data?.message || err.message));
+      notifyError(err, 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -206,7 +211,7 @@ const DynamicConfig = () => {
       await adminApi.savePermissions(selectedCompany, permissions);
       flashSaved();
     } catch (err) {
-      alert('Save failed: ' + (err.response?.data?.message || err.message));
+      notifyError(err, 'Save failed');
     } finally {
       setSaving(false);
     }

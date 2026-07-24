@@ -1,0 +1,123 @@
+/**
+ * ERP desktop density — compact professional layout for 1366–1920 screens.
+ */
+
+.classic-erp-window.erp-density,
+.classic-erp-window {
+  --erp-input-h: 30px;
+  --erp-label-w: 76px;
+  --erp-gap: 6px;
+  --erp-frame-pad: 10px;
+}
+
+.classic-erp-window .classic-erp-body {
+  padding: 10px 12px !important;
+  gap: 8px !important;
+}
+
+.classic-erp-window .classic-erp-frame {
+  padding: var(--erp-frame-pad) !important;
+}
+
+.classic-erp-window .classic-erp-input,
+.classic-erp-window .classic-erp-select,
+.classic-erp-window .erp-combobox-input {
+  height: var(--erp-input-h) !important;
+  min-height: var(--erp-input-h) !important;
+  font-size: 12px !important;
+  padding: 0 8px !important;
+}
+
+.classic-erp-window .classic-erp-label {
+  font-size: 10px !important;
+  min-width: var(--erp-label-w);
+}
+
+.classic-erp-field--compact {
+  min-height: var(--erp-input-h);
+}
+
+.classic-erp-control--grow {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Wider item grid columns */
+.classic-erp-table .col-item {
+  min-width: 200px;
+  width: 22%;
+}
+
+.classic-erp-table .col-desc {
+  min-width: 100px;
+  width: 10%;
+}
+
+.classic-erp-table-container.erp-grid-panel {
+  max-height: min(42vh, 360px) !important;
+  flex: 1;
+  min-height: 140px;
+}
+
+.classic-erp-table-container.erp-grid-panel .classic-erp-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-subtle) !important;
+}
+
+/* Sticky totals bar */
+.erp-sticky-summary {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: var(--bg-base);
+  border-top: 2px solid var(--border);
+  padding: 8px 12px;
+  box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.classic-erp-form-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+}
+
+/* Section headers */
+.erp-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Bill layout zones */
+.erp-bill-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1;
+}
+
+.erp-bill-party-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .erp-bill-party-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.erp-bill-doc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px 10px;
+}

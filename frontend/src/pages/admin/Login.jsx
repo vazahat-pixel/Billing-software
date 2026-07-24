@@ -6,9 +6,15 @@ import { loginWithOfflineSupport } from '../../utils/loginService';
 import { listOfflineProfiles } from '../../utils/offlineAuth';
 import { isOffline } from '../../utils/offlineHelpers';
 
+const isDev = import.meta.env.DEV;
+const DEMO_ADMIN = {
+    email: 'admin@textileerp.com',
+    password: 'Admin@123',
+};
+
 const AdminLogin = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState(() => (isDev ? DEMO_ADMIN.email : ''));
+    const [password, setPassword] = useState(() => (isDev ? DEMO_ADMIN.password : ''));
     const [showPass, setShowPass] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -25,7 +31,7 @@ const AdminLogin = () => {
         listOfflineProfiles()
             .then((profiles) => {
                 const admin = profiles.find((p) => p.role === 'super_admin');
-                if (admin) setEmail(admin.email);
+                if (admin && !isDev) setEmail(admin.email);
             })
             .catch(() => {});
         return () => {
@@ -33,6 +39,12 @@ const AdminLogin = () => {
             window.removeEventListener('offline', refresh);
         };
     }, []);
+
+    const fillDemo = () => {
+        setEmail(DEMO_ADMIN.email);
+        setPassword(DEMO_ADMIN.password);
+        setError('');
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -71,6 +83,19 @@ const AdminLogin = () => {
                         <WifiOff size={14} className="text-amber-700 shrink-0" />
                         <p className="text-[10px] font-semibold text-amber-800">Offline admin login — same password as last online sign-in</p>
                     </div>
+                )}
+
+                {isDev && (
+                    <button
+                        type="button"
+                        onClick={fillDemo}
+                        className="mb-4 w-full text-left rounded-lg px-3 py-2"
+                        style={{ background: '#ecfdf5', border: '1px solid #a7f3d0' }}
+                    >
+                        <p className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Dev demo admin</p>
+                        <p className="text-[10px] text-slate-700 font-mono mt-1">{DEMO_ADMIN.email}</p>
+                        <p className="text-[10px] text-slate-500 font-mono">Password: {DEMO_ADMIN.password}</p>
+                    </button>
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">

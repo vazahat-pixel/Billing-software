@@ -32,9 +32,21 @@ export const normalizeItem = (item) => {
     id,
     itemName: item.itemName || item.name || '',
     name: item.name || item.itemName || '',
+    itemCode: item.itemCode || '',
     salesRate: item.salesRate ?? item.saleRate ?? 0,
     purchaseRate: item.purchaseRate ?? item.purRate ?? 0,
-    purRate: item.purRate ?? item.purchaseRate ?? 0
+    purRate: item.purRate ?? item.purchaseRate ?? 0,
+    mrp: item.mrp ?? 0,
+    openingPcs: item.openingPcs ?? item.opPcs ?? 0,
+    openingQty: item.openingQty ?? item.opQty ?? item.openingStock ?? 0,
+    openingRate: item.openingRate ?? item.opRate ?? 0,
+    openingValue: item.openingValue ?? item.opValue ?? 0,
+    cut: item.cut ?? 0,
+    gstTaxLabel: item.gstTaxLabel || '',
+    categoryLabel: item.categoryLabel || item.group || item.category || '',
+    ewayBillProductName: item.ewayBillProductName || '',
+    description: item.description || '',
+    imageUrl: item.imageUrl || '',
   };
 };
 

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { CreditCard, Check, Shield, Package, Database, Users as UsersIcon, Trash2, Plus, Zap, X, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, FileText, ShoppingCart, Wrench, Calculator, BarChart2, Receipt, Settings, Wifi } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
+import { erpConfirm } from '../../utils/confirm';
+import { notifyError } from '../../utils/notify';
 
 /* ── Module Icon Map ── */
 const moduleIcons = {
@@ -361,8 +363,8 @@ const Plans = () => {
     };
 
     const handleDelete = async (id, name) => {
-        if (window.confirm(`Delete plan "${name}"?`)) {
-            try { await deletePlan(id); } catch (err) { alert(err.message); }
+        if (await erpConfirm({ title: 'Delete Plan', message: `Delete plan "${name}"?`, confirmLabel: 'Delete', danger: true })) {
+            try { await deletePlan(id); } catch (err) { notifyError(err, 'Failed to delete plan'); }
         }
     };
 

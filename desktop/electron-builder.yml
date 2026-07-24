@@ -1,0 +1,30 @@
+appId: com.textileerp.desktop
+productName: Textile ERP
+copyright: Copyright © Textile ERP
+directories:
+  output: dist
+  buildResources: assets
+files:
+  - main.js
+  - preload.js
+  - updater.js
+  - assets/**/*
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: TextileERP-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Textile ERP
+  deleteAppDataOnUninstall: false
+  differentialPackage: true
+publish:
+  - provider: generic
+    url: https://updates.example.com/textile-erp/
+    channel: latest
