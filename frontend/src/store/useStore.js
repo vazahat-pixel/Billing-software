@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import useConfigStore from './useConfigStore';
 import {
   authApi,
   partiesApi,
@@ -132,7 +133,6 @@ const useStore = create((set, get) => ({
     const plan = user.plan;
     persistOfflineFlag(user, plan);
     try {
-      const { default: useConfigStore } = await import('./useConfigStore');
       useConfigStore.getState().hydrateFromAuth(user, plan);
     } catch { /* config store optional during early boot */ }
     set({ 
@@ -273,7 +273,6 @@ const useStore = create((set, get) => ({
     localStorage.removeItem('role');
     localStorage.removeItem('user');
     try {
-      const { default: useConfigStore } = await import('./useConfigStore');
       useConfigStore.getState().reset();
     } catch { /* ignore */ }
     // FIXED: Clear ALL entity state on logout to prevent data leakage

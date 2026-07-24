@@ -17,6 +17,15 @@ export default defineConfig({
     }
   },
   build: {
-    chunkSizeWarningLimit: 1500
+    chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        // Keep zustand in its own chunk so store modules never import
+        // `create` from the app entry (avoids circular init: t is not a function).
+        manualChunks(id) {
+          if (id.includes('node_modules/zustand')) return 'zustand';
+        }
+      }
+    }
   }
 });
