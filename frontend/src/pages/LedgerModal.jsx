@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import useStore from '../store/useStore';
 import useConfigStore from '../store/useConfigStore';
 import { toast } from '../store/useToastStore';
-import Modal from '../components/ui/Modal';
+import ErpWindowedModal from '../components/erp/ErpWindowedModal';
 import { fmtDate, fmtMoney } from '../utils/invoiceHelpers';
 import { SkeletonTable, InlineLoader, ButtonLoader, ErpBusyOverlay } from '../components/ui/loaders';
 
@@ -197,14 +197,14 @@ const LedgerModal = ({ isOpen, onClose }) => {
   const isLoading = busy || loading;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[980px] w-full">
-      <div className="classic-erp-window ledger-stmt-window">
+    <ErpWindowedModal isOpen={isOpen} onClose={onClose} title="Ledger Statement" windowId="ledger" bare>
+      {({ WindowControls }) => (
+      <>
+      <div className="classic-erp-window ledger-stmt-window h-full min-h-0 !max-h-none flex flex-col">
         <ErpBusyOverlay show={isLoading && !!statement} message="Refreshing ledger…" />
-        <div className="classic-erp-header">
-          <span>Ledger Statement</span>
-          <button type="button" className="classic-erp-close-btn" onClick={onClose}>
-            X
-          </button>
+        <div className="classic-erp-header shrink-0">
+          <span className="erp-window-title truncate">Ledger Statement</span>
+          <WindowControls />
         </div>
 
         {/* Filters */}
@@ -528,7 +528,9 @@ const LedgerModal = ({ isOpen, onClose }) => {
         }
         @page { size: A4 portrait; margin: 10mm; }
       `}</style>
-    </Modal>
+      </>
+      )}
+    </ErpWindowedModal>
   );
 };
 

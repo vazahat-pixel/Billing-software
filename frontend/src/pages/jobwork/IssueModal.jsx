@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Modal from '../../components/ui/Modal';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { ERPCombobox } from '../../components/erp';
+import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
 import { useConfig } from '../../context/ConfigContext';
 import { buildBillFieldVisibility } from '../../utils/configHelpers';
@@ -368,15 +368,20 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
 
   return (
     <>
-    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-6xl">
-      <div className="classic-erp-window erp-density flex flex-col h-full">
+    <ErpWindowedModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Mill Issue [ ${selectedBook || 'PROCESS ISSUE BOOK'} ]`}
+      windowId="millIssue"
+      bare
+    >
+      {({ WindowControls }) => (
+      <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 !max-h-none">
         <ErpBusyOverlay show={bootLoading} message="Loading mill issue…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving mill issue…" />
-        <div className="classic-erp-header">
-          <span>Mill Issue [ {selectedBook || 'PROCESS ISSUE BOOK'} ]</span>
-          <button type="button" className="classic-erp-close-btn" onClick={onClose}>
-            X
-          </button>
+        <div className="classic-erp-header shrink-0">
+          <span className="erp-window-title truncate">Mill Issue [ {selectedBook || 'PROCESS ISSUE BOOK'} ]</span>
+          <WindowControls />
         </div>
 
         <div className="classic-erp-body flex-1 overflow-y-auto space-y-3">
@@ -732,7 +737,8 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
           </button>
         </div>
       </div>
-    </Modal>
+      )}
+    </ErpWindowedModal>
 
     <AccountMasterModal
       isOpen={accountModal.open}

@@ -14,6 +14,8 @@ import BillAutoFill from '../../components/BillAutoFill';
 import PurchasePrint from './PurchasePrint';
 import { warehousesApi } from '../../api';
 import { ERPCombobox } from '../../components/erp';
+import ErpWindowControls from '../../components/erp/ErpWindowControls';
+import useErpWindow from '../../hooks/useErpWindow';
 import { erpConfirm } from '../../utils/confirm';
 import { resolveParty, buildWhatsAppMessage, openWhatsAppShare } from '../../utils/invoiceHelpers';
 import { getFocusableElements } from '../../utils/formEnterNavigation';
@@ -89,6 +91,12 @@ const PurchaseModal = ({
     gstType: 'CGST+SGST',
     reverseCharge: 'No',
     warehouseId: ''
+  });
+
+  const win = useErpWindow(isOpen, {
+    id: 'purchase',
+    title: `Purchase Invoice [ ${header.book || selectedBook || 'PURCHASE BOOK'} ]`,
+    onClose,
   });
 
   const [gridItems, setGridItems] = useState([blankLine()]);
@@ -687,14 +695,29 @@ const PurchaseModal = ({
 
   return (
     <>
-    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[98vw] w-[98vw] !h-[calc(100dvh-16px)] !max-h-[calc(100dvh-16px)] flex flex-col">
-      <div className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-card)]">
+    <Modal
+      isOpen={isOpen && !win.isMinimized}
+      onClose={onClose}
+      bare
+      style={win.modalStyle}
+      className={win.modalClassName}
+      inertBackdrop={win.inertBackdrop}
+    >
+      <div
+        className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-card)] erp-bill-window-shell relative"
+        onPointerDown={win.onShellPointerDown}
+      >
       <div className="classic-erp-window erp-density erp-sales-bill-compact flex flex-col flex-1 min-h-0 overflow-hidden !max-h-none !h-auto">
         <ErpBusyOverlay show={bootLoading} message="Loading purchase bill…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving purchase…" />
         <div className="classic-erp-header shrink-0">
-          <span>Purchase Invoice [ {header.book} ]</span>
-          <button className="classic-erp-close-btn" onClick={onClose}>X</button>
+          <span className="erp-window-title truncate">Purchase Invoice [ {header.book} ]</span>
+          <ErpWindowControls
+            isMaximized={win.isMaximized}
+            onMinimize={win.minimize}
+            onToggleMax={win.toggleMax}
+            onClose={onClose}
+          />
         </div>
 
         <div ref={modalContainerRef} className="classic-erp-body flex-1 min-h-0 overflow-y-auto overflow-x-hidden erp-bill-layout">
@@ -1055,6 +1078,13 @@ const PurchaseModal = ({
           <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
         </div>
       </div>
+      {win.mode === 'normal' && (
+        <div
+          className="erp-window-resize-handle"
+          onPointerDown={win.onResizePointerDown}
+          title="Drag to resize"
+        />
+      )}
 
       <AccountMasterModal 
         isOpen={inlineModal.type === 'account'} 

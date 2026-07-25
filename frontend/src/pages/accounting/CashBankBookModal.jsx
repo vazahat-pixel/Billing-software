@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
 import { ERPCombobox } from '../../components/erp';
+import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import { notifySuccess, notifyWarning, notifyError } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
 import { Plus } from 'lucide-react';
@@ -606,13 +606,14 @@ const CashBankBookModal = ({
   if (!isOpen) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[98vw] w-[1180px]">
-      <div className="classic-erp-window flex flex-col h-full max-h-[94vh]">
+    <ErpWindowedModal isOpen={isOpen} onClose={onClose} title={windowTitle} windowId={`cashbank-${bookKind}-${initialType || 'Receipt'}`} bare>
+      {({ WindowControls }) => (
+      <div className="classic-erp-window flex flex-col h-full min-h-0 !max-h-none">
         <ErpBusyOverlay show={bootLoading} message="Loading cash/bank book…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving voucher…" />
-        <div className="classic-erp-header">
-          <span>{windowTitle}</span>
-          <button type="button" className="classic-erp-close-btn" onClick={onClose}>X</button>
+        <div className="classic-erp-header shrink-0">
+          <span className="erp-window-title truncate">{windowTitle}</span>
+          <WindowControls />
         </div>
 
         <div className="classic-erp-body cash-bank-form flex-1 overflow-y-auto flex flex-col">
@@ -883,7 +884,8 @@ const CashBankBookModal = ({
           <button className="classic-erp-btn" type="button" title="Head">{selectedBook?.head1 || 'Head'}</button>
         </div>
       </div>
-    </Modal>
+      )}
+    </ErpWindowedModal>
   );
 };
 

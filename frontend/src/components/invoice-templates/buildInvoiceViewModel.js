@@ -18,19 +18,94 @@ const resolveHsn = (line, items = []) => {
   if (line?.hsn) return line.hsn;
   if (line?.hsnCode) return line.hsnCode;
   if (typeof line?.itemId === 'object') {
-    return line.itemId?.hsnCode || line.itemId?.hsn || '—';
+    return line.itemId?.hsnCode || line.itemId?.hsn || '';
   }
   const id = line?.itemId;
   const found = items.find((i) => String(i._id || i.id) === String(id));
-  return found?.hsnCode || found?.hsn || '—';
+  return found?.hsnCode || found?.hsn || '';
 };
 
-const resolveUnit = (line) => line?.unit || line?.uom || (Number(line?.mts) ? 'Mtr' : 'Pcs');
+const resolveUnit = (line) => line?.unit || line?.uom || (Number(line?.mts) ? 'MTRS' : 'PCS');
 
 const partyAddress = (p) => {
   if (!p) return '';
   return [p.address, p.city, p.state, p.pincode].filter(Boolean).join(', ');
 };
+
+const partyAddressLines = (p) => {
+  if (!p) return [];
+  const lines = [];
+  if (p.address) lines.push(String(p.address));
+  const cityLine = [p.city, p.pincode].filter(Boolean).join(' - ');
+  if (cityLine) lines.push(cityLine);
+  else if (p.state && !String(p.address || '').includes(String(p.state))) lines.push(String(p.state));
+  return lines;
+};
+
+/** True only for real calendar dates (rejects bare day numbers like "4"). */
+const isValidPrintDate = (d) => {
+  if (d == null || d === '') return false;
+  if (typeof d === 'number' && d < 100000) return false;
+  const s = String(d).trim();
+  if (/^\d{1,2}$/.test(s)) return false;
+  const raw = s.includes('T') ? s.split('T')[0] : s;
+  const dt = new Date(raw);
+  return !Number.isNaN(dt.getTime()) && dt.getFullYear() >= 1990;
+};
+
+/** DD-MM-YYYY — textile ERP print style */
+const fmtDateDMY = (d) => {
+  if (!isValidPrintDate(d)) return '';
+  const raw = String(d).includes('T') ? String(d).split('T')[0] : d;
+  const dt = new Date(raw);
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const yyyy = dt.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+};
+
+const resolveDueDatePrint = (invoice) => {
+  if (isValidPrintDate(invoice.dueDate)) return fmtDateDMY(invoice.dueDate);
+  const days = Number(invoice.dueDays || 0);
+  if (days > 0 && isValidPrintDate(invoice.date)) {
+    const base = new Date(invoice.date);
+    base.setDate(base.getDate() + days);
+    return fmtDateDMY(base);
+  }
+  return '';
+};
+
+/** GSTIN must be 15 chars — never show state-code "09" as GSTIN */
+const normalizeGstin = (g) => {
+  const s = String(g || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '');
+  if (s.length >= 15) return s;
+  return '';
+};
+
+const stateCodeFromGstin = (g) => {
+  const s = String(g || '').trim();
+  if (/^\d{2}/.test(s)) return s.slice(0, 2);
+  return '';
+};
+
+const stateLabel = (state, code) => {
+  const s = String(state || '').trim();
+  const c = String(code || '').trim();
+  if (c && s) return `${c.padStart(2, '0')}-${s.toUpperCase()}`;
+  if (c) return c.padStart(2, '0');
+  return s ? s.toUpperCase() : '';
+};
+
+const DEFAULT_TERMS = [
+  'Claim if any must be made within 24 hours of receipt of goods.',
+  "Interest @24% will be charged if payment is not made within due date.",
+  "Subject to 'SURAT' Jurisdiction.",
+  'Goods once sold will not be taken back.',
+  'Our responsibility ceases as soon as the goods leave our premises.',
+];
 
 /**
  * @returns {object} InvoiceViewModel for templates
@@ -57,6 +132,10 @@ export function buildInvoiceViewModel({
       ? { name: invoice.customerName || 'Cash Customer' }
       : { name: invoice.supplierName || 'Vendor' });
 
+  const broker =
+    resolveParty(invoice.brokerId, parties) ||
+    (invoice.brokerName ? { name: invoice.brokerName } : null);
+
   const taxable = Number(invoice.taxableAmount ?? invoice.totals?.subtotal ?? 0);
   const gst = Number(invoice.gstAmount || 0);
   const net = Number(invoice.netAmount ?? invoice.totals?.total ?? taxable + gst);
@@ -64,34 +143,57 @@ export function buildInvoiceViewModel({
   const cgst = Number(invoice.cgst ?? (isIgst ? 0 : gst / 2));
   const sgst = Number(invoice.sgst ?? (isIgst ? 0 : gst / 2));
   const igst = Number(invoice.igst ?? (isIgst ? gst : 0));
+  const cess = Number(invoice.cess || 0);
   const discountTotal = Number(invoice.discountAmt || invoice.lessAmt || 0);
-  const gstRate = Number(invoice.gstRate || 0);
+  const footerAdd = Number(invoice.addAmt || 0);
+  const footerLess = Number(invoice.lessAmt || 0);
+
+  // Prefer line gstPer; else bill gstRate; else derive from taxable
+  let gstRate = Number(invoice.gstRate || 0);
+  if (!gstRate && taxable > 0 && gst > 0) {
+    gstRate = Math.round((gst / taxable) * 10000) / 100;
+  }
   const halfRate = isIgst ? 0 : gstRate / 2;
 
   const lines = (Array.isArray(invoice.items) ? invoice.items : []).map((line, idx) => {
-    const qty = Number(line.mts) || Number(line.pcs) || 0;
+    const pcs = Number(line.pcs) || 0;
+    const mts = Number(line.mts) || 0;
     const rate = Number(line.rate) || 0;
-    const amount = Number(line.amount) || qty * rate;
-    const lineDiscount = Number(line.discount || line.dis1Amt || 0);
-    const taxableLine = amount - lineDiscount;
-    const lineGst = gstRate ? (taxableLine * gstRate) / 100 : 0;
+    const amount = Number(line.amount) || (mts || pcs) * rate;
+    const dis1Amt = Number(line.dis1Amt || 0);
+    const dis2Amt = Number(line.dis2Amt || 0);
+    const addAmt = Number(line.addAmt || 0);
+    const legacyDisc = Number(line.discount || 0);
+    const lineDiscount = dis1Amt + dis2Amt || legacyDisc;
+    // Match salesBillCalc.lineTaxable
+    const taxableLine = amount - dis1Amt - dis2Amt + addAmt - (dis1Amt || dis2Amt ? 0 : legacyDisc);
+    const lineGstPer = Number(line.gstPer || gstRate || 0);
+    const lineGst = Number(line.gstAmt) || (lineGstPer ? (taxableLine * lineGstPer) / 100 : 0);
+    const lineHalf = isIgst ? 0 : lineGstPer / 2;
     return {
       sno: idx + 1,
       name: resolveItemName(line, items),
       desc: line.desc || '',
       hsn: resolveHsn(line, items),
-      qty,
-      pcs: Number(line.pcs) || 0,
-      mts: Number(line.mts) || 0,
+      qty: mts || pcs,
+      pcs,
+      mts,
       fold: line.fold ?? '',
       cut: line.cut ?? '',
       unit: resolveUnit(line),
       rate,
       discount: lineDiscount,
+      dis1Per: Number(line.dis1Per || 0),
+      dis1Amt,
+      dis2Per: Number(line.dis2Per || 0),
+      dis2Amt,
+      addAmt,
+      gstPer: lineGstPer,
+      gstAmt: lineGst,
       taxable: taxableLine,
-      cgstPct: isIgst ? 0 : halfRate,
-      sgstPct: isIgst ? 0 : halfRate,
-      igstPct: isIgst ? gstRate : 0,
+      cgstPct: isIgst ? 0 : lineHalf,
+      sgstPct: isIgst ? 0 : lineHalf,
+      igstPct: isIgst ? lineGstPer : 0,
       cgstAmt: isIgst ? 0 : lineGst / 2,
       sgstAmt: isIgst ? 0 : lineGst / 2,
       igstAmt: isIgst ? lineGst : 0,
@@ -99,6 +201,61 @@ export function buildInvoiceViewModel({
       amount,
     };
   });
+
+  const totalPcs = lines.reduce((s, l) => s + (Number(l.pcs) || 0), 0);
+  const totalMts = lines.reduce((s, l) => s + (Number(l.mts) || 0), 0);
+  const totalLineAmount = lines.reduce((s, l) => s + (Number(l.taxable) || Number(l.amount) || 0), 0);
+
+  // Tax summary rows grouped by gst %
+  const taxGroups = {};
+  lines.forEach((l) => {
+    const pct = Number(l.gstPer || gstRate || 0);
+    const key = String(pct);
+    if (!taxGroups[key]) {
+      taxGroups[key] = {
+        taxPct: pct,
+        taxValue: 0,
+        cgstPct: isIgst ? 0 : pct / 2,
+        cgstAmt: 0,
+        sgstPct: isIgst ? 0 : pct / 2,
+        sgstAmt: 0,
+        igstPct: isIgst ? pct : 0,
+        igstAmt: 0,
+        cessPct: 0,
+        cessAmt: 0,
+        total: 0,
+      };
+    }
+    const g = taxGroups[key];
+    const tv = Number(l.taxable) || 0;
+    g.taxValue += tv;
+    g.cgstAmt += Number(l.cgstAmt) || 0;
+    g.sgstAmt += Number(l.sgstAmt) || 0;
+    g.igstAmt += Number(l.igstAmt) || 0;
+    g.total += tv + (Number(l.gstAmt) || 0);
+  });
+  let taxRows = Object.values(taxGroups);
+  const taxRowsGst = taxRows.reduce(
+    (s, r) => s + Number(r.cgstAmt || 0) + Number(r.sgstAmt || 0) + Number(r.igstAmt || 0),
+    0
+  );
+  if (!taxRows.length || (gst > 0 && taxRowsGst < 0.01 && taxable > 0)) {
+    taxRows = [
+      {
+        taxPct: gstRate,
+        taxValue: taxable,
+        cgstPct: isIgst ? 0 : halfRate,
+        cgstAmt: cgst,
+        sgstPct: isIgst ? 0 : halfRate,
+        sgstAmt: sgst,
+        igstPct: isIgst ? gstRate : 0,
+        igstAmt: igst,
+        cessPct: 0,
+        cessAmt: cess,
+        total: taxable + gst,
+      },
+    ];
+  }
 
   const warnings = [];
   if (!firm.gstin) warnings.push('Add Company GSTIN in Company Settings');
@@ -113,8 +270,15 @@ export function buildInvoiceViewModel({
           name: invoice.shipToName || party?.name,
           gstin: invoice.shipToGstin || party?.gstin,
           address: invoice.shippingAddress || partyAddress(party),
+          addressLines: invoice.shippingAddress
+            ? [invoice.shippingAddress]
+            : partyAddressLines(party),
           state: invoice.shipToState || party?.state,
           stateCode: invoice.shipToStateCode || party?.stateCode,
+          stateLabel: stateLabel(
+            invoice.shipToState || party?.state,
+            invoice.shipToStateCode || party?.stateCode
+          ),
           phone: invoice.shipToPhone || party?.mobile || party?.phone || '',
           email: invoice.shipToEmail || party?.email || '',
         }
@@ -125,6 +289,36 @@ export function buildInvoiceViewModel({
     (shipTo.name === party?.name &&
       (shipTo.address || '') === (partyAddress(party) || ''));
 
+  const dueDays = Number(invoice.dueDays || 0);
+  const paymentWithin =
+    invoice.paymentTerms ||
+    (dueDays > 0 ? `Payment within ${dueDays} days` : 'Payment within 10 days');
+
+  const customTerms = String(firm.invoiceTerms || '')
+    .split(/\n+/)
+    .map((t) => t.replace(/^\d+[\).\-\s]+/, '').trim())
+    .filter(Boolean);
+
+  const partyGstin = normalizeGstin(party?.gstin);
+  const partyStateCode =
+    party?.stateCode || stateCodeFromGstin(party?.gstin) || stateCodeFromGstin(partyGstin) || '';
+  const firmStateCode = firm.stateCode || stateCodeFromGstin(firm.gstin) || '';
+  const posCode = partyStateCode || firmStateCode || '';
+  const posState = party?.state || firm.state || '';
+
+  const billParty = {
+    name: party?.name || '—',
+    gstin: partyGstin,
+    address: partyAddress(party),
+    addressLines: partyAddressLines(party),
+    state: party?.state || '',
+    stateCode: partyStateCode,
+    stateLabel: stateLabel(party?.state, partyStateCode),
+    phone: party?.mobile || party?.phone || party?.phoneO || '',
+    email: party?.email || '',
+    pan: party?.pan || '',
+  };
+
   return {
     type,
     isSale,
@@ -132,65 +326,86 @@ export function buildInvoiceViewModel({
     copyLabel: String(copyLabel || 'ORIGINAL').toUpperCase(),
     meta: {
       invoiceNo: invoice.invoiceNo || '—',
-      date: fmtDate(invoice.date || invoice.createdAt),
-      dueDate: invoice.dueDate ? fmtDate(invoice.dueDate) : null,
-      dueDays: invoice.dueDays || null,
-      paymentTerms: invoice.paymentTerms || (invoice.dueDays ? `${invoice.dueDays} days` : null),
-      placeOfSupply: party?.state || firm.state || '—',
-      placeOfSupplyCode: party?.stateCode || firm.stateCode || '',
+      date: fmtDateDMY(invoice.date || invoice.createdAt) || fmtDate(invoice.date || invoice.createdAt),
+      dueDate: resolveDueDatePrint(invoice),
+      dueDays: dueDays || null,
+      paymentTerms: paymentWithin,
+      placeOfSupply: posState || '—',
+      placeOfSupplyCode: posCode || '',
+      placeOfSupplyLabel: stateLabel(posState, posCode) || posState || '—',
       reverseCharge: invoice.reverseCharge ? 'Y' : 'N',
       invoiceType: invoice.invoiceType || 'Tax',
       orderNo: invoice.orderNo || '',
-      orderDate: invoice.orderDate ? fmtDate(invoice.orderDate) : '',
+      orderDate: invoice.orderDate ? fmtDateDMY(invoice.orderDate) : '',
       challanNo: invoice.challanNo || '',
+      chDate: invoice.chDate ? fmtDateDMY(invoice.chDate) : '',
       transport: invoice.transport || '',
       lrNo: invoice.lrNo || '',
+      lrDate: invoice.lrDate ? fmtDateDMY(invoice.lrDate) : '',
       station: invoice.station || '',
       eway: invoice.eway || '',
-      broker: invoice.brokerName || '',
+      baleNo: invoice.baleNo || '',
+      freight: Number(invoice.freight || 0),
+      weight: Number(invoice.weight || 0),
+      broker: broker?.name || invoice.brokerName || '',
+      brokerAddress: partyAddress(broker) || broker?.city || '',
       haste: invoice.haste || '',
       remarks: invoice.remarks || invoice.narration || '',
       supplierInvoiceNo: invoice.supplierInvoiceNo || '',
       irn: invoice.irn || invoice.einvoice?.irn || '',
       ackNo: invoice.ackNo || invoice.einvoice?.ackNo || '',
       ackDate: invoice.ackDate
-        ? fmtDate(invoice.ackDate)
+        ? fmtDateDMY(invoice.ackDate)
         : invoice.einvoice?.ackDate
-          ? fmtDate(invoice.einvoice.ackDate)
+          ? fmtDateDMY(invoice.einvoice.ackDate)
           : '',
     },
     company: {
       ...firm,
       showLogo: showLogo !== false,
       logoMissing: showLogo && !firm.logoUrl,
+      addressFull: [firm.address, firm.area].filter(Boolean).join(' ').trim(),
     },
-    billTo: {
-      name: party?.name || '—',
-      gstin: party?.gstin || '',
-      address: partyAddress(party),
-      state: party?.state || '',
-      stateCode: party?.stateCode || party?.stateName || '',
-      phone: party?.mobile || party?.phone || party?.phoneO || '',
-      email: party?.email || '',
-      pan: party?.pan || '',
-    },
-    shipTo: billToSameAsShip ? null : shipTo,
+    billTo: billParty,
+    shipTo: billToSameAsShip
+      ? billParty
+      : {
+          ...shipTo,
+          gstin: normalizeGstin(shipTo?.gstin),
+          stateLabel:
+            shipTo?.stateLabel ||
+            stateLabel(shipTo?.state, shipTo?.stateCode || stateCodeFromGstin(shipTo?.gstin)),
+        },
     lines,
+    lineTotals: {
+      pcs: totalPcs,
+      mts: totalMts,
+      amount: totalLineAmount || taxable,
+    },
+    taxRows,
     isIgst,
     gstRate,
     totals: {
       subtotal: taxable + discountTotal,
       discount: discountTotal,
+      lessAmt: footerLess,
+      addAmt: footerAdd,
       taxable,
       cgst,
       sgst,
       igst,
+      cess,
       gst,
       tcs: Number(invoice.tcs || invoice.tcsAmount || 0),
       tcsPer: invoice.tcsPer || 0,
       roundOff: Number(invoice.roundOff || 0),
       grandTotal: net,
-      amountWords: amountInWords(net),
+      amountWords: (() => {
+        const rounded = Math.round(Number(net) || 0);
+        return String(amountInWords(rounded))
+          .replace(/^Indian Rupees\s+/i, 'Rupees. ')
+          .replace(/^Zero Rupees/i, 'Rupees. Zero');
+      })(),
     },
     bank: {
       accountName: firm.accountName || firm.name,
@@ -200,14 +415,15 @@ export function buildInvoiceViewModel({
       branch: firm.bankBranch || '',
       upiId: firm.upiId || '',
     },
+    termsList: customTerms.length ? customTerms : DEFAULT_TERMS,
     terms:
       firm.invoiceTerms ||
-      'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.',
+      DEFAULT_TERMS.map((t, i) => `${i + 1}. ${t}`).join('\n'),
     festival,
     showFestivalGreeting: !!(showFestivalGreeting && festival?.greeting),
     warnings,
-    fmt: { money: fmtMoney, num: fmtNum, date: fmtDate },
-    _raw: { invoice, party, firm },
+    fmt: { money: fmtMoney, num: fmtNum, date: fmtDate, dateDMY: fmtDateDMY },
+    _raw: { invoice, party, firm, broker },
   };
 }
 

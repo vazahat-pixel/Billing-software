@@ -248,7 +248,7 @@ const InvoicePDFViewer = ({
         </div>
       </div>
 
-      <div className="flex-1 flex min-h-0 print:block">
+      <div className="flex-1 flex min-h-0 print:block print:h-auto">
         <aside className="invoice-pdf-sidebar print:hidden w-[200px] shrink-0 bg-[#faf8f5] border-r border-[#c4b8a8] overflow-y-auto flex flex-col">
           <div className="px-2.5 py-2 border-b border-[#c4b8a8] bg-[#efe8dc]">
             <div className="text-[10px] font-bold uppercase tracking-wider text-[#3d2914]">Invoice Style</div>
@@ -336,16 +336,17 @@ const InvoicePDFViewer = ({
 
         <div
           ref={previewPaneRef}
-          className="flex-1 overflow-auto p-4 bg-[#d6d0c4] print:p-0 print:overflow-visible print:bg-white"
+          className="invoice-print-body flex-1 overflow-auto p-4 bg-[#d6d0c4] print:p-0 print:overflow-visible print:bg-white"
         >
           <div
-            className="mx-auto print:!transform-none print:!w-auto"
+            className="invoice-print-scale mx-auto print:!transform-none"
             style={{
               width: paperWidth,
-              // zoom shrinks layout box (unlike transform) — no fake empty center
               zoom: scale,
-              // Firefox fallback
-              transform: typeof CSS !== 'undefined' && !CSS.supports?.('zoom', '1') ? `scale(${scale})` : undefined,
+              transform:
+                typeof CSS !== 'undefined' && !CSS.supports?.('zoom', '1')
+                  ? `scale(${scale})`
+                  : undefined,
               transformOrigin: 'top center',
             }}
           >

@@ -2,7 +2,7 @@ export const TEMPLATE_CATALOG = [
   {
     id: 'gst-formal',
     name: 'GST Formal',
-    blurb: 'Professional tax invoice · grid · GST compliant',
+    blurb: 'Textile tax invoice · bill-to / delivery / GST grid',
     swatch: ['#111111', '#f3f3f3', '#ffffff'],
   },
   {

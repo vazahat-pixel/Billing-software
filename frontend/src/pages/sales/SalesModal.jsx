@@ -12,6 +12,8 @@ import ItemMasterModal from '../masters/ItemMasterModal';
 import BillSaveNextActions from '../../components/BillSaveNextActions';
 import SalesPrint from './SalesPrint';
 import { ERPCombobox } from '../../components/erp';
+import ErpWindowControls from '../../components/erp/ErpWindowControls';
+import useErpWindow from '../../hooks/useErpWindow';
 import { erpConfirm } from '../../utils/confirm';
 import { resolveParty, buildWhatsAppMessage, openWhatsAppShare } from '../../utils/invoiceHelpers';
 import { getFocusableElements } from '../../utils/formEnterNavigation';
@@ -68,6 +70,12 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     orderDate: today(),
     type: 'INVOICE IN STATE',
     gstType: 'CGST+SGST'
+  });
+
+  const win = useErpWindow(isOpen, {
+    id: 'sales',
+    title: `Sales Invoice [ ${header.book || selectedBook || 'SALES BOOK'} ]`,
+    onClose,
   });
 
   const patchLine = (idx, patch) => {
@@ -718,20 +726,35 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
   return (
     <>
-    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[98vw] w-[98vw] !h-[calc(100dvh-16px)] !max-h-[calc(100dvh-16px)] flex flex-col">
-      <div className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-card)]">
+    <Modal
+      isOpen={isOpen && !win.isMinimized}
+      onClose={onClose}
+      bare
+      style={win.modalStyle}
+      className={win.modalClassName}
+      inertBackdrop={win.inertBackdrop}
+    >
+      <div
+        className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-card)] erp-bill-window-shell relative"
+        onPointerDown={win.onShellPointerDown}
+      >
       <div className="classic-erp-window erp-density erp-sales-bill-compact flex flex-col flex-1 min-h-0 overflow-hidden !max-h-none !h-auto">
         <ErpBusyOverlay show={bootLoading} message="Loading sales bill…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving invoice…" />
         {/* Title Bar */}
         <div className="classic-erp-header shrink-0">
-          <span>Sales Invoice [ {header.book} ]</span>
-          <span className="text-xs font-mono opacity-90">
+          <span className="erp-window-title truncate">Sales Invoice [ {header.book} ]</span>
+          <span className="text-xs font-mono opacity-90 hidden md:inline erp-window-meta">
             T.Sales: <strong>{sales.reduce((a, s) => a + (s.netAmount || 0), 0).toFixed(0)}</strong>
             &nbsp;&nbsp;|
             &nbsp;&nbsp;{new Date().toLocaleDateString('en-IN', { weekday: 'long' })}
           </span>
-          <button className="classic-erp-close-btn" onClick={onClose}>X</button>
+          <ErpWindowControls
+            isMaximized={win.isMaximized}
+            onMinimize={win.minimize}
+            onToggleMax={win.toggleMax}
+            onClose={onClose}
+          />
         </div>
 
         {/* Form Body — scrolls inside; action bar stays fixed below */}
@@ -1303,6 +1326,13 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
         </div>
       </div>
+      {win.mode === 'normal' && (
+        <div
+          className="erp-window-resize-handle"
+          onPointerDown={win.onResizePointerDown}
+          title="Drag to resize"
+        />
+      )}
 
       {/* Inline Sub Modals */}
       <AccountMasterModal 

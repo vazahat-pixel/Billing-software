@@ -3,7 +3,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
-const Modal = ({ isOpen, onClose, title, children, className, footer, bare = false, enableEscape = true }) => {
+/**
+ * @param {boolean} inertBackdrop — restore/floating mode: no dim overlay, clicks pass through to UI behind
+ */
+const Modal = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  className,
+  footer,
+  bare = false,
+  enableEscape = true,
+  style,
+  inertBackdrop = false,
+}) => {
   const contentRef = useRef(null);
 
   useEffect(() => {
@@ -12,15 +26,22 @@ const Modal = ({ isOpen, onClose, title, children, className, footer, bare = fal
       if (e.key !== 'Escape') return;
       if (e.target.closest('[data-command-palette]')) return;
       if (e.target.closest('.erp-combobox-dropdown')) return;
+      // Floating windows: Esc should not always kill the bill — only when focus inside
+      if (inertBackdrop) {
+        const root = contentRef.current;
+        if (root && !root.contains(document.activeElement) && document.activeElement !== root) {
+          return;
+        }
+      }
       e.preventDefault();
       onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose, enableEscape]);
+  }, [isOpen, onClose, enableEscape, inertBackdrop]);
 
   useEffect(() => {
-    if (!isOpen) return undefined;
+    if (!isOpen || inertBackdrop) return undefined;
     const t = setTimeout(() => {
       const root = contentRef.current;
       if (!root) return;
@@ -30,28 +51,39 @@ const Modal = ({ isOpen, onClose, title, children, className, footer, bare = fal
       first?.focus();
     }, 120);
     return () => clearTimeout(t);
-  }, [isOpen]);
+  }, [isOpen, inertBackdrop]);
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-1.5 sm:p-2 overflow-hidden">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-slate-900/30 backdrop-blur-[6px]"
-          />
+        <div
+          className={twMerge(
+            'fixed inset-0 z-[900]',
+            inertBackdrop
+              ? 'pointer-events-none overflow-hidden'
+              : 'z-[999] flex items-center justify-center p-1.5 sm:p-2 overflow-hidden'
+          )}
+        >
+          {!inertBackdrop && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={onClose}
+              className="fixed inset-0 bg-slate-900/30 backdrop-blur-[6px]"
+            />
+          )}
 
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+            style={style}
             className={twMerge(
-              'relative flex flex-col z-[1000] w-full max-h-[calc(100dvh-12px)] overflow-hidden border border-slate-200/80 shadow-[0_20px_50px_rgba(15,23,42,0.12)]',
+              'relative flex flex-col w-full max-h-[calc(100dvh-12px)] overflow-hidden border border-slate-200/80 shadow-[0_20px_50px_rgba(15,23,42,0.12)]',
+              inertBackdrop ? 'pointer-events-auto z-[910]' : 'z-[1000]',
               bare
                 ? 'max-w-5xl rounded-[var(--radius-card)] bg-[var(--bg-card)]'
                 : 'max-w-4xl rounded-2xl bg-[var(--bg-card)]',

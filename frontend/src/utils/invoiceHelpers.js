@@ -138,7 +138,7 @@ export const resolveItemName = (line, items = []) => {
   }
   const id = line?.itemId;
   const found = items.find((i) => String(i._id || i.id) === String(id));
-  return found?.name || '—';
+  return found?.name || found?.itemName || '—';
 };
 
 export const buildWhatsAppMessage = ({ type, invoice, party, company }) => {

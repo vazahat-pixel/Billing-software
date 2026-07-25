@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Modal from '../../components/ui/Modal';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
+import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 
@@ -106,12 +106,18 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Embroidery Job Issue" className="max-w-[95vw] h-[90vh] classic-erp-window p-0 border-0">
-      <div className="classic-erp-window flex flex-col h-full overflow-hidden">
-        {/* Title Bar */}
+    <ErpWindowedModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Job Issue [ ${selectedBook || 'EMB. JOBWORK'} ]`}
+      windowId="jobIssue"
+      bare
+    >
+      {({ WindowControls }) => (
+      <div className="classic-erp-window flex flex-col h-full min-h-0 overflow-hidden !max-h-none">
         <div className="classic-erp-header shrink-0">
-          <span>Embroidery Job Issue [ {selectedBook || 'EMB. JOBWORK'} ]</span>
-          <button className="classic-erp-close-btn" onClick={onClose}>X</button>
+          <span className="erp-window-title truncate">Embroidery Job Issue [ {selectedBook || 'EMB. JOBWORK'} ]</span>
+          <WindowControls />
         </div>
 
         {/* Tab Navigation */}
@@ -350,7 +356,8 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
           )}
         </div>
       </div>
-    </Modal>
+      )}
+    </ErpWindowedModal>
   );
 };
 

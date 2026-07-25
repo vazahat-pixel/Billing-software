@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Modal from '../../components/ui/Modal';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
+import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
@@ -145,14 +145,20 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Mill Receive Receipt" className="max-w-[95vw] h-[90vh] classic-erp-window p-0 border-0">
-      <div className="classic-erp-window flex flex-col h-full overflow-hidden">
+    <ErpWindowedModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Mill Receive [ ${selectedBook || 'RECEIVE BOOK'} ]`}
+      windowId="millRec"
+      bare
+    >
+      {({ WindowControls }) => (
+      <div className="classic-erp-window flex flex-col h-full min-h-0 overflow-hidden !max-h-none">
         <ErpBusyOverlay show={bootLoading} message="Loading mill receive…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving receive…" />
-        {/* Title Bar */}
         <div className="classic-erp-header shrink-0">
-          <span>Mill Receive Receipt [ {selectedBook || 'RECEIVE BOOK'} ]</span>
-          <button className="classic-erp-close-btn" onClick={onClose}>X</button>
+          <span className="erp-window-title truncate">Mill Receive Receipt [ {selectedBook || 'RECEIVE BOOK'} ]</span>
+          <WindowControls />
         </div>
 
         {/* Tab Navigation */}
@@ -397,7 +403,8 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
           )}
         </div>
       </div>
-    </Modal>
+      )}
+    </ErpWindowedModal>
   );
 };
 

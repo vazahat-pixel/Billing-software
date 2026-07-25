@@ -432,3 +432,250 @@
     overflow-y: auto !important;
   }
 }
+
+/* —— Bill window chrome: minimize / maximize / resize (no field overlap) —— */
+.erp-window-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.erp-window-btn {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  color: #fff !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  width: 22px !important;
+  height: 22px !important;
+  line-height: 1 !important;
+  border-radius: 4px !important;
+  cursor: pointer;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.erp-window-btn:hover {
+  background: rgba(255, 255, 255, 0.28) !important;
+}
+
+.erp-window-btn--close:hover {
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+}
+
+.erp-window-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.erp-bill-window-shell {
+  position: relative;
+  container-type: size;
+  container-name: billwin;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.erp-bill-window--normal {
+  width: var(--erp-win-w, 880px) !important;
+  height: var(--erp-win-h, 540px) !important;
+  max-width: 98vw !important;
+  max-height: 96dvh !important;
+  min-width: 640px !important;
+  min-height: 400px !important;
+}
+
+.erp-bill-window--floating {
+  position: absolute !important;
+  left: var(--erp-win-x, 48px) !important;
+  top: var(--erp-win-y, 56px) !important;
+  margin: 0 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.28) !important;
+  border: 1px solid #94a3b8 !important;
+}
+
+.classic-erp-header {
+  user-select: none;
+}
+
+.erp-bill-window--floating .classic-erp-header {
+  cursor: grab;
+}
+
+.erp-bill-window--floating .classic-erp-header:active {
+  cursor: grabbing;
+}
+
+.erp-bill-window--normal > [data-form-enter-nav] {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.erp-bill-window--normal .erp-bill-window-shell {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.erp-bill-window--normal .classic-erp-window {
+  max-height: none !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+}
+
+.erp-window-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 40;
+  background:
+    linear-gradient(135deg, transparent 50%, rgba(15, 23, 42, 0.35) 50%) no-repeat;
+  background-size: 10px 10px;
+  background-position: right 3px bottom 3px;
+}
+
+.erp-window-dock {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  z-index: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(320px, 42vw);
+  padding: 8px 10px 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: linear-gradient(180deg, #1e293b, #0f172a);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.erp-window-dock-tray {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 10050;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+
+.erp-window-dock-tray .erp-window-dock {
+  pointer-events: auto;
+}
+
+.erp-window-dock:hover {
+  background: linear-gradient(180deg, #334155, #1e293b);
+}
+
+.erp-window-dock-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-window-dock-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 10px;
+}
+
+.erp-window-dock-x:hover {
+  background: #dc2626;
+}
+
+/* When window is small — reflow, never overlap */
+.erp-bill-window-shell .classic-erp-field {
+  min-width: 0;
+}
+
+.erp-bill-window-shell .classic-erp-input,
+.erp-bill-window-shell .classic-erp-select,
+.erp-bill-window-shell [data-erp-combobox] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.erp-bill-window-shell .classic-erp-label {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@container billwin (max-width: 980px) {
+  .erp-bill-window-shell .classic-erp-header-split,
+  .erp-bill-window-shell .erp-sales-top {
+    flex-direction: column !important;
+    display: flex !important;
+  }
+
+  .erp-bill-window-shell .classic-erp-header-split > .classic-erp-header-bill,
+  .erp-bill-window-shell .classic-erp-header-split > .classic-erp-header-party {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 auto !important;
+  }
+
+  .erp-bill-window-shell .classic-erp-meta-grid,
+  .erp-bill-window-shell .erp-sales-bill-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .erp-bill-window-shell .erp-window-meta {
+    display: none !important;
+  }
+}
+
+@container billwin (max-width: 760px) {
+  .erp-bill-window-shell .classic-erp-meta-grid,
+  .erp-bill-window-shell .erp-sales-bill-meta,
+  .erp-bill-window-shell .classic-erp-meta-grid--3 {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .erp-bill-window-shell .classic-erp-field {
+    flex-wrap: wrap;
+  }
+}
+
+/* Item grids scroll horizontally instead of crushing columns */
+.erp-bill-window-shell .classic-erp-body {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+.erp-bill-window-shell table,
+.erp-bill-window-shell .erp-sales-items-wrap {
+  min-width: 0;
+}
+

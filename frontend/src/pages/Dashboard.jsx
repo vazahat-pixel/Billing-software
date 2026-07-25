@@ -14,6 +14,8 @@ import useConfigStore from '../store/useConfigStore';
 import PanelSwitcher from '../components/PanelSwitcher';
 import OfflineIndicator from '../components/OfflineIndicator';
 import FailedSyncModal from '../components/FailedSyncModal';
+import ErpWindowDockTray from '../components/erp/ErpWindowDockTray';
+import { yieldOtherWindows } from '../store/useWindowDockStore';
 import PwaInstallPrompt from '../components/PwaInstallPrompt';
 import Modal from '../components/ui/Modal';
 
@@ -421,6 +423,10 @@ const Dashboard = () => {
          return;
       }
 
+      // Opening any other screen — park maximized bills into the dock
+      if (val === true) {
+         yieldOtherWindows(key);
+      }
       setModals(prev => ({ ...prev, [key]: val }));
    };
 
@@ -433,6 +439,8 @@ const Dashboard = () => {
       const key = bookSelection.module;
       setSelectedBooks(prev => ({ ...prev, [key]: book }));
       setBookSelection({ isOpen: false, module: null, bookModule: null });
+      // Keep other bills open — minimize maximized ones so the new window can show
+      yieldOtherWindows(key);
       setModals(prev => ({ ...prev, [key]: true }));
    };
 
@@ -961,11 +969,11 @@ const Dashboard = () => {
             onClose={() => toggleModal('purchase', false)} 
             selectedBook={selectedBooks.purchase?.name} 
             readOnly={!permissions.canSave} 
-            onOpenSales={() => { toggleModal('purchase', false); toggleModal('sales', true); }}
-            onOpenJobIssue={() => { toggleModal('purchase', false); toggleModal('jobIssue', true); }}
+            onOpenSales={() => { yieldOtherWindows('sales'); toggleModal('sales', true); }}
+            onOpenJobIssue={() => { yieldOtherWindows('jobIssue'); toggleModal('jobIssue', true); }}
             onOpenMillIssue={(data) => {
                setMillIssueInitialData(data || null);
-               toggleModal('purchase', false);
+               yieldOtherWindows('millIssue');
                toggleModal('millIssue', true);
             }}
          />
@@ -1197,6 +1205,7 @@ const Dashboard = () => {
          />
 
          <FailedSyncModal isOpen={syncModalOpen} onClose={() => setSyncModalOpen(false)} />
+         <ErpWindowDockTray />
          <PwaInstallPrompt />
 
       </div>
