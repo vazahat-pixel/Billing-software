@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const Company = require('../models/Company');
 const CompanyModuleConfig = require('../models/CompanyModuleConfig');
 const CompanySettings = require('../models/CompanySettings');
@@ -26,27 +27,40 @@ const computeBundleHash = (payload) =>
 const logConfigChange = async ({
   companyId, configType, configKey, configId, version, action, actorId, before, after, req
 }) => {
-  await ConfigChangeLog.create({
-    companyId,
-    configType,
-    configKey,
-    configId,
-    version,
-    action,
-    actorId: actorId || null,
-    before,
-    after,
-    ip: req?.ip,
-    userAgent: req?.get?.('user-agent')
-  });
+  try {
+    let safeActor = null;
+    if (actorId && mongoose.Types.ObjectId.isValid(String(actorId))) {
+      safeActor = actorId;
+    }
+    await ConfigChangeLog.create({
+      companyId,
+      configType,
+      configKey,
+      configId,
+      version,
+      action,
+      actorId: safeActor,
+      before,
+      after,
+      ip: req?.ip,
+      userAgent: req?.get?.('user-agent')
+    });
+  } catch (err) {
+    // Never block config save because of audit-log failure
+    console.warn('[config] change log failed:', err.message);
+  }
 };
 
 const bumpMeta = (doc, actorId) => {
   const nextVersion = (doc?.version || 0) + 1;
+  let updatedBy = null;
+  if (actorId && mongoose.Types.ObjectId.isValid(String(actorId))) {
+    updatedBy = actorId;
+  }
   return {
     version: nextVersion,
     publishedAt: new Date(),
-    updatedBy: actorId || null,
+    updatedBy,
     isActive: true,
     deletedAt: null,
     configHash: ''
@@ -298,21 +312,25 @@ exports.saveCompanySettings = async (companyId, body, actorId, req) => {
   const meta = bumpMeta(existing, actorId);
   const {
     legalName, shortName, gstin, pan, tan, phone, email, website,
-    address, city, state, pincode, financialYear, gstScheme, currency,
+    address, city, state, pincode, stateCode, financialYear, gstScheme, currency,
     dateFormat, tdsEnabled, tcsEnabled, eway, eInvoice, businessType,
     invoicePrefix, purchasePrefix, challanPrefix, receiptPrefix, paymentPrefix,
     autoVoucherNo, notifyExpiry, notifyLowStock, notifyOverdue,
     showLogo, printWatermark, primaryColor, logoUrl, offlineModeEnabled,
+    bankName, accountName, accountNo, ifsc, bankBranch, upiId, invoiceTerms,
+    invoiceTemplateId, autoFestiveTheme, showFestivalGreeting,
     customField1Label, customField2Label, customField3Label
-  } = body;
+  } = body || {};
 
   const patch = {
     legalName, shortName, gstin, pan, tan, phone, email, website,
-    address, city, state, pincode, financialYear, gstScheme, currency,
+    address, city, state, pincode, stateCode, financialYear, gstScheme, currency,
     dateFormat, tdsEnabled, tcsEnabled, eway, eInvoice, businessType,
     invoicePrefix, purchasePrefix, challanPrefix, receiptPrefix, paymentPrefix,
     autoVoucherNo, notifyExpiry, notifyLowStock, notifyOverdue,
     showLogo, printWatermark, primaryColor, logoUrl, offlineModeEnabled,
+    bankName, accountName, accountNo, ifsc, bankBranch, upiId, invoiceTerms,
+    invoiceTemplateId, autoFestiveTheme, showFestivalGreeting,
     customField1Label, customField2Label, customField3Label
   };
   Object.keys(patch).forEach((k) => {
@@ -322,7 +340,7 @@ exports.saveCompanySettings = async (companyId, body, actorId, req) => {
   const updated = await CompanySettings.findOneAndUpdate(
     { companyId },
     { ...patch, companyId, ...meta, configHash: computeBundleHash(patch) },
-    { upsert: true, new: true }
+    { upsert: true, new: true, runValidators: true }
   );
 
   await logConfigChange({

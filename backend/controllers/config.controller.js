@@ -103,12 +103,21 @@ exports.getCompanySettings = async (req, res) => {
 exports.saveCompanySettings = async (req, res) => {
   try {
     const companyId = req.companyId || req.user?.companyId;
+    if (!companyId) {
+      return res.status(400).json({ success: false, message: 'Company context required' });
+    }
     const actorId = req.user?.id || req.user?._id;
     const updated = await configService.saveCompanySettings(companyId, req.body, actorId, req);
-    const bundle = await configService.getActiveConfigBundle(companyId);
+    let bundle = null;
+    try {
+      bundle = await configService.getActiveConfigBundle(companyId);
+    } catch (bundleErr) {
+      console.warn('[config] bundle refresh after settings save:', bundleErr.message);
+    }
     res.status(200).json({ success: true, data: updated, bundle });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error('[config] saveCompanySettings:', err);
+    res.status(500).json({ success: false, message: err.message || 'Failed to save settings' });
   }
 };
 

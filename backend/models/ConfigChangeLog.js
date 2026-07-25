@@ -12,7 +12,7 @@ const ConfigChangeLogSchema = new mongoose.Schema({
     required: true,
     enum: [
       'module', 'form', 'column', 'bill', 'featureFlag',
-      'company', 'pricingRule', 'notification', 'report', 'permission'
+      'company', 'settings', 'pricingRule', 'notification', 'report', 'permission'
     ]
   },
   configKey: { type: String, required: true },
