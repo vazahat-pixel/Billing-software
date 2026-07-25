@@ -58,8 +58,11 @@ const PurchaseSchema = new mongoose.Schema({
     dis1Amt: { type: Number, default: 0 },
     dis2Per: { type: Number, default: 0 },
     dis2Amt: { type: Number, default: 0 },
+    addAmt: { type: Number, default: 0 },
+    unit: { type: String, default: 'MTRS' },
     gstPer: { type: Number, default: 0 },
     gstAmt: { type: Number, default: 0 },
+    desc: { type: String, default: '' },
     lotId: String // Generated on save — string lotId for InventoryLot.lotId field
   }],
   // Standardized to match Sales model — previously was `totalAmount` (confusing)

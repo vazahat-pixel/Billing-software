@@ -113,18 +113,32 @@ class SalesService {
       const sales = new Sales(salesData);
       await sales.save({ session });
 
-      // Stock: every sold line must deduct from a lot (prevents books without stock movement)
+      // Stock: deduct from selected lot, or FIFO-auto-allocate when UI omits lotId
       if (!skipStock) {
-        const { applyLotMovement, loadLotForUpdate } = require('../utils/inventoryStockHelper');
+        const {
+          applyLotMovement,
+          loadLotForUpdate,
+          pickLotForSale,
+        } = require('../utils/inventoryStockHelper');
         for (const item of salesData.items || []) {
           const qty = Number(item.mts || 0) || Number(item.pcs || 0);
           if (qty <= 0 && !item.itemId && !item.desc) continue;
-          if (!item.lotId) {
-            throw new Error(
-              'Stock lot is required on every sales line. Select a lot so stock and ledger stay correct.'
+          let lot;
+          if (item.lotId) {
+            lot = await loadLotForUpdate(session, item.lotId, companyId);
+          } else {
+            if (!item.itemId) {
+              throw new Error('Item is required on every sales line for stock deduction');
+            }
+            lot = await pickLotForSale(
+              session,
+              companyId,
+              item.itemId,
+              item.mts || 0,
+              item.pcs || 0
             );
+            item.lotId = lot._id;
           }
-          const lot = await loadLotForUpdate(session, item.lotId, companyId);
           await applyLotMovement({
             session,
             lot,
@@ -137,6 +151,9 @@ class SalesService {
             remarks: `Sales Inv: ${sales.invoiceNo}`,
           });
         }
+        // Persist auto-allocated lotIds on the invoice lines
+        sales.items = salesData.items;
+        await sales.save({ session });
       }
 
       const accountingService = require('./accountingService');

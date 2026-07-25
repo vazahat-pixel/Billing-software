@@ -28,6 +28,7 @@ export default function ERPCombobox({
   debounceMs = 180,
   emptyMessage = 'No matches',
   allowClear = false,
+  openOnEnter = false,
   'data-enter-nav': enterNav,
 }) {
   const inputId = useId();
@@ -181,6 +182,14 @@ export default function ERPCombobox({
     }
 
     if (e.key === 'Enter') {
+      if (!open && openOnEnter) {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(true);
+        setQuery('');
+        setActiveIdx(0);
+        return;
+      }
       if (open && listCount > 0) {
         e.preventDefault();
         e.stopPropagation();
@@ -192,6 +201,14 @@ export default function ERPCombobox({
         }
         const opt = filtered[activeIdx];
         if (opt) selectOption(opt);
+        return;
+      }
+      if (open && showCreate && query.trim()) {
+        e.preventDefault();
+        e.stopPropagation();
+        onCreateNew(query.trim());
+        setOpen(false);
+        setQuery('');
         return;
       }
       /* closed: let global Enter-nav move to next field */

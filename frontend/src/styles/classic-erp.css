@@ -622,6 +622,11 @@
   max-height: calc(100vh - 24px) !important;
 }
 
+.classic-erp-window.erp-sales-bill-compact {
+  max-height: none !important;
+  height: 100% !important;
+}
+
 .classic-erp-body {
   padding: 12px 14px 16px !important;
   overflow-x: hidden;

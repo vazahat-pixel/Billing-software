@@ -104,6 +104,99 @@ async function loadLotForUpdate(session, lotOid, companyId) {
   return lot;
 }
 
+/**
+ * Create an opening lot so sales can post when purchase stock was never entered.
+ * Qty matches the bill line; after SALE movement remaining becomes 0.
+ */
+async function createOpeningLotForSale(session, companyId, itemId, needMts = 0, needPcs = 0) {
+  const mts = Math.max(Number(needMts) || 0, 0);
+  const pcs = Math.max(Number(needPcs) || 0, 0);
+  // Ensure lot has something to deduct (applyLotMovement blocks negative)
+  const totalMtrs = mts > 0 ? mts : pcs > 0 ? 0 : 0.001;
+  const totalPcs = pcs;
+  const lotId = `OPEN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+  const [lot] = await InventoryLot.create(
+    [
+      {
+        companyId,
+        itemId,
+        lotId,
+        source: 'opening',
+        totalMtrs,
+        remainingMtrs: totalMtrs,
+        totalPcs,
+        remainingPcs: totalPcs,
+        status: 'Available',
+        holdStatus: 'None',
+        reservedMtrs: 0,
+        reservedPcs: 0,
+      },
+    ],
+    { session }
+  );
+
+  // Lot qty is already on hand — SALE movement will post when invoice deducts.
+  // Do not create StockMovement here: referenceId is required and sale id is not known yet.
+
+  return lot;
+}
+
+/**
+ * FIFO pick an open lot for a sales line when UI does not send lotId.
+ * If no purchase stock exists (or not enough), auto-creates an opening lot
+ * so the sales bill can still be saved.
+ */
+async function pickLotForSale(session, companyId, itemId, needMts = 0, needPcs = 0) {
+  if (!itemId) {
+    throw AppError.badRequest('Item is required to allocate stock');
+  }
+  const qtyMts = Number(needMts || 0);
+  const qtyPcs = Number(needPcs || 0);
+  const lots = await InventoryLot.find({
+    companyId,
+    itemId,
+    isDeleted: { $ne: true },
+    status: { $nin: ['Closed', 'Exhausted'] },
+    $or: [{ holdStatus: { $exists: false } }, { holdStatus: 'None' }, { holdStatus: null }],
+  })
+    .sort({ createdAt: 1 })
+    .session(session);
+
+  const candidates = lots.filter((lot) => {
+    try {
+      assertLotIssuable(lot);
+    } catch {
+      return false;
+    }
+    return availableMtrs(lot) > 0.0001 || availablePcs(lot) > 0;
+  });
+
+  if (!candidates.length) {
+    return createOpeningLotForSale(session, companyId, itemId, qtyMts, qtyPcs);
+  }
+
+  let best =
+    candidates.find(
+      (lot) =>
+        availableMtrs(lot) + 0.0001 >= qtyMts && availablePcs(lot) >= qtyPcs
+    ) || null;
+
+  if (!best && qtyMts > 0) {
+    best = candidates.find((lot) => availableMtrs(lot) + 0.0001 >= qtyMts) || null;
+  }
+  if (!best) {
+    best = candidates[0];
+  }
+
+  if (qtyMts > 0 && availableMtrs(best) + 0.0001 < qtyMts) {
+    // Not enough on existing lots — open stock for this bill line
+    return createOpeningLotForSale(session, companyId, itemId, qtyMts, qtyPcs);
+  }
+
+  return best;
+}
+
 async function reverseSaleStock(session, sale, companyId) {
   if (sale.stockFromChallan) return;
   for (const item of sale.items || []) {
@@ -168,6 +261,8 @@ module.exports = {
   assertLotIssuable,
   applyLotMovement,
   loadLotForUpdate,
+  pickLotForSale,
+  createOpeningLotForSale,
   reverseSaleStock,
   reversePurchaseStock,
 };

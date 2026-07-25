@@ -11,9 +11,19 @@ const outstandingRefresh = require('./outstandingRefreshService');
 const { availableMtrs, assertLotIssuable } = require('../utils/inventoryStockHelper');
 
 /** Indian GSTIN: 15 chars, state(2)+PAN(10)+entity(1)+Z+check(1) */
+function normalizeGstinInput(gstin) {
+  return String(gstin || '')
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, '')
+    .trim();
+}
+
 function isValidGstin(gstin) {
-  if (!gstin || !String(gstin).trim()) return true; // empty allowed (unregistered)
-  return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(String(gstin).toUpperCase());
+  const g = normalizeGstinInput(gstin);
+  if (!g) return true; // empty / cleared = unregistered OK
+  // Placeholder junk often typed in masters — treat as empty for bill save
+  if (['NA', 'N/A', 'NIL', 'NULL', '0', 'NONE', 'UNREGISTERED'].includes(g)) return true;
+  return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(g);
 }
 
 /**
@@ -53,8 +63,15 @@ async function validateBusiness(context = {}) {
       if (party.status && party.status === 'Inactive') {
         pushErr('PARTY_INACTIVE', `Party ${party.name} is Inactive`);
       }
-      if (party.gstin && !isValidGstin(party.gstin)) {
-        pushErr('INVALID_GSTIN', `Invalid GSTIN format: ${party.gstin}`);
+      const gstinNorm = normalizeGstinInput(party.gstin);
+      if (gstinNorm && !isValidGstin(gstinNorm)) {
+        // Sales/Purchase bills must still save — warn only (masters often have incomplete GSTIN)
+        const msg = `Party GSTIN looks invalid (${party.gstin}). Bill will save; fix GSTIN in Account Master when possible.`;
+        if (module === 'sales' || module === 'purchase') {
+          pushWarn('INVALID_GSTIN', msg);
+        } else {
+          pushErr('INVALID_GSTIN', `Invalid GSTIN format: ${party.gstin}`);
+        }
       }
       if (module === 'sales' && action === 'create' && party.creditLimit > 0) {
         const bal = await outstandingRefresh.refreshPartyOutstanding(companyId, partyId);

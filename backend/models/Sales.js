@@ -76,7 +76,15 @@ const SalesSchema = new mongoose.Schema({
     fold: { type: Number, default: 0 },
     cut: { type: Number, default: 0 },
     dis1Per: { type: Number, default: 0 },
-    dis1Amt: { type: Number, default: 0 }
+    dis1Amt: { type: Number, default: 0 },
+    dis2Per: { type: Number, default: 0 },
+    dis2Amt: { type: Number, default: 0 },
+    mrp: { type: Number, default: 0 },
+    rdPer: { type: Number, default: 0 },
+    addAmt: { type: Number, default: 0 },
+    gstPer: { type: Number, default: 0 },
+    gstAmt: { type: Number, default: 0 },
+    unit: { type: String, default: 'MTRS' }
   }],
   taxableAmount: {
     type: Number,

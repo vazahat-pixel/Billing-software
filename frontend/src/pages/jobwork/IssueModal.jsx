@@ -43,11 +43,27 @@ const emptyFooter = () => ({
   chargesRate: '',
 });
 
+/** Lots created by a purchase bill (by purchaseId and/or string LOT-… codes). */
+const findLotsFromPurchase = (lots, data) => {
+  if (!data) return [];
+  const purchaseId = data.purchaseId != null ? String(data.purchaseId) : '';
+  const codes = new Set((data.lotCodes || []).map((c) => String(c)).filter(Boolean));
+  return (lots || []).filter((lot) => {
+    if (Number(lot.remainingMtrs || 0) <= 0) return false;
+    if (lot.status === 'Closed') return false;
+    if (lot.holdStatus && lot.holdStatus !== 'None') return false;
+    const pid = lot.purchaseId?._id || lot.purchaseId;
+    if (purchaseId && pid && String(pid) === purchaseId) return true;
+    if (codes.size && codes.has(String(lot.lotId || ''))) return true;
+    return false;
+  });
+};
+
 /**
  * Mill Issue — grey / stock lot nikal ke job worker / mill pe bhejna.
  * Backend requires: lotId, workerId, processType, issueQty, issuePcs.
  */
-const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
+const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }) => {
   const {
     parties,
     inventoryLots,
@@ -70,27 +86,76 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
   const [issueQty, setIssueQty] = useState('');
   const [selectedJobId, setSelectedJobId] = useState('');
   const [accountModal, setAccountModal] = useState({ open: false, initialData: null });
+  /** When opened from Purchase save — keep context to filter lots + auto-pick next after save */
+  const [fromPurchase, setFromPurchase] = useState(null);
 
   const locked = mode === 'View';
+
+  const applyLotSelection = (lotId, lotsList) => {
+    setSelectedLotId(lotId);
+    const lot = (lotsList || []).find((l) => (l._id || l.id) === lotId);
+    if (lot) {
+      setIssuePcs(String(lot.remainingPcs || 0));
+      setIssueQty(String(lot.remainingMtrs || 0));
+    } else {
+      setIssuePcs('');
+      setIssueQty('');
+    }
+  };
+
+  const applyPurchasePrefill = (data, lots) => {
+    if (!data?.purchaseId && !(data?.lotCodes || []).length) {
+      setFromPurchase(null);
+      return;
+    }
+    setFromPurchase({
+      purchaseId: data.purchaseId,
+      invoiceNo: data.invoiceNo,
+      lotCodes: data.lotCodes || [],
+    });
+    const matched = findLotsFromPurchase(lots, data);
+    if (matched.length) {
+      applyLotSelection(matched[0]._id || matched[0].id, matched);
+      toast.success(
+        matched.length === 1
+          ? `Lot loaded from Purchase ${data.invoiceNo || ''}`.trim()
+          : `${matched.length} lots from Purchase ${data.invoiceNo || ''} — first lot selected`
+      );
+    } else {
+      toast.info('Purchase stock not in inventory yet — pick lot manually or refresh');
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) {
       setBootLoading(false);
+      setFromPurchase(null);
       return;
     }
     let cancelled = false;
     setBootLoading(true);
+    setMode('Add');
+    setHeader(emptyHeader(selectedBook));
+    setFooter(emptyFooter());
+    setSelectedLotId('');
+    setIssuePcs('');
+    setIssueQty('');
+    setSelectedJobId('');
     Promise.all([fetchParties(), fetchInventory(), fetchJobs()])
+      .then((results) => {
+        if (cancelled) return;
+        const lots = results[1] || [];
+        if (initialData) applyPurchasePrefill(initialData, lots);
+      })
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setBootLoading(false);
       });
-    handleNew();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, selectedBook]);
+  }, [isOpen, selectedBook, initialData]);
 
   const workers = useMemo(
     () =>
@@ -122,28 +187,39 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
     [jobWorkEntries]
   );
 
-  const availableLots = useMemo(
-    () =>
-      (inventoryLots || []).filter(
-        (lot) =>
-          Number(lot.remainingMtrs || 0) > 0 &&
-          lot.status !== 'Closed' &&
-          (lot.holdStatus === 'None' || !lot.holdStatus)
-      ),
-    [inventoryLots]
+  const purchaseLots = useMemo(
+    () => findLotsFromPurchase(inventoryLots, fromPurchase),
+    [inventoryLots, fromPurchase]
   );
+
+  const availableLots = useMemo(() => {
+    const open = (inventoryLots || []).filter(
+      (lot) =>
+        Number(lot.remainingMtrs || 0) > 0 &&
+        lot.status !== 'Closed' &&
+        (lot.holdStatus === 'None' || !lot.holdStatus)
+    );
+    if (!fromPurchase || !purchaseLots.length) return open;
+    // Prefer purchase lots first in the list
+    const purchaseIds = new Set(purchaseLots.map((l) => String(l._id || l.id)));
+    const rest = open.filter((l) => !purchaseIds.has(String(l._id || l.id)));
+    return [...purchaseLots, ...rest];
+  }, [inventoryLots, fromPurchase, purchaseLots]);
 
   const lotOptions = useMemo(
     () =>
       availableLots.map((lot) => {
         const id = lot._id || lot.id;
         const name = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || 'Item';
+        const fromPur =
+          fromPurchase &&
+          purchaseLots.some((p) => String(p._id || p.id) === String(id));
         return {
           value: id,
-          label: `${lot.lotId || id.slice(-6)} · ${name} · Bal ${Number(lot.remainingMtrs || 0).toFixed(2)} mts / ${lot.remainingPcs || 0} pcs`,
+          label: `${fromPur ? '★ ' : ''}${lot.lotId || id.slice(-6)} · ${name} · Bal ${Number(lot.remainingMtrs || 0).toFixed(2)} mts / ${lot.remainingPcs || 0} pcs`,
         };
       }),
-    [availableLots]
+    [availableLots, fromPurchase, purchaseLots]
   );
 
   const processOptions = useMemo(
@@ -200,15 +276,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
   };
 
   const handleSelectLot = (lotId) => {
-    setSelectedLotId(lotId);
-    const lot = availableLots.find((l) => (l._id || l.id) === lotId);
-    if (lot) {
-      setIssuePcs(String(lot.remainingPcs || 0));
-      setIssueQty(String(lot.remainingMtrs || 0));
-    } else {
-      setIssuePcs('');
-      setIssueQty('');
-    }
+    applyLotSelection(lotId, availableLots);
   };
 
   const handleSelectJob = (id) => {
@@ -276,9 +344,21 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
         baleNo: footer.baleNo || undefined,
       });
       toast.success('Mill Issue saved — stock reduced from lot');
-      await Promise.all([fetchJobs(), fetchInventory()]);
-      handleNew();
-      setMode('View');
+      const [, lots] = await Promise.all([fetchJobs(), fetchInventory()]);
+      const remaining = fromPurchase ? findLotsFromPurchase(lots || [], fromPurchase) : [];
+      if (remaining.length) {
+        // Keep mill party / process; load next purchase lot
+        setMode('Add');
+        setFooter(emptyFooter());
+        setSelectedJobId('');
+        setHeader((h) => ({ ...emptyHeader(selectedBook), workerId: h.workerId, gstin: h.gstin, address: h.address, processType: h.processType, broker: h.broker }));
+        applyLotSelection(remaining[0]._id || remaining[0].id, remaining);
+        toast.success(`Next lot from purchase ready (${remaining.length} left)`);
+      } else {
+        if (fromPurchase) setFromPurchase(null);
+        handleNew();
+        setMode('View');
+      }
     } catch (err) {
       toast.error(err, { fallback: 'Failed to save mill issue' });
     } finally {
@@ -431,6 +511,17 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null }) => {
           {/* Stock lot picker */}
           <div className="classic-erp-frame classic-erp-stack">
             <span className="classic-erp-frame-title">Select Stock Lot (Inventory → Issue)</span>
+            {fromPurchase && (
+              <div
+                className="px-2 py-1.5 text-[11px] font-semibold rounded"
+                style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0' }}
+              >
+                From Purchase {fromPurchase.invoiceNo || ''}
+                {purchaseLots.length
+                  ? ` — ${purchaseLots.length} lot(s) loaded (★). Qty/Pcs filled; select Mill Party & Save.`
+                  : ' — matching stock not found yet; pick lot manually.'}
+              </div>
+            )}
             <div className="classic-erp-field classic-erp-field--lg">
               <span className="classic-erp-label red-label">Lot:</span>
               <ERPSelect

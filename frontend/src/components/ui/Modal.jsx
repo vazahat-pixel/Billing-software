@@ -35,7 +35,7 @@ const Modal = ({ isOpen, onClose, title, children, className, footer, bare = fal
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 overflow-hidden">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-1.5 sm:p-2 overflow-hidden">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -51,7 +51,7 @@ const Modal = ({ isOpen, onClose, title, children, className, footer, bare = fal
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ type: 'spring', damping: 24, stiffness: 280 }}
             className={twMerge(
-              'relative flex flex-col z-[1000] w-full max-h-[96vh] overflow-hidden border border-slate-200/80 shadow-[0_20px_50px_rgba(15,23,42,0.12)]',
+              'relative flex flex-col z-[1000] w-full max-h-[calc(100dvh-12px)] overflow-hidden border border-slate-200/80 shadow-[0_20px_50px_rgba(15,23,42,0.12)]',
               bare
                 ? 'max-w-5xl rounded-[var(--radius-card)] bg-[var(--bg-card)]'
                 : 'max-w-4xl rounded-2xl bg-[var(--bg-card)]',

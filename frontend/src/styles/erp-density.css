@@ -121,3 +121,314 @@
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 6px 10px;
 }
+
+/* ========== Sales bill: fit one viewport, keep every field ========== */
+.classic-erp-window.erp-sales-bill-compact {
+  --erp-input-h: 24px;
+  --erp-label-w: 68px;
+  --erp-frame-pad: 4px 6px;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Override global classic-erp-window max-height that clips footer */
+.classic-erp-window.erp-sales-bill-compact.classic-erp-window {
+  max-height: 100% !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-header {
+  padding: 4px 10px !important;
+  min-height: 28px !important;
+  font-size: 12px !important;
+  flex-shrink: 0 !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-body {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 4px 6px !important;
+  gap: 4px !important;
+  overflow: hidden !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-frame {
+  padding: 4px 6px !important;
+  margin: 0 !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-input,
+.classic-erp-window.erp-sales-bill-compact .classic-erp-select,
+.classic-erp-window.erp-sales-bill-compact .erp-combobox-input {
+  height: 24px !important;
+  min-height: 24px !important;
+  font-size: 11px !important;
+  padding: 0 4px !important;
+  line-height: 1.1 !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-label {
+  font-size: 9px !important;
+  min-width: 62px !important;
+  line-height: 1.1 !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-field {
+  gap: 2px !important;
+  min-height: 24px !important;
+  align-items: center !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-bill-layout {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  min-height: 0 !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-top-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px 6px;
+  align-items: center;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-party-field {
+  grid-column: span 2;
+}
+
+/* Party left (wider) + Bill/Challan/Order right (narrow compact) */
+.classic-erp-window.erp-sales-bill-compact .classic-erp-header-split.erp-sales-top {
+  grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.85fr) !important;
+  gap: 6px 10px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-header-split > .classic-erp-header-bill {
+  order: 2 !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-header-split > .classic-erp-header-party {
+  order: 1 !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-header-bill {
+  gap: 3px !important;
+  max-width: 340px;
+  justify-self: end;
+  width: 100%;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-bill-meta,
+.classic-erp-window.erp-sales-bill-compact .erp-sales-ref-meta,
+.classic-erp-window.erp-sales-bill-compact .erp-sales-party-meta {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 2px 4px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-ref-meta .classic-erp-label {
+  min-width: 52px !important;
+  font-size: 8px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-ref-meta .classic-erp-input,
+.classic-erp-window.erp-sales-bill-compact .erp-sales-bill-meta .classic-erp-input {
+  max-width: 118px;
+  height: 22px !important;
+  min-height: 22px !important;
+  font-size: 10px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-broker-row {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.7fr) minmax(0, 1fr) !important;
+  gap: 2px 6px !important;
+  margin-top: 2px;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-broker-row .classic-erp-label {
+  min-width: 48px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-header-party {
+  gap: 3px !important;
+  min-width: 0;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid.classic-erp-table-container.erp-grid-panel {
+  max-height: min(22vh, 200px) !important;
+  flex: 1 1 0 !important;
+  min-height: 88px !important;
+  overflow: auto !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .classic-erp-table {
+  width: max-content !important;
+  min-width: 1260px !important;
+  table-layout: fixed !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-table th,
+.classic-erp-window.erp-sales-bill-compact .classic-erp-table td {
+  padding: 2px 4px !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  height: 28px !important;
+  overflow: hidden !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .classic-erp-input,
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .classic-erp-select,
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .erp-combobox-input {
+  height: 24px !important;
+  min-height: 24px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  font-size: 11px !important;
+  padding: 0 3px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid input[type='number'] {
+  -moz-appearance: textfield;
+}
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid input[type='number']::-webkit-outer-spin-button,
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Fixed column widths — no squeeze / overlap */
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-sr { width: 36px; min-width: 36px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-item { width: 168px; min-width: 168px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-desc { width: 72px; min-width: 72px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-num { width: 56px; min-width: 56px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-qty { width: 64px; min-width: 64px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-unit { width: 78px; min-width: 78px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-amt { width: 78px; min-width: 78px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-pct { width: 54px; min-width: 54px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-del { width: 28px; min-width: 28px; }
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-history {
+  max-height: 48px !important;
+  overflow: auto !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-footer {
+  gap: 4px !important;
+  flex-shrink: 1 !important;
+  min-height: 0 !important;
+  max-height: min(32vh, 260px);
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-footer > .classic-erp-frame {
+  padding: 3px 5px !important;
+  min-height: 0;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-adj-row,
+.classic-erp-window.erp-sales-bill-compact .classic-erp-total-row {
+  min-height: 20px !important;
+  gap: 3px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-stack {
+  gap: 1px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-form-footer {
+  padding: 4px 8px !important;
+  min-height: 36px !important;
+  gap: 6px !important;
+  flex-shrink: 0 !important;
+  border-top: 1px solid var(--border);
+  background: var(--bg-card, #fff);
+  z-index: 20;
+  position: relative;
+}
+
+/* Auto Bill Fill — one compact toolbar row so footer buttons stay visible */
+.classic-erp-window.erp-sales-bill-compact .erp-autofill-bar .classic-erp-frame {
+  padding: 2px 6px !important;
+  margin: 0 !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-autofill-bar .space-y-2 {
+  gap: 2px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-autofill-bar .classic-erp-btn {
+  min-height: 24px !important;
+  height: 24px !important;
+  padding: 0 8px !important;
+  font-size: 10px !important;
+}
+
+/* Dedicated action bar — always fully visible under bill body */
+.erp-bill-action-bar {
+  flex-shrink: 0 !important;
+  min-height: 40px;
+  z-index: 30;
+  box-shadow: 0 -2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.erp-bill-action-bar .classic-erp-btn {
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  min-height: 28px !important;
+  height: 28px !important;
+  white-space: nowrap;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-btn {
+  padding: 2px 8px !important;
+  font-size: 10px !important;
+  min-height: 26px !important;
+  height: 26px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-stockbar {
+  min-height: 20px;
+  flex-shrink: 0;
+}
+
+/* Net amount always readable */
+.classic-erp-window.erp-sales-bill-compact .erp-sales-footer .classic-erp-total-row:last-child {
+  position: sticky;
+  bottom: 0;
+  background: var(--accent-light, #fef3c7);
+  z-index: 1;
+}
+
+@media (max-width: 1280px) {
+  .classic-erp-window.erp-sales-bill-compact .erp-sales-top-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .classic-erp-window.erp-sales-bill-compact .erp-sales-party-field {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 900px) {
+  .classic-erp-window.erp-sales-bill-compact .erp-sales-top-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .classic-erp-window.erp-sales-bill-compact .erp-sales-party-field {
+    grid-column: span 2;
+  }
+  .classic-erp-window.erp-sales-bill-compact .classic-erp-body {
+    overflow-y: auto !important;
+  }
+}

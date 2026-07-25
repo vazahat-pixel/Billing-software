@@ -17,9 +17,11 @@ import { resolveParty, buildWhatsAppMessage, openWhatsAppShare } from '../../uti
 import { getFocusableElements } from '../../utils/formEnterNavigation';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import useConfigStore from '../../store/useConfigStore';
+import { calcSalesBillTotals } from '../../utils/salesBillCalc';
 import { resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
 
 const today = () => new Date().toISOString().split('T')[0];
+const DEFAULT_UNITS = ['MTRS', 'PCS', 'KGS', 'ROLL', 'NETQTY'];
 
 const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, readOnly = false }) => {
   const {
@@ -68,9 +70,53 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     gstType: 'CGST+SGST'
   });
 
+  const patchLine = (idx, patch) => {
+    setGridItems((prev) => {
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], ...patch };
+      return updated;
+    });
+  };
+
+  const recalcLine = (row) => ({
+    ...row,
+    amount: Number(row.amount || 0),
+    dis1Per: Number(row.dis1Per || 0),
+    dis1Amt: Number(row.dis1Amt || 0),
+    dis2Per: Number(row.dis2Per || 0),
+    dis2Amt: Number(row.dis2Amt || 0),
+    addAmt: Number(row.addAmt || 0),
+    gstPer: Number(row.gstPer || 0),
+    gstAmt: Number(row.gstAmt || 0),
+  });
+
+  const blankLine = () => ({
+    id: Date.now(),
+    itemId: '',
+    itemName: '',
+    desc: '',
+    fold: 0,
+    cut: 0,
+    pcs: 0,
+    mts: 0,
+    saleRate: 0,
+    unit: 'MTRS',
+    mrp: 0,
+    rdPer: 0,
+    amount: 0,
+    dis1Per: 0,
+    dis1Amt: 0,
+    dis2Per: 0,
+    dis2Amt: 0,
+    addAmt: 0,
+    gstPer: 0,
+    gstAmt: 0,
+  });
+
   const [gridItems, setGridItems] = useState([
-    { id: 1, itemId: '', itemName: '', desc: '', lotId: '', fold: 0, cut: 0, pcs: 0, mts: 0, saleRate: 0, mrp: 0, rdPer: 0, amount: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0 }
+    { id: 1, itemId: '', itemName: '', desc: '', fold: 0, cut: 0, pcs: 0, mts: 0, saleRate: 0, unit: 'MTRS', mrp: 0, rdPer: 0, amount: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0, addAmt: 0, gstPer: 0, gstAmt: 0 }
   ]);
+  const [extraUnits, setExtraUnits] = useState([]);
 
   const [footer, setFooter] = useState({
     transport: '',
@@ -178,24 +224,27 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       gstType: inv.gstType || 'CGST+SGST'
     });
 
-    setGridItems(inv.items.map((item, idx) => ({
+    setGridItems(inv.items.map((item, idx) => recalcLine({
       id: idx + 1,
       itemId: item.itemId?._id || item.itemId || '',
       itemName: item.itemName || item.itemId?.itemName || item.itemId?.name || '',
       desc: item.desc || '',
-      lotId: item.lotId || '',
       fold: item.fold || 0,
       cut: item.cut || 0,
       pcs: item.pcs || 0,
       mts: item.mts || 0,
       saleRate: item.rate || 0,
+      unit: item.unit || item.itemId?.unit || 'MTRS',
       mrp: item.mrp || 0,
       rdPer: item.rdPer || 0,
       amount: item.amount || 0,
       dis1Per: item.dis1Per || 0,
       dis1Amt: item.dis1Amt || 0,
       dis2Per: item.dis2Per || 0,
-      dis2Amt: item.dis2Amt || 0
+      dis2Amt: item.dis2Amt || 0,
+      addAmt: item.addAmt || 0,
+      gstPer: item.gstPer ?? item.itemId?.gstRate ?? 0,
+      gstAmt: item.gstAmt || 0,
     })));
 
     setFooter({
@@ -259,48 +308,10 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     }
   }, [header.billDate, footer.dueDays]);
 
-  const calculations = useMemo(() => {
-    let gross = 0;
-    gridItems.forEach(item => {
-      let itemAmt = (parseFloat(item.mts || 0) * parseFloat(item.saleRate || 0)) - parseFloat(item.dis1Amt || 0);
-      gross += itemAmt;
-    });
-
-    let totalAdd = 0;
-    let totalLess = 0;
-
-    const adjust = (val, sign) => {
-      const parsed = parseFloat(val || 0);
-      if (sign === '+') {
-        totalAdd += parsed;
-        return parsed;
-      } else {
-        totalLess += parsed;
-        return -parsed;
-      }
-    };
-
-    let taxable = gross;
-    taxable += adjust(footer.foldLess, footer.foldLessSign);
-    taxable += adjust(footer.rdAmt, footer.rdAmtSign);
-    taxable += adjust(footer.discountAmt, footer.discountSign);
-    taxable += adjust(footer.lessAmt, footer.lessSign);
-    taxable += adjust(footer.addAmt, footer.addSign);
-
-    const isInState = header.type === 'INVOICE IN STATE';
-    const cgst = isInState ? taxable * (gstRates.cgstRate / 100) : 0;
-    const sgst = isInState ? taxable * (gstRates.sgstRate / 100) : 0;
-    const igst = !isInState ? taxable * (gstRates.igstRate / 100) : 0;
-    const gstAmt = cgst + sgst + igst;
-
-    const tcsAmt = taxable * (footer.tcsRate / 100);
-    const roundOff = footer.roundOff || 0;
-
-    const subTotal = taxable + gstAmt + tcsAmt;
-    const net = subTotal + parseFloat(roundOff);
-
-    return { gross, taxable, cgst, sgst, igst, gstAmt, tcsAmt, totalAdd, totalLess, net };
-  }, [gridItems, footer, header.type, gstRates]);
+  const calculations = useMemo(
+    () => calcSalesBillTotals(gridItems, footer, header, gstRates),
+    [gridItems, footer, header, gstRates]
+  );
 
   const currentItemInfo = useMemo(() => {
     if (!activeItemId) return null;
@@ -400,7 +411,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       gstType: 'CGST+SGST'
     });
     setGridItems([
-      { id: 1, itemId: '', itemName: '', desc: '', lotId: '', fold: 0, cut: 0, pcs: 0, mts: 0, saleRate: 0, mrp: 0, rdPer: 0, amount: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0 }
+      { id: 1, itemId: '', itemName: '', desc: '', fold: 0, cut: 0, pcs: 0, mts: 0, saleRate: 0, unit: 'MTRS', mrp: 0, rdPer: 0, amount: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0, addAmt: 0, gstPer: 0, gstAmt: 0 }
     ]);
     setFooter({
       transport: '',
@@ -433,12 +444,49 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const handleSave = async (e) => {
     if (e) e.preventDefault();
     if (saving) return;
-    if (!header.party) return toast.error('Please select a customer first');
-    const validLines = gridItems.filter(i => (i.itemId || i.desc) && (Number(i.mts || i.pcs || 0) > 0 || Number(i.saleRate || i.rate || 0) > 0));
-    if (validLines.length === 0) return toast.error('Please add at least one line item with Quantity and Sale Rate');
-    const missingLot = validLines.find((i) => !i.lotId);
-    if (missingLot) {
-      return toast.error('Select Stock Lot on every line. Without lot, stock will not reduce correctly.');
+    if (!header.party) return toast.error('Party is required');
+    if (!header.billNo) return toast.error('Bill No is required');
+    if (!header.billDate) return toast.error('Bill Date is required');
+    if (!header.type) return toast.error('Invoice Type is required');
+    if (showChallan && !String(header.challanNo || '').trim()) {
+      return toast.error('Challan No is required');
+    }
+    if (showChallan && !header.chDate) return toast.error('Challan Date is required');
+    if (billFields.header('orderNo') && !String(header.orderNo || '').trim()) {
+      return toast.error('Order No is required');
+    }
+    if (billFields.header('orderDate') && !header.orderDate) {
+      return toast.error('Order Date is required');
+    }
+    if (showBroker && !header.broker) return toast.error('Broker is required');
+    if (billFields.footer('transport') && !String(footer.transport || '').trim()) {
+      return toast.error('Transport is required');
+    }
+    if (!String(footer.station || '').trim()) return toast.error('City is required');
+    if (billFields.footer('lrNo') && !String(footer.lrNo || '').trim()) {
+      return toast.error('Lr No is required');
+    }
+    if (!footer.lrDate) return toast.error('Lr Date is required');
+    if (billFields.footer('bale') && !String(footer.baleNo || '').trim()) {
+      return toast.error('Bale No is required');
+    }
+    if (billFields.footer('weight') && !(Number(footer.weight) > 0)) {
+      return toast.error('Weight is required');
+    }
+    if (!String(footer.remarks || '').trim()) return toast.error('Remark is required');
+
+    const validLines = gridItems.filter((i) => i.itemId || i.desc || Number(i.mts) || Number(i.pcs) || Number(i.saleRate));
+    if (validLines.length === 0) {
+      return toast.error('Please add at least one item line');
+    }
+    for (let i = 0; i < validLines.length; i += 1) {
+      const line = validLines[i];
+      const n = i + 1;
+      if (!line.itemId) return toast.error(`Item Name is required on line ${n}`);
+      if (!String(line.desc || '').trim()) return toast.error(`Desc is required on line ${n}`);
+      if (!(Number(line.pcs) > 0)) return toast.error(`Pcs is required on line ${n}`);
+      if (!(Number(line.mts) > 0)) return toast.error(`Mts is required on line ${n} (enter meters manually)`);
+      if (!(Number(line.saleRate) > 0)) return toast.error(`Rate is required on line ${n}`);
     }
     setSaving(true);
 
@@ -482,7 +530,6 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         totalAdd: calculations.totalAdd,
         totalLess: calculations.totalLess,
         items: validLines.map(i => ({
-          lotId: i.lotId || null,
           itemId: i.itemId,
           desc: i.desc,
           fold: Number(i.fold || 0),
@@ -490,13 +537,17 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           pcs: Number(i.pcs || 0),
           mts: Number(i.mts || 0),
           rate: Number(i.saleRate || i.rate || 0),
+          unit: i.unit || 'MTRS',
           mrp: Number(i.mrp || 0),
           rdPer: Number(i.rdPer || 0),
           amount: Number(i.amount || 0),
           dis1Per: Number(i.dis1Per || 0),
           dis1Amt: Number(i.dis1Amt || 0),
           dis2Per: Number(i.dis2Per || 0),
-          dis2Amt: Number(i.dis2Amt || 0)
+          dis2Amt: Number(i.dis2Amt || 0),
+          addAmt: Number(i.addAmt || 0),
+          gstPer: Number(i.gstPer || 0),
+          gstAmt: Number(i.gstAmt || 0)
         })),
         taxableAmount: calculations.taxable,
         gstAmount: calculations.gstAmt,
@@ -613,6 +664,21 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     [items]
   );
 
+  const unitOptions = useMemo(() => {
+    const fromItems = items.map((i) => String(i.unit || '').trim().toUpperCase()).filter(Boolean);
+    const fromLines = gridItems.map((r) => String(r.unit || '').trim().toUpperCase()).filter(Boolean);
+    const all = [...DEFAULT_UNITS, ...fromItems, ...fromLines, ...extraUnits.map((u) => String(u).toUpperCase())];
+    return [...new Set(all)].map((u) => ({ value: u, label: u }));
+  }, [items, gridItems, extraUnits]);
+
+  const handleCreateUnit = (name, idx) => {
+    const u = String(name || '').trim().toUpperCase();
+    if (!u) return;
+    setExtraUnits((prev) => (prev.includes(u) ? prev : [...prev, u]));
+    patchLine(idx, { unit: u });
+    toast.success(`Unit "${u}" added`);
+  };
+
   const onPartySelect = (val, opt) => {
     if (!val) {
       setHeader({ ...header, party: '', add: '', gstin: '', city: '' });
@@ -638,64 +704,27 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const onGridItemSelect = (val, idx) => {
     if (!val) return;
     const item = items.find((i) => (i._id || i.id) === val);
-    const openLots = (inventoryLots || [])
-      .filter((lot) => {
-        const lid = lot.itemId?._id || lot.itemId || '';
-        if (String(lid) !== String(val)) return false;
-        const st = String(lot.status || 'Available').toLowerCase();
-        if (st === 'closed' || st === 'exhausted') return false;
-        return Number(lot.remainingMtrs ?? lot.mts ?? 0) > 0;
-      })
-      .sort(
-        (a, b) =>
-          Number(b.remainingMtrs ?? b.mts ?? 0) - Number(a.remainingMtrs ?? a.mts ?? 0)
-      );
-    const best = openLots[0];
-    const updated = [...gridItems];
-    updated[idx] = {
-      ...updated[idx],
+    const gstPer = Number(item?.gstRate ?? gridItems[idx].gstPer ?? 0);
+    const unit = String(item?.unit || gridItems[idx].unit || 'MTRS').toUpperCase();
+    patchLine(idx, {
       itemId: val,
       itemName: item?.itemName || item?.name || '',
-      saleRate: item?.salesRate || best?.rate || updated[idx].saleRate || 0,
-      lotId: best?._id || best?.id || '',
-    };
-    setGridItems(updated);
+      saleRate: item?.salesRate || gridItems[idx].saleRate || 0,
+      gstPer,
+      unit,
+    });
     setActiveItemId(val);
-  };
-
-  const openLotsForItem = (itemId) => {
-    if (!itemId) return [];
-    return (inventoryLots || [])
-      .filter((lot) => {
-        const lid = lot.itemId?._id || lot.itemId || '';
-        if (String(lid) !== String(itemId)) return false;
-        const st = String(lot.status || 'Available').toLowerCase();
-        if (st === 'closed' || st === 'exhausted' || st === 'reserved') return false;
-        const mts = Number(lot.remainingMtrs ?? lot.mts ?? lot.qty ?? 0);
-        const pcs = Number(lot.remainingPcs ?? lot.pcs ?? 0);
-        return mts > 0 || pcs > 0;
-      })
-      .sort(
-        (a, b) =>
-          Number(b.remainingMtrs ?? b.mts ?? 0) - Number(a.remainingMtrs ?? a.mts ?? 0)
-      );
-  };
-
-  const lotOptionLabel = (lot) => {
-    const no = lot.lotId || lot.lotNo || String(lot._id || lot.id).slice(-6);
-    const mts = Number(lot.remainingMtrs ?? lot.mts ?? 0).toFixed(2);
-    const pcs = Number(lot.remainingPcs ?? lot.pcs ?? 0);
-    return `${no} · ${mts} mts${pcs ? ` / ${pcs} pcs` : ''}`;
   };
 
   return (
     <>
-    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-7xl">
-      <div className="classic-erp-window erp-density flex flex-col h-full">
+    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[98vw] w-[98vw] !h-[calc(100dvh-16px)] !max-h-[calc(100dvh-16px)] flex flex-col">
+      <div className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-card)]">
+      <div className="classic-erp-window erp-density erp-sales-bill-compact flex flex-col flex-1 min-h-0 overflow-hidden !max-h-none !h-auto">
         <ErpBusyOverlay show={bootLoading} message="Loading sales bill…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving invoice…" />
         {/* Title Bar */}
-        <div className="classic-erp-header">
+        <div className="classic-erp-header shrink-0">
           <span>Sales Invoice [ {header.book} ]</span>
           <span className="text-xs font-mono opacity-90">
             T.Sales: <strong>{sales.reduce((a, s) => a + (s.netAmount || 0), 0).toFixed(0)}</strong>
@@ -705,11 +734,11 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           <button className="classic-erp-close-btn" onClick={onClose}>X</button>
         </div>
 
-        {/* Form Body */}
-        <div ref={modalContainerRef} className="classic-erp-body flex-1 overflow-y-auto space-y-3 erp-bill-layout">
+        {/* Form Body — scrolls inside; action bar stays fixed below */}
+        <div ref={modalContainerRef} className="classic-erp-body flex-1 min-h-0 overflow-y-auto overflow-x-hidden erp-bill-layout">
           
           {mode === 'View' && (
-            <div className="classic-erp-frame flex gap-3 items-center">
+            <div className="classic-erp-frame flex gap-2 items-center shrink-0">
               <span className="classic-erp-label blue-label font-bold">Find Invoice:</span>
               <select className="classic-erp-input flex-1" value={selectedInvoiceId} onChange={handleSelectInvoice}>
                 <option value="">- Select Invoice to View/Edit -</option>
@@ -720,12 +749,12 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             </div>
           )}
 
-          {/* Header Block — tab order: Bill No → Date → Party → rest */}
-          <div className="classic-erp-frame classic-erp-header-split">
+          {/* Header: Party (left, wider) | Bill+Challan/Order (right, compact) */}
+          <div className="classic-erp-frame classic-erp-header-split erp-sales-top shrink-0">
             <div className="classic-erp-stack classic-erp-header-bill">
-              <div className="classic-erp-meta-grid">
+              <div className="classic-erp-meta-grid erp-sales-bill-meta">
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label red-label">Bill No:</span>
+                  <span className="classic-erp-label red-label">Bill No *:</span>
                   <input
                     type="text"
                     className="classic-erp-input"
@@ -736,15 +765,44 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                   />
                 </div>
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Date:</span>
+                  <span className="classic-erp-label">Date *:</span>
                   <input type="date" className="classic-erp-input" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
                 </div>
               </div>
+
+              {(showChallan || billFields.header('orderNo') || billFields.header('orderDate')) ? (
+                <div className="classic-erp-meta-grid erp-sales-ref-meta">
+                  {showChallan ? (
+                    <>
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label">Challan *:</span>
+                        <input type="text" className="classic-erp-input" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
+                      </div>
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label">Ch Date *:</span>
+                        <input type="date" className="classic-erp-input" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
+                      </div>
+                    </>
+                  ) : null}
+                  {billFields.header('orderNo') ? (
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Order No *:</span>
+                      <input type="text" className="classic-erp-input" value={header.orderNo} onChange={e => setHeader({ ...header, orderNo: e.target.value })} disabled={locked} />
+                    </div>
+                  ) : null}
+                  {billFields.header('orderDate') ? (
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Ord Date *:</span>
+                      <input type="date" className="classic-erp-input" value={header.orderDate} onChange={e => setHeader({ ...header, orderDate: e.target.value })} disabled={locked} />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="classic-erp-stack classic-erp-header-party">
               <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label red-label">Party:</span>
+                <span className="classic-erp-label red-label">Party *:</span>
                 <div className="classic-erp-control" style={{display:'flex',alignItems:'center',gap:4}}>
                   <ERPCombobox
                     value={header.party}
@@ -759,13 +817,13 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                   />
                   {!locked && (
                     <button type="button" title="Add new party" onClick={() => handleCreateAccount('')}
-                      style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:2,padding:'3px 8px',fontSize:11,fontWeight:700,color:'#fff',background:'#16a34a',border:'none',borderRadius:4,cursor:'pointer',whiteSpace:'nowrap'}}>
-                      <Plus size={11}/> Add
+                      style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:2,padding:'2px 6px',fontSize:10,fontWeight:700,color:'#fff',background:'#16a34a',border:'none',borderRadius:3,cursor:'pointer',whiteSpace:'nowrap'}}>
+                      <Plus size={10}/> Add
                     </button>
                   )}
                 </div>
               </div>
-              <div className="classic-erp-meta-grid">
+              <div className="classic-erp-meta-grid erp-sales-party-meta">
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Gstin:</span>
                   <input type="text" className="classic-erp-input" value={header.gstin} readOnly />
@@ -775,113 +833,82 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                   <input type="text" className="classic-erp-input" value={header.city} readOnly />
                 </div>
               </div>
-            </div>
-          </div>
-
-          {(showChallan || billFields.header('orderNo') || billFields.header('orderDate')) ? (
-            <div className="classic-erp-frame classic-erp-meta-grid">
-              {showChallan ? (
-                <>
+              <div className="classic-erp-meta-grid--3 erp-sales-broker-row">
+                {showBroker ? (
                   <div className="classic-erp-field">
-                    <span className="classic-erp-label">Challan:</span>
-                    <input type="text" className="classic-erp-input" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
+                    <span className="classic-erp-label">Broker *:</span>
+                    <div style={{display:'flex',alignItems:'center',gap:4,minWidth:0}}>
+                      <ERPCombobox
+                        value={header.broker}
+                        onChange={(val) => setHeader({ ...header, broker: val })}
+                        options={brokerOptions}
+                        placeholder="Search broker…"
+                        disabled={locked}
+                        recentKey="sales-broker"
+                        onCreateNew={!locked ? (q) => handleCreateBroker(q) : undefined}
+                        createLabel="Broker"
+                      />
+                      {!locked && (
+                        <button type="button" title="Add new broker" onClick={() => handleCreateBroker('')}
+                          style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:2,padding:'2px 6px',fontSize:10,fontWeight:700,color:'#fff',background:'#16a34a',border:'none',borderRadius:3,cursor:'pointer',whiteSpace:'nowrap'}}>
+                          <Plus size={10}/> Add
+                        </button>
+                      )}
+                    </div>
                   </div>
+                ) : (
+                  <div />
+                )}
+                {billFields.header('haste') ? (
                   <div className="classic-erp-field">
-                    <span className="classic-erp-label">Ch Date:</span>
-                    <input type="date" className="classic-erp-input" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
+                    <span className="classic-erp-label">Haste:</span>
+                    <input type="text" className="classic-erp-input" value={header.haste} onChange={e => setHeader({ ...header, haste: e.target.value })} disabled={locked} />
                   </div>
-                </>
-              ) : null}
-              {billFields.header('orderNo') ? (
+                ) : (
+                  <div />
+                )}
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Order No:</span>
-                  <input type="text" className="classic-erp-input" value={header.orderNo} onChange={e => setHeader({ ...header, orderNo: e.target.value })} disabled={locked} />
-                </div>
-              ) : null}
-              {billFields.header('orderDate') ? (
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Ord Date:</span>
-                  <input type="date" className="classic-erp-input" value={header.orderDate} onChange={e => setHeader({ ...header, orderDate: e.target.value })} disabled={locked} />
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
-          {/* Broker / Haste / Type */}
-          <div className="classic-erp-frame classic-erp-meta-grid--3">
-            {showBroker ? (
-              <div className="classic-erp-field">
-                <span className="classic-erp-label">Broker:</span>
-                <div style={{display:'flex',alignItems:'center',gap:4}}>
-                  <ERPCombobox
-                    value={header.broker}
-                    onChange={(val) => setHeader({ ...header, broker: val })}
-                    options={brokerOptions}
-                    placeholder="Search broker…"
-                    disabled={locked}
-                    recentKey="sales-broker"
-                    onCreateNew={!locked ? (q) => handleCreateBroker(q) : undefined}
-                    createLabel="Broker"
-                  />
-                  {!locked && (
-                    <button type="button" title="Add new broker" onClick={() => handleCreateBroker('')}
-                      style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:2,padding:'3px 8px',fontSize:11,fontWeight:700,color:'#fff',background:'#16a34a',border:'none',borderRadius:4,cursor:'pointer',whiteSpace:'nowrap'}}>
-                      <Plus size={11}/> Add
-                    </button>
-                  )}
+                  <span className="classic-erp-label">Type *:</span>
+                  <select className="classic-erp-select" value={header.type} onChange={e => setHeader({ ...header, type: e.target.value })} disabled={locked}>
+                    <option value="INVOICE IN STATE">INVOICE IN STATE</option>
+                    <option value="INVOICE OUT OF STATE">INVOICE OUT OF STATE</option>
+                  </select>
                 </div>
               </div>
-            ) : (
-              <div />
-            )}
-            {billFields.header('haste') ? (
-            <div className="classic-erp-field">
-              <span className="classic-erp-label">Haste:</span>
-              <input type="text" className="classic-erp-input" value={header.haste} onChange={e => setHeader({ ...header, haste: e.target.value })} disabled={locked} />
-            </div>
-            ) : (
-              <div />
-            )}
-            <div className="classic-erp-field">
-              <span className="classic-erp-label">Type:</span>
-              <select className="classic-erp-select" value={header.type} onChange={e => setHeader({ ...header, type: e.target.value })} disabled={locked}>
-                <option value="INVOICE IN STATE">INVOICE IN STATE</option>
-                <option value="INVOICE OUT OF STATE">INVOICE OUT OF STATE</option>
-              </select>
             </div>
           </div>
 
           {/* Item Grid Table */}
-          <div className="classic-erp-table-container erp-grid-panel">
+          <div className="classic-erp-table-container erp-grid-panel erp-sales-grid min-h-0">
             <table className="classic-erp-table">
               <thead>
                 <tr>
-                  <th className="w-8 text-center">SrNo</th>
-                  <th className="col-item">Item Name</th>
-                  <th className="w-36 text-center" title="Stock lot is mandatory for sale">Lot *</th>
-                  <th className="col-desc">Desc</th>
-                  <th className="w-16 text-center">Fold</th>
-                  <th className="w-16 text-center">Cut</th>
-                  <th className="w-16 text-center">Pcs</th>
-                  <th className="w-20 text-center">Mts</th>
-                  <th className="w-20 text-right">Rate</th>
-                  <th className="w-16 text-center">Per/Unit</th>
-                  <th className="w-24 text-right">Amount</th>
-                  <th className="w-16 text-center">DIS1%</th>
-                  <th className="w-20 text-right">DISAM</th>
-                  <th className="w-16 text-right">Mrp</th>
-                  <th className="w-14 text-center">RD%</th>
-                  <th className="w-14 text-center">Dis2%</th>
-                  <th className="w-20 text-right">DISAM2</th>
-                  <th className="w-8"></th>
+                  <th className="col-sr text-center">Sr</th>
+                  <th className="col-item">Item Name *</th>
+                  <th className="col-desc">Desc *</th>
+                  <th className="col-num text-center">Fold</th>
+                  <th className="col-num text-center">Cut</th>
+                  <th className="col-num text-center">Pcs *</th>
+                  <th className="col-qty text-center" title="Enter meters manually — not auto-calculated">Mts *</th>
+                  <th className="col-qty text-right">Rate *</th>
+                  <th className="col-unit text-center">Per/Unit</th>
+                  <th className="col-amt text-right">Amount</th>
+                  <th className="col-pct text-center">DIS1%</th>
+                  <th className="col-amt text-right">DISAMT</th>
+                  <th className="col-pct text-center">DIS2%</th>
+                  <th className="col-amt text-right">DISAMT.</th>
+                  <th className="col-amt text-right">AddAmt</th>
+                  <th className="col-pct text-center">GST%</th>
+                  <th className="col-amt text-right">GSTAmt</th>
+                  <th className="col-del"></th>
                 </tr>
               </thead>
               <tbody>
                 {gridItems.map((row, idx) => (
                   <tr key={row.id || idx}>
-                    <td className="text-center font-bold">{idx + 1}</td>
+                    <td className="col-sr text-center font-bold">{idx + 1}</td>
                     <td className="col-item" style={{position:'relative'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:2}}>
+                      <div style={{display:'flex',alignItems:'center',gap:2,minWidth:0}}>
                         <ERPCombobox
                           value={row.itemId}
                           onChange={(val) => onGridItemSelect(val, idx)}
@@ -901,146 +928,95 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                         )}
                       </div>
                     </td>
-                    <td
-                      className="text-center"
-                      style={{
-                        background: row.itemId && !row.lotId ? 'rgba(185, 28, 28, 0.12)' : 'rgba(180, 83, 9, 0.08)',
-                        minWidth: 140,
-                      }}
-                    >
-                      <select
-                        className="classic-erp-input w-full border-0 text-xs font-bold"
-                        value={row.lotId || ''}
-                        disabled={locked || !row.itemId}
-                        title={!row.itemId ? 'Select item first' : 'Select stock lot'}
-                        onChange={(e) => {
-                          const lotId = e.target.value;
-                          const lot = (inventoryLots || []).find(
-                            (l) => String(l._id || l.id) === String(lotId)
-                          );
-                          const updated = [...gridItems];
-                          updated[idx] = {
-                            ...updated[idx],
-                            lotId,
-                            saleRate: lot?.rate || updated[idx].saleRate || 0,
-                          };
-                          setGridItems(updated);
-                          setActiveItemId(row.itemId);
-                        }}
-                        onFocus={() => row.itemId && setActiveItemId(row.itemId)}
-                        style={{
-                          color: row.lotId ? '#1e3a5f' : '#b91c1c',
-                          fontWeight: 700,
-                        }}
-                      >
-                        <option value="">
-                          {row.itemId
-                            ? openLotsForItem(row.itemId).length
-                              ? '— Select Lot —'
-                              : 'No open lot'
-                            : 'Item first'}
-                        </option>
-                        {(() => {
-                          const open = openLotsForItem(row.itemId);
-                          const ids = new Set(open.map((l) => String(l._id || l.id)));
-                          const extras = [];
-                          if (row.lotId && !ids.has(String(row.lotId))) {
-                            const cur = (inventoryLots || []).find(
-                              (l) => String(l._id || l.id) === String(row.lotId)
-                            );
-                            if (cur) extras.push(cur);
-                          }
-                          return [...extras, ...open].map((lot) => {
-                            const id = lot._id || lot.id;
-                            return (
-                              <option key={id} value={id}>
-                                {lotOptionLabel(lot)}
-                              </option>
-                            );
-                          });
-                        })()}
-                      </select>
-                    </td>
                     <td className="col-desc">
                       <input type="text" className="classic-erp-input w-full border-0" value={row.desc} onChange={e => {
-                        const updated = [...gridItems]; updated[idx].desc = e.target.value; setGridItems(updated);
+                        patchLine(idx, { desc: e.target.value });
                       }} disabled={locked} />
                     </td>
-                    <td>
+                    <td className="col-num">
                       <input type="number" className="classic-erp-input w-full text-center border-0" value={row.fold || ''} onChange={e => {
-                        const updated = [...gridItems]; updated[idx].fold = Number(e.target.value);
-                        updated[idx].mts = (updated[idx].cut || updated[idx].fold || 1) * updated[idx].pcs;
-                        updated[idx].amount = updated[idx].mts * updated[idx].saleRate;
-                        updated[idx].dis1Amt = (updated[idx].amount * updated[idx].dis1Per) / 100;
-                        setGridItems(updated);
+                        patchLine(idx, { fold: Number(e.target.value) });
                       }} disabled={locked} />
                     </td>
-                    <td>
+                    <td className="col-num">
                       <input type="number" className="classic-erp-input w-full text-center border-0" value={row.cut || ''} onChange={e => {
-                        const updated = [...gridItems]; updated[idx].cut = Number(e.target.value);
-                        updated[idx].mts = (updated[idx].cut || updated[idx].fold || 1) * updated[idx].pcs;
-                        updated[idx].amount = updated[idx].mts * updated[idx].saleRate;
-                        updated[idx].dis1Amt = (updated[idx].amount * updated[idx].dis1Per) / 100;
-                        setGridItems(updated);
+                        patchLine(idx, { cut: Number(e.target.value) });
                       }} disabled={locked} />
                     </td>
-                    <td>
+                    <td className="col-num">
                       <input type="number" className="classic-erp-input w-full text-center border-0" value={row.pcs || ''} onChange={e => {
-                        const updated = [...gridItems]; updated[idx].pcs = Number(e.target.value);
-                        updated[idx].mts = (updated[idx].cut || updated[idx].fold || 1) * updated[idx].pcs;
-                        updated[idx].amount = updated[idx].mts * updated[idx].saleRate;
-                        updated[idx].dis1Amt = (updated[idx].amount * updated[idx].dis1Per) / 100;
-                        setGridItems(updated);
+                        patchLine(idx, { pcs: Number(e.target.value) });
                       }} disabled={locked} />
                     </td>
-                    <td>
+                    <td className="col-qty">
                       <input type="number" className="classic-erp-input w-full text-center border-0" value={row.mts || ''} onChange={e => {
-                        const updated = [...gridItems]; updated[idx].mts = Number(e.target.value);
-                        updated[idx].amount = updated[idx].mts * updated[idx].saleRate;
-                        updated[idx].dis1Amt = (updated[idx].amount * updated[idx].dis1Per) / 100;
-                        setGridItems(updated);
-                      }} disabled={locked} />
+                        patchLine(idx, { mts: Number(e.target.value) });
+                      }} disabled={locked} title="Enter meters manually" />
                     </td>
-                    <td>
+                    <td className="col-qty">
                       <input type="number" className="classic-erp-input w-full text-right border-0" value={row.saleRate || ''} onChange={e => {
-                        const updated = [...gridItems]; updated[idx].saleRate = Number(e.target.value);
-                        updated[idx].amount = updated[idx].mts * updated[idx].saleRate;
-                        updated[idx].dis1Amt = (updated[idx].amount * updated[idx].dis1Per) / 100;
-                        setGridItems(updated);
+                        patchLine(idx, { saleRate: Number(e.target.value) });
                       }} disabled={locked} />
                     </td>
-                    <td className="text-center font-bold">Mts</td>
-                    <td className="text-right pr-2 font-bold font-mono">{parseFloat(row.amount || 0).toFixed(2)}</td>
-                    <td>
-                      <input type="number" className="classic-erp-input w-full text-center border-0" value={row.dis1Per || ''} onChange={e => {
-                        const updated = [...gridItems]; updated[idx].dis1Per = Number(e.target.value);
-                        updated[idx].dis1Amt = (updated[idx].amount * updated[idx].dis1Per) / 100;
-                        setGridItems(updated);
+                    <td className="col-unit">
+                      <ERPCombobox
+                        value={row.unit || 'MTRS'}
+                        onChange={(val) => patchLine(idx, { unit: String(val || 'MTRS').toUpperCase() })}
+                        options={unitOptions}
+                        placeholder="Unit…"
+                        disabled={locked}
+                        recentKey="sales-unit"
+                        openOnEnter
+                        onCreateNew={!locked ? (q) => handleCreateUnit(q, idx) : undefined}
+                        createLabel="Unit"
+                        emptyMessage="No unit — type & Create"
+                        inputClassName="border-0 text-center"
+                      />
+                    </td>
+                    <td className="col-amt">
+                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono font-bold" value={row.amount || ''} onChange={e => {
+                        patchLine(idx, { amount: Number(e.target.value) });
                       }} disabled={locked} />
                     </td>
-                    <td className="text-right pr-2 text-red-700 font-bold font-mono">{parseFloat(row.dis1Amt || 0).toFixed(2)}</td>
-                    <td>
-                      <input type="number" className="classic-erp-input w-full text-right border-0" placeholder="Mrp" value={row.mrp || ''} onChange={e => {
-                        const updated = [...gridItems]; updated[idx].mrp = Number(e.target.value); setGridItems(updated);
+                    <td className="col-pct">
+                      <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.dis1Per || ''} onChange={e => {
+                        patchLine(idx, { dis1Per: Number(e.target.value) });
                       }} disabled={locked} />
                     </td>
-                    <td>
-                      <input type="number" className="classic-erp-input w-full text-center border-0" placeholder="RD%" value={row.rdPer || ''} onChange={e => {
-                        const updated = [...gridItems]; updated[idx].rdPer = Number(e.target.value); setGridItems(updated);
+                    <td className="col-amt">
+                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis1Amt || ''} onChange={e => {
+                        patchLine(idx, { dis1Amt: Number(e.target.value) });
                       }} disabled={locked} />
                     </td>
-                    <td>
-                      <input type="number" className="classic-erp-input w-full text-center border-0" placeholder="Dis2%" value={row.dis2Per || ''} onChange={e => {
-                        const updated = [...gridItems]; updated[idx].dis2Per = Number(e.target.value);
-                        updated[idx].dis2Amt = (updated[idx].amount * updated[idx].dis2Per) / 100;
-                        setGridItems(updated);
+                    <td className="col-pct">
+                      <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.dis2Per || ''} onChange={e => {
+                        patchLine(idx, { dis2Per: Number(e.target.value) });
                       }} disabled={locked} />
                     </td>
-                    <td className="text-right pr-2 text-red-700 font-bold font-mono">{parseFloat(row.dis2Amt || 0).toFixed(2)}</td>
-                    <td className="text-center">
+                    <td className="col-amt">
+                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis2Amt || ''} onChange={e => {
+                        patchLine(idx, { dis2Amt: Number(e.target.value) });
+                      }} disabled={locked} />
+                    </td>
+                    <td className="col-amt">
+                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0" value={row.addAmt || ''} onChange={e => {
+                        patchLine(idx, { addAmt: Number(e.target.value) });
+                      }} disabled={locked} />
+                    </td>
+                    <td className="col-pct">
+                      <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.gstPer || ''} onChange={e => {
+                        patchLine(idx, { gstPer: Number(e.target.value) });
+                      }} disabled={locked} />
+                    </td>
+                    <td className="col-amt">
+                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono font-bold text-blue-800" value={row.gstAmt || ''} onChange={e => {
+                        patchLine(idx, { gstAmt: Number(e.target.value) });
+                      }} disabled={locked} />
+                    </td>
+                    <td className="col-del text-center">
                       <button type="button" onClick={() => {
                         const updated = gridItems.filter((_, i) => i !== idx);
-                        setGridItems(updated.length ? updated : [{ id: Date.now(), itemId: '', itemName: '', desc: '', lotId: '', fold: 0, cut: 0, pcs: 0, mts: 0, saleRate: 0, mrp: 0, rdPer: 0, amount: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0 }]);
+                        setGridItems(updated.length ? updated : [blankLine()]);
                       }} className="text-red-700 hover:text-red-950 p-1" disabled={locked}>
                         <Trash2 size={13} />
                       </button>
@@ -1054,7 +1030,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           <div className="flex justify-between items-center bg-[var(--bg-subtle)] p-1.5 border border-[var(--border)] rounded-md">
             <button
               type="button"
-              onClick={() => setGridItems([...gridItems, { id: Date.now(), itemId: '', itemName: '', desc: '', lotId: '', fold: 0, cut: 0, pcs: 0, mts: 0, saleRate: 0, mrp: 0, rdPer: 0, amount: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0 }])}
+              onClick={() => setGridItems([...gridItems, blankLine()])}
               className="classic-erp-btn"
               disabled={locked}
             >
@@ -1074,24 +1050,18 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
           {/* Current Stock Info Bar — from live Inventory lots */}
           {currentItemInfo && (
-            <div className="flex gap-4 items-center text-xs font-bold px-3 py-1.5 border border-[var(--border)] rounded-md" style={{ background: 'var(--accent-light, #fef3c7)' }}>
-              <span style={{ color: 'var(--accent, #b45309)' }}>Current Stock:</span>
+            <div className="erp-sales-stockbar shrink-0 flex gap-3 items-center text-[10px] font-bold px-2 py-0.5 border border-[var(--border)] rounded" style={{ background: 'var(--accent-light, #fef3c7)' }}>
+              <span style={{ color: 'var(--accent, #b45309)' }}>Stock:</span>
               <span>Pcs: <span className="text-blue-800">{currentItemStock.pcs}</span></span>
-              <span>Qty/Mts/Kgs: <span className="text-blue-800">{currentItemStock.mts}</span></span>
+              <span>Mts: <span className="text-blue-800">{currentItemStock.mts}</span></span>
               <span>Lots: <span className="text-blue-800">{currentItemStock.lots}</span></span>
               <span className="ml-auto">HSN: <span className="text-blue-800 font-mono">{currentItemInfo.hsn || currentItemInfo.hsnCode || '-'}</span></span>
             </div>
           )}
 
-          {gridItems.some((r) => r.itemId && !r.lotId) && !locked && (
-            <div className="text-xs font-bold px-3 py-1.5 rounded-md border border-red-300 text-red-800 bg-red-50">
-              Lot * column is required on every item line — without lot, stock will not reduce correctly.
-            </div>
-          )}
-
-          {/* Lot / Bill History Sub-table */}
+          {/* Lot / Bill History Sub-table — compact, no page scroll */}
           {lotHistory.length > 0 && (
-            <div className="classic-erp-table-container max-h-36">
+            <div className="classic-erp-table-container erp-sales-history shrink-0">
               <table className="classic-erp-table">
                 <thead>
                   <tr>
@@ -1138,7 +1108,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           )}
 
           {/* Footer Grid / Calculations */}
-          <div className="grid grid-cols-12 gap-3">
+          <div className="grid grid-cols-12 gap-1.5 erp-sales-footer shrink-0">
             
             {/* Left Adjustments Column */}
             <div className="col-span-4 classic-erp-frame classic-erp-stack p-2">
@@ -1189,35 +1159,39 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
               
               {billFields.footer('transport') && (
               <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label">Transport:</span>
+                <span className="classic-erp-label">Transport *:</span>
                 <input type="text" className="classic-erp-input" value={footer.transport} onChange={e => setFooter({ ...footer, transport: e.target.value })} disabled={locked} />
               </div>
               )}
               <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label">City:</span>
+                <span className="classic-erp-label">City *:</span>
                 <input type="text" className="classic-erp-input" value={footer.station} onChange={e => setFooter({ ...footer, station: e.target.value })} disabled={locked} />
               </div>
 
+              <div className="classic-erp-field classic-erp-field--lg">
+                <span className="classic-erp-label">Remark *:</span>
+                <input type="text" className="classic-erp-input" value={footer.remarks} onChange={e => setFooter({ ...footer, remarks: e.target.value })} disabled={locked} />
+              </div>
               <div className="classic-erp-meta-grid">
                 {billFields.footer('lrNo') && (
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Lr No:</span>
+                  <span className="classic-erp-label">Lr No *:</span>
                   <input type="text" className="classic-erp-input" value={footer.lrNo} onChange={e => setFooter({ ...footer, lrNo: e.target.value })} disabled={locked} />
                 </div>
                 )}
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Lr Dt:</span>
+                  <span className="classic-erp-label">Lr Dt *:</span>
                   <input type="date" className="classic-erp-input" value={footer.lrDate} onChange={e => setFooter({ ...footer, lrDate: e.target.value })} disabled={locked} />
                 </div>
                 {billFields.footer('bale') && (
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Bale:</span>
+                  <span className="classic-erp-label">Bale *:</span>
                   <input type="text" className="classic-erp-input" value={footer.baleNo} onChange={e => setFooter({ ...footer, baleNo: e.target.value })} disabled={locked} />
                 </div>
                 )}
                 {billFields.footer('weight') && (
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Weight:</span>
+                  <span className="classic-erp-label">Weight *:</span>
                   <input type="number" className="classic-erp-input" value={footer.weight || ''} onChange={e => setFooter({ ...footer, weight: Number(e.target.value) })} disabled={locked} />
                 </div>
                 )}
@@ -1311,11 +1285,12 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           </div>
 
         </div>
+      </div>
 
-        {/* Form Footer Action Toolbar */}
-        <div className="classic-erp-form-footer">
+        {/* Action bar — outside window so New/Save never clip */}
+        <div className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1.5 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]">
           <span className="text-[10px] text-[var(--text-muted)] mr-auto hidden sm:inline">
-            Enter → next field · Ctrl+Enter save · Alt+S save · Esc close
+            Enter → next · Ctrl+Enter save · Esc close
           </span>
           <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving}>New</button>
           <button className="classic-erp-btn btn-blue" type="button" data-enter-save onClick={handleSave} disabled={locked || saving || bootLoading}>
@@ -1327,7 +1302,6 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           <button className="classic-erp-btn btn-blue" type="button" onClick={handlePrint} disabled={!selectedInvoiceId && !initialData}>PDF / Print</button>
           <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
         </div>
-
       </div>
 
       {/* Inline Sub Modals */}

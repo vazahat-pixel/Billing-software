@@ -246,6 +246,7 @@ const Dashboard = () => {
 
       return true;
    };
+   const [millIssueInitialData, setMillIssueInitialData] = useState(null);
    const [modals, setModals] = useState({
       sales: false,
       purchase: false,
@@ -962,7 +963,11 @@ const Dashboard = () => {
             readOnly={!permissions.canSave} 
             onOpenSales={() => { toggleModal('purchase', false); toggleModal('sales', true); }}
             onOpenJobIssue={() => { toggleModal('purchase', false); toggleModal('jobIssue', true); }}
-            onOpenMillIssue={() => { toggleModal('purchase', false); toggleModal('millIssue', true); }}
+            onOpenMillIssue={(data) => {
+               setMillIssueInitialData(data || null);
+               toggleModal('purchase', false);
+               toggleModal('millIssue', true);
+            }}
          />
 
          <CashBankBookModal
@@ -997,7 +1002,15 @@ const Dashboard = () => {
             selectedBook={selectedBooks.payment}
             readOnly={!permissions.canSave}
          />
-         <IssueModal isOpen={modals.millIssue} onClose={() => toggleModal('millIssue', false)} selectedBook={selectedBooks.millIssue?.name} />
+         <IssueModal
+            isOpen={modals.millIssue}
+            onClose={() => {
+               setMillIssueInitialData(null);
+               toggleModal('millIssue', false);
+            }}
+            selectedBook={selectedBooks.millIssue?.name}
+            initialData={millIssueInitialData}
+         />
          <ReceiveModal isOpen={modals.millRec} onClose={() => toggleModal('millRec', false)} selectedBook={selectedBooks.millRec?.name} />
          <UpdateModal isOpen={modals.jobIssue} onClose={() => toggleModal('jobIssue', false)} selectedBook={selectedBooks.jobIssue?.name} />
          <JobReceiptModal isOpen={modals.jobRec} onClose={() => toggleModal('jobRec', false)} selectedBook={selectedBooks.jobRec?.name} />
