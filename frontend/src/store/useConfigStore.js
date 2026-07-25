@@ -90,6 +90,33 @@ const useConfigStore = create((set, get) => ({
 
   setBooks: (books) => set({ books: Array.isArray(books) ? books : [] }),
 
+  /** Immediately apply saved company settings so setup warnings clear without waiting for poll. */
+  patchCompanySettings: (settings) => {
+    if (!settings || typeof settings !== 'object') return;
+    set((s) => {
+      const next = { ...(s.companySettings || {}), ...settings };
+      const company = s.company
+        ? {
+            ...s.company,
+            name: settings.legalName || settings.shortName || s.company.name,
+            meta: {
+              ...(s.company.meta || {}),
+              gstin: settings.gstin ?? s.company.meta?.gstin,
+              pan: settings.pan ?? s.company.meta?.pan,
+              state: settings.state ?? s.company.meta?.state,
+              stateCode: settings.stateCode ?? s.company.meta?.stateCode,
+              address: settings.address ?? s.company.meta?.address,
+              phone: settings.phone ?? s.company.meta?.phone,
+              email: settings.email ?? s.company.meta?.email,
+              city: settings.city ?? s.company.meta?.city,
+              pincode: settings.pincode ?? s.company.meta?.pincode,
+            },
+          }
+        : s.company;
+      return { companySettings: next, company };
+    });
+  },
+
   can: (section) => get().permissions.canAccessSection?.(section) !== false,
 
   isModuleEnabled: (moduleKey) => {

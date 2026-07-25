@@ -1,363 +1,739 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { ERPSelect } from '../../components/forms/FormElements';
+import { ERPCombobox } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
-import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
+import { toast } from '../../store/useToastStore';
+import { Plus } from 'lucide-react';
+import AccountMasterModal from '../masters/AccountMasterModal';
+import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 
+const today = () => new Date().toISOString().split('T')[0];
+
+const weekday = (iso) => {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('en-IN', { weekday: 'short' });
+  } catch {
+    return '';
+  }
+};
+
+const PROCESS_TYPES = [
+  'Process Charge',
+  'Dyeing',
+  'Printing',
+  'Finishing',
+  'Bleaching',
+  'Sizing',
+  'Embroidery',
+  'Other',
+];
+
+const FINISH_OPTIONS = [
+  { value: '', label: '- Select Finish -' },
+  { value: 'Soft', label: 'Soft' },
+  { value: 'Hard', label: 'Hard' },
+  { value: 'Peach', label: 'Peach' },
+  { value: 'Brush', label: 'Brush' },
+  { value: 'Water Proof', label: 'Water Proof' },
+  { value: 'Other', label: 'Other' },
+];
+
+const emptyForm = (book) => ({
+  challanNo: 'AUTO',
+  date: today(),
+  millId: '',
+  weaver: '',
+  puBillNo: '',
+  itemName: '',
+  issPcs: '',
+  issQty: '',
+  puRate: '',
+  jobRate: '',
+  lotId: '',
+  remark1: '',
+  remark2: '',
+  procType: 'Process Charge',
+  finish: '',
+  book: book || 'PROCESS CHARGE',
+});
+
+/**
+ * Job Issue [ PROCESS CHARGE ] — same fields as classic textile ERP (no extras).
+ */
 const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
-  const { 
-    parties, 
-    inventoryLots, 
-    jobWorkEntries, 
-    fetchParties, 
-    fetchInventory, 
-    fetchJobs, 
-    issueToMill 
+  const {
+    parties,
+    inventoryLots,
+    jobWorkEntries,
+    fetchParties,
+    fetchInventory,
+    fetchJobs,
+    issueToMill,
   } = useStore();
 
-  const [activeTab, setActiveTab] = useState('Job Issue');
-  const [selectedLot, setSelectedLot] = useState(null);
+  const [mode, setMode] = useState('Add'); // Add | Edit | View
+  const [saving, setSaving] = useState(false);
+  const [bootLoading, setBootLoading] = useState(false);
+  const [form, setForm] = useState(emptyForm(selectedBook));
+  const [selectedJobId, setSelectedJobId] = useState('');
+  const [lotSort, setLotSort] = useState('asc'); // asc | desc
+  const [accountModal, setAccountModal] = useState({ open: false, initialData: null });
+  const [findOpen, setFindOpen] = useState(false);
 
-  const [header, setHeader] = useState({
-    processType: 'Embroidery',
-    jobCardNo: '',
-    date: new Date().toISOString().substring(0, 10),
-    workerId: '',
-    issuePcs: '',
-    issueQty: ''
-  });
+  const locked = mode === 'View';
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchParties();
-      fetchInventory();
-      fetchJobs();
-      // Auto-generate embroidery job card no
-      setHeader(prev => ({
-        ...prev,
-        jobCardNo: `JC-EMB-${Math.floor(100000 + Math.random() * 900000)}`
-      }));
-    }
-  }, [isOpen, fetchParties, fetchInventory, fetchJobs]);
+  const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
-  const workers = useMemo(() => {
-    return parties.filter(p => p.type === 'Job Worker');
-  }, [parties]);
+  const mills = useMemo(
+    () =>
+      parties.filter((p) => {
+        const type = String(p.type || '');
+        const group = String(p.group || '').toUpperCase();
+        return (
+          type === 'Job Worker' ||
+          type === 'Both' ||
+          group.includes('JOB') ||
+          group.includes('WORKER') ||
+          group.includes('MILL') ||
+          group.includes('PROCESS')
+        );
+      }),
+    [parties]
+  );
 
-  const workerOptions = useMemo(
-    () => workers.map((w) => ({ value: w._id || w.id, label: w.name })),
-    [workers]
+  const millOptions = useMemo(
+    () => mills.map((m) => ({ value: m._id || m.id, label: m.name })),
+    [mills]
   );
 
   const availableLots = useMemo(() => {
-    return inventoryLots.filter(lot => lot.remainingMtrs > 0 && lot.status !== 'Closed');
-  }, [inventoryLots]);
+    const open = (inventoryLots || []).filter(
+      (lot) =>
+        Number(lot.remainingMtrs || 0) > 0 &&
+        lot.status !== 'Closed' &&
+        (lot.holdStatus === 'None' || !lot.holdStatus)
+    );
+    const sorted = [...open].sort((a, b) => {
+      const la = String(a.lotId || '');
+      const lb = String(b.lotId || '');
+      return lotSort === 'asc' ? la.localeCompare(lb) : lb.localeCompare(la);
+    });
+    return sorted;
+  }, [inventoryLots, lotSort]);
 
-  const handleSelectLot = (lot) => {
-    setSelectedLot(lot);
-    setHeader(prev => ({
-      ...prev,
-      issuePcs: lot.remainingPcs || '',
-      issueQty: lot.remainingMtrs || ''
+  const lotOptions = useMemo(
+    () =>
+      availableLots.map((lot) => {
+        const id = lot._id || lot.id;
+        const name = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || 'Item';
+        return {
+          value: id,
+          label: `${lot.lotId || id.slice(-6)} · ${name} · ${Number(lot.remainingMtrs || 0).toFixed(2)} mts`,
+        };
+      }),
+    [availableLots]
+  );
+
+  const processOptions = useMemo(
+    () => PROCESS_TYPES.map((p) => ({ value: p, label: p })),
+    []
+  );
+
+  const selectedLot = useMemo(
+    () => availableLots.find((l) => String(l._id || l.id) === String(form.lotId)) || null,
+    [availableLots, form.lotId]
+  );
+
+  const jobOptions = useMemo(() => {
+    const list = [...(jobWorkEntries || [])];
+    list.sort((a, b) => {
+      const da = new Date(a.issueDate || a.createdAt || 0).getTime();
+      const db = new Date(b.issueDate || b.createdAt || 0).getTime();
+      return lotSort === 'asc' ? da - db : db - da;
+    });
+    return list.map((j) => ({
+      value: j._id || j.id,
+      label: `${j.challanNo || j.jobCardNo || '-'} · ${j.workerId?.name || 'Mill'} · ${Number(j.issueQty || 0).toFixed(2)} mts`,
+    }));
+  }, [jobWorkEntries, lotSort]);
+
+  const resetForm = useCallback(() => {
+    setForm(emptyForm(selectedBook));
+    setSelectedJobId('');
+    setFindOpen(false);
+  }, [selectedBook]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setBootLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setBootLoading(true);
+    setMode('Add');
+    resetForm();
+    Promise.all([fetchParties(), fetchInventory(), fetchJobs()])
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setBootLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, selectedBook, fetchParties, fetchInventory, fetchJobs, resetForm]);
+
+  const applyLot = (lotId) => {
+    const lot = availableLots.find((l) => String(l._id || l.id) === String(lotId));
+    if (!lot) {
+      setForm((f) => ({ ...f, lotId: '', itemName: '', issPcs: '', issQty: '', puRate: '' }));
+      return;
+    }
+    const itemName = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
+    const puRate =
+      lot.rate ??
+      lot.purchaseRate ??
+      lot.avgRate ??
+      lot.itemId?.purchaseRate ??
+      '';
+    setForm((f) => ({
+      ...f,
+      lotId,
+      itemName,
+      issPcs: String(lot.remainingPcs ?? ''),
+      issQty: String(lot.remainingMtrs ?? ''),
+      puRate: puRate !== '' && puRate != null ? String(puRate) : f.puRate,
+      puBillNo: f.puBillNo || lot.invoiceNo || lot.purchaseInvoiceNo || '',
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedLot) {
-      notifyWarning('Please select an available lot from the right panel first.');
+  const handleMillChange = (id) => {
+    setField('millId', id);
+  };
+
+  const handleCreateMill = (search = '') => {
+    setAccountModal({
+      open: true,
+      initialData: { name: search || '', group: 'JOB WORKER' },
+    });
+  };
+
+  const handleMillSuccess = (party) => {
+    fetchParties();
+    setField('millId', party._id || party.id);
+    setAccountModal({ open: false, initialData: null });
+    toast.success(`Mill "${party.name}" added`);
+  };
+
+  const handleNew = () => {
+    setMode('Add');
+    resetForm();
+  };
+
+  const handleEdit = () => {
+    if (!selectedJobId) return toast.warning('Find a challan first');
+    setMode('Edit');
+  };
+
+  const handleCancel = () => {
+    if (mode === 'Add') {
+      resetForm();
       return;
     }
-    if (!header.workerId) {
-      notifyWarning('Please select a Job Worker party.');
-      return;
+    setMode('View');
+    if (selectedJobId) loadJob(selectedJobId);
+  };
+
+  const loadJob = (id) => {
+    setSelectedJobId(id);
+    if (!id) return;
+    const job = jobWorkEntries.find((j) => String(j._id || j.id) === String(id));
+    if (!job) return;
+    setMode('View');
+    setFindOpen(true);
+    const remarks = String(job.remark || job.remarks || '');
+    const [r1, ...rest] = remarks.split(/\n/);
+    setForm({
+      challanNo: job.challanNo || job.jobCardNo || '',
+      date: job.issueDate ? String(job.issueDate).slice(0, 10) : today(),
+      millId: job.workerId?._id || job.workerId || '',
+      weaver: job.weaver || '',
+      puBillNo: job.purchaseBillNo || '',
+      itemName: job.lotId?.itemName || job.lotId?.itemId?.name || '',
+      issPcs: String(job.issuePcs ?? ''),
+      issQty: String(job.issueQty ?? ''),
+      puRate: job.purchaseRate != null ? String(job.purchaseRate) : '',
+      jobRate: job.jobRate != null ? String(job.jobRate) : String(job.processCharges || ''),
+      lotId: job.lotId?._id || job.lotId || '',
+      remark1: r1 || '',
+      remark2: rest.join(' ') || '',
+      procType: job.processType || 'Process Charge',
+      finish: job.finish || '',
+      book: selectedBook || 'PROCESS CHARGE',
+    });
+  };
+
+  const handleJobCard = () => {
+    if (locked) return;
+    const seq = Math.floor(100000 + Math.random() * 900000);
+    setField('challanNo', `JC-${seq}`);
+    toast.info('Job Card No. assigned');
+  };
+
+  const handleSave = async (e, { keepOpen = false } = {}) => {
+    if (e) e.preventDefault();
+    if (locked) {
+      toast.warning('Click Edit or New before saving');
+      return false;
     }
-    if (!header.issueQty || parseFloat(header.issueQty) <= 0) {
-      notifyWarning('Please enter a valid issue quantity.');
-      return;
+    if (mode === 'Edit') {
+      toast.warning('Issued challans cannot be edited — create New');
+      return false;
+    }
+    if (!form.millId) {
+      toast.error('Select Mill Name');
+      return false;
+    }
+    if (!form.lotId) {
+      toast.error('Select Lot No.');
+      return false;
+    }
+    const qty = Number(form.issQty);
+    const pcs = Number(form.issPcs || 0);
+    if (!qty || qty <= 0) {
+      toast.error('Enter Iss Qty');
+      return false;
+    }
+    if (selectedLot && qty > Number(selectedLot.remainingMtrs || 0) + 0.0001) {
+      toast.error(
+        `Iss Qty exceeds stock (${Number(selectedLot.remainingMtrs || 0).toFixed(2)})`
+      );
+      return false;
     }
 
+    setSaving(true);
     try {
+      const remark = [form.remark1, form.remark2].filter(Boolean).join('\n');
+      const millId = form.millId;
+      const procType = form.procType;
+      const finish = form.finish;
+      const jobRate = form.jobRate;
       await issueToMill({
-        jobCardNo: header.jobCardNo,
-        lotId: selectedLot._id,
-        workerId: header.workerId,
-        processType: 'Embroidery',
-        issuePcs: Number(header.issuePcs) || 0,
-        issueQty: Number(header.issueQty),
-        issueDate: new Date(header.date)
+        jobCardNo: form.challanNo === 'AUTO' || !form.challanNo ? 'AUTO' : form.challanNo,
+        challanNo: form.challanNo === 'AUTO' ? '' : form.challanNo,
+        issueDate: form.date,
+        date: form.date,
+        lotId: form.lotId,
+        workerId: form.millId,
+        processType: form.procType || form.finish || 'Process Charge',
+        finish: form.finish || '',
+        issueQty: qty,
+        issuePcs: pcs,
+        weaver: form.weaver || '',
+        purchaseBillNo: form.puBillNo || '',
+        purchaseRate: Number(form.puRate) || 0,
+        jobRate: Number(form.jobRate) || 0,
+        processCharges: Number(form.jobRate) || 0,
+        remark,
+        remarks: remark,
       });
-      notifySuccess('Embroidery job issued successfully!');
-      setSelectedLot(null);
-      // Reset form
-      setHeader(prev => ({
-        ...prev,
-        jobCardNo: `JC-EMB-${Math.floor(100000 + Math.random() * 900000)}`,
-        workerId: '',
-        issuePcs: '',
-        issueQty: ''
-      }));
-      setActiveTab('View Job Issue');
-      fetchInventory();
-      fetchJobs();
+      toast.success('Job Issue saved');
+      await Promise.all([fetchJobs(), fetchInventory()]);
+      if (keepOpen) {
+        setMode('Add');
+        setForm({
+          ...emptyForm(selectedBook),
+          millId,
+          procType,
+          finish,
+          jobRate,
+        });
+        setSelectedJobId('');
+        toast.info('Ready for next challan (same mill)');
+      } else {
+        handleNew();
+        setMode('View');
+        setFindOpen(true);
+      }
+      return true;
     } catch (err) {
-      notifyError(err, 'Failed to issue lot');
+      toast.error(err, { fallback: 'Failed to save Job Issue' });
+      return false;
+    } finally {
+      setSaving(false);
     }
   };
 
+  const handleDelete = () => {
+    toast.warning('Delete issued challan from Job Receive / Cancel flow');
+  };
+
+  const handlePrint = () => {
+    if (!selectedJobId) return toast.warning('Find a challan to print');
+    toast.info('Print preview — use Job Receive / reports for full print');
+  };
+
+  const titleBook = selectedBook || 'PROCESS CHARGE';
+
   return (
-    <ErpWindowedModal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`Job Issue [ ${selectedBook || 'EMB. JOBWORK'} ]`}
-      windowId="jobIssue"
-      bare
-    >
-      {({ WindowControls }) => (
-      <div className="classic-erp-window flex flex-col h-full min-h-0 overflow-hidden !max-h-none">
-        <div className="classic-erp-header shrink-0">
-          <span className="erp-window-title truncate">Embroidery Job Issue [ {selectedBook || 'EMB. JOBWORK'} ]</span>
-          <WindowControls />
-        </div>
+    <>
+      <ErpWindowedModal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={`Job Issue [ ${titleBook} ]`}
+        windowId="jobIssue"
+        bare
+      >
+        {({ WindowControls }) => (
+          <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 !max-h-none">
+            <ErpBusyOverlay show={bootLoading} message="Loading job issue…" />
+            <ErpBusyOverlay show={!bootLoading && saving} message="Saving job issue…" />
 
-        {/* Tab Navigation */}
-        <div className="classic-erp-tabs shrink-0">
-          {['Job Issue', 'View Job Issue'].map(tab => (
-            <button 
-             key={tab}
-             type="button"
-             onClick={() => setActiveTab(tab)}
-             className={`classic-erp-tab-button ${activeTab === tab ? 'active' : ''}`}
+            <div className="classic-erp-header shrink-0">
+              <span className="erp-window-title truncate">
+                Job Issue [ {titleBook} ]
+              </span>
+              <WindowControls />
+            </div>
+
+            <form
+              onSubmit={(e) => handleSave(e)}
+              className="classic-erp-body flex-1 overflow-y-auto flex flex-col gap-2 min-h-0"
             >
-              {tab}
-            </button>
-          ))}
-        </div>
+              <div className="flex flex-col lg:flex-row gap-2 flex-1 min-h-0">
+                {/* Left — main fields (image layout) */}
+                <div className="classic-erp-frame flex-1 space-y-1.5 min-w-0">
+                  {findOpen && (
+                    <div className="classic-erp-field classic-erp-field--lg">
+                      <span className="classic-erp-label blue-label">Find:</span>
+                      <ERPSelect
+                        className="classic-erp-select flex-1"
+                        value={selectedJobId}
+                        onChange={(e) => loadJob(e.target.value)}
+                        options={jobOptions}
+                        placeholder="- Select Job Issue Challan -"
+                        recentKey="job-issue-find"
+                      />
+                    </div>
+                  )}
 
-        <div className="flex-1 flex flex-col overflow-hidden bg-[#d4d0c8] p-2">
-          {activeTab === 'Job Issue' ? (
-            <div className="flex-1 flex overflow-hidden gap-2">
-               {/* Left Form (70%) */}
-               <form onSubmit={handleSubmit} className="flex-[3] flex flex-col overflow-y-auto space-y-2 no-scrollbar pb-16 relative">
-                  
-                  <div className="classic-erp-frame space-y-2">
-                     <div className="classic-erp-frame-title">Embroidery Specifications</div>
-
-                     {/* Form details */}
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="flex items-center gap-2">
-                           <span className="classic-erp-label red-label w-24">Job Card No:</span>
-                           <input 
-                             type="text"
-                             className="classic-erp-input flex-1" 
-                             value={header.jobCardNo} 
-                             onChange={e => setHeader({...header, jobCardNo: e.target.value})}
-                             required
-                           />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                           <span className="classic-erp-label red-label w-24">Challan Date:</span>
-                           <input 
-                             type="date" 
-                             className="classic-erp-input flex-1" 
-                             value={header.date} 
-                             onChange={e => setHeader({...header, date: e.target.value})} 
-                             required
-                           />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                           <span className="classic-erp-label red-label w-24">Emb. Unit:</span>
-                           <ERPSelect
-                             className="classic-erp-select flex-1"
-                             value={header.workerId}
-                             onChange={(e) => setHeader({...header, workerId: e.target.value})}
-                             options={workerOptions}
-                             placeholder="- Select Embroidery Partner -"
-                             recentKey="emb-worker"
-                           />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                           <span className="classic-erp-label w-24">Book Type:</span>
-                           <input 
-                             type="text"
-                             className="classic-erp-input flex-1" 
-                             value="EMB. JOBWORK" 
-                             readOnly 
-                           />
-                        </div>
-                     </div>
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label red-label w-[88px]">Challan No</span>
+                    <input
+                      type="text"
+                      className="classic-erp-input flex-1 font-bold"
+                      value={form.challanNo}
+                      onChange={(e) => setField('challanNo', e.target.value)}
+                      disabled={locked}
+                    />
                   </div>
 
-                  <div className="classic-erp-frame space-y-2">
-                     <div className="classic-erp-frame-title">Selected Lot Stock Issue Details</div>
-
-                     {selectedLot ? (
-                       <div className="space-y-3">
-                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono border-b border-[#808080] pb-2">
-                           <div>
-                             <span className="classic-erp-label text-slate-800">Lot ID:</span>
-                             <span className="font-bold text-black uppercase ml-1">{selectedLot.lotId}</span>
-                           </div>
-                           <div>
-                             <span className="classic-erp-label text-slate-800">Fabric Item:</span>
-                             <span className="font-bold text-black uppercase ml-1">{selectedLot.itemId?.name || selectedLot.itemName}</span>
-                           </div>
-                           <div>
-                             <span className="classic-erp-label text-slate-800">Available Pcs:</span>
-                             <span className="font-bold text-black ml-1">{selectedLot.remainingPcs} Pcs</span>
-                           </div>
-                           <div>
-                             <span className="classic-erp-label text-slate-800">Available Meters:</span>
-                             <span className="font-bold text-black ml-1">{selectedLot.remainingMtrs} Mtrs</span>
-                           </div>
-                         </div>
-
-                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                           <div className="flex items-center gap-2">
-                              <span className="classic-erp-label w-24">Issue Pcs:</span>
-                              <input 
-                                 type="number" 
-                                 className="classic-erp-input flex-1 font-bold text-right" 
-                                 value={header.issuePcs} 
-                                 onChange={e => setHeader({...header, issuePcs: e.target.value})}
-                                 max={selectedLot.remainingPcs}
-                                 placeholder="0"
-                              />
-                           </div>
-                           <div className="flex items-center gap-2">
-                              <span className="classic-erp-label red-label w-24">Issue Mtrs:</span>
-                              <input 
-                                 type="number" 
-                                 className="classic-erp-input flex-1 font-bold text-right" 
-                                 value={header.issueQty} 
-                                 onChange={e => setHeader({...header, issueQty: e.target.value})}
-                                 max={selectedLot.remainingMtrs}
-                                 placeholder="0.00"
-                                 required
-                              />
-                           </div>
-                         </div>
-                       </div>
-                     ) : (
-                       <div className="py-8 text-center text-red-800 font-bold uppercase tracking-wider text-[11px] bg-white border border-[#808080]">
-                          SELECT A GREY LOT FROM THE AVAILABLE LOTS PANEL TO CONTINUE
-                       </div>
-                     )}
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label red-label w-[88px]">Date</span>
+                    <input
+                      type="date"
+                      className="classic-erp-input w-[150px]"
+                      value={form.date}
+                      onChange={(e) => setField('date', e.target.value)}
+                      disabled={locked}
+                      required
+                    />
+                    <span className="text-[11px] font-bold text-slate-700 w-10">
+                      {weekday(form.date)}
+                    </span>
                   </div>
 
-                  {/* Footer Actions inside form */}
-                  <div className="classic-erp-form-footer absolute bottom-0 left-0 w-full shrink-0">
-                     <button 
-                        type="button" 
-                        onClick={onClose}
-                        className="classic-erp-btn"
-                     >
-                        Cancel
-                     </button>
-                     <button 
-                        type="submit"
-                        className="classic-erp-btn btn-blue"
-                     >
-                        Save & Issue
-                     </button>
+                  <div className="classic-erp-field classic-erp-field--lg">
+                    <span className="classic-erp-label red-label w-[88px]">MillName</span>
+                    <div className="flex items-center gap-1 min-w-0 flex-1">
+                      <ERPCombobox
+                        value={form.millId}
+                        onChange={handleMillChange}
+                        disabled={locked}
+                        options={millOptions}
+                        placeholder="Search Mill / Job Worker…"
+                        recentKey="job-issue-mill"
+                        onCreateNew={!locked ? handleCreateMill : undefined}
+                        createLabel="Mill"
+                        allowClear
+                      />
+                      {!locked && (
+                        <button
+                          type="button"
+                          title="Add Mill"
+                          onClick={() => handleCreateMill('')}
+                          className="shrink-0 inline-flex items-center gap-0.5 px-2 py-1 text-[11px] font-bold text-white bg-green-600 rounded"
+                        >
+                          <Plus size={11} /> Add
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-               </form>
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label w-[88px]">Weaver</span>
+                    <input
+                      type="text"
+                      className="classic-erp-input flex-1"
+                      value={form.weaver}
+                      onChange={(e) => setField('weaver', e.target.value)}
+                      disabled={locked}
+                    />
+                  </div>
 
-               {/* Lot Selector Card Grid (Right Column 30%) */}
-               <div className="flex-1 flex flex-col classic-erp-frame p-0 overflow-hidden w-80 shrink-0">
-                  <div className="classic-erp-header bg-black text-white text-xs px-2 h-7 flex justify-between items-center font-bold tracking-wider uppercase shrink-0">
-                     <span>Available Lots</span>
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label w-[88px]">Pu.BillNo</span>
+                    <input
+                      type="text"
+                      className="classic-erp-input w-[160px]"
+                      value={form.puBillNo}
+                      onChange={(e) => setField('puBillNo', e.target.value)}
+                      disabled={locked}
+                    />
                   </div>
-                  <div className="flex-1 overflow-y-auto p-2 space-y-2 no-scrollbar bg-white">
-                     {availableLots.map(lot => {
-                        const isSelected = selectedLot?._id === lot._id;
-                        return (
-                          <div 
-                             key={lot._id}
-                             onClick={() => handleSelectLot(lot)}
-                             className="p-2 border cursor-pointer select-none font-mono"
-                             style={{
-                               backgroundColor: isSelected ? '#ffffe1' : '#ffffff',
-                               borderColor: isSelected ? '#000000' : '#d4d0c8',
-                               borderWidth: '1px',
-                               borderStyle: 'solid'
-                             }}
-                          >
-                             <div className="flex items-center justify-between mb-1">
-                                <span className="text-xs font-bold text-blue-900">{lot.lotId}</span>
-                                <span className="px-1 bg-slate-200 text-slate-700 text-[9px] font-bold">
-                                   {lot.itemId?.category || lot.category || 'Grey'}
-                                </span>
-                             </div>
-                             <div className="space-y-0.5 text-[10px]">
-                               <div className="flex justify-between items-center">
-                                  <span className="text-slate-500">Item:</span>
-                                  <span className="font-bold text-slate-800 truncate max-w-[120px]">{lot.itemId?.name || lot.itemName}</span>
-                               </div>
-                               <div className="flex justify-between items-center">
-                                  <span className="text-slate-500">Meters:</span>
-                                  <span className="font-bold text-black">{lot.remainingMtrs.toFixed(2)} Mts</span>
-                               </div>
-                             </div>
-                          </div>
-                        );
-                     })}
-                     {availableLots.length === 0 && (
-                       <div className="py-8 text-center text-slate-400 font-bold uppercase tracking-widest text-[9px]">
-                          No grey fabric lots in stock
-                       </div>
-                     )}
+
+                  <div className="classic-erp-field classic-erp-field--lg">
+                    <span className="classic-erp-label red-label w-[88px]">Item Name</span>
+                    <input
+                      type="text"
+                      className="classic-erp-input flex-1 font-bold uppercase"
+                      value={form.itemName}
+                      onChange={(e) => setField('itemName', e.target.value)}
+                      disabled={locked}
+                      readOnly
+                      title="Filled from Lot No."
+                    />
                   </div>
-               </div>
-            </div>
-          ) : (
-            // View Embroidery Job Issue list tab
-            <div className="flex-1 flex flex-col overflow-hidden">
-               <div className="classic-erp-table-container flex-1">
-                  <table className="classic-erp-table">
-                     <thead>
-                        <tr>
-                           <th className="w-24">Date</th>
-                           <th className="w-32">Job Card No</th>
-                           <th>Embroidery Partner</th>
-                           <th className="w-28 text-right">Issued Qty</th>
-                           <th className="w-24 text-center">Status</th>
-                        </tr>
-                     </thead>
-                     <tbody>
-                        {jobWorkEntries.filter(j => j.processType === 'Embroidery').map((job) => (
-                           <tr key={job._id}>
-                              <td className="font-mono">{new Date(job.issueDate).toLocaleDateString()}</td>
-                              <td className="font-bold text-blue-900">{job.jobCardNo}</td>
-                              <td className="font-bold uppercase">{job.workerId?.name || 'N/A'}</td>
-                              <td className="text-right font-mono font-bold">{job.issueQty} Mtrs</td>
-                              <td className="text-center font-bold">
-                                 <span style={{ color: job.status === 'Received' ? 'green' : 'brown' }}>
-                                    {job.status}
-                                 </span>
-                              </td>
-                           </tr>
-                        ))}
-                        {jobWorkEntries.filter(j => j.processType === 'Embroidery').length === 0 && (
-                          <tr>
-                            <td colSpan="5" className="py-8 text-center text-slate-400 font-bold uppercase">
-                              No Issued Embroidery Jobs Found
-                            </td>
-                          </tr>
-                        )}
-                     </tbody>
-                  </table>
-               </div>
-            </div>
-          )}
-        </div>
-      </div>
-      )}
-    </ErpWindowedModal>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-2 gap-y-1.5">
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label w-[72px]">Iss Pcs</span>
+                      <input
+                        type="number"
+                        className="classic-erp-input flex-1 text-right font-bold"
+                        value={form.issPcs}
+                        onChange={(e) => setField('issPcs', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label red-label w-[72px]">Iss Qty</span>
+                      <input
+                        type="number"
+                        step="0.001"
+                        className="classic-erp-input flex-1 text-right font-bold"
+                        value={form.issQty}
+                        onChange={(e) => setField('issQty', e.target.value)}
+                        disabled={locked}
+                        required
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label w-[72px]">Pu.Rate</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="classic-erp-input flex-1 text-right"
+                        value={form.puRate}
+                        onChange={(e) => setField('puRate', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label w-[72px]">JobRate</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="classic-erp-input flex-1 text-right font-bold"
+                        value={form.jobRate}
+                        onChange={(e) => setField('jobRate', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field col-span-2">
+                      <span className="classic-erp-label red-label w-[72px]">Lot No.</span>
+                      <ERPCombobox
+                        value={form.lotId}
+                        onChange={(val) => applyLot(val)}
+                        disabled={locked}
+                        options={lotOptions}
+                        placeholder="Select lot…"
+                        recentKey="job-issue-lot"
+                        allowClear
+                      />
+                    </div>
+                  </div>
+
+                  <div className="classic-erp-field classic-erp-field--lg">
+                    <span className="classic-erp-label w-[88px]">Remark</span>
+                    <div className="flex-1 space-y-1">
+                      <input
+                        type="text"
+                        className="classic-erp-input w-full"
+                        value={form.remark1}
+                        onChange={(e) => setField('remark1', e.target.value)}
+                        disabled={locked}
+                      />
+                      <input
+                        type="text"
+                        className="classic-erp-input w-full"
+                        value={form.remark2}
+                        onChange={(e) => setField('remark2', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                  </div>
+
+                  {selectedLot && (
+                    <div className="text-[10px] font-mono text-slate-600 px-1">
+                      Stock: {Number(selectedLot.remainingPcs || 0)} pcs ·{' '}
+                      {Number(selectedLot.remainingMtrs || 0).toFixed(2)} mts
+                    </div>
+                  )}
+                </div>
+
+                {/* Right — ProcType / Finish / tools */}
+                <div className="classic-erp-frame w-full lg:w-[220px] shrink-0 space-y-2">
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label w-[70px]">ProcType</span>
+                    <ERPSelect
+                      className="classic-erp-select flex-1"
+                      value={form.procType}
+                      onChange={(e) => setField('procType', e.target.value)}
+                      options={processOptions}
+                      disabled={locked}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="classic-erp-btn w-full"
+                    onClick={handleJobCard}
+                    disabled={locked}
+                  >
+                    Job Card
+                  </button>
+
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label w-[70px]">Finish</span>
+                    <ERPSelect
+                      className="classic-erp-select flex-1"
+                      value={form.finish}
+                      onChange={(e) => setField('finish', e.target.value)}
+                      options={FINISH_OPTIONS}
+                      disabled={locked}
+                    />
+                  </div>
+
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      className={`classic-erp-btn flex-1 ${lotSort === 'asc' ? 'btn-blue' : ''}`}
+                      onClick={() => setLotSort('asc')}
+                    >
+                      Asc
+                    </button>
+                    <button
+                      type="button"
+                      className={`classic-erp-btn flex-1 ${lotSort === 'desc' ? 'btn-blue' : ''}`}
+                      onClick={() => setLotSort('desc')}
+                    >
+                      Desc
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="classic-erp-btn w-full"
+                    disabled={locked || saving}
+                    onClick={() => handleSave(null, { keepOpen: true })}
+                  >
+                    Create Multi Challan
+                  </button>
+
+                  <p className="text-[10px] font-bold text-red-700 leading-tight pt-1">
+                    F1 &gt; SelectAll / F2 &gt; UnSelectAll
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer — same action set as classic Job Issue */}
+              <div className="classic-erp-form-footer shrink-0 flex flex-wrap gap-1">
+                <button type="button" className="classic-erp-btn" onClick={handleNew} disabled={saving}>
+                  New
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={handleEdit}
+                  disabled={saving || mode !== 'View' || !selectedJobId}
+                >
+                  Edit
+                </button>
+                <button type="submit" className="classic-erp-btn btn-blue" disabled={saving || locked}>
+                  <SaveButtonLabel saving={saving} label="Save" />
+                </button>
+                <button type="button" className="classic-erp-btn" onClick={handleCancel} disabled={saving}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => {
+                    setFindOpen(true);
+                    setMode('View');
+                  }}
+                  disabled={saving}
+                >
+                  Find
+                </button>
+                <button type="button" className="classic-erp-btn" onClick={handleDelete} disabled={saving}>
+                  Delete
+                </button>
+                <button type="button" className="classic-erp-btn" onClick={onClose} disabled={saving}>
+                  Exit
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => toast.info('Open Job Receive for receipt detail')}
+                >
+                  ReceiptDetail
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => toast.info('Last year lot — use Lot No. search')}
+                >
+                  LastYearLot
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => {
+                    setFindOpen(true);
+                    setMode('View');
+                  }}
+                >
+                  Sp.Find
+                </button>
+                <button type="button" className="classic-erp-btn" onClick={handlePrint}>
+                  Print
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </ErpWindowedModal>
+
+      <AccountMasterModal
+        isOpen={accountModal.open}
+        onClose={() => setAccountModal({ open: false, initialData: null })}
+        initialData={accountModal.initialData}
+        onSuccess={handleMillSuccess}
+      />
+    </>
   );
 };
 

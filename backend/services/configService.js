@@ -337,6 +337,12 @@ exports.saveCompanySettings = async (companyId, body, actorId, req) => {
     if (patch[k] === undefined) delete patch[k];
   });
 
+  // GSTIN first 2 digits = state code when not provided
+  if (patch.gstin && !patch.stateCode) {
+    const g = String(patch.gstin).replace(/\s/g, '').toUpperCase();
+    if (g.length >= 2 && /^\d{2}/.test(g)) patch.stateCode = g.slice(0, 2);
+  }
+
   const updated = await CompanySettings.findOneAndUpdate(
     { companyId },
     { ...patch, companyId, ...meta, configHash: computeBundleHash(patch) },

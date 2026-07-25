@@ -2,57 +2,106 @@
  * Resolves invoice/print letterhead from live session config — never a demo firm.
  */
 import useConfigStore from '../store/useConfigStore';
+import { stateCodeFromGstin } from './gstStateCodes';
 
 /** @deprecated Prefer resolveCompanyProfile() — kept so old imports don't crash */
 export const DEMO_COMPANY = null;
 
-export const resolveCompanyProfile = (override) => {
-  if (override && (override.name || override.legalName || override.gstin)) {
-    return normalizeCompany(override);
+const PLACEHOLDER_NAME = /^(company|my company|your company name)$/i;
+
+const isPlaceholderName = (v) => PLACEHOLDER_NAME.test(String(v || '').trim());
+
+/** Prefer first non-empty, non-placeholder value */
+const pick = (...vals) => {
+  for (const v of vals) {
+    const s = String(v ?? '').trim();
+    if (s && !isPlaceholderName(s)) return s;
   }
+  for (const v of vals) {
+    const s = String(v ?? '').trim();
+    if (s) return s;
+  }
+  return '';
+};
+
+/**
+ * Always merges Company Settings from the live config store.
+ * A partial `override` must not wipe saved GSTIN / bank / legal name.
+ */
+export const resolveCompanyProfile = (override) => {
   const cfg = useConfigStore.getState();
   const settings = cfg.companySettings || {};
   const company = cfg.company || {};
   const meta = company.meta || {};
+  const o = override && typeof override === 'object' ? override : {};
+
+  const name = pick(
+    settings.legalName,
+    settings.shortName,
+    o.legalName,
+    o.name,
+    company.name
+  );
+
+  const gstin = pick(settings.gstin, meta.gstin, o.gstin);
+  const stateCode = pick(
+    settings.stateCode,
+    meta.stateCode,
+    o.stateCode,
+    stateCodeFromGstin(gstin)
+  );
+
   return normalizeCompany({
-    name: settings.legalName || settings.shortName || company.name || 'Company',
-    tagline: settings.tagline || settings.businessType || '',
-    address: settings.address || meta.address || '',
-    area: [settings.city || meta.city, settings.state || meta.state, settings.pincode || meta.pincode]
+    name: name || 'Company',
+    tagline: pick(settings.tagline, settings.businessType, o.tagline),
+    address: pick(settings.address, meta.address, o.address),
+    area: [
+      pick(settings.city, meta.city, o.city),
+      pick(settings.state, meta.state, o.state),
+      pick(settings.pincode, meta.pincode, o.pincode),
+    ]
       .filter(Boolean)
       .join(', '),
-    phone: settings.phone || meta.phone || '',
-    email: settings.email || meta.email || '',
-    website: settings.website || '',
-    gstin: settings.gstin || meta.gstin || '',
-    pan: settings.pan || meta.pan || '',
-    bankName: settings.bankName || settings.bank?.name || '',
-    accountName: settings.accountName || settings.bank?.accountName || settings.legalName || '',
-    accountNo: settings.accountNo || settings.bank?.accountNo || '',
-    ifsc: settings.ifsc || settings.bank?.ifsc || '',
-    bankBranch: settings.bankBranch || settings.bank?.branch || '',
-    upiId: settings.upiId || settings.upi || '',
-    invoiceTerms: settings.invoiceTerms || settings.terms || '',
-    logoUrl: settings.logoUrl || '',
-    showLogo: settings.showLogo !== false,
-    state: settings.state || meta.state || '',
-    stateCode: settings.stateCode || meta.stateCode || '',
+    phone: pick(settings.phone, meta.phone, o.phone),
+    email: pick(settings.email, meta.email, o.email),
+    website: pick(settings.website, o.website),
+    gstin,
+    pan: pick(settings.pan, meta.pan, o.pan),
+    bankName: pick(settings.bankName, settings.bank?.name, o.bankName),
+    accountName: pick(
+      settings.accountName,
+      settings.bank?.accountName,
+      settings.legalName,
+      o.accountName,
+      name
+    ),
+    accountNo: pick(settings.accountNo, settings.bank?.accountNo, o.accountNo),
+    ifsc: pick(settings.ifsc, settings.bank?.ifsc, o.ifsc),
+    bankBranch: pick(settings.bankBranch, settings.bank?.branch, o.bankBranch),
+    upiId: pick(settings.upiId, settings.upi, o.upiId),
+    invoiceTerms: pick(settings.invoiceTerms, settings.terms, o.invoiceTerms),
+    logoUrl: pick(settings.logoUrl, o.logoUrl),
+    showLogo: settings.showLogo !== false && o.showLogo !== false,
+    state: pick(settings.state, meta.state, o.state),
+    stateCode,
     autoFestiveTheme: settings.autoFestiveTheme === true,
     showFestivalGreeting: !!settings.showFestivalGreeting,
-    invoiceTemplateId: settings.invoiceTemplateId || 'gst-formal',
+    invoiceTemplateId: settings.invoiceTemplateId || o.invoiceTemplateId || 'gst-formal',
   });
 };
 
 function normalizeCompany(c) {
+  const gstin = String(c.gstin || '').replace(/\s/g, '').toUpperCase();
+  const rawName = String(c.name || c.legalName || '').trim();
   return {
-    name: c.name || c.legalName || 'Company',
+    name: isPlaceholderName(rawName) ? '' : rawName || '',
     tagline: c.tagline || '',
     address: c.address || '',
     area: c.area || '',
     phone: c.phone || '',
     email: c.email || '',
     website: c.website || '',
-    gstin: c.gstin || '',
+    gstin,
     pan: c.pan || '',
     bankName: c.bankName || '',
     accountName: c.accountName || '',
@@ -64,7 +113,7 @@ function normalizeCompany(c) {
     logoUrl: c.logoUrl || '',
     showLogo: c.showLogo !== false,
     state: c.state || '',
-    stateCode: c.stateCode || '',
+    stateCode: c.stateCode || stateCodeFromGstin(gstin) || '',
     autoFestiveTheme: c.autoFestiveTheme === true,
     showFestivalGreeting: !!c.showFestivalGreeting,
     invoiceTemplateId: c.invoiceTemplateId || 'gst-formal',
@@ -146,7 +195,8 @@ export const buildWhatsAppMessage = ({ type, invoice, party, company }) => {
   const invNo = invoice?.invoiceNo || invoice?.billNo || '—';
   const amt = fmtMoney(invoice?.netAmount || invoice?.totalAmount || 0);
   const partyName = party?.name || 'Customer';
-  return `*${firm.name}*\n${type || 'Invoice'} ${invNo}\nParty: ${partyName}\nAmount: ${amt}\nGSTIN: ${firm.gstin || '—'}`;
+  const firmLabel = firm.name || 'Company';
+  return `*${firmLabel}*\n${type || 'Invoice'} ${invNo}\nParty: ${partyName}\nAmount: ${amt}\nGSTIN: ${firm.gstin || '—'}`;
 };
 
 export const openWhatsAppShare = (message, phone = '') => {

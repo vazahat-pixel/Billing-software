@@ -15,7 +15,10 @@ export const configApi = {
   billConfig: (billType) => unwrap(get(`/config/bills/${billType}`)),
   saveBillConfig: (billType, body) => unwrap(put(`/config/bills/${billType}`, body)),
   getSettings: () => unwrap(get('/config/settings')),
-  saveSettings: (body) => unwrap(put('/config/settings', body)),
+  saveSettings: async (body) => {
+    const env = await put('/config/settings', body);
+    return { settings: env.data, bundle: env.raw?.bundle || null };
+  },
   getModules: () => unwrap(get('/config/modules')),
   saveModules: (body) => unwrap(put('/config/modules', body)),
   listColumns: () => unwrap(get('/config/columns')).then((d) => asArray(d)),

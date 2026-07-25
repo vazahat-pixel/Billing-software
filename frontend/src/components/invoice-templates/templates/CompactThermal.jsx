@@ -1,13 +1,15 @@
 import React from 'react';
+import { displayFirmName } from '../shared/TaxInvoiceLayout';
 
 /**
- * Compact thermal / POS roll — 58mm or 80mm, text-only, no color dependency.
- * pageSize prop: 'thermal-80' | 'thermal-58'
+ * Compact thermal / POS roll — 58mm or 80mm, text-only.
+ * pageSize: 'thermal-80' | 'thermal-58'
  */
 export default function CompactThermal({ data, pageSize = 'thermal-80' }) {
   const width = pageSize === 'thermal-58' ? '48mm' : '68mm';
   const { company, meta, billTo, lines, totals, fmt, isIgst, bank } = data;
   const mono = "'Courier New', Courier, monospace";
+  const firmName = displayFirmName(company?.name);
 
   const line = (left, right) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
@@ -32,15 +34,28 @@ export default function CompactThermal({ data, pageSize = 'thermal-80' }) {
         lineHeight: 1.35,
       }}
     >
-      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 12 }}>{company.name}</div>
+      <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 12 }}>
+        {firmName || ''}
+      </div>
       <div style={{ textAlign: 'center', fontSize: 9 }}>
         {[company.address, company.area].filter(Boolean).join(', ')}
       </div>
-      <div style={{ textAlign: 'center', fontSize: 9 }}>
-        Ph: {company.phone || '—'}
-      </div>
-      <div style={{ textAlign: 'center', fontSize: 9 }}>GSTIN: {company.gstin || '—'}</div>
-      <div style={{ borderTop: '1px dashed #000', borderBottom: '1px dashed #000', margin: '6px 0', padding: '4px 0', textAlign: 'center', fontWeight: 700 }}>
+      {company.phone ? (
+        <div style={{ textAlign: 'center', fontSize: 9 }}>Ph: {company.phone}</div>
+      ) : null}
+      {company.gstin ? (
+        <div style={{ textAlign: 'center', fontSize: 9 }}>GSTIN: {company.gstin}</div>
+      ) : null}
+      <div
+        style={{
+          borderTop: '1px dashed #000',
+          borderBottom: '1px dashed #000',
+          margin: '6px 0',
+          padding: '4px 0',
+          textAlign: 'center',
+          fontWeight: 700,
+        }}
+      >
         {data.docTitle}
         <br />
         {data.copyLabel}
@@ -51,7 +66,6 @@ export default function CompactThermal({ data, pageSize = 'thermal-80' }) {
       {line('Party:', billTo.name)}
       {billTo.gstin ? line('GSTIN:', billTo.gstin) : null}
       {line('POS:', meta.placeOfSupply)}
-      {line('RCM:', meta.reverseCharge)}
 
       <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
       {line('ITEM', 'AMT')}
@@ -79,27 +93,18 @@ export default function CompactThermal({ data, pageSize = 'thermal-80' }) {
       ) : (
         line('IGST', fmt.money(totals.igst))
       )}
-      {totals.roundOff !== 0 && line('Round Off', fmt.money(totals.roundOff))}
-      <div style={{ borderTop: '1px solid #000', marginTop: 4, paddingTop: 4, fontWeight: 700, fontSize: 12 }}>
-        {line('TOTAL', fmt.money(totals.grandTotal))}
-      </div>
-
-      <div style={{ marginTop: 6, fontSize: 8, textAlign: 'center' }}>{totals.amountWords}</div>
-
-      {(bank.upiId || bank.accountNo) && (
-        <div style={{ marginTop: 8, fontSize: 8, borderTop: '1px dashed #000', paddingTop: 4 }}>
-          {bank.bankName ? <div>{bank.bankName}</div> : null}
-          {bank.accountNo ? <div>A/c: {bank.accountNo}</div> : null}
-          {bank.ifsc ? <div>IFSC: {bank.ifsc}</div> : null}
-          {bank.upiId ? <div>UPI: {bank.upiId}</div> : null}
-        </div>
+      {line('TOTAL', fmt.money(totals.grandTotal))}
+      {(bank?.bankName || bank?.accountNo) && (
+        <>
+          <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+          <div style={{ fontSize: 9 }}>
+            {bank.bankName}
+            {bank.accountNo ? ` A/c ${bank.accountNo}` : ''}
+            {bank.ifsc ? ` IFSC ${bank.ifsc}` : ''}
+          </div>
+        </>
       )}
-
-      <div style={{ marginTop: 10, textAlign: 'center', fontSize: 8 }}>
-        Thank you
-        <br />
-        Computer generated
-      </div>
+      <div style={{ textAlign: 'center', marginTop: 8, fontSize: 9 }}>*** Thank You ***</div>
     </div>
   );
 }

@@ -32,15 +32,12 @@ const useInvoiceTemplateStore = create(
       clearForceTemplate: () => set({ forceTemplate: false }),
 
       applyFestiveAuto: () =>
-        set({ selectedTemplateId: 'festive-edition', forceTemplate: false }),
+        set({ selectedTemplateId: 'gst-formal', forceTemplate: false }),
 
       hydrateFromSettings: (settings = {}) => {
         const next = {};
         if (settings.invoiceTemplateId) {
-          let raw = settings.invoiceTemplateId;
-          // Stock / festive defaults → professional GST Formal
-          if (raw === 'classic-ledger' || raw === 'festive-edition') raw = 'gst-formal';
-          next.selectedTemplateId = normalizeTemplateId(raw);
+          next.selectedTemplateId = normalizeTemplateId(settings.invoiceTemplateId);
           next.forceTemplate = true;
         }
         if (typeof settings.showFestivalGreeting === 'boolean') {
@@ -59,7 +56,7 @@ const useInvoiceTemplateStore = create(
     }),
     {
       name: 'invoice-template-prefs',
-      version: 4,
+      version: 5,
       migrate: (persistedState, version) => {
         if (!persistedState) return persistedState;
         let next = { ...persistedState };
@@ -69,15 +66,19 @@ const useInvoiceTemplateStore = create(
         if (version < 3) {
           next = {
             ...next,
-            selectedTemplateId:
-              next.selectedTemplateId === 'festive-edition'
-                ? 'gst-formal'
-                : next.selectedTemplateId || 'gst-formal',
+            selectedTemplateId: 'gst-formal',
             forceTemplate: true,
           };
         }
         if (version < 4) {
           next = { ...next, zoom: 85, pageSize: 'a4' };
+        }
+        if (version < 5) {
+          next = {
+            ...next,
+            selectedTemplateId: normalizeTemplateId(next.selectedTemplateId),
+            forceTemplate: true,
+          };
         }
         return next;
       },

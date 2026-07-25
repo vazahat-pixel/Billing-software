@@ -82,6 +82,21 @@ class JobService {
         );
       }
 
+      // Normalize textile / process-charge form fields
+      if (issueData.date && !issueData.issueDate) {
+        issueData.issueDate = new Date(issueData.date);
+      }
+      if (issueData.jobRate != null && issueData.processCharges == null) {
+        issueData.processCharges = Number(issueData.jobRate) || 0;
+      }
+      if (issueData.chargesRate != null && !issueData.jobRate) {
+        issueData.jobRate = Number(issueData.chargesRate) || 0;
+        if (!issueData.processCharges) issueData.processCharges = issueData.jobRate;
+      }
+      if (issueData.remarks && !issueData.remark) {
+        issueData.remark = issueData.remarks;
+      }
+
       const job = new Job(issueData);
       await job.save({ session });
 

@@ -6,7 +6,9 @@ import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import { configApi } from '../../api';
 import { useConfig } from '../../context/ConfigContext';
 import useStore from '../../store/useStore';
+import useConfigStore from '../../store/useConfigStore';
 import { toast } from '../../store/useToastStore';
+import { stateCodeFromGstin, stateNameFromCode } from '../../utils/gstStateCodes';
 import { InlineLoader } from '../../components/ui/loaders';
 import { Save, ChevronDown, ChevronUp, Sliders, ExternalLink } from 'lucide-react';
 import {
@@ -80,16 +82,11 @@ const ROLE_OPTIONS = [
 ];
 
 const PRINT_TEMPLATES = [
-  { value: 'gst-formal', label: 'GST Formal (Professional)' },
-  { value: 'classic-ledger', label: 'Classic Ledger' },
-  { value: 'corporate-minimal', label: 'Corporate Minimal' },
-  { value: 'gold-letterhead', label: 'Gold Letterhead' },
-  { value: 'festive-edition', label: 'Festive Edition' },
-  { value: 'compact-thermal', label: 'Compact Thermal' },
-  // legacy aliases kept for older saved configs
-  { value: 'classic', label: 'Classic (legacy → Ledger)' },
-  { value: 'compact', label: 'Compact (legacy → Thermal)' },
-  { value: 'modern', label: 'Modern (legacy → Corporate)' },
+  { value: 'gst-formal', label: 'GST Formal (Tax Invoice Grid)' },
+  { value: 'erp-classic', label: 'ERP Classic (Busy / Tally)' },
+  { value: 'commerce-pro', label: 'Commerce Pro (Modern CRM)' },
+  { value: 'executive', label: 'Executive (Navy Premium)' },
+  { value: 'compact-thermal', label: 'Thermal POS (58/80mm)' },
 ];
 
 const emptySettings = () => ({
@@ -417,7 +414,18 @@ const CompanySettingsModal = ({ isOpen, onClose, initialTab = 'appearance', init
     if (!canEdit) return;
     setSaving(true);
     try {
-      await configApi.saveSettings(settings);
+      const payload = { ...settings };
+      const gstin = String(payload.gstin || '').replace(/\s/g, '').toUpperCase();
+      if (gstin && !String(payload.stateCode || '').trim() && /^\d{2}/.test(gstin)) {
+        payload.stateCode = gstin.slice(0, 2);
+      }
+      const { settings: saved, bundle } = await configApi.saveSettings(payload);
+      const next = saved || payload;
+      setSettings((s) => ({ ...s, ...next }));
+      useConfigStore.getState().patchCompanySettings(next);
+      if (bundle) {
+        useConfigStore.getState().syncBundle(bundle);
+      }
       await refreshConfig();
       toast.success('Settings saved');
     } catch (err) {
@@ -562,7 +570,25 @@ const CompanySettingsModal = ({ isOpen, onClose, initialTab = 'appearance', init
       {loading ? <InlineLoader /> : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FieldRow label="GSTIN"><ERPInput className="w-full" value={settings.gstin} onChange={(e) => setSetting('gstin', e.target.value)} disabled={!canEdit} /></FieldRow>
+            <FieldRow label="GSTIN">
+              <ERPInput
+                className="w-full"
+                value={settings.gstin}
+                onChange={(e) => {
+                  const gstin = e.target.value;
+                  const code = stateCodeFromGstin(gstin);
+                  setSettings((s) => ({
+                    ...s,
+                    gstin,
+                    ...(code && !String(s.stateCode || '').trim() ? { stateCode: code } : {}),
+                    ...(code && !String(s.state || '').trim() && stateNameFromCode(code)
+                      ? { state: stateNameFromCode(code) }
+                      : {}),
+                  }));
+                }}
+                disabled={!canEdit}
+              />
+            </FieldRow>
             <FieldRow label="PAN"><ERPInput className="w-full" value={settings.pan} onChange={(e) => setSetting('pan', e.target.value)} disabled={!canEdit} /></FieldRow>
             <FieldRow label="TAN"><ERPInput className="w-full" value={settings.tan} onChange={(e) => setSetting('tan', e.target.value)} disabled={!canEdit} /></FieldRow>
             <FieldRow label="GST Scheme"><ERPSelect className="w-full" value={settings.gstScheme} onChange={(e) => setSetting('gstScheme', e.target.value)} options={GST_SCHEME_OPTIONS} disabled={!canEdit} /></FieldRow>
@@ -612,9 +638,7 @@ const CompanySettingsModal = ({ isOpen, onClose, initialTab = 'appearance', init
                 className="w-full"
                 value={settings.invoiceTemplateId || 'gst-formal'}
                 onChange={(e) => setSetting('invoiceTemplateId', e.target.value)}
-                options={PRINT_TEMPLATES.filter((t) =>
-                  ['gst-formal', 'classic-ledger', 'corporate-minimal', 'gold-letterhead', 'festive-edition', 'compact-thermal'].includes(t.value)
-                )}
+                options={PRINT_TEMPLATES}
                 disabled={!canEdit}
               />
             </FieldRow>

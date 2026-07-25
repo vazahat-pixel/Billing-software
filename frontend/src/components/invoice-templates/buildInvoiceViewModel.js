@@ -239,30 +239,29 @@ export function buildInvoiceViewModel({
     (s, r) => s + Number(r.cgstAmt || 0) + Number(r.sgstAmt || 0) + Number(r.igstAmt || 0),
     0
   );
-  if (!taxRows.length || (gst > 0 && taxRowsGst < 0.01 && taxable > 0)) {
-    taxRows = [
-      {
-        taxPct: gstRate,
-        taxValue: taxable,
-        cgstPct: isIgst ? 0 : halfRate,
-        cgstAmt: cgst,
-        sgstPct: isIgst ? 0 : halfRate,
-        sgstAmt: sgst,
-        igstPct: isIgst ? gstRate : 0,
-        igstAmt: igst,
-        cessPct: 0,
-        cessAmt: cess,
-        total: taxable + gst,
-      },
-    ];
+  // Prefer bill-level GST when line tax amounts drift (e.g. 1.50 vs 879.85)
+  const billTaxRow = {
+    taxPct: gstRate,
+    taxValue: taxable,
+    cgstPct: isIgst ? 0 : halfRate,
+    cgstAmt: cgst,
+    sgstPct: isIgst ? 0 : halfRate,
+    sgstAmt: sgst,
+    igstPct: isIgst ? gstRate : 0,
+    igstAmt: igst,
+    cessPct: 0,
+    cessAmt: cess,
+    total: taxable + gst,
+  };
+  if (!taxRows.length || (gst > 0 && Math.abs(taxRowsGst - gst) > 0.5 && taxable > 0)) {
+    taxRows = [billTaxRow];
   }
 
   const warnings = [];
+  const firmName = String(firm.name || '').trim();
   if (!firm.gstin) warnings.push('Add Company GSTIN in Company Settings');
-  if (!firm.name || firm.name === 'Company') warnings.push('Set Business Legal Name in Company Settings');
+  if (!firmName) warnings.push('Set Business Legal Name in Company Settings');
   if (!party?.name) warnings.push('Bill-To party name is missing on this invoice');
-  if (!firm.bankName && !firm.accountNo) warnings.push('Optional: add bank details for the invoice footer');
-  if (showLogo && !firm.logoUrl) warnings.push('Optional: add logo URL for letterhead');
 
   const shipTo =
     invoice.shipToName || invoice.shippingAddress

@@ -140,12 +140,16 @@ const Dashboard = () => {
       const st = companySettings || {};
       const meta = companyMeta?.meta || {};
       const gaps = [];
-      const name = st.legalName || st.shortName || companyMeta?.name || '';
-      if (!name || name === 'Company' || name === 'My Company') gaps.push('Company legal name');
-      if (!(st.gstin || meta.gstin)) gaps.push('GSTIN');
-      if (!(st.address || meta.address)) gaps.push('Address');
-      if (!(st.stateCode || meta.stateCode)) gaps.push('State code');
-      if (!(st.bankName || st.accountNo)) gaps.push('Bank details');
+      const name = String(st.legalName || st.shortName || companyMeta?.name || '').trim();
+      if (!name || /^company$/i.test(name) || /^my company$/i.test(name)) gaps.push('Company legal name');
+      const gstin = String(st.gstin || meta.gstin || '').replace(/\s/g, '').toUpperCase();
+      if (!gstin || gstin.length < 15) gaps.push('GSTIN');
+      if (!String(st.address || meta.address || '').trim()) gaps.push('Address');
+      const stateCode =
+         String(st.stateCode || meta.stateCode || '').trim() ||
+         (gstin.length >= 2 && /^\d{2}/.test(gstin) ? gstin.slice(0, 2) : '');
+      if (!stateCode) gaps.push('State code');
+      if (!String(st.bankName || st.accountNo || '').trim()) gaps.push('Bank details');
       return gaps;
    }, [companySettings, companyMeta]);
    const { bundle, moduleConfig: liveModuleConfig, lastSynced } = useConfig();

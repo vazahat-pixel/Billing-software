@@ -40,12 +40,15 @@ export const ConfigProvider = ({ children }) => {
     [syncActiveConfig, syncBundle]
   );
 
-  const fetchBundle = useCallback(async () => {
-    if (!token || fetchingRef.current || isOffline()) return null;
+  const fetchBundle = useCallback(async (opts = {}) => {
+    const force = opts === true || opts?.force === true;
+    if (!token || isOffline()) return null;
+    if (fetchingRef.current && !force) return null;
     fetchingRef.current = true;
     try {
       const data = await configApi.active({ silent: true });
       if (data) {
+        if (force) hashRef.current = null;
         applyBundle(data);
         return data;
       }
@@ -117,7 +120,7 @@ export const ConfigProvider = ({ children }) => {
     loading,
     lastSynced,
     moduleConfig,
-    refreshConfig: fetchBundle,
+    refreshConfig: () => fetchBundle({ force: true }),
     configVersion: bundle?.bundleVersion || user?.configVersion || 0,
     configHash: bundle?.configHash || user?.configHash || null,
   };

@@ -83,6 +83,14 @@ const JobSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  /** Process-charge / textile challan extras (optional — UI form fields) */
+  challanNo: { type: String, default: '' },
+  weaver: { type: String, default: '' },
+  purchaseBillNo: { type: String, default: '' },
+  purchaseRate: { type: Number, default: 0, min: 0 },
+  jobRate: { type: Number, default: 0, min: 0 },
+  finish: { type: String, default: '' },
+  remark: { type: String, default: '' },
   receivedPcs: {
     type: Number,
     default: 0

@@ -10,6 +10,7 @@ import {
   TemplatePicker,
   buildInvoiceViewModel,
   invoicePrintCss,
+  normalizeTemplateId,
 } from './invoice-templates';
 import { WarningsBanner } from './invoice-templates/shared/FieldWarning';
 import useInvoiceTemplateStore from '../store/useInvoiceTemplateStore';
@@ -36,28 +37,34 @@ const InvoicePDFViewer = ({
     pageSize,
     zoom,
     copyLabel,
-    showFestivalGreeting,
     setSelectedTemplateId,
     setPageSize,
     setZoom,
     setCopyLabel,
-    setShowFestivalGreeting,
     hydrateFromSettings,
   } = useInvoiceTemplateStore();
 
   const companySettings = useConfigStore((s) => s.companySettings);
+  const configCompany = useConfigStore((s) => s.company);
 
   useEffect(() => {
     if (companySettings) hydrateFromSettings(companySettings);
   }, [companySettings, hydrateFromSettings]);
 
-  // Always open on professional GST Formal (avoid festive/other leftovers)
+  // Prefer last chosen professional template; map deleted festive → formal
   useEffect(() => {
-    setSelectedTemplateId('gst-formal');
-    setPageSize('a4');
-  }, [invoice?._id || invoice?.id, setSelectedTemplateId, setPageSize]);
+    const id = normalizeTemplateId(selectedTemplateId);
+    if (id !== selectedTemplateId) setSelectedTemplateId(id);
+    if (pageSize.startsWith('thermal') && id !== 'compact-thermal') {
+      setPageSize('a4');
+    }
+  }, [invoice?._id || invoice?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const firm = useMemo(() => resolveCompanyProfile(company), [company]);
+  // Live company settings always win over any stale prop
+  const firm = useMemo(
+    () => resolveCompanyProfile(company),
+    [company, companySettings, configCompany]
+  );
 
   const effectivePageSize =
     selectedTemplateId === 'compact-thermal'
@@ -105,7 +112,7 @@ const InvoicePDFViewer = ({
       showFestivalGreeting: false,
       showLogo: firm.showLogo !== false,
     });
-  }, [type, invoice, parties, items, company, copyLabel, firm.showLogo]);
+  }, [type, invoice, parties, items, company, copyLabel, firm, companySettings]);
 
   if (!invoice || !viewModel) return null;
 
@@ -122,11 +129,90 @@ const InvoicePDFViewer = ({
   const docTitle = viewModel.docTitle;
 
   const handlePrint = () => {
+    const paper = paperRef.current;
+    if (!paper) return;
+
+    // Force A4 for tax-invoice print (thermal stays thermal)
+    const isThermal = String(effectivePageSize || '').startsWith('thermal');
+    const pageWmm = isThermal
+      ? effectivePageSize === 'thermal-58'
+        ? 58
+        : 80
+      : 210;
+    const pageHmm = isThermal ? 297 : 297;
+    const marginMm = isThermal ? 2 : 5;
+    const contentWmm = pageWmm - marginMm * 2;
+    const contentHmm = pageHmm - marginMm * 2;
+
+    let styleEl = document.getElementById('invoice-print-style');
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = 'invoice-print-style';
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = isThermal
+      ? invoicePrintCss.replace('210mm 297mm', `${pageWmm}mm ${pageHmm}mm`).replace(/200mm/g, `${contentWmm}mm`).replace('margin: 5mm', `margin: ${marginMm}mm`)
+      : invoicePrintCss;
+
+    const mmToPx = (mm) => (mm * 96) / 25.4;
+    const contentWpx = mmToPx(contentWmm);
+    const contentHpx = mmToPx(contentHmm);
+
+    const root = document.createElement('div');
+    root.id = 'invoice-print-root';
+    root.style.cssText = [
+      'position:fixed',
+      'left:0',
+      'top:0',
+      `width:${contentWmm}mm`,
+      'margin:0',
+      'padding:0',
+      'background:#fff',
+      'overflow:hidden',
+      'z-index:2147483647',
+    ].join(';');
+
+    const clone = paper.cloneNode(true);
+    clone.id = 'invoice-print-clone';
+    clone.style.cssText = [
+      `width:${contentWmm}mm`,
+      'max-width:100%',
+      'margin:0',
+      'padding:0',
+      'box-shadow:none',
+      'background:#fff',
+      'transform-origin:top left',
+      'zoom:1',
+    ].join(';');
+    root.appendChild(clone);
+    document.body.appendChild(root);
     document.body.classList.add('invoice-printing');
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => document.body.classList.remove('invoice-printing'), 500);
-    }, 80);
+
+    // Scale down to fit A4 height if content is taller than printable area
+    const naturalH = clone.scrollHeight || clone.offsetHeight;
+    const naturalW = clone.scrollWidth || contentWpx;
+    const scaleH = naturalH > 0 ? contentHpx / naturalH : 1;
+    const scaleW = naturalW > 0 ? contentWpx / naturalW : 1;
+    const fit = Math.min(1, scaleH, scaleW);
+
+    if (fit < 0.999) {
+      // zoom affects layout size in Chromium (avoids blank 2nd page from transform)
+      clone.style.zoom = String(fit);
+    }
+
+    const cleanup = () => {
+      document.body.classList.remove('invoice-printing');
+      root.remove();
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.print();
+        setTimeout(cleanup, 2000);
+      });
+    });
   };
 
   const handleDownloadPdf = async () => {
@@ -154,40 +240,34 @@ const InvoicePDFViewer = ({
       });
 
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const format =
-        effectivePageSize === 'a5'
-          ? 'a5'
-          : effectivePageSize.startsWith('thermal')
-            ? [
-                effectivePageSize === 'thermal-58' ? 58 : 80,
-                Math.max(
-                  120,
-                  (canvas.height * (effectivePageSize === 'thermal-58' ? 58 : 80)) / canvas.width
-                ),
-              ]
-            : 'a4';
+      const isThermal = String(effectivePageSize || '').startsWith('thermal');
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: Array.isArray(format) ? format : format,
+        format: effectivePageSize === 'a5' ? 'a5' : isThermal
+          ? [
+              effectivePageSize === 'thermal-58' ? 58 : 80,
+              Math.max(
+                120,
+                (canvas.height * (effectivePageSize === 'thermal-58' ? 58 : 80)) / canvas.width
+              ),
+            ]
+          : 'a4',
       });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * pageWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft > 2) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      const margin = isThermal ? 2 : 5;
+      const maxW = pageWidth - margin * 2;
+      const maxH = pageHeight - margin * 2;
+      let imgWidth = maxW;
+      let imgHeight = (canvas.height * imgWidth) / canvas.width;
+      if (imgHeight > maxH) {
+        imgHeight = maxH;
+        imgWidth = (canvas.width * imgHeight) / canvas.height;
       }
+      const x = margin + (maxW - imgWidth) / 2;
+      const y = margin;
+      pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight);
 
       const filename = `${isSale ? 'Invoice' : 'Purchase'}_${String(docNo).replace(/[^\w.-]+/g, '_')}.pdf`;
       pdf.save(filename);
@@ -223,7 +303,7 @@ const InvoicePDFViewer = ({
 
   return (
     <div
-      className={`invoice-pdf-overlay invoice-page-${effectivePageSize} fixed inset-0 z-[10000] bg-[#2a2a2a]/80 flex flex-col print:static print:bg-white print:z-auto`}
+      className={`invoice-pdf-overlay invoice-page-${effectivePageSize} fixed inset-0 z-[10000] bg-[#2a2a2a]/80 flex flex-col print:static print:inset-auto print:block print:h-auto print:min-h-0 print:bg-white print:z-auto`}
     >
       <div className="invoice-pdf-toolbar shrink-0 flex items-center justify-between gap-3 px-3 py-2 bg-[#f5f0e8] border-b border-[#3d2914] print:hidden">
         <div className="min-w-0">
@@ -248,7 +328,7 @@ const InvoicePDFViewer = ({
         </div>
       </div>
 
-      <div className="flex-1 flex min-h-0 print:block print:h-auto">
+      <div className="flex-1 flex min-h-0 print:block print:h-auto print:min-h-0 print:overflow-visible">
         <aside className="invoice-pdf-sidebar print:hidden w-[200px] shrink-0 bg-[#faf8f5] border-r border-[#c4b8a8] overflow-y-auto flex flex-col">
           <div className="px-2.5 py-2 border-b border-[#c4b8a8] bg-[#efe8dc]">
             <div className="text-[10px] font-bold uppercase tracking-wider text-[#3d2914]">Invoice Style</div>
@@ -314,17 +394,6 @@ const InvoicePDFViewer = ({
                 Fit to width
               </button>
             </div>
-
-            {selectedTemplateId === 'festive-edition' && (
-              <label className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={showFestivalGreeting}
-                  onChange={(e) => setShowFestivalGreeting(e.target.checked)}
-                />
-                Festival greeting
-              </label>
-            )}
           </div>
 
           {viewModel.warnings?.length ? (
@@ -336,10 +405,10 @@ const InvoicePDFViewer = ({
 
         <div
           ref={previewPaneRef}
-          className="invoice-print-body flex-1 overflow-auto p-4 bg-[#d6d0c4] print:p-0 print:overflow-visible print:bg-white"
+          className="invoice-print-body flex-1 overflow-auto p-4 bg-[#d6d0c4] print:p-0 print:m-0 print:overflow-visible print:bg-white print:h-auto print:min-h-0"
         >
           <div
-            className="invoice-print-scale mx-auto print:!transform-none"
+            className="invoice-print-scale mx-auto print:!transform-none print:!zoom-100 print:m-0 print:w-full"
             style={{
               width: paperWidth,
               zoom: scale,
@@ -347,13 +416,13 @@ const InvoicePDFViewer = ({
                 typeof CSS !== 'undefined' && !CSS.supports?.('zoom', '1')
                   ? `scale(${scale})`
                   : undefined,
-              transformOrigin: 'top center',
+              transformOrigin: 'top left',
             }}
           >
             <div
               ref={paperRef}
               id="invoice-pdf-paper"
-              className="invoice-pdf-paper bg-white"
+              className="invoice-pdf-paper bg-white print:shadow-none print:m-0 print:w-full"
               style={{
                 width: paperWidth,
                 boxSizing: 'border-box',
