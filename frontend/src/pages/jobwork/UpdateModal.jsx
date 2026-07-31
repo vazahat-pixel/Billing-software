@@ -7,6 +7,8 @@ import { toast } from '../../store/useToastStore';
 import { Plus } from 'lucide-react';
 import AccountMasterModal from '../masters/AccountMasterModal';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
+import WeaverLookupModal from './WeaverLookupModal';
+import PuBillLookupModal from './PuBillLookupModal';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -65,9 +67,13 @@ const emptyForm = (book) => ({
 const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
   const {
     parties,
+    items,
+    purchases,
     inventoryLots,
     jobWorkEntries,
     fetchParties,
+    fetchItems,
+    fetchPurchases,
     fetchInventory,
     fetchJobs,
     issueToMill,
@@ -81,6 +87,8 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
   const [lotSort, setLotSort] = useState('asc'); // asc | desc
   const [accountModal, setAccountModal] = useState({ open: false, initialData: null });
   const [findOpen, setFindOpen] = useState(false);
+  const [weaverLookupOpen, setWeaverLookupOpen] = useState(false);
+  const [puBillLookupOpen, setPuBillLookupOpen] = useState(false);
 
   const locked = mode === 'View';
 
@@ -174,7 +182,7 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
     setBootLoading(true);
     setMode('Add');
     resetForm();
-    Promise.all([fetchParties(), fetchInventory(), fetchJobs()])
+    Promise.all([fetchParties(), fetchItems(), fetchPurchases(), fetchInventory(), fetchJobs()])
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setBootLoading(false);
@@ -182,7 +190,45 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
     return () => {
       cancelled = true;
     };
-  }, [isOpen, selectedBook, fetchParties, fetchInventory, fetchJobs, resetForm]);
+  }, [isOpen, selectedBook, fetchParties, fetchItems, fetchPurchases, fetchInventory, fetchJobs, resetForm]);
+
+  const applyPuBillRow = (row) => {
+    if (!row) return;
+    setForm((f) => ({
+      ...f,
+      puBillNo: row.billNo || f.puBillNo,
+      itemName: row.itemName || f.itemName,
+      lotId: row.lotId || f.lotId,
+      issPcs: row.balPcs != null ? String(row.balPcs) : f.issPcs,
+      issQty: row.balMts != null ? String(row.balMts) : f.issQty,
+      puRate: row.puRate != null ? String(row.puRate) : f.puRate,
+    }));
+    toast.success(`Loaded ${row.billNo} · ${row.itemName}`);
+  };
+
+  const handleWeaverSelect = (party) => {
+    const name = party?.name || '';
+    setField('weaver', name);
+    setWeaverLookupOpen(false);
+    if (!locked) {
+      setTimeout(() => setPuBillLookupOpen(true), 80);
+    }
+  };
+
+  const openWeaverLookup = () => {
+    if (locked) return;
+    setWeaverLookupOpen(true);
+  };
+
+  const openPuBillLookup = () => {
+    if (locked) return;
+    if (!form.weaver?.trim()) {
+      toast.warning('Select Weaver first');
+      setWeaverLookupOpen(true);
+      return;
+    }
+    setPuBillLookupOpen(true);
+  };
 
   const applyLot = (lotId) => {
     const lot = availableLots.find((l) => String(l._id || l.id) === String(lotId));
@@ -386,7 +432,7 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
         bare
       >
         {({ WindowControls }) => (
-          <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 !max-h-none">
+          <div className="classic-erp-window erp-density erp-job-issue-window flex flex-col h-full min-h-0 !max-h-none">
             <ErpBusyOverlay show={bootLoading} message="Loading job issue…" />
             <ErpBusyOverlay show={!bootLoading && saving} message="Saving job issue…" />
 
@@ -399,16 +445,15 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
 
             <form
               onSubmit={(e) => handleSave(e)}
-              className="classic-erp-body flex-1 overflow-y-auto flex flex-col gap-2 min-h-0"
+              className="classic-erp-body erp-job-issue-body flex-1 overflow-y-auto min-h-0"
             >
-              <div className="flex flex-col lg:flex-row gap-2 flex-1 min-h-0">
-                {/* Left — main fields (image layout) */}
-                <div className="classic-erp-frame flex-1 space-y-1.5 min-w-0">
+              <div className="classic-erp-frame erp-job-issue-split">
+                <div className="classic-erp-stack erp-job-issue-main min-w-0">
                   {findOpen && (
                     <div className="classic-erp-field classic-erp-field--lg">
-                      <span className="classic-erp-label blue-label">Find:</span>
+                      <span className="classic-erp-label blue-label">Find</span>
                       <ERPSelect
-                        className="classic-erp-select flex-1"
+                        className="classic-erp-select"
                         value={selectedJobId}
                         onChange={(e) => loadJob(e.target.value)}
                         options={jobOptions}
@@ -419,10 +464,10 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
                   )}
 
                   <div className="classic-erp-field">
-                    <span className="classic-erp-label red-label w-[88px]">Challan No</span>
+                    <span className="classic-erp-label red-label">Challan No</span>
                     <input
                       type="text"
-                      className="classic-erp-input flex-1 font-bold"
+                      className="classic-erp-input font-bold"
                       value={form.challanNo}
                       onChange={(e) => setField('challanNo', e.target.value)}
                       disabled={locked}
@@ -430,23 +475,23 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
                   </div>
 
                   <div className="classic-erp-field">
-                    <span className="classic-erp-label red-label w-[88px]">Date</span>
-                    <input
-                      type="date"
-                      className="classic-erp-input w-[150px]"
-                      value={form.date}
-                      onChange={(e) => setField('date', e.target.value)}
-                      disabled={locked}
-                      required
-                    />
-                    <span className="text-[11px] font-bold text-slate-700 w-10">
-                      {weekday(form.date)}
-                    </span>
+                    <span className="classic-erp-label red-label">Date</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="date"
+                        className="classic-erp-input erp-job-issue-date"
+                        value={form.date}
+                        onChange={(e) => setField('date', e.target.value)}
+                        disabled={locked}
+                        required
+                      />
+                      <span className="erp-job-issue-weekday">{weekday(form.date)}</span>
+                    </div>
                   </div>
 
                   <div className="classic-erp-field classic-erp-field--lg">
-                    <span className="classic-erp-label red-label w-[88px]">MillName</span>
-                    <div className="flex items-center gap-1 min-w-0 flex-1">
+                    <span className="classic-erp-label red-label">MillName</span>
+                    <div className="classic-erp-control">
                       <ERPCombobox
                         value={form.millId}
                         onChange={handleMillChange}
@@ -463,7 +508,7 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
                           type="button"
                           title="Add Mill"
                           onClick={() => handleCreateMill('')}
-                          className="shrink-0 inline-flex items-center gap-0.5 px-2 py-1 text-[11px] font-bold text-white bg-green-600 rounded"
+                          className="erp-job-issue-add-btn"
                         >
                           <Plus size={11} /> Add
                         </button>
@@ -472,32 +517,64 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
                   </div>
 
                   <div className="classic-erp-field">
-                    <span className="classic-erp-label w-[88px]">Weaver</span>
-                    <input
-                      type="text"
-                      className="classic-erp-input flex-1"
-                      value={form.weaver}
-                      onChange={(e) => setField('weaver', e.target.value)}
-                      disabled={locked}
-                    />
+                    <span className="classic-erp-label">Weaver</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="text"
+                        className="classic-erp-input cursor-pointer"
+                        value={form.weaver}
+                        readOnly
+                        onFocus={openWeaverLookup}
+                        onClick={openWeaverLookup}
+                        disabled={locked}
+                        placeholder="Click to select weaver…"
+                        title="Opens Account List — Enter to select Pu Bill"
+                      />
+                      {!locked && (
+                        <button
+                          type="button"
+                          className="classic-erp-btn erp-job-issue-lookup-btn"
+                          onClick={openWeaverLookup}
+                          aria-label="Select weaver"
+                        >
+                          …
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="classic-erp-field">
-                    <span className="classic-erp-label w-[88px]">Pu.BillNo</span>
-                    <input
-                      type="text"
-                      className="classic-erp-input w-[160px]"
-                      value={form.puBillNo}
-                      onChange={(e) => setField('puBillNo', e.target.value)}
-                      disabled={locked}
-                    />
+                    <span className="classic-erp-label">Pu.BillNo</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="text"
+                        className="classic-erp-input cursor-pointer font-bold"
+                        value={form.puBillNo}
+                        readOnly
+                        onFocus={openPuBillLookup}
+                        onClick={openPuBillLookup}
+                        disabled={locked}
+                        placeholder="Select bill…"
+                        title="Opens Purchase Bill list with balance"
+                      />
+                      {!locked && (
+                        <button
+                          type="button"
+                          className="classic-erp-btn erp-job-issue-lookup-btn"
+                          onClick={openPuBillLookup}
+                          aria-label="Select purchase bill"
+                        >
+                          …
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="classic-erp-field classic-erp-field--lg">
-                    <span className="classic-erp-label red-label w-[88px]">Item Name</span>
+                    <span className="classic-erp-label red-label">Item Name</span>
                     <input
                       type="text"
-                      className="classic-erp-input flex-1 font-bold uppercase"
+                      className="classic-erp-input font-bold uppercase"
                       value={form.itemName}
                       onChange={(e) => setField('itemName', e.target.value)}
                       disabled={locked}
@@ -506,23 +583,23 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-2 gap-y-1.5">
+                  <div className="erp-job-issue-metrics">
                     <div className="classic-erp-field">
-                      <span className="classic-erp-label w-[72px]">Iss Pcs</span>
+                      <span className="classic-erp-label">Iss Pcs</span>
                       <input
                         type="number"
-                        className="classic-erp-input flex-1 text-right font-bold"
+                        className="classic-erp-input text-right font-bold"
                         value={form.issPcs}
                         onChange={(e) => setField('issPcs', e.target.value)}
                         disabled={locked}
                       />
                     </div>
                     <div className="classic-erp-field">
-                      <span className="classic-erp-label red-label w-[72px]">Iss Qty</span>
+                      <span className="classic-erp-label red-label">Iss Qty</span>
                       <input
                         type="number"
                         step="0.001"
-                        className="classic-erp-input flex-1 text-right font-bold"
+                        className="classic-erp-input text-right font-bold"
                         value={form.issQty}
                         onChange={(e) => setField('issQty', e.target.value)}
                         disabled={locked}
@@ -530,29 +607,29 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
                       />
                     </div>
                     <div className="classic-erp-field">
-                      <span className="classic-erp-label w-[72px]">Pu.Rate</span>
+                      <span className="classic-erp-label">Pu.Rate</span>
                       <input
                         type="number"
                         step="0.01"
-                        className="classic-erp-input flex-1 text-right"
+                        className="classic-erp-input text-right"
                         value={form.puRate}
                         onChange={(e) => setField('puRate', e.target.value)}
                         disabled={locked}
                       />
                     </div>
                     <div className="classic-erp-field">
-                      <span className="classic-erp-label w-[72px]">JobRate</span>
+                      <span className="classic-erp-label">JobRate</span>
                       <input
                         type="number"
                         step="0.01"
-                        className="classic-erp-input flex-1 text-right font-bold"
+                        className="classic-erp-input text-right font-bold"
                         value={form.jobRate}
                         onChange={(e) => setField('jobRate', e.target.value)}
                         disabled={locked}
                       />
                     </div>
-                    <div className="classic-erp-field col-span-2">
-                      <span className="classic-erp-label red-label w-[72px]">Lot No.</span>
+                    <div className="classic-erp-field erp-job-issue-lot">
+                      <span className="classic-erp-label red-label">Lot No.</span>
                       <ERPCombobox
                         value={form.lotId}
                         onChange={(val) => applyLot(val)}
@@ -566,18 +643,18 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
                   </div>
 
                   <div className="classic-erp-field classic-erp-field--lg">
-                    <span className="classic-erp-label w-[88px]">Remark</span>
-                    <div className="flex-1 space-y-1">
+                    <span className="classic-erp-label">Remark</span>
+                    <div className="classic-erp-control classic-erp-control--stack">
                       <input
                         type="text"
-                        className="classic-erp-input w-full"
+                        className="classic-erp-input"
                         value={form.remark1}
                         onChange={(e) => setField('remark1', e.target.value)}
                         disabled={locked}
                       />
                       <input
                         type="text"
-                        className="classic-erp-input w-full"
+                        className="classic-erp-input"
                         value={form.remark2}
                         onChange={(e) => setField('remark2', e.target.value)}
                         disabled={locked}
@@ -586,19 +663,18 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
                   </div>
 
                   {selectedLot && (
-                    <div className="text-[10px] font-mono text-slate-600 px-1">
+                    <div className="erp-job-issue-stock">
                       Stock: {Number(selectedLot.remainingPcs || 0)} pcs ·{' '}
                       {Number(selectedLot.remainingMtrs || 0).toFixed(2)} mts
                     </div>
                   )}
                 </div>
 
-                {/* Right — ProcType / Finish / tools */}
-                <div className="classic-erp-frame w-full lg:w-[220px] shrink-0 space-y-2">
+                <aside className="erp-job-issue-side">
                   <div className="classic-erp-field">
-                    <span className="classic-erp-label w-[70px]">ProcType</span>
+                    <span className="classic-erp-label">ProcType</span>
                     <ERPSelect
-                      className="classic-erp-select flex-1"
+                      className="classic-erp-select"
                       value={form.procType}
                       onChange={(e) => setField('procType', e.target.value)}
                       options={processOptions}
@@ -608,7 +684,7 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
 
                   <button
                     type="button"
-                    className="classic-erp-btn w-full"
+                    className="classic-erp-btn"
                     onClick={handleJobCard}
                     disabled={locked}
                   >
@@ -616,9 +692,9 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
                   </button>
 
                   <div className="classic-erp-field">
-                    <span className="classic-erp-label w-[70px]">Finish</span>
+                    <span className="classic-erp-label">Finish</span>
                     <ERPSelect
-                      className="classic-erp-select flex-1"
+                      className="classic-erp-select"
                       value={form.finish}
                       onChange={(e) => setField('finish', e.target.value)}
                       options={FINISH_OPTIONS}
@@ -626,17 +702,17 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
                     />
                   </div>
 
-                  <div className="flex gap-1">
+                  <div className="erp-job-issue-sort">
                     <button
                       type="button"
-                      className={`classic-erp-btn flex-1 ${lotSort === 'asc' ? 'btn-blue' : ''}`}
+                      className={`classic-erp-btn ${lotSort === 'asc' ? 'btn-blue' : ''}`}
                       onClick={() => setLotSort('asc')}
                     >
                       Asc
                     </button>
                     <button
                       type="button"
-                      className={`classic-erp-btn flex-1 ${lotSort === 'desc' ? 'btn-blue' : ''}`}
+                      className={`classic-erp-btn ${lotSort === 'desc' ? 'btn-blue' : ''}`}
                       onClick={() => setLotSort('desc')}
                     >
                       Desc
@@ -645,21 +721,20 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
 
                   <button
                     type="button"
-                    className="classic-erp-btn w-full"
+                    className="classic-erp-btn"
                     disabled={locked || saving}
                     onClick={() => handleSave(null, { keepOpen: true })}
                   >
                     Create Multi Challan
                   </button>
 
-                  <p className="text-[10px] font-bold text-red-700 leading-tight pt-1">
+                  <p className="erp-job-issue-hint">
                     F1 &gt; SelectAll / F2 &gt; UnSelectAll
                   </p>
-                </div>
+                </aside>
               </div>
 
-              {/* Footer — same action set as classic Job Issue */}
-              <div className="classic-erp-form-footer shrink-0 flex flex-wrap gap-1">
+              <div className="classic-erp-form-footer erp-job-issue-footer shrink-0">
                 <button type="button" className="classic-erp-btn" onClick={handleNew} disabled={saving}>
                   New
                 </button>
@@ -732,6 +807,23 @@ const UpdateModal = ({ isOpen, onClose, selectedBook = null }) => {
         onClose={() => setAccountModal({ open: false, initialData: null })}
         initialData={accountModal.initialData}
         onSuccess={handleMillSuccess}
+      />
+
+      <WeaverLookupModal
+        isOpen={weaverLookupOpen}
+        onClose={() => setWeaverLookupOpen(false)}
+        parties={parties}
+        onSelect={handleWeaverSelect}
+      />
+
+      <PuBillLookupModal
+        isOpen={puBillLookupOpen}
+        onClose={() => setPuBillLookupOpen(false)}
+        weaver={form.weaver}
+        inventoryLots={inventoryLots}
+        purchases={purchases}
+        items={items}
+        onSelect={applyPuBillRow}
       />
     </>
   );

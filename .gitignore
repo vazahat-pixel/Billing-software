@@ -66,6 +66,7 @@ backend/qa/reports/output/
 
 # Backend scratch / dev scripts
 backend/scratch/
+scratch/
 backend/scripts/seedFeatureSetup.js
 backend/scripts/testOfflineFeature.js
 backend/scripts/testOfflineIntegration.js

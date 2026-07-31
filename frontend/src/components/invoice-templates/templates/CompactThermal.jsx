@@ -1,5 +1,6 @@
 import React from 'react';
-import { displayFirmName } from '../shared/TaxInvoiceLayout';
+
+const displayFirmName = (name) => String(name || '').trim();
 
 /**
  * Compact thermal / POS roll — 58mm or 80mm, text-only.

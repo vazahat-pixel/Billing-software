@@ -86,7 +86,7 @@ export const resolveCompanyProfile = (override) => {
     stateCode,
     autoFestiveTheme: settings.autoFestiveTheme === true,
     showFestivalGreeting: !!settings.showFestivalGreeting,
-    invoiceTemplateId: settings.invoiceTemplateId || o.invoiceTemplateId || 'gst-formal',
+    invoiceTemplateId: settings.invoiceTemplateId || o.invoiceTemplateId || 'textile-pro',
   });
 };
 
@@ -116,7 +116,7 @@ function normalizeCompany(c) {
     stateCode: c.stateCode || stateCodeFromGstin(gstin) || '',
     autoFestiveTheme: c.autoFestiveTheme === true,
     showFestivalGreeting: !!c.showFestivalGreeting,
-    invoiceTemplateId: c.invoiceTemplateId || 'gst-formal',
+    invoiceTemplateId: c.invoiceTemplateId || 'textile-pro',
   };
 }
 

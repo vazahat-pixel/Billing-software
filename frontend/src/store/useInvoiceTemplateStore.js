@@ -11,7 +11,7 @@ export { INVOICE_TEMPLATE_IDS };
 const useInvoiceTemplateStore = create(
   persist(
     (set, get) => ({
-      selectedTemplateId: 'gst-formal',
+      selectedTemplateId: 'textile-pro',
       pageSize: 'a4',
       zoom: 85,
       copyLabel: 'ORIGINAL',
@@ -32,7 +32,7 @@ const useInvoiceTemplateStore = create(
       clearForceTemplate: () => set({ forceTemplate: false }),
 
       applyFestiveAuto: () =>
-        set({ selectedTemplateId: 'gst-formal', forceTemplate: false }),
+        set({ selectedTemplateId: 'textile-pro', forceTemplate: false }),
 
       hydrateFromSettings: (settings = {}) => {
         const next = {};
@@ -56,29 +56,19 @@ const useInvoiceTemplateStore = create(
     }),
     {
       name: 'invoice-template-prefs',
-      version: 5,
+      version: 7,
       migrate: (persistedState, version) => {
         if (!persistedState) return persistedState;
         let next = { ...persistedState };
-        if (version < 2) {
-          next = { ...next, selectedTemplateId: 'gst-formal', forceTemplate: true };
-        }
-        if (version < 3) {
-          next = {
-            ...next,
-            selectedTemplateId: 'gst-formal',
-            forceTemplate: true,
-          };
-        }
-        if (version < 4) {
-          next = { ...next, zoom: 85, pageSize: 'a4' };
-        }
-        if (version < 5) {
+        if (version < 7) {
           next = {
             ...next,
             selectedTemplateId: normalizeTemplateId(next.selectedTemplateId),
             forceTemplate: true,
           };
+        }
+        if (version < 4) {
+          next = { ...next, zoom: 85, pageSize: 'a4' };
         }
         return next;
       },

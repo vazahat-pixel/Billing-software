@@ -1,18 +1,28 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { ERPCombobox } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
-import { useConfig } from '../../context/ConfigContext';
-import { buildBillFieldVisibility } from '../../utils/configHelpers';
 import { toast } from '../../store/useToastStore';
 import { Plus } from 'lucide-react';
 import AccountMasterModal from '../masters/AccountMasterModal';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
+import WeaverLookupModal from './WeaverLookupModal';
+import PuBillLookupModal from './PuBillLookupModal';
 
 const today = () => new Date().toISOString().split('T')[0];
 
+const weekday = (iso) => {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('en-IN', { weekday: 'short' });
+  } catch {
+    return '';
+  }
+};
+
 const PROCESS_TYPES = [
+  'Process Charge',
   'Dyeing',
   'Printing',
   'Finishing',
@@ -23,27 +33,36 @@ const PROCESS_TYPES = [
   'Other',
 ];
 
-const emptyHeader = (book) => ({
+const FINISH_OPTIONS = [
+  { value: '', label: '- Select Finish -' },
+  { value: 'Soft', label: 'Soft' },
+  { value: 'Hard', label: 'Hard' },
+  { value: 'Peach', label: 'Peach' },
+  { value: 'Brush', label: 'Brush' },
+  { value: 'Water Proof', label: 'Water Proof' },
+  { value: 'Other', label: 'Other' },
+];
+
+const emptyForm = (book) => ({
   challanNo: 'AUTO',
   date: today(),
-  workerId: '',
-  gstin: '',
-  address: '',
-  processType: 'Dyeing',
-  reFinish: false,
-  broker: '',
+  millId: '',
+  weaver: '',
+  puBillNo: '',
+  itemName: '',
+  issPcs: '',
+  issQty: '',
+  puRate: '',
+  jobRate: '',
+  lotId: '',
+  remark1: '',
+  remark2: '',
+  procType: 'Process Charge',
+  finish: '',
   book: book || 'PROCESS ISSUE BOOK',
 });
 
-const emptyFooter = () => ({
-  remark: '',
-  transport: '',
-  lrNo: '',
-  baleNo: '',
-  chargesRate: '',
-});
-
-/** Lots created by a purchase bill (by purchaseId and/or string LOT-… codes). */
+/** Lots linked to a purchase bill (for Purchase → Mill Issue flow). */
 const findLotsFromPurchase = (lots, data) => {
   if (!data) return [];
   const purchaseId = data.purchaseId != null ? String(data.purchaseId) : '';
@@ -60,104 +79,40 @@ const findLotsFromPurchase = (lots, data) => {
 };
 
 /**
- * Mill Issue — grey / stock lot nikal ke job worker / mill pe bhejna.
- * Backend requires: lotId, workerId, processType, issueQty, issuePcs.
+ * Mill Issue — grey stock lot se mill / job worker ko material bhejna.
+ * Classic ERP layout: Challan, MillName, Weaver, Pu.BillNo, Item, Iss Pcs/Qty, rates, Lot No.
  */
 const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }) => {
   const {
     parties,
+    items,
+    purchases,
     inventoryLots,
     jobWorkEntries,
     fetchParties,
+    fetchItems,
+    fetchPurchases,
     fetchInventory,
     fetchJobs,
     issueToMill,
   } = useStore();
-  const { bundle } = useConfig();
-  const f = useMemo(() => buildBillFieldVisibility(bundle, 'millIssue'), [bundle]);
 
-  const [mode, setMode] = useState('Add'); // Add | View
+  const [mode, setMode] = useState('Add');
   const [saving, setSaving] = useState(false);
   const [bootLoading, setBootLoading] = useState(false);
-  const [header, setHeader] = useState(emptyHeader(selectedBook));
-  const [footer, setFooter] = useState(emptyFooter());
-  const [selectedLotId, setSelectedLotId] = useState('');
-  const [issuePcs, setIssuePcs] = useState('');
-  const [issueQty, setIssueQty] = useState('');
+  const [form, setForm] = useState(emptyForm(selectedBook));
   const [selectedJobId, setSelectedJobId] = useState('');
+  const [lotSort, setLotSort] = useState('asc');
   const [accountModal, setAccountModal] = useState({ open: false, initialData: null });
-  /** When opened from Purchase save — keep context to filter lots + auto-pick next after save */
+  const [findOpen, setFindOpen] = useState(false);
+  const [weaverLookupOpen, setWeaverLookupOpen] = useState(false);
+  const [puBillLookupOpen, setPuBillLookupOpen] = useState(false);
   const [fromPurchase, setFromPurchase] = useState(null);
 
   const locked = mode === 'View';
+  const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
-  const applyLotSelection = (lotId, lotsList) => {
-    setSelectedLotId(lotId);
-    const lot = (lotsList || []).find((l) => (l._id || l.id) === lotId);
-    if (lot) {
-      setIssuePcs(String(lot.remainingPcs || 0));
-      setIssueQty(String(lot.remainingMtrs || 0));
-    } else {
-      setIssuePcs('');
-      setIssueQty('');
-    }
-  };
-
-  const applyPurchasePrefill = (data, lots) => {
-    if (!data?.purchaseId && !(data?.lotCodes || []).length) {
-      setFromPurchase(null);
-      return;
-    }
-    setFromPurchase({
-      purchaseId: data.purchaseId,
-      invoiceNo: data.invoiceNo,
-      lotCodes: data.lotCodes || [],
-    });
-    const matched = findLotsFromPurchase(lots, data);
-    if (matched.length) {
-      applyLotSelection(matched[0]._id || matched[0].id, matched);
-      toast.success(
-        matched.length === 1
-          ? `Lot loaded from Purchase ${data.invoiceNo || ''}`.trim()
-          : `${matched.length} lots from Purchase ${data.invoiceNo || ''} — first lot selected`
-      );
-    } else {
-      toast.info('Purchase stock not in inventory yet — pick lot manually or refresh');
-    }
-  };
-
-  useEffect(() => {
-    if (!isOpen) {
-      setBootLoading(false);
-      setFromPurchase(null);
-      return;
-    }
-    let cancelled = false;
-    setBootLoading(true);
-    setMode('Add');
-    setHeader(emptyHeader(selectedBook));
-    setFooter(emptyFooter());
-    setSelectedLotId('');
-    setIssuePcs('');
-    setIssueQty('');
-    setSelectedJobId('');
-    Promise.all([fetchParties(), fetchInventory(), fetchJobs()])
-      .then((results) => {
-        if (cancelled) return;
-        const lots = results[1] || [];
-        if (initialData) applyPurchasePrefill(initialData, lots);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setBootLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, selectedBook, initialData]);
-
-  const workers = useMemo(
+  const mills = useMemo(
     () =>
       parties.filter((p) => {
         const type = String(p.type || '');
@@ -173,18 +128,9 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     [parties]
   );
 
-  const workerOptions = useMemo(
-    () => workers.map((w) => ({ value: w._id || w.id, label: w.name })),
-    [workers]
-  );
-
-  const jobOptions = useMemo(
-    () =>
-      jobWorkEntries.map((j) => ({
-        value: j._id || j.id,
-        label: `${j.jobCardNo || j.challanNo} · ${j.workerId?.name || 'Party'} · ${j.processType || '-'} · ${Number(j.issueQty || 0).toFixed(2)} mts`,
-      })),
-    [jobWorkEntries]
+  const millOptions = useMemo(
+    () => mills.map((m) => ({ value: m._id || m.id, label: m.name })),
+    [mills]
   );
 
   const purchaseLots = useMemo(
@@ -199,12 +145,18 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         lot.status !== 'Closed' &&
         (lot.holdStatus === 'None' || !lot.holdStatus)
     );
-    if (!fromPurchase || !purchaseLots.length) return open;
-    // Prefer purchase lots first in the list
-    const purchaseIds = new Set(purchaseLots.map((l) => String(l._id || l.id)));
-    const rest = open.filter((l) => !purchaseIds.has(String(l._id || l.id)));
-    return [...purchaseLots, ...rest];
-  }, [inventoryLots, fromPurchase, purchaseLots]);
+    let list = open;
+    if (fromPurchase && purchaseLots.length) {
+      const purchaseIds = new Set(purchaseLots.map((l) => String(l._id || l.id)));
+      const rest = open.filter((l) => !purchaseIds.has(String(l._id || l.id)));
+      list = [...purchaseLots, ...rest];
+    }
+    return [...list].sort((a, b) => {
+      const la = String(a.lotId || '');
+      const lb = String(b.lotId || '');
+      return lotSort === 'asc' ? la.localeCompare(lb) : lb.localeCompare(la);
+    });
+  }, [inventoryLots, fromPurchase, purchaseLots, lotSort]);
 
   const lotOptions = useMemo(
     () =>
@@ -212,11 +164,10 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         const id = lot._id || lot.id;
         const name = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || 'Item';
         const fromPur =
-          fromPurchase &&
-          purchaseLots.some((p) => String(p._id || p.id) === String(id));
+          fromPurchase && purchaseLots.some((p) => String(p._id || p.id) === String(id));
         return {
           value: id,
-          label: `${fromPur ? '★ ' : ''}${lot.lotId || id.slice(-6)} · ${name} · Bal ${Number(lot.remainingMtrs || 0).toFixed(2)} mts / ${lot.remainingPcs || 0} pcs`,
+          label: `${fromPur ? '★ ' : ''}${lot.lotId || id.slice(-6)} · ${name} · ${Number(lot.remainingMtrs || 0).toFixed(2)} mts`,
         };
       }),
     [availableLots, fromPurchase, purchaseLots]
@@ -228,524 +179,742 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   );
 
   const selectedLot = useMemo(
-    () => availableLots.find((l) => (l._id || l.id) === selectedLotId) || null,
-    [availableLots, selectedLotId]
+    () => availableLots.find((l) => String(l._id || l.id) === String(form.lotId)) || null,
+    [availableLots, form.lotId]
   );
+
+  const jobOptions = useMemo(() => {
+    const list = [...(jobWorkEntries || [])];
+    list.sort((a, b) => {
+      const da = new Date(a.issueDate || a.createdAt || 0).getTime();
+      const db = new Date(b.issueDate || b.createdAt || 0).getTime();
+      return lotSort === 'asc' ? da - db : db - da;
+    });
+    return list.map((j) => ({
+      value: j._id || j.id,
+      label: `${j.challanNo || j.jobCardNo || '-'} · ${j.workerId?.name || 'Mill'} · ${Number(j.issueQty || 0).toFixed(2)} mts`,
+    }));
+  }, [jobWorkEntries, lotSort]);
+
+  const resetForm = useCallback(() => {
+    setForm(emptyForm(selectedBook));
+    setSelectedJobId('');
+    setFindOpen(false);
+  }, [selectedBook]);
+
+  const applyPurchasePrefill = useCallback((data, lots) => {
+    if (!data?.purchaseId && !(data?.lotCodes || []).length) {
+      setFromPurchase(null);
+      return;
+    }
+    setFromPurchase({
+      purchaseId: data.purchaseId,
+      invoiceNo: data.invoiceNo,
+      lotCodes: data.lotCodes || [],
+    });
+    const matched = findLotsFromPurchase(lots, data);
+    if (matched.length) {
+      const lot = matched[0];
+      const lotId = lot._id || lot.id;
+      const itemName = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
+      const puRate = lot.rate ?? lot.purchaseRate ?? lot.avgRate ?? '';
+      setForm((f) => ({
+        ...f,
+        lotId,
+        itemName,
+        issPcs: String(lot.remainingPcs ?? ''),
+        issQty: String(lot.remainingMtrs ?? ''),
+        puRate: puRate !== '' && puRate != null ? String(puRate) : f.puRate,
+        puBillNo: data.invoiceNo || f.puBillNo,
+      }));
+      toast.success(
+        matched.length === 1
+          ? `Lot loaded from Purchase ${data.invoiceNo || ''}`.trim()
+          : `${matched.length} lots from Purchase ${data.invoiceNo || ''} — first lot selected`
+      );
+    } else {
+      toast.info('Purchase stock not in inventory yet — pick lot manually');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setBootLoading(false);
+      setFromPurchase(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setBootLoading(true);
+    setMode('Add');
+    resetForm();
+    Promise.all([fetchParties(), fetchItems(), fetchPurchases(), fetchInventory(), fetchJobs()])
+      .then((results) => {
+        if (cancelled) return;
+        const lots = results[3] || [];
+        if (initialData) applyPurchasePrefill(initialData, lots);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setBootLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, selectedBook, initialData]);
+
+  const applyPuBillRow = (row) => {
+    if (!row) return;
+    setForm((f) => ({
+      ...f,
+      puBillNo: row.billNo || f.puBillNo,
+      itemName: row.itemName || f.itemName,
+      lotId: row.lotId || f.lotId,
+      issPcs: row.balPcs != null ? String(row.balPcs) : f.issPcs,
+      issQty: row.balMts != null ? String(row.balMts) : f.issQty,
+      puRate: row.puRate != null ? String(row.puRate) : f.puRate,
+    }));
+    toast.success(`Loaded ${row.billNo} · ${row.itemName}`);
+  };
+
+  const handleWeaverSelect = (party) => {
+    setField('weaver', party?.name || '');
+    setWeaverLookupOpen(false);
+    if (!locked) setTimeout(() => setPuBillLookupOpen(true), 80);
+  };
+
+  const openWeaverLookup = () => {
+    if (locked) return;
+    setWeaverLookupOpen(true);
+  };
+
+  const openPuBillLookup = () => {
+    if (locked) return;
+    if (!form.weaver?.trim()) {
+      toast.warning('Select Weaver first');
+      setWeaverLookupOpen(true);
+      return;
+    }
+    setPuBillLookupOpen(true);
+  };
+
+  const applyLot = (lotId) => {
+    const lot = availableLots.find((l) => String(l._id || l.id) === String(lotId));
+    if (!lot) {
+      setForm((f) => ({ ...f, lotId: '', itemName: '', issPcs: '', issQty: '', puRate: '' }));
+      return;
+    }
+    const itemName = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
+    const puRate =
+      lot.rate ?? lot.purchaseRate ?? lot.avgRate ?? lot.itemId?.purchaseRate ?? '';
+    setForm((f) => ({
+      ...f,
+      lotId,
+      itemName,
+      issPcs: String(lot.remainingPcs ?? ''),
+      issQty: String(lot.remainingMtrs ?? ''),
+      puRate: puRate !== '' && puRate != null ? String(puRate) : f.puRate,
+      puBillNo: f.puBillNo || lot.invoiceNo || lot.purchaseInvoiceNo || '',
+    }));
+  };
+
+  const handleMillChange = (id) => setField('millId', id);
+
+  const handleCreateMill = (search = '') => {
+    setAccountModal({ open: true, initialData: { name: search || '', group: 'JOB WORKER' } });
+  };
+
+  const handleMillSuccess = (party) => {
+    fetchParties();
+    setField('millId', party._id || party.id);
+    setAccountModal({ open: false, initialData: null });
+    toast.success(`Mill "${party.name}" added`);
+  };
 
   const handleNew = () => {
     setMode('Add');
-    setHeader(emptyHeader(selectedBook));
-    setFooter(emptyFooter());
-    setSelectedLotId('');
-    setIssuePcs('');
-    setIssueQty('');
-    setSelectedJobId('');
+    setFromPurchase(null);
+    resetForm();
   };
 
-  const handlePartyChange = (id) => {
-    const p = workers.find((w) => (w._id || w.id) === id) || parties.find((w) => (w._id || w.id) === id);
-    setHeader((h) => ({
-      ...h,
-      workerId: id,
-      gstin: p?.gstin || '',
-      address: p?.address || p?.city || '',
-    }));
+  const handleEdit = () => {
+    if (!selectedJobId) return toast.warning('Find a challan first');
+    setMode('Edit');
   };
 
-  const handleCreateMillParty = (search = '') => {
-    setAccountModal({
-      open: true,
-      initialData: {
-        name: search || '',
-        group: 'JOB WORKER',
-      },
-    });
+  const handleCancel = () => {
+    if (mode === 'Add') {
+      resetForm();
+      return;
+    }
+    setMode('View');
+    if (selectedJobId) loadJob(selectedJobId);
   };
 
-  const handleMillPartySuccess = (newAccount) => {
-    fetchParties();
-    const id = newAccount._id || newAccount.id;
-    setHeader((h) => ({
-      ...h,
-      workerId: id,
-      gstin: newAccount.gstin || '',
-      address: newAccount.address || newAccount.city || newAccount.station || '',
-    }));
-    setAccountModal({ open: false, initialData: null });
-    toast.success(`Mill party "${newAccount.name}" added`);
-  };
-
-  const handleSelectLot = (lotId) => {
-    applyLotSelection(lotId, availableLots);
-  };
-
-  const handleSelectJob = (id) => {
+  const loadJob = (id) => {
     setSelectedJobId(id);
     if (!id) return;
-    const job = jobWorkEntries.find((j) => (j._id || j.id) === id);
+    const job = jobWorkEntries.find((j) => String(j._id || j.id) === String(id));
     if (!job) return;
     setMode('View');
-    setHeader({
-      challanNo: job.jobCardNo || job.challanNo || '',
-      date: job.date ? String(job.date).slice(0, 10) : today(),
-      workerId: job.workerId?._id || job.workerId || '',
-      gstin: job.workerId?.gstin || '',
-      address: '',
-      processType: job.processType || 'Dyeing',
-      reFinish: !!job.reFinish,
-      broker: job.broker || '',
+    setFindOpen(true);
+    const remarks = String(job.remark || job.remarks || '');
+    const [r1, ...rest] = remarks.split(/\n/);
+    setForm({
+      challanNo: job.challanNo || job.jobCardNo || '',
+      date: job.issueDate ? String(job.issueDate).slice(0, 10) : today(),
+      millId: job.workerId?._id || job.workerId || '',
+      weaver: job.weaver || '',
+      puBillNo: job.purchaseBillNo || '',
+      itemName: job.lotId?.itemName || job.lotId?.itemId?.name || '',
+      issPcs: String(job.issuePcs ?? ''),
+      issQty: String(job.issueQty ?? ''),
+      puRate: job.purchaseRate != null ? String(job.purchaseRate) : '',
+      jobRate: job.jobRate != null ? String(job.jobRate) : String(job.processCharges || ''),
+      lotId: job.lotId?._id || job.lotId || '',
+      remark1: r1 || '',
+      remark2: rest.join(' ') || '',
+      procType: job.processType || 'Process Charge',
+      finish: job.finish || '',
       book: selectedBook || 'PROCESS ISSUE BOOK',
-    });
-    setSelectedLotId(job.lotId?._id || job.lotId || '');
-    setIssuePcs(String(job.issuePcs || 0));
-    setIssueQty(String(job.issueQty || 0));
-    setFooter({
-      remark: job.remarks || job.remark || '',
-      transport: job.transport || '',
-      lrNo: job.lrNo || '',
-      baleNo: job.baleNo || '',
-      chargesRate: job.chargesRate != null ? String(job.chargesRate) : '',
     });
   };
 
-  const handleSave = async (e) => {
-    if (e) e.preventDefault();
+  const handleJobCard = () => {
     if (locked) return;
-    if (!header.workerId) return toast.error('Select Mill / Job Party');
-    if (!selectedLotId) return toast.error('Select a stock lot to issue');
-    const qty = Number(issueQty);
-    const pcs = Number(issuePcs || 0);
-    if (!qty || qty <= 0) return toast.error('Enter issue quantity (Mts/Kgs)');
+    setField('challanNo', `JC-${Math.floor(100000 + Math.random() * 900000)}`);
+    toast.info('Job Card No. assigned');
+  };
+
+  const handleSave = async (e, { keepOpen = false } = {}) => {
+    if (e) e.preventDefault();
+    if (locked) {
+      toast.warning('Click Edit or New before saving');
+      return false;
+    }
+    if (mode === 'Edit') {
+      toast.warning('Issued challans cannot be edited — create New');
+      return false;
+    }
+    if (!form.millId) {
+      toast.error('Select Mill Name');
+      return false;
+    }
+    if (!form.lotId) {
+      toast.error('Select Lot No.');
+      return false;
+    }
+    const qty = Number(form.issQty);
+    const pcs = Number(form.issPcs || 0);
+    if (!qty || qty <= 0) {
+      toast.error('Enter Iss Qty');
+      return false;
+    }
     if (selectedLot && qty > Number(selectedLot.remainingMtrs || 0) + 0.0001) {
-      return toast.error(
-        `Qty exceeds available stock (${Number(selectedLot.remainingMtrs || 0).toFixed(2)})`
-      );
+      toast.error(`Iss Qty exceeds stock (${Number(selectedLot.remainingMtrs || 0).toFixed(2)})`);
+      return false;
     }
 
     setSaving(true);
     try {
-      const itemId =
-        selectedLot?.itemId?._id || selectedLot?.itemId || selectedLot?.item?._id || null;
+      const remark = [form.remark1, form.remark2].filter(Boolean).join('\n');
+      const { millId, procType, finish, jobRate } = form;
       await issueToMill({
-        jobCardNo: header.challanNo === 'AUTO' ? 'AUTO' : header.challanNo,
-        date: header.date,
-        lotId: selectedLotId,
-        itemId,
-        workerId: header.workerId,
-        processType: header.processType,
+        jobCardNo: form.challanNo === 'AUTO' || !form.challanNo ? 'AUTO' : form.challanNo,
+        challanNo: form.challanNo === 'AUTO' ? '' : form.challanNo,
+        issueDate: form.date,
+        date: form.date,
+        lotId: form.lotId,
+        workerId: form.millId,
+        processType: form.procType || 'Process Charge',
+        finish: form.finish || '',
         issueQty: qty,
         issuePcs: pcs,
-        chargesRate: Number(footer.chargesRate || 0),
-        reFinish: header.reFinish,
-        broker: header.broker || undefined,
-        remarks: footer.remark || undefined,
-        transport: footer.transport || undefined,
-        lrNo: footer.lrNo || undefined,
-        baleNo: footer.baleNo || undefined,
+        weaver: form.weaver || '',
+        purchaseBillNo: form.puBillNo || '',
+        purchaseRate: Number(form.puRate) || 0,
+        jobRate: Number(form.jobRate) || 0,
+        processCharges: Number(form.jobRate) || 0,
+        chargesRate: Number(form.jobRate) || 0,
+        remark,
+        remarks: remark,
       });
       toast.success('Mill Issue saved — stock reduced from lot');
       const [, lots] = await Promise.all([fetchJobs(), fetchInventory()]);
       const remaining = fromPurchase ? findLotsFromPurchase(lots || [], fromPurchase) : [];
-      if (remaining.length) {
-        // Keep mill party / process; load next purchase lot
+
+      if (keepOpen) {
+        const base = { ...emptyForm(selectedBook), millId, procType, finish, jobRate };
         setMode('Add');
-        setFooter(emptyFooter());
         setSelectedJobId('');
-        setHeader((h) => ({ ...emptyHeader(selectedBook), workerId: h.workerId, gstin: h.gstin, address: h.address, processType: h.processType, broker: h.broker }));
-        applyLotSelection(remaining[0]._id || remaining[0].id, remaining);
+        if (remaining.length) {
+          const lot = remaining[0];
+          const lotId = lot._id || lot.id;
+          const itemName = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
+          const puRate = lot.rate ?? lot.purchaseRate ?? lot.avgRate ?? '';
+          setForm({
+            ...base,
+            lotId,
+            itemName,
+            issPcs: String(lot.remainingPcs ?? ''),
+            issQty: String(lot.remainingMtrs ?? ''),
+            puRate: puRate !== '' && puRate != null ? String(puRate) : '',
+            puBillNo: fromPurchase?.invoiceNo || base.puBillNo,
+          });
+          toast.info(`Ready for next challan (${remaining.length} lot(s) left)`);
+        } else {
+          setForm(base);
+          toast.info('Ready for next challan (same mill)');
+        }
+      } else if (remaining.length) {
+        const lot = remaining[0];
+        const lotId = lot._id || lot.id;
+        const itemName = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
+        const puRate = lot.rate ?? lot.purchaseRate ?? lot.avgRate ?? '';
+        setMode('Add');
+        setForm({
+          ...emptyForm(selectedBook),
+          millId,
+          procType,
+          finish,
+          jobRate,
+          lotId,
+          itemName,
+          issPcs: String(lot.remainingPcs ?? ''),
+          issQty: String(lot.remainingMtrs ?? ''),
+          puRate: puRate !== '' && puRate != null ? String(puRate) : '',
+          puBillNo: fromPurchase?.invoiceNo || '',
+        });
+        setSelectedJobId('');
         toast.success(`Next lot from purchase ready (${remaining.length} left)`);
       } else {
         if (fromPurchase) setFromPurchase(null);
         handleNew();
         setMode('View');
+        setFindOpen(true);
       }
+      return true;
     } catch (err) {
       toast.error(err, { fallback: 'Failed to save mill issue' });
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
+  const handleDelete = () => toast.warning('Delete issued challan from Mill Receive / Cancel flow');
+  const handlePrint = () => {
+    if (!selectedJobId) return toast.warning('Find a challan to print');
+    toast.info('Print preview — coming soon');
+  };
+
+  const titleBook = selectedBook || 'PROCESS ISSUE BOOK';
+
   return (
     <>
-    <ErpWindowedModal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`Mill Issue [ ${selectedBook || 'PROCESS ISSUE BOOK'} ]`}
-      windowId="millIssue"
-      bare
-    >
-      {({ WindowControls }) => (
-      <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 !max-h-none">
-        <ErpBusyOverlay show={bootLoading} message="Loading mill issue…" />
-        <ErpBusyOverlay show={!bootLoading && saving} message="Saving mill issue…" />
-        <div className="classic-erp-header shrink-0">
-          <span className="erp-window-title truncate">Mill Issue [ {selectedBook || 'PROCESS ISSUE BOOK'} ]</span>
-          <WindowControls />
-        </div>
+      <ErpWindowedModal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={`Mill Issue [ ${titleBook} ]`}
+        windowId="millIssue"
+        bare
+      >
+        {({ WindowControls }) => (
+          <div className="classic-erp-window erp-density erp-job-issue-window erp-mill-issue-window flex flex-col h-full min-h-0 !max-h-none">
+            <ErpBusyOverlay show={bootLoading} message="Loading mill issue…" />
+            <ErpBusyOverlay show={!bootLoading && saving} message="Saving mill issue…" />
 
-        <div className="classic-erp-body flex-1 overflow-y-auto space-y-3">
-          {mode === 'View' && (
-            <div className="classic-erp-frame classic-erp-field classic-erp-field--lg">
-              <span className="classic-erp-label blue-label">Find Issue:</span>
-              <ERPSelect
-                className="classic-erp-select flex-1"
-                value={selectedJobId}
-                onChange={(e) => handleSelectJob(e.target.value)}
-                options={jobOptions}
-                placeholder="- Select Mill / Job Issue -"
-                recentKey="mill-issue-job"
-              />
+            <div className="classic-erp-header shrink-0">
+              <span className="erp-window-title truncate">Mill Issue [ {titleBook} ]</span>
+              <WindowControls />
             </div>
-          )}
 
-          {/* Header */}
-          <div className="classic-erp-frame classic-erp-header-split">
-            <div className="classic-erp-stack">
-              <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label red-label">Mill Party:</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, width: '100%' }}>
-                  <ERPCombobox
-                    value={header.workerId}
-                    onChange={(val) => handlePartyChange(val)}
+            <form
+              onSubmit={(e) => handleSave(e)}
+              className="classic-erp-body erp-job-issue-body flex-1 overflow-y-auto min-h-0"
+            >
+              {fromPurchase && (
+                <div className="erp-mill-issue-purchase-bar shrink-0">
+                  From Purchase {fromPurchase.invoiceNo || ''}
+                  {purchaseLots.length
+                    ? ` — ${purchaseLots.length} lot(s) available (★ in Lot No.)`
+                    : ' — matching stock not found; pick lot manually.'}
+                </div>
+              )}
+
+              <div className="classic-erp-frame erp-job-issue-split">
+                <div className="classic-erp-stack erp-job-issue-main min-w-0">
+                  {findOpen && (
+                    <div className="classic-erp-field classic-erp-field--lg">
+                      <span className="classic-erp-label blue-label">Find</span>
+                      <ERPSelect
+                        className="classic-erp-select"
+                        value={selectedJobId}
+                        onChange={(e) => loadJob(e.target.value)}
+                        options={jobOptions}
+                        placeholder="- Select Mill Issue Challan -"
+                        recentKey="mill-issue-find"
+                      />
+                    </div>
+                  )}
+
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label red-label">Challan No</span>
+                    <input
+                      type="text"
+                      className="classic-erp-input font-bold"
+                      value={form.challanNo}
+                      onChange={(e) => setField('challanNo', e.target.value)}
+                      disabled={locked}
+                    />
+                  </div>
+
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label red-label">Date</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="date"
+                        className="classic-erp-input erp-job-issue-date"
+                        value={form.date}
+                        onChange={(e) => setField('date', e.target.value)}
+                        disabled={locked}
+                        required
+                      />
+                      <span className="erp-job-issue-weekday">{weekday(form.date)}</span>
+                    </div>
+                  </div>
+
+                  <div className="classic-erp-field classic-erp-field--lg">
+                    <span className="classic-erp-label red-label">MillName</span>
+                    <div className="classic-erp-control">
+                      <ERPCombobox
+                        value={form.millId}
+                        onChange={handleMillChange}
+                        disabled={locked}
+                        options={millOptions}
+                        placeholder="Search Mill / Job Worker…"
+                        recentKey="mill-issue-mill"
+                        onCreateNew={!locked ? handleCreateMill : undefined}
+                        createLabel="Mill"
+                        allowClear
+                      />
+                      {!locked && (
+                        <button
+                          type="button"
+                          title="Add Mill"
+                          onClick={() => handleCreateMill('')}
+                          className="erp-job-issue-add-btn"
+                        >
+                          <Plus size={11} /> Add
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">Weaver</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="text"
+                        className="classic-erp-input cursor-pointer"
+                        value={form.weaver}
+                        readOnly
+                        onFocus={openWeaverLookup}
+                        onClick={openWeaverLookup}
+                        disabled={locked}
+                        placeholder="Click to select weaver…"
+                      />
+                      {!locked && (
+                        <button
+                          type="button"
+                          className="classic-erp-btn erp-job-issue-lookup-btn"
+                          onClick={openWeaverLookup}
+                          aria-label="Select weaver"
+                        >
+                          …
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">Pu.BillNo</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="text"
+                        className="classic-erp-input cursor-pointer font-bold"
+                        value={form.puBillNo}
+                        readOnly
+                        onFocus={openPuBillLookup}
+                        onClick={openPuBillLookup}
+                        disabled={locked}
+                        placeholder="Select bill…"
+                      />
+                      {!locked && (
+                        <button
+                          type="button"
+                          className="classic-erp-btn erp-job-issue-lookup-btn"
+                          onClick={openPuBillLookup}
+                          aria-label="Select purchase bill"
+                        >
+                          …
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="classic-erp-field classic-erp-field--lg">
+                    <span className="classic-erp-label red-label">Item Name</span>
+                    <input
+                      type="text"
+                      className="classic-erp-input font-bold uppercase"
+                      value={form.itemName}
+                      readOnly
+                      disabled={locked}
+                      title="Filled from Lot No."
+                    />
+                  </div>
+
+                  <div className="erp-job-issue-metrics">
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Iss Pcs</span>
+                      <input
+                        type="number"
+                        className="classic-erp-input text-right font-bold"
+                        value={form.issPcs}
+                        onChange={(e) => setField('issPcs', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label red-label">Iss Qty</span>
+                      <input
+                        type="number"
+                        step="0.001"
+                        className="classic-erp-input text-right font-bold"
+                        value={form.issQty}
+                        onChange={(e) => setField('issQty', e.target.value)}
+                        disabled={locked}
+                        required
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Pu.Rate</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="classic-erp-input text-right"
+                        value={form.puRate}
+                        onChange={(e) => setField('puRate', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">JobRate</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="classic-erp-input text-right font-bold"
+                        value={form.jobRate}
+                        onChange={(e) => setField('jobRate', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field erp-job-issue-lot">
+                      <span className="classic-erp-label red-label">Lot No.</span>
+                      <ERPCombobox
+                        value={form.lotId}
+                        onChange={(val) => applyLot(val)}
+                        disabled={locked}
+                        options={lotOptions}
+                        placeholder="Select lot…"
+                        recentKey="mill-issue-lot"
+                        allowClear
+                      />
+                    </div>
+                  </div>
+
+                  <div className="classic-erp-field classic-erp-field--lg">
+                    <span className="classic-erp-label">Remark</span>
+                    <div className="classic-erp-control classic-erp-control--stack">
+                      <input
+                        type="text"
+                        className="classic-erp-input"
+                        value={form.remark1}
+                        onChange={(e) => setField('remark1', e.target.value)}
+                        disabled={locked}
+                      />
+                      <input
+                        type="text"
+                        className="classic-erp-input"
+                        value={form.remark2}
+                        onChange={(e) => setField('remark2', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                  </div>
+
+                  {selectedLot && (
+                    <div className="erp-job-issue-stock">
+                      Stock: {Number(selectedLot.remainingPcs || 0)} pcs ·{' '}
+                      {Number(selectedLot.remainingMtrs || 0).toFixed(2)} mts
+                    </div>
+                  )}
+                </div>
+
+                <aside className="erp-job-issue-side">
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">ProcType</span>
+                    <ERPSelect
+                      className="classic-erp-select"
+                      value={form.procType}
+                      onChange={(e) => setField('procType', e.target.value)}
+                      options={processOptions}
+                      disabled={locked}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="classic-erp-btn"
+                    onClick={handleJobCard}
                     disabled={locked}
-                    options={workerOptions}
-                    placeholder={workerOptions.length ? 'Search Job Worker / Mill…' : 'No mill party — click Add'}
-                    recentKey="mill-party"
-                    onCreateNew={!locked ? handleCreateMillParty : undefined}
-                    createLabel="Mill Party"
-                    emptyMessage="No mill / job worker found. Click Add"
-                    allowClear
-                  />
-                  {!locked && (
+                  >
+                    Job Card
+                  </button>
+
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">Finish</span>
+                    <ERPSelect
+                      className="classic-erp-select"
+                      value={form.finish}
+                      onChange={(e) => setField('finish', e.target.value)}
+                      options={FINISH_OPTIONS}
+                      disabled={locked}
+                    />
+                  </div>
+
+                  <div className="erp-job-issue-sort">
                     <button
                       type="button"
-                      title="Add new Mill / Job Worker"
-                      onClick={() => handleCreateMillParty('')}
-                      style={{
-                        flexShrink: 0,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 2,
-                        padding: '3px 8px',
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: '#fff',
-                        background: '#16a34a',
-                        border: 'none',
-                        borderRadius: 4,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                      }}
+                      className={`classic-erp-btn ${lotSort === 'asc' ? 'btn-blue' : ''}`}
+                      onClick={() => setLotSort('asc')}
                     >
-                      <Plus size={11} /> Add
+                      Asc
                     </button>
-                  )}
-                </div>
-              </div>
-              <div className="classic-erp-meta-grid">
-                {f.header('gstin') && (
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Gstin:</span>
-                  <input type="text" className="classic-erp-input" value={header.gstin} readOnly />
-                </div>
-                )}
-                {f.header('address') && (
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">City:</span>
-                  <input type="text" className="classic-erp-input" value={header.address} readOnly />
-                </div>
-                )}
-              </div>
-              <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label">Process:</span>
-                <ERPSelect
-                  className="classic-erp-select flex-1"
-                  value={header.processType}
-                  onChange={(e) => setHeader((h) => ({ ...h, processType: e.target.value }))}
-                  disabled={locked}
-                  options={processOptions}
-                  placeholder="Process type"
-                />
-              </div>
-              {f.header('broker') && (
-              <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label">Broker:</span>
-                <input
-                  type="text"
-                  className="classic-erp-input"
-                  value={header.broker}
-                  onChange={(e) => setHeader((h) => ({ ...h, broker: e.target.value }))}
-                  disabled={locked}
-                />
-              </div>
-              )}
-            </div>
+                    <button
+                      type="button"
+                      className={`classic-erp-btn ${lotSort === 'desc' ? 'btn-blue' : ''}`}
+                      onClick={() => setLotSort('desc')}
+                    >
+                      Desc
+                    </button>
+                  </div>
 
-            <div className="classic-erp-stack">
-              <div className="classic-erp-meta-grid">
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label red-label">Challan:</span>
-                  <input type="text" className="classic-erp-input" value={header.challanNo} readOnly />
-                </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Date:</span>
-                  <input
-                    type="date"
-                    className="classic-erp-input"
-                    value={header.date}
-                    onChange={(e) => setHeader((h) => ({ ...h, date: e.target.value }))}
-                    disabled={locked}
-                  />
-                </div>
+                  <button
+                    type="button"
+                    className="classic-erp-btn"
+                    disabled={locked || saving}
+                    onClick={() => handleSave(null, { keepOpen: true })}
+                  >
+                    Create Multi Challan
+                  </button>
+
+                  <p className="erp-job-issue-hint">F1 &gt; SelectAll / F2 &gt; UnSelectAll</p>
+                </aside>
               </div>
-              {f.header('reFinish') && (
-              <label className="flex items-center gap-2 px-1 text-[11px] font-semibold text-[var(--text-secondary)]">
-                <input
-                  type="checkbox"
-                  checked={header.reFinish}
-                  onChange={(e) => setHeader((h) => ({ ...h, reFinish: e.target.checked }))}
-                  disabled={locked}
-                />
-                Re-Finish (same lot re-process)
-              </label>
-              )}
-            </div>
+
+              <div className="classic-erp-form-footer erp-job-issue-footer shrink-0">
+                <button type="button" className="classic-erp-btn" onClick={handleNew} disabled={saving}>
+                  New
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={handleEdit}
+                  disabled={saving || mode !== 'View' || !selectedJobId}
+                >
+                  Edit
+                </button>
+                <button type="submit" className="classic-erp-btn btn-blue" disabled={saving || locked}>
+                  <SaveButtonLabel saving={saving} label="Save" />
+                </button>
+                <button type="button" className="classic-erp-btn" onClick={handleCancel} disabled={saving}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => {
+                    setFindOpen(true);
+                    setMode('View');
+                  }}
+                  disabled={saving}
+                >
+                  Find
+                </button>
+                <button type="button" className="classic-erp-btn" onClick={handleDelete} disabled={saving}>
+                  Delete
+                </button>
+                <button type="button" className="classic-erp-btn" onClick={onClose} disabled={saving}>
+                  Exit
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => toast.info('Open Mill Receive for receipt detail')}
+                >
+                  ReceiptDetail
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => toast.info('Last year lot — use Lot No. search')}
+                >
+                  LastYearLot
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => {
+                    setFindOpen(true);
+                    setMode('View');
+                  }}
+                >
+                  Sp.Find
+                </button>
+                <button type="button" className="classic-erp-btn" onClick={handlePrint}>
+                  Print
+                </button>
+              </div>
+            </form>
           </div>
+        )}
+      </ErpWindowedModal>
 
-          {/* Stock lot picker */}
-          <div className="classic-erp-frame classic-erp-stack">
-            <span className="classic-erp-frame-title">Select Stock Lot (Inventory → Issue)</span>
-            {fromPurchase && (
-              <div
-                className="px-2 py-1.5 text-[11px] font-semibold rounded"
-                style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0' }}
-              >
-                From Purchase {fromPurchase.invoiceNo || ''}
-                {purchaseLots.length
-                  ? ` — ${purchaseLots.length} lot(s) loaded (★). Qty/Pcs filled; select Mill Party & Save.`
-                  : ' — matching stock not found yet; pick lot manually.'}
-              </div>
-            )}
-            <div className="classic-erp-field classic-erp-field--lg">
-              <span className="classic-erp-label red-label">Lot:</span>
-              <ERPSelect
-                className="classic-erp-select flex-1"
-                value={selectedLotId}
-                onChange={(e) => handleSelectLot(e.target.value)}
-                disabled={locked}
-                options={lotOptions}
-                placeholder="- Available lots -"
-                recentKey="mill-issue-lot"
-              />
-            </div>
+      <AccountMasterModal
+        isOpen={accountModal.open}
+        onClose={() => setAccountModal({ open: false, initialData: null })}
+        initialData={accountModal.initialData}
+        onSuccess={handleMillSuccess}
+      />
 
-            {selectedLot && (
-              <div className="classic-erp-meta-grid--3 text-[11px] px-1">
-                <div>
-                  <span className="text-[var(--text-muted)]">Item </span>
-                  <b>{selectedLot.itemName || selectedLot.itemId?.name || '—'}</b>
-                </div>
-                <div>
-                  <span className="text-[var(--text-muted)]">Available </span>
-                  <b>
-                    {Number(selectedLot.remainingMtrs || 0).toFixed(2)} mts ·{' '}
-                    {selectedLot.remainingPcs || 0} pcs
-                  </b>
-                </div>
-                <div>
-                  <span className="text-[var(--text-muted)]">Source </span>
-                  <b>{selectedLot.source || '—'}</b>
-                </div>
-              </div>
-            )}
+      <WeaverLookupModal
+        isOpen={weaverLookupOpen}
+        onClose={() => setWeaverLookupOpen(false)}
+        parties={parties}
+        onSelect={handleWeaverSelect}
+      />
 
-            <div className="classic-erp-meta-grid">
-              <div className="classic-erp-field">
-                <span className="classic-erp-label">Issue Pcs:</span>
-                <input
-                  type="number"
-                  className="classic-erp-input text-center"
-                  value={issuePcs}
-                  onChange={(e) => setIssuePcs(e.target.value)}
-                  disabled={locked || !selectedLotId}
-                />
-              </div>
-              <div className="classic-erp-field">
-                <span className="classic-erp-label red-label">Issue Qty:</span>
-                <input
-                  type="number"
-                  className="classic-erp-input text-right font-bold"
-                  value={issueQty}
-                  onChange={(e) => setIssueQty(e.target.value)}
-                  disabled={locked || !selectedLotId}
-                  placeholder="Mts / Kgs"
-                />
-              </div>
-              {f.line('chargesRate') && (
-              <div className="classic-erp-field">
-                <span className="classic-erp-label">Job Rate:</span>
-                <input
-                  type="number"
-                  className="classic-erp-input text-right"
-                  value={footer.chargesRate}
-                  onChange={(e) => setFooter((f) => ({ ...f, chargesRate: e.target.value }))}
-                  disabled={locked}
-                  placeholder="₹ / mtr"
-                />
-              </div>
-              )}
-            </div>
-          </div>
-
-          {/* Transport / remarks */}
-          {(f.footer('transport') || f.footer('lrNo') || f.footer('baleNo') || f.footer('remark')) && (
-          <div className="classic-erp-frame classic-erp-meta-grid--3">
-            {f.footer('transport') && (
-            <div className="classic-erp-field">
-              <span className="classic-erp-label">Transport:</span>
-              <input
-                type="text"
-                className="classic-erp-input"
-                value={footer.transport}
-                onChange={(e) => setFooter((f) => ({ ...f, transport: e.target.value }))}
-                disabled={locked}
-              />
-            </div>
-            )}
-            {f.footer('lrNo') && (
-            <div className="classic-erp-field">
-              <span className="classic-erp-label">Lr No:</span>
-              <input
-                type="text"
-                className="classic-erp-input"
-                value={footer.lrNo}
-                onChange={(e) => setFooter((f) => ({ ...f, lrNo: e.target.value }))}
-                disabled={locked}
-              />
-            </div>
-            )}
-            {f.footer('baleNo') && (
-            <div className="classic-erp-field">
-              <span className="classic-erp-label">Bale No:</span>
-              <input
-                type="text"
-                className="classic-erp-input"
-                value={footer.baleNo}
-                onChange={(e) => setFooter((f) => ({ ...f, baleNo: e.target.value }))}
-                disabled={locked}
-              />
-            </div>
-            )}
-            {f.footer('remark') && (
-            <div className="classic-erp-field classic-erp-field--lg" style={{ gridColumn: '1 / -1' }}>
-              <span className="classic-erp-label">Remark:</span>
-              <input
-                type="text"
-                className="classic-erp-input"
-                value={footer.remark}
-                onChange={(e) => setFooter((f) => ({ ...f, remark: e.target.value }))}
-                disabled={locked}
-              />
-            </div>
-            )}
-          </div>
-          )}
-
-          {/* Recent issues mini list when viewing */}
-          {mode === 'View' && !selectedJobId && (
-            <div className="classic-erp-table-container max-h-48">
-              <table className="classic-erp-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Challan</th>
-                    <th>Party</th>
-                    <th>Process</th>
-                    <th className="text-right">Qty</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {jobWorkEntries.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="text-center text-[var(--text-muted)] py-6">
-                        No mill issues yet — click New to create.
-                      </td>
-                    </tr>
-                  ) : (
-                    jobWorkEntries.slice(0, 40).map((j) => (
-                      <tr
-                        key={j._id || j.id}
-                        className="cursor-pointer hover:bg-[var(--bg-subtle)]"
-                        onClick={() => handleSelectJob(j._id || j.id)}
-                      >
-                        <td className="font-mono">
-                          {new Date(j.date || j.createdAt).toLocaleDateString('en-IN')}
-                        </td>
-                        <td className="font-bold text-blue-900">{j.jobCardNo}</td>
-                        <td>{j.workerId?.name || '—'}</td>
-                        <td>{j.processType || '—'}</td>
-                        <td className="text-right font-mono">{Number(j.issueQty || 0).toFixed(2)}</td>
-                        <td
-                          style={{
-                            color: j.status === 'Received' ? 'green' : 'brown',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {j.status}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        <div className="classic-erp-form-footer">
-          <button
-            type="button"
-            className="classic-erp-btn"
-            onClick={handleNew}
-            disabled={saving}
-          >
-            <Plus size={12} strokeWidth={3} /> New
-          </button>
-          <button
-            type="button"
-            className="classic-erp-btn btn-blue"
-            onClick={handleSave}
-            disabled={locked || saving}
-          >
-            <SaveButtonLabel saving={saving} idle="Save & Issue" busy="Saving…" />
-          </button>
-          <button
-            type="button"
-            className="classic-erp-btn"
-            onClick={() => {
-              setMode('View');
-              setSelectedJobId('');
-            }}
-            disabled={saving}
-          >
-            Find
-          </button>
-          <button type="button" className="classic-erp-btn" onClick={onClose}>
-            Exit
-          </button>
-        </div>
-      </div>
-      )}
-    </ErpWindowedModal>
-
-    <AccountMasterModal
-      isOpen={accountModal.open}
-      onClose={() => setAccountModal({ open: false, initialData: null })}
-      initialData={accountModal.initialData}
-      onSuccess={handleMillPartySuccess}
-    />
+      <PuBillLookupModal
+        isOpen={puBillLookupOpen}
+        onClose={() => setPuBillLookupOpen(false)}
+        weaver={form.weaver}
+        inventoryLots={inventoryLots}
+        purchases={purchases}
+        items={items}
+        onSelect={applyPuBillRow}
+      />
     </>
   );
 };

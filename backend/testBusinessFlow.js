@@ -304,7 +304,7 @@ async function run() {
     console.log('Verified StockMovement for Mill Receive');
 
     // Verify job work charges accounting entry
-    const jobWorkEntry = await AccountingEntry.findOne({ refType: 'JobReceive', refId: jobIssueResult._id, companyId });
+    const jobWorkEntry = await AccountingEntry.findOne({ refType: 'JobWorkCharges', refId: jobIssueResult._id, companyId });
     if (!jobWorkEntry || jobWorkEntry.totalDebit !== 3045) {
       throw new Error(`Job work charges accounting entry missing or incorrect: Dr=${jobWorkEntry?.totalDebit}`);
     }
@@ -316,14 +316,14 @@ async function run() {
     }
     console.log('Verified Job Work Charges accounting entry successfully');
 
-    // Verify abnormal wastage accounting entry (10m * ₹50 purchase cost = ₹500)
+    // Verify abnormal wastage accounting entry (2m abnormal wastage * ₹50 purchase cost = ₹100)
     const wastageEntry = await AccountingEntry.findOne({ refType: 'Journal', refId: jobIssueResult._id, voucherType: 'WastageAuto', companyId });
-    if (!wastageEntry || wastageEntry.totalDebit !== 500) {
+    if (!wastageEntry || wastageEntry.totalDebit !== 100) {
       throw new Error(`Abnormal wastage accounting entry missing or incorrect: Dr=${wastageEntry?.totalDebit}`);
     }
     const lossLine = wastageEntry.lines.find(l => l.ledgerName === 'Production Loss A/c');
     const stockLine = wastageEntry.lines.find(l => l.ledgerName === 'Stock A/c');
-    if (!lossLine || lossLine.amount !== 500 || !stockLine || stockLine.amount !== 500) {
+    if (!lossLine || lossLine.amount !== 100 || !stockLine || stockLine.amount !== 100) {
       throw new Error('Abnormal wastage double entry lines incorrect');
     }
     console.log('Verified Abnormal Wastage accounting entry successfully');
@@ -401,25 +401,26 @@ async function run() {
     let totalDr = 0;
     let totalCr = 0;
     trialBalanceData.forEach(tb => {
-      if (tb.type === 'Dr') totalDr += tb.balance;
-      else totalCr += tb.balance;
+      totalDr += tb.debit || 0;
+      totalCr += tb.credit || 0;
     });
 
     console.log(`Trial Balance Total Dr: ₹${totalDr.toFixed(2)}, Cr: ₹${totalCr.toFixed(2)}`);
     if (Math.abs(totalDr - totalCr) > 0.01) {
       throw new Error(`Trial Balance is not balancing! Dr=${totalDr}, Cr=${totalCr}`);
     }
-    if (Math.round(totalDr) !== 93845) {
-      throw new Error(`Trial Balance sum incorrect. Expected ₹93845, got ₹${totalDr}`);
+    if (Math.round(totalDr) !== 93445) {
+      throw new Error(`Trial Balance sum incorrect. Expected ₹93445, got ₹${totalDr}`);
     }
 
     const assertLedger = (name, val, type) => {
-      const row = trialBalanceData.find(tb => tb.ledger.name === name);
+      const row = trialBalanceData.find(tb => tb.name === name);
       if (!row) throw new Error(`Ledger not found in TB: ${name}`);
-      if (Math.abs(row.balance - val) > 0.01 || row.type !== type) {
-        throw new Error(`Ledger balance mismatch for ${name}: Expected ${val} ${type}, got ${row.balance} ${row.type}`);
+      const actualVal = type === 'Dr' ? row.debit : row.credit;
+      if (Math.abs(actualVal - val) > 0.01) {
+        throw new Error(`Ledger balance mismatch for ${name}: Expected ${val} ${type}, got Dr=${row.debit} Cr=${row.credit}`);
       }
-      console.log(`Verified Ledger: ${name.padEnd(25)} | Balance: ₹${row.balance.toFixed(2).padStart(8)} [${row.type}]`);
+      console.log(`Verified Ledger: ${name.padEnd(25)} | Balance: ₹${actualVal.toFixed(2).padStart(8)} [${type}]`);
     };
 
     assertLedger('Purchase A/c', 50000, 'Dr');
@@ -429,8 +430,8 @@ async function run() {
     assertLedger('CGST Output', 900, 'Cr');   // 900 from sales
     assertLedger('SGST Output', 900, 'Cr');   // 900 from sales
     assertLedger('Job Work Charges', 2900, 'Dr');
-    assertLedger('Production Loss A/c', 500, 'Dr');
-    assertLedger('Stock A/c', 500, 'Cr');
+    assertLedger('Production Loss A/c', 100, 'Dr');
+    assertLedger('Stock A/c', 100, 'Cr');
     assertLedger('Supplier A Ltd', 52500, 'Cr');
     assertLedger('Customer B Corp', 37800, 'Dr');
     assertLedger('Mill C Dyeing & Printing', 3045, 'Cr');
@@ -447,12 +448,12 @@ async function run() {
     };
     await gstController.getGstr1(reqG1, resG1);
 
-    if (!gstr1Data || gstr1Data.b2b.length !== 1) {
+    if (!gstr1Data || !gstr1Data.invoices || gstr1Data.invoices.length !== 1) {
       throw new Error('GSTR-1 report validation failed: B2B list should contain exactly 1 entry');
     }
-    const b2bRow = gstr1Data.b2b[0];
-    if (b2bRow.inum !== 'SAL-TEST-001' || b2bRow.txval !== 36000 || b2bRow.camt !== 900 || b2bRow.samt !== 900) {
-      throw new Error('GSTR-1 invoice data values mismatch');
+    const invRow = gstr1Data.invoices[0];
+    if (invRow.invoiceNo !== 'SAL-TEST-001' || invRow.taxable !== 36000 || invRow.cgst !== 900 || invRow.sgst !== 900) {
+      throw new Error(`GSTR-1 invoice data values mismatch: invoiceNo=${invRow.invoiceNo}, taxable=${invRow.taxable}, cgst=${invRow.cgst}, sgst=${invRow.sgst}`);
     }
     console.log('✅ GSTR-1 report validation successful');
 

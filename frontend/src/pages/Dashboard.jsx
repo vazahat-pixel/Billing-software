@@ -403,7 +403,7 @@ const Dashboard = () => {
       if (match) return { badge: match[1], text: match[2] };
       return { badge: null, text: label };
    };
-   const CORE_MODULES_WITH_BOOKS = ['sales', 'purchase', 'receipt', 'payment', 'cashBook', 'bankBook', 'millIssue', 'millRec', 'jobIssue', 'jobRec', 'ledger'];
+   const CORE_MODULES_WITH_BOOKS = ['sales', 'purchase', 'receipt', 'payment', 'cashBook', 'bankBook', 'millIssue', 'millRec', 'jobIssue', 'jobRec'];
 
    const BOOK_MODULE_ALIAS = {
       cashBook: 'receipt',
@@ -1027,7 +1027,7 @@ const Dashboard = () => {
          <UpdateModal isOpen={modals.jobIssue} onClose={() => toggleModal('jobIssue', false)} selectedBook={selectedBooks.jobIssue?.name} />
          <JobReceiptModal isOpen={modals.jobRec} onClose={() => toggleModal('jobRec', false)} selectedBook={selectedBooks.jobRec?.name} />
          <ProcessUpdateModal isOpen={modals.updateJob} onClose={() => toggleModal('updateJob', false)} />
-         <LedgerModal isOpen={modals.ledger} onClose={() => toggleModal('ledger', false)} selectedBook={selectedBooks.ledger?.name} />
+         <LedgerModal isOpen={modals.ledger} onClose={() => toggleModal('ledger', false)} />
          <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters} />
          <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} readOnly={permissions.readOnlyMasters} />
          {modals.outstanding && <SalesOutstanding isOpen={modals.outstanding} onClose={() => toggleModal('outstanding', false)} />}

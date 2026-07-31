@@ -33,7 +33,7 @@ const AccountingEntrySchema = new mongoose.Schema({
   refType: {
     type: String,
     enum: [
-      'SalesInvoice', 'PurchaseBill', 'GRN', 'JobIssue', 'JobReceive',
+      'SalesInvoice', 'PurchaseBill', 'GRN', 'JobIssue', 'JobReceive', 'JobWorkCharges',
       'Payment', 'Receipt', 'Journal', 'Contra',
       'CreditNote', 'DebitNote',
       'SalesReturn', 'PurchaseReturn',

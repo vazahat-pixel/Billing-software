@@ -102,10 +102,73 @@ const PurchaseModal = ({
   const [gridItems, setGridItems] = useState([blankLine()]);
   const [extraUnits, setExtraUnits] = useState([]);
 
-  const patchLine = (idx, patch) => {
+  const lineQty = (row) => {
+    const unit = String(row?.unit || 'MTRS').toUpperCase();
+    if (['PCS', 'PC', 'NOS', 'NO', 'QTY'].includes(unit)) {
+      return Number(row?.pcs || 0);
+    }
+    return Number(row?.mts || 0);
+  };
+
+  const computeLine = (row, fieldChanged = '') => {
+    let cut = Number(row.cut) || 0;
+    let pcs = Number(row.pcs) || 0;
+    let mts = Number(row.mts) || 0;
+
+    if (fieldChanged === 'cut' || fieldChanged === 'pcs' || fieldChanged === 'itemId') {
+      if (cut > 0 && pcs > 0) {
+        mts = Number((cut * pcs).toFixed(3));
+      }
+    } else if (fieldChanged !== 'mts' && !row._mtsManual) {
+      if (cut > 0 && pcs > 0) {
+        mts = Number((cut * pcs).toFixed(3));
+      }
+    }
+
+    const rate = Number(row.rate) || 0;
+    const qty = lineQty({ ...row, pcs, mts });
+    const autoAmt = qty > 0 && rate > 0 ? Number((qty * rate).toFixed(2)) : Number(row.amount || 0);
+    const amount = row._amountManual ? Number(row.amount || 0) : autoAmt;
+
+    const dis1Per = Number(row.dis1Per) || 0;
+    const dis1Amt = dis1Per > 0 && !row._dis1Manual
+      ? Number(((amount * dis1Per) / 100).toFixed(2))
+      : Number(row.dis1Amt) || 0;
+
+    const dis2Per = Number(row.dis2Per) || 0;
+    const dis2Amt = dis2Per > 0 && !row._dis2Manual
+      ? Number((((amount - dis1Amt) * dis2Per) / 100).toFixed(2))
+      : Number(row.dis2Amt) || 0;
+
+    const addAmt = Number(row.addAmt) || 0;
+    const taxable = Number((amount - dis1Amt - dis2Amt + addAmt).toFixed(2));
+
+    const gstPer = Number(row.gstPer) || 0;
+    const gstAmt = gstPer > 0
+      ? Number(((taxable * gstPer) / 100).toFixed(2))
+      : Number(row.gstAmt) || 0;
+
+    return {
+      ...row,
+      cut,
+      pcs,
+      mts,
+      amount,
+      dis1Per,
+      dis1Amt,
+      dis2Per,
+      dis2Amt,
+      addAmt,
+      gstPer,
+      gstAmt,
+    };
+  };
+
+  const patchLine = (idx, patch, fieldChanged = '') => {
     setGridItems((prev) => {
       const updated = [...prev];
-      updated[idx] = { ...updated[idx], ...patch };
+      const merged = { ...updated[idx], ...patch };
+      updated[idx] = computeLine(merged, fieldChanged);
       return updated;
     });
   };
@@ -653,10 +716,11 @@ const PurchaseModal = ({
     patchLine(idx, {
       itemId: val,
       itemName: item?.itemName || item?.name || '',
+      cut: Number(item?.cut || gridItems[idx].cut || 0),
       rate: item?.purRate || item?.purchaseRate || 0,
       unit: String(item?.unit || 'MTRS').toUpperCase(),
       gstPer: Number(item?.gstRate || 0),
-    });
+    }, 'itemId');
   };
 
   const nextStepActions = [
@@ -909,13 +973,13 @@ const PurchaseModal = ({
                       <input type="number" className="classic-erp-input w-full text-center border-0" value={row.fold || ''} onChange={e => patchLine(idx, { fold: Number(e.target.value) })} disabled={locked} />
                     </td>
                     <td className="col-num">
-                      <input type="number" className="classic-erp-input w-full text-center border-0" value={row.cut || ''} onChange={e => patchLine(idx, { cut: Number(e.target.value) })} disabled={locked} />
+                      <input type="number" className="classic-erp-input w-full text-center border-0" value={row.cut || ''} onChange={e => patchLine(idx, { cut: Number(e.target.value) || 0, _mtsManual: false }, 'cut')} disabled={locked} placeholder="0" />
                     </td>
                     <td className="col-num">
-                      <input type="number" className="classic-erp-input w-full text-center border-0" value={row.pcs || ''} onChange={e => patchLine(idx, { pcs: Number(e.target.value) })} disabled={locked} />
+                      <input type="number" className="classic-erp-input w-full text-center border-0 font-bold" value={row.pcs > 0 ? row.pcs : ''} onChange={e => patchLine(idx, { pcs: Number(e.target.value) || 0, _mtsManual: false }, 'pcs')} disabled={locked} min="0" step="1" placeholder="0" />
                     </td>
                     <td className="col-qty">
-                      <input type="number" className="classic-erp-input w-full text-center border-0" value={row.mts || ''} onChange={e => patchLine(idx, { mts: Number(e.target.value) })} disabled={locked} title="Enter meters manually" />
+                      <input type="number" className="classic-erp-input w-full text-center border-0" value={row.mts > 0 ? row.mts : ''} onChange={e => patchLine(idx, { mts: Number(e.target.value) || 0, _mtsManual: true, _amountManual: false }, 'mts')} disabled={locked} min="0" step="0.001" placeholder="0.000" title="Auto = Cut × Pcs. Type to override." />
                     </td>
                     <td className="col-qty">
                       <input type="number" className="classic-erp-input w-full text-right border-0" value={row.rate || ''} onChange={e => patchLine(idx, { rate: Number(e.target.value) })} disabled={locked} />

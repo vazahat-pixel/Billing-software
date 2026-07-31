@@ -53,7 +53,7 @@ const CompanySettingsSchema = new mongoose.Schema({
     upiId: { type: String, default: '' },
     invoiceTerms: { type: String, default: '' },
     stateCode: { type: String, default: '' },
-    invoiceTemplateId: { type: String, default: 'gst-formal' },
+    invoiceTemplateId: { type: String, default: 'textile-pro' },
     autoFestiveTheme: { type: Boolean, default: false },
     showFestivalGreeting: { type: Boolean, default: false },
     // Custom Fields

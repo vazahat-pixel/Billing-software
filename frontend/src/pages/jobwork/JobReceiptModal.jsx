@@ -1,409 +1,854 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { ERPSelect } from '../../components/forms/FormElements';
+import { ERPCombobox } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
-import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
+import { toast } from '../../store/useToastStore';
+import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
+import { Plus, Trash2 } from 'lucide-react';
+import {
+  blankLine,
+  calcJobReceipt,
+  jobToLine,
+  PQK_OPTIONS,
+  RCM_OPTIONS,
+  TYPE_OPTIONS,
+  lineJobAmt,
+} from './jobReceiptCalc';
+
+const today = () => new Date().toISOString().split('T')[0];
+
+const weekday = (iso) => {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('en-IN', { weekday: 'short' });
+  } catch {
+    return '';
+  }
+};
+
+const emptyHeader = (book) => ({
+  serialNo: '1',
+  date: today(),
+  reverseCharge: 'No',
+  billChNo: '',
+  broker: '',
+  hsnCd: '',
+  type: 'INVOICE IN STATE',
+  partyId: '',
+  gstin: '',
+  book: book || 'JOB WORK RECEIVE BOOK',
+});
+
+const emptyFooter = () => ({
+  addAmt: '',
+  addLabel: '',
+  lessAmt: '',
+  lessLabel: '',
+  otherLess1Amt: '',
+  otherLess1Label: '',
+  otherLess2Amt: '',
+  otherLess2Label: '',
+  tdsOnAmount: '',
+  tdsPercent: '',
+  remark: '',
+  taxRate: '5',
+  roundOff: '',
+  rcmCharge: '',
+});
 
 const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
-  const { 
-    jobWorkEntries, 
-    fetchJobs, 
-    receiveFromMill,
-    fetchInventory
-  } = useStore();
+  const { jobWorkEntries, parties, fetchJobs, fetchParties, receiveFromMill } = useStore();
 
-  const [activeTab, setActiveTab] = useState('Job Receive');
-  const [selectedJobId, setSelectedJobId] = useState('');
-  const [receivedPcs, setReceivedPcs] = useState('');
-  const [receivedQty, setReceivedQty] = useState('');
-  const [rate, setRate] = useState('');
-  const [gstPercent, setGstPercent] = useState('5');
+  const [mode, setMode] = useState('Add');
+  const [findOpen, setFindOpen] = useState(false);
+  const [selectedReceiptId, setSelectedReceiptId] = useState('');
+  const [header, setHeader] = useState(emptyHeader(selectedBook));
+  const [footer, setFooter] = useState(emptyFooter());
+  const [lines, setLines] = useState([blankLine()]);
   const [saving, setSaving] = useState(false);
+  const [bootLoading, setBootLoading] = useState(false);
+
+  const locked = mode === 'View';
+  const titleBook = selectedBook || header.book || 'JOBWORK BOOK';
 
   useEffect(() => {
-    if (isOpen) {
-      fetchJobs();
-    }
-  }, [isOpen, fetchJobs]);
-
-  const pendingJobs = useMemo(() => {
-    return jobWorkEntries.filter(j => j.status === 'Issued');
-  }, [jobWorkEntries]);
-
-  const jobOptions = useMemo(
-    () =>
-      pendingJobs.map((j) => ({
-        value: j._id,
-        label: `${j.jobCardNo} - ${j.workerId?.name || 'Worker'} (${j.processType || 'Process'} · Qty: ${j.issueQty}m)`,
-      })),
-    [pendingJobs]
-  );
-
-  const gstOptions = [
-    { value: '0', label: '0%' },
-    { value: '5', label: '5%' },
-    { value: '12', label: '12%' },
-    { value: '18', label: '18%' },
-  ];
-
-  const receivedJobs = useMemo(() => {
-    return jobWorkEntries.filter(j => j.status === 'Received');
-  }, [jobWorkEntries]);
-
-  const selectedJob = useMemo(() => {
-    return jobWorkEntries.find(j => j._id === selectedJobId) || null;
-  }, [selectedJobId, jobWorkEntries]);
-
-  // Auto-fill values when job changes
-  useEffect(() => {
-    if (selectedJob) {
-      setReceivedPcs(selectedJob.issuePcs || '');
-      setReceivedQty(selectedJob.issueQty || '');
-      let defaultRate = 15; // Embroidery rate default
-      try {
-        if (selectedJob.workerId?.address && selectedJob.workerId?.address.startsWith('{')) {
-          const extra = JSON.parse(selectedJob.workerId.address);
-          if (extra.rate) defaultRate = extra.rate;
-        }
-      } catch (e) {}
-      setRate(defaultRate);
-    } else {
-      setReceivedPcs('');
-      setReceivedQty('');
-      setRate('');
-    }
-  }, [selectedJob]);
-
-  // Derived Calculations
-  const calculatedWastage = useMemo(() => {
-    if (!selectedJob || !receivedQty) return 0;
-    return Math.max(0, selectedJob.issueQty - Number(receivedQty));
-  }, [selectedJob, receivedQty]);
-
-  const wastagePercent = useMemo(() => {
-    if (!selectedJob || !selectedJob.issueQty) return 0;
-    return (calculatedWastage / selectedJob.issueQty) * 100;
-  }, [selectedJob, calculatedWastage]);
-
-  const charges = useMemo(() => {
-    return (Number(receivedQty) || 0) * (Number(rate) || 0);
-  }, [receivedQty, rate]);
-
-  const gstAmount = useMemo(() => {
-    return (charges * (Number(gstPercent) || 0)) / 100;
-  }, [charges, gstPercent]);
-
-  const totalAmount = useMemo(() => {
-    return charges + gstAmount;
-  }, [charges, gstAmount]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedJobId) {
-      notifyWarning('Please select a pending embroidery job card');
+    if (!isOpen) {
+      setBootLoading(false);
       return;
     }
-    if (!receivedQty || parseFloat(receivedQty) <= 0) {
-      notifyWarning('Please enter a valid received quantity');
+    let cancelled = false;
+    setBootLoading(true);
+    Promise.all([fetchJobs(), fetchParties?.()])
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setBootLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, fetchJobs, fetchParties]);
+
+  useEffect(() => {
+    if (isOpen && selectedBook) {
+      setHeader((h) => ({ ...h, book: selectedBook }));
+    }
+  }, [isOpen, selectedBook]);
+
+  const partyOptions = useMemo(
+    () =>
+      (parties || [])
+        .filter((p) => ['Supplier', 'Job Worker', 'Mill', 'Customer', 'Both'].includes(p.type))
+        .map((p) => ({
+          value: p._id || p.id,
+          label: p.name,
+          gstin: p.gstin || '',
+        })),
+    [parties]
+  );
+
+  const pendingJobs = useMemo(
+    () => (jobWorkEntries || []).filter((j) => j.status === 'Issued'),
+    [jobWorkEntries]
+  );
+
+  const receivedJobs = useMemo(
+    () => (jobWorkEntries || []).filter((j) => j.status === 'Received'),
+    [jobWorkEntries]
+  );
+
+  const receiptOptions = useMemo(
+    () =>
+      receivedJobs.map((j) => ({
+        value: j._id,
+        label: `${j.jobCardNo} · ${j.workerId?.name || 'Party'} · ₹${Number(j.processCharges || 0).toFixed(2)}`,
+      })),
+    [receivedJobs]
+  );
+
+  const partyPendingJobs = useMemo(() => {
+    if (!header.partyId) return pendingJobs;
+    return pendingJobs.filter(
+      (j) => String(j.workerId?._id || j.workerId) === String(header.partyId)
+    );
+  }, [pendingJobs, header.partyId]);
+
+  const calc = useMemo(() => calcJobReceipt(lines, footer, header), [lines, footer, header]);
+
+  const setLine = useCallback((idx, patch) => {
+    setLines((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], ...patch };
+      next[idx].jobAmt = lineJobAmt(next[idx]);
+      return next;
+    });
+  }, []);
+
+  const addLine = () => setLines((prev) => [...prev, blankLine()]);
+
+  const removeLine = (idx) => {
+    setLines((prev) => (prev.length <= 1 ? [blankLine()] : prev.filter((_, i) => i !== idx)));
+  };
+
+  const handlePartyChange = (partyId) => {
+    const party = partyOptions.find((p) => String(p.value) === String(partyId));
+    setHeader((h) => ({
+      ...h,
+      partyId: partyId || '',
+      gstin: party?.gstin || '',
+    }));
+  };
+
+  const loadPendingChallans = () => {
+    if (!header.partyId) {
+      toast.warning('Select Job Party first');
+      return;
+    }
+    if (partyPendingJobs.length === 0) {
+      toast.info('No pending issued challans for this party');
+      return;
+    }
+    setLines(partyPendingJobs.map(jobToLine));
+    toast.success(`Loaded ${partyPendingJobs.length} pending challan(s)`);
+  };
+
+  const handleNew = () => {
+    setMode('Add');
+    setSelectedReceiptId('');
+    setFindOpen(false);
+    setHeader(emptyHeader(selectedBook));
+    setFooter(emptyFooter());
+    setLines([blankLine()]);
+  };
+
+  const handleEdit = () => {
+    if (!selectedReceiptId) return toast.warning('Find a receipt to edit');
+    setMode('Edit');
+  };
+
+  const handleCancel = () => {
+    if (selectedReceiptId) {
+      loadReceipt(selectedReceiptId);
+      setMode('View');
+    } else {
+      handleNew();
+    }
+  };
+
+  const loadReceipt = (jobId) => {
+    const job = receivedJobs.find((j) => String(j._id) === String(jobId));
+    if (!job) return;
+    setSelectedReceiptId(jobId);
+    setHeader({
+      serialNo: '1',
+      date: job.receiveDate ? job.receiveDate.split('T')[0] : today(),
+      reverseCharge: 'No',
+      billChNo: job.challanNo || '',
+      broker: '',
+      hsnCd: '',
+      type: 'INVOICE IN STATE',
+      partyId: job.workerId?._id || job.workerId || '',
+      gstin: job.workerId?.gstin || '',
+      book: selectedBook || 'JOB WORK RECEIVE BOOK',
+    });
+    setFooter({
+      ...emptyFooter(),
+      taxRate: String(
+        job.processGstAmount && job.processCharges
+          ? ((job.processGstAmount / job.processCharges) * 100).toFixed(2)
+          : '5'
+      ),
+      remark: job.remark || '',
+    });
+    setLines(() => {
+      const line = jobToLine(job);
+      line.recPcs = job.receivedPcs ?? '';
+      line.recMts = job.receivedQty ?? '';
+      line.jobAmt = lineJobAmt(line);
+      return [line];
+    });
+    setMode('View');
+  };
+
+  const handleSave = async (e) => {
+    e?.preventDefault?.();
+    if (!header.partyId) {
+      toast.warning('Select Job Party');
+      return;
+    }
+
+    const receivable = calc.linesWithAmt.filter(
+      (l) => l.jobId && (Number(l.recMts) > 0 || Number(l.recPcs) > 0)
+    );
+    if (receivable.length === 0) {
+      toast.warning('Add at least one line with received qty and linked challan');
       return;
     }
 
     setSaving(true);
+    let ok = 0;
     try {
-      await receiveFromMill({
-        jobId: selectedJobId,
-        receivedQty: Number(receivedQty),
-        receivedPcs: Number(receivedPcs) || 0,
-        wastage: Number(calculatedWastage),
-        charges: Number(charges),
-        gstAmount: Number(gstAmount)
-      });
-      notifySuccess('Embroidery job received and finished lots added to stock!');
-      setSelectedJobId('');
-      setActiveTab('View Job Rec');
-      fetchJobs();
-      fetchInventory();
+      for (const line of receivable) {
+        const gstShare =
+          calc.gross > 0 ? (line.jobAmt / calc.gross) * calc.totalGst : calc.totalGst / receivable.length;
+        await receiveFromMill({
+          jobId: line.jobId,
+          receivedQty: Number(line.recMts) || 0,
+          receivedPcs: Number(line.recPcs) || 0,
+          charges: Number(line.jobAmt) || 0,
+          gstAmount: Number(gstShare.toFixed(2)) || 0,
+        });
+        ok += 1;
+      }
+      toast.success(`Job receipt saved — ${ok} challan(s) received`);
+      handleNew();
+      setMode('View');
+      await fetchJobs();
     } catch (err) {
-      notifyError(err, 'Failed to receive job');
+      toast.error(err, { fallback: ok > 0 ? `Partial save: ${ok} received, then failed` : 'Failed to save job receipt' });
     } finally {
       setSaving(false);
     }
   };
 
+  const handleDelete = () => toast.warning('Delete from admin / reverse receive flow');
+  const handlePrint = () => {
+    if (!selectedReceiptId) return toast.warning('Find a receipt to print');
+    toast.info('Print preview — coming soon');
+  };
+
+  const gridCols = [
+    { key: 'chlnNo', label: 'ChlnNo', w: 'w-20' },
+    { key: 'itemName', label: 'ItemName', w: 'min-w-[120px]' },
+    { key: 'finishItem', label: 'FinishItem', w: 'min-w-[100px]' },
+    { key: 'cut', label: 'Cut', w: 'w-14' },
+    { key: 'recPcs', label: 'RecPcs', w: 'w-16', align: 'right' },
+    { key: 'recMts', label: 'RecMts', w: 'w-16', align: 'right' },
+    { key: 'jRate', label: 'J.Rate', w: 'w-16', align: 'right' },
+    { key: 'pqk', label: 'PQK', w: 'w-14' },
+    { key: 'jobAmt', label: 'JobAmt', w: 'w-20', align: 'right', readOnly: true },
+    { key: 'cp', label: 'CP', w: 'w-12' },
+    { key: 'jobcardNo', label: 'JobcardNo', w: 'w-24' },
+  ];
+
   return (
     <ErpWindowedModal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Job Receive [ ${selectedBook || 'RECEIVE BOOK'} ]`}
+      title={`Additional Job Receipt [ ${titleBook} ]`}
       windowId="jobRec"
       bare
     >
       {({ WindowControls }) => (
-      <div className="classic-erp-window flex flex-col h-full min-h-0 overflow-hidden !max-h-none">
-        <div className="classic-erp-header shrink-0">
-          <span className="erp-window-title truncate">Embroidery Job Receive [ {selectedBook || 'RECEIVE BOOK'} ]</span>
-          <WindowControls />
-        </div>
+        <div className="classic-erp-window erp-density erp-job-receipt-window flex flex-col h-full min-h-0 !max-h-none">
+          <ErpBusyOverlay show={bootLoading} message="Loading job receipt…" />
+          <ErpBusyOverlay show={!bootLoading && saving} message="Saving job receipt…" />
 
-        {/* Tab Navigation */}
-        <div className="classic-erp-tabs shrink-0">
-          {['Job Receive', 'View Job Rec'].map(tab => (
-            <button 
-             key={tab}
-             type="button"
-             onClick={() => setActiveTab(tab)}
-             className={`classic-erp-tab-button ${activeTab === tab ? 'active' : ''}`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+          <div className="classic-erp-header shrink-0">
+            <span className="erp-window-title truncate">
+              Additional Job Receipt [ {titleBook} ]
+            </span>
+            <WindowControls />
+          </div>
 
-        <div className="flex-1 flex flex-col overflow-hidden bg-[#d4d0c8] p-2">
-          {activeTab === 'Job Receive' ? (
-            <div className="flex-1 flex overflow-hidden gap-2">
-               {/* Left Form Column (70%) */}
-               <form onSubmit={handleSubmit} className="flex-[3] flex flex-col overflow-y-auto space-y-2 no-scrollbar pb-16 relative">
-                  
-                  <div className="classic-erp-frame space-y-2">
-                     <div className="classic-erp-frame-title">Receive Specs & Logistics</div>
+          <form
+            onSubmit={handleSave}
+            className="classic-erp-body erp-job-receipt-body flex-1 overflow-y-auto min-h-0"
+          >
+            {findOpen && (
+              <div className="classic-erp-frame erp-job-receipt-find shrink-0">
+                <div className="classic-erp-field classic-erp-field--lg">
+                  <span className="classic-erp-label blue-label">Find</span>
+                  <ERPSelect
+                    className="classic-erp-select"
+                    value={selectedReceiptId}
+                    onChange={(e) => loadReceipt(e.target.value)}
+                    options={receiptOptions}
+                    placeholder="- Select Job Receipt -"
+                    recentKey="job-receipt-find"
+                  />
+                </div>
+              </div>
+            )}
 
-                     {/* Form Info */}
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="flex items-center gap-2">
-                           <span className="classic-erp-label w-36">Pending Job Card:</span>
-                           <ERPSelect
-                             className="classic-erp-select flex-1"
-                             value={selectedJobId}
-                             onChange={(e) => setSelectedJobId(e.target.value)}
-                             options={jobOptions}
-                             placeholder="- Select Job Card -"
-                             recentKey="emb-receive-job"
-                           />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                           <span className="classic-erp-label w-24">Receive Date:</span>
-                           <input 
-                             type="date" 
-                             className="classic-erp-input flex-1" 
-                             defaultValue={new Date().toISOString().substring(0, 10)} 
-                             readOnly
-                           />
-                        </div>
-                     </div>
+            {/* Header */}
+            <div className="classic-erp-frame erp-job-receipt-header shrink-0">
+              <div className="erp-job-receipt-header-grid">
+                <div className="classic-erp-stack erp-job-receipt-party-col">
+                  <div className="classic-erp-field classic-erp-field--lg">
+                    <span className="classic-erp-label red-label">Job Party</span>
+                    <ERPCombobox
+                      value={header.partyId}
+                      onChange={handlePartyChange}
+                      disabled={locked}
+                      options={partyOptions}
+                      placeholder="Select job worker / mill…"
+                      recentKey="job-receipt-party"
+                      allowClear
+                    />
                   </div>
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">GSTIN</span>
+                    <input
+                      type="text"
+                      className="classic-erp-input font-mono uppercase"
+                      value={header.gstin}
+                      readOnly
+                      placeholder="—"
+                    />
+                  </div>
+                </div>
 
-                  {selectedJob ? (
-                    <div className="classic-erp-frame space-y-2">
-                      <div className="classic-erp-frame-title">Job Card Original vs Received Allocation</div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono border-b border-[#808080] pb-2">
-                        <div>
-                          <span className="classic-erp-label text-slate-800">Issued Lot Ref:</span>
-                          <span className="font-bold text-black uppercase ml-1">{selectedJob.lotId?.lotId || 'N/A'}</span>
-                        </div>
-                        <div>
-                          <span className="classic-erp-label text-slate-800">Worker / Unit:</span>
-                          <span className="font-bold text-black uppercase ml-1">{selectedJob.workerId?.name || 'N/A'}</span>
-                        </div>
-                        <div>
-                          <span className="classic-erp-label text-slate-800">Original Issued Pcs:</span>
-                          <span className="font-bold text-black ml-1">{selectedJob.issuePcs} Pcs</span>
-                        </div>
-                        <div>
-                          <span className="classic-erp-label text-slate-800">Original Issued Mts:</span>
-                          <span className="font-bold text-black ml-1">{selectedJob.issueQty} Mtrs</span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
-                        <div className="flex items-center gap-1">
-                           <span className="classic-erp-label text-[11px] w-12">Rec Pcs:</span>
-                           <input 
-                              type="number" 
-                              className="classic-erp-input flex-1 font-bold text-right" 
-                              value={receivedPcs} 
-                              onChange={e => setReceivedPcs(e.target.value)}
-                              max={selectedJob.issuePcs}
-                              placeholder="0"
-                           />
-                        </div>
-                        <div className="flex items-center gap-1">
-                           <span className="classic-erp-label red-label text-[11px] w-12">Rec Mts:</span>
-                           <input 
-                              type="number" 
-                              className="classic-erp-input flex-1 font-bold text-right" 
-                              value={receivedQty} 
-                              onChange={e => setReceivedQty(e.target.value)}
-                              max={selectedJob.issueQty}
-                              placeholder="0.00"
-                              required
-                           />
-                        </div>
-                        <div className="flex items-center gap-1">
-                           <span className="classic-erp-label text-[11px] w-16">Proc Rate:</span>
-                           <input 
-                              type="number" 
-                              className="classic-erp-input flex-1 text-right" 
-                              value={rate} 
-                              onChange={e => setRate(e.target.value)}
-                              placeholder="0.00"
-                           />
-                        </div>
-                        <div className="flex items-center gap-1">
-                           <span className="classic-erp-label text-[11px] w-16">GST Slab:</span>
-                           <ERPSelect
-                              className="classic-erp-select flex-1"
-                              value={gstPercent}
-                              onChange={(e) => setGstPercent(e.target.value)}
-                              options={gstOptions}
-                           />
-                        </div>
-                      </div>
-
-                      <div className="border border-[#808080] p-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono bg-[#d4d0c8] mt-2">
-                        <div>
-                           <span className="classic-erp-label text-slate-800">Base Cost:</span>
-                           <span className="font-bold text-black mt-1 block">₹{charges.toFixed(2)}</span>
-                        </div>
-                        <div>
-                           <span className="classic-erp-label text-slate-800">GST Amt:</span>
-                           <span className="font-bold text-black mt-1 block">₹{gstAmount.toFixed(2)}</span>
-                        </div>
-                        <div>
-                           <span className="classic-erp-label text-slate-800">Total Chg:</span>
-                           <span className="font-bold text-blue-900 mt-1 block">₹{totalAmount.toFixed(2)}</span>
-                        </div>
-                        <div>
-                           <span className="classic-erp-label text-slate-800">Wastage:</span>
-                           <span className="font-bold text-red-800 mt-1 block">{calculatedWastage.toFixed(2)} Mts</span>
-                        </div>
+                <div className="classic-erp-stack erp-job-receipt-meta-col">
+                  <div className="classic-erp-meta-grid erp-job-receipt-meta-row">
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label red-label">Serial No</span>
+                      <input
+                        type="text"
+                        className="classic-erp-input text-center font-bold"
+                        value={header.serialNo}
+                        onChange={(e) => setHeader({ ...header, serialNo: e.target.value })}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label red-label">Date</span>
+                      <div className="classic-erp-control">
+                        <input
+                          type="date"
+                          className="classic-erp-input erp-job-receipt-date"
+                          value={header.date}
+                          onChange={(e) => setHeader({ ...header, date: e.target.value })}
+                          disabled={locked}
+                          required
+                        />
+                        <span className="erp-job-receipt-weekday">{weekday(header.date)}</span>
                       </div>
                     </div>
-                  ) : (
-                    <div className="py-8 text-center text-red-800 font-bold uppercase tracking-wider text-[11px] bg-white border border-[#808080]">
-                       SELECT A PENDING EMBROIDERY CHALLAN FROM THE DROPDOWN TO CONTINUE
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Reverse Charge</span>
+                      <ERPSelect
+                        className={`classic-erp-select ${header.reverseCharge === 'Yes' ? 'erp-rcm-highlight' : ''}`}
+                        value={header.reverseCharge}
+                        onChange={(e) => setHeader({ ...header, reverseCharge: e.target.value })}
+                        options={RCM_OPTIONS}
+                        disabled={locked}
+                      />
                     </div>
-                  )}
-
-                  {/* Footer Actions inside form */}
-                  <div className="classic-erp-form-footer absolute bottom-0 left-0 w-full shrink-0">
-                     <button 
-                        type="button" 
-                        onClick={onClose}
-                        className="classic-erp-btn"
-                     >
-                        Cancel
-                     </button>
-                     <button 
-                        type="submit"
-                        disabled={saving || !selectedJobId}
-                        onClick={handleSubmit}
-                        className="classic-erp-btn btn-blue"
-                     >
-                        {saving ? 'Saving...' : 'Save Receipt (F12)'}
-                     </button>
                   </div>
 
-               </form>
-
-               {/* Yield & Wastage Monitor (Right Column 30%) */}
-               <div className="flex-1 flex flex-col w-80 shrink-0 classic-erp-frame p-0 overflow-hidden bg-white">
-                  <div className="classic-erp-header bg-black text-white text-xs px-2 h-7 flex justify-between items-center font-bold uppercase shrink-0">
-                     <span>Yield & Wastage Monitor</span>
+                  <div className="classic-erp-meta-grid erp-job-receipt-meta-row">
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Bill/Ch No</span>
+                      <input
+                        type="text"
+                        className="classic-erp-input"
+                        value={header.billChNo}
+                        onChange={(e) => setHeader({ ...header, billChNo: e.target.value })}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Broker</span>
+                      <input
+                        type="text"
+                        className="classic-erp-input"
+                        value={header.broker}
+                        onChange={(e) => setHeader({ ...header, broker: e.target.value })}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">HSN CD</span>
+                      <input
+                        type="text"
+                        className="classic-erp-input text-center font-mono"
+                        value={header.hsnCd}
+                        onChange={(e) => setHeader({ ...header, hsnCd: e.target.value })}
+                        disabled={locked}
+                        placeholder="9988"
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label red-label">TYPE</span>
+                      <ERPSelect
+                        className="classic-erp-select"
+                        value={header.type}
+                        onChange={(e) => setHeader({ ...header, type: e.target.value })}
+                        options={TYPE_OPTIONS}
+                        disabled={locked}
+                      />
+                    </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-2 space-y-3 no-scrollbar font-mono">
-                      
-                      <div className="border border-[#808080] p-2 space-y-1.5 bg-[#d4d0c8]">
-                         <span className="text-[10px] font-bold uppercase text-blue-900 block">Metrics Overview</span>
-                         
-                         <div className="flex justify-between items-center text-xs">
-                            <span className="classic-erp-label text-slate-700">Issued:</span>
-                            <span className="font-bold text-black">{selectedJob ? selectedJob.issueQty.toFixed(2) : '0.00'} mts</span>
-                         </div>
+                </div>
+              </div>
 
-                         <div className="flex justify-between items-center text-xs border-t border-[#808080] pt-1">
-                            <span className="classic-erp-label text-slate-700">Received:</span>
-                            <span className="font-bold text-black">{receivedQty ? Number(receivedQty).toFixed(2) : '0.00'} mts</span>
-                         </div>
-                      </div>
-
-                      <div className="border border-[#808080] p-2" style={{ backgroundColor: wastagePercent > 10 ? '#ffffe1' : '#ffffff' }}>
-                         <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[10px] font-bold uppercase text-slate-700">Computed Wastage:</span>
-                            {wastagePercent > 10 ? (
-                               <span className="px-1 bg-red-800 text-white text-[9px] font-bold uppercase animate-pulse">
-                                  CRITICAL
-                               </span>
-                            ) : (
-                               <span className="px-1 bg-green-800 text-white text-[9px] font-bold uppercase">
-                                  OPTIMAL
-                               </span>
-                            )}
-                         </div>
-
-                         <div className="text-3xl font-black text-slate-900">
-                            {wastagePercent.toFixed(1)}%
-                         </div>
-                         <p className="text-[10px] text-slate-600 leading-normal mt-1">
-                            Wastage quantity is <span className="font-bold text-black">{calculatedWastage.toFixed(2)}</span> meters.
-                         </p>
-                      </div>
-
-                      <div className="bg-[#eff6ff] border border-blue-300 p-2 text-[10px] text-slate-700 leading-relaxed font-sans">
-                         <span className="font-bold text-blue-900 block mb-1">Wastage Tolerance Policy</span>
-                         Maximum allowable shrinkage/wastage during process is 10%. Over-wastage will deduct processing charges automatically.
-                      </div>
-                  </div>
-               </div>
+              {!locked && (
+                <div className="erp-job-receipt-toolbar">
+                  <button type="button" className="classic-erp-btn" onClick={loadPendingChallans}>
+                    Load Pending Challans
+                  </button>
+                  <button type="button" className="classic-erp-btn" onClick={addLine}>
+                    <Plus size={12} className="inline mr-0.5" /> Add Line
+                  </button>
+                  <span className="erp-job-receipt-pending-tag">
+                    {partyPendingJobs.length} Pending
+                  </span>
+                </div>
+              )}
             </div>
-          ) : (
-            // View Embroidery Job Rec list tab
-            <div className="flex-1 flex flex-col overflow-hidden">
-               <div className="classic-erp-table-container flex-1">
-                  <table className="classic-erp-table">
-                     <thead>
-                        <tr>
-                           <th className="w-24">Date</th>
-                           <th className="w-32">Job Card No</th>
-                           <th>Embroidery Partner</th>
-                           <th className="w-28 text-right">Issued Qty</th>
-                           <th className="w-28 text-right">Received Qty</th>
-                           <th className="w-28 text-right">Wastage Qty</th>
-                           <th className="w-24 text-center">Status</th>
-                        </tr>
-                     </thead>
-                     <tbody>
-                        {receivedJobs.map((job) => (
-                           <tr key={job._id}>
-                              <td className="font-mono">{job.receiveDate ? new Date(job.receiveDate).toLocaleDateString() : 'N/A'}</td>
-                              <td className="font-bold text-blue-900">{job.jobCardNo}</td>
-                              <td className="font-bold uppercase">{job.workerId?.name || 'N/A'}</td>
-                              <td className="text-right font-mono">{job.issueQty} Mts</td>
-                              <td className="text-right font-mono font-bold text-green-800">{job.receivedQty} Mts</td>
-                              <td className="text-right font-mono font-bold text-red-800">{job.wastage} Mts</td>
-                              <td className="text-center font-bold">
-                                 <span className="px-1 bg-black text-white text-[9px] uppercase">
-                                    {job.status}
-                                 </span>
+
+            {/* Line grid */}
+            <div className="classic-erp-frame erp-job-receipt-grid-wrap flex-1 min-h-0 flex flex-col">
+              <div className="classic-erp-table-container erp-job-receipt-grid flex-1 min-h-[140px]">
+                <table className="classic-erp-table erp-job-receipt-table">
+                  <thead>
+                    <tr>
+                      {gridCols.map((c) => (
+                        <th key={c.key} className={`${c.w} ${c.align === 'right' ? 'text-right' : ''}`}>
+                          {c.label}
+                        </th>
+                      ))}
+                      {!locked && <th className="w-8" />}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {calc.linesWithAmt.map((line, idx) => (
+                      <tr key={line.id}>
+                        {gridCols.map((c) => {
+                          if (c.key === 'pqk') {
+                            return (
+                              <td key={c.key}>
+                                <select
+                                  className="classic-erp-select w-full text-[11px]"
+                                  value={line.pqk}
+                                  onChange={(e) => setLine(idx, { pqk: e.target.value })}
+                                  disabled={locked}
+                                >
+                                  {PQK_OPTIONS.map((o) => (
+                                    <option key={o.value} value={o.value}>
+                                      {o.label}
+                                    </option>
+                                  ))}
+                                </select>
                               </td>
-                           </tr>
-                        ))}
-                        {receivedJobs.length === 0 && (
-                          <tr>
-                            <td colSpan="7" className="py-8 text-center text-slate-400 font-bold uppercase">
-                              No Received Embroidery Receipts Found
+                            );
+                          }
+                          if (c.readOnly) {
+                            return (
+                              <td key={c.key} className="text-right font-mono font-bold">
+                                {Number(line.jobAmt || 0).toFixed(2)}
+                              </td>
+                            );
+                          }
+                          return (
+                            <td key={c.key}>
+                              <input
+                                type={['recPcs', 'recMts', 'jRate'].includes(c.key) ? 'number' : 'text'}
+                                step={c.key === 'jRate' ? '0.01' : c.key === 'recMts' ? '0.001' : '1'}
+                                className={`classic-erp-input w-full ${c.align === 'right' ? 'text-right' : ''} ${c.key === 'itemName' ? 'uppercase font-bold' : ''}`}
+                                value={line[c.key] ?? ''}
+                                onChange={(e) => setLine(idx, { [c.key]: e.target.value })}
+                                disabled={locked}
+                              />
                             </td>
-                          </tr>
+                          );
+                        })}
+                        {!locked && (
+                          <td className="text-center">
+                            <button
+                              type="button"
+                              className="erp-job-receipt-del"
+                              onClick={() => removeLine(idx)}
+                              title="Remove line"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </td>
                         )}
-                     </tbody>
-                  </table>
-               </div>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          )}
+
+            {/* Footer — adjustments + totals */}
+            <div className="erp-job-receipt-footer-grid shrink-0">
+              <div className="classic-erp-frame erp-job-receipt-adjust">
+                <div className="erp-job-receipt-adj-grid">
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">Add</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="text"
+                        className="classic-erp-input flex-1"
+                        value={footer.addLabel}
+                        onChange={(e) => setFooter({ ...footer, addLabel: e.target.value })}
+                        disabled={locked}
+                        placeholder="Description"
+                      />
+                      <input
+                        type="number"
+                        className="classic-erp-input w-20 text-right"
+                        value={footer.addAmt}
+                        onChange={(e) => setFooter({ ...footer, addAmt: e.target.value })}
+                        disabled={locked}
+                      />
+                    </div>
+                  </div>
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">Less</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="text"
+                        className="classic-erp-input flex-1"
+                        value={footer.lessLabel}
+                        onChange={(e) => setFooter({ ...footer, lessLabel: e.target.value })}
+                        disabled={locked}
+                      />
+                      <input
+                        type="number"
+                        className="classic-erp-input w-20 text-right"
+                        value={footer.lessAmt}
+                        onChange={(e) => setFooter({ ...footer, lessAmt: e.target.value })}
+                        disabled={locked}
+                      />
+                    </div>
+                  </div>
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">Other Less</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="text"
+                        className="classic-erp-input flex-1"
+                        value={footer.otherLess1Label}
+                        onChange={(e) => setFooter({ ...footer, otherLess1Label: e.target.value })}
+                        disabled={locked}
+                      />
+                      <input
+                        type="number"
+                        className="classic-erp-input w-20 text-right"
+                        value={footer.otherLess1Amt}
+                        onChange={(e) => setFooter({ ...footer, otherLess1Amt: e.target.value })}
+                        disabled={locked}
+                      />
+                    </div>
+                  </div>
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">Other Less</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="text"
+                        className="classic-erp-input flex-1"
+                        value={footer.otherLess2Label}
+                        onChange={(e) => setFooter({ ...footer, otherLess2Label: e.target.value })}
+                        disabled={locked}
+                      />
+                      <input
+                        type="number"
+                        className="classic-erp-input w-20 text-right"
+                        value={footer.otherLess2Amt}
+                        onChange={(e) => setFooter({ ...footer, otherLess2Amt: e.target.value })}
+                        disabled={locked}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="erp-job-receipt-tds-row">
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">On Tds Amount</span>
+                    <input
+                      type="number"
+                      className="classic-erp-input text-right"
+                      value={footer.tdsOnAmount}
+                      onChange={(e) => setFooter({ ...footer, tdsOnAmount: e.target.value })}
+                      disabled={locked}
+                      placeholder={calc.taxable.toFixed(2)}
+                    />
+                  </div>
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">T.d.s.</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="number"
+                        className="classic-erp-input w-16 text-right"
+                        value={footer.tdsPercent}
+                        onChange={(e) => setFooter({ ...footer, tdsPercent: e.target.value })}
+                        disabled={locked}
+                        step="0.01"
+                      />
+                      <span className="text-[10px] font-bold">%</span>
+                      <span className="font-mono text-[11px] ml-auto">₹{calc.tdsAmt.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Remark</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input"
+                    value={footer.remark}
+                    onChange={(e) => setFooter({ ...footer, remark: e.target.value })}
+                    disabled={locked}
+                  />
+                </div>
+
+                <div className="erp-job-receipt-tax-panel">
+                  <div className="erp-job-receipt-tax-rate">
+                    <span className="classic-erp-label">Tax Rate</span>
+                    <input
+                      type="number"
+                      className="classic-erp-input text-center font-bold"
+                      value={footer.taxRate}
+                      onChange={(e) => setFooter({ ...footer, taxRate: e.target.value })}
+                      disabled={locked}
+                    />
+                  </div>
+                  <div className="classic-erp-field">
+                    <span className="classic-erp-label">TaxableAmt</span>
+                    <input
+                      type="text"
+                      className="classic-erp-input text-right font-mono font-bold"
+                      value={calc.taxable.toFixed(2)}
+                      readOnly
+                    />
+                  </div>
+                  <table className="erp-job-receipt-gst-table">
+                    <thead>
+                      <tr>
+                        <th />
+                        <th>SGST%</th>
+                        <th>CGST%</th>
+                        <th>IGST%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="font-bold text-[10px]">Rate</td>
+                        <td>
+                          <input
+                            type="text"
+                            className="classic-erp-input text-center"
+                            value={header.type === 'INVOICE IN STATE' ? (Number(footer.taxRate) / 2).toFixed(2) : '0'}
+                            readOnly
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="classic-erp-input text-center"
+                            value={header.type === 'INVOICE IN STATE' ? (Number(footer.taxRate) / 2).toFixed(2) : '0'}
+                            readOnly
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="classic-erp-input text-center"
+                            value={header.type !== 'INVOICE IN STATE' ? footer.taxRate : '0'}
+                            readOnly
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="font-bold text-[10px]">Amt</td>
+                        <td className="font-mono text-right">{calc.sgst.toFixed(2)}</td>
+                        <td className="font-mono text-right">{calc.cgst.toFixed(2)}</td>
+                        <td className="font-mono text-right">{calc.igst.toFixed(2)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="classic-erp-frame erp-job-receipt-totals">
+                <div className="classic-erp-total-row">
+                  <span className="classic-erp-label">Gross Amt</span>
+                  <span className="font-mono font-bold">₹{calc.gross.toFixed(2)}</span>
+                </div>
+                <div className="classic-erp-total-row">
+                  <span className="classic-erp-label">TOTAL GST</span>
+                  <span className="font-mono font-bold">₹{calc.totalGst.toFixed(2)}</span>
+                </div>
+                <div className="classic-erp-total-row">
+                  <span className="classic-erp-label erp-rcm-label">RCM CHARGE</span>
+                  <input
+                    type="number"
+                    className={`classic-erp-input w-28 text-right font-mono ${header.reverseCharge === 'Yes' ? 'erp-rcm-highlight' : ''}`}
+                    value={footer.rcmCharge}
+                    onChange={(e) => setFooter({ ...footer, rcmCharge: e.target.value })}
+                    disabled={locked || header.reverseCharge !== 'Yes'}
+                  />
+                </div>
+                <div className="classic-erp-total-row">
+                  <span className="classic-erp-label">Round Off</span>
+                  <input
+                    type="number"
+                    className="classic-erp-input w-28 text-right font-mono"
+                    value={footer.roundOff}
+                    onChange={(e) => setFooter({ ...footer, roundOff: e.target.value })}
+                    disabled={locked}
+                    step="0.01"
+                  />
+                </div>
+                <div className="classic-erp-total-row">
+                  <span className="classic-erp-label">Net Amount</span>
+                  <span className="font-mono font-bold">₹{calc.net.toFixed(2)}</span>
+                </div>
+                <div className="classic-erp-total-row erp-job-receipt-final-row">
+                  <span className="classic-erp-label text-blue-900">Final Amount</span>
+                  <span className="font-mono font-bold text-blue-900 text-lg">₹{calc.final.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="classic-erp-form-footer erp-job-receipt-footer shrink-0">
+              <button type="button" className="classic-erp-btn" onClick={handleNew} disabled={saving}>
+                New
+              </button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                onClick={handleEdit}
+                disabled={saving || mode !== 'View' || !selectedReceiptId}
+              >
+                Edit
+              </button>
+              <button type="submit" className="classic-erp-btn btn-blue" disabled={saving || locked}>
+                <SaveButtonLabel saving={saving} label="Save" />
+              </button>
+              <button type="button" className="classic-erp-btn" onClick={handleCancel} disabled={saving}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                onClick={() => {
+                  setFindOpen(true);
+                  setMode('View');
+                }}
+                disabled={saving}
+              >
+                Find
+              </button>
+              <button type="button" className="classic-erp-btn" onClick={handleDelete} disabled={saving}>
+                Delete
+              </button>
+              <button type="button" className="classic-erp-btn" onClick={onClose} disabled={saving}>
+                Exit
+              </button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                onClick={() => {
+                  setFindOpen(true);
+                  setMode('View');
+                }}
+              >
+                Sp.Find
+              </button>
+              <button type="button" className="classic-erp-btn" onClick={handlePrint}>
+                Print
+              </button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                onClick={() => toast.info('Open Payment Entry from Accounting')}
+              >
+                Payment Entry
+              </button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                onClick={() => toast.info('Send JobWork — integration coming soon')}
+              >
+                Send JobWork
+              </button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                disabled={receiptOptions.length === 0}
+                onClick={() => receiptOptions[0] && loadReceipt(receiptOptions[0].value)}
+              >
+                First
+              </button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                disabled={receiptOptions.length === 0}
+                onClick={() => receiptOptions[receiptOptions.length - 1] && loadReceipt(receiptOptions[receiptOptions.length - 1].value)}
+              >
+                Last
+              </button>
+              <button type="button" className="classic-erp-btn" onClick={() => toast.info('CP — cost price lookup')}>
+                CP
+              </button>
+            </div>
+          </form>
         </div>
-      </div>
       )}
     </ErpWindowedModal>
   );

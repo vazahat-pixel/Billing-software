@@ -12,6 +12,24 @@ import {
   amountInWords,
 } from '../../utils/invoiceHelpers';
 
+const printTimestamp = () => {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+};
+
+const resolveLot = (line, items = []) => {
+  if (line?.lot) return String(line.lot);
+  if (line?.lotId && typeof line.lotId === 'object') {
+    return line.lotId?.lotNo || line.lotId?.name || line.lotId?.code || '';
+  }
+  if (line?.lotId) {
+    const found = items.find((i) => String(i._id || i.id) === String(line.lotId));
+    return found?.lotNo || found?.name || String(line.lotId);
+  }
+  return '';
+};
+
 const missing = (label) => ({ missing: true, label });
 
 const resolveHsn = (line, items = []) => {
@@ -180,6 +198,18 @@ export function buildInvoiceViewModel({
       mts,
       fold: line.fold ?? '',
       cut: line.cut ?? '',
+      lot: resolveLot(line, items),
+      batch: line.batch || line.batchNo || '',
+      weight: Number(line.weight || line.kgs || 0) || null,
+      remarks: line.remark || line.remarks || '',
+      designNo: line.designNo || line.design || '',
+      colour: line.colour || line.color || '',
+      quality: line.quality || '',
+      grey: line.grey || '',
+      finish: line.finish || '',
+      bale: line.bale || line.baleNo || '',
+      roll: line.roll || line.rollNo || '',
+      fabricWidth: line.fabricWidth || line.width || '',
       unit: resolveUnit(line),
       rate,
       discount: lineDiscount,
@@ -199,6 +229,7 @@ export function buildInvoiceViewModel({
       igstAmt: isIgst ? lineGst : 0,
       total: taxableLine + lineGst,
       amount,
+      pcsDetails: Array.isArray(line.pcsDetails) ? line.pcsDetails : [],
     };
   });
 
@@ -385,10 +416,14 @@ export function buildInvoiceViewModel({
     isIgst,
     gstRate,
     totals: {
+      grossAmount: taxable + discountTotal + Number(invoice.foldLess || 0),
       subtotal: taxable + discountTotal,
       discount: discountTotal,
+      foldLess: Number(invoice.foldLess || 0),
       lessAmt: footerLess,
       addAmt: footerAdd,
+      freight: Number(invoice.freight || 0),
+      packing: Number(invoice.packing || invoice.totalAdd || 0),
       taxable,
       cgst,
       sgst,
@@ -406,13 +441,44 @@ export function buildInvoiceViewModel({
           .replace(/^Zero Rupees/i, 'Rupees. Zero');
       })(),
     },
+    // Group lines by HSN code for Tax Auditor HSN summary table
+    hsnSummary: (() => {
+      const groups = {};
+      lines.forEach((l) => {
+        const hsn = l.hsn || '5208';
+        if (!groups[hsn]) {
+          groups[hsn] = {
+            hsn,
+            taxable: 0,
+            cgstRate: l.cgstPct || 0,
+            cgstAmt: 0,
+            sgstRate: l.sgstPct || 0,
+            sgstAmt: 0,
+            igstRate: l.igstPct || 0,
+            igstAmt: 0,
+            totalTax: 0,
+          };
+        }
+        const g = groups[hsn];
+        const tv = Number(l.taxable) || 0;
+        g.taxable += tv;
+        g.cgstAmt += Number(l.cgstAmt) || 0;
+        g.sgstAmt += Number(l.sgstAmt) || 0;
+        g.igstAmt += Number(l.igstAmt) || 0;
+        g.totalTax += Number(l.gstAmt) || 0;
+      });
+      return Object.values(groups);
+    })(),
     bank: {
       accountName: firm.accountName || firm.name,
       bankName: firm.bankName || '',
       accountNo: firm.accountNo || '',
       ifsc: firm.ifsc || '',
       branch: firm.bankBranch || '',
-      upiId: firm.upiId || '',
+      upiId: firm.upiId || firm.upi || '',
+      upiQrUrl: (firm.upiId || firm.upi)
+        ? `https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=2&data=${encodeURIComponent(`upi://pay?pa=${firm.upiId || firm.upi}&pn=${encodeURIComponent(firm.name || 'Company')}&am=${net.toFixed(2)}&cu=INR`)}`
+        : null,
     },
     termsList: customTerms.length ? customTerms : DEFAULT_TERMS,
     terms:
@@ -421,6 +487,10 @@ export function buildInvoiceViewModel({
     festival,
     showFestivalGreeting: !!(showFestivalGreeting && festival?.greeting),
     warnings,
+    printMeta: {
+      timestamp: printTimestamp(),
+      generatedBy: 'ERP Billing System',
+    },
     fmt: { money: fmtMoney, num: fmtNum, date: fmtDate, dateDMY: fmtDateDMY },
     _raw: { invoice, party, firm, broker },
   };

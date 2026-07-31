@@ -84,7 +84,14 @@ const SalesSchema = new mongoose.Schema({
     addAmt: { type: Number, default: 0 },
     gstPer: { type: Number, default: 0 },
     gstAmt: { type: Number, default: 0 },
-    unit: { type: String, default: 'MTRS' }
+    unit: { type: String, default: 'MTRS' },
+    /** Pcs click breakdown — SrNo, Remark, Kgs, Qty rows */
+    pcsDetails: [{
+      srNo: { type: Number, default: 0 },
+      remark: { type: String, default: '' },
+      kgs: { type: Number, default: 0 },
+      qty: { type: Number, default: 0 },
+    }],
   }],
   taxableAmount: {
     type: Number,

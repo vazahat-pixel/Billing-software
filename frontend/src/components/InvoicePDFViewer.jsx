@@ -188,16 +188,22 @@ const InvoicePDFViewer = ({
     document.body.appendChild(root);
     document.body.classList.add('invoice-printing');
 
-    // Scale down to fit A4 height if content is taller than printable area
-    const naturalH = clone.scrollHeight || clone.offsetHeight;
-    const naturalW = clone.scrollWidth || contentWpx;
-    const scaleH = naturalH > 0 ? contentHpx / naturalH : 1;
-    const scaleW = naturalW > 0 ? contentWpx / naturalW : 1;
-    const fit = Math.min(1, scaleH, scaleW);
+    const isV2Engine = !!clone.querySelector?.('[data-print-engine="v2"]');
 
-    if (fit < 0.999) {
-      // zoom affects layout size in Chromium (avoids blank 2nd page from transform)
-      clone.style.zoom = String(fit);
+    // v2 engine: natural multi-page flow — do not squash to single page
+    if (!isV2Engine) {
+      const naturalH = clone.scrollHeight || clone.offsetHeight;
+      const naturalW = clone.scrollWidth || contentWpx;
+      const scaleH = naturalH > 0 ? contentHpx / naturalH : 1;
+      const scaleW = naturalW > 0 ? contentWpx / naturalW : 1;
+      const fit = Math.min(1, scaleH, scaleW);
+
+      if (fit < 0.999) {
+        clone.style.zoom = String(fit);
+      }
+    } else {
+      clone.style.overflow = 'visible';
+      root.style.overflow = 'visible';
     }
 
     const cleanup = () => {

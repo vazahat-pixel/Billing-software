@@ -34,46 +34,83 @@ export function lineTaxable(item) {
  */
 export function calcSalesBillTotals(gridItems = [], footer = {}, header = {}, gstRates = {}) {
   let gross = 0;
-  let linesTaxable = 0;
+  let lineDiscounts = 0;
   let linesGst = 0;
 
   for (const item of gridItems) {
-    gross = money(gross + money(item?.amount));
-    linesTaxable = money(linesTaxable + lineTaxable(item));
+    const amt = money(item?.amount);
+    const dis1 = money(item?.dis1Amt);
+    const dis2 = money(item?.dis2Amt);
+    gross = money(gross + amt);
+    lineDiscounts = money(lineDiscounts + dis1 + dis2);
     linesGst = money(linesGst + money(item?.gstAmt));
   }
 
   let totalAdd = 0;
-  let totalLess = 0;
+  let totalLess = lineDiscounts;
 
-  const adjust = (val, sign) => {
-    const parsed = money(val);
-    if (sign === '+') {
-      totalAdd = money(totalAdd + parsed);
-      return parsed;
-    }
-    totalLess = money(totalLess + parsed);
-    return money(-parsed);
-  };
+  // FOLD LESS is an addition to taxable value in textile billing (extra meters/fold value)
+  const foldLessAmt = money(footer.foldLess);
+  if (foldLessAmt > 0) {
+    totalAdd = money(totalAdd + foldLessAmt);
+  }
 
-  let taxable = linesTaxable;
-  taxable = money(taxable + adjust(footer.foldLess, footer.foldLessSign || '-'));
-  taxable = money(taxable + adjust(footer.rdAmt, footer.rdAmtSign || '-'));
-  taxable = money(taxable + adjust(footer.discountAmt, footer.discountSign || '-'));
-  taxable = money(taxable + adjust(footer.lessAmt, footer.lessSign || '-'));
-  taxable = money(taxable + adjust(footer.addAmt, footer.addSign || '+'));
+  const rdAmt = money(footer.rdAmt);
+  if (rdAmt > 0) {
+    if (footer.rdAmtSign === '+') totalAdd = money(totalAdd + rdAmt);
+    else totalLess = money(totalLess + rdAmt);
+  }
+
+  const discountAmt = money(footer.discountAmt);
+  if (discountAmt > 0) {
+    if (footer.discountSign === '+') totalAdd = money(totalAdd + discountAmt);
+    else totalLess = money(totalLess + discountAmt);
+  }
+
+  const lessAmt = money(footer.lessAmt);
+  if (lessAmt > 0) {
+    if (footer.lessSign === '+') totalAdd = money(totalAdd + lessAmt);
+    else totalLess = money(totalLess + lessAmt);
+  }
+
+  const addAmt = money(footer.addAmt);
+  if (addAmt > 0) {
+    if (footer.addSign === '-') totalLess = money(totalLess + addAmt);
+    else totalAdd = money(totalAdd + addAmt);
+  }
+
+  let taxable = money(gross + totalAdd - totalLess);
   if (taxable < 0) taxable = 0;
 
   const isInState = header.type !== 'INVOICE OUT OF STATE';
-  const cgstRate = Number(gstRates.cgstRate) || 0;
-  const sgstRate = Number(gstRates.sgstRate) || 0;
-  const igstRate = Number(gstRates.igstRate) || 0;
+  const cgstRate = Number(gstRates.cgstRate) || 2.5;
+  const sgstRate = Number(gstRates.sgstRate) || 2.5;
+  const igstRate = Number(gstRates.igstRate) || 5.0;
   const tcsRate = Number(footer.tcsRate) || 0;
 
-  const cgst = isInState ? taxOn(taxable, cgstRate) : 0;
-  const sgst = isInState ? taxOn(taxable, sgstRate) : 0;
-  const igst = !isInState ? taxOn(taxable, igstRate) : 0;
-  const gstAmt = money(cgst + sgst + igst);
+  let cgst = 0;
+  let sgst = 0;
+  let igst = 0;
+  let gstAmt = 0;
+
+  if (linesGst > 0) {
+    gstAmt = linesGst;
+    if (isInState) {
+      cgst = money(gstAmt / 2);
+      sgst = money(gstAmt - cgst);
+      igst = 0;
+    } else {
+      igst = gstAmt;
+      cgst = 0;
+      sgst = 0;
+    }
+  } else {
+    cgst = isInState ? taxOn(taxable, cgstRate) : 0;
+    sgst = isInState ? taxOn(taxable, sgstRate) : 0;
+    igst = !isInState ? taxOn(taxable, igstRate) : 0;
+    gstAmt = money(cgst + sgst + igst);
+  }
+
   const tcsAmt = taxOn(taxable, tcsRate);
   const roundOff = money(footer.roundOff);
   const net = money(taxable + gstAmt + tcsAmt + roundOff);

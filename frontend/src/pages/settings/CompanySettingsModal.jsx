@@ -82,10 +82,11 @@ const ROLE_OPTIONS = [
 ];
 
 const PRINT_TEMPLATES = [
-  { value: 'gst-formal', label: 'GST Formal (Tax Invoice Grid)' },
-  { value: 'erp-classic', label: 'ERP Classic (Busy / Tally)' },
-  { value: 'commerce-pro', label: 'Commerce Pro (Modern CRM)' },
-  { value: 'executive', label: 'Executive (Navy Premium)' },
+  { value: 'textile-pro', label: 'Textile Pro (Surat GST Grid)' },
+  { value: 'modern-enterprise', label: 'Modern Enterprise (SAP-style)' },
+  { value: 'luxury-corporate', label: 'Luxury Corporate (Letterhead)' },
+  { value: 'premium-minimal', label: 'Premium Minimal' },
+  { value: 'international-biz', label: 'International Business' },
   { value: 'compact-thermal', label: 'Thermal POS (58/80mm)' },
 ];
 
@@ -99,7 +100,7 @@ const emptySettings = () => ({
   notifyOverdue: true, showLogo: true, printWatermark: false, primaryColor: '', logoUrl: '',
   offlineModeEnabled: false,
   bankName: '', accountName: '', accountNo: '', ifsc: '', bankBranch: '', upiId: '',
-  invoiceTerms: '', invoiceTemplateId: 'gst-formal',
+  invoiceTerms: '', invoiceTemplateId: 'textile-pro',
   autoFestiveTheme: false, showFestivalGreeting: false,
   customField1Label: '', customField2Label: '', customField3Label: '',
 });
@@ -636,7 +637,7 @@ const CompanySettingsModal = ({ isOpen, onClose, initialTab = 'appearance', init
             <FieldRow label="Default Invoice Template">
               <ERPSelect
                 className="w-full"
-                value={settings.invoiceTemplateId || 'gst-formal'}
+                value={settings.invoiceTemplateId || 'textile-pro'}
                 onChange={(e) => setSetting('invoiceTemplateId', e.target.value)}
                 options={PRINT_TEMPLATES}
                 disabled={!canEdit}

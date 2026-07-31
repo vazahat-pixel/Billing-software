@@ -471,7 +471,7 @@ class AccountingService {
 
       lines.push({ ledgerId: millLedger._id, ledgerName: millLedger.name, type: 'Cr', amount: total, narration: 'Job Work Payable to Mill' });
 
-      const data = { companyId, entryNo, entryDate: receive.date || new Date(), voucherType: 'JobWorkAuto', refType: 'JobReceive', refId: receive._id, lines, narration: 'Auto posted Job Work Charges' };
+      const data = { companyId, entryNo, entryDate: receive.date || new Date(), voucherType: 'JobWorkAuto', refType: 'JobWorkCharges', refId: receive._id, lines, narration: 'Auto posted Job Work Charges' };
       if (session) {
         const entry = await AccountingEntry.create([data], { session });
         return entry[0];

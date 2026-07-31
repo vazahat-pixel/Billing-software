@@ -122,11 +122,11 @@
   gap: 6px 10px;
 }
 
-/* ========== Sales bill: fit one viewport, keep every field ========== */
+/* ========== Sales bill: fit one viewport, spacious & perfectly aligned layout ========== */
 .classic-erp-window.erp-sales-bill-compact {
-  --erp-input-h: 24px;
-  --erp-label-w: 68px;
-  --erp-frame-pad: 4px 6px;
+  --erp-input-h: 26px;
+  --erp-label-w: 72px;
+  --erp-frame-pad: 8px 12px;
   height: 100% !important;
   max-height: 100% !important;
 }
@@ -137,69 +137,60 @@
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-header {
-  padding: 4px 10px !important;
-  min-height: 28px !important;
-  font-size: 12px !important;
+  padding: 6px 14px !important;
+  min-height: 32px !important;
+  font-size: 12.5px !important;
   flex-shrink: 0 !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-body {
   display: flex !important;
   flex-direction: column !important;
-  padding: 4px 6px !important;
-  gap: 4px !important;
+  padding: 8px 12px !important;
+  gap: 8px !important;
   overflow: hidden !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-frame {
-  padding: 4px 6px !important;
+  padding: 8px 12px !important;
   margin: 0 !important;
+  border-radius: 6px !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-input,
 .classic-erp-window.erp-sales-bill-compact .classic-erp-select,
 .classic-erp-window.erp-sales-bill-compact .erp-combobox-input {
-  height: 24px !important;
-  min-height: 24px !important;
-  font-size: 11px !important;
-  padding: 0 4px !important;
-  line-height: 1.1 !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  font-size: 11.5px !important;
+  padding: 0 6px !important;
+  line-height: 1.2 !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-label {
-  font-size: 9px !important;
-  min-width: 62px !important;
-  line-height: 1.1 !important;
+  font-size: 10.5px !important;
+  min-width: 64px !important;
+  line-height: 1.2 !important;
+  font-weight: 600 !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-field {
-  gap: 2px !important;
-  min-height: 24px !important;
+  gap: 6px !important;
+  min-height: 26px !important;
   align-items: center !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .erp-bill-layout {
   display: flex !important;
   flex-direction: column !important;
-  gap: 4px !important;
+  gap: 8px !important;
   min-height: 0 !important;
 }
 
-.classic-erp-window.erp-sales-bill-compact .erp-sales-top-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 3px 6px;
-  align-items: center;
-}
-
-.classic-erp-window.erp-sales-bill-compact .erp-sales-party-field {
-  grid-column: span 2;
-}
-
-/* Party left (wider) + Bill/Challan/Order right (narrow compact) */
+/* Party left (wider) + Bill/Challan/Order right (spacious layout) */
 .classic-erp-window.erp-sales-bill-compact .classic-erp-header-split.erp-sales-top {
-  grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.85fr) !important;
-  gap: 6px 10px !important;
+  grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1.1fr) !important;
+  gap: 8px 16px !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-header-split > .classic-erp-header-bill {
@@ -211,8 +202,8 @@
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-header-bill {
-  gap: 3px !important;
-  max-width: 340px;
+  gap: 5px !important;
+  max-width: 440px;
   justify-self: end;
   width: 100%;
 }
@@ -222,50 +213,53 @@
 .classic-erp-window.erp-sales-bill-compact .erp-sales-party-meta {
   display: grid !important;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 2px 4px !important;
+  gap: 4px 10px !important;
 }
 
-.classic-erp-window.erp-sales-bill-compact .erp-sales-ref-meta .classic-erp-label {
-  min-width: 52px !important;
-  font-size: 8px !important;
+.classic-erp-window.erp-sales-bill-compact .erp-sales-ref-meta .classic-erp-label,
+.classic-erp-window.erp-sales-bill-compact .erp-sales-bill-meta .classic-erp-label {
+  min-width: 58px !important;
+  font-size: 10px !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .erp-sales-ref-meta .classic-erp-input,
 .classic-erp-window.erp-sales-bill-compact .erp-sales-bill-meta .classic-erp-input {
-  max-width: 118px;
-  height: 22px !important;
-  min-height: 22px !important;
-  font-size: 10px !important;
+  max-width: 145px;
+  height: 26px !important;
+  min-height: 26px !important;
+  font-size: 11px !important;
+  padding: 0 6px !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .erp-sales-broker-row {
   display: grid !important;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.7fr) minmax(0, 1fr) !important;
-  gap: 2px 6px !important;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr) minmax(130px, 1.2fr) !important;
+  gap: 4px 8px !important;
   margin-top: 2px;
 }
 
 .classic-erp-window.erp-sales-bill-compact .erp-sales-broker-row .classic-erp-label {
-  min-width: 48px !important;
+  min-width: 52px !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-header-party {
-  gap: 3px !important;
+  gap: 5px !important;
   min-width: 0;
 }
 
 .classic-erp-window.erp-sales-bill-compact .erp-sales-grid.classic-erp-table-container.erp-grid-panel {
-  max-height: min(22vh, 200px) !important;
+  max-height: min(28vh, 260px) !important;
   flex: 1 1 0 !important;
-  min-height: 88px !important;
+  min-height: 110px !important;
   overflow: auto !important;
   overflow-x: auto !important;
   overflow-y: auto !important;
+  border-radius: 6px !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .erp-sales-grid .classic-erp-table {
   width: max-content !important;
-  min-width: 1260px !important;
+  min-width: 1340px !important;
   table-layout: fixed !important;
   border-collapse: separate !important;
   border-spacing: 0 !important;
@@ -273,10 +267,10 @@
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-table th,
 .classic-erp-window.erp-sales-bill-compact .classic-erp-table td {
-  padding: 2px 4px !important;
-  font-size: 11px !important;
-  line-height: 1.2 !important;
-  height: 28px !important;
+  padding: 3px 6px !important;
+  font-size: 11.5px !important;
+  line-height: 1.25 !important;
+  height: 30px !important;
   overflow: hidden !important;
   vertical-align: middle !important;
   box-sizing: border-box !important;
@@ -285,13 +279,13 @@
 .classic-erp-window.erp-sales-bill-compact .erp-sales-grid .classic-erp-input,
 .classic-erp-window.erp-sales-bill-compact .erp-sales-grid .classic-erp-select,
 .classic-erp-window.erp-sales-bill-compact .erp-sales-grid .erp-combobox-input {
-  height: 24px !important;
-  min-height: 24px !important;
+  height: 25px !important;
+  min-height: 25px !important;
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
-  font-size: 11px !important;
-  padding: 0 3px !important;
+  font-size: 11.5px !important;
+  padding: 0 4px !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
   text-overflow: clip !important;
@@ -306,57 +300,113 @@
   margin: 0;
 }
 
-/* Fixed column widths — no squeeze / overlap */
-.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-sr { width: 36px; min-width: 36px; }
-.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-item { width: 168px; min-width: 168px; }
-.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-desc { width: 72px; min-width: 72px; }
-.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-num { width: 56px; min-width: 56px; }
-.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-qty { width: 64px; min-width: 64px; }
-.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-unit { width: 78px; min-width: 78px; }
-.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-amt { width: 78px; min-width: 78px; }
-.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-pct { width: 54px; min-width: 54px; }
-.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-del { width: 28px; min-width: 28px; }
+/* Fixed spacious column widths — no squeeze / overlap */
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-sr { width: 40px; min-width: 40px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-item { width: 190px; min-width: 190px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-desc { width: 90px; min-width: 90px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-num { width: 60px; min-width: 60px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-qty { width: 70px; min-width: 70px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-unit { width: 84px; min-width: 84px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-amt { width: 88px; min-width: 88px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-pct { width: 60px; min-width: 60px; }
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .col-del { width: 32px; min-width: 32px; }
 
 .classic-erp-window.erp-sales-bill-compact .erp-sales-history {
-  max-height: 48px !important;
+  max-height: 54px !important;
   overflow: auto !important;
 }
 
+/* Stock + lot history — one panel, no divider line between stock bar and table header */
+.erp-sales-history-panel {
+  overflow: auto !important;
+}
+
+.erp-sales-history-panel .erp-sales-stockbar {
+  border: none !important;
+  border-radius: 0 !important;
+  min-height: 22px;
+  flex-shrink: 0;
+}
+
+.erp-sales-history-panel .erp-sales-history-table {
+  margin: 0 !important;
+  border-collapse: collapse !important;
+}
+
+.erp-sales-history-panel .erp-sales-history-table thead th {
+  border-top: none !important;
+  position: static !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-history-panel {
+  max-height: 80px !important;
+}
+
 .classic-erp-window.erp-sales-bill-compact .erp-sales-footer {
-  gap: 4px !important;
+  gap: 8px !important;
   flex-shrink: 1 !important;
   min-height: 0 !important;
-  max-height: min(32vh, 260px);
+  max-height: min(36vh, 280px);
   overflow-y: auto !important;
   overflow-x: hidden !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .erp-sales-footer > .classic-erp-frame {
-  padding: 3px 5px !important;
+  padding: 6px 10px !important;
   min-height: 0;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-adj-row,
 .classic-erp-window.erp-sales-bill-compact .classic-erp-total-row {
-  min-height: 20px !important;
-  gap: 3px !important;
+  min-height: 24px !important;
+  gap: 6px !important;
   margin: 0 !important;
-  padding: 0 !important;
+  padding: 1px 0 !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-stack {
-  gap: 1px !important;
+  gap: 4px !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-form-footer {
-  padding: 4px 8px !important;
-  min-height: 36px !important;
-  gap: 6px !important;
+  padding: 6px 12px !important;
+  min-height: 40px !important;
+  gap: 8px !important;
   flex-shrink: 0 !important;
   border-top: 1px solid var(--border);
   background: var(--bg-card, #fff);
   z-index: 20;
   position: relative;
+}
+
+/* Ensure date inputs have enough width for DD/MM/YYYY + calendar icon without clipping */
+.classic-erp-window.erp-sales-bill-compact input[type='date'] {
+  min-width: 124px !important;
+  padding-right: 2px !important;
+}
+
+/* Footer Totals Row Layout — Clean alignment for Rate % and Amounts */
+.classic-erp-window.erp-sales-bill-compact .erp-sales-footer .classic-erp-total-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  min-height: 24px !important;
+  padding: 2px 4px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-footer .classic-erp-control {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-footer .classic-erp-control input[type='number'] {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 24px !important;
+  text-align: center !important;
+  padding: 0 2px !important;
 }
 
 /* Auto Bill Fill — one compact toolbar row so footer buttons stay visible */
@@ -677,5 +727,429 @@
 .erp-bill-window-shell table,
 .erp-bill-window-shell .erp-sales-items-wrap {
   min-width: 0;
+}
+
+/* ============================================================
+   Job Issue — JOB WORK ISSUE BOOK (classic desktop layout)
+   ============================================================ */
+
+.classic-erp-window.erp-job-issue-window {
+  --erp-label-w: 88px;
+  --erp-gap: 5px;
+  --erp-frame-pad: 10px 12px;
+}
+
+.classic-erp-window.erp-job-issue-window .classic-erp-body.erp-job-issue-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0 !important;
+  padding: 8px 10px !important;
+  min-height: 0;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 232px;
+  gap: 10px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+  padding: var(--erp-frame-pad) !important;
+  margin: 0;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-main.classic-erp-stack {
+  gap: 5px;
+}
+
+.classic-erp-window.erp-job-issue-window .classic-erp-field,
+.classic-erp-window.erp-job-issue-window .classic-erp-field--lg {
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.classic-erp-window.erp-job-issue-window .classic-erp-label {
+  min-width: 88px;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-date {
+  width: 142px !important;
+  flex: 0 0 142px !important;
+  max-width: 142px !important;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-weekday {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  line-height: 1;
+  padding-left: 2px;
+  white-space: nowrap;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-lookup-btn {
+  flex: 0 0 28px;
+  width: 28px;
+  min-width: 28px;
+  height: var(--erp-input-h) !important;
+  min-height: var(--erp-input-h) !important;
+  padding: 0 !important;
+  font-size: 14px !important;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-add-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--erp-input-h);
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #16a34a;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-add-btn:hover {
+  background: #15803d;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px 10px;
+  padding: 8px 0 2px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border-subtle, #cbd5e1);
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-metrics .classic-erp-field {
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 6px;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-metrics .erp-job-issue-lot {
+  grid-column: 2 / 4;
+}
+
+.classic-erp-window.erp-job-issue-window .classic-erp-control--stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-stock {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: ui-monospace, monospace;
+  color: #64748b;
+  padding: 2px 0 0 96px;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-side {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid var(--border-subtle, #cbd5e1);
+  border-radius: 4px;
+  min-width: 0;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-side .classic-erp-field {
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 6px;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-side .classic-erp-btn {
+  width: 100%;
+  min-height: var(--erp-input-h);
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-sort {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-hint {
+  margin: 0;
+  padding-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #b91c1c;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-footer {
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  gap: 6px !important;
+  padding: 8px 10px !important;
+  border-top: 1px solid var(--border-subtle, #cbd5e1);
+  background: var(--bg-base, #fff);
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-footer .classic-erp-btn {
+  flex: 0 0 auto;
+  min-width: 72px;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+@media (max-width: 860px) {
+  .classic-erp-window.erp-job-issue-window .erp-job-issue-split {
+    grid-template-columns: 1fr;
+  }
+
+  .classic-erp-window.erp-job-issue-window .erp-job-issue-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .classic-erp-window.erp-job-issue-window .erp-job-issue-metrics .erp-job-issue-lot {
+    grid-column: 1 / -1;
+  }
+
+  .classic-erp-window.erp-job-issue-window .erp-job-issue-footer {
+    flex-wrap: wrap !important;
+  }
+}
+
+/* Mill Issue — shares job-issue layout; purchase prefill bar */
+.classic-erp-window.erp-mill-issue-window .erp-mill-issue-purchase-bar {
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 4px;
+}
+
+
+.classic-erp-window.erp-job-receipt-window {
+  --erp-label-w: 88px;
+  --erp-gap: 6px;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px !important;
+  padding: 8px 10px !important;
+  min-height: 0;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-header {
+  padding: 10px 12px !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-header-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-meta-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px 8px;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-date {
+  width: 132px !important;
+  flex: 0 0 132px !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-weekday {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-rcm-highlight {
+  background: #fef9c3 !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle, #cbd5e1);
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-pending-tag {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: #b91c1c;
+  text-transform: uppercase;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-grid-wrap {
+  padding: 0 !important;
+  min-height: 160px;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-grid {
+  max-height: min(38vh, 280px);
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-table th,
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-table td {
+  padding: 2px 4px !important;
+  vertical-align: middle;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-table .classic-erp-input,
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-table .classic-erp-select {
+  height: 26px !important;
+  min-height: 26px !important;
+  font-size: 11px !important;
+  padding: 0 4px !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border-subtle, #cbd5e1);
+  border-radius: 3px;
+  background: #fff;
+  color: #b91c1c;
+  cursor: pointer;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(240px, 0.75fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-adjust {
+  padding: 10px 12px !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-adj-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+  margin-bottom: 6px;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-tds-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-tax-panel {
+  display: grid;
+  grid-template-columns: 72px 1fr minmax(0, 1.2fr);
+  gap: 8px;
+  align-items: start;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle, #cbd5e1);
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-tax-rate {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-tax-rate .classic-erp-input {
+  width: 48px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-gst-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-gst-table th,
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-gst-table td {
+  border: 1px solid var(--border-subtle, #94a3b8);
+  padding: 2px 4px;
+  text-align: center;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-gst-table .classic-erp-input {
+  height: 24px !important;
+  min-height: 24px !important;
+  font-size: 10px !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-totals {
+  padding: 10px 12px !important;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-final-row {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 2px solid #0f172a;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer {
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  gap: 5px !important;
+  padding: 8px 10px !important;
+  border-top: 1px solid var(--border-subtle, #cbd5e1);
+  background: var(--bg-base, #fff);
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer .classic-erp-btn {
+  flex: 0 0 auto;
+  min-width: 68px;
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+@media (max-width: 960px) {
+  .classic-erp-window.erp-job-receipt-window .erp-job-receipt-header-grid,
+  .classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .classic-erp-window.erp-job-receipt-window .erp-job-receipt-meta-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .classic-erp-window.erp-job-receipt-window .erp-job-receipt-tax-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer {
+    flex-wrap: wrap !important;
+  }
 }
 
