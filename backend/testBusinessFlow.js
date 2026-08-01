@@ -476,6 +476,177 @@ async function run() {
     }
     console.log('✅ GSTR-2 report validation successful');
 
+    // 8. TRANSACTION 5: BANK & CASH SETTLEMENT (PAYMENT / RECEIPT VOUCHERS)
+    console.log('\n--- Step 6: Processing Payment & Receipt Vouchers (Bank + Cash) ---');
+    const ledgerEngineService = require('./services/ledgerEngineService');
+
+    const bankLedger = await LedgerMaster.findOne({ name: 'Bank A/c', companyId });
+    const cashLedger = await LedgerMaster.findOne({ name: 'Cash A/c', companyId });
+    if (!bankLedger || !cashLedger) throw new Error('System Cash/Bank ledgers not seeded');
+
+    const callController = (fn, req) => new Promise((resolve, reject) => {
+      const res = { status: (code) => ({ json: (body) => resolve({ code, body }) }) };
+      Promise.resolve(fn(req, res)).catch(reject);
+    });
+
+    // 8a. Pay Supplier in full via Bank (NEFT)
+    const payToSupplier = await callController(accountingController.createPaymentVoucher, {
+      companyId,
+      body: {
+        date: new Date(),
+        partyLedgerId: supplierLedger._id,
+        amount: 52500,
+        paymentMode: 'NEFT',
+        utrNo: 'UTR-SUP-001',
+        bankLedgerId: bankLedger._id,
+        status: 'Posted',
+        againstInvoices: [{ invoiceId: purchaseResult._id, amount: 52500 }],
+        narration: 'Full payment to Supplier A Ltd via Bank'
+      }
+    });
+    if (!payToSupplier.body.success) throw new Error('Payment to Supplier failed: ' + payToSupplier.body.message);
+    console.log(`Payment Voucher created: ${payToSupplier.body.data.voucherNo} — ₹52,500 to Supplier via Bank`);
+
+    // 8b. Pay Mill (Job Worker) job work charges in full via Cash
+    const payToMill = await callController(accountingController.createPaymentVoucher, {
+      companyId,
+      body: {
+        date: new Date(),
+        partyLedgerId: millLedger._id,
+        amount: 3045,
+        paymentMode: 'Cash',
+        bankLedgerId: cashLedger._id,
+        status: 'Posted',
+        narration: 'Job work charges paid to Mill C via Cash'
+      }
+    });
+    if (!payToMill.body.success) throw new Error('Payment to Mill failed: ' + payToMill.body.message);
+    console.log(`Payment Voucher created: ${payToMill.body.data.voucherNo} — ₹3,045 to Mill via Cash`);
+
+    // 8c. Receive from Customer — partial via Bank (RTGS)
+    const receiveBank = await callController(accountingController.createReceiptVoucher, {
+      companyId,
+      body: {
+        date: new Date(),
+        partyLedgerId: customerLedger._id,
+        amount: 20000,
+        paymentMode: 'RTGS',
+        utrNo: 'UTR-CUST-001',
+        bankLedgerId: bankLedger._id,
+        status: 'Posted',
+        againstInvoices: [{ invoiceId: salesResult._id, amount: 20000 }],
+        narration: 'Partial receipt from Customer B Corp via Bank'
+      }
+    });
+    if (!receiveBank.body.success) throw new Error('Receipt from Customer (Bank) failed: ' + receiveBank.body.message);
+    console.log(`Receipt Voucher created: ${receiveBank.body.data.voucherNo} — ₹20,000 from Customer via Bank`);
+
+    // 8d. Receive balance from Customer via Cash
+    const receiveCash = await callController(accountingController.createReceiptVoucher, {
+      companyId,
+      body: {
+        date: new Date(),
+        partyLedgerId: customerLedger._id,
+        amount: 17800,
+        paymentMode: 'Cash',
+        bankLedgerId: cashLedger._id,
+        status: 'Posted',
+        againstInvoices: [{ invoiceId: salesResult._id, amount: 17800 }],
+        narration: 'Balance receipt from Customer B Corp via Cash'
+      }
+    });
+    if (!receiveCash.body.success) throw new Error('Receipt from Customer (Cash) failed: ' + receiveCash.body.message);
+    console.log(`Receipt Voucher created: ${receiveCash.body.data.voucherNo} — ₹17,800 from Customer via Cash`);
+
+    // Verify bill settlement synced back onto Sales/Purchase docs
+    const purchaseAfterPay = await Purchase.findById(purchaseResult._id);
+    if (purchaseAfterPay.paidAmount !== 52500 || purchaseAfterPay.status !== 'paid') {
+      throw new Error(`Purchase bill not marked fully paid: paid=${purchaseAfterPay.paidAmount}, status=${purchaseAfterPay.status}`);
+    }
+    console.log('Verified Purchase bill fully settled (status=paid)');
+
+    const salesAfterReceive = await Sales.findById(salesResult._id);
+    if (salesAfterReceive.paidAmount !== 37800 || salesAfterReceive.status !== 'paid') {
+      throw new Error(`Sales bill not marked fully paid: paid=${salesAfterReceive.paidAmount}, status=${salesAfterReceive.status}`);
+    }
+    console.log('Verified Sales bill fully settled (status=paid)');
+
+    // 9. PARTY-WISE LEDGER VERIFICATION (running balance, post-settlement)
+    console.log('\n--- Step 7: Verifying Party-wise Ledger Statements ---');
+
+    const supplierStatement = await ledgerEngineService.partyLedger(companyId, supplier._id);
+    if (supplierStatement.statement.length !== 2) {
+      throw new Error(`Supplier ledger expected 2 lines (purchase + payment), got ${supplierStatement.statement.length}`);
+    }
+    if (supplierStatement.closingBalance !== 0) {
+      throw new Error(`Supplier ledger not settled to zero: ${supplierStatement.closingBalance} ${supplierStatement.closingBalanceType}`);
+    }
+    console.log(`Verified Supplier party ledger (${supplierStatement.statement.length} entries) — closing ₹0.00`);
+
+    const customerStatement = await ledgerEngineService.partyLedger(companyId, customer._id);
+    if (customerStatement.statement.length !== 3) {
+      throw new Error(`Customer ledger expected 3 lines (sale + 2 receipts), got ${customerStatement.statement.length}`);
+    }
+    if (customerStatement.closingBalance !== 0) {
+      throw new Error(`Customer ledger not settled to zero: ${customerStatement.closingBalance} ${customerStatement.closingBalanceType}`);
+    }
+    console.log(`Verified Customer party ledger (${customerStatement.statement.length} entries) — closing ₹0.00`);
+
+    // Mill's current-account ledger carries only payable movements: JobWorkCharges (Cr) + Payment (Dr).
+    // Stock-in-transit value while goods are at the mill is tracked separately in Job Work In Progress (asset), not here.
+    const millStatement = await ledgerEngineService.partyLedger(companyId, jobWorker._id);
+    if (millStatement.statement.length !== 2) {
+      throw new Error(`Mill ledger expected 2 lines (job charges + payment), got ${millStatement.statement.length}`);
+    }
+    if (millStatement.closingBalance !== 0) {
+      throw new Error(`Mill ledger not settled to zero: ${millStatement.closingBalance} ${millStatement.closingBalanceType}`);
+    }
+    console.log(`Verified Mill (Job Worker) party ledger (${millStatement.statement.length} entries) — closing ₹0.00`);
+
+    // Job Work In Progress (system asset ledger): Dr on Issue (goods sent out), Cr on Receive (goods back) — must net to zero once the job round-trips
+    const jwipLedger = await LedgerMaster.findOne({ name: 'Job Work In Progress', companyId });
+    if (!jwipLedger) throw new Error('Job Work In Progress system ledger not found');
+    const jwipStmt = await ledgerEngineService.getStatement(companyId, jwipLedger._id);
+    if (jwipStmt.statement.length !== 2) {
+      throw new Error(`Job Work In Progress expected 2 lines (issue + receive), got ${jwipStmt.statement.length}`);
+    }
+    if (jwipStmt.closingBalance !== 0) {
+      throw new Error(`Job Work In Progress not cleared to zero after full receive: ${jwipStmt.closingBalance} ${jwipStmt.closingBalanceType}`);
+    }
+    console.log(`Verified Job Work In Progress ledger (${jwipStmt.statement.length} entries) — closing ₹0.00 (stock correctly separated from Mill payable)`);
+
+    // 10. POST-SETTLEMENT TRIAL BALANCE (Bank/Cash now carry the balances)
+    console.log('\n--- Step 8: Verifying Post-Settlement Trial Balance ---');
+    let tb2Data;
+    const resTB2 = { status: () => ({ json: (res) => { tb2Data = res.data; } }) };
+    await accountingController.getTrialBalance({ companyId, query: {} }, resTB2);
+
+    let totalDr2 = 0, totalCr2 = 0;
+    tb2Data.forEach(r => { totalDr2 += r.debit || 0; totalCr2 += r.credit || 0; });
+    console.log(`Post-Settlement Trial Balance Total Dr: ₹${totalDr2.toFixed(2)}, Cr: ₹${totalCr2.toFixed(2)}`);
+    if (Math.abs(totalDr2 - totalCr2) > 0.01) {
+      throw new Error(`Post-settlement Trial Balance not balancing! Dr=${totalDr2}, Cr=${totalCr2}`);
+    }
+    if (Math.round(totalDr2) !== 70400) {
+      throw new Error(`Post-settlement Trial Balance sum incorrect. Expected ₹70,400, got ₹${totalDr2}`);
+    }
+
+    const assertLedger2 = (name, val, type) => {
+      const row = tb2Data.find(tb => tb.name === name);
+      if (!row) throw new Error(`Ledger not found in post-settlement TB: ${name}`);
+      const actualVal = type === 'Dr' ? row.debit : row.credit;
+      if (Math.abs(actualVal - val) > 0.01) {
+        throw new Error(`Ledger balance mismatch for ${name}: Expected ${val} ${type}, got Dr=${row.debit} Cr=${row.credit}`);
+      }
+      console.log(`Verified Ledger: ${name.padEnd(25)} | Balance: ₹${actualVal.toFixed(2).padStart(8)} [${type}]`);
+    };
+    assertLedger2('Bank A/c', 32500, 'Cr');
+    assertLedger2('Cash A/c', 14755, 'Dr');
+    if (tb2Data.find(tb => tb.name === 'Supplier A Ltd')) throw new Error('Supplier A Ltd should be fully settled and absent from TB');
+    if (tb2Data.find(tb => tb.name === 'Customer B Corp')) throw new Error('Customer B Corp should be fully settled and absent from TB');
+    if (tb2Data.find(tb => tb.name === 'Mill C Dyeing & Printing')) throw new Error('Mill C Dyeing & Printing should be fully settled and absent from TB');
+    console.log('✅ Post-Settlement Trial Balance validation successful — Bank & Cash correctly reflect all Receipts/Payments');
+
     console.log('\n==========================================');
     console.log('🎉 ALL BUSINESS FLOW INTEGRATION TESTS PASSED!');
     console.log('==========================================');

@@ -14,7 +14,9 @@ import {
   RCM_OPTIONS,
   TYPE_OPTIONS,
   lineJobAmt,
+  lineShortagePct,
 } from './jobReceiptCalc';
+import JobLotLookupModal from './JobLotLookupModal';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -68,6 +70,9 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
   const [lines, setLines] = useState([blankLine()]);
   const [saving, setSaving] = useState(false);
   const [bootLoading, setBootLoading] = useState(false);
+  const [lotLookupOpen, setLotLookupOpen] = useState(false);
+  const [lotLookupTargetIdx, setLotLookupTargetIdx] = useState(null);
+  const [lotEntryValue, setLotEntryValue] = useState('');
 
   const locked = mode === 'View';
   const titleBook = selectedBook || header.book || 'JOBWORK BOOK';
@@ -170,6 +175,49 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
     }
     setLines(partyPendingJobs.map(jobToLine));
     toast.success(`Loaded ${partyPendingJobs.length} pending challan(s)`);
+  };
+
+  const lotLookupJobs = header.partyId ? partyPendingJobs : pendingJobs;
+
+  /** Classic ERP "Press ALT+L To LotNo Entry" — opens which pending bill/challan to receive against for a lot. */
+  const openLotLookup = (targetIdx = null) => {
+    if (locked) return;
+    if (lotLookupJobs.length === 0) {
+      toast.info(header.partyId ? 'No pending challans for this party' : 'No pending Mill Issue challans to receive');
+      return;
+    }
+    setLotLookupTargetIdx(targetIdx);
+    setLotLookupOpen(true);
+  };
+
+  const handleLotSelect = (job) => {
+    const newLine = jobToLine(job);
+    setLines((prev) => {
+      if (lotLookupTargetIdx == null) {
+        const firstBlankIdx = prev.findIndex((l) => !l.jobId);
+        if (firstBlankIdx === -1) return [...prev, newLine];
+        const next = [...prev];
+        next[firstBlankIdx] = newLine;
+        return next;
+      }
+      const next = [...prev];
+      next[lotLookupTargetIdx] = newLine;
+      return next;
+    });
+    if (!header.partyId && job.workerId) {
+      const workerId = job.workerId?._id || job.workerId;
+      const party = partyOptions.find((p) => String(p.value) === String(workerId));
+      setHeader((h) => ({ ...h, partyId: workerId, gstin: party?.gstin || job.workerId?.gstin || '' }));
+    }
+    setLotEntryValue('');
+    toast.success(`Loaded Lot ${newLine.lotNo || newLine.chlnNo} for receipt`);
+  };
+
+  const handleHeaderKeyDown = (e) => {
+    if (e.altKey && String(e.key).toLowerCase() === 'l') {
+      e.preventDefault();
+      openLotLookup(null);
+    }
   };
 
   const handleNew = () => {
@@ -278,12 +326,16 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
   };
 
   const gridCols = [
+    { key: 'lotNo', label: 'LotNo', w: 'w-24', lookup: true },
     { key: 'chlnNo', label: 'ChlnNo', w: 'w-20' },
     { key: 'itemName', label: 'ItemName', w: 'min-w-[120px]' },
     { key: 'finishItem', label: 'FinishItem', w: 'min-w-[100px]' },
     { key: 'cut', label: 'Cut', w: 'w-14' },
+    { key: 'issuePcsRef', label: 'G.Pcs', w: 'w-14', align: 'right', readOnly: true },
+    { key: 'issueMtsRef', label: 'Grey.Mts', w: 'w-16', align: 'right', readOnly: true },
     { key: 'recPcs', label: 'RecPcs', w: 'w-16', align: 'right' },
     { key: 'recMts', label: 'RecMts', w: 'w-16', align: 'right' },
+    { key: 'shtgPct', label: 'Shtg%', w: 'w-14', align: 'right', readOnly: true, computed: true },
     { key: 'jRate', label: 'J.Rate', w: 'w-16', align: 'right' },
     { key: 'pqk', label: 'PQK', w: 'w-14' },
     { key: 'jobAmt', label: 'JobAmt', w: 'w-20', align: 'right', readOnly: true },
@@ -292,6 +344,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
   ];
 
   return (
+    <>
     <ErpWindowedModal
       isOpen={isOpen}
       onClose={onClose}
@@ -313,6 +366,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
 
           <form
             onSubmit={handleSave}
+            onKeyDown={handleHeaderKeyDown}
             className="classic-erp-body erp-job-receipt-body flex-1 overflow-y-auto min-h-0"
           >
             {findOpen && (
@@ -418,6 +472,39 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                         disabled={locked}
                       />
                     </div>
+                    <div className="classic-erp-field classic-erp-field--lg">
+                      <span className="classic-erp-label">
+                        LotNo <span className="text-[9px] font-normal text-slate-500">(Alt+L or Enter)</span>
+                      </span>
+                      <div className="classic-erp-control">
+                        <input
+                          type="text"
+                          className="classic-erp-input cursor-pointer"
+                          value={lotEntryValue}
+                          readOnly
+                          onFocus={() => openLotLookup(null)}
+                          onClick={() => openLotLookup(null)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              openLotLookup(null);
+                            }
+                          }}
+                          disabled={locked}
+                          placeholder="Press Enter — which bill to receive from…"
+                        />
+                        {!locked && (
+                          <button
+                            type="button"
+                            className="classic-erp-btn erp-job-issue-lookup-btn"
+                            onClick={() => openLotLookup(null)}
+                            aria-label="Lot No entry"
+                          >
+                            …
+                          </button>
+                        )}
+                      </div>
+                    </div>
                     <div className="classic-erp-field">
                       <span className="classic-erp-label">HSN CD</span>
                       <input
@@ -464,6 +551,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                 <table className="classic-erp-table erp-job-receipt-table">
                   <thead>
                     <tr>
+                      <th className="w-8">SrNo</th>
                       {gridCols.map((c) => (
                         <th key={c.key} className={`${c.w} ${c.align === 'right' ? 'text-right' : ''}`}>
                           {c.label}
@@ -475,7 +563,23 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                   <tbody>
                     {calc.linesWithAmt.map((line, idx) => (
                       <tr key={line.id}>
+                        <td className="text-center text-slate-500">{idx + 1}</td>
                         {gridCols.map((c) => {
+                          if (c.key === 'lotNo') {
+                            return (
+                              <td key={c.key}>
+                                <button
+                                  type="button"
+                                  className="classic-erp-input w-full text-left font-bold truncate disabled:cursor-default"
+                                  onClick={() => openLotLookup(idx)}
+                                  disabled={locked}
+                                  title="Pick which bill/challan to receive from"
+                                >
+                                  {line.lotNo || '— select —'}
+                                </button>
+                              </td>
+                            );
+                          }
                           if (c.key === 'pqk') {
                             return (
                               <td key={c.key}>
@@ -494,10 +598,24 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                               </td>
                             );
                           }
-                          if (c.readOnly) {
+                          if (c.computed && c.key === 'shtgPct') {
+                            return (
+                              <td key={c.key} className="text-right font-mono">
+                                {lineShortagePct(line).toFixed(2)}
+                              </td>
+                            );
+                          }
+                          if (c.key === 'jobAmt') {
                             return (
                               <td key={c.key} className="text-right font-mono font-bold">
                                 {Number(line.jobAmt || 0).toFixed(2)}
+                              </td>
+                            );
+                          }
+                          if (c.readOnly) {
+                            return (
+                              <td key={c.key} className="text-right font-mono text-slate-500">
+                                {line[c.key] !== '' && line[c.key] != null ? Number(line[c.key]).toFixed(c.key === 'issueMtsRef' ? 2 : 0) : ''}
                               </td>
                             );
                           }
@@ -851,6 +969,15 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
         </div>
       )}
     </ErpWindowedModal>
+
+    <JobLotLookupModal
+      isOpen={lotLookupOpen}
+      onClose={() => setLotLookupOpen(false)}
+      jobs={lotLookupJobs}
+      partyName={header.partyId ? partyOptions.find((p) => String(p.value) === String(header.partyId))?.label : ''}
+      onSelect={handleLotSelect}
+    />
+    </>
   );
 };
 

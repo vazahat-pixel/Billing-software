@@ -344,11 +344,12 @@ class AccountingService {
 
       const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
       const millLedger = await this.getOrCreatePartyLedger(companyId, job.workerId);
+      const jwipLedger = await this.getSystemLedger(companyId, 'Job Work In Progress');
       const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c');
 
       const narr = `Mill Issue ${job.jobCardNo || ''} → ${millLedger.name} | ${job.processType || 'Process'} | ${qty} mts @ ₹${rate}/mtr`;
       const lines = [
-        { ledgerId: millLedger._id, ledgerName: millLedger.name, type: 'Dr', amount, narration: narr },
+        { ledgerId: jwipLedger._id, ledgerName: jwipLedger.name, type: 'Dr', amount, narration: narr },
         { ledgerId: stockLedger._id, ledgerName: stockLedger.name, type: 'Cr', amount, narration: narr },
       ];
 
@@ -390,13 +391,14 @@ class AccountingService {
 
       const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
       const millLedger = await this.getOrCreatePartyLedger(companyId, job.workerId);
+      const jwipLedger = await this.getSystemLedger(companyId, 'Job Work In Progress');
       const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c');
 
       const recvQty = parseFloat(receivedQty || job.receivedQty || 0);
       const narr = `Mill Receive ${job.jobCardNo || ''} from ${millLedger.name} | finished ${recvQty} mts | material back ${issueQty} mts`;
       const lines = [
         { ledgerId: stockLedger._id, ledgerName: stockLedger.name, type: 'Dr', amount, narration: narr },
-        { ledgerId: millLedger._id, ledgerName: millLedger.name, type: 'Cr', amount, narration: narr },
+        { ledgerId: jwipLedger._id, ledgerName: jwipLedger.name, type: 'Cr', amount, narration: narr },
       ];
 
       const data = {

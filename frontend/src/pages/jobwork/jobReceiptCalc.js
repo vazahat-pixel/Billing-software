@@ -20,10 +20,13 @@ export const RCM_OPTIONS = [
 export const blankLine = () => ({
   id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
   jobId: '',
+  lotNo: '',
   chlnNo: '',
   itemName: '',
   finishItem: '',
   cut: '',
+  issuePcsRef: '',
+  issueMtsRef: '',
   recPcs: '',
   recMts: '',
   jRate: '',
@@ -32,6 +35,14 @@ export const blankLine = () => ({
   cp: '',
   jobcardNo: '',
 });
+
+/** Shortage % between issued qty and received qty for a line (0 when no issued reference). */
+export const lineShortagePct = (line) => {
+  const issued = Number(line.issueMtsRef) || 0;
+  if (issued <= 0) return 0;
+  const received = Number(line.recMts) || 0;
+  return Number((((issued - received) / issued) * 100).toFixed(2));
+};
 
 export const lineQty = (line) => {
   if (line.pqk === 'P') return Number(line.recPcs) || 0;
@@ -60,10 +71,13 @@ export const jobToLine = (job) => {
   const line = {
     id: job._id,
     jobId: job._id,
+    lotNo: job.lotId?.lotId || job.lotId?.code || '',
     chlnNo: job.challanNo || job.jobCardNo || '',
     itemName,
     finishItem: job.outputItemId?.name || job.finish || '',
     cut: '',
+    issuePcsRef: job.issuePcs ?? '',
+    issueMtsRef: job.issueQty ?? '',
     recPcs: job.issuePcs ?? '',
     recMts: job.issueQty ?? '',
     jRate: rate ? rate.toFixed(2) : '',
