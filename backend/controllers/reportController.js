@@ -11,11 +11,38 @@ exports.getStockReport = async (req, res) => {
   }
 };
 
+const csvToArray = (v) => (v ? String(v).split(',').map((s) => s.trim()).filter(Boolean) : []);
+
 exports.getOutstanding = async (req, res) => {
   try {
-    const { type, asOn } = req.query;
-    const outstanding = await reportService.getOutstanding(companyId(req), type || 'receivable', asOn);
+    const {
+      type, asOn, billDateFrom, billDateTo, status,
+      partyIds, brokerIds, stations, hastes, bookIds, states, msmeTypes,
+    } = req.query;
+    const outstanding = await reportService.getOutstanding(companyId(req), type || 'receivable', {
+      asOn,
+      billDateFrom,
+      billDateTo,
+      status: status || 'Pending',
+      partyIds: csvToArray(partyIds),
+      brokerIds: csvToArray(brokerIds),
+      stations: csvToArray(stations),
+      hastes: csvToArray(hastes),
+      bookIds: csvToArray(bookIds),
+      states: csvToArray(states),
+      msmeTypes: csvToArray(msmeTypes),
+    });
     res.status(200).json({ success: true, data: outstanding });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getOutstandingFilterOptions = async (req, res) => {
+  try {
+    const { type } = req.query;
+    const options = await reportService.getOutstandingFilterOptions(companyId(req), type || 'receivable');
+    res.status(200).json({ success: true, data: options });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

@@ -6,6 +6,7 @@ export const reportApi = {
   purchases: (params) => unwrap(get('/reports/purchases', params)),
   stock: (params) => unwrap(get('/reports/stock', params)),
   outstanding: (params) => unwrap(get('/reports/outstanding', params)),
+  outstandingFilterOptions: (params) => unwrap(get('/reports/outstanding/filter-options', params)),
   pl: (params) => unwrap(get('/reports/pl', params)),
   jobwork: (params) => unwrap(get('/reports/jobwork', params)),
   daily: (params) => unwrap(get('/reports/daily', params)),

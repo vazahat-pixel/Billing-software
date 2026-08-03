@@ -193,17 +193,53 @@ class ReportService {
     }));
   }
 
-  async getOutstanding(companyId, type = 'receivable', asOn) {
+  /**
+   * @param {string|Date|object} asOnOrFilters - back-compat: a plain date value (asOn),
+   *   or a filter options object: { asOn, billDateFrom, billDateTo, partyIds, brokerIds,
+   *   stations, hastes, bookIds, states, msmeTypes, status ('Pending'|'All') }
+   */
+  async getOutstanding(companyId, type = 'receivable', asOnOrFilters) {
     const isReceivable = type === 'receivable';
+    const filters =
+      asOnOrFilters && typeof asOnOrFilters === 'object' && !(asOnOrFilters instanceof Date)
+        ? asOnOrFilters
+        : { asOn: asOnOrFilters };
+    const {
+      asOn,
+      billDateFrom,
+      billDateTo,
+      partyIds = [],
+      brokerIds = [],
+      stations = [],
+      hastes = [],
+      bookIds = [],
+      states = [],
+      msmeTypes = [],
+      status = 'Pending',
+    } = filters;
+
     const partyGroup = isReceivable ? 'Customer' : 'Supplier';
-    const parties = await Party.find({ companyId, type: { $in: [partyGroup, 'Both'] } }).lean();
+    const partyFilter = { companyId, type: { $in: [partyGroup, 'Both'] } };
+    if (partyIds.length) partyFilter._id = { $in: partyIds };
+    if (states.length) partyFilter.state = { $in: states };
+    if (msmeTypes.length) partyFilter.msmeType = { $in: msmeTypes };
+
+    const parties = await Party.find(partyFilter).lean();
     const asOnDate = asOn ? new Date(asOn) : new Date();
     const lines = [];
 
     for (const party of parties) {
+      const docFilter = { companyId, status: { $ne: 'cancelled' } };
+      docFilter[isReceivable ? 'customerId' : 'supplierId'] = party._id;
+      if (brokerIds.length) docFilter.brokerId = { $in: brokerIds };
+      if (bookIds.length) docFilter.bookId = { $in: bookIds };
+      if (isReceivable && stations.length) docFilter.station = { $in: stations };
+      if (isReceivable && hastes.length) docFilter.haste = { $in: hastes };
+      Object.assign(docFilter, buildDateQuery(billDateFrom, billDateTo));
+
       const documents = isReceivable
-        ? await Sales.find({ companyId, customerId: party._id, status: { $ne: 'cancelled' } }).lean()
-        : await Purchase.find({ companyId, supplierId: party._id, status: { $ne: 'cancelled' } }).lean();
+        ? await Sales.find(docFilter).lean()
+        : await Purchase.find(docFilter).lean();
 
       let partyTotal = 0;
       const aging = { bucket30: 0, bucket60: 0, bucket90: 0, bucket90Plus: 0 };
@@ -213,7 +249,7 @@ class ReportService {
         const total = parseFloat(doc.netAmount || doc.totals?.total || doc.totalAmount || 0);
         const paid = await paidAgainstDoc(companyId, doc._id);
         const outstanding = total - paid;
-        if (outstanding <= 0.01) continue;
+        if (status === 'Pending' && outstanding <= 0.01) continue;
 
         partyTotal += outstanding;
         const ageInDays = Math.floor((asOnDate - new Date(doc.date)) / 86400000);
@@ -228,16 +264,23 @@ class ReportService {
           total,
           paid,
           outstanding,
-          ageDays: ageInDays
+          ageDays: ageInDays,
+          broker: doc.brokerId || null,
+          station: doc.station || '',
+          haste: doc.haste || '',
+          bookId: doc.bookId || '',
         });
       }
 
-      if (partyTotal > 0.01) {
+      if (partyTotal > 0.01 || (status === 'All' && invoices.length)) {
         lines.push({
           partyId: party._id,
           partyName: party.name,
           phone: party.mobile || party.phone,
-          city: party.station || '',
+          address: party.address || '',
+          city: party.city || party.station || '',
+          state: party.state || '',
+          msmeType: party.msmeType || 'None',
           gstin: party.gstin || '',
           totalOutstanding: parseFloat(partyTotal.toFixed(2)),
           aging,
@@ -246,6 +289,38 @@ class ReportService {
       }
     }
     return lines.sort((a, b) => b.totalOutstanding - a.totalOutstanding);
+  }
+
+  /** Real, distinct dimension values for the Outstanding report's filter tabs — no fabricated data. */
+  async getOutstandingFilterOptions(companyId, type = 'receivable') {
+    const isReceivable = type === 'receivable';
+    const partyGroup = isReceivable ? 'Customer' : 'Supplier';
+    const DocModel = isReceivable ? Sales : Purchase;
+
+    const [parties, brokers, stations, hastes, bookIds, states] = await Promise.all([
+      Party.find({ companyId, type: { $in: [partyGroup, 'Both'] } })
+        .select('name address city state msmeType')
+        .sort({ name: 1 })
+        .lean(),
+      Party.find({ companyId, type: { $in: ['Broker', 'Both'] } })
+        .select('name')
+        .sort({ name: 1 })
+        .lean(),
+      isReceivable ? DocModel.distinct('station', { companyId, station: { $nin: [null, ''] } }) : [],
+      isReceivable ? DocModel.distinct('haste', { companyId, haste: { $nin: [null, ''] } }) : [],
+      DocModel.distinct('bookId', { companyId, bookId: { $nin: [null, ''] } }),
+      Party.distinct('state', { companyId, type: { $in: [partyGroup, 'Both'] }, state: { $nin: [null, ''] } }),
+    ]);
+
+    return {
+      parties: parties.map((p) => ({ _id: p._id, name: p.name, address: p.address || '', state: p.state || '' })),
+      brokers: brokers.map((b) => ({ _id: b._id, name: b.name })),
+      stations: stations.sort(),
+      hastes: hastes.sort(),
+      books: bookIds.sort(),
+      states: states.sort(),
+      msmeTypes: ['None', 'Micro', 'Small', 'Medium'],
+    };
   }
 
   async getProfitLoss(companyId, startDate, endDate) {

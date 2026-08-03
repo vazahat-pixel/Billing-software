@@ -11,6 +11,12 @@ import {
   accountingApi,
   ledgerApi,
   gstApi,
+  tdsApi,
+  stage4Api,
+  stage3Api,
+  utilityApi,
+  cuttingBeamApi,
+  masterDataApi,
   reportsApi,
   booksApi,
   usersApi,
@@ -1294,6 +1300,36 @@ const useStore = create((set, get) => ({
     }
   },
 
+  /** Full filterable Outstanding report — Bill Date range, Party/Broker/Station/Haste/Book/State/MSME multi-select. */
+  fetchOutstandingReportFiltered: async (type, filters = {}) => {
+    try {
+      const params = { type, ...filters };
+      Object.keys(params).forEach((k) => {
+        if (Array.isArray(params[k])) params[k] = params[k].join(',');
+        if (params[k] === '' || params[k] == null) delete params[k];
+      });
+      const data = await reportsApi.outstanding(params);
+      return data || [];
+    } catch (err) {
+      set({ error: err.message });
+      return [];
+    }
+  },
+
+  fetchOutstandingFilterOptions: async (type) => {
+    try {
+      const data = await reportsApi.outstandingFilterOptions({ type });
+      return (
+        data || {
+          parties: [], brokers: [], stations: [], hastes: [], books: [], states: [], msmeTypes: [],
+        }
+      );
+    } catch (err) {
+      set({ error: err.message });
+      return { parties: [], brokers: [], stations: [], hastes: [], books: [], states: [], msmeTypes: [] };
+    }
+  },
+
   fetchReportsBundle: async (startDate, endDate) => {
     try {
       const _rb = await reportsApi.bundle({ startDate: startDate || '', endDate: endDate || '' });
@@ -1589,6 +1625,191 @@ const useStore = create((set, get) => ({
       return newNote;
     } catch (err) {
       console.error('Add note failed:', err);
+      throw err;
+    }
+  },
+
+  /** Contra voucher — transfer between two Cash/Bank ledgers (Stage 3 financial engine). */
+  postContra: async ({ fromLedgerId, toLedgerId, amount, entryDate, narration }) => {
+    try {
+      return await accountingApi.stage3.contra({ fromLedgerId, toLedgerId, amount, entryDate, narration });
+    } catch (err) {
+      console.error('Contra voucher failed:', err);
+      throw err;
+    }
+  },
+
+  // --- TDS / TCS ---
+  fetchTdsSections: async () => {
+    try {
+      return await tdsApi.sections();
+    } catch (err) {
+      console.error('Fetch TDS sections failed:', err);
+      return { tds: {}, tcs: {} };
+    }
+  },
+
+  postTds: async (payload) => {
+    try {
+      return await tdsApi.postTds(payload);
+    } catch (err) {
+      console.error('Post TDS failed:', err);
+      throw err;
+    }
+  },
+
+  postTcs: async (payload) => {
+    try {
+      return await tdsApi.postTcs(payload);
+    } catch (err) {
+      console.error('Post TCS failed:', err);
+      throw err;
+    }
+  },
+
+  fetchTdsList: async (params) => {
+    try {
+      return await tdsApi.list(params);
+    } catch (err) {
+      console.error('Fetch TDS list failed:', err);
+      return [];
+    }
+  },
+
+  fetchTdsReport: async (params) => {
+    try {
+      return await tdsApi.report(params);
+    } catch (err) {
+      console.error('Fetch TDS/TCS report failed:', err);
+      return null;
+    }
+  },
+
+  // --- GST Compliance (Stage 4 engine) ---
+  fetchGstr3b: async (period) => {
+    try {
+      return await stage4Api.gstr3b({ period });
+    } catch (err) {
+      console.error('Fetch GSTR-3B failed:', err);
+      return null;
+    }
+  },
+
+  fetchGstr9: async (financialYear) => {
+    try {
+      return await stage4Api.gstr9({ financialYear });
+    } catch (err) {
+      console.error('Fetch GSTR-9 failed:', err);
+      return null;
+    }
+  },
+
+  fetchGstReconciliation: async (period) => {
+    try {
+      return await stage4Api.fullReconcile({ period });
+    } catch (err) {
+      console.error('Fetch GST reconciliation failed:', err);
+      return null;
+    }
+  },
+
+  // --- SYSTEM UTILITIES ---
+  fetchMissingSeries: async () => {
+    try {
+      return await utilityApi.missingSeries();
+    } catch (err) {
+      console.error('Missing series scan failed:', err);
+      return null;
+    }
+  },
+
+  fetchMismatchScan: async () => {
+    try {
+      return await stage4Api.fullReconcile();
+    } catch (err) {
+      console.error('Mismatch scan failed:', err);
+      return null;
+    }
+  },
+
+  fetchFinancialYears: async () => {
+    try {
+      return await masterDataApi.listFinancialYears();
+    } catch (err) {
+      console.error('Fetch financial years failed:', err);
+      return [];
+    }
+  },
+
+  createFinancialYear: async (body) => {
+    try {
+      return await masterDataApi.createFinancialYear(body);
+    } catch (err) {
+      console.error('Create financial year failed:', err);
+      throw err;
+    }
+  },
+
+  validateYearClose: async (financialYearId) => {
+    try {
+      return await stage3Api.validateClose({ financialYearId });
+    } catch (err) {
+      console.error('Validate close failed:', err);
+      throw err;
+    }
+  },
+
+  closeFinancialYear: async ({ financialYearId, nextFyCode }) => {
+    try {
+      return await stage3Api.closeYear({ financialYearId, nextFyCode });
+    } catch (err) {
+      console.error('Close year failed:', err);
+      throw err;
+    }
+  },
+
+  reopenFinancialYear: async ({ financialYearId, reason }) => {
+    try {
+      return await stage3Api.reopenYear({ financialYearId, reason });
+    } catch (err) {
+      console.error('Reopen year failed:', err);
+      throw err;
+    }
+  },
+
+  // --- CUTTING / BEAM ENTRY ---
+  fetchCuttingEntries: async (params) => {
+    try {
+      return await cuttingBeamApi.listCutting(params);
+    } catch (err) {
+      console.error('Fetch cutting entries failed:', err);
+      return [];
+    }
+  },
+
+  addCuttingEntry: async (body) => {
+    try {
+      return await cuttingBeamApi.createCutting(body);
+    } catch (err) {
+      console.error('Add cutting entry failed:', err);
+      throw err;
+    }
+  },
+
+  fetchBeamEntries: async (params) => {
+    try {
+      return await cuttingBeamApi.listBeam(params);
+    } catch (err) {
+      console.error('Fetch beam entries failed:', err);
+      return [];
+    }
+  },
+
+  addBeamEntry: async (body) => {
+    try {
+      return await cuttingBeamApi.createBeam(body);
+    } catch (err) {
+      console.error('Add beam entry failed:', err);
       throw err;
     }
   },

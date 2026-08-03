@@ -42,6 +42,12 @@ import UpdateModal from './jobwork/UpdateModal';
 import JobReceiptModal from './jobwork/JobReceiptModal';
 import ProcessUpdateModal from './jobwork/ProcessUpdateModal';
 import SalesOutstanding from './reports/SalesOutstanding';
+import OutstandingReportModal from './reports/OutstandingReportModal';
+import GstComplianceReportsModal from './reports/GstComplianceReportsModal';
+import SystemUtilitiesModal from './utilities/SystemUtilitiesModal';
+import LotNoEntryModal from './inventory/LotNoEntryModal';
+import IssueMultipleModal from './jobwork/IssueMultipleModal';
+import CuttingBeamEntryModal from './inventory/CuttingBeamEntryModal';
 import LedgerModal from './LedgerModal';
 import AccountMasterModal from './masters/AccountMasterModal';
 import ItemMasterModal from './masters/ItemMasterModal';
@@ -70,6 +76,8 @@ import MergeMasterModal from './masters/MergeMasterModal';
 import OrderModal from './transactions/OrderModal';
 import ReturnModal from './transactions/ReturnModal';
 import NoteModal from './transactions/NoteModal';
+import ContraVoucherModal from './transactions/ContraVoucherModal';
+import TdsEntryModal from './transactions/TdsEntryModal';
 import JournalEntryModal from './transactions/JournalEntryModal';
 import CompanySettingsModal from './settings/CompanySettingsModal';
 import OpeningBalanceModal from './masters/OpeningBalanceModal';
@@ -253,6 +261,7 @@ const Dashboard = () => {
       return true;
    };
    const [millIssueInitialData, setMillIssueInitialData] = useState(null);
+   const [productionEngineTab, setProductionEngineTab] = useState('Board');
    const [modals, setModals] = useState({
       sales: false,
       purchase: false,
@@ -288,6 +297,16 @@ const Dashboard = () => {
       warehouseMaster: false,
       mergeMaster: false,
       purchaseEngine: false,
+      outstandingSalesFull: false,
+      outstandingPurchaseFull: false,
+      contraVoucher: false,
+      tdsEntry: false,
+      gstComplianceReports: false,
+      systemUtilities: false,
+      issueMultiple: false,
+      lotNoEntry: false,
+      cuttingEntry: false,
+      beamEntry: false,
       inventoryEngine: false,
       productionEngine: false,
       salesEngine: false,
@@ -585,17 +604,25 @@ const Dashboard = () => {
          { label: 'Bank Book', action: () => toggleModal('bankBook', true) },
          { label: 'Bank Receipt', action: () => toggleModal('receipt', true) },
          { label: 'Bank Payment', action: () => toggleModal('payment', true) },
+         { label: 'Voucher Entry', action: () => setModals(prev => ({ ...prev, contraVoucher: true })) },
          { label: 'Journal (GST)', action: () => openJournal() },
          { label: 'Debit/Credit Note', action: () => openNote('Credit') },
+         { label: 'Tds Entry', action: () => setModals(prev => ({ ...prev, tdsEntry: true })) },
          { label: 'Sales Return', action: () => openReturn('Sales') },
          { label: 'Purchase Return', action: () => openReturn('Purchase') },
       ],
       Inventory: [
-         { label: 'Mill Issue', key: 'millIssue' },
-         { label: 'Mill Receive', key: 'millRec' },
+         { label: 'Issue', key: 'millIssue' },
+         { label: 'Issue Multiple', action: () => setModals(prev => ({ ...prev, issueMultiple: true })) },
+         { label: 'Receipt', key: 'millRec' },
+         { label: 'LotNo Entry', action: () => setModals(prev => ({ ...prev, lotNoEntry: true })) },
+         { label: 'Work Process', action: () => { setProductionEngineTab('Mapping'); setModals(prev => ({ ...prev, productionEngine: true })); } },
          { label: 'Job Issue', key: 'jobIssue' },
          { label: 'Job Receive', key: 'jobRec' },
          { label: 'Update Job', key: 'updateJob' },
+         { label: 'Production', action: () => { setProductionEngineTab('Board'); setModals(prev => ({ ...prev, productionEngine: true })); } },
+         { label: 'Cutting Entry', action: () => setModals(prev => ({ ...prev, cuttingEntry: true })) },
+         { label: 'Beam Entry', action: () => setModals(prev => ({ ...prev, beamEntry: true })) },
          { label: 'Stock Ledger', key: 'inventoryPage' },
       ],
       Reports: [
@@ -605,6 +632,8 @@ const Dashboard = () => {
          { label: 'Job Work Reports', action: () => openReportsHub('jobwork') },
          { label: 'Stock Reports', action: () => openReportsHub('stock') },
          { label: 'Outstanding', key: 'outstanding' },
+         { label: 'Outstanding Report (Sales)', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
+         { label: 'Outstanding Report (Purchase)', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
          { label: 'GSTR-1', key: 'gstr1' },
          { label: 'CA Desk', key: 'caDashboard' },
       ],
@@ -613,6 +642,12 @@ const Dashboard = () => {
          { label: 'Daily Transaction', action: () => openReportsHub('daily') },
          { label: 'Master List', action: () => openReportsHub('masters') },
          { label: 'Item Ledger', action: () => openReportsHub('stockItem') },
+         { label: '3B Monthly Return', key: 'gst3bMonthly' },
+         { label: 'Gstr-1 Error Checking', key: 'gstr1Errorchek' },
+         { label: 'Gstr Matching', key: 'gst2bMatching' },
+         { label: 'Gstr-9', action: () => setModals(prev => ({ ...prev, gstComplianceReports: true })) },
+         { label: 'Tds Reports', action: () => setModals(prev => ({ ...prev, gstComplianceReports: true })) },
+         { label: 'Tcs Reports', action: () => setModals(prev => ({ ...prev, gstComplianceReports: true })) },
       ],
       Advanced: [
          { label: 'Purchase Order / GRN', action: () => setModals(prev => ({ ...prev, purchaseEngine: true })) },
@@ -627,6 +662,11 @@ const Dashboard = () => {
          { label: 'Refresh All Data', action: () => refreshAllData().then(() => toast.success('All data refreshed.')) },
       ],
       Utilities: [
+         { label: 'Backup', action: () => setModals(prev => ({ ...prev, infrastructure: true })) },
+         { label: 'Closing / UnClosing Year', action: () => setModals(prev => ({ ...prev, systemUtilities: true })) },
+         { label: 'New A/c. Year ( Manual )', action: () => setModals(prev => ({ ...prev, systemUtilities: true })) },
+         { label: 'MisMatch Data Scanner', action: () => setModals(prev => ({ ...prev, systemUtilities: true })) },
+         { label: 'Missing Series', action: () => setModals(prev => ({ ...prev, systemUtilities: true })) },
          { label: 'Update Main Account Master', action: () => toggleModal('accountMaster', true) },
          { label: 'Gst Updation', action: () => toggleModal('caDashboard', true) },
          { label: 'Application Sync', action: () => refreshAllData().then(() => toast.success('All data refreshed.')) },
@@ -634,6 +674,8 @@ const Dashboard = () => {
       'Setup System': [
          { label: 'Setting', action: () => openSettings('appearance') },
          { label: 'Company Info', action: () => openSettings('company') },
+         { label: 'Extra Event', action: () => openSettings('notificationRules') },
+         { label: 'Extra Event DetailData', action: () => openSettings('notificationRules') },
          { label: 'User Setup', action: () => openSettings('users') },
       ],
       Records: showRecordsHub ? [
@@ -1031,6 +1073,59 @@ const Dashboard = () => {
          <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters} />
          <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} readOnly={permissions.readOnlyMasters} />
          {modals.outstanding && <SalesOutstanding isOpen={modals.outstanding} onClose={() => toggleModal('outstanding', false)} />}
+         {modals.outstandingSalesFull && (
+            <OutstandingReportModal
+               isOpen={modals.outstandingSalesFull}
+               onClose={() => setModals(prev => ({ ...prev, outstandingSalesFull: false }))}
+               type="receivable"
+            />
+         )}
+         {modals.outstandingPurchaseFull && (
+            <OutstandingReportModal
+               isOpen={modals.outstandingPurchaseFull}
+               onClose={() => setModals(prev => ({ ...prev, outstandingPurchaseFull: false }))}
+               type="payable"
+            />
+         )}
+
+         {modals.gstComplianceReports && (
+            <GstComplianceReportsModal
+               isOpen={modals.gstComplianceReports}
+               onClose={() => setModals(prev => ({ ...prev, gstComplianceReports: false }))}
+            />
+         )}
+         {modals.systemUtilities && (
+            <SystemUtilitiesModal
+               isOpen={modals.systemUtilities}
+               onClose={() => setModals(prev => ({ ...prev, systemUtilities: false }))}
+            />
+         )}
+         {modals.lotNoEntry && (
+            <LotNoEntryModal
+               isOpen={modals.lotNoEntry}
+               onClose={() => setModals(prev => ({ ...prev, lotNoEntry: false }))}
+            />
+         )}
+         {modals.issueMultiple && (
+            <IssueMultipleModal
+               isOpen={modals.issueMultiple}
+               onClose={() => setModals(prev => ({ ...prev, issueMultiple: false }))}
+            />
+         )}
+         {modals.cuttingEntry && (
+            <CuttingBeamEntryModal
+               isOpen={modals.cuttingEntry}
+               onClose={() => setModals(prev => ({ ...prev, cuttingEntry: false }))}
+               mode="cutting"
+            />
+         )}
+         {modals.beamEntry && (
+            <CuttingBeamEntryModal
+               isOpen={modals.beamEntry}
+               onClose={() => setModals(prev => ({ ...prev, beamEntry: false }))}
+               mode="beam"
+            />
+         )}
 
          {/* GST Compliance Modals */}
          <Gst3bMonthlyModal isOpen={modals.gst3bMonthly} onClose={() => toggleModal('gst3bMonthly', false)} />
@@ -1132,6 +1227,7 @@ const Dashboard = () => {
          <ProductionEngineModal
             isOpen={modals.productionEngine}
             onClose={() => setModals(prev => ({ ...prev, productionEngine: false }))}
+            initialTab={productionEngineTab}
          />
          <SalesEngineModal
             isOpen={modals.salesEngine}
@@ -1180,9 +1276,17 @@ const Dashboard = () => {
             onClose={() => setModals(prev => ({ ...prev, note: false }))} 
             initialType={modals.noteType} 
          />
-         <JournalEntryModal 
-            isOpen={modals.journal} 
-            onClose={() => setModals(prev => ({ ...prev, journal: false }))} 
+         <JournalEntryModal
+            isOpen={modals.journal}
+            onClose={() => setModals(prev => ({ ...prev, journal: false }))}
+         />
+         <ContraVoucherModal
+            isOpen={modals.contraVoucher}
+            onClose={() => setModals(prev => ({ ...prev, contraVoucher: false }))}
+         />
+         <TdsEntryModal
+            isOpen={modals.tdsEntry}
+            onClose={() => setModals(prev => ({ ...prev, tdsEntry: false }))}
          />
          <CompanySettingsModal
             isOpen={modals.companySettings}

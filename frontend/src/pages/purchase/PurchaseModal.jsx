@@ -258,7 +258,7 @@ const PurchaseModal = ({
       billDate: pur.date ? pur.date.split('T')[0] : today(),
       challanNo: pur.challanNo || '',
       chDate: pur.challanDate ? pur.challanDate.split('T')[0] : today(),
-      type: pur.gstType === 'IGST' ? 'INVOICE OUT OF STATE' : 'INVOICE IN STATE',
+      type: pur.invoiceType || (pur.gstType === 'IGST' ? 'INVOICE OUT OF STATE' : 'INVOICE IN STATE'),
       gstType: pur.gstType || 'CGST+SGST',
       reverseCharge: pur.reverseCharge || 'No',
       warehouseId: pur.warehouseId?._id || pur.warehouseId || ''
@@ -294,6 +294,9 @@ const PurchaseModal = ({
       addSign: pur.addSign || '+',
       octroi: pur.octroi || 0,
       octroiSign: pur.octroiSign || '+',
+      rdAmt: pur.rdAmt || 0,
+      tcsRate: pur.tcsRate || 0,
+      tcsAmt: pur.tcsAmt || 0,
       itcEligibility: pur.itcEligibility || 'Inputs',
       roundOff: pur.roundOff || 0,
       rcmCharge: pur.rcmCharge || 0,
@@ -317,6 +320,20 @@ const PurchaseModal = ({
   const [inlineModal, setInlineModal] = useState({
     type: null, target: 'party', initialData: null, rowIndex: null
   });
+
+  /** Real running total — sum of this party's past purchases (already loaded in the store), excludes cancelled/this same open bill. */
+  const partyTotalPurchase = useMemo(() => {
+    if (!header.party) return 0;
+    return (purchases || [])
+      .filter((p) => {
+        const pid = p.supplierId?._id || p.supplierId;
+        if (String(pid) !== String(header.party)) return false;
+        if (p.status === 'cancelled') return false;
+        if (selectedPurchaseId && String(p._id || p.id) === String(selectedPurchaseId)) return false;
+        return true;
+      })
+      .reduce((sum, p) => sum + (Number(p.netAmount) || 0), 0);
+  }, [purchases, header.party, selectedPurchaseId]);
 
   const calculations = useMemo(() => {
     let gross = 0;
@@ -346,13 +363,24 @@ const PurchaseModal = ({
     taxable = money(taxable + adjust(footer.lessAmt, footer.lessSign));
     taxable = money(taxable + adjust(footer.addAmt, footer.addSign));
     taxable = money(taxable + adjust(footer.octroi, footer.octroiSign));
+    totalLess = money(totalLess + money(footer.rdAmt));
+    taxable = money(taxable - money(footer.rdAmt));
     if (taxable < 0) taxable = 0;
 
-    // User-entered line GSTAmt only — never invent 5% when 0
-    const gstAmt = linesGst;
-    const cgst = header.type === 'INVOICE OUT OF STATE' ? 0 : money(gstAmt / 2);
-    const sgst = header.type === 'INVOICE OUT OF STATE' ? 0 : money(gstAmt / 2);
-    const igst = header.type === 'INVOICE OUT OF STATE' ? gstAmt : 0;
+    const isUnregistered = /UNREGISTERED/i.test(header.type || '');
+    const isOutOfState = (header.type || '').includes('OUT OF STATE');
+
+    // Footer adjustments (Discount/Less/Add/Octroi/RD Amt) change the Taxable Amount, so GST
+    // must scale with it too — otherwise Octroi only affects the displayed total, not the tax,
+    // and the on-screen preview won't match what the server actually saves.
+    const gstAmt = isUnregistered
+      ? 0
+      : linesTaxable > 0
+        ? money(linesGst * (taxable / linesTaxable))
+        : linesGst;
+    const cgst = isOutOfState ? 0 : money(gstAmt / 2);
+    const sgst = isOutOfState ? 0 : money(gstAmt / 2);
+    const igst = isOutOfState ? gstAmt : 0;
 
     const rcmVal = money(footer.rcmCharge);
     const rcmDelta = footer.rcmChargeSign === '+' ? rcmVal : money(-rcmVal);
@@ -361,9 +389,11 @@ const PurchaseModal = ({
       else totalLess = money(totalLess + rcmVal);
     }
 
-    const net = money(taxable + gstAmt + money(footer.roundOff) + rcmDelta);
+    const tcsAmt = footer.tcsRate > 0 ? money((taxable * footer.tcsRate) / 100) : money(footer.tcsAmt);
 
-    return { gross, taxable, gstAmt, cgst, sgst, igst, net, totalAdd, totalLess };
+    const net = money(taxable + gstAmt + money(footer.roundOff) + rcmDelta + tcsAmt);
+
+    return { gross, taxable, gstAmt, cgst, sgst, igst, net, totalAdd, totalLess, tcsAmt, isUnregistered, isOutOfState };
   }, [gridItems, footer, header.type]);
 
   useEffect(() => {
@@ -430,6 +460,9 @@ const PurchaseModal = ({
       addSign: '+',
       octroi: 0,
       octroiSign: '+',
+      rdAmt: 0,
+      tcsRate: 0,
+      tcsAmt: 0,
       itcEligibility: 'Inputs',
       roundOff: 0,
       rcmCharge: 0,
@@ -520,6 +553,7 @@ const PurchaseModal = ({
         bookId: header.book,
         brokerId: header.broker || undefined,
         type: header.type,
+        invoiceType: header.type,
         reverseCharge: header.reverseCharge,
         warehouseId: header.warehouseId || null,
         billAttachment: billAttachment
@@ -538,6 +572,9 @@ const PurchaseModal = ({
         addSign: footer.addSign,
         octroi: footer.octroi,
         octroiSign: footer.octroiSign,
+        rdAmt: footer.rdAmt,
+        tcsRate: footer.tcsRate,
+        tcsAmt: calculations.tcsAmt,
         itcEligibility: footer.itcEligibility,
         roundOff: footer.roundOff,
         rcmCharge: footer.rcmCharge,
@@ -563,7 +600,7 @@ const PurchaseModal = ({
         taxableAmount: calculations.taxable,
         gstAmount: calculations.gstAmt,
         netAmount: calculations.net,
-        gstType: header.type === 'INVOICE OUT OF STATE' ? 'IGST' : 'CGST+SGST',
+        gstType: (header.type || '').includes('OUT OF STATE') ? 'IGST' : 'CGST+SGST',
         cgst: calculations.cgst,
         sgst: calculations.sgst,
         igst: calculations.igst,
@@ -816,7 +853,7 @@ const PurchaseModal = ({
             <div className="classic-erp-stack classic-erp-header-bill">
               <div className="classic-erp-meta-grid erp-sales-bill-meta">
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label red-label">Supp. Bill *:</span>
+                  <span className="classic-erp-label red-label">Bill No *:</span>
                   <input ref={suppBillRef} type="text" className="classic-erp-input" value={header.billNo} placeholder="Supp Bill No…" onChange={e => setHeader({ ...header, billNo: e.target.value })} disabled={locked} />
                 </div>
                 <div className="classic-erp-field">
@@ -826,7 +863,7 @@ const PurchaseModal = ({
               </div>
               <div className="classic-erp-meta-grid erp-sales-ref-meta">
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Voucher:</span>
+                  <span className="classic-erp-label">SrNo:</span>
                   <input type="text" className="classic-erp-input" value={header.vNo} readOnly />
                 </div>
                 <div className="classic-erp-field">
@@ -842,24 +879,29 @@ const PurchaseModal = ({
 
             <div className="classic-erp-stack classic-erp-header-party">
               <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label red-label">Vendor *:</span>
+                <span className="classic-erp-label red-label">Party *:</span>
                 <div className="classic-erp-control" style={{display:'flex',alignItems:'center',gap:4}}>
                   <ERPCombobox
                     value={header.party}
                     onChange={onVendorSelect}
                     options={vendorOptions}
-                    placeholder="Search vendor / supplier…"
+                    placeholder="Search party / supplier…"
                     disabled={locked}
                     recentKey="purchase-vendor"
                     onCreateNew={!locked ? (q) => handleCreateAccount(q) : undefined}
-                    createLabel="Vendor"
+                    createLabel="Party"
                     inputClassName="border-0 flex-1"
                   />
                   {!locked && (
-                    <button type="button" title="Add new vendor" onClick={() => handleCreateAccount('')}
+                    <button type="button" title="Add new party" onClick={() => handleCreateAccount('')}
                       style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:2,padding:'2px 6px',fontSize:10,fontWeight:700,color:'#fff',background:'#16a34a',border:'none',borderRadius:3,cursor:'pointer',whiteSpace:'nowrap'}}>
                       <Plus size={10}/> Add
                     </button>
+                  )}
+                  {header.party && (
+                    <span className="text-[11px] font-bold text-red-600 whitespace-nowrap ml-2" title="Total purchases from this party to date">
+                      T.Purch: {partyTotalPurchase.toFixed(0)}
+                    </span>
                   )}
                 </div>
               </div>
@@ -900,7 +942,7 @@ const PurchaseModal = ({
                   <div />
                 )}
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">RCM:</span>
+                  <span className="classic-erp-label">Reverse Charge:</span>
                   <select className="classic-erp-select" value={header.reverseCharge} onChange={e => setHeader({ ...header, reverseCharge: e.target.value })} disabled={locked}>
                     <option value="No">No</option>
                     <option value="Yes">Yes</option>
@@ -910,6 +952,8 @@ const PurchaseModal = ({
                   <span className="classic-erp-label">Type *:</span>
                   <select className="classic-erp-select" value={header.type} onChange={e => setHeader({ ...header, type: e.target.value })} disabled={locked}>
                     <option value="INVOICE IN STATE">INVOICE IN STATE</option>
+                    <option value="UNREGISTERED INVOICE (IN STATE)">UNREGISTERED INVOICE (IN STATE)</option>
+                    <option value="UNREGISTERED INVOICE (OUT OF STATE)">UNREGISTERED INVOICE (OUT OF STATE)</option>
                     <option value="INVOICE OUT OF STATE">INVOICE OUT OF STATE</option>
                   </select>
                 </div>
@@ -1044,6 +1088,12 @@ const PurchaseModal = ({
             <div className="text-xs font-bold text-black font-mono">
               TOTAL Pcs: <span className="text-blue-800">{gridItems.reduce((a, b) => a + (Number(b.pcs) || 0), 0)}</span>
               {' / '}Qty: <span className="text-blue-800">{gridItems.reduce((a, b) => a + (Number(b.mts) || 0), 0).toFixed(2)}</span>
+              {' / '}NetQty: <span className="text-blue-800">{gridItems.reduce((a, b) => {
+                const mts = Number(b.mts) || 0;
+                const fold = Number(b.fold) || 0;
+                return a + (fold > 0 ? (mts * fold) / 100 : mts);
+              }, 0).toFixed(2)}</span>
+              {' / '}Kgs: <span className="text-blue-800">0</span>
             </div>
           </div>
 
@@ -1064,6 +1114,10 @@ const PurchaseModal = ({
                   <input type="number" className="classic-erp-input text-right" value={footer[adj.key] || ''} onChange={e => setFooter({ ...footer, [adj.key]: Number(e.target.value) })} disabled={locked} />
                 </div>
               ))}
+              <div className="classic-erp-adj-row">
+                <span className="classic-erp-label">RD AMT:</span>
+                <input type="number" className="classic-erp-input text-right col-span-2" value={footer.rdAmt || ''} onChange={e => setFooter({ ...footer, rdAmt: Number(e.target.value) })} disabled={locked} title="Round Difference — always subtracted from Taxable Amt" />
+              </div>
               <div className="classic-erp-field classic-erp-field--lg pt-1 border-t border-[var(--border)]">
                 <span className="classic-erp-label">ITC:</span>
                 <select className="classic-erp-select" value={footer.itcEligibility} onChange={e => setFooter({ ...footer, itcEligibility: e.target.value })} disabled={locked}>
@@ -1084,7 +1138,7 @@ const PurchaseModal = ({
                 <span className="classic-erp-label text-slate-800">Taxable Amt:</span>
                 <span className="font-mono text-black shrink-0">₹{calculations.taxable.toFixed(2)}</span>
               </div>
-              {header.type === 'INVOICE IN STATE' ? (
+              {!calculations.isOutOfState ? (
                 <>
                   <div className="classic-erp-total-row font-bold">
                     <span className="classic-erp-label text-slate-800">CGST:</span>
@@ -1102,7 +1156,12 @@ const PurchaseModal = ({
                 </div>
               )}
               <div className="classic-erp-adj-row font-bold">
-                <span className="classic-erp-label text-slate-800">RCM:</span>
+                <span className="classic-erp-label text-slate-800">TCS%:</span>
+                <input type="number" step="0.001" className="classic-erp-input text-center" value={footer.tcsRate || ''} onChange={e => setFooter({ ...footer, tcsRate: Number(e.target.value) })} disabled={locked} />
+                <input type="number" className="classic-erp-input text-right font-mono" value={footer.tcsRate > 0 ? calculations.tcsAmt.toFixed(2) : (footer.tcsAmt || '')} onChange={e => setFooter({ ...footer, tcsAmt: Number(e.target.value) })} disabled={locked || footer.tcsRate > 0} title={footer.tcsRate > 0 ? 'Auto-computed from TCS%' : 'Manual TCS amount'} />
+              </div>
+              <div className="classic-erp-adj-row font-bold">
+                <span className="classic-erp-label text-slate-800">RCM CHARGE:</span>
                 <select className="classic-erp-select text-center font-bold" value={footer.rcmChargeSign} onChange={e => setFooter({ ...footer, rcmChargeSign: e.target.value })} disabled={locked}>
                   <option value="-">-</option>
                   <option value="+">+</option>

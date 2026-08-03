@@ -6,6 +6,7 @@ import { notifySuccess, notifyWarning, notifyError } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
 import { Plus } from 'lucide-react';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
+import BillNoLookupModal from './BillNoLookupModal';
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 
@@ -75,6 +76,8 @@ const CashBankBookModal = ({
   const [saving, setSaving] = useState(false);
   const [bootLoading, setBootLoading] = useState(false);
   const [error, setError] = useState('');
+  const [billLookupOpen, setBillLookupOpen] = useState(false);
+  const [billLookupTargetIdx, setBillLookupTargetIdx] = useState(null);
   const openedRef = useRef(false);
 
   const [header, setHeader] = useState({
@@ -323,6 +326,45 @@ const CashBankBookModal = ({
     if (!isOpen || mode === 'View') return;
     loadPartyBills();
   }, [header.partyId, header.accBill, partyInvoices.length]);
+
+  /** BillNo Entry — press Enter on a row's BillNo cell to see which outstanding bills to pick from. */
+  const openBillLookup = (idx) => {
+    if (locked) return;
+    if (!header.partyId) {
+      notifyWarning('Select Party first');
+      return;
+    }
+    setBillLookupTargetIdx(idx);
+    setBillLookupOpen(true);
+  };
+
+  const billLookupInvoices = useMemo(() => {
+    const usedElsewhere = new Set(
+      billRows
+        .filter((_, i) => i !== billLookupTargetIdx)
+        .map((r) => r.invoiceId)
+        .filter(Boolean)
+    );
+    return partyInvoices.filter((inv) => !usedElsewhere.has(inv._id));
+  }, [partyInvoices, billRows, billLookupTargetIdx]);
+
+  const handleBillSelect = (inv) => {
+    setBillRows((rows) => {
+      const next = [...rows];
+      const idx = billLookupTargetIdx;
+      next[idx] = {
+        ...next[idx],
+        invoiceId: inv._id,
+        billNo: inv.invoiceNo,
+        billDt: inv.billDt,
+        billAmt: inv.billAmt,
+        osAmt: inv.osAmt,
+        osDy: inv.osDy,
+        netOs: inv.osAmt,
+      };
+      return next;
+    });
+  };
 
   const setH = (key) => (e) => {
     const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -606,6 +648,7 @@ const CashBankBookModal = ({
   if (!isOpen) return null;
 
   return (
+    <>
     <ErpWindowedModal isOpen={isOpen} onClose={onClose} title={windowTitle} windowId={`cashbank-${bookKind}-${initialType || 'Receipt'}`} bare>
       {({ WindowControls }) => (
       <div className="classic-erp-window flex flex-col h-full min-h-0 !max-h-none">
@@ -790,7 +833,22 @@ const CashBankBookModal = ({
                 {billRows.map((row, idx) => (
                   <tr key={row.id || idx}>
                     <td className="text-center text-blue-800 font-bold">{idx === 0 ? '►' : ''}</td>
-                    <td><input type="text" className="classic-erp-input w-full border-0 bg-transparent" value={row.billNo} onChange={(e) => updateRow(idx, 'billNo', e.target.value)} disabled={locked} /></td>
+                    <td>
+                      <input
+                        type="text"
+                        className="classic-erp-input w-full border-0 bg-transparent"
+                        value={row.billNo}
+                        onChange={(e) => updateRow(idx, 'billNo', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            openBillLookup(idx);
+                          }
+                        }}
+                        placeholder="Type or Enter…"
+                        disabled={locked}
+                      />
+                    </td>
                     <td><input type="text" className="classic-erp-input w-full border-0 bg-transparent text-center" value={row.nSlash} onChange={(e) => updateRow(idx, 'nSlash', e.target.value)} disabled={locked} /></td>
                     <td><input type="date" className="classic-erp-input w-full border-0 bg-transparent" value={row.billDt || ''} onChange={(e) => updateRow(idx, 'billDt', e.target.value)} disabled={locked} /></td>
                     <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.billAmt || ''} onChange={(e) => updateRow(idx, 'billAmt', Number(e.target.value))} disabled={locked} /></td>
@@ -874,7 +932,7 @@ const CashBankBookModal = ({
           </button>
           <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked}>Cancel</button>
           <button className="classic-erp-btn" type="button" onClick={handleFind}>Find</button>
-          <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || !selectedVoucherId || mode !== 'View'} title="Reverse posted voucher (ledger + bill OS)">Delete / Reverse</button>
+          <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || !selectedVoucherId || mode !== 'View'} title="Reverses posted voucher — ledger entries and bill outstanding are undone, not hard-deleted">Delete</button>
           <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
           {isBank && <button className="classic-erp-btn" type="button" onClick={() => notifyWarning('Cheque return — use Bank Reconciliation.')}>Cheq Rt</button>}
           <button className="classic-erp-btn" type="button" onClick={() => { setFindQuery(''); handleFind(); }}>Sp.Find</button>
@@ -886,6 +944,15 @@ const CashBankBookModal = ({
       </div>
       )}
     </ErpWindowedModal>
+
+    <BillNoLookupModal
+      isOpen={billLookupOpen}
+      onClose={() => setBillLookupOpen(false)}
+      invoices={billLookupInvoices}
+      partyName={selectedParty?.name || ''}
+      onSelect={handleBillSelect}
+    />
+    </>
   );
 };
 

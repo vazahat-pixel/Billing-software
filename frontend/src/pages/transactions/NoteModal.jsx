@@ -10,6 +10,8 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit' }) => {
   const [noteNo, setNoteNo] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState('');
+  const [gstRate, setGstRate] = useState(0);
+  const [gstType, setGstType] = useState('CGST+SGST');
   const [againstInvoiceNo, setAgainstInvoiceNo] = useState('');
   const [reason, setReason] = useState('');
 
@@ -21,6 +23,22 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit' }) => {
     [parties]
   );
 
+  // Mirrors backend noteController.createNote exactly: Amount is Gross (GST-inclusive)
+  // when a rate is set, and the backend back-calculates Taxable from it.
+  const gstPreview = useMemo(() => {
+    const gross = parseFloat(amount) || 0;
+    const rate = Number(gstRate) || 0;
+    const taxable = rate > 0 ? gross / (1 + rate / 100) : gross;
+    const gstAmt = gross - taxable;
+    return {
+      taxable: Number(taxable.toFixed(2)),
+      gstAmt: Number(gstAmt.toFixed(2)),
+      cgst: gstType === 'IGST' ? 0 : Number((gstAmt / 2).toFixed(2)),
+      sgst: gstType === 'IGST' ? 0 : Number((gstAmt / 2).toFixed(2)),
+      igst: gstType === 'IGST' ? Number(gstAmt.toFixed(2)) : 0,
+    };
+  }, [amount, gstRate, gstType]);
+
   useEffect(() => {
     if (isOpen) {
       setType(initialType);
@@ -29,6 +47,8 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit' }) => {
       setNoteNo('');
       setDate(new Date().toISOString().split('T')[0]);
       setAmount('');
+      setGstRate(0);
+      setGstType('CGST+SGST');
       setAgainstInvoiceNo('');
       setReason('');
       setErrorMsg('');
@@ -57,6 +77,8 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit' }) => {
         partyLedgerId: partyId,
         date,
         amount: numAmount,
+        gstRate: Number(gstRate) || 0,
+        gstType,
         againstInvoiceNo,
         reason,
         status: 'Posted'
@@ -125,17 +147,18 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit' }) => {
           <div className="classic-erp-frame grid grid-cols-2 gap-3">
             <div className="flex items-center gap-2">
               <span className="classic-erp-label red-label w-20">Amount:</span>
-              <input 
+              <input
                 type="number"
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
                 placeholder="0.00"
                 className="classic-erp-input flex-1 text-right font-bold"
+                title="Gross amount — GST-inclusive if a GST% is set below"
               />
             </div>
             <div className="flex items-center gap-2">
               <span className="classic-erp-label w-20">Invoice Ref:</span>
-              <input 
+              <input
                 type="text"
                 value={againstInvoiceNo}
                 onChange={e => setAgainstInvoiceNo(e.target.value)}
@@ -144,6 +167,46 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit' }) => {
               />
             </div>
           </div>
+
+          <div className="classic-erp-frame grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-2">
+              <span className="classic-erp-label w-20">GST%:</span>
+              <input
+                type="number"
+                step="0.01"
+                value={gstRate || ''}
+                onChange={e => setGstRate(e.target.value)}
+                placeholder="0"
+                className="classic-erp-input flex-1 text-right"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="classic-erp-label w-20">GST Type:</span>
+              <select
+                className="classic-erp-select flex-1"
+                value={gstType}
+                onChange={e => setGstType(e.target.value)}
+                disabled={!gstRate}
+              >
+                <option value="CGST+SGST">CGST+SGST</option>
+                <option value="IGST">IGST</option>
+              </select>
+            </div>
+          </div>
+
+          {Number(gstRate) > 0 && amount > 0 && (
+            <div className="classic-erp-frame text-[11px] font-mono flex flex-wrap gap-x-4 gap-y-1 bg-slate-50">
+              <span>Taxable: <b>₹{gstPreview.taxable.toFixed(2)}</b></span>
+              {gstType === 'IGST' ? (
+                <span>IGST: <b>₹{gstPreview.igst.toFixed(2)}</b></span>
+              ) : (
+                <>
+                  <span>CGST: <b>₹{gstPreview.cgst.toFixed(2)}</b></span>
+                  <span>SGST: <b>₹{gstPreview.sgst.toFixed(2)}</b></span>
+                </>
+              )}
+            </div>
+          )}
 
           <div className="classic-erp-frame flex flex-col gap-1">
             <span className="classic-erp-label">Reason / Remarks:</span>

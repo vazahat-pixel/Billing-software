@@ -11,9 +11,13 @@ const TABS = ['Board', 'Issue', 'Process', 'QC', 'Receive', 'Mapping'];
  * Sprint 2.4 — Production & job work workspace (modal shell).
  * Grey → process chain → QC → receive finished goods
  */
-const ProductionEngineModal = ({ isOpen, onClose }) => {
+const ProductionEngineModal = ({ isOpen, onClose, initialTab = 'Board' }) => {
   const { inventoryLots, parties, items, fetchInventory, fetchParties, fetchItems, fetchJobs } = useStore();
-  const [tab, setTab] = useState('Board');
+  const [tab, setTab] = useState(initialTab);
+
+  useEffect(() => {
+    if (isOpen) setTab(initialTab);
+  }, [isOpen, initialTab]);
   const [pipeline, setPipeline] = useState(null);
   const [board, setBoard] = useState(null);
   const [chains, setChains] = useState([]);

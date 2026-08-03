@@ -92,12 +92,21 @@ const PurchaseSchema = new mongoose.Schema({
     min: 0
   },
   discountAmt: { type: Number, default: 0 },
+  discountSign: { type: String, enum: ['+', '-'], default: '-' },
   lessAmt: { type: Number, default: 0 },
+  lessSign: { type: String, enum: ['+', '-'], default: '-' },
   addAmt: { type: Number, default: 0 },
+  addSign: { type: String, enum: ['+', '-'], default: '+' },
   octroi: { type: Number, default: 0 },
+  octroiSign: { type: String, enum: ['+', '-'], default: '+' },
+  rdAmt: { type: Number, default: 0 },
+  tcsRate: { type: Number, default: 0 },
+  tcsAmt: { type: Number, default: 0 },
+  invoiceType: { type: String, default: 'INVOICE IN STATE' },
   itcEligibility: { type: String, default: 'Inputs' },
   roundOff: { type: Number, default: 0 },
   rcmCharge: { type: Number, default: 0 },
+  rcmChargeSign: { type: String, enum: ['+', '-'], default: '+' },
   // Tracks how much has been paid against this bill (for partial payment tracking)
   paidAmount: {
     type: Number,

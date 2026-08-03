@@ -27,16 +27,30 @@ function recalcPurchaseTotals(items = [], {
     return { ...it, amount };
   });
 
+  // Signed footer adjustments — sign '+' adds to taxable, anything else (default '-') subtracts.
+  // Must mirror the frontend's adjust() in PurchaseModal.jsx exactly, or the saved bill won't
+  // match what the user saw on screen before hitting Save.
+  const signedAdjust = (amount, sign) => (sign === '+' ? Number(amount || 0) : -Number(amount || 0));
+
   let taxable = mapped.reduce((s, it) => s + Number(it.amount || 0), 0);
-  const lessAmt = Number(extras.lessAmt || 0) + Number(extras.discountAmt || 0);
-  const addAmt = Number(extras.addAmt || 0) + Number(extras.freight || 0);
-  taxable = Math.max(0, Number((taxable - lessAmt + addAmt).toFixed(2)));
+  taxable += signedAdjust(extras.discountAmt, extras.discountSign);
+  taxable += signedAdjust(extras.lessAmt, extras.lessSign);
+  taxable += signedAdjust(extras.addAmt, extras.addSign);
+  taxable += signedAdjust(extras.octroi, extras.octroiSign);
+  taxable -= Number(extras.rdAmt || 0);
+  taxable += Number(extras.freight || 0);
+  taxable = Math.max(0, Number(taxable.toFixed(2)));
+
+  // Unregistered-dealer purchase — no GST is charged on the bill (rate forced to 0).
+  const isUnregistered = /UNREGISTERED/i.test(extras.invoiceType || '');
 
   // Prefer per-line rates when present; else invoice-level rate
   const rates = mapped.map((it) => Number(it.gstRate || it.itemId?.gstRate || gstRate)).filter((r) => r > 0);
-  const effectiveRate = rates.length
-    ? Number((rates.reduce((a, b) => a + b, 0) / rates.length).toFixed(2))
-    : Number(gstRate);
+  const effectiveRate = isUnregistered
+    ? 0
+    : rates.length
+      ? Number((rates.reduce((a, b) => a + b, 0) / rates.length).toFixed(2))
+      : Number(gstRate);
 
   const resolvedType = determineGstType({
     companyGstin,
@@ -49,14 +63,16 @@ function recalcPurchaseTotals(items = [], {
   const tax = computeTaxComponents(taxable, effectiveRate, resolvedType, extras.cessRate || 0);
   const tdsAmount = Number(extras.tdsAmount || 0);
   const roundOff = Number(extras.roundOff || 0);
+  // TCS — manually entered (rate/amount), collected on top by the seller, so it adds to payable.
+  const tcsAmt = Number(extras.tcsAmt || 0);
 
   // RCM: tax is payable by recipient — net to supplier excludes GST (or includes depending on policy)
   // Standard: invoice net to supplier = taxable (+ non-RCM GST). Under RCM, GST paid separately.
   let netAmount;
   if (reverseCharge || extras.reverseCharge) {
-    netAmount = Number((taxable - tdsAmount + roundOff).toFixed(2));
+    netAmount = Number((taxable - tdsAmount + roundOff + tcsAmt).toFixed(2));
   } else {
-    netAmount = Number((taxable + tax.gstAmount + tax.cess - tdsAmount + roundOff).toFixed(2));
+    netAmount = Number((taxable + tax.gstAmount + tax.cess - tdsAmount + roundOff + tcsAmt).toFixed(2));
   }
 
   return {
@@ -70,6 +86,7 @@ function recalcPurchaseTotals(items = [], {
     cess: tax.cess,
     gstAmount: Number((tax.gstAmount + tax.cess).toFixed(2)),
     tdsAmount,
+    tcsAmt,
     reverseCharge: !!(reverseCharge || extras.reverseCharge),
     netAmount,
   };

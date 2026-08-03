@@ -92,6 +92,7 @@ class PurchaseService {
       purchaseData.gstAmount = totals.gstAmount;
       purchaseData.netAmount = totals.netAmount;
       purchaseData.tdsAmount = totals.tdsAmount;
+      purchaseData.tcsAmt = totals.tcsAmt;
       purchaseData.reverseCharge = totals.reverseCharge ? 'Yes' : 'No';
       purchaseData.rcmCharge = !!totals.reverseCharge;
 
