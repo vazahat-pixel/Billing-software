@@ -147,9 +147,8 @@ export default function OceanBlue({ data }) {
         <thead>
           <tr>
             <th style={{ width: '4%' }}>S.No.</th>
-            <th style={{ width: '22%', textAlign: 'left' }}>Description of Goods</th>
+            <th style={{ width: '27%', textAlign: 'left' }}>Description of Goods</th>
             <th style={{ width: '6%' }}>HSN</th>
-            <th style={{ width: '5%' }}>Lot</th>
             <th style={{ width: '4%' }}>Cut</th>
             <th style={{ width: '5%' }}>PCS</th>
             <th style={{ width: '7%' }}>Meters</th>
@@ -176,7 +175,6 @@ export default function OceanBlue({ data }) {
               <td className="ob-ctr">
                 <span className="ob-pill">{line.hsn}</span>
               </td>
-              <td className="ob-ctr">{line.lot || '—'}</td>
               <td className="ob-ctr">{line.cut || '—'}</td>
               <td className="ob-num">{line.pcs || ''}</td>
               <td className="ob-num">{line.mts ? fmt.num(line.mts) : ''}</td>
@@ -190,13 +188,13 @@ export default function OceanBlue({ data }) {
           ))}
           {Array.from({ length: Math.max(0, 5 - (lines || []).length) }).map((_, i) => (
             <tr key={`e${i}`}>
-              {Array.from({ length: 13 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
+              {Array.from({ length: 12 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
             </tr>
           ))}
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={5} className="ob-ctr">TOTAL</td>
+            <td colSpan={4} className="ob-ctr">TOTAL</td>
             <td className="ob-num">{totalPcs || ''}</td>
             <td className="ob-num">{totalMts ? fmt.num(totalMts) : ''}</td>
             <td colSpan={3}>&nbsp;</td>

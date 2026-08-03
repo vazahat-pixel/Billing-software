@@ -522,6 +522,17 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     [gridItems, footer, header, gstRates]
   );
 
+  // Auto round-off Net Amount to the nearest rupee (Indian invoicing convention),
+  // unless the user has typed a manual override in the Round Off field.
+  useEffect(() => {
+    if (locked || footer.roundOffManual) return;
+    const preRound = Number((calculations.taxable + calculations.gstAmt + calculations.tcsAmt).toFixed(2));
+    const auto = Number((Math.round(preRound) - preRound).toFixed(2));
+    if (Number(footer.roundOff || 0) !== auto) {
+      setFooter(prev => ({ ...prev, roundOff: auto }));
+    }
+  }, [calculations.taxable, calculations.gstAmt, calculations.tcsAmt, footer.roundOff, footer.roundOffManual, locked]);
+
   const currentItemInfo = useMemo(() => {
     if (!activeItemId) return null;
     return items.find((i) => (i._id || i.id) === activeItemId) || null;
@@ -1526,6 +1537,20 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             {/* Right Totals & GST Summary Column */}
             <div className="col-span-4 classic-erp-frame classic-erp-stack p-2 bg-[var(--accent-light)] pb-3">
               <div className="classic-erp-total-row font-bold">
+                <span className="classic-erp-label text-slate-800">Gross Amt:</span>
+                <span className="font-mono text-black">₹{calculations.gross.toFixed(2)}</span>
+              </div>
+
+              {Number(footer.foldLess || 0) > 0 && (
+                <div className="classic-erp-total-row font-bold">
+                  <span className="classic-erp-label text-orange-700">Fold Less:</span>
+                  <span className="font-mono text-orange-700">
+                    {footer.foldLessSign === '+' ? '+' : '-'}₹{Number(footer.foldLess).toFixed(2)}
+                  </span>
+                </div>
+              )}
+
+              <div className="classic-erp-total-row font-bold border-t border-[var(--border)] pt-1">
                 <span className="classic-erp-label text-slate-800">Taxable Amt:</span>
                 <span className="font-mono text-black shrink-0">₹{calculations.taxable.toFixed(2)}</span>
               </div>
@@ -1570,11 +1595,6 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
               </div>
 
               <div className="classic-erp-total-row font-bold border-t border-[var(--border)] pt-1">
-                <span className="classic-erp-label text-slate-800">Gross Amt:</span>
-                <span className="font-mono text-black">₹{calculations.gross.toFixed(2)}</span>
-              </div>
-
-              <div className="classic-erp-total-row font-bold">
                 <span className="classic-erp-label text-slate-800">Total Add:</span>
                 <span className="font-mono text-green-700">₹{calculations.totalAdd.toFixed(2)}</span>
               </div>
@@ -1588,10 +1608,12 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 <span className="classic-erp-label text-slate-800">Round Off:</span>
                 <input
                   type="number"
+                  step="0.01"
                   className="classic-erp-input w-24 text-right font-mono"
                   value={footer.roundOff}
-                  onChange={e => setFooter({ ...footer, roundOff: Number(e.target.value) })}
+                  onChange={e => setFooter({ ...footer, roundOff: Number(e.target.value), roundOffManual: true })}
                   disabled={locked}
+                  title="Auto-rounded to the nearest rupee. Type to override."
                 />
               </div>
 

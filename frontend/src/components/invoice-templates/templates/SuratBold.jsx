@@ -184,9 +184,8 @@ export default function SuratBold({ data }) {
           <thead>
             <tr>
               <th style={{ width: '5%' }}>S.No.</th>
-              <th style={{ width: '22%', textAlign: 'left' }}>Description of Goods</th>
+              <th style={{ width: '27%', textAlign: 'left' }}>Description of Goods</th>
               <th style={{ width: '6%' }}>HSN</th>
-              <th style={{ width: '5%' }}>Lot</th>
               <th style={{ width: '5%' }}>Cut</th>
               <th style={{ width: '6%' }}>PCS</th>
               <th style={{ width: '8%' }}>Mtrs</th>
@@ -209,7 +208,6 @@ export default function SuratBold({ data }) {
                   {line.quality && <div style={{ fontSize: '6.5pt', color: MUTED }}>Quality: {line.quality}</div>}
                 </td>
                 <td className="sb-center">{line.hsn}</td>
-                <td className="sb-center">{line.lot || '—'}</td>
                 <td className="sb-center">{line.cut || '—'}</td>
                 <td className="sb-num">{line.pcs || ''}</td>
                 <td className="sb-num">{line.mts ? fmt.num(line.mts) : ''}</td>
@@ -224,7 +222,7 @@ export default function SuratBold({ data }) {
             {/* Empty rows */}
             {Array.from({ length: Math.max(0, 6 - (lines || []).length) }).map((_, i) => (
               <tr key={`e-${i}`}>
-                {Array.from({ length: 13 }).map((__, j) => (
+                {Array.from({ length: 12 }).map((__, j) => (
                   <td key={j} style={{ height: '7mm' }}>&nbsp;</td>
                 ))}
               </tr>
@@ -232,7 +230,7 @@ export default function SuratBold({ data }) {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={5} style={{ fontWeight: 700, textAlign: 'center', background: NAVY, color: '#fff' }}>TOTAL</td>
+              <td colSpan={4} style={{ fontWeight: 700, textAlign: 'center', background: NAVY, color: '#fff' }}>TOTAL</td>
               <td className="sb-num">{totalPcs || ''}</td>
               <td className="sb-num">{totalMts ? fmt.num(totalMts) : ''}</td>
               <td colSpan={3}>&nbsp;</td>
@@ -311,6 +309,8 @@ export default function SuratBold({ data }) {
           {/* Totals */}
           <div style={{ marginTop: '2mm', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1mm', fontSize: '7.5pt' }}>
             {[
+              ['Gross Amount', totals.grossAmount, false],
+              totals.foldLess ? ['Fold Less', -totals.foldLess, false] : null,
               ['Taxable Amount', totals.taxable, false],
               ['GST Amount', totals.gst, false],
               totals.roundOff ? ['Round Off', totals.roundOff, false] : null,

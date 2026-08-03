@@ -76,6 +76,18 @@ function TextileTaxGrid({ data }) {
       <tfoot>
         <tr>
           <td colSpan={9} style={{ border: 'none', borderRight: '1px solid #000' }}>&nbsp;</td>
+          <td style={{ fontWeight: 700, textAlign: 'right', fontSize: '8pt' }}>Gross Amount</td>
+          <td className="ipe-num" style={{ textAlign: 'right' }}>{money(totals.grossAmount)}</td>
+        </tr>
+        {totals.foldLess ? (
+          <tr>
+            <td colSpan={9} style={{ border: 'none', borderRight: '1px solid #000' }}>&nbsp;</td>
+            <td style={{ fontWeight: 700, textAlign: 'right', fontSize: '8pt' }}>- Fold Less</td>
+            <td className="ipe-num" style={{ textAlign: 'right' }}>{money(totals.foldLess)}</td>
+          </tr>
+        ) : null}
+        <tr>
+          <td colSpan={9} style={{ border: 'none', borderRight: '1px solid #000' }}>&nbsp;</td>
           <td style={{ fontWeight: 700, textAlign: 'right', fontSize: '8pt' }}>+ GST Amount</td>
           <td className="ipe-num" style={{ textAlign: 'right', fontWeight: 700 }}>{money(totals.gst)}</td>
         </tr>

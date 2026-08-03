@@ -144,9 +144,8 @@ export default function SlateElegant({ data }) {
         <thead>
           <tr>
             <th style={{ width: '4%' }}>Sr.</th>
-            <th style={{ width: '22%', textAlign: 'left' }}>Description of Goods</th>
+            <th style={{ width: '27%', textAlign: 'left' }}>Description of Goods</th>
             <th style={{ width: '6%' }}>HSN</th>
-            <th style={{ width: '5%' }}>Lot</th>
             <th style={{ width: '4%' }}>Cut</th>
             <th style={{ width: '5%' }}>PCS</th>
             <th style={{ width: '7%' }}>Mtrs</th>
@@ -171,7 +170,6 @@ export default function SlateElegant({ data }) {
               <td className="se-ctr">
                 {line.hsn ? <span className="se-badge">{line.hsn}</span> : '—'}
               </td>
-              <td className="se-ctr">{line.lot || '—'}</td>
               <td className="se-ctr">{line.cut || '—'}</td>
               <td className="se-num">{line.pcs || ''}</td>
               <td className="se-num">{line.mts ? fmt.num(line.mts) : ''}</td>
@@ -185,13 +183,13 @@ export default function SlateElegant({ data }) {
           ))}
           {Array.from({ length: Math.max(0, 5 - (lines || []).length) }).map((_, i) => (
             <tr key={`e${i}`}>
-              {Array.from({ length: 13 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
+              {Array.from({ length: 12 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
             </tr>
           ))}
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={5} className="se-ctr" style={{ background: SLATE_MED }}>TOTAL</td>
+            <td colSpan={4} className="se-ctr" style={{ background: SLATE_MED }}>TOTAL</td>
             <td className="se-num">{totalPcs || ''}</td>
             <td className="se-num">{totalMts ? fmt.num(totalMts) : ''}</td>
             <td colSpan={3}>&nbsp;</td>

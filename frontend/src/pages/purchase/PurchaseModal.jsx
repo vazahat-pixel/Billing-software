@@ -447,8 +447,21 @@ const PurchaseModal = ({
 
     const net = money(taxable + gstAmt + money(footer.roundOff) + rcmDelta + tcsAmt);
 
-    return { gross, taxable, gstAmt, cgst, sgst, igst, net, totalAdd, totalLess, tcsAmt, isUnregistered, isOutOfState };
+    return { gross, taxable, gstAmt, cgst, sgst, igst, net, totalAdd, totalLess, tcsAmt, rcmDelta, isUnregistered, isOutOfState };
   }, [gridItems, footer, header.type]);
+
+  // Auto round-off Net Amount to the nearest rupee (Indian invoicing convention),
+  // unless the user has typed a manual override in the Round Off field.
+  useEffect(() => {
+    if (locked || footer.roundOffManual) return;
+    const preRound = Number(
+      (calculations.taxable + calculations.gstAmt + calculations.rcmDelta + calculations.tcsAmt).toFixed(2)
+    );
+    const auto = Number((Math.round(preRound) - preRound).toFixed(2));
+    if (Number(footer.roundOff || 0) !== auto) {
+      setFooter(prev => ({ ...prev, roundOff: auto }));
+    }
+  }, [calculations.taxable, calculations.gstAmt, calculations.rcmDelta, calculations.tcsAmt, footer.roundOff, footer.roundOffManual, locked]);
 
   useEffect(() => {
     if (!isOpen || readOnly || mode === 'View') return;
@@ -1241,6 +1254,18 @@ const PurchaseModal = ({
 
                 <div className="col-span-4 classic-erp-frame classic-erp-stack p-2 bg-[var(--accent-light)] pb-3">
                   <div className="classic-erp-total-row font-bold">
+                    <span className="classic-erp-label text-slate-800">Gross Amt:</span>
+                    <span className="font-mono text-black">₹{calculations.gross.toFixed(2)}</span>
+                  </div>
+                  {Number(footer.foldLess || 0) > 0 && (
+                    <div className="classic-erp-total-row font-bold">
+                      <span className="classic-erp-label text-orange-700">Fold Less:</span>
+                      <span className="font-mono text-orange-700">
+                        {footer.foldLessSign === '+' ? '+' : '-'}₹{Number(footer.foldLess).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="classic-erp-total-row font-bold border-t border-[var(--border)] pt-1">
                     <span className="classic-erp-label text-slate-800">Taxable Amt:</span>
                     <span className="font-mono text-black shrink-0">₹{calculations.taxable.toFixed(2)}</span>
                   </div>
@@ -1270,12 +1295,16 @@ const PurchaseModal = ({
                     <input type="number" className="classic-erp-input text-right font-mono" value={footer.rcmCharge || ''} onChange={e => setFooter({ ...footer, rcmCharge: Number(e.target.value) })} disabled={locked} />
                   </div>
                   <div className="classic-erp-total-row font-bold border-t border-[var(--border)] pt-1">
-                    <span className="classic-erp-label text-slate-800">Gross Amt:</span>
-                    <span className="font-mono text-black">₹{calculations.gross.toFixed(2)}</span>
-                  </div>
-                  <div className="classic-erp-total-row font-bold">
                     <span className="classic-erp-label text-slate-800">Round Off:</span>
-                    <input type="number" className="classic-erp-input w-24 text-right font-mono" value={footer.roundOff} onChange={e => setFooter({ ...footer, roundOff: Number(e.target.value) })} disabled={locked} />
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="classic-erp-input w-24 text-right font-mono"
+                      value={footer.roundOff}
+                      onChange={e => setFooter({ ...footer, roundOff: Number(e.target.value), roundOffManual: true })}
+                      disabled={locked}
+                      title="Auto-rounded to the nearest rupee. Type to override."
+                    />
                   </div>
                   <div className="classic-erp-total-row font-bold pt-2 border-t-2 border-[#000] mt-1">
                     <span className="classic-erp-label text-blue-900 text-sm">NET AMOUNT:</span>

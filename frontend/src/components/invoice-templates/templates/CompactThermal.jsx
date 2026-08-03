@@ -85,6 +85,8 @@ export default function CompactThermal({ data, pageSize = 'thermal-80' }) {
       ))}
 
       <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
+      {line('Gross', fmt.money(totals.grossAmount))}
+      {totals.foldLess ? line('Fold Less', fmt.money(totals.foldLess)) : null}
       {line('Taxable', fmt.money(totals.taxable))}
       {!isIgst ? (
         <>
