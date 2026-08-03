@@ -297,21 +297,21 @@ export function buildInvoiceViewModel({
   const shipTo =
     invoice.shipToName || invoice.shippingAddress
       ? {
-          name: invoice.shipToName || party?.name,
-          gstin: invoice.shipToGstin || party?.gstin,
-          address: invoice.shippingAddress || partyAddress(party),
-          addressLines: invoice.shippingAddress
-            ? [invoice.shippingAddress]
-            : partyAddressLines(party),
-          state: invoice.shipToState || party?.state,
-          stateCode: invoice.shipToStateCode || party?.stateCode,
-          stateLabel: stateLabel(
-            invoice.shipToState || party?.state,
-            invoice.shipToStateCode || party?.stateCode
-          ),
-          phone: invoice.shipToPhone || party?.mobile || party?.phone || '',
-          email: invoice.shipToEmail || party?.email || '',
-        }
+        name: invoice.shipToName || party?.name,
+        gstin: invoice.shipToGstin || party?.gstin,
+        address: invoice.shippingAddress || partyAddress(party),
+        addressLines: invoice.shippingAddress
+          ? [invoice.shippingAddress]
+          : partyAddressLines(party),
+        state: invoice.shipToState || party?.state,
+        stateCode: invoice.shipToStateCode || party?.stateCode,
+        stateLabel: stateLabel(
+          invoice.shipToState || party?.state,
+          invoice.shipToStateCode || party?.stateCode
+        ),
+        phone: invoice.shipToPhone || party?.mobile || party?.phone || '',
+        email: invoice.shipToEmail || party?.email || '',
+      }
       : null;
 
   const billToSameAsShip =
@@ -400,12 +400,12 @@ export function buildInvoiceViewModel({
     shipTo: billToSameAsShip
       ? billParty
       : {
-          ...shipTo,
-          gstin: normalizeGstin(shipTo?.gstin),
-          stateLabel:
-            shipTo?.stateLabel ||
-            stateLabel(shipTo?.state, shipTo?.stateCode || stateCodeFromGstin(shipTo?.gstin)),
-        },
+        ...shipTo,
+        gstin: normalizeGstin(shipTo?.gstin),
+        stateLabel:
+          shipTo?.stateLabel ||
+          stateLabel(shipTo?.state, shipTo?.stateCode || stateCodeFromGstin(shipTo?.gstin)),
+      },
     lines,
     lineTotals: {
       pcs: totalPcs,
