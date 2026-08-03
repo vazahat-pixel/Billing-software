@@ -2,14 +2,40 @@ const { computeTaxComponents, determineGstType } = require('./gstDetermination')
 
 /**
  * Server-side purchase totals — Sprint 4.2 parity with salesTotals.
- * Never trust client GST amounts.
+ * Never trust client GST totals, but mirror PurchaseModal's computeLine() for line
+ * amounts so saved/printed figures match what the user actually entered.
+ */
+const PCS_UNITS = ['PCS', 'PC', 'NOS', 'NO'];
+
+/** Qty that drives Amount = Rate × Qty, matching PurchaseModal.jsx's lineQty(). */
+function lineQty(line) {
+  const unit = String(line.unit || 'MTRS').toUpperCase();
+  if (PCS_UNITS.includes(unit)) return Number(line.pcs || 0);
+  return Number(line.mts || line.qty || line.quantity || 0);
+}
+
+/**
+ * Gross (pre-discount) line amount. Trusts the client-computed value when present —
+ * it already carries fold adjustments (NETQTY/QTY) that can't be re-derived from
+ * qty × rate alone — and only falls back to qty × rate for legacy/incomplete payloads.
  */
 function lineAmount(line) {
-  const qty = Number(line.mts || line.qty || line.quantity || 0);
+  const provided = Number(line.amount);
+  if (Number.isFinite(provided) && provided !== 0) return Math.max(0, Number(provided.toFixed(2)));
+  const qty = lineQty(line);
   const rate = Number(line.rate || 0);
-  const discount = Number(line.discount || line.dis1Amt || 0);
-  const gross = qty * rate;
-  return Math.max(0, Number((gross - discount).toFixed(2)));
+  return Math.max(0, Number((qty * rate).toFixed(2)));
+}
+
+/** Post-discount, post-addAmt taxable contribution of one (already-amounted) line. */
+function lineTaxable(line) {
+  const amount = Number(line.amount || 0);
+  const dis1Amt = Number(line.dis1Amt || 0);
+  const dis2Amt = Number(line.dis2Amt || 0);
+  const legacyDiscount = Number(line.discount || 0);
+  const discount = dis1Amt || dis2Amt ? dis1Amt + dis2Amt : legacyDiscount;
+  const addAmt = Number(line.addAmt || 0);
+  return Math.max(0, Number((amount - discount + addAmt).toFixed(2)));
 }
 
 function recalcPurchaseTotals(items = [], {
@@ -32,7 +58,7 @@ function recalcPurchaseTotals(items = [], {
   // match what the user saw on screen before hitting Save.
   const signedAdjust = (amount, sign) => (sign === '+' ? Number(amount || 0) : -Number(amount || 0));
 
-  let taxable = mapped.reduce((s, it) => s + Number(it.amount || 0), 0);
+  let taxable = mapped.reduce((s, it) => s + lineTaxable(it), 0);
   taxable += signedAdjust(extras.discountAmt, extras.discountSign);
   taxable += signedAdjust(extras.lessAmt, extras.lessSign);
   taxable += signedAdjust(extras.addAmt, extras.addSign);
@@ -92,4 +118,4 @@ function recalcPurchaseTotals(items = [], {
   };
 }
 
-module.exports = { lineAmount, recalcPurchaseTotals };
+module.exports = { lineAmount, lineTaxable, recalcPurchaseTotals };

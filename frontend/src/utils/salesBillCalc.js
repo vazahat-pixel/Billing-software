@@ -49,10 +49,14 @@ export function calcSalesBillTotals(gridItems = [], footer = {}, header = {}, gs
   let totalAdd = 0;
   let totalLess = lineDiscounts;
 
-  // FOLD LESS is an addition to taxable value in textile billing (extra meters/fold value)
+  // FOLD LESS adjustment based on sign
   const foldLessAmt = money(footer.foldLess);
   if (foldLessAmt > 0) {
-    totalAdd = money(totalAdd + foldLessAmt);
+    if (footer.foldLessSign === '+') {
+      totalAdd = money(totalAdd + foldLessAmt);
+    } else {
+      totalLess = money(totalLess + foldLessAmt);
+    }
   }
 
   const rdAmt = money(footer.rdAmt);

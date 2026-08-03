@@ -24,17 +24,19 @@ import { resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
 import PcsBreakdownModal from './PcsBreakdownModal';
 
 const today = () => new Date().toISOString().split('T')[0];
-const DEFAULT_UNITS = ['MTRS', 'PCS', 'KGS', 'ROLL', 'NETQTY', 'QTY'];
+const DEFAULT_UNITS = ['PCS', 'KGS', 'NETQTY', 'QTY'];
 
-/** Per/Unit → which qty drives amount (Rate × qty). */
+/** Per/Unit → which qty drives amount (Rate × qty).
+ * For NETQTY: qty = full mts (gross). Fold reduction is applied at the AMOUNT level in computeLine.
+ */
 const lineQty = (row) => {
   const unit = String(row?.unit || 'MTRS').toUpperCase();
-  if (['PCS', 'PC', 'NOS', 'NO', 'QTY'].includes(unit)) {
+  if (['PCS', 'PC', 'NOS', 'NO'].includes(unit)) {
     return Number(row?.pcs || 0);
   }
-  if (unit === 'NETQTY') {
-    const foldLessLine = Number(row?.foldLessLine || 0);
-    return Math.max(0, Number((row?.mts || 0) - foldLessLine));
+  // NETQTY and QTY: use full mts as qty
+  if (unit === 'NETQTY' || unit === 'QTY') {
+    return Number(row?.mts || 0);
   }
   return Number(row?.mts || 0);
 };
@@ -51,6 +53,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     parties,
     items,
     addSale,
+    updateSale,
     deleteSale,
     sales,
     inventoryLots,
@@ -68,6 +71,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const [activeItemId, setActiveItemId] = useState('');
   const [mode, setMode] = useState('View');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
+  const locked = readOnly || mode === 'View';
   const [saving, setSaving] = useState(false);
   const [bootLoading, setBootLoading] = useState(false);
   const [saveNextActions, setSaveNextActions] = useState(null);
@@ -127,21 +131,67 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
     const rate = Number(row.saleRate) || 0;
     const qty = lineQty({ ...row, pcs, mts });
-    const autoAmt = qty > 0 && rate > 0 ? Number((qty * rate).toFixed(2)) : Number(row.amount || 0);
-    const amount = row._amountManual ? Number(row.amount || 0) : autoAmt;
+    const unit = String(row.unit || 'MTRS').toUpperCase();
+    const isNetQty = unit === 'NETQTY';
+    const isQtyOrPcs = unit === 'QTY' || unit === 'PCS';
 
+    // Step 1: Gross amount from qty × rate
+    const grossAmt = qty > 0 && rate > 0 ? Number((qty * rate).toFixed(2)) : Number(row.amount || 0);
+
+    // Step 2 (NETQTY only): Apply fold % reduction BEFORE discounts.
+    //   formula: y = grossAmt × (100 - fold) / 100
+    //            baseAmt = grossAmt - y
+    //   e.g. fold=95, grossAmt=6000 → y=300 → baseAmt=5700
+    let foldDeductionAmt = 0;
+    let foldLessAmt = 0;
+    let foldAddAmt = 0;
+    let baseAmt = grossAmt;
+    if (isNetQty && !row._amountManual) {
+      const fold = Number(row.fold || 0);
+      foldDeductionAmt = Number(((grossAmt * (100 - fold)) / 100).toFixed(2));
+      baseAmt = Number((grossAmt - foldDeductionAmt).toFixed(2));
+    }
+
+    // Step 2b (QTY / PCS unit only): Fold Less / Fold Add
+    //   Amount column always shows GROSS (Meter × Rate / Pcs * Rate).
+    //   baseAmt (used for discounts / GST / taxable) is adjusted by fold:
+    //     fold = 100 → no adjustment
+    //     fold < 100 → foldLessAmt = grossAmt × (100 − fold) / 100; baseAmt = grossAmt − foldLessAmt
+    //     fold > 100 → foldAddAmt  = grossAmt × (fold − 100) / 100; baseAmt = grossAmt + foldAddAmt
+    if (isQtyOrPcs && !row._amountManual) {
+      const fold = Number(row.fold ?? 100);
+      if (fold < 100) {
+        foldLessAmt = Number(((grossAmt * (100 - fold)) / 100).toFixed(2));
+        baseAmt = Number((grossAmt - foldLessAmt).toFixed(2));
+      } else if (fold > 100) {
+        foldAddAmt = Number(((grossAmt * (fold - 100)) / 100).toFixed(2));
+        baseAmt = Number((grossAmt + foldAddAmt).toFixed(2));
+      }
+    }
+
+    // Step 3: amount stored on row
+    //   QTY/PCS unit  → always GROSS (Meter/Pcs × Rate); fold adjustment shown in foldLessAmt / foldAddAmt
+    //   All others → fold-reduced base (or manual override)
+    const amount = row._amountManual
+      ? Number(row.amount || 0)
+      : isQtyOrPcs
+        ? grossAmt
+        : baseAmt;
+
+    // Step 4: Discounts applied on fold-adjusted baseAmt (QTY/PCS) or amount (others)
+    const discountBase = isQtyOrPcs ? baseAmt : amount;
     const dis1Per = Number(row.dis1Per) || 0;
     const dis1Amt = dis1Per > 0 && !row._dis1Manual
-      ? Number(((amount * dis1Per) / 100).toFixed(2))
+      ? Number(((discountBase * dis1Per) / 100).toFixed(2))
       : Number(row.dis1Amt) || 0;
 
     const dis2Per = Number(row.dis2Per) || 0;
     const dis2Amt = dis2Per > 0 && !row._dis2Manual
-      ? Number((((amount - dis1Amt) * dis2Per) / 100).toFixed(2))
+      ? Number((((discountBase - dis1Amt) * dis2Per) / 100).toFixed(2))
       : Number(row.dis2Amt) || 0;
 
     const addAmt = Number(row.addAmt) || 0;
-    const taxable = Number((amount - dis1Amt - dis2Amt + addAmt).toFixed(2));
+    const taxable = Number((discountBase - dis1Amt - dis2Amt + addAmt).toFixed(2));
 
     const gstPer = Number(row.gstPer) || 0;
     const gstAmt = gstPer > 0
@@ -153,6 +203,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       cut,
       pcs,
       mts,
+      foldDeductionAmt,
+      foldLessAmt,
+      foldAddAmt,
       amount,
       dis1Per,
       dis1Amt,
@@ -207,6 +260,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     mrp: 0,
     rdPer: 0,
     amount: 0,
+    foldDeductionAmt: 0,
+    foldLessAmt: 0,
+    foldAddAmt: 0,
     dis1Per: 0,
     dis1Amt: 0,
     dis2Per: 0,
@@ -218,7 +274,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   });
 
   const [gridItems, setGridItems] = useState([
-    { id: 1, itemId: '', itemName: '', desc: '', fold: 0, cut: 0, pcs: 0, mts: 0, saleRate: 0, unit: 'MTRS', mrp: 0, rdPer: 0, amount: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0, addAmt: 0, gstPer: 0, gstAmt: 0, pcsDetails: [] }
+    { id: 1, itemId: '', itemName: '', desc: '', fold: 0, cut: 0, pcs: 0, mts: 0, saleRate: 0, unit: 'MTRS', mrp: 0, rdPer: 0, amount: 0, foldDeductionAmt: 0, foldLessAmt: 0, foldAddAmt: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0, addAmt: 0, gstPer: 0, gstAmt: 0, pcsDetails: [] }
   ]);
   const [extraUnits, setExtraUnits] = useState([]);
   const [pcsBreakdown, setPcsBreakdown] = useState({ open: false, lineIdx: -1 });
@@ -343,6 +399,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       mrp: item.mrp || 0,
       rdPer: item.rdPer || 0,
       amount: item.amount || 0,
+      foldDeductionAmt: item.foldDeductionAmt || 0,
+      foldLessAmt: item.foldLessAmt || 0,
+      foldAddAmt: item.foldAddAmt || 0,
       dis1Per: item.dis1Per || 0,
       dis1Amt: item.dis1Amt || 0,
       dis2Per: item.dis2Per || 0,
@@ -413,6 +472,50 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       }
     }
   }, [header.billDate, footer.dueDays]);
+
+  // Auto-sync footer fold less/add values based on line items (only when in edit/add mode)
+  useEffect(() => {
+    if (locked) return;
+    let totalFoldLess = 0;
+    let totalFoldAdd = 0;
+    
+    gridItems.forEach(item => {
+      const u = String(item.unit || '').toUpperCase();
+      if (u === 'QTY' || u === 'PCS') {
+        totalFoldLess += Number(item.foldLessAmt || 0);
+        totalFoldAdd += Number(item.foldAddAmt || 0);
+      }
+    });
+
+    setFooter(prev => {
+      const updates = {};
+      
+      // Update FOLD LESS
+      if (totalFoldLess > 0) {
+        updates.foldLess = Number(totalFoldLess.toFixed(2));
+        updates.foldLessSign = '-';
+      } else {
+        updates.foldLess = 0;
+      }
+
+      // Update ADD
+      if (totalFoldAdd > 0) {
+        updates.addAmt = Number(totalFoldAdd.toFixed(2));
+        updates.addSign = '+';
+      } else {
+        updates.addAmt = 0;
+      }
+
+      // Avoid infinite loop / redundant state updates
+      if (prev.foldLess !== updates.foldLess || 
+          prev.foldLessSign !== updates.foldLessSign || 
+          prev.addAmt !== updates.addAmt || 
+          prev.addSign !== updates.addSign) {
+        return { ...prev, ...updates };
+      }
+      return prev;
+    });
+  }, [gridItems, locked]);
 
   const calculations = useMemo(
     () => calcSalesBillTotals(gridItems, footer, header, gstRates),
@@ -645,6 +748,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           mrp: Number(i.mrp || 0),
           rdPer: Number(i.rdPer || 0),
           amount: Number(i.amount || 0),
+          foldDeductionAmt: Number(i.foldDeductionAmt || 0),
+          foldLessAmt: Number(i.foldLessAmt || 0),
+          foldAddAmt: Number(i.foldAddAmt || 0),
           dis1Per: Number(i.dis1Per || 0),
           dis1Amt: Number(i.dis1Amt || 0),
           dis2Per: Number(i.dis2Per || 0),
@@ -665,11 +771,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
       const saved =
         mode === 'Edit' && selectedInvoiceId
-          ? (() => {
-              throw new Error(
-                'Posted sales bills cannot be edited. Cancel this bill (Delete) then create a new one — Edit would break stock and ledger.'
-              );
-            })()
+          ? await updateSale(selectedInvoiceId, payload)
           : await addSale(payload);
       const savedId = saved?._id || saved?.id;
       if (savedId) setSelectedInvoiceId(savedId);
@@ -733,8 +835,6 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     setMode('View');
   };
 
-  const locked = readOnly || mode === 'View';
-
   const partyOptions = useMemo(
     () =>
       parties
@@ -773,7 +873,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     const fromItems = items.map((i) => String(i.unit || '').trim().toUpperCase()).filter(Boolean);
     const fromLines = gridItems.map((r) => String(r.unit || '').trim().toUpperCase()).filter(Boolean);
     const all = [...DEFAULT_UNITS, ...fromItems, ...fromLines, ...extraUnits.map((u) => String(u).toUpperCase())];
-    return [...new Set(all)].map((u) => ({ value: u, label: u }));
+    return [...new Set(all)]
+      .filter((u) => u !== 'MTRS' && u !== 'ROLL')
+      .map((u) => ({ value: u, label: u }));
   }, [items, gridItems, extraUnits]);
 
   const handleCreateUnit = (name, idx) => {
@@ -1077,6 +1179,24 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                       <input type="number" className="classic-erp-input w-full text-center border-0" value={row.fold || ''} onChange={e => {
                         patchLine(idx, { fold: Number(e.target.value) });
                       }} disabled={locked} />
+                      {['QTY', 'PCS'].includes(String(row.unit || '').toUpperCase()) && (row.foldLessAmt || 0) > 0 && (
+                        <span
+                          className="block text-center font-mono leading-none"
+                          style={{ fontSize: 9, color: '#c2410c', paddingTop: 1 }}
+                          title={`Fold Less: ${(row.foldLessAmt || 0).toFixed(2)} deducted from Taxable`}
+                        >
+                          less {(row.foldLessAmt || 0).toFixed(2)}
+                        </span>
+                      )}
+                      {['QTY', 'PCS'].includes(String(row.unit || '').toUpperCase()) && (row.foldAddAmt || 0) > 0 && (
+                        <span
+                          className="block text-center font-mono leading-none"
+                          style={{ fontSize: 9, color: '#16a34a', paddingTop: 1 }}
+                          title={`Fold Add: ${(row.foldAddAmt || 0).toFixed(2)} added to Taxable`}
+                        >
+                          add {(row.foldAddAmt || 0).toFixed(2)}
+                        </span>
+                      )}
                     </td>
                     <td className="col-num">
                       <input
@@ -1168,8 +1288,19 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                         onChange={e => patchLine(idx, { amount: Number(e.target.value) || 0, _amountManual: true })}
                         disabled={locked}
                         placeholder="auto"
-                        title="Auto = Mts × Rate. Type to override."
+                        title={String(row.unit || '').toUpperCase() === 'NETQTY' && row.foldDeductionAmt > 0
+                          ? `Gross: ${(row.amount + row.foldDeductionAmt).toFixed(2)} − Fold(${100 - (row.fold || 0)}%): ${row.foldDeductionAmt.toFixed(2)} = Net: ${row.amount.toFixed(2)}`
+                          : 'Auto = Mts × Rate. Type to override.'}
                       />
+                      {String(row.unit || '').toUpperCase() === 'NETQTY' && row.foldDeductionAmt > 0 && (
+                        <span
+                          className="block text-right font-mono leading-none"
+                          style={{ fontSize: 9, color: '#c2410c', paddingRight: 2 }}
+                          title={`Fold deduction: Gross ${(row.amount + row.foldDeductionAmt).toFixed(2)} × ${100 - (row.fold || 0)}% = −${row.foldDeductionAmt.toFixed(2)}`}
+                        >
+                          fold −{row.foldDeductionAmt.toFixed(2)}
+                        </span>
+                      )}
                     </td>
                     <td className="col-pct">
                       <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.dis1Per || ''} onChange={e => patchLine(idx, { dis1Per: Number(e.target.value) || 0, _dis1Manual: false })} disabled={locked} placeholder="%" />
@@ -1486,6 +1617,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           </button>
           <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked || saving}>Cancel</button>
           <button className="classic-erp-btn" type="button" onClick={() => setMode('View')} disabled={readOnly || mode === 'View' || saving}>Find</button>
+          <button className="classic-erp-btn" type="button" onClick={() => setMode('Edit')} disabled={readOnly || mode !== 'View' || !selectedInvoiceId || saving}>Edit</button>
           <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || saving || !selectedInvoiceId}>Delete</button>
           <button className="classic-erp-btn btn-blue" type="button" onClick={handlePrint} disabled={!selectedInvoiceId && !initialData}>PDF / Print</button>
           <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>

@@ -10,12 +10,7 @@ router.use(guard('sales'));
 router.post('/', requirePermission('sales', 'create'), salesController.createInvoice);
 router.get('/', requirePermission('sales', 'read'), salesController.getSales);
 router.get('/:id', requirePermission('sales', 'read'), objectIdParam, salesController.getSale);
-router.put('/:id', requirePermission('sales', 'update'), objectIdParam, (req, res) => {
-  res.status(400).json({
-    success: false,
-    message: 'Posted sales invoices cannot be edited. Cancel the bill then create a new invoice.',
-  });
-});
+router.put('/:id', requirePermission('sales', 'update'), objectIdParam, salesController.updateInvoice);
 router.put('/:id/status', requirePermission('sales', 'update'), objectIdParam, saleStatus, salesController.updateSaleStatus);
 router.delete('/:id', requirePermission('sales', 'delete'), objectIdParam, salesController.deleteSale);
 

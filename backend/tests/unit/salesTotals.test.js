@@ -1,10 +1,22 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { lineAmount, recalcSalesTotals } = require('../../utils/salesTotals');
+const { lineAmount, lineTaxable, recalcSalesTotals } = require('../../utils/salesTotals');
 
 describe('salesTotals', () => {
-  it('lineAmount applies discount', () => {
-    assert.equal(lineAmount({ mts: 10, rate: 100, discount: 50 }), 950);
+  it('lineAmount is gross qty × rate (discount applied downstream in lineTaxable)', () => {
+    assert.equal(lineAmount({ mts: 10, rate: 100 }), 1000);
+  });
+
+  it('lineAmount uses pcs qty for PCS-unit lines', () => {
+    assert.equal(lineAmount({ unit: 'PCS', pcs: 5, mts: 0, rate: 100 }), 500);
+  });
+
+  it('lineTaxable applies discount to the gross amount', () => {
+    assert.equal(lineTaxable({ amount: 1000, discount: 50 }), 950);
+  });
+
+  it('lineTaxable sums both discount tiers and addAmt', () => {
+    assert.equal(lineTaxable({ amount: 1000, dis1Amt: 50, dis2Amt: 20, addAmt: 10 }), 940);
   });
 
   it('intra-state invoice totals', () => {

@@ -5,13 +5,39 @@ const {
 
 /**
  * Server-side sales totals — Stage 4 hardened (backend GST only).
+ * Mirrors SalesModal's computeLine() so saved/printed amounts match what the user entered.
+ */
+const PCS_UNITS = ['PCS', 'PC', 'NOS', 'NO'];
+
+/** Qty that drives Amount = Rate × Qty, matching SalesModal.jsx's lineQty(). */
+function lineQty(line) {
+  const unit = String(line.unit || 'MTRS').toUpperCase();
+  if (PCS_UNITS.includes(unit)) return Number(line.pcs || 0);
+  return Number(line.mts || line.qty || 0);
+}
+
+/**
+ * Gross (pre-discount) line amount. Trusts the client-computed value when present —
+ * it already carries fold adjustments (NETQTY/QTY) that can't be re-derived from
+ * qty × rate alone — and only falls back to qty × rate for legacy/incomplete payloads.
  */
 function lineAmount(line) {
-  const mts = Number(line.mts || line.qty || 0);
+  const provided = Number(line.amount);
+  if (Number.isFinite(provided) && provided !== 0) return Math.max(0, Number(provided.toFixed(2)));
+  const qty = lineQty(line);
   const rate = Number(line.rate || 0);
-  const discount = Number(line.discount || line.dis1Amt || 0);
-  const gross = mts * rate;
-  return Math.max(0, Number((gross - discount).toFixed(2)));
+  return Math.max(0, Number((qty * rate).toFixed(2)));
+}
+
+/** Post-discount, post-addAmt taxable contribution of one (already-amounted) line. */
+function lineTaxable(line) {
+  const amount = Number(line.amount || 0);
+  const dis1Amt = Number(line.dis1Amt || 0);
+  const dis2Amt = Number(line.dis2Amt || 0);
+  const legacyDiscount = Number(line.discount || 0);
+  const discount = dis1Amt || dis2Amt ? dis1Amt + dis2Amt : legacyDiscount;
+  const addAmt = Number(line.addAmt || 0);
+  return Math.max(0, Number((amount - discount + addAmt).toFixed(2)));
 }
 
 function recalcSalesTotals(items = [], {
@@ -28,7 +54,7 @@ function recalcSalesTotals(items = [], {
     return { ...it, amount };
   });
 
-  let taxable = mapped.reduce((s, it) => s + Number(it.amount || 0), 0);
+  let taxable = mapped.reduce((s, it) => s + lineTaxable(it), 0);
   const lessAmt = Number(extras.lessAmt || 0) + Number(extras.discountAmt || 0) + Number(extras.rdAmt || 0);
   const addAmt = Number(extras.addAmt || 0) + Number(extras.freight || 0);
   taxable = Math.max(0, Number((taxable - lessAmt + addAmt).toFixed(2)));
@@ -76,4 +102,4 @@ function recalcSalesTotals(items = [], {
   };
 }
 
-module.exports = { lineAmount, recalcSalesTotals };
+module.exports = { lineAmount, lineTaxable, recalcSalesTotals };

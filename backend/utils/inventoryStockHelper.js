@@ -197,11 +197,18 @@ async function pickLotForSale(session, companyId, itemId, needMts = 0, needPcs =
   return best;
 }
 
-async function reverseSaleStock(session, sale, companyId) {
+/**
+ * @param {{ revision?: string|number, remarks?: string }} [options] — `revision` (e.g. the
+ *   invoice's pre-update `updatedAt` timestamp) keeps the idempotency key unique per edit
+ *   cycle while still deduping retries of the *same* reversal attempt.
+ */
+async function reverseSaleStock(session, sale, companyId, options = {}) {
   if (sale.stockFromChallan) return;
+  const { revision, remarks } = options;
+  const keySuffix = revision != null ? `:${revision}` : '';
   for (const item of sale.items || []) {
     if (!item.lotId) continue;
-    const key = `SALE_CANCEL:${sale._id}:${item.lotId}`;
+    const key = `SALE_CANCEL:${sale._id}:${item.lotId}${keySuffix}`;
     const exists = await StockMovement.findOne({ companyId, idempotencyKey: key }).session(session);
     if (exists) continue;
     const lot = await loadLotForUpdate(session, item.lotId, companyId);
@@ -214,7 +221,7 @@ async function reverseSaleStock(session, sale, companyId) {
       type: 'SALE_CANCEL',
       referenceId: sale._id,
       idempotencyKey: key,
-      remarks: `Cancel Sales Inv: ${sale.invoiceNo}`,
+      remarks: remarks || `Cancel Sales Inv: ${sale.invoiceNo}`,
     });
   }
 }

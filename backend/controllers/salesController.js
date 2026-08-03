@@ -34,6 +34,17 @@ exports.getSale = asyncHandler(async (req, res) => {
   return ok(res, sale);
 });
 
+exports.updateInvoice = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const before = await salesService.getSaleById(req.params.id, req.companyId).catch(() => null);
+  const sales = await salesService.updateInvoice(req.params.id, req.companyId, req.body);
+  await auditService.log(req, 'UPDATE_INVOICE', 'Sales', sales._id, before, {
+    invoiceNo: sales.invoiceNo,
+    amount: sales.netAmount,
+  });
+  return ok(res, sales, 'Sales invoice updated');
+});
+
 exports.updateSaleStatus = asyncHandler(async (req, res) => {
   if (!req.companyId) throw AppError.forbidden('No company context');
   const sale = await salesService.updateSaleStatus(req.params.id, req.companyId, req.body.status);

@@ -35,6 +35,17 @@ exports.getPurchase = asyncHandler(async (req, res) => {
   return ok(res, purchase);
 });
 
+exports.updatePurchase = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const before = await purchaseService.getPurchaseById(req.params.id, req.companyId).catch(() => null);
+  const purchase = await purchaseService.updatePurchase(req.params.id, req.companyId, req.body);
+  await auditService.log(req, 'UPDATE_BILL', 'Purchase', purchase._id, before, {
+    invoiceNo: purchase.invoiceNo,
+    amount: purchase.netAmount,
+  });
+  return ok(res, purchase, 'Purchase updated');
+});
+
 exports.updatePurchaseStatus = asyncHandler(async (req, res) => {
   if (!req.companyId) throw AppError.forbidden('No company context');
   const purchase = await purchaseService.updatePurchaseStatus(req.params.id, req.companyId, req.body.status);

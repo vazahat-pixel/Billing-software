@@ -192,6 +192,217 @@ class SalesService {
     }
   }
 
+  /** Reverses the accounting entry linked to a sale (used by both edit and cancel). */
+  async _reverseAccountingEntry(sale, companyId, session) {
+    if (!sale.accountingEntryId) return;
+    const originalEntry = await AccountingEntry.findById(sale.accountingEntryId).session(session);
+    if (!originalEntry || originalEntry.isReversed) return;
+
+    const accountingService = require('./accountingService');
+    const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
+
+    const reversalLines = originalEntry.lines.map(line => ({
+      ledgerId: line.ledgerId,
+      ledgerName: line.ledgerName,
+      type: line.type === 'Dr' ? 'Cr' : 'Dr',
+      amount: line.amount,
+      narration: `Reversal: ${line.narration || ''}`
+    }));
+
+    const reversalEntry = await AccountingEntry.create([{
+      companyId,
+      entryNo,
+      entryDate: new Date(),
+      voucherType: 'SalesAuto',
+      refType: 'SalesInvoice',
+      refId: sale._id,
+      lines: reversalLines,
+      narration: `Reversal of Sales Invoice #${sale.invoiceNo}`,
+      isReversed: false
+    }], { session });
+
+    await AccountingEntry.findByIdAndUpdate(
+      originalEntry._id,
+      { isReversed: true, reversalEntryId: reversalEntry[0]._id },
+      { session }
+    );
+  }
+
+  /**
+   * Edit a posted sales invoice in place — same invoice number. Reverses the old
+   * stock/accounting effects, revalidates + recalculates totals from the new items,
+   * then re-applies stock deduction and posts a fresh accounting entry.
+   */
+  async updateInvoice(id, companyId, salesData) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const sale = await Sales.findOne({ _id: id, companyId }).session(session);
+      if (!sale) throw new Error('Sale not found');
+      if (sale.status === 'cancelled') {
+        throw new Error('Cannot edit a cancelled invoice. Create a new invoice instead.');
+      }
+      if (Number(sale.paidAmount || 0) > 0.01) {
+        throw new Error(
+          'Cannot edit invoice with receipts applied. Reverse cash/bank receipts against this bill first.'
+        );
+      }
+
+      // Snapshot before any mutation — used to key this edit's stock movements uniquely.
+      const revision = sale.updatedAt ? sale.updatedAt.getTime() : Date.now();
+
+      const { reverseSaleStock } = require('../utils/inventoryStockHelper');
+      await this._reverseAccountingEntry(sale, companyId, session);
+      await reverseSaleStock(session, sale, companyId, {
+        revision,
+        remarks: `Edit Sales Inv: ${sale.invoiceNo}`,
+      });
+
+      const { items } = salesData;
+      const {
+        _id: _dropId,
+        id: _dropId2,
+        localId: _dropLocal,
+        accountingEntryId: _dropAcct,
+        invoiceNo: _dropInvoiceNo,
+        companyId: _dropCompanyId,
+        createdAt: _dropCreatedAt,
+        status: _dropStatus,
+        ...clean
+      } = salesData || {};
+      const safeItems = Array.isArray(items)
+        ? items.map((it) => {
+            const { _id, id, lotId, ...rest } = it || {};
+            return rest; // stock is re-picked fresh below
+          })
+        : items;
+
+      const Party = require('../models/Party');
+      const Item = require('../models/Item');
+      const { assertRefs } = require('../utils/refIntegrity');
+      const { recalcSalesTotals } = require('../utils/salesTotals');
+
+      await assertRefs(companyId, [
+        { Model: Party, id: clean.customerId, label: 'Customer' },
+        ...((safeItems || []).map((it) => ({ Model: Item, id: it.itemId, label: 'Item' }))),
+      ]);
+
+      const { assertBusinessValid } = require('./validateBusinessService');
+      await assertBusinessValid({
+        module: 'sales',
+        action: 'update',
+        companyId,
+        payload: { ...clean, _id: id, items: safeItems },
+      });
+
+      let gstRate = clean.gstRate;
+      if (gstRate == null && items?.[0]?.itemId) {
+        const it = await Item.findOne({ _id: items[0].itemId, companyId }).select('gstRate').session(session);
+        gstRate = it?.gstRate ?? 5;
+      }
+      const customer = await Party.findOne({ _id: clean.customerId, companyId }).session(session);
+      let companyGstin = '';
+      let companyStateCode = '';
+      try {
+        const gstConfigService = require('./gstConfigService');
+        const cfg = await gstConfigService.getOrCreate(companyId);
+        companyGstin = cfg.gstin;
+        companyStateCode = cfg.stateCode;
+        await gstConfigService.assertPeriodOpen(companyId, clean.date || sale.date || new Date());
+      } catch (err) {
+        if (err.message && err.message.includes('GST period')) throw err;
+      }
+
+      const totals = recalcSalesTotals(safeItems || [], {
+        gstType: clean.gstType || 'CGST+SGST',
+        gstRate: gstRate ?? 5,
+        extras: clean,
+        companyGstin,
+        companyStateCode,
+        partyGstin: customer?.gstin,
+        partyStateCode: customer?.stateCode,
+      });
+
+      Object.assign(sale, clean, {
+        items: totals.items,
+        taxableAmount: totals.taxableAmount,
+        gstType: totals.gstType,
+        cgst: totals.cgst,
+        sgst: totals.sgst,
+        igst: totals.igst,
+        gstAmount: totals.gstAmount,
+        netAmount: totals.netAmount,
+      });
+      if (totals.cess != null) sale.cess = totals.cess;
+      sale.status = 'active';
+      await sale.save({ session });
+
+      if (!sale.stockFromChallan) {
+        const { applyLotMovement, loadLotForUpdate, pickLotForSale } = require('../utils/inventoryStockHelper');
+        for (const item of sale.items || []) {
+          const qty = Number(item.mts || 0) || Number(item.pcs || 0);
+          if (qty <= 0 && !item.itemId && !item.desc) continue;
+          let lot;
+          if (item.lotId) {
+            lot = await loadLotForUpdate(session, item.lotId, companyId);
+          } else {
+            if (!item.itemId) {
+              throw new Error('Item is required on every sales line for stock deduction');
+            }
+            lot = await pickLotForSale(session, companyId, item.itemId, item.mts || 0, item.pcs || 0);
+            item.lotId = lot._id;
+          }
+          await applyLotMovement({
+            session,
+            lot,
+            companyId,
+            deltaMts: -(item.mts || 0),
+            deltaPcs: -(item.pcs || 0),
+            type: 'SALE',
+            referenceId: sale._id,
+            idempotencyKey: `SALE:${sale._id}:${lot._id}:${revision}`,
+            remarks: `Sales Inv (Edit): ${sale.invoiceNo}`,
+          });
+        }
+        sale.items = sale.items;
+        await sale.save({ session });
+      }
+
+      const accountingService = require('./accountingService');
+      const entry = await accountingService.onSalesInvoicePost(sale, session);
+      sale.accountingEntryId = entry?._id;
+      await sale.save({ session });
+
+      try {
+        const outstandingEngine = require('./outstandingEngineService');
+        await outstandingEngine.syncBillFromSales(companyId, sale, session);
+      } catch (syncErr) {
+        console.warn('BillSettlement sync after sales update:', syncErr.message);
+      }
+
+      await session.commitTransaction();
+      try {
+        const eventBus = require('../events/eventBus');
+        eventBus.emitSafe('sales.updated', {
+          companyId: sale.companyId?.toString?.() || sale.companyId,
+          salesId: sale._id?.toString?.(),
+          invoiceNo: sale.invoiceNo,
+          netAmount: sale.netAmount,
+          customerId: sale.customerId?.toString?.() || sale.customerId,
+        });
+      } catch {
+        /* event bus optional */
+      }
+      return sale;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
   async getSales(companyId, { page = 1, limit = 100, startDate, endDate, status } = {}) {
     const query = { companyId };
     if (status) query.status = status;
@@ -271,39 +482,7 @@ class SalesService {
       }
 
       // Reverse journals + stock for any non-cancelled status (including paid)
-      if (sale.accountingEntryId) {
-        const originalEntry = await AccountingEntry.findById(sale.accountingEntryId).session(session);
-        if (originalEntry && !originalEntry.isReversed) {
-          const accountingService = require('./accountingService');
-          const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
-
-          const reversalLines = originalEntry.lines.map(line => ({
-            ledgerId: line.ledgerId,
-            ledgerName: line.ledgerName,
-            type: line.type === 'Dr' ? 'Cr' : 'Dr',
-            amount: line.amount,
-            narration: `Reversal: ${line.narration || ''}`
-          }));
-
-          const reversalEntry = await AccountingEntry.create([{
-            companyId,
-            entryNo,
-            entryDate: new Date(),
-            voucherType: 'SalesAuto',
-            refType: 'SalesInvoice',
-            refId: sale._id,
-            lines: reversalLines,
-            narration: `Reversal of Sales Invoice #${sale.invoiceNo}`,
-            isReversed: false
-          }], { session });
-
-          await AccountingEntry.findByIdAndUpdate(
-            originalEntry._id,
-            { isReversed: true, reversalEntryId: reversalEntry[0]._id },
-            { session }
-          );
-        }
-      }
+      await this._reverseAccountingEntry(sale, companyId, session);
 
       if (!sale.stockFromChallan) {
         const { reverseSaleStock } = require('../utils/inventoryStockHelper');

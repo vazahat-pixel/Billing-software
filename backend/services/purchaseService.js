@@ -210,6 +210,237 @@ class PurchaseService {
     }
   }
 
+  /** Reverses the accounting entry linked to a purchase (used by both edit and cancel). */
+  async _reverseAccountingEntry(purchase, companyId, session) {
+    if (!purchase.accountingEntryId) return;
+    const originalEntry = await AccountingEntry.findById(purchase.accountingEntryId).session(session);
+    if (!originalEntry || originalEntry.isReversed) return;
+
+    const accountingService = require('./accountingService');
+    const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
+
+    const reversalLines = originalEntry.lines.map(line => ({
+      ledgerId: line.ledgerId,
+      ledgerName: line.ledgerName,
+      type: line.type === 'Dr' ? 'Cr' : 'Dr',
+      amount: line.amount,
+      narration: `Reversal: ${line.narration || ''}`
+    }));
+
+    const reversalEntry = await AccountingEntry.create([{
+      companyId,
+      entryNo,
+      entryDate: new Date(),
+      voucherType: 'PurchaseAuto',
+      refType: 'PurchaseBill',
+      refId: purchase._id,
+      lines: reversalLines,
+      narration: `Reversal of Purchase Bill #${purchase.invoiceNo}`,
+      isReversed: false
+    }], { session });
+
+    await AccountingEntry.findByIdAndUpdate(
+      originalEntry._id,
+      { isReversed: true, reversalEntryId: reversalEntry[0]._id },
+      { session }
+    );
+  }
+
+  /**
+   * Edit a posted purchase bill in place — same invoice number. Reverses the old
+   * lots/accounting effects (blocked if any lot was already consumed by a sale),
+   * revalidates + recalculates totals from the new items, then re-creates lots and
+   * posts a fresh accounting entry.
+   */
+  async updatePurchase(id, companyId, purchaseData) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const purchase = await Purchase.findOne({ _id: id, companyId }).session(session);
+      if (!purchase) throw new Error('Purchase not found');
+      if (purchase.status === 'cancelled') {
+        throw new Error('Cannot edit a cancelled purchase. Create a new purchase instead.');
+      }
+      if (Number(purchase.paidAmount || 0) > 0.01) {
+        throw new Error(
+          'Cannot edit bill with payments applied. Reverse cash/bank payments against this bill first.'
+        );
+      }
+
+      await this._reverseAccountingEntry(purchase, companyId, session);
+
+      // Throws if any lot from this purchase was already consumed by a sale —
+      // editing item quantities/rates would corrupt that sale's stock trail.
+      const { reversePurchaseStock } = require('../utils/inventoryStockHelper');
+      await reversePurchaseStock(session, purchase, companyId);
+
+      const {
+        _id: _dropId,
+        id: _dropId2,
+        localId: _dropLocal,
+        accountingEntryId: _dropAcct,
+        invoiceNo: _dropInvoiceNo,
+        companyId: _dropCompanyId,
+        createdAt: _dropCreatedAt,
+        status: _dropStatus,
+        ...clean
+      } = purchaseData || {};
+      if (Array.isArray(clean.items)) {
+        clean.items = clean.items.map((it) => {
+          const { _id, id, lotId, ...rest } = it || {};
+          return rest; // lots are recreated fresh below
+        });
+      }
+
+      const Party = require('../models/Party');
+      const Item = require('../models/Item');
+      const { assertRefs } = require('../utils/refIntegrity');
+      await assertRefs(companyId, [
+        { Model: Party, id: clean.supplierId, label: 'Supplier' },
+        ...((clean.items || []).map((it) => ({ Model: Item, id: it.itemId, label: 'Item' }))),
+      ]);
+
+      const { assertBusinessValid } = require('./validateBusinessService');
+      await assertBusinessValid({
+        module: 'purchase',
+        action: 'update',
+        companyId,
+        payload: { ...clean, _id: id },
+      });
+
+      const { recalcPurchaseTotals } = require('../utils/purchaseTotals');
+      const supplier = await Party.findOne({ _id: clean.supplierId, companyId }).session(session);
+      let companyGstin = '';
+      let companyStateCode = '';
+      try {
+        const gstConfigService = require('./gstConfigService');
+        const cfg = await gstConfigService.getOrCreate(companyId);
+        companyGstin = cfg.gstin;
+        companyStateCode = cfg.stateCode;
+        await gstConfigService.assertPeriodOpen(companyId, clean.date || purchase.date || new Date());
+      } catch (err) {
+        if (err.message && err.message.includes('GST period')) throw err;
+      }
+      let gstRate = clean.gstRate || clean.gstPer;
+      if (gstRate == null && clean.items?.[0]?.itemId) {
+        const it = await Item.findOne({ _id: clean.items[0].itemId, companyId }).select('gstRate').session(session);
+        gstRate = it?.gstRate ?? 5;
+      }
+      const totals = recalcPurchaseTotals(clean.items || [], {
+        gstType: clean.gstType || 'CGST+SGST',
+        gstRate: gstRate ?? 5,
+        extras: clean,
+        companyGstin,
+        companyStateCode,
+        partyGstin: supplier?.gstin,
+        partyStateCode: supplier?.stateCode,
+        reverseCharge: clean.reverseCharge === 'Yes' || clean.reverseCharge === true || !!clean.rcmCharge,
+      });
+
+      Object.assign(purchase, clean, {
+        items: totals.items,
+        taxableAmount: totals.taxableAmount,
+        gstType: totals.gstType,
+        cgst: totals.cgst,
+        sgst: totals.sgst,
+        igst: totals.igst,
+        gstAmount: totals.gstAmount,
+        netAmount: totals.netAmount,
+        tdsAmount: totals.tdsAmount,
+        tcsAmt: totals.tcsAmt,
+        reverseCharge: totals.reverseCharge ? 'Yes' : 'No',
+        rcmCharge: !!totals.reverseCharge,
+      });
+      purchase.status = 'active';
+
+      // Fresh lot IDs for the (possibly changed) item lines
+      for (let i = 0; i < purchase.items.length; i += 1) {
+        const timestamp = Date.now();
+        const random = Math.floor(Math.random() * 9000) + 1000;
+        purchase.items[i].lotId = `LOT-${timestamp}-${i}-${random}`;
+      }
+      await purchase.save({ session });
+
+      for (const item of purchase.items) {
+        const lot = new InventoryLot({
+          lotId: item.lotId,
+          itemId: item.itemId,
+          purchaseId: purchase._id,
+          totalPcs: item.pcs || 0,
+          remainingPcs: item.pcs || 0,
+          totalMtrs: item.mts || 0,
+          remainingMtrs: item.mts || 0,
+          rate: item.rate || 0,
+          warehouseId: purchase.warehouseId || null,
+          status: 'Available',
+          source: 'purchase',
+          companyId: purchase.companyId,
+        });
+        await lot.save({ session });
+
+        const movement = new StockMovement({
+          lotId: lot._id,
+          type: 'PURCHASE',
+          qtyPcs: item.pcs || 0,
+          qtyMtrs: item.mts || 0,
+          balanceMtrs: item.mts || 0,
+          referenceId: purchase._id,
+          idempotencyKey: `PURCHASE:${purchase._id}:${item.lotId}`,
+          remarks: `Purchase Bill (Edit): ${purchase.invoiceNo}`,
+          companyId: purchase.companyId,
+        });
+        await movement.save({ session });
+      }
+
+      const accountingService = require('./accountingService');
+      const entry = await accountingService.onPurchaseBillPost(purchase, session);
+      purchase.accountingEntryId = entry?._id;
+      await purchase.save({ session });
+
+      try {
+        const outstandingEngine = require('./outstandingEngineService');
+        await outstandingEngine.syncBillFromPurchase(companyId, purchase, session);
+      } catch (syncErr) {
+        console.warn('BillSettlement sync after purchase update:', syncErr.message);
+      }
+
+      await session.commitTransaction();
+      try {
+        const eventBus = require('../events/eventBus');
+        eventBus.emitSafe('purchase.updated', {
+          companyId: purchase.companyId?.toString?.() || purchase.companyId,
+          purchaseId: purchase._id?.toString?.(),
+          invoiceNo: purchase.invoiceNo,
+          netAmount: purchase.netAmount,
+          supplierId: purchase.supplierId?.toString?.() || purchase.supplierId,
+        });
+      } catch {
+        /* event bus optional */
+      }
+      return purchase;
+    } catch (error) {
+      await session.abortTransaction();
+      if (error && error.code === 11000) {
+        const AppError = require('../utils/AppError');
+        const fields = Object.keys(error.keyPattern || {});
+        const field = fields[0] || '';
+        if (field === 'lotId' || fields.includes('lotId')) {
+          throw AppError.conflict('Stock lot conflict while saving. Please click Save once more.');
+        }
+        if (fields.includes('idempotencyKey')) {
+          throw AppError.conflict('This purchase update was already processed. Refresh and try again.');
+        }
+        throw AppError.conflict(
+          'This purchase could not be updated because a duplicate record already exists.'
+        );
+      }
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
   async getPurchases(companyId, { page = 1, limit = 100, startDate, endDate, status } = {}) {
     const query = { companyId };
     if (status) query.status = status;
@@ -287,39 +518,7 @@ class PurchaseService {
       }
 
       // Reverse journals + stock for any non-cancelled status (including paid)
-      if (purchase.accountingEntryId) {
-        const originalEntry = await AccountingEntry.findById(purchase.accountingEntryId).session(session);
-        if (originalEntry && !originalEntry.isReversed) {
-          const accountingService = require('./accountingService');
-          const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
-
-          const reversalLines = originalEntry.lines.map(line => ({
-            ledgerId: line.ledgerId,
-            ledgerName: line.ledgerName,
-            type: line.type === 'Dr' ? 'Cr' : 'Dr',
-            amount: line.amount,
-            narration: `Reversal: ${line.narration || ''}`
-          }));
-
-          const reversalEntry = await AccountingEntry.create([{
-            companyId,
-            entryNo,
-            entryDate: new Date(),
-            voucherType: 'PurchaseAuto',
-            refType: 'PurchaseBill',
-            refId: purchase._id,
-            lines: reversalLines,
-            narration: `Reversal of Purchase Bill #${purchase.invoiceNo}`,
-            isReversed: false
-          }], { session });
-
-          await AccountingEntry.findByIdAndUpdate(
-            originalEntry._id,
-            { isReversed: true, reversalEntryId: reversalEntry[0]._id },
-            { session }
-          );
-        }
-      }
+      await this._reverseAccountingEntry(purchase, companyId, session);
 
       const { reversePurchaseStock } = require('../utils/inventoryStockHelper');
       await reversePurchaseStock(session, purchase, companyId);

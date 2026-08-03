@@ -25,7 +25,7 @@ import { resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
 import { money, lineTaxable } from '../../utils/salesBillCalc';
 
 const today = () => new Date().toISOString().split('T')[0];
-const DEFAULT_UNITS = ['MTRS', 'PCS', 'KGS', 'ROLL', 'NETQTY'];
+const DEFAULT_UNITS = ['PCS', 'KGS', 'NETQTY', 'QTY'];
 
 const blankLine = () => ({
   id: Date.now(),
@@ -39,6 +39,9 @@ const blankLine = () => ({
   rate: 0,
   unit: 'MTRS',
   amount: 0,
+  foldDeductionAmt: 0,
+  foldLessAmt: 0,
+  foldAddAmt: 0,
   dis1Per: 0,
   dis1Amt: 0,
   dis2Per: 0,
@@ -57,12 +60,13 @@ const PurchaseModal = ({
   onOpenJobIssue,
   onOpenMillIssue
 }) => {
-  const { parties, items, purchases, addPurchase, deletePurchase, fetchParties, fetchItems, fetchPurchases, plan, user } = useStore();
+  const { parties, items, purchases, addPurchase, updatePurchase, deletePurchase, fetchParties, fetchItems, fetchPurchases, plan, user } = useStore();
   const { bundle } = useConfig();
   const companySettings = useConfigStore((s) => s.companySettings);
   const { showBroker } = resolvePurchaseFieldVisibility(bundle, user, plan);
   const [mode, setMode] = useState('View');
   const [selectedPurchaseId, setSelectedPurchaseId] = useState('');
+  const locked = readOnly || mode === 'View';
   const [error, setError] = useState('');
   const [saveNextActions, setSaveNextActions] = useState(null);
   const [printInvoiceId, setPrintInvoiceId] = useState(null);
@@ -99,13 +103,19 @@ const PurchaseModal = ({
     onClose,
   });
 
-  const [gridItems, setGridItems] = useState([blankLine()]);
+  const [gridItems, setGridItems] = useState([
+    { id: 1, itemId: '', itemName: '', desc: '', fold: 0, cut: 0, pcs: 0, mts: 0, rate: 0, unit: 'MTRS', amount: 0, foldDeductionAmt: 0, foldLessAmt: 0, foldAddAmt: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0, addAmt: 0, gstPer: 0, gstAmt: 0 }
+  ]);
   const [extraUnits, setExtraUnits] = useState([]);
 
   const lineQty = (row) => {
     const unit = String(row?.unit || 'MTRS').toUpperCase();
-    if (['PCS', 'PC', 'NOS', 'NO', 'QTY'].includes(unit)) {
+    if (['PCS', 'PC', 'NOS', 'NO'].includes(unit)) {
       return Number(row?.pcs || 0);
+    }
+    // NETQTY and QTY: use full mts as qty
+    if (unit === 'NETQTY' || unit === 'QTY') {
+      return Number(row?.mts || 0);
     }
     return Number(row?.mts || 0);
   };
@@ -127,21 +137,59 @@ const PurchaseModal = ({
 
     const rate = Number(row.rate) || 0;
     const qty = lineQty({ ...row, pcs, mts });
-    const autoAmt = qty > 0 && rate > 0 ? Number((qty * rate).toFixed(2)) : Number(row.amount || 0);
-    const amount = row._amountManual ? Number(row.amount || 0) : autoAmt;
+    const unit = String(row.unit || 'MTRS').toUpperCase();
+    const isNetQty = unit === 'NETQTY';
+    const isQty = unit === 'QTY';
 
+    // Step 1: Gross amount from qty × rate
+    const grossAmt = qty > 0 && rate > 0 ? Number((qty * rate).toFixed(2)) : Number(row.amount || 0);
+
+    // Step 2 (NETQTY only): Apply fold % reduction BEFORE discounts.
+    let foldDeductionAmt = 0;
+    let foldLessAmt = 0;
+    let foldAddAmt = 0;
+    let baseAmt = grossAmt;
+    if (isNetQty && !row._amountManual) {
+      const fold = Number(row.fold || 0);
+      foldDeductionAmt = Number(((grossAmt * (100 - fold)) / 100).toFixed(2));
+      baseAmt = Number((grossAmt - foldDeductionAmt).toFixed(2));
+    }
+
+    // Step 2b (QTY unit only): Fold Less / Fold Add
+    if (isQty && !row._amountManual) {
+      const fold = Number(row.fold ?? 100);
+      if (fold < 100) {
+        foldLessAmt = Number(((grossAmt * (100 - fold)) / 100).toFixed(2));
+        baseAmt = Number((grossAmt - foldLessAmt).toFixed(2));
+      } else if (fold > 100) {
+        foldAddAmt = Number(((grossAmt * (fold - 100)) / 100).toFixed(2));
+        baseAmt = Number((grossAmt + foldAddAmt).toFixed(2));
+      }
+    }
+
+    // Step 3: amount stored on row
+    //   QTY unit  → always GROSS (Meter × Rate)
+    //   NETQTY unit → net (foldDeductionAmt already subtracted)
+    const amount = row._amountManual
+      ? Number(row.amount || 0)
+      : isQty
+        ? grossAmt
+        : baseAmt;
+
+    // Step 4: Discounts applied on fold-adjusted baseAmt (QTY) or amount (others)
+    const discountBase = isQty ? baseAmt : amount;
     const dis1Per = Number(row.dis1Per) || 0;
     const dis1Amt = dis1Per > 0 && !row._dis1Manual
-      ? Number(((amount * dis1Per) / 100).toFixed(2))
+      ? Number(((discountBase * dis1Per) / 100).toFixed(2))
       : Number(row.dis1Amt) || 0;
 
     const dis2Per = Number(row.dis2Per) || 0;
     const dis2Amt = dis2Per > 0 && !row._dis2Manual
-      ? Number((((amount - dis1Amt) * dis2Per) / 100).toFixed(2))
+      ? Number((((discountBase - dis1Amt) * dis2Per) / 100).toFixed(2))
       : Number(row.dis2Amt) || 0;
 
     const addAmt = Number(row.addAmt) || 0;
-    const taxable = Number((amount - dis1Amt - dis2Amt + addAmt).toFixed(2));
+    const taxable = Number((discountBase - dis1Amt - dis2Amt + addAmt).toFixed(2));
 
     const gstPer = Number(row.gstPer) || 0;
     const gstAmt = gstPer > 0
@@ -154,6 +202,9 @@ const PurchaseModal = ({
       pcs,
       mts,
       amount,
+      foldDeductionAmt,
+      foldLessAmt,
+      foldAddAmt,
       dis1Per,
       dis1Amt,
       dis2Per,
@@ -206,7 +257,7 @@ const PurchaseModal = ({
       fetchPurchases(),
       warehousesApi.list().then((list) => setWarehouses(Array.isArray(list) ? list : [])).catch(() => setWarehouses([])),
     ])
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => {
         if (!cancelled) setBootLoading(false);
       });
@@ -227,13 +278,13 @@ const PurchaseModal = ({
     const t = setTimeout(() => {
       if (suppBillRef.current && !locked) {
         suppBillRef.current.focus();
-        try { suppBillRef.current.select(); } catch {}
+        try { suppBillRef.current.select(); } catch { }
       } else if (modalContainerRef.current) {
         const focusables = getFocusableElements(modalContainerRef.current);
         if (focusables.length > 0) {
           focusables[0].focus();
           if (typeof focusables[0].select === 'function') {
-            try { focusables[0].select(); } catch {}
+            try { focusables[0].select(); } catch { }
           }
         }
       }
@@ -276,6 +327,9 @@ const PurchaseModal = ({
       rate: item.rate || 0,
       unit: item.unit || item.itemId?.unit || 'MTRS',
       amount: item.amount || 0,
+      foldDeductionAmt: item.foldDeductionAmt || 0,
+      foldLessAmt: item.foldLessAmt || 0,
+      foldAddAmt: item.foldAddAmt || 0,
       dis1Per: item.dis1Per || 0,
       dis1Amt: item.dis1Amt || 0,
       dis2Per: item.dis2Per || 0,
@@ -402,6 +456,50 @@ const PurchaseModal = ({
     const first = warehouses[0]?._id || warehouses[0]?.id;
     if (first) setHeader((h) => ({ ...h, warehouseId: first }));
   }, [isOpen, readOnly, mode, warehouses, header.warehouseId]);
+
+  // Auto-sync footer fold less/add values based on line items (only when in edit/add mode)
+  useEffect(() => {
+    if (locked) return;
+    let totalFoldLess = 0;
+    let totalFoldAdd = 0;
+    
+    gridItems.forEach(item => {
+      const u = String(item.unit || '').toUpperCase();
+      if (u === 'QTY') {
+        totalFoldLess += Number(item.foldLessAmt || 0);
+        totalFoldAdd += Number(item.foldAddAmt || 0);
+      }
+    });
+
+    setFooter(prev => {
+      const updates = {};
+      
+      // Update LESS
+      if (totalFoldLess > 0) {
+        updates.lessAmt = Number(totalFoldLess.toFixed(2));
+        updates.lessSign = '-';
+      } else {
+        updates.lessAmt = 0;
+      }
+
+      // Update ADD
+      if (totalFoldAdd > 0) {
+        updates.addAmt = Number(totalFoldAdd.toFixed(2));
+        updates.addSign = '+';
+      } else {
+        updates.addAmt = 0;
+      }
+
+      // Avoid infinite loop / redundant state updates
+      if (prev.lessAmt !== updates.lessAmt || 
+          prev.lessSign !== updates.lessSign || 
+          prev.addAmt !== updates.addAmt || 
+          prev.addSign !== updates.addSign) {
+        return { ...prev, ...updates };
+      }
+      return prev;
+    });
+  }, [gridItems, locked]);
 
   const handleCreateAccount = (search) => setInlineModal({ type: 'account', target: 'party', initialData: { name: search, group: 'SUNDRY CREDITORS' } });
   const handleCreateBroker = (search) => setInlineModal({ type: 'account', target: 'broker', initialData: { name: search, group: 'BROKER' } });
@@ -558,10 +656,10 @@ const PurchaseModal = ({
         warehouseId: header.warehouseId || null,
         billAttachment: billAttachment
           ? {
-              fileName: billAttachment.fileName || '',
-              mimeType: billAttachment.mimeType || '',
-              extractedAt: billAttachment.extractedAt || null,
-            }
+            fileName: billAttachment.fileName || '',
+            mimeType: billAttachment.mimeType || '',
+            extractedAt: billAttachment.extractedAt || null,
+          }
           : undefined,
         narration: footer.remarks,
         discountAmt: footer.discountAmt,
@@ -588,7 +686,9 @@ const PurchaseModal = ({
           mts: Number(i.mts || 0),
           rate: Number(i.rate || 0),
           unit: i.unit || 'MTRS',
-          amount: Number(i.amount || 0),
+          foldDeductionAmt: Number(i.foldDeductionAmt || 0),
+          foldLessAmt: Number(i.foldLessAmt || 0),
+          foldAddAmt: Number(i.foldAddAmt || 0),
           dis1Per: Number(i.dis1Per || 0),
           dis1Amt: Number(i.dis1Amt || 0),
           dis2Per: Number(i.dis2Per || 0),
@@ -608,11 +708,7 @@ const PurchaseModal = ({
 
       const saved =
         mode === 'Edit' && selectedPurchaseId
-          ? (() => {
-              throw new Error(
-                'Posted purchase bills cannot be edited. Cancel this bill (Delete) then create a new one — Edit would break stock and ledger.'
-              );
-            })()
+          ? await updatePurchase(selectedPurchaseId, payload)
           : await addPurchase(payload);
       const savedId = saved?._id || saved?.id;
       if (savedId) {
@@ -650,14 +746,14 @@ const PurchaseModal = ({
       confirmLabel: 'Delete',
       danger: true,
     }))) return;
-      try {
-        await deletePurchase(id);
-        toast.success('Purchase bill cancelled!');
-        handleNew();
-        fetchPurchases();
-      } catch (err) {
-        toast.error(err, { fallback: 'Failed to delete purchase bill' });
-      }
+    try {
+      await deletePurchase(id);
+      toast.success('Purchase bill cancelled!');
+      handleNew();
+      fetchPurchases();
+    } catch (err) {
+      toast.error(err, { fallback: 'Failed to delete purchase bill' });
+    }
   };
 
   const handleCancel = () => {
@@ -667,8 +763,6 @@ const PurchaseModal = ({
     }
     setMode('View');
   };
-
-  const locked = readOnly || mode === 'View';
 
   const vendorOptions = useMemo(
     () =>
@@ -714,7 +808,9 @@ const PurchaseModal = ({
     const fromItems = items.map((i) => String(i.unit || '').trim().toUpperCase()).filter(Boolean);
     const fromLines = gridItems.map((r) => String(r.unit || '').trim().toUpperCase()).filter(Boolean);
     const all = [...DEFAULT_UNITS, ...fromItems, ...fromLines, ...extraUnits.map((u) => String(u).toUpperCase())];
-    return [...new Set(all)].map((u) => ({ value: u, label: u }));
+    return [...new Set(all)]
+      .filter((u) => u !== 'MTRS' && u !== 'ROLL')
+      .map((u) => ({ value: u, label: u }));
   }, [items, gridItems, extraUnits]);
 
   const handleCreateUnit = (name, idx) => {
@@ -796,465 +892,471 @@ const PurchaseModal = ({
 
   return (
     <>
-    <Modal
-      isOpen={isOpen && !win.isMinimized}
-      onClose={onClose}
-      bare
-      style={win.modalStyle}
-      className={win.modalClassName}
-      inertBackdrop={win.inertBackdrop}
-    >
-      <div
-        className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-card)] erp-bill-window-shell relative"
-        onPointerDown={win.onShellPointerDown}
+      <Modal
+        isOpen={isOpen && !win.isMinimized}
+        onClose={onClose}
+        bare
+        style={win.modalStyle}
+        className={win.modalClassName}
+        inertBackdrop={win.inertBackdrop}
       >
-      <div className="classic-erp-window erp-density erp-sales-bill-compact flex flex-col flex-1 min-h-0 overflow-hidden !max-h-none !h-auto">
-        <ErpBusyOverlay show={bootLoading} message="Loading purchase bill…" />
-        <ErpBusyOverlay show={!bootLoading && saving} message="Saving purchase…" />
-        <div className="classic-erp-header shrink-0">
-          <span className="erp-window-title truncate">Purchase Invoice [ {header.book} ]</span>
-          <ErpWindowControls
-            isMaximized={win.isMaximized}
-            onMinimize={win.minimize}
-            onToggleMax={win.toggleMax}
-            onClose={onClose}
-          />
-        </div>
-
-        <div ref={modalContainerRef} className="classic-erp-body flex-1 min-h-0 overflow-y-auto overflow-x-hidden erp-bill-layout">
-          {mode === 'View' && (
-            <div className="classic-erp-frame flex gap-2 items-center shrink-0">
-              <span className="classic-erp-label blue-label font-bold">Find Purchase:</span>
-              <select className="classic-erp-input flex-1" value={selectedPurchaseId} onChange={handleSelectPurchase}>
-                <option value="">- Select Purchase to View/Edit -</option>
-                {purchases.map(p => (
-                  <option key={p._id || p.id} value={p._id || p.id}>Voucher #{p.invoiceNo} - {p.supplierId?.name} (₹{p.netAmount?.toFixed(2)})</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {!locked && (
-            <div className="shrink-0 erp-autofill-bar">
-              <BillAutoFill
-                parties={parties}
-                items={items}
-                disabled={locked}
-                onApply={handleBillAutoApply}
-                onMastersChanged={async () => {
-                  await Promise.all([fetchParties(), fetchItems()]);
-                }}
+        <div
+          className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-card)] erp-bill-window-shell relative"
+          onPointerDown={win.onShellPointerDown}
+        >
+          <div className="classic-erp-window erp-density erp-sales-bill-compact flex flex-col flex-1 min-h-0 overflow-hidden !max-h-none !h-auto">
+            <ErpBusyOverlay show={bootLoading} message="Loading purchase bill…" />
+            <ErpBusyOverlay show={!bootLoading && saving} message="Saving purchase…" />
+            <div className="classic-erp-header shrink-0">
+              <span className="erp-window-title truncate">Purchase Invoice [ {header.book} ]</span>
+              <ErpWindowControls
+                isMaximized={win.isMaximized}
+                onMinimize={win.minimize}
+                onToggleMax={win.toggleMax}
+                onClose={onClose}
               />
             </div>
-          )}
 
-          {/* Vendor left | Bill + Challan right (same as sales) */}
-          <div className="classic-erp-frame classic-erp-header-split erp-sales-top shrink-0">
-            <div className="classic-erp-stack classic-erp-header-bill">
-              <div className="classic-erp-meta-grid erp-sales-bill-meta">
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label red-label">Bill No *:</span>
-                  <input ref={suppBillRef} type="text" className="classic-erp-input" value={header.billNo} placeholder="Supp Bill No…" onChange={e => setHeader({ ...header, billNo: e.target.value })} disabled={locked} />
+            <div ref={modalContainerRef} className="classic-erp-body flex-1 min-h-0 overflow-y-auto overflow-x-hidden erp-bill-layout">
+              {mode === 'View' && (
+                <div className="classic-erp-frame flex gap-2 items-center shrink-0">
+                  <span className="classic-erp-label blue-label font-bold">Find Purchase:</span>
+                  <select className="classic-erp-input flex-1" value={selectedPurchaseId} onChange={handleSelectPurchase}>
+                    <option value="">- Select Purchase to View/Edit -</option>
+                    {purchases.map(p => (
+                      <option key={p._id || p.id} value={p._id || p.id}>Voucher #{p.invoiceNo} - {p.supplierId?.name} (₹{p.netAmount?.toFixed(2)})</option>
+                    ))}
+                  </select>
                 </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Date *:</span>
-                  <input type="date" className="classic-erp-input" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
-                </div>
-              </div>
-              <div className="classic-erp-meta-grid erp-sales-ref-meta">
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">SrNo:</span>
-                  <input type="text" className="classic-erp-input" value={header.vNo} readOnly />
-                </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Challan:</span>
-                  <input type="text" className="classic-erp-input" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
-                </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Ch Date:</span>
-                  <input type="date" className="classic-erp-input" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
-                </div>
-              </div>
-            </div>
+              )}
 
-            <div className="classic-erp-stack classic-erp-header-party">
-              <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label red-label">Party *:</span>
-                <div className="classic-erp-control" style={{display:'flex',alignItems:'center',gap:4}}>
-                  <ERPCombobox
-                    value={header.party}
-                    onChange={onVendorSelect}
-                    options={vendorOptions}
-                    placeholder="Search party / supplier…"
+              {!locked && (
+                <div className="shrink-0 erp-autofill-bar">
+                  <BillAutoFill
+                    parties={parties}
+                    items={items}
                     disabled={locked}
-                    recentKey="purchase-vendor"
-                    onCreateNew={!locked ? (q) => handleCreateAccount(q) : undefined}
-                    createLabel="Party"
-                    inputClassName="border-0 flex-1"
+                    onApply={handleBillAutoApply}
+                    onMastersChanged={async () => {
+                      await Promise.all([fetchParties(), fetchItems()]);
+                    }}
                   />
-                  {!locked && (
-                    <button type="button" title="Add new party" onClick={() => handleCreateAccount('')}
-                      style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:2,padding:'2px 6px',fontSize:10,fontWeight:700,color:'#fff',background:'#16a34a',border:'none',borderRadius:3,cursor:'pointer',whiteSpace:'nowrap'}}>
-                      <Plus size={10}/> Add
-                    </button>
-                  )}
-                  {header.party && (
-                    <span className="text-[11px] font-bold text-red-600 whitespace-nowrap ml-2" title="Total purchases from this party to date">
-                      T.Purch: {partyTotalPurchase.toFixed(0)}
-                    </span>
-                  )}
                 </div>
-              </div>
-              <div className="classic-erp-meta-grid erp-sales-party-meta">
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Gstin:</span>
-                  <input type="text" className="classic-erp-input" value={header.gstin} readOnly />
+              )}
+
+              {/* Vendor left | Bill + Challan right (same as sales) */}
+              <div className="classic-erp-frame classic-erp-header-split erp-sales-top shrink-0">
+                <div className="classic-erp-stack classic-erp-header-bill">
+                  <div className="classic-erp-meta-grid erp-sales-bill-meta">
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label red-label">Supp. Bill *:</span>
+                      <input ref={suppBillRef} type="text" className="classic-erp-input" value={header.billNo} placeholder="Supp Bill No…" onChange={e => setHeader({ ...header, billNo: e.target.value })} disabled={locked} />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Date *:</span>
+                      <input type="date" className="classic-erp-input" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
+                    </div>
+                  </div>
+                  <div className="classic-erp-meta-grid erp-sales-ref-meta">
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Voucher:</span>
+                      <input type="text" className="classic-erp-input" value={header.vNo} readOnly />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Challan:</span>
+                      <input type="text" className="classic-erp-input" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Ch Date:</span>
+                      <input type="date" className="classic-erp-input" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
+                    </div>
+                  </div>
                 </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">City:</span>
-                  <input type="text" className="classic-erp-input" value={header.city} readOnly />
-                </div>
-              </div>
-              <div className="classic-erp-meta-grid--3 erp-sales-broker-row">
-                {showBroker ? (
-                  <div className="classic-erp-field">
-                    <span className="classic-erp-label">Broker:</span>
-                    <div style={{display:'flex',alignItems:'center',gap:4,minWidth:0}}>
+
+                <div className="classic-erp-stack classic-erp-header-party">
+                  <div className="classic-erp-field classic-erp-field--lg">
+                    <span className="classic-erp-label red-label">Vendor *:</span>
+                    <div className="classic-erp-control" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <ERPCombobox
-                        value={header.broker}
-                        onChange={(val) => setHeader({ ...header, broker: val })}
-                        options={brokerOptions}
-                        placeholder="Search broker…"
+                        value={header.party}
+                        onChange={onVendorSelect}
+                        options={vendorOptions}
+                        placeholder="Search vendor / supplier…"
                         disabled={locked}
-                        recentKey="purchase-broker"
-                        onCreateNew={!locked ? (q) => handleCreateBroker(q) : undefined}
-                        createLabel="Broker"
+                        recentKey="purchase-vendor"
+                        onCreateNew={!locked ? (q) => handleCreateAccount(q) : undefined}
+                        createLabel="Vendor"
+                        inputClassName="border-0 flex-1"
                       />
                       {!locked && (
-                        <button type="button" title="Add new broker" onClick={() => handleCreateBroker('')}
-                          style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:2,padding:'2px 6px',fontSize:10,fontWeight:700,color:'#fff',background:'#16a34a',border:'none',borderRadius:3,cursor:'pointer',whiteSpace:'nowrap'}}>
-                          <Plus size={10}/> Add
+                        <button type="button" title="Add new vendor" onClick={() => handleCreateAccount('')}
+                          style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 2, padding: '2px 6px', fontSize: 10, fontWeight: 700, color: '#fff', background: '#16a34a', border: 'none', borderRadius: 3, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          <Plus size={10} /> Add
                         </button>
                       )}
                     </div>
                   </div>
-                ) : (
-                  <div />
-                )}
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Reverse Charge:</span>
-                  <select className="classic-erp-select" value={header.reverseCharge} onChange={e => setHeader({ ...header, reverseCharge: e.target.value })} disabled={locked}>
-                    <option value="No">No</option>
-                    <option value="Yes">Yes</option>
-                  </select>
-                </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Type *:</span>
-                  <select className="classic-erp-select" value={header.type} onChange={e => setHeader({ ...header, type: e.target.value })} disabled={locked}>
-                    <option value="INVOICE IN STATE">INVOICE IN STATE</option>
-                    <option value="UNREGISTERED INVOICE (IN STATE)">UNREGISTERED INVOICE (IN STATE)</option>
-                    <option value="UNREGISTERED INVOICE (OUT OF STATE)">UNREGISTERED INVOICE (OUT OF STATE)</option>
-                    <option value="INVOICE OUT OF STATE">INVOICE OUT OF STATE</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="classic-erp-table-container erp-grid-panel erp-sales-grid min-h-0">
-            <table className="classic-erp-table">
-              <thead>
-                <tr>
-                  <th className="col-sr text-center">Sr</th>
-                  <th className="col-item">Item Name *</th>
-                  <th className="col-desc">Desc</th>
-                  <th className="col-num text-center">Fold</th>
-                  <th className="col-num text-center">Cut</th>
-                  <th className="col-num text-center">Pcs</th>
-                  <th className="col-qty text-center">Mts</th>
-                  <th className="col-qty text-right">Rate</th>
-                  <th className="col-unit text-center">Per/Unit</th>
-                  <th className="col-amt text-right">Amount</th>
-                  <th className="col-pct text-center">DIS1%</th>
-                  <th className="col-amt text-right">DISAMT</th>
-                  <th className="col-pct text-center">DIS2%</th>
-                  <th className="col-amt text-right">DISAMT.</th>
-                  <th className="col-amt text-right">AddAmt</th>
-                  <th className="col-pct text-center">GST%</th>
-                  <th className="col-amt text-right">GSTAmt</th>
-                  <th className="col-del"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {gridItems.map((row, idx) => (
-                  <tr key={row.id || idx}>
-                    <td className="col-sr text-center font-bold">{idx + 1}</td>
-                    <td className="col-item" style={{position:'relative'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:2,minWidth:0}}>
-                        <ERPCombobox
-                          value={row.itemId}
-                          onChange={(val) => onPurchaseItemSelect(val, idx)}
-                          options={itemOptions}
-                          placeholder="Search item…"
-                          disabled={locked}
-                          recentKey="purchase-item"
-                          onCreateNew={!locked ? (q) => handleCreateItem(q, idx) : undefined}
-                          createLabel="Item"
-                          inputClassName="border-0"
-                        />
-                        {!locked && (
-                          <button type="button" title="Add new item" onClick={() => handleCreateItem('', idx)}
-                            style={{flexShrink:0,display:'inline-flex',alignItems:'center',padding:'2px 5px',fontSize:10,fontWeight:700,color:'#16a34a',background:'transparent',border:'1px solid #16a34a',borderRadius:4,cursor:'pointer',whiteSpace:'nowrap'}}>
-                            <Plus size={10}/>
-                          </button>
-                        )}
+                  <div className="classic-erp-meta-grid erp-sales-party-meta">
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Gstin:</span>
+                      <input type="text" className="classic-erp-input" value={header.gstin} readOnly />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">City:</span>
+                      <input type="text" className="classic-erp-input" value={header.city} readOnly />
+                    </div>
+                  </div>
+                  <div className="classic-erp-meta-grid--3 erp-sales-broker-row">
+                    {showBroker ? (
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label">Broker:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                          <ERPCombobox
+                            value={header.broker}
+                            onChange={(val) => setHeader({ ...header, broker: val })}
+                            options={brokerOptions}
+                            placeholder="Search broker…"
+                            disabled={locked}
+                            recentKey="purchase-broker"
+                            onCreateNew={!locked ? (q) => handleCreateBroker(q) : undefined}
+                            createLabel="Broker"
+                          />
+                          {!locked && (
+                            <button type="button" title="Add new broker" onClick={() => handleCreateBroker('')}
+                              style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 2, padding: '2px 6px', fontSize: 10, fontWeight: 700, color: '#fff', background: '#16a34a', border: 'none', borderRadius: 3, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                              <Plus size={10} /> Add
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </td>
-                    <td className="col-desc">
-                      <input type="text" className="classic-erp-input w-full border-0" value={row.desc || ''} onChange={e => patchLine(idx, { desc: e.target.value })} disabled={locked} />
-                    </td>
-                    <td className="col-num">
-                      <input type="number" className="classic-erp-input w-full text-center border-0" value={row.fold || ''} onChange={e => patchLine(idx, { fold: Number(e.target.value) })} disabled={locked} />
-                    </td>
-                    <td className="col-num">
-                      <input type="number" className="classic-erp-input w-full text-center border-0" value={row.cut || ''} onChange={e => patchLine(idx, { cut: Number(e.target.value) || 0, _mtsManual: false }, 'cut')} disabled={locked} placeholder="0" />
-                    </td>
-                    <td className="col-num">
-                      <input type="number" className="classic-erp-input w-full text-center border-0 font-bold" value={row.pcs > 0 ? row.pcs : ''} onChange={e => patchLine(idx, { pcs: Number(e.target.value) || 0, _mtsManual: false }, 'pcs')} disabled={locked} min="0" step="1" placeholder="0" />
-                    </td>
-                    <td className="col-qty">
-                      <input type="number" className="classic-erp-input w-full text-center border-0" value={row.mts > 0 ? row.mts : ''} onChange={e => patchLine(idx, { mts: Number(e.target.value) || 0, _mtsManual: true, _amountManual: false }, 'mts')} disabled={locked} min="0" step="0.001" placeholder="0.000" title="Auto = Cut × Pcs. Type to override." />
-                    </td>
-                    <td className="col-qty">
-                      <input type="number" className="classic-erp-input w-full text-right border-0" value={row.rate || ''} onChange={e => patchLine(idx, { rate: Number(e.target.value) })} disabled={locked} />
-                    </td>
-                    <td className="col-unit">
-                      <ERPCombobox
-                        value={row.unit || 'MTRS'}
-                        onChange={(val) => patchLine(idx, { unit: String(val || 'MTRS').toUpperCase() })}
-                        options={unitOptions}
-                        placeholder="Unit…"
-                        disabled={locked}
-                        recentKey="purchase-unit"
-                        openOnEnter
-                        onCreateNew={!locked ? (q) => handleCreateUnit(q, idx) : undefined}
-                        createLabel="Unit"
-                        emptyMessage="No unit — type & Create"
-                        inputClassName="border-0 text-center"
-                      />
-                    </td>
-                    <td className="col-amt">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono font-bold" value={row.amount || ''} onChange={e => patchLine(idx, { amount: Number(e.target.value) })} disabled={locked} />
-                    </td>
-                    <td className="col-pct">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.dis1Per || ''} onChange={e => patchLine(idx, { dis1Per: Number(e.target.value) })} disabled={locked} />
-                    </td>
-                    <td className="col-amt">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis1Amt || ''} onChange={e => patchLine(idx, { dis1Amt: Number(e.target.value) })} disabled={locked} />
-                    </td>
-                    <td className="col-pct">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.dis2Per || ''} onChange={e => patchLine(idx, { dis2Per: Number(e.target.value) })} disabled={locked} />
-                    </td>
-                    <td className="col-amt">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis2Amt || ''} onChange={e => patchLine(idx, { dis2Amt: Number(e.target.value) })} disabled={locked} />
-                    </td>
-                    <td className="col-amt">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0" value={row.addAmt || ''} onChange={e => patchLine(idx, { addAmt: Number(e.target.value) })} disabled={locked} />
-                    </td>
-                    <td className="col-pct">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.gstPer || ''} onChange={e => patchLine(idx, { gstPer: Number(e.target.value) })} disabled={locked} />
-                    </td>
-                    <td className="col-amt">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono font-bold text-blue-800" value={row.gstAmt || ''} onChange={e => patchLine(idx, { gstAmt: Number(e.target.value) })} disabled={locked} />
-                    </td>
-                    <td className="col-del text-center">
-                      <button type="button" onClick={() => {
-                        const updated = gridItems.filter((_, i) => i !== idx);
-                        setGridItems(updated.length ? updated : [blankLine()]);
-                      }} className="text-red-700 hover:text-red-950 p-1" disabled={locked}>
-                        <Trash2 size={13} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    ) : (
+                      <div />
+                    )}
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">RCM:</span>
+                      <select className="classic-erp-select" value={header.reverseCharge} onChange={e => setHeader({ ...header, reverseCharge: e.target.value })} disabled={locked}>
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Type *:</span>
+                      <select className="classic-erp-select" value={header.type} onChange={e => setHeader({ ...header, type: e.target.value })} disabled={locked}>
+                        <option value="INVOICE IN STATE">INVOICE IN STATE</option>
+                        <option value="INVOICE OUT OF STATE">INVOICE OUT OF STATE</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="classic-erp-table-container erp-grid-panel erp-sales-grid min-h-0">
+                <table className="classic-erp-table">
+                  <thead>
+                    <tr>
+                      <th className="col-sr text-center">Sr</th>
+                      <th className="col-item">Item Name *</th>
+                      <th className="col-desc">Desc</th>
+                      <th className="col-num text-center">Fold</th>
+                      <th className="col-num text-center">Cut</th>
+                      <th className="col-num text-center">Pcs</th>
+                      <th className="col-qty text-center">Qty</th>
+                      <th className="col-qty text-right">Rate</th>
+                      <th className="col-unit text-center">Per/Unit</th>
+                      <th className="col-amt text-right">Amount</th>
+                      <th className="col-pct text-center">DIS1%</th>
+                      <th className="col-amt text-right">DISAMT</th>
+                      <th className="col-pct text-center">DIS2%</th>
+                      <th className="col-amt text-right">DISAMT.</th>
+                      <th className="col-amt text-right">AddAmt</th>
+                      <th className="col-pct text-center">GST%</th>
+                      <th className="col-amt text-right">GSTAmt</th>
+                      <th className="col-del"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gridItems.map((row, idx) => (
+                      <tr key={row.id || idx}>
+                        <td className="col-sr text-center font-bold">{idx + 1}</td>
+                        <td className="col-item" style={{ position: 'relative' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
+                            <ERPCombobox
+                              value={row.itemId}
+                              onChange={(val) => onPurchaseItemSelect(val, idx)}
+                              options={itemOptions}
+                              placeholder="Search item…"
+                              disabled={locked}
+                              recentKey="purchase-item"
+                              onCreateNew={!locked ? (q) => handleCreateItem(q, idx) : undefined}
+                              createLabel="Item"
+                              inputClassName="border-0"
+                            />
+                            {!locked && (
+                              <button type="button" title="Add new item" onClick={() => handleCreateItem('', idx)}
+                                style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', padding: '2px 5px', fontSize: 10, fontWeight: 700, color: '#16a34a', background: 'transparent', border: '1px solid #16a34a', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                <Plus size={10} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="col-desc">
+                          <input type="text" className="classic-erp-input w-full border-0" value={row.desc || ''} onChange={e => patchLine(idx, { desc: e.target.value })} disabled={locked} />
+                        </td>
+                        <td className="col-num">
+                          <input type="number" className="classic-erp-input w-full text-center border-0" value={row.fold || ''} onChange={e => patchLine(idx, { fold: Number(e.target.value) })} disabled={locked} />
+                          {String(row.unit || '').toUpperCase() === 'QTY' && (row.foldLessAmt || 0) > 0 && (
+                            <span
+                              className="block text-center font-mono leading-none"
+                              style={{ fontSize: 9, color: '#c2410c', paddingTop: 1 }}
+                              title={`Fold Less: ${(row.foldLessAmt || 0).toFixed(2)} deducted from Taxable`}
+                            >
+                              less {(row.foldLessAmt || 0).toFixed(2)}
+                            </span>
+                          )}
+                          {String(row.unit || '').toUpperCase() === 'QTY' && (row.foldAddAmt || 0) > 0 && (
+                            <span
+                              className="block text-center font-mono leading-none"
+                              style={{ fontSize: 9, color: '#16a34a', paddingTop: 1 }}
+                              title={`Fold Add: ${(row.foldAddAmt || 0).toFixed(2)} added to Taxable`}
+                            >
+                              add {(row.foldAddAmt || 0).toFixed(2)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="col-num">
+                          <input type="number" className="classic-erp-input w-full text-center border-0" value={row.cut || ''} onChange={e => patchLine(idx, { cut: Number(e.target.value) || 0, _mtsManual: false }, 'cut')} disabled={locked} placeholder="0" />
+                        </td>
+                        <td className="col-num">
+                          <input type="number" className="classic-erp-input w-full text-center border-0 font-bold" value={row.pcs > 0 ? row.pcs : ''} onChange={e => patchLine(idx, { pcs: Number(e.target.value) || 0, _mtsManual: false }, 'pcs')} disabled={locked} min="0" step="1" placeholder="0" />
+                        </td>
+                        <td className="col-qty">
+                          <input type="number" className="classic-erp-input w-full text-center border-0" value={row.mts > 0 ? row.mts : ''} onChange={e => patchLine(idx, { mts: Number(e.target.value) || 0, _mtsManual: true, _amountManual: false }, 'mts')} disabled={locked} min="0" step="0.001" placeholder="0.000" title="Auto = Cut × Pcs. Type to override." />
+                        </td>
+                        <td className="col-qty">
+                          <input type="number" className="classic-erp-input w-full text-right border-0" value={row.rate || ''} onChange={e => patchLine(idx, { rate: Number(e.target.value) })} disabled={locked} />
+                        </td>
+                        <td className="col-unit">
+                          <ERPCombobox
+                            value={row.unit || 'MTRS'}
+                            onChange={(val) => patchLine(idx, { unit: String(val || 'MTRS').toUpperCase() })}
+                            options={unitOptions}
+                            placeholder="Unit…"
+                            disabled={locked}
+                            recentKey="purchase-unit"
+                            openOnEnter
+                            onCreateNew={!locked ? (q) => handleCreateUnit(q, idx) : undefined}
+                            createLabel="Unit"
+                            emptyMessage="No unit — type & Create"
+                            inputClassName="border-0 text-center"
+                          />
+                        </td>
+                        <td className="col-amt">
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono font-bold" value={row.amount || ''} onChange={e => patchLine(idx, { amount: Number(e.target.value) })} disabled={locked} />
+                          {String(row.unit || '').toUpperCase() === 'NETQTY' && row.foldDeductionAmt > 0 && (
+                            <span
+                              className="block text-right font-mono leading-none"
+                              style={{ fontSize: 9, color: '#c2410c', paddingRight: 2 }}
+                              title={`Fold deduction: Gross ${(row.amount + row.foldDeductionAmt).toFixed(2)} × ${100 - (row.fold || 0)}% = −${row.foldDeductionAmt.toFixed(2)}`}
+                            >
+                              fold −{row.foldDeductionAmt.toFixed(2)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="col-pct">
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.dis1Per || ''} onChange={e => patchLine(idx, { dis1Per: Number(e.target.value) })} disabled={locked} />
+                        </td>
+                        <td className="col-amt">
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis1Amt || ''} onChange={e => patchLine(idx, { dis1Amt: Number(e.target.value) })} disabled={locked} />
+                        </td>
+                        <td className="col-pct">
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.dis2Per || ''} onChange={e => patchLine(idx, { dis2Per: Number(e.target.value) })} disabled={locked} />
+                        </td>
+                        <td className="col-amt">
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis2Amt || ''} onChange={e => patchLine(idx, { dis2Amt: Number(e.target.value) })} disabled={locked} />
+                        </td>
+                        <td className="col-amt">
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0" value={row.addAmt || ''} onChange={e => patchLine(idx, { addAmt: Number(e.target.value) })} disabled={locked} />
+                        </td>
+                        <td className="col-pct">
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.gstPer || ''} onChange={e => patchLine(idx, { gstPer: Number(e.target.value) })} disabled={locked} />
+                        </td>
+                        <td className="col-amt">
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono font-bold text-blue-800" value={row.gstAmt || ''} onChange={e => patchLine(idx, { gstAmt: Number(e.target.value) })} disabled={locked} />
+                        </td>
+                        <td className="col-del text-center">
+                          <button type="button" onClick={() => {
+                            const updated = gridItems.filter((_, i) => i !== idx);
+                            setGridItems(updated.length ? updated : [blankLine()]);
+                          }} className="text-red-700 hover:text-red-950 p-1" disabled={locked}>
+                            <Trash2 size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-between items-center bg-[var(--bg-subtle)] p-1 border border-[var(--border)] rounded-md shrink-0 erp-sales-stockbar">
+                <button type="button" onClick={() => setGridItems([...gridItems, blankLine()])} className="classic-erp-btn" disabled={locked}>
+                  <Plus size={12} strokeWidth={3} /> Add Line Item
+                </button>
+                <div className="text-xs font-bold text-black font-mono">
+                  TOTAL Pcs: <span className="text-blue-800">{gridItems.reduce((a, b) => a + (Number(b.pcs) || 0), 0)}</span>
+                  {' / '}Qty: <span className="text-blue-800">{gridItems.reduce((a, b) => a + (Number(b.mts) || 0), 0).toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-12 gap-1.5 erp-sales-footer shrink-0">
+                <div className="col-span-4 classic-erp-frame classic-erp-stack p-2">
+                  {[
+                    { label: 'DISCOUNT', key: 'discountAmt', signKey: 'discountSign' },
+                    { label: 'LESS', key: 'lessAmt', signKey: 'lessSign' },
+                    { label: 'ADD', key: 'addAmt', signKey: 'addSign' },
+                    { label: 'OCTROI', key: 'octroi', signKey: 'octroiSign' }
+                  ].map(adj => (
+                    <div key={adj.key} className="classic-erp-adj-row">
+                      <span className="classic-erp-label">{adj.label}:</span>
+                      <select className="classic-erp-select text-center font-bold" value={footer[adj.signKey]} onChange={e => setFooter({ ...footer, [adj.signKey]: e.target.value })} disabled={locked}>
+                        <option value="-">-</option>
+                        <option value="+">+</option>
+                      </select>
+                      <input type="number" className="classic-erp-input text-right" value={footer[adj.key] || ''} onChange={e => setFooter({ ...footer, [adj.key]: Number(e.target.value) })} disabled={locked} />
+                    </div>
+                  ))}
+                  <div className="classic-erp-field classic-erp-field--lg pt-1 border-t border-[var(--border)]">
+                    <span className="classic-erp-label">ITC:</span>
+                    <select className="classic-erp-select" value={footer.itcEligibility} onChange={e => setFooter({ ...footer, itcEligibility: e.target.value })} disabled={locked}>
+                      <option value="Inputs">Inputs</option>
+                      <option value="Capital Goods">Capital Goods</option>
+                      <option value="None">None</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="col-span-4 classic-erp-frame classic-erp-stack p-2">
+                  <span className="classic-erp-frame-title">Remarks</span>
+                  <textarea className="classic-erp-textarea w-full resize-none text-[11px]" rows={4} value={footer.remarks} onChange={e => setFooter({ ...footer, remarks: e.target.value })} disabled={locked} placeholder="Optional remarks…" />
+                </div>
+
+                <div className="col-span-4 classic-erp-frame classic-erp-stack p-2 bg-[var(--accent-light)] pb-3">
+                  <div className="classic-erp-total-row font-bold">
+                    <span className="classic-erp-label text-slate-800">Taxable Amt:</span>
+                    <span className="font-mono text-black shrink-0">₹{calculations.taxable.toFixed(2)}</span>
+                  </div>
+                  {header.type === 'INVOICE IN STATE' ? (
+                    <>
+                      <div className="classic-erp-total-row font-bold">
+                        <span className="classic-erp-label text-slate-800">CGST:</span>
+                        <span className="font-mono text-black">₹{calculations.cgst.toFixed(2)}</span>
+                      </div>
+                      <div className="classic-erp-total-row font-bold">
+                        <span className="classic-erp-label text-slate-800">SGST:</span>
+                        <span className="font-mono text-black">₹{calculations.sgst.toFixed(2)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="classic-erp-total-row font-bold">
+                      <span className="classic-erp-label text-slate-800">IGST:</span>
+                      <span className="font-mono text-black">₹{calculations.igst.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="classic-erp-adj-row font-bold">
+                    <span className="classic-erp-label text-slate-800">RCM:</span>
+                    <select className="classic-erp-select text-center font-bold" value={footer.rcmChargeSign} onChange={e => setFooter({ ...footer, rcmChargeSign: e.target.value })} disabled={locked}>
+                      <option value="-">-</option>
+                      <option value="+">+</option>
+                    </select>
+                    <input type="number" className="classic-erp-input text-right font-mono" value={footer.rcmCharge || ''} onChange={e => setFooter({ ...footer, rcmCharge: Number(e.target.value) })} disabled={locked} />
+                  </div>
+                  <div className="classic-erp-total-row font-bold border-t border-[var(--border)] pt-1">
+                    <span className="classic-erp-label text-slate-800">Gross Amt:</span>
+                    <span className="font-mono text-black">₹{calculations.gross.toFixed(2)}</span>
+                  </div>
+                  <div className="classic-erp-total-row font-bold">
+                    <span className="classic-erp-label text-slate-800">Round Off:</span>
+                    <input type="number" className="classic-erp-input w-24 text-right font-mono" value={footer.roundOff} onChange={e => setFooter({ ...footer, roundOff: Number(e.target.value) })} disabled={locked} />
+                  </div>
+                  <div className="classic-erp-total-row font-bold pt-2 border-t-2 border-[#000] mt-1">
+                    <span className="classic-erp-label text-blue-900 text-sm">NET AMOUNT:</span>
+                    <span className="font-mono text-blue-900 text-lg shrink-0">₹{calculations.net.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="flex justify-between items-center bg-[var(--bg-subtle)] p-1 border border-[var(--border)] rounded-md shrink-0 erp-sales-stockbar">
-            <button type="button" onClick={() => setGridItems([...gridItems, blankLine()])} className="classic-erp-btn" disabled={locked}>
-              <Plus size={12} strokeWidth={3} /> Add Line Item
+          {/* Action bar — outside scroll/window so New/Save never clip */}
+          <div className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1.5 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]">
+            <span className="text-[10px] text-[var(--text-muted)] mr-auto hidden sm:inline">
+              Enter → next · Esc close
+            </span>
+            <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving}>New</button>
+            <button className="classic-erp-btn btn-blue" type="button" data-enter-save onClick={handleSave} disabled={locked || saving || bootLoading}>
+              <SaveButtonLabel saving={saving} />
             </button>
-            <div className="text-xs font-bold text-black font-mono">
-              TOTAL Pcs: <span className="text-blue-800">{gridItems.reduce((a, b) => a + (Number(b.pcs) || 0), 0)}</span>
-              {' / '}Qty: <span className="text-blue-800">{gridItems.reduce((a, b) => a + (Number(b.mts) || 0), 0).toFixed(2)}</span>
-              {' / '}NetQty: <span className="text-blue-800">{gridItems.reduce((a, b) => {
-                const mts = Number(b.mts) || 0;
-                const fold = Number(b.fold) || 0;
-                return a + (fold > 0 ? (mts * fold) / 100 : mts);
-              }, 0).toFixed(2)}</span>
-              {' / '}Kgs: <span className="text-blue-800">0</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-12 gap-1.5 erp-sales-footer shrink-0">
-            <div className="col-span-4 classic-erp-frame classic-erp-stack p-2">
-              {[
-                { label: 'DISCOUNT', key: 'discountAmt', signKey: 'discountSign' },
-                { label: 'LESS', key: 'lessAmt', signKey: 'lessSign' },
-                { label: 'ADD', key: 'addAmt', signKey: 'addSign' },
-                { label: 'OCTROI', key: 'octroi', signKey: 'octroiSign' }
-              ].map(adj => (
-                <div key={adj.key} className="classic-erp-adj-row">
-                  <span className="classic-erp-label">{adj.label}:</span>
-                  <select className="classic-erp-select text-center font-bold" value={footer[adj.signKey]} onChange={e => setFooter({ ...footer, [adj.signKey]: e.target.value })} disabled={locked}>
-                    <option value="-">-</option>
-                    <option value="+">+</option>
-                  </select>
-                  <input type="number" className="classic-erp-input text-right" value={footer[adj.key] || ''} onChange={e => setFooter({ ...footer, [adj.key]: Number(e.target.value) })} disabled={locked} />
-                </div>
-              ))}
-              <div className="classic-erp-adj-row">
-                <span className="classic-erp-label">RD AMT:</span>
-                <input type="number" className="classic-erp-input text-right col-span-2" value={footer.rdAmt || ''} onChange={e => setFooter({ ...footer, rdAmt: Number(e.target.value) })} disabled={locked} title="Round Difference — always subtracted from Taxable Amt" />
-              </div>
-              <div className="classic-erp-field classic-erp-field--lg pt-1 border-t border-[var(--border)]">
-                <span className="classic-erp-label">ITC:</span>
-                <select className="classic-erp-select" value={footer.itcEligibility} onChange={e => setFooter({ ...footer, itcEligibility: e.target.value })} disabled={locked}>
-                  <option value="Inputs">Inputs</option>
-                  <option value="Capital Goods">Capital Goods</option>
-                  <option value="None">None</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="col-span-4 classic-erp-frame classic-erp-stack p-2">
-              <span className="classic-erp-frame-title">Remarks</span>
-              <textarea className="classic-erp-textarea w-full resize-none text-[11px]" rows={4} value={footer.remarks} onChange={e => setFooter({ ...footer, remarks: e.target.value })} disabled={locked} placeholder="Optional remarks…" />
-            </div>
-
-            <div className="col-span-4 classic-erp-frame classic-erp-stack p-2 bg-[var(--accent-light)] pb-3">
-              <div className="classic-erp-total-row font-bold">
-                <span className="classic-erp-label text-slate-800">Taxable Amt:</span>
-                <span className="font-mono text-black shrink-0">₹{calculations.taxable.toFixed(2)}</span>
-              </div>
-              {!calculations.isOutOfState ? (
-                <>
-                  <div className="classic-erp-total-row font-bold">
-                    <span className="classic-erp-label text-slate-800">CGST:</span>
-                    <span className="font-mono text-black">₹{calculations.cgst.toFixed(2)}</span>
-                  </div>
-                  <div className="classic-erp-total-row font-bold">
-                    <span className="classic-erp-label text-slate-800">SGST:</span>
-                    <span className="font-mono text-black">₹{calculations.sgst.toFixed(2)}</span>
-                  </div>
-                </>
-              ) : (
-                <div className="classic-erp-total-row font-bold">
-                  <span className="classic-erp-label text-slate-800">IGST:</span>
-                  <span className="font-mono text-black">₹{calculations.igst.toFixed(2)}</span>
-                </div>
-              )}
-              <div className="classic-erp-adj-row font-bold">
-                <span className="classic-erp-label text-slate-800">TCS%:</span>
-                <input type="number" step="0.001" className="classic-erp-input text-center" value={footer.tcsRate || ''} onChange={e => setFooter({ ...footer, tcsRate: Number(e.target.value) })} disabled={locked} />
-                <input type="number" className="classic-erp-input text-right font-mono" value={footer.tcsRate > 0 ? calculations.tcsAmt.toFixed(2) : (footer.tcsAmt || '')} onChange={e => setFooter({ ...footer, tcsAmt: Number(e.target.value) })} disabled={locked || footer.tcsRate > 0} title={footer.tcsRate > 0 ? 'Auto-computed from TCS%' : 'Manual TCS amount'} />
-              </div>
-              <div className="classic-erp-adj-row font-bold">
-                <span className="classic-erp-label text-slate-800">RCM CHARGE:</span>
-                <select className="classic-erp-select text-center font-bold" value={footer.rcmChargeSign} onChange={e => setFooter({ ...footer, rcmChargeSign: e.target.value })} disabled={locked}>
-                  <option value="-">-</option>
-                  <option value="+">+</option>
-                </select>
-                <input type="number" className="classic-erp-input text-right font-mono" value={footer.rcmCharge || ''} onChange={e => setFooter({ ...footer, rcmCharge: Number(e.target.value) })} disabled={locked} />
-              </div>
-              <div className="classic-erp-total-row font-bold border-t border-[var(--border)] pt-1">
-                <span className="classic-erp-label text-slate-800">Gross Amt:</span>
-                <span className="font-mono text-black">₹{calculations.gross.toFixed(2)}</span>
-              </div>
-              <div className="classic-erp-total-row font-bold">
-                <span className="classic-erp-label text-slate-800">Round Off:</span>
-                <input type="number" className="classic-erp-input w-24 text-right font-mono" value={footer.roundOff} onChange={e => setFooter({ ...footer, roundOff: Number(e.target.value) })} disabled={locked} />
-              </div>
-              <div className="classic-erp-total-row font-bold pt-2 border-t-2 border-[#000] mt-1">
-                <span className="classic-erp-label text-blue-900 text-sm">NET AMOUNT:</span>
-                <span className="font-mono text-blue-900 text-lg shrink-0">₹{calculations.net.toFixed(2)}</span>
-              </div>
-            </div>
+            <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked || saving}>Cancel</button>
+            <button className="classic-erp-btn" type="button" onClick={() => setMode('View')} disabled={readOnly || mode === 'View' || saving}>Find</button>
+            <button className="classic-erp-btn" type="button" onClick={() => setMode('Edit')} disabled={readOnly || mode !== 'View' || !selectedPurchaseId || saving}>Edit</button>
+            <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || saving || !selectedPurchaseId}>Delete</button>
+            <button className="classic-erp-btn btn-blue" type="button" onClick={() => selectedPurchaseId && setPrintInvoiceId(selectedPurchaseId)} disabled={!selectedPurchaseId}>PDF / Print</button>
+            <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
           </div>
         </div>
-      </div>
+        {win.mode === 'normal' && (
+          <div
+            className="erp-window-resize-handle"
+            onPointerDown={win.onResizePointerDown}
+            title="Drag to resize"
+          />
+        )}
 
-        {/* Action bar — outside scroll/window so New/Save never clip */}
-        <div className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1.5 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]">
-          <span className="text-[10px] text-[var(--text-muted)] mr-auto hidden sm:inline">
-            Enter → next · Esc close
-          </span>
-          <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving}>New</button>
-          <button className="classic-erp-btn btn-blue" type="button" data-enter-save onClick={handleSave} disabled={locked || saving || bootLoading}>
-            <SaveButtonLabel saving={saving} />
-          </button>
-          <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked || saving}>Cancel</button>
-          <button className="classic-erp-btn" type="button" onClick={() => setMode('View')} disabled={readOnly || mode === 'View' || saving}>Find</button>
-          <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || saving || !selectedPurchaseId}>Delete</button>
-          <button className="classic-erp-btn btn-blue" type="button" onClick={() => selectedPurchaseId && setPrintInvoiceId(selectedPurchaseId)} disabled={!selectedPurchaseId}>PDF / Print</button>
-          <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
-        </div>
-      </div>
-      {win.mode === 'normal' && (
-        <div
-          className="erp-window-resize-handle"
-          onPointerDown={win.onResizePointerDown}
-          title="Drag to resize"
+        <AccountMasterModal
+          isOpen={inlineModal.type === 'account'}
+          onClose={() => setInlineModal({ type: null, target: 'party', initialData: null, rowIndex: null })}
+          initialData={inlineModal.initialData}
+          onSuccess={handleAccountSuccess}
         />
+        <ItemMasterModal
+          isOpen={inlineModal.type === 'item'}
+          onClose={() => setInlineModal({ type: null, target: 'party', initialData: null, rowIndex: null })}
+          initialData={inlineModal.initialData}
+          onSuccess={handleItemSuccess}
+        />
+      </Modal>
+
+      {typeof document !== 'undefined' && saveNextActions && createPortal(
+        <BillSaveNextActions
+          open
+          title="Purchase Saved"
+          invoiceNo={saveNextActions.invoiceNo}
+          offlinePending={saveNextActions.offlinePending}
+          actions={nextStepActions}
+          onPdf={() => {
+            if (saveNextActions.id) setPrintInvoiceId(saveNextActions.id);
+          }}
+          onPrint={() => {
+            if (saveNextActions.id) setPrintInvoiceId(saveNextActions.id);
+          }}
+          onWhatsApp={() => {
+            const inv = saveNextActions.invoice || purchases.find((p) => p._id === saveNextActions.id || p.id === saveNextActions.id);
+            if (!inv) return;
+            const party = resolveParty(inv.supplierId, parties);
+            openWhatsAppShare(buildWhatsAppMessage({ type: 'purchase', invoice: inv, party }), party?.phone || party?.mobile);
+          }}
+          onNew={() => {
+            setSaveNextActions(null);
+            handleNew();
+          }}
+          onClose={() => setSaveNextActions(null)}
+        />,
+        document.body
       )}
 
-      <AccountMasterModal 
-        isOpen={inlineModal.type === 'account'} 
-        onClose={() => setInlineModal({ type: null, target: 'party', initialData: null, rowIndex: null })}
-        initialData={inlineModal.initialData}
-        onSuccess={handleAccountSuccess}
-      />
-      <ItemMasterModal 
-        isOpen={inlineModal.type === 'item'} 
-        onClose={() => setInlineModal({ type: null, target: 'party', initialData: null, rowIndex: null })}
-        initialData={inlineModal.initialData}
-        onSuccess={handleItemSuccess}
-      />
-    </Modal>
-
-    {typeof document !== 'undefined' && saveNextActions && createPortal(
-      <BillSaveNextActions
-        open
-        title="Purchase Saved"
-        invoiceNo={saveNextActions.invoiceNo}
-        offlinePending={saveNextActions.offlinePending}
-        actions={nextStepActions}
-        onPdf={() => {
-          if (saveNextActions.id) setPrintInvoiceId(saveNextActions.id);
-        }}
-        onPrint={() => {
-          if (saveNextActions.id) setPrintInvoiceId(saveNextActions.id);
-        }}
-        onWhatsApp={() => {
-          const inv = saveNextActions.invoice || purchases.find((p) => p._id === saveNextActions.id || p.id === saveNextActions.id);
-          if (!inv) return;
-          const party = resolveParty(inv.supplierId, parties);
-          openWhatsAppShare(buildWhatsAppMessage({ type: 'purchase', invoice: inv, party }), party?.phone || party?.mobile);
-        }}
-        onNew={() => {
-          setSaveNextActions(null);
-          handleNew();
-        }}
-        onClose={() => setSaveNextActions(null)}
-      />,
-      document.body
-    )}
-
-    {typeof document !== 'undefined' && printInvoiceId && createPortal(
-      <PurchasePrint invoiceId={printInvoiceId} onClose={() => setPrintInvoiceId(null)} />,
-      document.body
-    )}
+      {typeof document !== 'undefined' && printInvoiceId && createPortal(
+        <PurchasePrint invoiceId={printInvoiceId} onClose={() => setPrintInvoiceId(null)} />,
+        document.body
+      )}
     </>
   );
 };

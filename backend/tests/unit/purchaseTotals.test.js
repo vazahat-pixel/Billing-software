@@ -1,10 +1,18 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
-const { lineAmount, recalcPurchaseTotals } = require('../../utils/purchaseTotals');
+const { lineAmount, lineTaxable, recalcPurchaseTotals } = require('../../utils/purchaseTotals');
 
 describe('purchaseTotals', () => {
-  it('lineAmount', () => {
-    assert.equal(lineAmount({ mts: 20, rate: 50, discount: 100 }), 900);
+  it('lineAmount is gross qty × rate (discount applied downstream in lineTaxable)', () => {
+    assert.equal(lineAmount({ mts: 20, rate: 50 }), 1000);
+  });
+
+  it('lineAmount uses pcs qty for PCS-unit lines', () => {
+    assert.equal(lineAmount({ unit: 'PCS', pcs: 4, mts: 0, rate: 50 }), 200);
+  });
+
+  it('lineTaxable applies discount to the gross amount', () => {
+    assert.equal(lineTaxable({ amount: 1000, discount: 100 }), 900);
   });
 
   it('intra-state purchase', () => {
