@@ -152,13 +152,13 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       baseAmt = Number((grossAmt - foldDeductionAmt).toFixed(2));
     }
 
-    // Step 2b (QTY / PCS unit only): Fold Less / Fold Add
-    //   Amount column always shows GROSS (Meter × Rate / Pcs * Rate).
+    // Step 2b (QTY unit only): Fold Less / Fold Add
+    //   Amount column always shows GROSS (Meter × Rate).
     //   baseAmt (used for discounts / GST / taxable) is adjusted by fold:
     //     fold = 100 → no adjustment
     //     fold < 100 → foldLessAmt = grossAmt × (100 − fold) / 100; baseAmt = grossAmt − foldLessAmt
     //     fold > 100 → foldAddAmt  = grossAmt × (fold − 100) / 100; baseAmt = grossAmt + foldAddAmt
-    if (isQtyOrPcs && !row._amountManual) {
+    if (unit === 'QTY' && !row._amountManual) {
       const fold = Number(row.fold ?? 100);
       if (fold < 100) {
         foldLessAmt = Number(((grossAmt * (100 - fold)) / 100).toFixed(2));
@@ -481,7 +481,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     
     gridItems.forEach(item => {
       const u = String(item.unit || '').toUpperCase();
-      if (u === 'QTY' || u === 'PCS') {
+      if (u === 'QTY') {
         totalFoldLess += Number(item.foldLessAmt || 0);
         totalFoldAdd += Number(item.foldAddAmt || 0);
       }
