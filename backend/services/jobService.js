@@ -137,6 +137,13 @@ class JobService {
       if (!job) throw AppError.notFound('Job record not found');
       if (job.status === 'Received') throw AppError.badRequest('This job has already been received');
 
+      // Validate receivedQty does not exceed issuedQty
+      const received = Number(receivedQty || 0);
+      if (received < 0) throw AppError.badRequest('Received quantity cannot be negative');
+      if (received > Number(job.issueQty || 0)) {
+        throw AppError.badRequest(`Received quantity (${received}) cannot exceed issued quantity (${job.issueQty})`);
+      }
+
       const openStep = job.steps?.length
         ? job.steps.find((s) => ['In-Process', 'QC-Pending', 'QC-Pass'].includes(s.status))
         : null;

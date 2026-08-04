@@ -328,8 +328,14 @@ class GstReturnService {
       igst: round2(rcm.reduce((s, x) => s + (x.igst || 0), 0)),
     };
 
+    // Filter to only ITC-eligible purchases (exclude itcEligibility: 'None')
+    const itcEligiblePurchases = purchases.filter((p) => {
+      const eligibility = String(p.itcEligibility || 'Inputs').toUpperCase();
+      return eligibility !== 'NONE';
+    });
+
     const itcByTy = { IMPG: { iamt: 0, camt: 0, samt: 0, csamt: 0 }, IMPS: { iamt: 0, camt: 0, samt: 0, csamt: 0 }, OTH: { iamt: 0, camt: 0, samt: 0, csamt: 0 } };
-    for (const p of purchases) {
+    for (const p of itcEligiblePurchases) {
       // RCM ITC is claimed under ISRC in portal terms; keep in OTH bucket for domestic unless import
       const ty = this._isImportPurchase(p);
       itcByTy[ty].iamt = round2(itcByTy[ty].iamt + (p.igst || 0));
@@ -339,10 +345,10 @@ class GstReturnService {
     }
 
     const itcAvailable = {
-      cgst: inward.cgst,
-      sgst: inward.sgst,
-      igst: inward.igst,
-      cess: inward.cess,
+      cgst: round2(itcEligiblePurchases.reduce((s, x) => s + (x.cgst || 0), 0)),
+      sgst: round2(itcEligiblePurchases.reduce((s, x) => s + (x.sgst || 0), 0)),
+      igst: round2(itcEligiblePurchases.reduce((s, x) => s + (x.igst || 0), 0)),
+      cess: round2(itcEligiblePurchases.reduce((s, x) => s + (x.cess || 0), 0)),
     };
 
     const netPayable = {

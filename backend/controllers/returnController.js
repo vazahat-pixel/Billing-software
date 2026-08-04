@@ -5,6 +5,7 @@ const InventoryLot = require('../models/InventoryLot');
 const StockMovement = require('../models/StockMovement');
 const Counter = require('../models/Counter');
 const accountingService = require('../services/accountingService');
+const auditService = require('../services/auditService');
 
 async function generateReturnNo(companyId, type, session = null) {
   const prefix = type === 'Sales' ? 'SR' : 'PR';
@@ -28,6 +29,10 @@ exports.createReturn = async (req, res) => {
       session.endSession();
       return res.status(400).json({ success: false, message: 'Type, party, items, and amounts are required' });
     }
+
+    // Check GST period is not locked/filed
+    const gstConfigService = require('../services/gstConfigService');
+    await gstConfigService.assertPeriodOpen(companyId, date || new Date());
 
     const finalInvoiceNo = invoiceNo || await generateReturnNo(companyId, returnType, session);
 
@@ -142,7 +147,7 @@ exports.createReturn = async (req, res) => {
     // Post accounting entries (fixed refType to use 'SalesReturn'/'PurchaseReturn')
     // =====================================================================
     const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
-    const partyLedger = await accountingService.getOrCreatePartyLedger(companyId, partyId);
+    const partyLedger = await accountingService.getOrCreatePartyLedger(companyId, partyId, session);
     const gstAmt = parseFloat(gstAmount || 0);
     const taxableAmt = parseFloat(taxableAmount);
     const netAmt = parseFloat(netAmount);
@@ -150,10 +155,10 @@ exports.createReturn = async (req, res) => {
     const lines = [];
 
     if (returnType === 'Sales') {
-      const salesReturnLedger = await accountingService.getSystemLedger(companyId, 'Sales Return A/c');
-      const cgstLedger = await accountingService.getSystemLedger(companyId, 'CGST Output');
-      const sgstLedger = await accountingService.getSystemLedger(companyId, 'SGST Output');
-      const igstLedger = await accountingService.getSystemLedger(companyId, 'IGST Output');
+      const salesReturnLedger = await accountingService.getSystemLedger(companyId, 'Sales Return A/c', session);
+      const cgstLedger = await accountingService.getSystemLedger(companyId, 'CGST Output', session);
+      const sgstLedger = await accountingService.getSystemLedger(companyId, 'SGST Output', session);
+      const igstLedger = await accountingService.getSystemLedger(companyId, 'IGST Output', session);
 
       // Contra-income: Dr Sales Return (not Sales A/c) so gross sales stay intact
       lines.push({ ledgerId: salesReturnLedger._id, ledgerName: salesReturnLedger.name, type: 'Dr', amount: taxableAmt, narration: `Sales Return #${finalInvoiceNo}` });
@@ -173,10 +178,10 @@ exports.createReturn = async (req, res) => {
 
       lines.push({ ledgerId: partyLedger._id, ledgerName: partyLedger.name, type: 'Cr', amount: netAmt, narration: `Credit to Customer for Return #${finalInvoiceNo}` });
     } else {
-      const purchaseReturnLedger = await accountingService.getSystemLedger(companyId, 'Purchase Return A/c');
-      const cgstLedger = await accountingService.getSystemLedger(companyId, 'CGST Input');
-      const sgstLedger = await accountingService.getSystemLedger(companyId, 'SGST Input');
-      const igstLedger = await accountingService.getSystemLedger(companyId, 'IGST Input');
+      const purchaseReturnLedger = await accountingService.getSystemLedger(companyId, 'Purchase Return A/c', session);
+      const cgstLedger = await accountingService.getSystemLedger(companyId, 'CGST Input', session);
+      const sgstLedger = await accountingService.getSystemLedger(companyId, 'SGST Input', session);
+      const igstLedger = await accountingService.getSystemLedger(companyId, 'IGST Input', session);
 
       lines.push({ ledgerId: partyLedger._id, ledgerName: partyLedger.name, type: 'Dr', amount: netAmt, narration: `Debit to Supplier for Return #${finalInvoiceNo}` });
       lines.push({ ledgerId: purchaseReturnLedger._id, ledgerName: purchaseReturnLedger.name, type: 'Cr', amount: taxableAmt, narration: `Purchase Return #${finalInvoiceNo}` });
@@ -207,6 +212,14 @@ exports.createReturn = async (req, res) => {
     }], { session });
 
     await session.commitTransaction();
+
+    // Audit log
+    await auditService.log(req, `CREATE_${returnType.toUpperCase()}_RETURN`, 'ReturnInvoice', rInvoice._id, null, {
+      invoiceNo: rInvoice.invoiceNo,
+      returnType,
+      amount: rInvoice.netAmount
+    });
+
     res.status(201).json({ success: true, data: rInvoice });
   } catch (error) {
     await session.abortTransaction();

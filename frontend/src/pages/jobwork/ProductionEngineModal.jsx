@@ -369,7 +369,7 @@ const ProductionEngineModal = ({ isOpen, onClose, initialTab = 'Board' }) => {
               onChange={setSelectedJobId}
             />
             <ERPSearchableSelect label="Finished item" options={finishedItems} value={outputItemId} onChange={setOutputItemId} />
-            <ERPInput label="Received mtrs" type="number" value={receiveQty} onChange={(e) => setReceiveQty(e.target.value)} />
+            <ERPInput label="Received mtrs" type="number" value={receiveQty} onChange={(e) => setReceiveQty(e.target.value)} max={selectedJob?.issueQty} />
             <ERPInput label="Received pcs" type="number" value={receivePcs} onChange={(e) => setReceivePcs(e.target.value)} />
             <ERPInput label="Process rate / mtr" type="number" value={rate} onChange={(e) => setRate(e.target.value)} />
             <ERPInput label="GST %" type="number" value={gstPercent} onChange={(e) => setGstPercent(e.target.value)} />

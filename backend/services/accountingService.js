@@ -40,28 +40,32 @@ class AccountingService {
   }
 
   // Get or auto-create system ledger
-  async getSystemLedger(companyId, name) {
-    let ledger = await LedgerMaster.findOne({ companyId, name });
+  async getSystemLedger(companyId, name, session = null) {
+    let ledger = await LedgerMaster.findOne({ companyId, name }).session(session);
     if (!ledger) {
       const template = SYSTEM_LEDGER_TEMPLATES.find(t => t.name === name) || {
         name,
         group: 'Expenses',
         subGroup: 'General'
       };
-      ledger = await LedgerMaster.create({
-        companyId,
-        ...template,
-        isSystemLedger: true
-      });
+      ledger = await LedgerMaster.create(
+        [{
+          companyId,
+          ...template,
+          isSystemLedger: true
+        }],
+        { session }
+      );
+      if (Array.isArray(ledger)) ledger = ledger[0];
     }
     return ledger;
   }
 
   // Get or auto-create party ledger
-  async getOrCreatePartyLedger(companyId, partyId) {
-    let ledger = await LedgerMaster.findOne({ companyId, linkedPartyId: partyId });
+  async getOrCreatePartyLedger(companyId, partyId, session = null) {
+    let ledger = await LedgerMaster.findOne({ companyId, linkedPartyId: partyId }).session(session);
     if (!ledger) {
-      const party = await Party.findOne({ _id: partyId, companyId });
+      const party = await Party.findOne({ _id: partyId, companyId }).session(session);
       if (!party) {
         throw new Error(`Party with ID ${partyId} not found`);
       }
@@ -70,17 +74,21 @@ class AccountingService {
       const group = isCreditor ? 'Liabilities' : 'Assets';
       const subGroup = isCreditor ? 'Sundry Creditors' : 'Sundry Debtors';
 
-      ledger = await LedgerMaster.create({
-        companyId,
-        name: party.name,
-        group,
-        subGroup,
-        linkedPartyId: partyId,
-        accountType: 'Party',
-        nature: isCreditor ? 'Cr' : 'Dr',
-        openingBalance: party.openingBalance || 0,
-        openingBalanceType: party.openingBalanceType || (isCreditor ? 'Cr' : 'Dr')
-      });
+      const created = await LedgerMaster.create(
+        [{
+          companyId,
+          name: party.name,
+          group,
+          subGroup,
+          linkedPartyId: partyId,
+          accountType: 'Party',
+          nature: isCreditor ? 'Cr' : 'Dr',
+          openingBalance: party.openingBalance || 0,
+          openingBalanceType: party.openingBalanceType || (isCreditor ? 'Cr' : 'Dr')
+        }],
+        { session }
+      );
+      ledger = Array.isArray(created) ? created[0] : created;
     }
     return ledger;
   }
@@ -105,11 +113,11 @@ class AccountingService {
       const companyId = invoice.companyId;
       const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
 
-      const customerLedger = await this.getOrCreatePartyLedger(companyId, invoice.customerId);
-      const salesLedger = await this.getSystemLedger(companyId, 'Sales A/c');
-      const cgstLedger = await this.getSystemLedger(companyId, 'CGST Output');
-      const sgstLedger = await this.getSystemLedger(companyId, 'SGST Output');
-      const igstLedger = await this.getSystemLedger(companyId, 'IGST Output');
+      const customerLedger = await this.getOrCreatePartyLedger(companyId, invoice.customerId, session);
+      const salesLedger = await this.getSystemLedger(companyId, 'Sales A/c', session);
+      const cgstLedger = await this.getSystemLedger(companyId, 'CGST Output', session);
+      const sgstLedger = await this.getSystemLedger(companyId, 'SGST Output', session);
+      const igstLedger = await this.getSystemLedger(companyId, 'IGST Output', session);
 
       const round2 = (n) => Number(Number(n || 0).toFixed(2));
       const netAmount = round2(invoice.netAmount);
@@ -141,7 +149,7 @@ class AccountingService {
       if (igst > 0) lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Cr', amount: igst, narration: `IGST Output #${invoice.invoiceNo}` });
 
       if (tcs > 0) {
-        const tcsLedger = await this.getSystemLedger(companyId, 'TCS Payable');
+        const tcsLedger = await this.getSystemLedger(companyId, 'TCS Payable', session);
         lines.push({
           ledgerId: tcsLedger._id,
           ledgerName: tcsLedger.name,
@@ -160,7 +168,7 @@ class AccountingService {
       });
       const salesGap = round2(salesDr - salesCr);
       if (Math.abs(salesGap) >= 0.01) {
-        const roundLedger = await this.getSystemLedger(companyId, 'Round Off');
+        const roundLedger = await this.getSystemLedger(companyId, 'Round Off', session);
         if (salesGap > 0) {
           lines.push({ ledgerId: roundLedger._id, ledgerName: roundLedger.name, type: 'Cr', amount: round2(Math.abs(salesGap)), narration: `Round off #${invoice.invoiceNo}` });
         } else {
@@ -183,11 +191,11 @@ class AccountingService {
       const companyId = bill.companyId;
       const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
 
-      const supplierLedger = await this.getOrCreatePartyLedger(companyId, bill.supplierId);
-      const purchaseLedger = await this.getSystemLedger(companyId, 'Purchase A/c');
-      const cgstLedger = await this.getSystemLedger(companyId, 'CGST Input');
-      const sgstLedger = await this.getSystemLedger(companyId, 'SGST Input');
-      const igstLedger = await this.getSystemLedger(companyId, 'IGST Input');
+      const supplierLedger = await this.getOrCreatePartyLedger(companyId, bill.supplierId, session);
+      const purchaseLedger = await this.getSystemLedger(companyId, 'Purchase A/c', session);
+      const cgstLedger = await this.getSystemLedger(companyId, 'CGST Input', session);
+      const sgstLedger = await this.getSystemLedger(companyId, 'SGST Input', session);
+      const igstLedger = await this.getSystemLedger(companyId, 'IGST Input', session);
 
       const round2 = (n) => Number(Number(n || 0).toFixed(2));
       const netAmount = round2(bill.netAmount);
@@ -205,17 +213,17 @@ class AccountingService {
       if (isRcm) {
         // RCM: Dr Input ITC + Cr RCM Liability; supplier payable = taxable (ex-GST) net of TDS
         if (cgst > 0) {
-          const cgstRcm = await this.getSystemLedger(companyId, 'CGST RCM');
+          const cgstRcm = await this.getSystemLedger(companyId, 'CGST RCM', session);
           lines.push({ ledgerId: cgstLedger._id, ledgerName: cgstLedger.name, type: 'Dr', amount: cgst, narration: `CGST Input (RCM) #${bill.invoiceNo}` });
           lines.push({ ledgerId: cgstRcm._id, ledgerName: cgstRcm.name, type: 'Cr', amount: cgst, narration: `CGST RCM Liability #${bill.invoiceNo}` });
         }
         if (sgst > 0) {
-          const sgstRcm = await this.getSystemLedger(companyId, 'SGST RCM');
+          const sgstRcm = await this.getSystemLedger(companyId, 'SGST RCM', session);
           lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Dr', amount: sgst, narration: `SGST Input (RCM) #${bill.invoiceNo}` });
           lines.push({ ledgerId: sgstRcm._id, ledgerName: sgstRcm.name, type: 'Cr', amount: sgst, narration: `SGST RCM Liability #${bill.invoiceNo}` });
         }
         if (igst > 0) {
-          const igstRcm = await this.getSystemLedger(companyId, 'IGST RCM');
+          const igstRcm = await this.getSystemLedger(companyId, 'IGST RCM', session);
           lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Dr', amount: igst, narration: `IGST Input (RCM) #${bill.invoiceNo}` });
           lines.push({ ledgerId: igstRcm._id, ledgerName: igstRcm.name, type: 'Cr', amount: igst, narration: `IGST RCM Liability #${bill.invoiceNo}` });
         }
@@ -229,7 +237,7 @@ class AccountingService {
       lines.push({ ledgerId: supplierLedger._id, ledgerName: supplierLedger.name, type: 'Cr', amount: netAmount, narration: `Purchase Bill #${bill.invoiceNo}` });
 
       if (tds > 0) {
-        const tdsLedger = await this.getSystemLedger(companyId, 'TDS Payable');
+        const tdsLedger = await this.getSystemLedger(companyId, 'TDS Payable', session);
         lines.push({
           ledgerId: tdsLedger._id,
           ledgerName: tdsLedger.name,
@@ -248,7 +256,7 @@ class AccountingService {
       });
       const gap = round2(dr - cr);
       if (Math.abs(gap) >= 0.01) {
-        const roundLedger = await this.getSystemLedger(companyId, 'Round Off');
+        const roundLedger = await this.getSystemLedger(companyId, 'Round Off', session);
         if (gap > 0) {
           lines.push({
             ledgerId: roundLedger._id,
@@ -343,9 +351,9 @@ class AccountingService {
       if (amount < 0.01) return null;
 
       const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
-      const millLedger = await this.getOrCreatePartyLedger(companyId, job.workerId);
-      const jwipLedger = await this.getSystemLedger(companyId, 'Job Work In Progress');
-      const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c');
+      const millLedger = await this.getOrCreatePartyLedger(companyId, job.workerId, session);
+      const jwipLedger = await this.getSystemLedger(companyId, 'Job Work In Progress', session);
+      const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c', session);
 
       const narr = `Mill Issue ${job.jobCardNo || ''} → ${millLedger.name} | ${job.processType || 'Process'} | ${qty} mts @ ₹${rate}/mtr`;
       const lines = [
@@ -390,9 +398,9 @@ class AccountingService {
       if (amount < 0.01) return null;
 
       const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
-      const millLedger = await this.getOrCreatePartyLedger(companyId, job.workerId);
-      const jwipLedger = await this.getSystemLedger(companyId, 'Job Work In Progress');
-      const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c');
+      const millLedger = await this.getOrCreatePartyLedger(companyId, job.workerId, session);
+      const jwipLedger = await this.getSystemLedger(companyId, 'Job Work In Progress', session);
+      const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c', session);
 
       const recvQty = parseFloat(receivedQty || job.receivedQty || 0);
       const narr = `Mill Receive ${job.jobCardNo || ''} from ${millLedger.name} | finished ${recvQty} mts | material back ${issueQty} mts`;
@@ -428,11 +436,11 @@ class AccountingService {
       const companyId = receive.companyId;
       const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
 
-      const jobChargesLedger = await this.getSystemLedger(companyId, 'Job Work Charges');
-      const cgstInputLedger = await this.getSystemLedger(companyId, 'CGST Input');
-      const sgstInputLedger = await this.getSystemLedger(companyId, 'SGST Input');
-      const igstInputLedger = await this.getSystemLedger(companyId, 'IGST Input');
-      const millLedger = await this.getOrCreatePartyLedger(companyId, receive.millId);
+      const jobChargesLedger = await this.getSystemLedger(companyId, 'Job Work Charges', session);
+      const cgstInputLedger = await this.getSystemLedger(companyId, 'CGST Input', session);
+      const sgstInputLedger = await this.getSystemLedger(companyId, 'SGST Input', session);
+      const igstInputLedger = await this.getSystemLedger(companyId, 'IGST Input', session);
+      const millLedger = await this.getOrCreatePartyLedger(companyId, receive.millId, session);
 
       const charges = parseFloat(receive.charges || receive.totalAmount || 0);
       const totalGst = parseFloat(receive.gstAmount || 0);
@@ -489,8 +497,8 @@ class AccountingService {
   async onAbnormalWastagePost(companyId, qty, costPerUnit, refId = null, session = null) {
     try {
       const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
-      const lossLedger = await this.getSystemLedger(companyId, 'Production Loss A/c');
-      const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c');
+      const lossLedger = await this.getSystemLedger(companyId, 'Production Loss A/c', session);
+      const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c', session);
       const amount = Number((parseFloat(qty) * parseFloat(costPerUnit)).toFixed(2));
 
       const lines = [
