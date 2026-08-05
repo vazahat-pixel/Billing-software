@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { withTransaction } = require('../utils/withTransaction');
 const Purchase = require('../models/Purchase');
 const InventoryLot = require('../models/InventoryLot');
 const StockMovement = require('../models/StockMovement');
@@ -6,9 +7,7 @@ const AccountingEntry = require('../models/AccountingEntry');
 
 class PurchaseService {
   async createPurchase(purchaseData) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
+    return withTransaction(async (session) => {
     try {
       // Strip offline / client-only ids — Mongo ObjectId cannot be "local-…"
       const {
@@ -167,7 +166,6 @@ class PurchaseService {
         console.warn('BillSettlement sync after purchase:', syncErr.message);
       }
 
-      await session.commitTransaction();
       try {
         const eventBus = require('../events/eventBus');
         eventBus.emitSafe('purchase.created', {
@@ -180,7 +178,6 @@ class PurchaseService {
       } catch { /* optional */ }
       return purchase;
     } catch (error) {
-      await session.abortTransaction();
       if (error && error.code === 11000) {
         const AppError = require('../utils/AppError');
         const fields = Object.keys(error.keyPattern || {});
@@ -205,9 +202,8 @@ class PurchaseService {
         );
       }
       throw error;
-    } finally {
-      session.endSession();
     }
+    }); // end withTransaction
   }
 
   /** Reverses the accounting entry linked to a purchase (used by both edit and cancel). */
@@ -253,9 +249,7 @@ class PurchaseService {
    * posts a fresh accounting entry.
    */
   async updatePurchase(id, companyId, purchaseData) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
+    return withTransaction(async (session) => {
     try {
       const purchase = await Purchase.findOne({ _id: id, companyId }).session(session);
       if (!purchase) throw new Error('Purchase not found');
@@ -405,7 +399,6 @@ class PurchaseService {
         console.warn('BillSettlement sync after purchase update:', syncErr.message);
       }
 
-      await session.commitTransaction();
       try {
         const eventBus = require('../events/eventBus');
         eventBus.emitSafe('purchase.updated', {
@@ -420,7 +413,6 @@ class PurchaseService {
       }
       return purchase;
     } catch (error) {
-      await session.abortTransaction();
       if (error && error.code === 11000) {
         const AppError = require('../utils/AppError');
         const fields = Object.keys(error.keyPattern || {});
@@ -436,9 +428,8 @@ class PurchaseService {
         );
       }
       throw error;
-    } finally {
-      session.endSession();
     }
+    }); // end withTransaction
   }
 
   async getPurchases(companyId, { page = 1, limit = 100, startDate, endDate, status } = {}) {
@@ -495,9 +486,7 @@ class PurchaseService {
    * FIXED: Cancel now creates proper accounting reversal entry.
    */
   async deletePurchase(id, companyId) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
+    return withTransaction(async (session) => {
       const purchase = await Purchase.findOne({ _id: id, companyId }).session(session);
       if (!purchase) throw new Error('Purchase not found');
 
@@ -507,7 +496,6 @@ class PurchaseService {
           { isDeleted: true, deletedAt: new Date() },
           { session }
         );
-        await session.commitTransaction();
         return { message: 'Purchase soft-deleted' };
       }
 
@@ -529,14 +517,8 @@ class PurchaseService {
       const outstandingEngine = require('./outstandingEngineService');
       await outstandingEngine.syncBillFromPurchase(companyId, purchase, session);
 
-      await session.commitTransaction();
       return purchase;
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
-    }
+    }); // end withTransaction
   }
 }
 
