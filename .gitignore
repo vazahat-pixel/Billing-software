@@ -68,8 +68,6 @@ backend/qa/reports/output/
 backend/scratch/
 scratch/
 backend/scripts/seedFeatureSetup.js
-backend/scripts/testOfflineFeature.js
-backend/scripts/testOfflineIntegration.js
 
 # PDF / binary assets not needed in repo
 *.pdf
