@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-   "build": "cd frontend && pnpm install --frozen-lockfile && pnpm run build && cd ..",
+    "build": "cd frontend && npm install && npm run build && cd ..",
     "install": "cd backend && npm install && cd ..",
     "desktop:start": "cd desktop && npm start",
     "desktop:dist": "cd desktop && npm run dist:win"

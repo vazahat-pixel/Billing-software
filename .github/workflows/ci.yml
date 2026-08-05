@@ -104,24 +104,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Build frontend
         working-directory: frontend
-        run: pnpm run build
+        run: npm run build
 
       - name: Lint
         working-directory: frontend
-        run: pnpm run lint
+        run: npm run lint
         continue-on-error: true
 
   frontend-e2e-smoke:
@@ -133,24 +129,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend
         working-directory: frontend
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Install Playwright browser
         working-directory: frontend
-        run: pnpm exec playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Smoke + keyboard E2E
         working-directory: frontend
-        run: pnpm run test:e2e:cert
+        run: npm run test:e2e:cert
         continue-on-error: true
 
   quality-gate:

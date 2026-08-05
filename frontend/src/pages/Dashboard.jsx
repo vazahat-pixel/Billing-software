@@ -533,22 +533,36 @@ const Dashboard = () => {
          return new Date(d).toLocaleDateString('en-IN');
       };
       const acts = [];
-      sales.slice(0, 3).forEach((s) => acts.push({
+      
+      sales.forEach((s) => acts.push({
         text: `Sales Invoice ${s.invoiceNo} — ₹${(s.netAmount || 0).toLocaleString('en-IN')}`,
-        time: fmtRel(s.date || s.createdAt),
+        timeStr: fmtRel(s.date || s.createdAt),
+        timestamp: new Date(s.date || s.createdAt).getTime(),
         type: 'sales'
       }));
-      purchases.slice(0, 2).forEach((p) => acts.push({
-        text: `Purchase Bill ${p.billNo || p.invoiceNo}`,
-        time: fmtRel(p.date || p.createdAt),
+      
+      purchases.forEach((p) => acts.push({
+        text: `Purchase Bill ${p.billNo || p.invoiceNo || 'N/A'} — ₹${(p.netAmount || 0).toLocaleString('en-IN')}`,
+        timeStr: fmtRel(p.date || p.createdAt),
+        timestamp: new Date(p.date || p.createdAt).getTime(),
         type: 'purchase'
       }));
-      jobWorkEntries.slice(0, 2).forEach((j) => acts.push({
-        text: `Job ${j.jobCardNo} — ${j.status}`,
-        time: fmtRel(j.issueDate || j.createdAt),
+      
+      jobWorkEntries.forEach((j) => acts.push({
+        text: `${j.status === 'Issued' ? 'Mill Issue' : 'Mill Receipt'} ${j.jobCardNo || j.challanNo} — ${j.status}`,
+        timeStr: fmtRel(j.issueDate || j.createdAt),
+        timestamp: new Date(j.issueDate || j.createdAt).getTime(),
         type: 'job'
       }));
-      return acts.slice(0, 6);
+      
+      // Sort chronologically descending
+      acts.sort((a, b) => b.timestamp - a.timestamp);
+      
+      return acts.slice(0, 6).map(act => ({
+        text: act.text,
+        time: act.timeStr,
+        type: act.type
+      }));
    }, [sales, purchases, jobWorkEntries]);
 
    const handleMenuItemClick = (item) => {

@@ -7,8 +7,7 @@ import { toast } from '../../store/useToastStore';
 import { Plus } from 'lucide-react';
 import AccountMasterModal from '../masters/AccountMasterModal';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
-import WeaverLookupModal from './WeaverLookupModal';
-import PuBillLookupModal from './PuBillLookupModal';
+import { buildPuBillRows } from './puBillLookupUtils';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -105,8 +104,6 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   const [lotSort, setLotSort] = useState('asc');
   const [accountModal, setAccountModal] = useState({ open: false, initialData: null });
   const [findOpen, setFindOpen] = useState(false);
-  const [weaverLookupOpen, setWeaverLookupOpen] = useState(false);
-  const [puBillLookupOpen, setPuBillLookupOpen] = useState(false);
   const [fromPurchase, setFromPurchase] = useState(null);
 
   const locked = mode === 'View';
@@ -132,6 +129,63 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     () => mills.map((m) => ({ value: m._id || m.id, label: m.name })),
     [mills]
   );
+
+  const weaverOptions = useMemo(() => {
+    const weaverNames = new Set();
+
+    // 1. Add all suppliers/weavers from the master Parties list
+    (parties || []).forEach((p) => {
+      const type = String(p.type || '');
+      const group = String(p.group || '').toUpperCase();
+      if (
+        type === 'Supplier' ||
+        type === 'Both' ||
+        group.includes('SUPPLIER') ||
+        group.includes('WEAVER')
+      ) {
+        if (p.name) weaverNames.add(p.name.trim());
+      }
+    });
+
+    // 2. Add any associated suppliers/weavers from inventory lots
+    const purchaseById = new Map((purchases || []).map((p) => [String(p._id || p.id), p]));
+    (inventoryLots || []).forEach((lot) => {
+      const pid = String(lot.purchaseId?._id || lot.purchaseId || '');
+      const purchase = pid ? purchaseById.get(pid) : null;
+      const supplierName =
+        purchase?.supplierId?.name ||
+        purchase?.supplierName ||
+        purchase?.partyName ||
+        '';
+
+      if (supplierName) {
+        weaverNames.add(supplierName.trim());
+      }
+      if (lot.weaver) {
+        weaverNames.add(lot.weaver.trim());
+      }
+    });
+
+    return Array.from(weaverNames)
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({ value: name, label: name }));
+  }, [parties, inventoryLots, purchases]);
+
+  const puBillOptions = useMemo(() => {
+    if (!form.weaver) return [];
+    const rows = buildPuBillRows({
+      inventoryLots,
+      purchases,
+      items,
+      weaver: form.weaver,
+    });
+
+    return rows.map((r) => ({
+      value: r.billNo,
+      label: `${r.billNo} · ${r.itemName} · ${r.balPcs} pcs / ${Number(r.balMts).toFixed(2)} mts`,
+      raw: r,
+    }));
+  }, [inventoryLots, purchases, items, form.weaver]);
 
   const purchaseLots = useMemo(
     () => findLotsFromPurchase(inventoryLots, fromPurchase),
@@ -265,48 +319,71 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
 
   const applyPuBillRow = (row) => {
     if (!row) return;
+    const finalPcs = Number(row.balPcs) > 0 ? row.balPcs : (row.pcs || '');
+    const finalMts = Number(row.balMts) > 0 ? row.balMts : (row.mts || '');
     setForm((f) => ({
       ...f,
       puBillNo: row.billNo || f.puBillNo,
       itemName: row.itemName || f.itemName,
       lotId: row.lotId || f.lotId,
-      issPcs: row.balPcs != null ? String(row.balPcs) : f.issPcs,
-      issQty: row.balMts != null ? String(row.balMts) : f.issQty,
+      issPcs: finalPcs != null ? String(finalPcs) : f.issPcs,
+      issQty: finalMts != null ? String(finalMts) : f.issQty,
       puRate: row.puRate != null ? String(row.puRate) : f.puRate,
     }));
     toast.success(`Loaded ${row.billNo} · ${row.itemName}`);
   };
 
-  const handleWeaverSelect = (party) => {
-    setField('weaver', party?.name || '');
-    setWeaverLookupOpen(false);
-    if (!locked) setTimeout(() => setPuBillLookupOpen(true), 80);
+  const handleWeaverChange = (val) => {
+    setForm((f) => ({
+      ...f,
+      weaver: val || '',
+      puBillNo: '',
+      itemName: '',
+      lotId: '',
+      issPcs: '',
+      issQty: '',
+      puRate: '',
+    }));
   };
 
-  const openWeaverLookup = () => {
-    if (locked) return;
-    setWeaverLookupOpen(true);
-  };
-
-  const openPuBillLookup = () => {
-    if (locked) return;
-    if (!form.weaver?.trim()) {
-      toast.warning('Select Weaver first');
-      setWeaverLookupOpen(true);
+  const handlePuBillChange = (val, option) => {
+    if (!val) {
+      setForm((f) => ({
+        ...f,
+        puBillNo: '',
+        itemName: '',
+        lotId: '',
+        issPcs: '',
+        issQty: '',
+        puRate: '',
+      }));
       return;
     }
-    setPuBillLookupOpen(true);
+    const row = option?.raw;
+    applyPuBillRow(row);
   };
 
   const applyLot = (lotId) => {
     const lot = availableLots.find((l) => String(l._id || l.id) === String(lotId));
     if (!lot) {
-      setForm((f) => ({ ...f, lotId: '', itemName: '', issPcs: '', issQty: '', puRate: '' }));
+      setForm((f) => ({ ...f, lotId: '', itemName: '', issPcs: '', issQty: '', puRate: '', weaver: '', puBillNo: '' }));
       return;
     }
     const itemName = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
     const puRate =
       lot.rate ?? lot.purchaseRate ?? lot.avgRate ?? lot.itemId?.purchaseRate ?? '';
+    
+    // Look up supplier name (weaver) from purchases associated with this lot
+    const purchaseById = new Map((purchases || []).map((p) => [String(p._id || p.id), p]));
+    const pid = String(lot.purchaseId?._id || lot.purchaseId || '');
+    const purchase = pid ? purchaseById.get(pid) : null;
+    const supplierName =
+      purchase?.supplierId?.name ||
+      purchase?.supplierName ||
+      purchase?.partyName ||
+      lot.weaver ||
+      '';
+
     setForm((f) => ({
       ...f,
       lotId,
@@ -315,6 +392,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       issQty: String(lot.remainingMtrs ?? ''),
       puRate: puRate !== '' && puRate != null ? String(puRate) : f.puRate,
       puBillNo: f.puBillNo || lot.invoiceNo || lot.purchaseInvoiceNo || '',
+      weaver: f.weaver || supplierName || '',
     }));
   };
 
@@ -611,55 +689,33 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                     </div>
                   </div>
 
-                  <div className="classic-erp-field">
+                  <div className="classic-erp-field classic-erp-field--lg">
                     <span className="classic-erp-label">Weaver</span>
                     <div className="classic-erp-control">
-                      <input
-                        type="text"
-                        className="classic-erp-input cursor-pointer"
+                      <ERPCombobox
                         value={form.weaver}
-                        readOnly
-                        onFocus={openWeaverLookup}
-                        onClick={openWeaverLookup}
+                        onChange={handleWeaverChange}
                         disabled={locked}
-                        placeholder="Click to select weaver…"
+                        options={weaverOptions}
+                        placeholder="Search Weaver…"
+                        recentKey="mill-issue-weaver"
+                        allowClear
                       />
-                      {!locked && (
-                        <button
-                          type="button"
-                          className="classic-erp-btn erp-job-issue-lookup-btn"
-                          onClick={openWeaverLookup}
-                          aria-label="Select weaver"
-                        >
-                          …
-                        </button>
-                      )}
                     </div>
                   </div>
 
-                  <div className="classic-erp-field">
+                  <div className="classic-erp-field classic-erp-field--lg">
                     <span className="classic-erp-label">Pu.BillNo</span>
                     <div className="classic-erp-control">
-                      <input
-                        type="text"
-                        className="classic-erp-input cursor-pointer font-bold"
+                      <ERPCombobox
                         value={form.puBillNo}
-                        readOnly
-                        onFocus={openPuBillLookup}
-                        onClick={openPuBillLookup}
+                        onChange={handlePuBillChange}
                         disabled={locked}
-                        placeholder="Select bill…"
+                        options={puBillOptions}
+                        placeholder={form.weaver ? "Select purchase bill…" : "Select weaver first…"}
+                        recentKey="mill-issue-pubill"
+                        allowClear
                       />
-                      {!locked && (
-                        <button
-                          type="button"
-                          className="classic-erp-btn erp-job-issue-lookup-btn"
-                          onClick={openPuBillLookup}
-                          aria-label="Select purchase bill"
-                        >
-                          …
-                        </button>
-                      )}
                     </div>
                   </div>
 
@@ -676,65 +732,76 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                   </div>
 
                   <div className="erp-job-issue-metrics">
-                    <div className="classic-erp-field">
-                      <span className="classic-erp-label">Iss Pcs</span>
-                      <input
-                        type="number"
-                        className="classic-erp-input text-right font-bold"
-                        value={form.issPcs}
-                        onChange={(e) => setField('issPcs', e.target.value)}
-                        disabled={locked}
-                      />
+                    {/* Column 1: Iss Pcs & Iss Qty */}
+                    <div className="flex flex-col gap-1">
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label">Iss Pcs</span>
+                        <input
+                          type="number"
+                          className="classic-erp-input text-right font-bold"
+                          value={form.issPcs}
+                          onChange={(e) => setField('issPcs', e.target.value)}
+                          disabled={locked}
+                        />
+                      </div>
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label red-label">Iss Qty</span>
+                        <input
+                          type="number"
+                          step="0.001"
+                          className="classic-erp-input text-right font-bold"
+                          value={form.issQty}
+                          onChange={(e) => setField('issQty', e.target.value)}
+                          disabled={locked}
+                          required
+                        />
+                      </div>
                     </div>
-                    <div className="classic-erp-field">
-                      <span className="classic-erp-label red-label">Iss Qty</span>
-                      <input
-                        type="number"
-                        step="0.001"
-                        className="classic-erp-input text-right font-bold"
-                        value={form.issQty}
-                        onChange={(e) => setField('issQty', e.target.value)}
-                        disabled={locked}
-                        required
-                      />
+
+                    {/* Column 2: Pu.Rate & JobRate */}
+                    <div className="flex flex-col gap-1">
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label">Pu.Rate</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="classic-erp-input text-right"
+                          value={form.puRate}
+                          onChange={(e) => setField('puRate', e.target.value)}
+                          disabled={locked}
+                        />
+                      </div>
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label">JobRate</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="classic-erp-input text-right font-bold"
+                          value={form.jobRate}
+                          onChange={(e) => setField('jobRate', e.target.value)}
+                          disabled={locked}
+                        />
+                      </div>
                     </div>
-                    <div className="classic-erp-field">
-                      <span className="classic-erp-label">Pu.Rate</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="classic-erp-input text-right"
-                        value={form.puRate}
-                        onChange={(e) => setField('puRate', e.target.value)}
-                        disabled={locked}
-                      />
-                    </div>
-                    <div className="classic-erp-field">
-                      <span className="classic-erp-label">JobRate</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="classic-erp-input text-right font-bold"
-                        value={form.jobRate}
-                        onChange={(e) => setField('jobRate', e.target.value)}
-                        disabled={locked}
-                      />
-                    </div>
-                    <div className="classic-erp-field erp-job-issue-lot">
-                      <span className="classic-erp-label red-label">Lot No.</span>
-                      <ERPCombobox
-                        value={form.lotId}
-                        onChange={(val) => applyLot(val)}
-                        disabled={locked}
-                        options={lotOptions}
-                        placeholder="Select lot…"
-                        recentKey="mill-issue-lot"
-                        allowClear
-                      />
+
+                    {/* Column 3: Lot No. */}
+                    <div className="flex flex-col gap-1">
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label red-label">Lot No.</span>
+                        <ERPCombobox
+                          value={form.lotId}
+                          onChange={(val) => applyLot(val)}
+                          disabled={locked}
+                          options={lotOptions}
+                          placeholder="Select lot…"
+                          recentKey="mill-issue-lot"
+                          allowClear
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="classic-erp-field classic-erp-field--lg">
+                  <div className="classic-erp-field classic-erp-field--lg mt-4">
                     <span className="classic-erp-label">Remark</span>
                     <div className="classic-erp-control classic-erp-control--stack">
                       <input
@@ -897,23 +964,6 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         onClose={() => setAccountModal({ open: false, initialData: null })}
         initialData={accountModal.initialData}
         onSuccess={handleMillSuccess}
-      />
-
-      <WeaverLookupModal
-        isOpen={weaverLookupOpen}
-        onClose={() => setWeaverLookupOpen(false)}
-        parties={parties}
-        onSelect={handleWeaverSelect}
-      />
-
-      <PuBillLookupModal
-        isOpen={puBillLookupOpen}
-        onClose={() => setPuBillLookupOpen(false)}
-        weaver={form.weaver}
-        inventoryLots={inventoryLots}
-        purchases={purchases}
-        items={items}
-        onSelect={applyPuBillRow}
       />
     </>
   );
