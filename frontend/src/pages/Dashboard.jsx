@@ -45,6 +45,7 @@ import SalesOutstanding from './reports/SalesOutstanding';
 import OutstandingReportModal from './reports/OutstandingReportModal';
 import GstComplianceReportsModal from './reports/GstComplianceReportsModal';
 import SystemUtilitiesModal from './utilities/SystemUtilitiesModal';
+import TrialBalanceModal from './accounting/TrialBalanceModal';
 import LotNoEntryModal from './inventory/LotNoEntryModal';
 import IssueMultipleModal from './jobwork/IssueMultipleModal';
 import CuttingBeamEntryModal from './inventory/CuttingBeamEntryModal';
@@ -303,6 +304,7 @@ const Dashboard = () => {
       tdsEntry: false,
       gstComplianceReports: false,
       systemUtilities: false,
+      zTrial: false,
       issueMultiple: false,
       lotNoEntry: false,
       cuttingEntry: false,
@@ -636,6 +638,7 @@ const Dashboard = () => {
          { label: 'Outstanding Report (Purchase)', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
          { label: 'GSTR-1', key: 'gstr1' },
          { label: 'CA Desk', key: 'caDashboard' },
+         { label: 'Z Trial (Trial Balance)', action: () => setModals(prev => ({ ...prev, zTrial: true })) },
       ],
       'Others Reports': [
          { label: 'Outstanding Zoom', key: 'outstanding' },
@@ -953,6 +956,7 @@ const Dashboard = () => {
                         <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => toggleModal('caDashboard', true)}>CA Desk</button>
                      )}
                      <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => toggleModal('ledger', true)}>Ledger</button>
+                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => setModals(prev => ({ ...prev, zTrial: true }))}>Z Trial</button>
                      <button type="button" className="erp-btn erp-btn-primary h-7 px-3 text-[11px]" onClick={() => toggleModal('sales', true)}>+ Invoice</button>
                   </div>
                </div>
@@ -1069,7 +1073,13 @@ const Dashboard = () => {
          <UpdateModal isOpen={modals.jobIssue} onClose={() => toggleModal('jobIssue', false)} selectedBook={selectedBooks.jobIssue?.name} />
          <JobReceiptModal isOpen={modals.jobRec} onClose={() => toggleModal('jobRec', false)} selectedBook={selectedBooks.jobRec?.name} />
          <ProcessUpdateModal isOpen={modals.updateJob} onClose={() => toggleModal('updateJob', false)} />
-         <LedgerModal isOpen={modals.ledger} onClose={() => toggleModal('ledger', false)} />
+         <LedgerModal
+            isOpen={modals.ledger}
+            onClose={() => toggleModal('ledger', false)}
+            onOpenJournal={() => setModals(prev => ({ ...prev, journal: true }))}
+            onOpenPayment={() => toggleModal('payment', true)}
+            onOpenReceipt={() => toggleModal('receipt', true)}
+         />
          <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters} />
          <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} readOnly={permissions.readOnlyMasters} />
          {modals.outstanding && <SalesOutstanding isOpen={modals.outstanding} onClose={() => toggleModal('outstanding', false)} />}
@@ -1098,6 +1108,12 @@ const Dashboard = () => {
             <SystemUtilitiesModal
                isOpen={modals.systemUtilities}
                onClose={() => setModals(prev => ({ ...prev, systemUtilities: false }))}
+            />
+         )}
+         {modals.zTrial && (
+            <TrialBalanceModal
+               isOpen={modals.zTrial}
+               onClose={() => setModals(prev => ({ ...prev, zTrial: false }))}
             />
          )}
          {modals.lotNoEntry && (

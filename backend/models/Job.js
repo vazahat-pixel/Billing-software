@@ -113,6 +113,15 @@ const JobSchema = new mongoose.Schema({
     default: Date.now
   },
   receiveDate: Date,
+  receiveReversalEntryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AccountingEntry',
+    default: null,
+  },
+  receiveReversedAt: {
+    type: Date,
+    default: null,
+  },
   companyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',

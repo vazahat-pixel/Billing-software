@@ -37,6 +37,11 @@ const emptyBillRow = () => ({
   discount: 0,
   bc: '',
   netOs: 0,
+  claim: 0,
+  rd: 0,
+  interest: 0,
+  oth1: 0,
+  oth2: 0,
 });
 
 /**
@@ -110,6 +115,9 @@ const CashBankBookModal = ({
   // Cash book never shows P.Bank / Cheq / Slip — even if a cash-named book was picked from bank list
   const isBank = bookKind === 'bank' && !/cash/i.test(selectedBook?.name || bookTitle || '');
   const settlementKind = isBank ? 'bank' : 'cash';
+  // Slip No (pay-in slip) and P.Bank (which of the party's banks the cheque is drawn on)
+  // are only meaningful when depositing money IN — a Payment issues your own cheque instead.
+  const isBankReceipt = isBank && voucherType === 'Receipt';
 
   const selectedParty = useMemo(
     () => parties.find((p) => String(p._id || p.id) === String(header.partyId)),
@@ -218,6 +226,22 @@ const CashBankBookModal = ({
     () => billRows.reduce((s, r) => s + (Number(r.pq) || 0), 0),
     [billRows]
   );
+
+  /** Live per-column totals shown in the "(B.AMT-x)(TDS-x)..." breakdown bar. */
+  const breakdownTotals = useMemo(() => {
+    const sum = (key) => billRows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
+    return {
+      billAmt: sum('billAmt'),
+      tds: sum('tds'),
+      rg: sum('rg'),
+      claim: sum('claim'),
+      rd: sum('rd'),
+      discount: sum('discount'),
+      interest: sum('interest'),
+      oth1: sum('oth1'),
+      oth2: sum('oth2'),
+    };
+  }, [billRows]);
 
   const closingBal = useMemo(() => {
     if (selectedParty) {
@@ -402,7 +426,7 @@ const CashBankBookModal = ({
     setBillRows((rows) => {
       const next = [...rows];
       const row = { ...next[idx], [key]: value };
-      if (['disPer', 'osAmt', 'adjust', 'tds', 'discount', 'jvDis', 'rg', 'partRc'].includes(key)) {
+      if (['disPer', 'osAmt', 'adjust', 'tds', 'discount', 'jvDis', 'rg', 'partRc', 'claim', 'rd', 'interest', 'oth1', 'oth2'].includes(key)) {
         const os = Number(row.osAmt) || 0;
         const disPer = Number(row.disPer) || 0;
         if (key === 'disPer') {
@@ -413,7 +437,12 @@ const CashBankBookModal = ({
         const adjust = Number(row.adjust) || 0;
         const jvDis = Number(row.jvDis) || 0;
         const rg = Number(row.rg) || 0;
-        row.netOs = Number((os - adjust - discount - tds - jvDis - rg).toFixed(2));
+        const claim = Number(row.claim) || 0;
+        const rd = Number(row.rd) || 0;
+        const interest = Number(row.interest) || 0;
+        const oth1 = Number(row.oth1) || 0;
+        const oth2 = Number(row.oth2) || 0;
+        row.netOs = Number((os - adjust - discount - tds - jvDis - rg - claim - rd - interest - oth1 - oth2).toFixed(2));
       }
       next[idx] = row;
       return next;
@@ -459,6 +488,11 @@ const CashBankBookModal = ({
       discount: a.discount || 0,
       bc: a.bc || '',
       netOs: a.netOs || 0,
+      claim: a.claim || 0,
+      rd: a.rd || 0,
+      interest: a.interest || 0,
+      oth1: a.oth1 || 0,
+      oth2: a.oth2 || 0,
     }));
     setBillRows(rows.length ? rows : [emptyBillRow()]);
     setFooter({
@@ -569,6 +603,11 @@ const CashBankBookModal = ({
           bc: r.bc || '',
           netOs: Number(r.netOs) || 0,
           nSlash: r.nSlash || '',
+          claim: Number(r.claim) || 0,
+          rd: Number(r.rd) || 0,
+          interest: Number(r.interest) || 0,
+          oth1: Number(r.oth1) || 0,
+          oth2: Number(r.oth2) || 0,
         };
       })
       .filter(Boolean);
@@ -664,7 +703,7 @@ const CashBankBookModal = ({
             <div
               className="cash-bank-row"
               style={{
-                gridTemplateColumns: isBank
+                gridTemplateColumns: isBankReceipt
                   ? 'minmax(200px,1.1fr) minmax(180px,1fr) minmax(120px,0.7fr) auto'
                   : 'minmax(200px,1.1fr) minmax(180px,1fr) auto',
               }}
@@ -686,7 +725,7 @@ const CashBankBookModal = ({
                   <input type="text" className="classic-erp-input" value={header.intBillNo} onChange={setH('intBillNo')} disabled={locked} />
                 </div>
               </div>
-              {isBank && (
+              {isBankReceipt && (
                 <div className="classic-erp-field classic-erp-field--sm">
                   <span className="classic-erp-label">Slip No:</span>
                   <input type="text" className="classic-erp-input" value={header.slipNo} onChange={setH('slipNo')} disabled={locked} />
@@ -701,9 +740,11 @@ const CashBankBookModal = ({
             <div
               className="cash-bank-row"
               style={{
-                gridTemplateColumns: isBank
+                gridTemplateColumns: isBankReceipt
                   ? 'minmax(210px,1.1fr) minmax(140px,0.85fr) minmax(180px,1fr) minmax(220px,1.2fr)'
-                  : 'minmax(240px,1fr)',
+                  : isBank
+                    ? 'minmax(210px,1.1fr) minmax(140px,0.85fr) minmax(180px,1fr)'
+                    : 'minmax(240px,1fr)',
               }}
             >
               <div className="classic-erp-field">
@@ -723,34 +764,36 @@ const CashBankBookModal = ({
                     <span className="classic-erp-label">Date:</span>
                     <input type="date" className="classic-erp-input" value={header.chequeDate} onChange={setH('chequeDate')} disabled={locked} />
                   </div>
-                  <div className="classic-erp-field classic-erp-field--sm">
-                    <span className="classic-erp-label">P.Bank:</span>
-                    <div className="classic-erp-control">
-                      <ERPCombobox
-                        value={header.partyBank}
-                        onChange={(val) => setHeader((h) => ({ ...h, partyBank: val }))}
-                        options={partyBankOptions}
-                        placeholder={partyBankOptions.length ? 'Select party bank…' : 'No party bank — type & Add'}
-                        disabled={locked}
-                        recentKey="cash-bank-pbank"
-                        onCreateNew={!locked ? handleAddPartyBank : undefined}
-                        createLabel="P.Bank"
-                        emptyMessage="No party bank. Type name & Add"
-                        allowClear
-                      />
-                      {!locked && (
-                        <button
-                          type="button"
-                          title="Add P.Bank to party"
-                          onClick={() => handleAddPartyBank(header.partyBank)}
-                          style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 2, padding: '3px 8px', fontSize: 11, fontWeight: 700, color: '#fff', background: '#16a34a', border: 'none', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                        >
-                          <Plus size={11} /> Add
-                        </button>
-                      )}
-                    </div>
-                  </div>
                 </>
+              )}
+              {isBankReceipt && (
+                <div className="classic-erp-field classic-erp-field--sm">
+                  <span className="classic-erp-label">P.Bank:</span>
+                  <div className="classic-erp-control">
+                    <ERPCombobox
+                      value={header.partyBank}
+                      onChange={(val) => setHeader((h) => ({ ...h, partyBank: val }))}
+                      options={partyBankOptions}
+                      placeholder={partyBankOptions.length ? 'Select party bank…' : 'No party bank — type & Add'}
+                      disabled={locked}
+                      recentKey="cash-bank-pbank"
+                      onCreateNew={!locked ? handleAddPartyBank : undefined}
+                      createLabel="P.Bank"
+                      emptyMessage="No party bank. Type name & Add"
+                      allowClear
+                    />
+                    {!locked && (
+                      <button
+                        type="button"
+                        title="Add P.Bank to party"
+                        onClick={() => handleAddPartyBank(header.partyBank)}
+                        style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 2, padding: '3px 8px', fontSize: 11, fontWeight: 700, color: '#fff', background: '#16a34a', border: 'none', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                      >
+                        <Plus size={11} /> Add
+                      </button>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -817,6 +860,8 @@ const CashBankBookModal = ({
                   <th className="text-right">PartRc</th>
                   <th className="text-right">Rg</th>
                   <th className="text-right">Tds</th>
+                  <th className="text-right">Claim</th>
+                  <th className="text-right">RD</th>
                   <th className="text-center">OsDy</th>
                   <th>Type</th>
                   <th className="text-right">OsAmt</th>
@@ -825,6 +870,9 @@ const CashBankBookModal = ({
                   <th className="w-10">PQ</th>
                   <th className="text-right">Dis%</th>
                   <th className="text-right">Discount</th>
+                  <th className="text-right">Int</th>
+                  <th className="text-right">Oth1</th>
+                  <th className="text-right">Oth2</th>
                   <th className="w-10">Bc</th>
                   <th className="text-right">NetOs</th>
                 </tr>
@@ -855,6 +903,8 @@ const CashBankBookModal = ({
                     <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.partRc || ''} onChange={(e) => updateRow(idx, 'partRc', Number(e.target.value))} disabled={locked} /></td>
                     <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.rg || ''} onChange={(e) => updateRow(idx, 'rg', Number(e.target.value))} disabled={locked} /></td>
                     <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.tds || ''} onChange={(e) => updateRow(idx, 'tds', Number(e.target.value))} disabled={locked} /></td>
+                    <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.claim || ''} onChange={(e) => updateRow(idx, 'claim', Number(e.target.value))} disabled={locked} /></td>
+                    <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.rd || ''} onChange={(e) => updateRow(idx, 'rd', Number(e.target.value))} disabled={locked} /></td>
                     <td className="text-center font-mono">{row.osDy || 0}</td>
                     <td><input type="text" className="classic-erp-input w-full border-0 bg-transparent" value={row.billType} onChange={(e) => updateRow(idx, 'billType', e.target.value)} disabled={locked} /></td>
                     <td className="text-right font-mono pr-1">{Number(row.osAmt || 0).toFixed(2)}</td>
@@ -863,6 +913,9 @@ const CashBankBookModal = ({
                     <td><input type="text" className="classic-erp-input w-full border-0 bg-transparent text-center" value={row.pq} onChange={(e) => updateRow(idx, 'pq', e.target.value)} disabled={locked} /></td>
                     <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.disPer || ''} onChange={(e) => updateRow(idx, 'disPer', Number(e.target.value))} disabled={locked} /></td>
                     <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.discount || ''} onChange={(e) => updateRow(idx, 'discount', Number(e.target.value))} disabled={locked} /></td>
+                    <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.interest || ''} onChange={(e) => updateRow(idx, 'interest', Number(e.target.value))} disabled={locked} /></td>
+                    <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.oth1 || ''} onChange={(e) => updateRow(idx, 'oth1', Number(e.target.value))} disabled={locked} /></td>
+                    <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.oth2 || ''} onChange={(e) => updateRow(idx, 'oth2', Number(e.target.value))} disabled={locked} /></td>
                     <td><input type="text" className="classic-erp-input w-full border-0 bg-transparent text-center" value={row.bc} onChange={(e) => updateRow(idx, 'bc', e.target.value)} disabled={locked} /></td>
                     <td className="text-right font-mono font-bold pr-1">{Number(row.netOs || 0).toFixed(2)}</td>
                   </tr>
@@ -904,7 +957,17 @@ const CashBankBookModal = ({
               </div>
             </div>
             <div className="classic-erp-frame" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ flex: 1, minHeight: 40, borderRadius: 4, border: '1px solid #f59e0b', background: '#fff59d' }} />
+              <div style={{ flex: 1, minHeight: 40, borderRadius: 4, border: '1px solid #f59e0b', background: '#fff59d', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', display: 'flex', flexWrap: 'wrap', gap: '2px 6px', alignContent: 'flex-start' }}>
+                <span>( B.AMT- {breakdownTotals.billAmt.toFixed(0)} )</span>
+                <span>( TDS- {breakdownTotals.tds.toFixed(0)} )</span>
+                <span>( RG- {breakdownTotals.rg.toFixed(0)} )</span>
+                <span>( CLAIM- {breakdownTotals.claim.toFixed(0)} )</span>
+                <span>( RD- {breakdownTotals.rd.toFixed(0)} )</span>
+                <span>( DISC- {breakdownTotals.discount.toFixed(0)} )</span>
+                <span>( INT- {breakdownTotals.interest.toFixed(0)} )</span>
+                <span>( OTH1- {breakdownTotals.oth1.toFixed(0)} )</span>
+                <span>( OTH2- {breakdownTotals.oth2.toFixed(0)} )</span>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span className="text-red-700 font-bold font-mono">{totalPcs || 0}</span>
                 <span className="text-red-700 font-bold">Pcs</span>
@@ -936,7 +999,8 @@ const CashBankBookModal = ({
           <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
           {isBank && <button className="classic-erp-btn" type="button" onClick={() => notifyWarning('Cheque return — use Bank Reconciliation.')}>Cheq Rt</button>}
           <button className="classic-erp-btn" type="button" onClick={() => { setFindQuery(''); handleFind(); }}>Sp.Find</button>
-          {isBank && <button className="classic-erp-btn" type="button" onClick={handlePrint}>Slip.Print</button>}
+          {isBankReceipt && <button className="classic-erp-btn" type="button" onClick={handlePrint}>Slip.Print</button>}
+          {isBank && !isBankReceipt && <button className="classic-erp-btn" type="button" onClick={handlePrint}>Chq.Print</button>}
           <button className="classic-erp-btn" type="button" onClick={handlePrint}>{isBank ? 'Vou.Print' : 'Print'}</button>
           <button className="classic-erp-btn" type="button" title="Keyboard">K</button>
           <button className="classic-erp-btn" type="button" title="Head">{selectedBook?.head1 || 'Head'}</button>

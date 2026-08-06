@@ -1079,6 +1079,23 @@ const useStore = create((set, get) => ({
     }
   },
 
+  reverseJobReceive: async (jobId) => {
+    try {
+      const _jr = await jobsApi.reverseReceive({ jobId });
+      const res = { data: { data: _jr } };
+      const updated = res.data.data;
+      set((state) => ({
+        jobWorkEntries: state.jobWorkEntries.map((j) =>
+          j._id === jobId ? { ...j, ...updated } : j
+        )
+      }));
+      await get().fetchInventory();
+      return updated;
+    } catch (err) {
+      throw err;
+    }
+  },
+
   // --- ACCOUNTING ---
   fetchLedger: async (partyId) => {
     set({ loading: true });
@@ -1271,6 +1288,15 @@ const useStore = create((set, get) => ({
     } catch (err) {
       set({ error: err.message, loading: false });
       return [];
+    }
+  },
+
+  fetchGroupedTrialBalance: async ({ asOn, withZeroBalance } = {}) => {
+    try {
+      return await accountingApi.groupedTrialBalance({ asOn: asOn || '', withZeroBalance: !!withZeroBalance });
+    } catch (err) {
+      console.error('Fetch grouped trial balance failed:', err);
+      return null;
     }
   },
 

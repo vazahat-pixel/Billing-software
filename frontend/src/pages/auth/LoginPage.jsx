@@ -10,6 +10,11 @@ import { subscribeNetworkStatus } from '../../utils/networkStatus';
 /** Seeded by backend/seed.js — shown only in Vite dev for quick local login */
 const DEMO_USERS = [
     {
+        label: 'QA Admin (Dev)',
+        email: 'qa.dev.admin@textileerp.dev',
+        password: 'QaTenant@123',
+    },
+    {
         label: 'Owner (Acme Textile)',
         email: 'user@textileerp.com',
         password: 'User@123',

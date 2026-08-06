@@ -33,6 +33,16 @@ const paidAgainstDoc = async (companyId, docId) => {
   }, 0);
 };
 
+/** Most recent voucher date that settled any amount against this bill — real "PaidDate" backing. */
+const lastPaymentDate = async (companyId, docId) => {
+  const vouchers = await PaymentVoucher.find({
+    companyId,
+    status: 'Posted',
+    'againstInvoices.invoiceId': docId,
+  }).select('date').sort({ date: -1 }).limit(1).lean();
+  return vouchers[0]?.date ? new Date(vouchers[0].date) : null;
+};
+
 class ReportService {
   async getSalesRegister(companyId, startDate, endDate) {
     const sales = await Sales.find({
@@ -195,8 +205,10 @@ class ReportService {
 
   /**
    * @param {string|Date|object} asOnOrFilters - back-compat: a plain date value (asOn),
-   *   or a filter options object: { asOn, billDateFrom, billDateTo, partyIds, brokerIds,
-   *   stations, hastes, bookIds, states, msmeTypes, status ('Pending'|'All') }
+   *   or a filter options object: { asOn, billDateFrom, billDateTo, paidDateFrom, paidDateTo,
+   *   partyIds, brokerIds, stations, hastes, bookIds, states, msmeTypes, mainGroups,
+   *   remarkSearch, dueDaysMin, onlyFullBill, onlyPartReceived, includeLastYear,
+   *   fyStartDate, status ('Pending'|'All') }
    */
   async getOutstanding(companyId, type = 'receivable', asOnOrFilters) {
     const isReceivable = type === 'receivable';
@@ -208,6 +220,8 @@ class ReportService {
       asOn,
       billDateFrom,
       billDateTo,
+      paidDateFrom,
+      paidDateTo,
       partyIds = [],
       brokerIds = [],
       stations = [],
@@ -215,6 +229,13 @@ class ReportService {
       bookIds = [],
       states = [],
       msmeTypes = [],
+      mainGroups = [],
+      remarkSearch = '',
+      dueDaysMin,
+      onlyFullBill = false,
+      onlyPartReceived = false,
+      includeLastYear = true,
+      fyStartDate,
       status = 'Pending',
     } = filters;
 
@@ -223,6 +244,7 @@ class ReportService {
     if (partyIds.length) partyFilter._id = { $in: partyIds };
     if (states.length) partyFilter.state = { $in: states };
     if (msmeTypes.length) partyFilter.msmeType = { $in: msmeTypes };
+    if (mainGroups.length) partyFilter.mainGroupId = { $in: mainGroups };
 
     const parties = await Party.find(partyFilter).lean();
     const asOnDate = asOn ? new Date(asOn) : new Date();
@@ -235,6 +257,10 @@ class ReportService {
       if (bookIds.length) docFilter.bookId = { $in: bookIds };
       if (isReceivable && stations.length) docFilter.station = { $in: stations };
       if (isReceivable && hastes.length) docFilter.haste = { $in: hastes };
+      if (remarkSearch.trim()) docFilter.remarks = { $regex: remarkSearch.trim(), $options: 'i' };
+      if (!includeLastYear && fyStartDate) {
+        docFilter.date = { ...(docFilter.date || {}), $gte: new Date(fyStartDate) };
+      }
       Object.assign(docFilter, buildDateQuery(billDateFrom, billDateTo));
 
       const documents = isReceivable
@@ -250,9 +276,20 @@ class ReportService {
         const paid = await paidAgainstDoc(companyId, doc._id);
         const outstanding = total - paid;
         if (status === 'Pending' && outstanding <= 0.01) continue;
+        if (onlyFullBill && paid > 0.01) continue;
+        if (onlyPartReceived && (paid <= 0.01 || outstanding <= 0.01)) continue;
+
+        const ageInDays = Math.floor((asOnDate - new Date(doc.date)) / 86400000);
+        if (dueDaysMin != null && ageInDays < Number(dueDaysMin)) continue;
+
+        if (paidDateFrom || paidDateTo) {
+          const paidOn = await lastPaymentDate(companyId, doc._id);
+          if (!paidOn) continue;
+          if (paidDateFrom && paidOn < new Date(paidDateFrom)) continue;
+          if (paidDateTo && paidOn > new Date(paidDateTo)) continue;
+        }
 
         partyTotal += outstanding;
-        const ageInDays = Math.floor((asOnDate - new Date(doc.date)) / 86400000);
         if (ageInDays <= 30) aging.bucket30 += outstanding;
         else if (ageInDays <= 60) aging.bucket60 += outstanding;
         else if (ageInDays <= 90) aging.bucket90 += outstanding;
@@ -269,6 +306,7 @@ class ReportService {
           station: doc.station || '',
           haste: doc.haste || '',
           bookId: doc.bookId || '',
+          remarks: doc.remarks || '',
         });
       }
 
@@ -282,6 +320,8 @@ class ReportService {
           state: party.state || '',
           msmeType: party.msmeType || 'None',
           gstin: party.gstin || '',
+          mainGroupId: party.mainGroupId || '',
+          banks: party.banks || [],
           totalOutstanding: parseFloat(partyTotal.toFixed(2)),
           aging,
           invoices
@@ -297,7 +337,7 @@ class ReportService {
     const partyGroup = isReceivable ? 'Customer' : 'Supplier';
     const DocModel = isReceivable ? Sales : Purchase;
 
-    const [parties, brokers, stations, hastes, bookIds, states] = await Promise.all([
+    const [parties, brokers, stations, hastes, bookIds, states, mainGroups] = await Promise.all([
       Party.find({ companyId, type: { $in: [partyGroup, 'Both'] } })
         .select('name address city state msmeType')
         .sort({ name: 1 })
@@ -310,6 +350,7 @@ class ReportService {
       isReceivable ? DocModel.distinct('haste', { companyId, haste: { $nin: [null, ''] } }) : [],
       DocModel.distinct('bookId', { companyId, bookId: { $nin: [null, ''] } }),
       Party.distinct('state', { companyId, type: { $in: [partyGroup, 'Both'] }, state: { $nin: [null, ''] } }),
+      Party.distinct('mainGroupId', { companyId, type: { $in: [partyGroup, 'Both'] }, mainGroupId: { $nin: [null, ''] } }),
     ]);
 
     return {
@@ -319,6 +360,7 @@ class ReportService {
       hastes: hastes.sort(),
       books: bookIds.sort(),
       states: states.sort(),
+      mainGroups: mainGroups.sort(),
       msmeTypes: ['None', 'Micro', 'Small', 'Medium'],
     };
   }

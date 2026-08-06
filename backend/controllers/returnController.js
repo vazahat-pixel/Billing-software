@@ -6,6 +6,7 @@ const StockMovement = require('../models/StockMovement');
 const Counter = require('../models/Counter');
 const accountingService = require('../services/accountingService');
 const auditService = require('../services/auditService');
+const { recalcReturnTotals } = require('../utils/returnTotals');
 
 async function generateReturnNo(companyId, type, session = null) {
   const prefix = type === 'Sales' ? 'SR' : 'PR';
@@ -22,9 +23,9 @@ exports.createReturn = async (req, res) => {
 
   try {
     const companyId = req.companyId;
-    const { returnType, invoiceNo, originalInvoiceNo, partyId, date, items, taxableAmount, gstAmount, netAmount } = req.body;
+    const { returnType, invoiceNo, originalInvoiceNo, partyId, date, items, taxableAmount: clientTaxable, gstAmount: clientGstAmount, netAmount: clientNetAmount, gstType, gstRate } = req.body;
 
-    if (!returnType || !partyId || !items || items.length === 0 || !taxableAmount || !netAmount) {
+    if (!returnType || !partyId || !items || items.length === 0 || !clientTaxable || !clientNetAmount) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ success: false, message: 'Type, party, items, and amounts are required' });
@@ -36,6 +37,68 @@ exports.createReturn = async (req, res) => {
 
     const finalInvoiceNo = invoiceNo || await generateReturnNo(companyId, returnType, session);
 
+    // =====================================================================
+    // Stage 4: Server-side GST recomputation (hardened)
+    // Never trust client-supplied GST amounts. Recompute from items + rate.
+    // =====================================================================
+    let companyGstin = '';
+    let companyStateCode = '';
+    try {
+      const cfg = await gstConfigService.getOrCreate(companyId);
+      companyGstin = cfg.gstin;
+      companyStateCode = cfg.stateCode;
+    } catch (_) { /* optional */ }
+
+    const computedTotals = recalcReturnTotals(items || [], {
+      gstType: gstType || 'CGST+SGST',
+      gstRate: Number(gstRate || 5),
+      extras: {},
+      companyGstin,
+      companyStateCode,
+      partyGstin: req.body.partyGstin || '',
+      partyStateCode: req.body.partyStateCode || '',
+    });
+
+    // Audit: Log if client values differed from computed values
+    const clientCgst = Number(req.body.cgst || 0);
+    const clientSgst = Number(req.body.sgst || 0);
+    const clientIgst = Number(req.body.igst || 0);
+    const taxOverride = {
+      clientTaxable: Number(clientTaxable),
+      serverTaxable: computedTotals.taxableAmount,
+      clientGstAmount: Number(clientGstAmount || 0),
+      serverGstAmount: computedTotals.gstAmount,
+      clientCgst,
+      serverCgst: computedTotals.cgst,
+      clientSgst,
+      serverSgst: computedTotals.sgst,
+      clientIgst,
+      serverIgst: computedTotals.igst,
+      clientNetAmount: Number(clientNetAmount),
+      serverNetAmount: computedTotals.netAmount,
+    };
+
+    // Log if any GST value was corrected server-side
+    const taxCorrectionNeeded = (
+      Math.abs(taxOverride.clientTaxable - taxOverride.serverTaxable) > 0.01 ||
+      Math.abs(taxOverride.clientGstAmount - taxOverride.serverGstAmount) > 0.01 ||
+      Math.abs(taxOverride.clientCgst - taxOverride.serverCgst) > 0.01 ||
+      Math.abs(taxOverride.clientSgst - taxOverride.serverSgst) > 0.01 ||
+      Math.abs(taxOverride.clientIgst - taxOverride.serverIgst) > 0.01
+    );
+
+    if (taxCorrectionNeeded) {
+      console.warn(
+        `[SECURITY] Return GST hardened on ${returnType} return ${finalInvoiceNo}: ` +
+        `Taxable ${taxOverride.clientTaxable} → ${taxOverride.serverTaxable}, ` +
+        `GST ${taxOverride.clientGstAmount} → ${taxOverride.serverGstAmount}, ` +
+        `CGST ${taxOverride.clientCgst} → ${taxOverride.serverCgst}, ` +
+        `SGST ${taxOverride.clientSgst} → ${taxOverride.serverSgst}, ` +
+        `IGST ${taxOverride.clientIgst} → ${taxOverride.serverIgst}`
+      );
+    }
+
+    // Use server-computed totals, not client values
     const returnInvoice = await ReturnInvoice.create([{
       companyId,
       returnType,
@@ -43,10 +106,16 @@ exports.createReturn = async (req, res) => {
       originalInvoiceNo,
       partyId,
       date: date || new Date(),
-      items,
-      taxableAmount: parseFloat(taxableAmount),
-      gstAmount: parseFloat(gstAmount || 0),
-      netAmount: parseFloat(netAmount)
+      items: computedTotals.items,
+      taxableAmount: computedTotals.taxableAmount,
+      gstAmount: computedTotals.gstAmount,
+      netAmount: computedTotals.netAmount,
+      gstType: computedTotals.gstType,
+      cgst: computedTotals.cgst,
+      sgst: computedTotals.sgst,
+      igst: computedTotals.igst,
+      cess: computedTotals.cess,
+      gstRate: computedTotals.gstRate,
     }], { session });
 
     const rInvoice = returnInvoice[0];
@@ -144,13 +213,14 @@ exports.createReturn = async (req, res) => {
     }
 
     // =====================================================================
-    // Post accounting entries (fixed refType to use 'SalesReturn'/'PurchaseReturn')
+    // Post accounting entries using server-computed GST amounts
+    // Use computedTotals, NOT client-supplied values
     // =====================================================================
     const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
     const partyLedger = await accountingService.getOrCreatePartyLedger(companyId, partyId, session);
-    const gstAmt = parseFloat(gstAmount || 0);
-    const taxableAmt = parseFloat(taxableAmount);
-    const netAmt = parseFloat(netAmount);
+    const gstAmt = computedTotals.gstAmount;
+    const taxableAmt = computedTotals.taxableAmount;
+    const netAmt = computedTotals.netAmount;
 
     const lines = [];
 
@@ -163,17 +233,12 @@ exports.createReturn = async (req, res) => {
       // Contra-income: Dr Sales Return (not Sales A/c) so gross sales stay intact
       lines.push({ ledgerId: salesReturnLedger._id, ledgerName: salesReturnLedger.name, type: 'Dr', amount: taxableAmt, narration: `Sales Return #${finalInvoiceNo}` });
 
-      const cgst = parseFloat(req.body.cgst || 0);
-      const sgst = parseFloat(req.body.sgst || 0);
-      const igst = parseFloat(req.body.igst || 0);
-      if (igst > 0 || (gstAmt > 0 && req.body.gstType === 'IGST')) {
-        const igstAmt = igst > 0 ? igst : gstAmt;
-        lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Dr', amount: igstAmt, narration: 'IGST Output reversal on Sales Return' });
+      // Use server-computed GST amounts only
+      if (computedTotals.igst > 0 || (gstAmt > 0 && computedTotals.gstType === 'IGST')) {
+        lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Dr', amount: computedTotals.igst, narration: 'IGST Output reversal on Sales Return' });
       } else if (gstAmt > 0) {
-        const cgstAmt = cgst > 0 ? cgst : parseFloat((gstAmt / 2).toFixed(2));
-        const sgstAmt = sgst > 0 ? sgst : parseFloat((gstAmt - cgstAmt).toFixed(2));
-        if (cgstAmt > 0) lines.push({ ledgerId: cgstLedger._id, ledgerName: cgstLedger.name, type: 'Dr', amount: cgstAmt, narration: 'CGST Output reversal on Sales Return' });
-        if (sgstAmt > 0) lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Dr', amount: sgstAmt, narration: 'SGST Output reversal on Sales Return' });
+        if (computedTotals.cgst > 0) lines.push({ ledgerId: cgstLedger._id, ledgerName: cgstLedger.name, type: 'Dr', amount: computedTotals.cgst, narration: 'CGST Output reversal on Sales Return' });
+        if (computedTotals.sgst > 0) lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Dr', amount: computedTotals.sgst, narration: 'SGST Output reversal on Sales Return' });
       }
 
       lines.push({ ledgerId: partyLedger._id, ledgerName: partyLedger.name, type: 'Cr', amount: netAmt, narration: `Credit to Customer for Return #${finalInvoiceNo}` });
@@ -186,17 +251,12 @@ exports.createReturn = async (req, res) => {
       lines.push({ ledgerId: partyLedger._id, ledgerName: partyLedger.name, type: 'Dr', amount: netAmt, narration: `Debit to Supplier for Return #${finalInvoiceNo}` });
       lines.push({ ledgerId: purchaseReturnLedger._id, ledgerName: purchaseReturnLedger.name, type: 'Cr', amount: taxableAmt, narration: `Purchase Return #${finalInvoiceNo}` });
 
-      const cgst = parseFloat(req.body.cgst || 0);
-      const sgst = parseFloat(req.body.sgst || 0);
-      const igst = parseFloat(req.body.igst || 0);
-      if (igst > 0 || (gstAmt > 0 && req.body.gstType === 'IGST')) {
-        const igstAmt = igst > 0 ? igst : gstAmt;
-        lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Cr', amount: igstAmt, narration: 'IGST Input reversal on Purchase Return' });
+      // Use server-computed GST amounts only
+      if (computedTotals.igst > 0 || (gstAmt > 0 && computedTotals.gstType === 'IGST')) {
+        lines.push({ ledgerId: igstLedger._id, ledgerName: igstLedger.name, type: 'Cr', amount: computedTotals.igst, narration: 'IGST Input reversal on Purchase Return' });
       } else if (gstAmt > 0) {
-        const cgstAmt = cgst > 0 ? cgst : parseFloat((gstAmt / 2).toFixed(2));
-        const sgstAmt = sgst > 0 ? sgst : parseFloat((gstAmt - cgstAmt).toFixed(2));
-        if (cgstAmt > 0) lines.push({ ledgerId: cgstLedger._id, ledgerName: cgstLedger.name, type: 'Cr', amount: cgstAmt, narration: 'CGST Input reversal on Purchase Return' });
-        if (sgstAmt > 0) lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Cr', amount: sgstAmt, narration: 'SGST Input reversal on Purchase Return' });
+        if (computedTotals.cgst > 0) lines.push({ ledgerId: cgstLedger._id, ledgerName: cgstLedger.name, type: 'Cr', amount: computedTotals.cgst, narration: 'CGST Input reversal on Purchase Return' });
+        if (computedTotals.sgst > 0) lines.push({ ledgerId: sgstLedger._id, ledgerName: sgstLedger.name, type: 'Cr', amount: computedTotals.sgst, narration: 'SGST Input reversal on Purchase Return' });
       }
     }
 

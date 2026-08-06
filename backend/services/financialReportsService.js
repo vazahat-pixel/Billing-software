@@ -1,9 +1,45 @@
 const AccountingEntry = require('../models/AccountingEntry');
+const Party = require('../models/Party');
 const ledgerEngine = require('./ledgerEngineService');
 
 const round2 = (n) => Number(Number(n || 0).toFixed(2));
 
 const isEquityGroup = (g) => g === 'Capital' || g === 'Equity';
+
+/**
+ * Legacy Tally-style category label for a ledger — used only for the grouped Trial
+ * Balance display. Real accounting (Dr/Cr, balances) never depends on this; it's
+ * presentation-only, derived from fields that already exist (accountType/group/subGroup
+ * plus the linked party's type for Party ledgers).
+ */
+function categorizeLedger(ledger, partyType) {
+  const name = (ledger.name || '').toUpperCase();
+  const accountType = ledger.accountType || '';
+  const group = ledger.group || '';
+  const subGroup = (ledger.subGroup || '').toUpperCase();
+
+  if (accountType === 'Bank') return 'BANK BALANCE';
+  if (accountType === 'Cash') return 'CASH-IN-HAND';
+  if (accountType === 'Tax') return 'DUTIES & TAXES';
+
+  if (accountType === 'Party') {
+    if (partyType === 'Job Worker') return 'CREDITORS FOR PROCESS';
+    if (partyType === 'Customer') return 'SUNDRY DEBTORS';
+    if (partyType === 'Supplier' || partyType === 'Broker') return 'SUNDRY CREDITORS';
+    return group === 'Assets' ? 'SUNDRY DEBTORS' : 'SUNDRY CREDITORS';
+  }
+
+  if (subGroup.includes('CURRENT LIABILIT')) return 'PROVISIONS';
+  if (subGroup.includes('CASH & BANK')) return accountType === 'Bank' ? 'BANK BALANCE' : 'CASH-IN-HAND';
+  if (subGroup.includes('CURRENT ASSET')) return 'CURRENT ASSETS';
+  if (subGroup.includes('FIXED ASSET')) return 'FIXED ASSETS';
+  if (group === 'Capital' || group === 'Equity') return 'CAPITAL ACCOUNT';
+  if (group === 'Income') return 'PROFIT & LOSS INCOME';
+  if (group === 'Expenses') return 'PROFIT & LOSS EXPENSE';
+  if (group === 'Liabilities') return 'SUNDRY CREDITORS';
+  if (group === 'Assets') return 'CURRENT ASSETS';
+  return name || 'OTHERS';
+}
 
 /**
  * Financial Reports Engine — Sprint 3.6
@@ -33,6 +69,71 @@ class FinancialReportsService {
       totalCredit,
       isBalanced: Math.abs(totalDebit - totalCredit) < 0.05,
       difference: round2(totalDebit - totalCredit),
+    };
+  }
+
+  /** Grouped Trial Balance — same numbers as trialBalance(), organized under category
+   * headers with per-group subtotals, a Station (party city) column, and Gross Profit. */
+  async groupedTrialBalance(companyId, { asOn, withZeroBalance = false } = {}) {
+    const balances = await ledgerEngine.computeBalances(companyId, { asOn, includeOpening: true });
+    const filtered = withZeroBalance ? balances : balances.filter((b) => b.balance > 0.001);
+
+    const partyIds = [...new Set(
+      filtered.map((b) => b.ledger.linkedPartyId).filter(Boolean).map(String)
+    )];
+    const partiesById = new Map();
+    if (partyIds.length) {
+      const parties = await Party.find({ _id: { $in: partyIds }, companyId }).select('type city state').lean();
+      parties.forEach((p) => partiesById.set(String(p._id), p));
+    }
+
+    const groupMap = new Map();
+    for (const b of filtered) {
+      const party = b.ledger.linkedPartyId ? partiesById.get(String(b.ledger.linkedPartyId)) : null;
+      const category = categorizeLedger(b.ledger, party?.type);
+      if (!groupMap.has(category)) groupMap.set(category, []);
+      groupMap.get(category).push({
+        ledgerId: b.ledgerId,
+        name: b.ledger.name,
+        debit: b.type === 'Dr' ? b.balance : 0,
+        credit: b.type === 'Cr' ? b.balance : 0,
+        station: party?.city || '',
+      });
+    }
+
+    const groups = Array.from(groupMap.entries())
+      .map(([name, lines]) => {
+        const totalDebit = round2(lines.reduce((s, l) => s + l.debit, 0));
+        const totalCredit = round2(lines.reduce((s, l) => s + l.credit, 0));
+        const signed = round2(totalDebit - totalCredit);
+        return {
+          name,
+          lines,
+          totalDebit,
+          totalCredit,
+          totalBalance: round2(Math.abs(signed)),
+          balanceType: signed >= 0 ? 'Dr' : 'Cr',
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const grandTotalDebit = round2(groups.reduce((s, g) => s + g.totalDebit, 0));
+    const grandTotalCredit = round2(groups.reduce((s, g) => s + g.totalCredit, 0));
+
+    let grossProfit = 0;
+    try {
+      const pl = await this.profitAndLoss(companyId, { to: asOn });
+      grossProfit = pl.grossProfit;
+    } catch (_) { /* non-blocking — GP is a supplementary figure on this screen */ }
+
+    return {
+      asOn: asOn || new Date(),
+      groups,
+      grandTotalDebit,
+      grandTotalCredit,
+      difference: round2(grandTotalDebit - grandTotalCredit),
+      isBalanced: Math.abs(grandTotalDebit - grandTotalCredit) < 0.05,
+      grossProfit,
     };
   }
 

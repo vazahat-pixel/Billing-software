@@ -16,13 +16,16 @@ const csvToArray = (v) => (v ? String(v).split(',').map((s) => s.trim()).filter(
 exports.getOutstanding = async (req, res) => {
   try {
     const {
-      type, asOn, billDateFrom, billDateTo, status,
-      partyIds, brokerIds, stations, hastes, bookIds, states, msmeTypes,
+      type, asOn, billDateFrom, billDateTo, paidDateFrom, paidDateTo, status,
+      partyIds, brokerIds, stations, hastes, bookIds, states, msmeTypes, mainGroups,
+      remarkSearch, dueDaysMin, onlyFullBill, onlyPartReceived, includeLastYear, fyStartDate,
     } = req.query;
     const outstanding = await reportService.getOutstanding(companyId(req), type || 'receivable', {
       asOn,
       billDateFrom,
       billDateTo,
+      paidDateFrom,
+      paidDateTo,
       status: status || 'Pending',
       partyIds: csvToArray(partyIds),
       brokerIds: csvToArray(brokerIds),
@@ -31,6 +34,13 @@ exports.getOutstanding = async (req, res) => {
       bookIds: csvToArray(bookIds),
       states: csvToArray(states),
       msmeTypes: csvToArray(msmeTypes),
+      mainGroups: csvToArray(mainGroups),
+      remarkSearch: remarkSearch || '',
+      dueDaysMin: dueDaysMin != null && dueDaysMin !== '' ? Number(dueDaysMin) : undefined,
+      onlyFullBill: onlyFullBill === 'true',
+      onlyPartReceived: onlyPartReceived === 'true',
+      includeLastYear: includeLastYear !== 'false',
+      fyStartDate,
     });
     res.status(200).json({ success: true, data: outstanding });
   } catch (error) {

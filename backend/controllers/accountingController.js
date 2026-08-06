@@ -88,6 +88,26 @@ async function generateVoucherNo(companyId, type, session = null) {
   return `${prefix}-${fy}-${seq.toString().padStart(4, '0')}`;
 }
 
+// Cash & Bank Book bill-adjustment columns (Tds/Discount/Rg/Claim/RD/Interest/Oth1/Oth2)
+// reduce a bill's outstanding without any cash moving — each needs its own ledger line
+// or the party ledger silently drifts from what the bills actually show as outstanding.
+function itemDeductionTotal(item) {
+  return (
+    Number(item.discount || 0) +
+    Number(item.tds || 0) +
+    Number(item.rg || 0) +
+    Number(item.claim || 0) +
+    Number(item.rd || 0) +
+    Number(item.interest || 0) +
+    Number(item.oth1 || 0) +
+    Number(item.oth2 || 0)
+  );
+}
+
+function sumAcrossInvoices(againstInvoices, key) {
+  return (againstInvoices || []).reduce((s, item) => s + Number(item[key] || 0), 0);
+}
+
 // 1. Create Ledger Account
 exports.createLedger = async (req, res) => {
   try {
@@ -208,6 +228,47 @@ exports.createPaymentVoucher = async (req, res) => {
     if (status === 'Posted') {
       // Create double-entry journal lines
       const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
+
+      const totalTds = sumAcrossInvoices(againstInvoices, 'tds');
+      const totalDiscount = sumAcrossInvoices(againstInvoices, 'discount');
+      const totalOther =
+        sumAcrossInvoices(againstInvoices, 'rg') +
+        sumAcrossInvoices(againstInvoices, 'claim') +
+        sumAcrossInvoices(againstInvoices, 'rd') +
+        sumAcrossInvoices(againstInvoices, 'interest') +
+        sumAcrossInvoices(againstInvoices, 'oth1') +
+        sumAcrossInvoices(againstInvoices, 'oth2');
+      const partyDrTotal = parseFloat(amount) + totalTds + totalDiscount + totalOther;
+
+      const lines = [
+        {
+          ledgerId: partyLedger._id,
+          ledgerName: partyLedger.name,
+          type: 'Dr',
+          amount: partyDrTotal,
+          narration: `Payment Voucher #${voucherNo}`
+        },
+        {
+          ledgerId: bankLedgerId,
+          ledgerName: bankLedger.name,
+          type: 'Cr',
+          amount: parseFloat(amount),
+          narration: `Paid via ${paymentNarration}`
+        }
+      ];
+      if (totalTds > 0.004) {
+        const tdsLedger = await accountingService.getSystemLedger(companyId, 'TDS Payable', session);
+        lines.push({ ledgerId: tdsLedger._id, ledgerName: tdsLedger.name, type: 'Cr', amount: totalTds, narration: `TDS withheld — Voucher #${voucherNo}` });
+      }
+      if (totalDiscount > 0.004) {
+        const discLedger = await accountingService.getSystemLedger(companyId, 'Discount Received', session);
+        lines.push({ ledgerId: discLedger._id, ledgerName: discLedger.name, type: 'Cr', amount: totalDiscount, narration: `Discount received — Voucher #${voucherNo}` });
+      }
+      if (totalOther > 0.004) {
+        const otherLedger = await accountingService.getSystemLedger(companyId, 'Other Adjustments A/c', session);
+        lines.push({ ledgerId: otherLedger._id, ledgerName: otherLedger.name, type: 'Cr', amount: totalOther, narration: `Rg/Claim/RD/Interest/Other — Voucher #${voucherNo}` });
+      }
+
       const accountingEntry = await AccountingEntry.create([{
         companyId,
         entryNo,
@@ -215,22 +276,7 @@ exports.createPaymentVoucher = async (req, res) => {
         voucherType: 'Payment',
         refType: 'Payment',
         refId: voucher._id,
-        lines: [
-          {
-            ledgerId: partyLedger._id,
-            ledgerName: partyLedger.name,
-            type: 'Dr',
-            amount: parseFloat(amount),
-            narration: `Payment Voucher #${voucherNo}`
-          },
-          {
-            ledgerId: bankLedgerId,
-            ledgerName: bankLedger.name,
-            type: 'Cr',
-            amount: parseFloat(amount),
-            narration: `Paid via ${paymentNarration}`
-          }
-        ],
+        lines,
         narration: narration || `Paid to ${partyLedger.name} — ${paymentNarration}`
       }], { session });
 
@@ -240,7 +286,7 @@ exports.createPaymentVoucher = async (req, res) => {
       const outstandingEngine = require('../services/outstandingEngineService');
       if (againstInvoices && againstInvoices.length > 0) {
         for (const item of againstInvoices) {
-          const paidNow = parseFloat(item.amount || 0);
+          const paidNow = parseFloat(item.amount || 0) + itemDeductionTotal(item);
           if (paidNow <= 0) continue;
 
           const saleDoc = await Sales.findOne({ _id: item.invoiceId, companyId }).session(session);
@@ -348,6 +394,47 @@ exports.createReceiptVoucher = async (req, res) => {
 
     if (status === 'Posted') {
       const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
+
+      const totalTds = sumAcrossInvoices(againstInvoices, 'tds');
+      const totalDiscount = sumAcrossInvoices(againstInvoices, 'discount');
+      const totalOther =
+        sumAcrossInvoices(againstInvoices, 'rg') +
+        sumAcrossInvoices(againstInvoices, 'claim') +
+        sumAcrossInvoices(againstInvoices, 'rd') +
+        sumAcrossInvoices(againstInvoices, 'interest') +
+        sumAcrossInvoices(againstInvoices, 'oth1') +
+        sumAcrossInvoices(againstInvoices, 'oth2');
+      const partyCrTotal = parseFloat(amount) + totalTds + totalDiscount + totalOther;
+
+      const lines = [
+        {
+          ledgerId: bankLedgerId,
+          ledgerName: bankLedger.name,
+          type: 'Dr',
+          amount: parseFloat(amount),
+          narration: `Received via ${paymentNarration}`
+        },
+        {
+          ledgerId: partyLedger._id,
+          ledgerName: partyLedger.name,
+          type: 'Cr',
+          amount: partyCrTotal,
+          narration: `Receipt Voucher #${voucherNo}`
+        }
+      ];
+      if (totalTds > 0.004) {
+        const tdsLedger = await accountingService.getSystemLedger(companyId, 'TDS Receivable', session);
+        lines.push({ ledgerId: tdsLedger._id, ledgerName: tdsLedger.name, type: 'Dr', amount: totalTds, narration: `TDS deducted by party — Voucher #${voucherNo}` });
+      }
+      if (totalDiscount > 0.004) {
+        const discLedger = await accountingService.getSystemLedger(companyId, 'Discount Allowed', session);
+        lines.push({ ledgerId: discLedger._id, ledgerName: discLedger.name, type: 'Dr', amount: totalDiscount, narration: `Discount allowed — Voucher #${voucherNo}` });
+      }
+      if (totalOther > 0.004) {
+        const otherLedger = await accountingService.getSystemLedger(companyId, 'Other Adjustments A/c', session);
+        lines.push({ ledgerId: otherLedger._id, ledgerName: otherLedger.name, type: 'Dr', amount: totalOther, narration: `Rg/Claim/RD/Interest/Other — Voucher #${voucherNo}` });
+      }
+
       const accountingEntry = await AccountingEntry.create([{
         companyId,
         entryNo,
@@ -355,22 +442,7 @@ exports.createReceiptVoucher = async (req, res) => {
         voucherType: 'Receipt',
         refType: 'Receipt',
         refId: voucher._id,
-        lines: [
-          {
-            ledgerId: bankLedgerId,
-            ledgerName: bankLedger.name,
-            type: 'Dr',
-            amount: parseFloat(amount),
-            narration: `Received via ${paymentNarration}`
-          },
-          {
-            ledgerId: partyLedger._id,
-            ledgerName: partyLedger.name,
-            type: 'Cr',
-            amount: parseFloat(amount),
-            narration: `Receipt Voucher #${voucherNo}`
-          }
-        ],
+        lines,
         narration: narration || `Received from ${partyLedger.name} — ${paymentNarration}`
       }], { session });
 
@@ -379,7 +451,7 @@ exports.createReceiptVoucher = async (req, res) => {
       const outstandingEngine = require('../services/outstandingEngineService');
       if (againstInvoices && againstInvoices.length > 0) {
         for (const item of againstInvoices) {
-          const paidNow = parseFloat(item.amount || 0);
+          const paidNow = parseFloat(item.amount || 0) + itemDeductionTotal(item);
           if (paidNow <= 0) continue;
 
           const saleDoc = await Sales.findOne({ _id: item.invoiceId, companyId }).session(session);
@@ -488,7 +560,7 @@ exports.reverseVoucher = async (req, res) => {
       const outstandingEngine = require('../services/outstandingEngineService');
       for (const item of voucher.againstInvoices) {
         if (!item.invoiceId) continue;
-        const paidNow = parseFloat(item.amount || 0);
+        const paidNow = parseFloat(item.amount || 0) + itemDeductionTotal(item);
         if (paidNow <= 0) continue;
 
         const saleDoc = await Sales.findOne({ _id: item.invoiceId, companyId }).session(session);
@@ -632,6 +704,20 @@ exports.getTrialBalance = async (req, res) => {
     const financialReports = require('../services/financialReportsService');
     const data = await financialReports.trialBalance(req.companyId, { asOn: req.query.asOn });
     res.status(200).json({ success: true, data: data.lines, meta: { isBalanced: data.isBalanced, totalDebit: data.totalDebit, totalCredit: data.totalCredit } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 8b. Trial Balance — grouped by category (Z Trial), with per-group subtotals + Gross Profit
+exports.getGroupedTrialBalance = async (req, res) => {
+  try {
+    const financialReports = require('../services/financialReportsService');
+    const data = await financialReports.groupedTrialBalance(req.companyId, {
+      asOn: req.query.to || req.query.asOn,
+      withZeroBalance: req.query.withZeroBalance === 'true',
+    });
+    res.status(200).json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

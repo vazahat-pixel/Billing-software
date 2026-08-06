@@ -86,7 +86,12 @@ const PaymentVoucherSchema = new mongoose.Schema({
     discount: Number,
     bc: String,
     netOs: Number,
-    nSlash: String
+    nSlash: String,
+    claim: Number,
+    rd: Number,
+    interest: Number,
+    oth1: Number,
+    oth2: Number
   }],
   accountingEntryId: {
     type: mongoose.Schema.Types.ObjectId,

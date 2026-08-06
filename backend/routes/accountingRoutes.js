@@ -22,6 +22,7 @@ router.post('/payments/:id/reverse', write, accountingController.reverseVoucher)
 
 // Financial Reports
 router.get('/trial-balance', read, accountingController.getTrialBalance);
+router.get('/trial-balance/grouped', read, accountingController.getGroupedTrialBalance);
 router.get('/profit-loss', read, accountingController.getProfitLoss);
 router.get('/balance-sheet', read, accountingController.getBalanceSheet);
 router.get('/outstanding', read, accountingController.getOutstandingReport);

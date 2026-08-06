@@ -13,6 +13,7 @@ const update = requirePermission('jobWork', 'update');
 router.post('/issue', write, jobController.issueToJob);
 router.post('/receive', write, jobController.receiveFromJob);
 router.put('/process', update, jobController.updateProcess);
+router.put('/reverse-receive', update, jobController.reverseJobReceive);
 router.get('/', read, jobController.getJobs);
 
 module.exports = router;

@@ -31,6 +31,20 @@ exports.updateProcess = async (req, res) => {
   }
 };
 
+exports.reverseJobReceive = async (req, res) => {
+  try {
+    const { jobId } = req.body;
+    const companyId = req.companyId || req.body.companyId;
+    if (!jobId) {
+      return res.status(400).json({ success: false, message: 'jobId is required' });
+    }
+    const job = await jobService.reverseJobReceive(jobId, companyId);
+    res.status(200).json({ success: true, data: job });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 exports.getJobs = async (req, res) => {
   try {
     const companyId = req.companyId || req.query.companyId;

@@ -8,7 +8,7 @@ import { ButtonLoader } from '../../components/ui/loaders';
 const STATUSES = ['Issued', 'In-Process', 'Received', 'Cancelled'];
 
 const ProcessUpdateModal = ({ isOpen, onClose }) => {
-  const { jobWorkEntries, fetchJobs, updateJobProcess } = useStore();
+  const { jobWorkEntries, fetchJobs, updateJobProcess, reverseJobReceive } = useStore();
   const [selectedJobId, setSelectedJobId] = useState('');
   const [status, setStatus] = useState('In-Process');
   const [saving, setSaving] = useState(false);
@@ -61,6 +61,27 @@ const ProcessUpdateModal = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleReverseReceive = async () => {
+    if (!selectedJobId) return notifyWarning('Select a job card');
+    if (!selectedJob || selectedJob.status !== 'Received') {
+      return notifyWarning('Only received jobs can be reversed');
+    }
+    if (!window.confirm(`Reverse receive for job ${selectedJob.jobCardNo}? This will restore inventory and reverse accounting entries.`)) {
+      return;
+    }
+    setSaving(true);
+    try {
+      await reverseJobReceive(selectedJobId);
+      notifySuccess('Job receive reversed successfully');
+      setSelectedJobId('');
+      fetchJobs();
+    } catch (err) {
+      notifyError(err, 'Reversal failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Update Job Status" className="max-w-3xl">
       <form onSubmit={handleSave} className="erp-modal-body space-y-4">
@@ -97,6 +118,16 @@ const ProcessUpdateModal = ({ isOpen, onClose }) => {
 
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" className="erp-btn erp-btn-secondary" onClick={onClose}>Cancel</button>
+          {selectedJob?.status === 'Received' && (
+            <button
+              type="button"
+              className="erp-btn erp-btn-danger"
+              onClick={handleReverseReceive}
+              disabled={saving}
+            >
+              {saving ? <ButtonLoader label="Reversing…" /> : 'Reverse Receive'}
+            </button>
+          )}
           <button type="submit" className="erp-btn erp-btn-primary" disabled={saving || !selectedJobId}>
             {saving ? <ButtonLoader label="Saving…" /> : 'Update Status'}
           </button>

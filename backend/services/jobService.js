@@ -470,6 +470,89 @@ class JobService {
     }
   }
 
+  async reverseJobReceive(jobId, companyId) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const job = await Job.findOne({ _id: jobId, companyId }).session(session);
+      if (!job) throw AppError.notFound('Job not found');
+      if (job.status !== 'Received') {
+        throw AppError.badRequest('Only received jobs can be reversed. Current status: ' + job.status);
+      }
+
+      const AccountingEntry = require('../models/AccountingEntry');
+      const journalEngineService = require('./journalEngineService');
+
+      // Find and reverse the 3 accounting entries posted on receive
+      // Look for entries with refType in ['JobReceive', 'JobWorkCharges'] or refType='Journal' and refId=jobId
+      const entriesToReverse = await AccountingEntry.find({
+        companyId,
+        refId: job._id,
+        $or: [
+          { refType: 'JobReceive' },
+          { refType: 'JobWorkCharges' },
+          { refType: 'Journal' }
+        ],
+        isReversed: { $ne: true }
+      }).session(session);
+
+      for (const entry of entriesToReverse) {
+        await journalEngineService.reverseJournal(companyId, entry._id, { session });
+      }
+
+      // Delete or mark finished lot as unused
+      if (job.finishedLotId) {
+        const finishedLot = await InventoryLot.findById(job.finishedLotId).session(session);
+        if (finishedLot) {
+          finishedLot.status = 'Deleted';
+          finishedLot.remainingMtrs = 0;
+          finishedLot.remainingPcs = 0;
+          await finishedLot.save({ session });
+        }
+      }
+
+      // Restore original grey lot's remaining quantity to full
+      if (job.lotId) {
+        const originalLot = await InventoryLot.findById(job.lotId).session(session);
+        if (originalLot) {
+          originalLot.remainingMtrs = originalLot.totalMtrs;
+          originalLot.remainingPcs = originalLot.totalPcs || 0;
+          await originalLot.save({ session });
+        }
+      }
+
+      // Update job status back to Issued
+      job.status = 'Issued';
+      job.receiveReversedAt = new Date();
+      // Store the first reversal entry ID for audit trail
+      if (entriesToReverse.length > 0) {
+        job.receiveReversalEntryId = entriesToReverse[0]._id;
+      }
+      await job.save({ session });
+
+      await session.commitTransaction();
+
+      try {
+        const eventBus = require('../events/eventBus');
+        eventBus.emitSafe('job.receive-reversed', {
+          companyId: String(companyId),
+          jobId: job._id?.toString?.(),
+          jobCardNo: job.jobCardNo,
+        });
+      } catch {
+        /* optional */
+      }
+
+      return job;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
   async getJobs(companyId, { status } = {}) {
     const query = { companyId };
     if (status) query.status = status;

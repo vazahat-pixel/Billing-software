@@ -18,6 +18,7 @@ const SYSTEM_LEDGER_TEMPLATES = [
   { name: 'SGST RCM', group: 'Liabilities', subGroup: 'Tax' },
   { name: 'IGST RCM', group: 'Liabilities', subGroup: 'Tax' },
   { name: 'TDS Payable', group: 'Liabilities', subGroup: 'Current Liabilities' },
+  { name: 'TDS Receivable', group: 'Assets', subGroup: 'Current Assets' },
   { name: 'TCS Payable', group: 'Liabilities', subGroup: 'Current Liabilities' },
   { name: 'Job Work Charges', group: 'Expenses', subGroup: 'Direct Expenses' },
   { name: 'Job Work In Progress', group: 'Assets', subGroup: 'Current Assets' },
@@ -515,6 +516,75 @@ class AccountingService {
     } catch (err) {
       console.error('Failed auto wastage posting:', err);
       if (session) throw err;
+    }
+  }
+
+  /**
+   * 7. TDS Receivable posting on Receipt Voucher
+   * When a receipt is created with TDS deduction on an invoice:
+   * Dr TDS Receivable A/c / Cr Customer Party A/c
+   * This records the tax deducted at source as a receivable asset.
+   */
+  async postTdsReceivableEntry(companyId, invoiceId, tdsAmount, session = null) {
+    try {
+      const Sales = require('../models/Sales');
+
+      // Load the original sales invoice
+      const invoice = await Sales.findById(invoiceId).session(session);
+      if (!invoice) {
+        throw new Error(`Sales Invoice not found for TDS posting: ${invoiceId}`);
+      }
+
+      const tdsAmountRounded = Number(Number(tdsAmount || 0).toFixed(2));
+      if (tdsAmountRounded <= 0) return null; // Skip if no TDS
+
+      // Get/create TDS Receivable ledger
+      const tdsLedger = await this.getSystemLedger(companyId, 'TDS Receivable', session);
+
+      // Get customer ledger
+      const customerLedger = await this.getOrCreatePartyLedger(companyId, invoice.customerId, session);
+
+      // Generate journal entry number
+      const entryNo = await this.generateEntryNo(companyId, 'JNL', session);
+
+      const narrationText = `TDS Receivable on Invoice #${invoice.invoiceNo}`;
+
+      const lines = [
+        {
+          ledgerId: tdsLedger._id,
+          ledgerName: tdsLedger.name,
+          type: 'Dr',
+          amount: tdsAmountRounded,
+          narration: narrationText
+        },
+        {
+          ledgerId: customerLedger._id,
+          ledgerName: customerLedger.name,
+          type: 'Cr',
+          amount: tdsAmountRounded,
+          narration: narrationText
+        }
+      ];
+
+      const data = {
+        companyId,
+        entryNo,
+        entryDate: new Date(),
+        voucherType: 'ReceiptAuto',
+        refType: 'TdsReceivable',
+        refId: invoiceId,
+        lines,
+        narration: `TDS Receivable deducted on receipt — Invoice #${invoice.invoiceNo} ₹${tdsAmountRounded}`
+      };
+
+      if (session) {
+        const entry = await AccountingEntry.create([data], { session });
+        return Array.isArray(entry) ? entry[0] : entry;
+      }
+      return await AccountingEntry.create(data);
+    } catch (err) {
+      console.error('Failed TDS receivable posting:', err);
+      throw err;
     }
   }
 }

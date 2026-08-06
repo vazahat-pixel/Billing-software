@@ -5,6 +5,7 @@ export const jobworkApi = {
   issue: (body) => unwrap(post('/jobs/issue', body)),
   receive: (body) => unwrap(post('/jobs/receive', body)),
   process: (body) => unwrap(put('/jobs/process', body)),
+  reverseReceive: (body) => unwrap(put('/jobs/reverse-receive', body)),
 };
 
 /** @deprecated alias */

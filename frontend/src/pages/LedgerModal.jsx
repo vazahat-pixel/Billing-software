@@ -15,6 +15,18 @@ const fyStartISO = () => {
   return `${startYear}-04-01`;
 };
 
+/** FY start year that `fromDate` falls in (Apr–Mar cycle), regardless of what's currently picked. */
+const fyStartYearOf = (isoDate) => {
+  const d = new Date(isoDate);
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  return m >= 3 ? y : y - 1;
+};
+const fyRange = (startYear) => ({
+  from: `${startYear}-04-01`,
+  to: `${startYear + 1}-03-31`,
+});
+
 const money = (n) =>
   Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -59,7 +71,7 @@ function AccountListPanel({ rows, highlightIdx, onSelect, emptyText = 'No accoun
   );
 }
 
-const LedgerModal = ({ isOpen, onClose }) => {
+const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenReceipt }) => {
   const {
     ledgers,
     parties,
@@ -202,7 +214,7 @@ const LedgerModal = ({ isOpen, onClose }) => {
     return '';
   };
 
-  const runLedger = async () => {
+  const runLedger = async (overrideRange) => {
     const picked = resolveAccountFromText() || ledgerId;
     const id = resolveLedgerId(picked);
     if (!picked) {
@@ -215,9 +227,11 @@ const LedgerModal = ({ isOpen, onClose }) => {
       toast.warning('No ledger linked for this party yet. Create a bill/payment first.');
       return false;
     }
+    const effFrom = overrideRange?.from ?? from;
+    const effTo = overrideRange?.to ?? to;
     setBusy(true);
     try {
-      await fetchLedgerStatement({ ledgerId: id, from, to });
+      await fetchLedgerStatement({ ledgerId: id, from: effFrom, to: effTo });
       setView('statement');
       return true;
     } catch (err) {
@@ -226,6 +240,15 @@ const LedgerModal = ({ isOpen, onClose }) => {
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Next Year / Back Year — shifts the whole Apr–Mar window relative to whatever's currently shown. */
+  const shiftYear = (direction) => {
+    const startYear = fyStartYearOf(from) + direction;
+    const range = fyRange(startYear);
+    setFrom(range.from);
+    setTo(range.to);
+    runLedger(range);
   };
 
   const handleListKey = (e, list, onPick) => {
@@ -273,6 +296,37 @@ const LedgerModal = ({ isOpen, onClose }) => {
     if (!linkedId) return null;
     return (parties || []).find((p) => String(p._id || p.id) === linkedId) || null;
   }, [currentLedgerStatement, selectedMeta, ledgerId, parties]);
+
+  const partyId = partyInfo ? String(partyInfo._id || partyInfo.id) : '';
+
+  // Classic ERP power-user shortcuts, active only while viewing a statement:
+  // L = change account, * = Journal Voucher, - = Cash Payment, + = Cash Receipt.
+  useEffect(() => {
+    if (!isOpen || view !== 'statement') return undefined;
+    const onKeyDown = (e) => {
+      const tag = (e.target?.tagName || '').toUpperCase();
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+      if (e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        setView('entry');
+      } else if (e.key === '*') {
+        e.preventDefault();
+        if (onOpenJournal) onOpenJournal({ partyId, ledgerId: resolveLedgerId() });
+        else toast.info('Journal Voucher — open from Transaction > Journal (GST)');
+      } else if (e.key === '-') {
+        e.preventDefault();
+        if (onOpenPayment) onOpenPayment({ partyId, ledgerId: resolveLedgerId() });
+        else toast.info('Cash Payment — open from Transaction > Cash Book');
+      } else if (e.key === '+') {
+        e.preventDefault();
+        if (onOpenReceipt) onOpenReceipt({ partyId, ledgerId: resolveLedgerId() });
+        else toast.info('Cash Receipt — open from Transaction > Cash Book');
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, view, partyId, onOpenJournal, onOpenPayment, onOpenReceipt]);
 
   const ledgerName =
     statement?.ledgerName || statement?.ledger?.name || selectedMeta?.ledger?.name || accountText || '—';
@@ -327,7 +381,9 @@ const LedgerModal = ({ isOpen, onClose }) => {
           </div>
 
           <label className="ledger-form-label">Company</label>
-          <input className="classic-erp-input" value={companyName} readOnly disabled />
+          <select className="classic-erp-select ledger-company-select" value="current" disabled>
+            <option value="current">{companyName}</option>
+          </select>
 
           <label className="ledger-form-label">Account</label>
           <div className="ledger-field-wrap">
@@ -362,11 +418,24 @@ const LedgerModal = ({ isOpen, onClose }) => {
         </div>
 
         <div className="ledger-side-checks">
-          <label className="ledger-stmt-check"><input type="checkbox" checked={showRemark} onChange={(e) => setShowRemark(e.target.checked)} />With Remark (Detail)</label>
-          <label className="ledger-stmt-check"><input type="checkbox" checked={showAddress} onChange={(e) => setShowAddress(e.target.checked)} />With Address</label>
-          <label className="ledger-stmt-check"><input type="checkbox" checked={compShortName} onChange={(e) => setCompShortName(e.target.checked)} />Comp ShortName</label>
-          <label className="ledger-stmt-check"><input type="checkbox" checked={newProcess} onChange={(e) => setNewProcess(e.target.checked)} />New Process</label>
-          <label className="ledger-stmt-check"><input type="checkbox" checked={withPuVoNo} onChange={(e) => setWithPuVoNo(e.target.checked)} />With PuVoNo</label>
+          <label className={`ledger-toggle-check ${showRemark ? 'is-on' : ''}`}>
+            <input type="checkbox" checked={showRemark} onChange={(e) => setShowRemark(e.target.checked)} />With Remark (Detail)
+          </label>
+          <label className={`ledger-toggle-check ${showAddress ? 'is-on' : ''}`}>
+            <input type="checkbox" checked={showAddress} onChange={(e) => setShowAddress(e.target.checked)} />With Address
+          </label>
+          <label className={`ledger-toggle-check ${compShortName ? 'is-on' : ''}`}>
+            <input type="checkbox" checked={compShortName} onChange={(e) => setCompShortName(e.target.checked)} />Comp ShortName
+          </label>
+          <div className="ledger-toggle-row">
+            <label className={`ledger-toggle-check ${newProcess ? 'is-on' : ''}`} style={{ flex: 1 }}>
+              <input type="checkbox" checked={newProcess} onChange={(e) => setNewProcess(e.target.checked)} />New Process
+            </label>
+            <button type="button" className="classic-erp-btn ledger-tes-btn" onClick={() => toast.unavailable('Tes')}>Tes</button>
+          </div>
+          <label className={`ledger-toggle-check ${withPuVoNo ? 'is-on' : ''}`}>
+            <input type="checkbox" checked={withPuVoNo} onChange={(e) => setWithPuVoNo(e.target.checked)} />With PuVouNo
+          </label>
         </div>
       </div>
       {financialYear ? <div className="ledger-entry-fy">FY {financialYear}</div> : null}
@@ -414,24 +483,53 @@ const LedgerModal = ({ isOpen, onClose }) => {
               <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('Excel')}>Excel</button>
               <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('Mail')}>Mail</button>
               <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('WhatsApp')}>Whatsapp</button>
-              <button type="button" className="classic-erp-btn" onClick={() => setView('entry')}>Change A/c</button>
-              <button type="button" className="classic-erp-btn" onClick={() => { setFrom(fyStartISO()); setTo(todayISO()); runLedger(); }}>CurrentYear</button>
-              <label className="ledger-stmt-check ml-auto"><input type="checkbox" checked={onlyDr} onChange={(e) => setOnlyDr(e.target.checked)} />Only Dr</label>
-              <label className="ledger-stmt-check"><input type="checkbox" checked={onlyCr} onChange={(e) => setOnlyCr(e.target.checked)} />Only Cr</label>
+              <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('ALL Reports')}>ALL Reports</button>
+              <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('O/S Reports')}>O/S Reports</button>
+              <button type="button" className="classic-erp-btn" onClick={() => shiftYear(1)} disabled={isLoading}>Next Year</button>
+              <button type="button" className="classic-erp-btn" onClick={() => shiftYear(-1)} disabled={isLoading}>Back Year</button>
+              <button type="button" className="classic-erp-btn" onClick={() => {
+                const range = { from: fyStartISO(), to: todayISO() };
+                setFrom(range.from);
+                setTo(range.to);
+                runLedger(range);
+              }}>Current Year</button>
+              <input type="text" className="classic-erp-input ledger-toolbar-search" placeholder="" />
+              <div className="ledger-toolbar-hints">
+                <span>F3 &gt; Description Filter</span>
+                <span>F5 &gt; Remark_1 Filter</span>
+              </div>
+            </div>
+
+            <div className="ledger-toolbar2 print:hidden">
+              <div className="ledger-toolbar2-left">
+                <div className="ledger-toolbar2-row">
+                  <input type="text" className="classic-erp-input ledger-party-box" value={ledgerName} readOnly />
+                  <span className="classic-erp-label">Date</span>
+                  <input type="date" className="classic-erp-input ledger-date-red" value={from} onChange={(e) => setFrom(e.target.value)} />
+                  <span className="classic-erp-label">To</span>
+                  <input type="date" className="classic-erp-input ledger-date-red" value={to} onChange={(e) => setTo(e.target.value)} />
+                  <button type="button" className="classic-erp-btn ledger-green-btn" onClick={() => runLedger()} disabled={isLoading}>OK</button>
+                  <button type="button" className="classic-erp-btn ledger-green-btn" onClick={() => toast.unavailable('Month')}>Month</button>
+                  <label className="ledger-stmt-check"><input type="checkbox" checked={onlyDr} onChange={(e) => setOnlyDr(e.target.checked)} />Only Dr</label>
+                  <label className="ledger-stmt-check"><input type="checkbox" checked={onlyCr} onChange={(e) => setOnlyCr(e.target.checked)} />Only Cr</label>
+                </div>
+                <div className="ledger-toolbar2-row">
+                  <button type="button" className="classic-erp-btn ledger-green-btn" onClick={() => setView('entry')}>Filter</button>
+                  <span className="ledger-l-hint">To Change Account = Press L</span>
+                  {financialYear ? <span>{financialYear}</span> : null}
+                  <span>{companyName}</span>
+                  <span className="ml-auto classic-erp-label">Opening Bal</span>
+                  <input type="text" className="classic-erp-input ledger-openingbal-box" value={fmtMoney(openingBal)} readOnly />
+                </div>
+              </div>
+              <div className="ledger-toolbar2-hints">
+                <span>Press <b>(*)</b> To OpenJv</span>
+                <span>Press <b>(-)</b> CashPayment</span>
+                <span>Press <b>(+)</b> CashReceipt</span>
+              </div>
             </div>
 
             <div className="ledger-stmt-body" ref={printRef}>
-              <div className="ledger-stmt-summary">
-                <div>
-                  <div className="ledger-stmt-acc-name">{ledgerName}</div>
-                  {showAddress && partyAddress ? <div className="ledger-stmt-acc-addr">{partyAddress}</div> : null}
-                </div>
-                <div className="ledger-stmt-bal-box">
-                  <div>Period: <b>{fmtDate(from)}</b> to <b>{fmtDate(to)}</b></div>
-                  <div>Opening: <b>{fmtMoney(openingBal)} {openingType}</b></div>
-                  <div>Closing: <b>{fmtMoney(closingBal)} {closingType}</b></div>
-                </div>
-              </div>
 
               <div className="ledger-stmt-table-wrap relative">
                 {(isLoading && !statement) ? (
@@ -477,17 +575,24 @@ const LedgerModal = ({ isOpen, onClose }) => {
                         );
                       })}
                     </tbody>
-                    <tfoot>
-                      <tr>
-                        <td colSpan={5} className="tfoot-label">Grand Total</td>
-                        <td className="num"><b>{money(periodDebit)}</b></td>
-                        <td className="num"><b>{money(periodCredit)}</b></td>
-                        <td className="num"><b>{money(closingBal)}</b></td>
-                        <td><b>{closingType}</b></td><td>—</td>
-                      </tr>
-                    </tfoot>
                   </table>
                 )}
+              </div>
+            </div>
+
+            <div className="ledger-grand-bar print:hidden">
+              <div className="ledger-grand-remark" />
+              <div className="ledger-grand-totals">
+                <div>Record<br /><b>{filteredRows.length}</b></div>
+                <div className="ledger-grand-labels">
+                  <span>Date Total</span>
+                  <span>Grand Total</span>
+                </div>
+                <div className="ledger-grand-boxes">
+                  <input type="text" className="classic-erp-input" readOnly value={money(periodDebit)} />
+                  <input type="text" className="classic-erp-input" readOnly value={money(periodCredit)} />
+                  <input type="text" className="classic-erp-input" readOnly value={`${money(closingBal)} ${closingType}`} />
+                </div>
               </div>
             </div>
 
@@ -520,10 +625,14 @@ const ledgerStyles = `
   }
   .ledger-entry-titlebar {
     display: flex; align-items: center; justify-content: space-between;
-    background: linear-gradient(#0054e3, #003399);
-    color: #fff; font-weight: 700; padding: 4px 8px; font-size: 13px;
+    background: #ece9d8;
+    color: #111; font-weight: 700; padding: 4px 8px; font-size: 13px;
+    border-bottom: 1px solid #aca899;
   }
-  .ledger-entry-close { background: none; border: none; color: #fff; font-size: 18px; cursor: pointer; line-height: 1; }
+  .ledger-entry-close {
+    background: #d9534f; border: 1px solid #a02622; color: #fff;
+    font-size: 13px; cursor: pointer; line-height: 1; width: 20px; height: 18px;
+  }
   .ledger-entry-body {
     display: grid; grid-template-columns: 1fr 170px; gap: 8px;
     padding: 10px 10px 6px;
@@ -533,10 +642,17 @@ const ledgerStyles = `
   }
   .ledger-form-label { font-weight: 700; font-size: 12px; color: #111; }
   .ledger-field-wrap { position: relative; }
+  .ledger-company-select { background: #cfe2ff; color: #003399; font-weight: 700; }
   .ledger-side-checks {
-    display: flex; flex-direction: column; gap: 4px;
-    background: #eef3ff; border: 1px solid #94a3b8; padding: 6px; font-size: 11px;
+    display: flex; flex-direction: column; gap: 5px; font-size: 11px;
   }
+  .ledger-toggle-check {
+    display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: 700;
+    padding: 3px 6px; border-radius: 2px; background: #808080; color: #e5e5e5;
+  }
+  .ledger-toggle-check.is-on { background: #1d4ed8; color: #fff; }
+  .ledger-toggle-row { display: flex; align-items: center; gap: 4px; }
+  .ledger-tes-btn { padding: 2px 8px !important; font-size: 10px !important; }
   .ledger-stmt-check { display: flex; align-items: center; gap: 4px; cursor: pointer; font-weight: 600; }
   .ledger-entry-fy { padding: 0 10px 4px; font-size: 10px; color: #666; }
   .ledger-entry-footer {
@@ -561,27 +677,48 @@ const ledgerStyles = `
     display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 8px;
     background: #9bc89b; border-bottom: 1px solid #7eab7e; align-items: center;
   }
-  .ledger-stmt-body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #fff; overflow: hidden; }
-  .ledger-stmt-summary {
-    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-    padding: 8px 12px; border-bottom: 1px solid #ddd; background: #f5f0e8;
+  .ledger-toolbar-search { width: 160px; height: 24px; }
+  .ledger-toolbar-hints {
+    display: flex; flex-direction: column; margin-left: auto; text-align: right;
+    font-size: 10px; font-weight: 700; color: #7a1212; line-height: 1.3;
   }
-  .ledger-stmt-acc-name { font-size: 13px; font-weight: 800; color: #c00; text-transform: uppercase; }
-  .ledger-stmt-acc-addr { font-size: 10px; color: #555; margin-top: 2px; }
-  .ledger-stmt-bal-box { font-size: 11px; text-align: right; line-height: 1.45; }
+  .ledger-toolbar2 {
+    display: flex; gap: 12px; padding: 4px 8px;
+    background: #9bc89b; border-bottom: 1px solid #7eab7e; align-items: stretch;
+  }
+  .ledger-toolbar2-left { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+  .ledger-toolbar2-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: #111; }
+  .ledger-party-box { width: 160px; color: #b91c1c; font-weight: 800; }
+  .ledger-date-red { border-color: #c00 !important; color: #c00; font-weight: 700; }
+  .ledger-green-btn { background: #bff0bf !important; border-color: #6ba86b !important; }
+  .ledger-l-hint { color: #b91c1c; font-weight: 800; }
+  .ledger-openingbal-box { width: 90px; text-align: right; font-family: ui-monospace, Consolas, monospace; }
+  .ledger-toolbar2-hints {
+    display: flex; flex-direction: column; justify-content: center; text-align: right;
+    font-size: 10px; font-weight: 700; color: #7a1212; line-height: 1.5; white-space: nowrap;
+  }
+  .ledger-toolbar2-hints b { color: #1d4ed8; }
+  .ledger-stmt-body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #fff; overflow: hidden; }
   .ledger-stmt-table-wrap { flex: 1; min-height: 280px; overflow: auto; }
   .ledger-stmt-table { width: 100%; border-collapse: collapse; font-size: 11px; }
   .ledger-stmt-table thead th {
-    position: sticky; top: 0; z-index: 1; background: #555; color: #fff;
-    padding: 6px 8px; font-size: 10px; text-transform: uppercase;
+    position: sticky; top: 0; z-index: 1; background: #fff; color: #111; border-bottom: 2px solid #333;
+    padding: 6px 8px; font-size: 11px; font-weight: 800;
   }
   .ledger-stmt-table thead th.num, .ledger-stmt-table td.num { text-align: right; font-family: ui-monospace, Consolas, monospace; }
   .ledger-stmt-table td { padding: 4px 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
   .ledger-stmt-table tbody tr:nth-child(even) { background: #f5f5f5; }
   .ledger-stmt-table tbody tr:hover { background: #1e40af; color: #fff; }
   .ledger-ob-row td { background: #efe8dc !important; font-weight: 600; }
-  .ledger-stmt-table tfoot td { background: #f5f0e8; border-top: 1px solid #333; padding: 6px 8px; }
-  .tfoot-label { text-align: right; font-weight: 800; text-transform: uppercase; font-size: 10px; }
+  .ledger-grand-bar {
+    display: flex; align-items: center; gap: 16px; padding: 6px 10px;
+    background: #9bc89b; border-top: 1px solid #7eab7e;
+  }
+  .ledger-grand-remark { flex: 1; height: 30px; background: #fff; border: 1px solid #7eab7e; border-radius: 2px; }
+  .ledger-grand-totals { display: flex; align-items: center; gap: 10px; font-size: 11px; font-weight: 700; }
+  .ledger-grand-labels { display: flex; flex-direction: column; text-align: right; line-height: 1.3; }
+  .ledger-grand-boxes { display: flex; gap: 6px; }
+  .ledger-grand-boxes input { width: 100px; text-align: right; font-family: ui-monospace, Consolas, monospace; font-weight: 700; }
   @media print {
     body * { visibility: hidden !important; }
     .ledger-stmt-window, .ledger-stmt-window * { visibility: visible !important; }
