@@ -1043,13 +1043,15 @@ const useStore = create((set, get) => ({
   issueToMill: async (issueData) => {
     try {
       const _ji = await jobsApi.issue(issueData);
-      const res = { data: { data: _ji } };
-      set((state) => ({ jobWorkEntries: [res.data.data || res.data, ...state.jobWorkEntries] }));
-      return res.data;
+      // Reload from server so receipt lookup gets fully-populated entries
+      // (workerId.name, lotId.itemId.name, lotId.lotId, etc.)
+      await get().fetchJobs();
+      return _ji;
     } catch (err) {
       throw err;
     }
   },
+
 
   receiveFromMill: async (receiveData) => {
     try {

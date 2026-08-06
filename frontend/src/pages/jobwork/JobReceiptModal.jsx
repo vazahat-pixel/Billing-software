@@ -259,13 +259,23 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
       gstin: job.workerId?.gstin || '',
       book: selectedBook || 'JOB WORK RECEIVE BOOK',
     });
+
+    // Derive taxRate safely: only back-calculate when both values are positive and
+    // the result is a recognisable GST slab; otherwise fall back to default 5%.
+    let derivedTaxRate = '5';
+    const gstAmt = Number(job.processGstAmount || 0);
+    const charges = Number(job.processCharges || 0);
+    if (gstAmt > 0 && charges > 0) {
+      const pct = (gstAmt / charges) * 100;
+      // Accept only if within a realistic GST range (1–30%)
+      if (pct >= 1 && pct <= 30) {
+        derivedTaxRate = pct.toFixed(2);
+      }
+    }
+
     setFooter({
       ...emptyFooter(),
-      taxRate: String(
-        job.processGstAmount && job.processCharges
-          ? ((job.processGstAmount / job.processCharges) * 100).toFixed(2)
-          : '5'
-      ),
+      taxRate: derivedTaxRate,
       remark: job.remark || '',
     });
     setLines(() => {
@@ -276,6 +286,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
       return [line];
     });
     setMode('View');
+
   };
 
   const handleSave = async (e) => {
@@ -326,17 +337,13 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
   };
 
   const gridCols = [
-    { key: 'lotNo', label: 'LotNo', w: 'w-24', lookup: true },
-    { key: 'chlnNo', label: 'ChlnNo', w: 'w-20' },
-    { key: 'itemName', label: 'ItemName', w: 'min-w-[120px]' },
-    { key: 'finishItem', label: 'FinishItem', w: 'min-w-[100px]' },
-    { key: 'cut', label: 'Cut', w: 'w-14' },
-    { key: 'issuePcsRef', label: 'G.Pcs', w: 'w-14', align: 'right', readOnly: true },
-    { key: 'issueMtsRef', label: 'Grey.Mts', w: 'w-16', align: 'right', readOnly: true },
+    { key: 'chlnNo', label: 'ChlnNo', w: 'w-28', lookup: true },
+    { key: 'itemName', label: 'ItemName', w: 'flex-1', readOnly: true },
+    { key: 'finishItem', label: 'FinishItem', w: 'w-32' },
+    { key: 'cut', label: 'Cut', w: 'w-16', align: 'right' },
     { key: 'recPcs', label: 'RecPcs', w: 'w-16', align: 'right' },
-    { key: 'recMts', label: 'RecMts', w: 'w-16', align: 'right' },
-    { key: 'shtgPct', label: 'Shtg%', w: 'w-14', align: 'right', readOnly: true, computed: true },
-    { key: 'jRate', label: 'J.Rate', w: 'w-16', align: 'right' },
+    { key: 'recMts', label: 'RecMts', w: 'w-20', align: 'right' },
+    { key: 'jRate', label: 'J.Rate', w: 'w-20', align: 'right' },
     { key: 'pqk', label: 'PQK', w: 'w-14' },
     { key: 'jobAmt', label: 'JobAmt', w: 'w-20', align: 'right', readOnly: true },
     { key: 'cp', label: 'CP', w: 'w-12' },
@@ -472,39 +479,6 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                         disabled={locked}
                       />
                     </div>
-                    <div className="classic-erp-field classic-erp-field--lg">
-                      <span className="classic-erp-label">
-                        LotNo <span className="text-[9px] font-normal text-slate-500">(Alt+L or Enter)</span>
-                      </span>
-                      <div className="classic-erp-control">
-                        <input
-                          type="text"
-                          className="classic-erp-input cursor-pointer"
-                          value={lotEntryValue}
-                          readOnly
-                          onFocus={() => openLotLookup(null)}
-                          onClick={() => openLotLookup(null)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              openLotLookup(null);
-                            }
-                          }}
-                          disabled={locked}
-                          placeholder="Press Enter — which bill to receive from…"
-                        />
-                        {!locked && (
-                          <button
-                            type="button"
-                            className="classic-erp-btn erp-job-issue-lookup-btn"
-                            onClick={() => openLotLookup(null)}
-                            aria-label="Lot No entry"
-                          >
-                            …
-                          </button>
-                        )}
-                      </div>
-                    </div>
                     <div className="classic-erp-field">
                       <span className="classic-erp-label">HSN CD</span>
                       <input
@@ -565,7 +539,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                       <tr key={line.id}>
                         <td className="text-center text-slate-500">{idx + 1}</td>
                         {gridCols.map((c) => {
-                          if (c.key === 'lotNo') {
+                          if (c.key === 'chlnNo') {
                             return (
                               <td key={c.key}>
                                 <button
@@ -575,7 +549,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                                   disabled={locked}
                                   title="Pick which bill/challan to receive from"
                                 >
-                                  {line.lotNo || '— select —'}
+                                  {line.chlnNo || '— select —'}
                                 </button>
                               </td>
                             );

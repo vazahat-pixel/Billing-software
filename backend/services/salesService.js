@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { withTransaction } = require('../utils/withTransaction');
 const Sales = require('../models/Sales');
 const InventoryLot = require('../models/InventoryLot');
 const StockMovement = require('../models/StockMovement');
@@ -10,9 +11,7 @@ class SalesService {
    * @param {{ skipStock?: boolean }} options — skipStock when challan already deducted stock
    */
   async createInvoice(salesData, options = {}) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
+    return withTransaction(async (session) => {
     try {
       const { companyId, items } = salesData;
       const skipStock = options.skipStock === true || salesData.stockFromChallan === true;
@@ -169,7 +168,6 @@ class SalesService {
         console.warn('BillSettlement sync after sales:', syncErr.message);
       }
 
-      await session.commitTransaction();
       try {
         const eventBus = require('../events/eventBus');
         eventBus.emitSafe('sales.created', {
@@ -185,11 +183,9 @@ class SalesService {
       }
       return sales;
     } catch (error) {
-      await session.abortTransaction();
       throw error;
-    } finally {
-      session.endSession();
     }
+    }); // end withTransaction
   }
 
   /** Reverses the accounting entry linked to a sale (used by both edit and cancel). */
@@ -234,9 +230,7 @@ class SalesService {
    * then re-applies stock deduction and posts a fresh accounting entry.
    */
   async updateInvoice(id, companyId, salesData) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
+    return withTransaction(async (session) => {
     try {
       const sale = await Sales.findOne({ _id: id, companyId }).session(session);
       if (!sale) throw new Error('Sale not found');
@@ -381,7 +375,6 @@ class SalesService {
         console.warn('BillSettlement sync after sales update:', syncErr.message);
       }
 
-      await session.commitTransaction();
       try {
         const eventBus = require('../events/eventBus');
         eventBus.emitSafe('sales.updated', {
@@ -396,11 +389,9 @@ class SalesService {
       }
       return sale;
     } catch (error) {
-      await session.abortTransaction();
       throw error;
-    } finally {
-      session.endSession();
     }
+    }); // end withTransaction
   }
 
   async getSales(companyId, { page = 1, limit = 100, startDate, endDate, status } = {}) {
@@ -458,9 +449,7 @@ class SalesService {
    * For goods already dispatched without lot tracking, use Sales Return workflow.
    */
   async deleteSale(id, companyId) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
+    return withTransaction(async (session) => {
       const sale = await Sales.findOne({ _id: id, companyId }).session(session);
       if (!sale) throw new Error('Sale not found');
 
@@ -471,7 +460,6 @@ class SalesService {
           { isDeleted: true, deletedAt: new Date() },
           { session }
         );
-        await session.commitTransaction();
         return { message: 'Sale deleted' };
       }
 
@@ -495,14 +483,8 @@ class SalesService {
       const outstandingEngine = require('./outstandingEngineService');
       await outstandingEngine.syncBillFromSales(companyId, sale, session);
 
-      await session.commitTransaction();
       return sale;
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
-    }
+    }); // end withTransaction
   }
 }
 

@@ -393,11 +393,23 @@ const PurchaseModal = ({
     let gross = 0;
     let linesTaxable = 0;
     let linesGst = 0;
+    let linesGstBase = 0;
 
     gridItems.forEach((item) => {
       gross = money(gross + money(item.amount));
       linesTaxable = money(linesTaxable + lineTaxable(item));
       linesGst = money(linesGst + money(item.gstAmt));
+
+      const unit = String(item.unit || 'MTRS').toUpperCase();
+      const isQty = unit === 'QTY';
+      let rowBase = money(item.amount);
+      if (isQty) {
+        rowBase = money(rowBase - money(item.foldLessAmt) + money(item.foldAddAmt));
+      }
+      const dis1 = money(item.dis1Amt);
+      const dis2 = money(item.dis2Amt);
+      const add = money(item.addAmt);
+      linesGstBase = money(linesGstBase + money(rowBase - dis1 - dis2 + add));
     });
 
     let totalAdd = 0;
@@ -429,8 +441,8 @@ const PurchaseModal = ({
     // and the on-screen preview won't match what the server actually saves.
     const gstAmt = isUnregistered
       ? 0
-      : linesTaxable > 0
-        ? money(linesGst * (taxable / linesTaxable))
+      : linesGstBase > 0
+        ? money(linesGst * (taxable / linesGstBase))
         : linesGst;
     const cgst = isOutOfState ? 0 : money(gstAmt / 2);
     const sgst = isOutOfState ? 0 : money(gstAmt / 2);

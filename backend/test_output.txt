@@ -1,0 +1,94 @@
+﻿
+> billing-software-backend@1.0.0 test:integration
+> node --test tests/integration/*.test.js
+
+TAP version 13
+# [2026-08-05T12:03:39.126Z] [INFO] MongoDB connected {"pool":20}
+# [2026-08-05T12:03:39.129Z] [INFO] automation listeners registered
+# [2026-08-05T12:03:39.130Z] [INFO] job.worker.started {"workerId":"worker-30668-msg1gcsk","intervalMs":5000}
+# [2026-08-05T12:03:40.369Z] [INFO] GET /health 200 3ms {"requestId":"552fec35-db65-4966-b380-59d8672e6e53","companyId":null,"userId":null}
+# Subtest: ERP core billing flow
+    # Subtest: health check
+    ok 1 - health check
+      ---
+      duration_ms: 30.9385
+      type: 'test'
+      ...
+# [2026-08-05T12:03:49.127Z] [INFO] POST /api/auth/register 201 8724ms {"requestId":"f5082724-12c3-4ae9-af57-fd3eb844884e","companyId":null,"userId":null}
+# [2026-08-05T12:03:49.127Z] [INFO] POST /api/auth/register {"category":"api","requestId":"f5082724-12c3-4ae9-af57-fd3eb844884e","module":"api","action":"POST"}
+    # Subtest: registers company owner
+    ok 2 - registers company owner
+      ---
+      duration_ms: 8757.9673
+      type: 'test'
+      ...
+# [2026-08-05T12:03:49.429Z] [INFO] POST /api/parties 201 289ms {"requestId":"7cd0a44c-ecd4-4c00-9c8e-eee9ce780800","companyId":"6a73269fb333a40b1922c7ad","userId":"6a73269fb333a40b1922c76f"}
+# [2026-08-05T12:03:49.735Z] [INFO] POST /api/parties 201 300ms {"requestId":"170ab2f4-d81c-4240-8267-e8e104f838ac","companyId":"6a73269fb333a40b1922c7ad","userId":"6a73269fb333a40b1922c76f"}
+    # Subtest: creates supplier and customer
+    ok 3 - creates supplier and customer
+      ---
+      duration_ms: 601.0904
+      type: 'test'
+      ...
+# [2026-08-05T12:03:49.999Z] [INFO] POST /api/items 201 259ms {"requestId":"5e681a6a-bcb7-4f22-b877-20f365be295d","companyId":"6a73269fb333a40b1922c7ad","userId":"6a73269fb333a40b1922c76f"}
+    # Subtest: creates item master
+    ok 4 - creates item master
+      ---
+      duration_ms: 264.9319
+      type: 'test'
+      ...
+# [2026-08-05T12:03:51.910Z] [INFO] POST /api/purchases 201 1904ms {"requestId":"d66c3fef-7740-45c9-9135-7fc837a3d49d","companyId":"6a73269fb333a40b1922c7ad","userId":"6a73269fb333a40b1922c76f"}
+# [2026-08-05T12:03:52.135Z] [INFO] GET /api/inventory/stock/6a7326a5b333a40b1922c8aa 200 220ms {"requestId":"24618807-812d-4178-bf8e-e3b70afbda5b","companyId":"6a73269fb333a40b1922c7ad","userId":"6a73269fb333a40b1922c76f"}
+# [2026-08-05T12:03:52.135Z] [INFO] GET /api/inventory/stock/6a7326a5b333a40b1922c8aa {"category":"api","companyId":"6a73269fb333a40b1922c7ad","requestId":"24618807-812d-4178-bf8e-e3b70afbda5b","module":"api","action":"GET"}
+# [2026-08-05T12:03:52.405Z] [INFO] GET /api/inventory/lots?itemId=6a7326a5b333a40b1922c8aa 200 262ms {"requestId":"1b6c1757-e3c6-4e94-9781-70c64e917c3b","companyId":"6a73269fb333a40b1922c7ad","userId":"6a73269fb333a40b1922c76f"}
+# [2026-08-05T12:03:52.405Z] [INFO] GET /api/inventory/lots?itemId=6a7326a5b333a40b1922c8aa {"category":"api","companyId":"6a73269fb333a40b1922c7ad","requestId":"1b6c1757-e3c6-4e94-9781-70c64e917c3b","module":"api","action":"GET"}
+    # Subtest: creates purchase and increases stock
+    ok 5 - creates purchase and increases stock
+      ---
+      duration_ms: 2406.2013
+      type: 'test'
+      ...
+# [2026-08-05T12:03:53.818Z] [INFO] POST /api/sales 201 1405ms {"requestId":"82555d64-ff31-45df-9d4a-ece78c80cd4e","companyId":"6a73269fb333a40b1922c7ad","userId":"6a73269fb333a40b1922c76f"}
+# [2026-08-05T12:03:54.018Z] [INFO] GET /api/inventory/stock/6a7326a5b333a40b1922c8aa 200 195ms {"requestId":"a5f936f9-7e84-4996-a093-2b955987fb48","companyId":"6a73269fb333a40b1922c7ad","userId":"6a73269fb333a40b1922c76f"}
+# [2026-08-05T12:03:54.019Z] [INFO] GET /api/inventory/stock/6a7326a5b333a40b1922c8aa {"category":"api","companyId":"6a73269fb333a40b1922c7ad","requestId":"a5f936f9-7e84-4996-a093-2b955987fb48","module":"api","action":"GET"}
+    # Subtest: creates sales invoice and deducts stock
+    ok 6 - creates sales invoice and deducts stock
+      ---
+      duration_ms: 1613.5643
+      type: 'test'
+      ...
+# [2026-08-05T12:03:54.774Z] [INFO] DELETE /api/sales/6a7326a9b333a40b1922c93b 200 749ms {"requestId":"351880ae-01b0-47e4-9f79-fd6e61b41427","companyId":"6a73269fb333a40b1922c7ad","userId":"6a73269fb333a40b1922c76f"}
+# [2026-08-05T12:03:54.775Z] [INFO] DELETE /api/sales/6a7326a9b333a40b1922c93b {"category":"api","companyId":"6a73269fb333a40b1922c7ad","requestId":"351880ae-01b0-47e4-9f79-fd6e61b41427","module":"api","action":"DELETE"}
+# [2026-08-05T12:03:54.985Z] [INFO] GET /api/inventory/stock/6a7326a5b333a40b1922c8aa 200 204ms {"requestId":"c77c4aef-141a-4654-a4de-3ae13a303b02","companyId":"6a73269fb333a40b1922c7ad","userId":"6a73269fb333a40b1922c76f"}
+# [2026-08-05T12:03:54.985Z] [INFO] GET /api/inventory/stock/6a7326a5b333a40b1922c8aa {"category":"api","companyId":"6a73269fb333a40b1922c7ad","requestId":"c77c4aef-141a-4654-a4de-3ae13a303b02","module":"api","action":"GET"}
+    # Subtest: cancels sale and restores stock
+    ok 7 - cancels sale and restores stock
+      ---
+      duration_ms: 965.8139
+      type: 'test'
+      ...
+# [2026-08-05T12:03:55.824Z] [INFO] DELETE /api/purchases/6a7326a7b333a40b1922c8e6 200 834ms {"requestId":"a1c02aba-3142-4dde-9cdc-ac45b4a27075","companyId":"6a73269fb333a40b1922c7ad","userId":"6a73269fb333a40b1922c76f"}
+# [2026-08-05T12:03:55.824Z] [INFO] DELETE /api/purchases/6a7326a7b333a40b1922c8e6 {"category":"api","companyId":"6a73269fb333a40b1922c7ad","requestId":"a1c02aba-3142-4dde-9cdc-ac45b4a27075","module":"api","action":"DELETE"}
+# [2026-08-05T12:03:56.028Z] [INFO] GET /api/inventory/stock/6a7326a5b333a40b1922c8aa 200 199ms {"requestId":"99847578-92bc-4c3b-962d-126a80b9f886","companyId":"6a73269fb333a40b1922c7ad","userId":"6a73269fb333a40b1922c76f"}
+# [2026-08-05T12:03:56.029Z] [INFO] GET /api/inventory/stock/6a7326a5b333a40b1922c8aa {"category":"api","companyId":"6a73269fb333a40b1922c7ad","requestId":"99847578-92bc-4c3b-962d-126a80b9f886","module":"api","action":"GET"}
+    # Subtest: cancels purchase and removes stock when unused
+    ok 8 - cancels purchase and removes stock when unused
+      ---
+      duration_ms: 1043.847
+      type: 'test'
+      ...
+    1..8
+ok 1 - ERP core billing flow
+  ---
+  duration_ms: 17327.1071
+  type: 'suite'
+  ...
+1..1
+# tests 8
+# suites 1
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 20566.1065
