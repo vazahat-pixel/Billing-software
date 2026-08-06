@@ -286,7 +286,8 @@ exports.createReturn = async (req, res) => {
     if (error.code === 11000) {
       return res.status(400).json({ success: false, message: 'A return with this number already exists' });
     }
-    res.status(500).json({ success: false, message: error.message });
+    const status = error.message.includes('locked') || error.message.includes('Locked') || error.message.includes('Filed') ? 400 : 500;
+    res.status(status).json({ success: false, message: error.message });
   } finally {
     session.endSession();
   }
