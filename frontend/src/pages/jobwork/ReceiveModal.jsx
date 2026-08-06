@@ -11,7 +11,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
       jobWorkEntries,
       fetchJobs,
       receiveFromMill,
-      fetchInventory
+      fetchInventory,
+      items,
+      fetchItems
    } = useStore();
 
    const [activeTab, setActiveTab] = useState('Mill Receive');
@@ -35,6 +37,8 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
    const [serialNo, setSerialNo] = useState('4');
    const [receiveDate, setReceiveDate] = useState(new Date().toISOString().substring(0, 10));
    const [showLotDropdown, setShowLotDropdown] = useState(false);
+   const [dropdownSelectIdx, setDropdownSelectIdx] = useState(0);
+   const dropdownRef = React.useRef(null);
 
    // Grid fields (static single row representation for UI only)
    const [gridLotNo, setGridLotNo] = useState('');
@@ -91,7 +95,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
       }
       let cancelled = false;
       setBootLoading(true);
-      Promise.all([fetchJobs(), fetchInventory?.()])
+      Promise.all([fetchJobs(), fetchInventory?.(), fetchItems?.()])
          .catch(() => { })
          .finally(() => {
             if (!cancelled) setBootLoading(false);
@@ -99,7 +103,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
       return () => {
          cancelled = true;
       };
-   }, [isOpen, fetchJobs, fetchInventory]);
+   }, [isOpen, fetchJobs, fetchInventory, fetchItems]);
 
    // Handle escape key globally to close lookup dialog
    useEffect(() => {
@@ -135,14 +139,22 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
       }));
    }, [pendingJobs]);
 
-   const associatedLots = useMemo(() => {
-      if (!selectedJobPartyId) return [];
-      return pendingJobs.filter(j => {
-         if (!j.workerId) return false;
-         const workerIdStr = String(j.workerId._id || j.workerId.id || j.workerId);
-         return workerIdStr === String(selectedJobPartyId);
-      });
-   }, [pendingJobs, selectedJobPartyId]);
+    const associatedLots = useMemo(() => {
+       if (!selectedJobPartyId) return [];
+       const list = pendingJobs.filter(j => {
+          if (!j.workerId) return false;
+          const workerIdStr = String(j.workerId._id || j.workerId.id || j.workerId);
+          return workerIdStr === String(selectedJobPartyId);
+       });
+       const q = String(gridLotNo || '').trim().toLowerCase();
+       if (!q) return list;
+       return list.filter(j => {
+          const lotVal = String(j.lotId?.lotId || j.lotId || '').toLowerCase();
+          const chlnVal = String(j.jobCardNo || '').toLowerCase();
+          const itemVal = String(j.lotId?.itemId?.name || j.lotId?.itemName || '').toLowerCase();
+          return lotVal.includes(q) || chlnVal.includes(q) || itemVal.includes(q);
+       });
+    }, [pendingJobs, selectedJobPartyId, gridLotNo]);
 
    const gstOptions = [
       { value: '0', label: '0%' },
@@ -159,114 +171,265 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
       return jobWorkEntries.find(j => j._id === selectedJobId) || null;
    }, [selectedJobId, jobWorkEntries]);
 
-   const handleSelectLot = (job) => {
-      setGridLotNo(job.lotId?.lotId || '');
-      setGridChlnNo(job.jobCardNo || '');
-      setGridItemName(job.lotId?.itemName || '');
-      setGridCP('C');
-      setGridCuttingPending('P');
-      setGridProcType('Finish');
+    const handleSelectLot = (job, options = {}) => {
+       setGridLotNo(job.lotId?.lotId || '');
+       setGridChlnNo(job.challanNo || job.jobCardNo || '');
+       setGridItemName(job.lotId?.itemId?.name || job.lotId?.itemName || '');
+       setGridCP('C');
+       setGridCuttingPending('P');
+       setGridProcType('Finish');
+        // Populate actuals from job issue
+        setGridGPcs(String(job.issuePcs || 0));
+        setGridGreyMts(Number(job.issueQty || 0).toFixed(2));
+        setGridFinishMts('0.00');
+        setGridFinalMts('0.00');
+        setGridFPcs(String(job.issuePcs || 0));
+        setGridJobRate(Number(job.jobRate || 0).toFixed(2));
+ 
+       // Populate gstin, hsnCd, and tax defaults for the header/footer
+       setGstin(job.workerId?.gstin || '');
+       setHsnCd(job.hsnCd || '5407');
+       const gstPct = job.gstPercent ? Number(job.gstPercent) : 5;
+       setSgstPercent((gstPct / 2).toString());
+       setCgstPercent((gstPct / 2).toString());
+       setIgstPercent('0');
+ 
+       // Keep legacy fields populated for backward compatibility with submit handlers
+       setReceivedPcs('0');
+       setReceivedQty('0');
+       setRate(0);
+ 
+       // Save selected Job Card ID for submission
+       setSelectedJobId(job._id);
+ 
+       // Focus the specified field or default to Challan No
+       const focusFieldId = options.focusField || 'grid-chln-no';
+       setTimeout(() => {
+          const el = document.getElementById(focusFieldId);
+          if (el) {
+             el.focus();
+             el.select?.();
+          }
+       }, 100);
+    };
 
-      // Explicitly make other fields NOT to be auto-filled (stay default)
-      setGridGPcs('0');
-      setGridGreyMts('0.00');
-      setGridFinishMts('0.00');
-      setGridFinalMts('0.00');
-      setGridFPcs('0');
-      setGridJobRate('0.00');
+    const handleChlnNoEnter = (e) => {
+       if (!selectedJobPartyId) {
+          notifyWarning('Please select a Job Party first');
+          return;
+       }
+        const typedChln = String(gridChlnNo || '').trim();
+        if (!typedChln) {
+           e.preventDefault();
+           e.stopPropagation();
+           setShowLotDropdown(true);
+           return;
+        }
+       
+       const query = typedChln.toLowerCase();
+       const matches = associatedLots.filter(j => 
+          String(j.jobCardNo || '').toLowerCase() === query || 
+          String(j.challanNo || '').toLowerCase() === query
+       );
+       
+       if (matches.length === 1) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleSelectLot(matches[0], { focusField: 'grid-finish-mts' });
+          notifySuccess(`Loaded Challan ${matches[0].challanNo || matches[0].jobCardNo}`);
+       } else if (matches.length > 1) {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowLotDropdown(true);
+       } else {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowLotDropdown(true);
+          notifyWarning(`No pending issue found with Challan No: "${typedChln}"`);
+       }
+    };
 
-      // Populate gstin, hsnCd, and tax defaults for the header/footer
-      setGstin(job.workerId?.gstin || '');
-      setHsnCd(job.hsnCd || '5407');
-      const gstPct = job.gstPercent ? Number(job.gstPercent) : 5;
-      setSgstPercent((gstPct / 2).toString());
-      setCgstPercent((gstPct / 2).toString());
-      setIgstPercent('0');
-
-      // Keep legacy fields populated for backward compatibility with submit handlers
-      setReceivedPcs('0');
-      setReceivedQty('0');
-      setRate(0);
-
-      // Save selected Job Card ID for submission
-      setSelectedJobId(job._id);
-   };
+    useEffect(() => {
+       if (showLotDropdown) {
+          setDropdownSelectIdx(0);
+          setTimeout(() => {
+             dropdownRef.current?.focus();
+          }, 50);
+       }
+    }, [showLotDropdown]);
+ 
+    const handleDropdownKeyDown = (e) => {
+       if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setDropdownSelectIdx((prev) => Math.min(prev + 1, Math.max(0, associatedLots.length - 1)));
+       } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setDropdownSelectIdx((prev) => Math.max(prev - 1, 0));
+       } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (associatedLots[dropdownSelectIdx]) {
+             handleSelectLot(associatedLots[dropdownSelectIdx]);
+             setShowLotDropdown(false);
+          }
+       } else if (e.key === 'Escape') {
+          e.preventDefault();
+          setShowLotDropdown(false);
+       }
+    };
 
    // Derived Calculations
-   const calculatedShortage = useMemo(() => {
-      const grey = Number(gridGreyMts) || 0;
-      const finish = Number(gridFinishMts) || 0;
-      if (grey <= 0) return '0.0';
-      const diff = grey - finish;
-      const pct = (diff / grey) * 100;
-      return pct.toFixed(1);
-   }, [gridGreyMts, gridFinishMts]);
+    const calculatedShortage = useMemo(() => {
+       const grey = Number(gridGreyMts) || 0;
+       const finish = Number(gridFinishMts) || 0;
+       if (isNaN(grey) || isNaN(finish) || grey <= 0 || finish <= 0) return '0.0';
+       const diff = grey - finish;
+       const pct = (diff / grey) * 100;
+       return isNaN(pct) ? '0.0' : pct.toFixed(1);
+    }, [gridGreyMts, gridFinishMts]);
 
-   const calculatedJobAmt = useMemo(() => {
-      const finish = Number(gridFinishMts) || 0;
-      const rateVal = Number(gridJobRate) || 0;
-      return (finish * rateVal).toFixed(2);
-   }, [gridFinishMts, gridJobRate]);
+    const calculatedJobAmt = useMemo(() => {
+       const finalVal = Number(gridFinalMts) || 0;
+       const finish = Number(gridFinishMts) || 0;
+       const rateVal = Number(gridJobRate) || 0;
+       const qty = finalVal > 0 ? finalVal : finish;
+       return (qty * rateVal).toFixed(2);
+    }, [gridFinishMts, gridFinalMts, gridJobRate]);
+ 
+    const computedGrossAmt = useMemo(() => {
+       return Number(calculatedJobAmt) || 0;
+    }, [calculatedJobAmt]);
 
-   const computedGrossAmt = useMemo(() => {
-      return Number(calculatedJobAmt) || 0;
-   }, [calculatedJobAmt]);
+    const finishItemOptions = useMemo(() => {
+       return (items || []).map((item) => ({
+          value: item.name || item.itemName || '',
+          label: item.name || item.itemName || '',
+       })).sort((a, b) => a.label.localeCompare(b.label));
+    }, [items]);
+ 
+    // Synchronize TDS base amount to Gross Amt automatically
+    useEffect(() => {
+       setOnTdsAmt(computedGrossAmt.toFixed(2));
+    }, [computedGrossAmt]);
+ 
+    // Synchronize TDS Amt state from base/percent
+    useEffect(() => {
+       const base = Number(onTdsAmt) || computedGrossAmt;
+       const pct = Number(tdsPercent) || 0;
+       setTdsAmt(((base * pct) / 100).toFixed(2));
+    }, [onTdsAmt, computedGrossAmt, tdsPercent]);
 
-   // Synchronize TDS base amount to Gross Amt automatically
-   useEffect(() => {
-      setOnTdsAmt(computedGrossAmt.toFixed(2));
-   }, [computedGrossAmt]);
+    // Handlers for Cut/FPcs change relations
+    const handleCutChange = (val) => {
+       setGridCut(val);
+       const cutVal = Number(val) || 0;
+       const finish = Number(gridFinishMts) || 0;
+       if (cutVal > 0 && finish > 0) {
+          setGridFPcs(String(Math.round(finish / cutVal)));
+       }
+    };
 
-   const computedTdsAmt = useMemo(() => {
-      const base = Number(onTdsAmt) || computedGrossAmt;
-      const pct = Number(tdsPercent) || 0;
-      return ((base * pct) / 100).toFixed(2);
-   }, [onTdsAmt, computedGrossAmt, tdsPercent]);
+    const handleFPcsChange = (val) => {
+       setGridFPcs(val);
+       const pcsVal = Number(val) || 0;
+       const finish = Number(gridFinishMts) || 0;
+       if (pcsVal > 0 && finish > 0) {
+          setGridCut((finish / pcsVal).toFixed(2));
+       }
+    };
 
-   const computedSgstAmt = useMemo(() => {
-      const pct = Number(sgstPercent) || 0;
-      return ((computedGrossAmt * pct) / 100).toFixed(2);
-   }, [computedGrossAmt, sgstPercent]);
+    // Sync pieces when Finish.Mts changes
+    useEffect(() => {
+       const finish = Number(gridFinishMts) || 0;
+       const cutVal = Number(gridCut) || 0;
+       if (cutVal > 0 && finish > 0) {
+          setGridFPcs(String(Math.round(finish / cutVal)));
+       }
+    }, [gridFinishMts]);
 
-   const computedCgstAmt = useMemo(() => {
-      const pct = Number(cgstPercent) || 0;
-      return ((computedGrossAmt * pct) / 100).toFixed(2);
-   }, [computedGrossAmt, cgstPercent]);
+    // Handlers for percentage adjustments
+    const handleLessPercentChange = (val) => {
+       setLessPercent(val);
+       const gross = computedGrossAmt;
+       const pct = Number(val) || 0;
+       setLessAmt(((gross * pct) / 100).toFixed(2));
+    };
 
-   const computedIgstAmt = useMemo(() => {
-      const pct = Number(igstPercent) || 0;
-      return ((computedGrossAmt * pct) / 100).toFixed(2);
-   }, [computedGrossAmt, igstPercent]);
+    const handleOtherLessPercentChange = (val) => {
+       setOtherLessPercent(val);
+       const gross = computedGrossAmt;
+       const pct = Number(val) || 0;
+       setOtherLessAmt(((gross * pct) / 100).toFixed(2));
+    };
 
-   const computedNetAmt = useMemo(() => {
-      const gross = computedGrossAmt;
-      const sgst = Number(computedSgstAmt) || 0;
-      const cgst = Number(computedCgstAmt) || 0;
-      const igst = Number(computedIgstAmt) || 0;
+    const handleOtherAddPercentChange = (val) => {
+       setOtherAddPercent(val);
+       const gross = computedGrossAmt;
+       const pct = Number(val) || 0;
+       setOtherAddAmt(((gross * pct) / 100).toFixed(2));
+    };
 
-      const lessVal = Number(lessAmt) || 0;
-      const otherLess = Number(otherLessAmt) || 0;
-      const otherAdd = Number(otherAddAmt) || 0;
+    // Sync footer adjustment amounts if gross amount changes
+    useEffect(() => {
+       const gross = computedGrossAmt;
 
-      return gross + sgst + cgst + igst - lessVal - otherLess + otherAdd;
-   }, [computedGrossAmt, computedSgstAmt, computedCgstAmt, computedIgstAmt, lessAmt, otherLessAmt, otherAddAmt]);
+       const pct1 = Number(lessPercent) || 0;
+       setLessAmt(((gross * pct1) / 100).toFixed(2));
 
-   const computedRoundOff = useMemo(() => {
-      const net = computedNetAmt;
-      const rounded = Math.round(net);
-      return (rounded - net).toFixed(2);
-   }, [computedNetAmt]);
+       const pct2 = Number(otherLessPercent) || 0;
+       setOtherLessAmt(((gross * pct2) / 100).toFixed(2));
 
-   const computedFinalAmt = useMemo(() => {
-      const net = computedNetAmt;
-      const tds = Number(computedTdsAmt) || 0;
-      return Math.round(net - tds);
-   }, [computedNetAmt, computedTdsAmt]);
+       const pct3 = Number(otherAddPercent) || 0;
+       setOtherAddAmt(((gross * pct3) / 100).toFixed(2));
+    }, [computedGrossAmt]);
+ 
+    const computedSgstAmt = useMemo(() => {
+       const pct = Number(sgstPercent) || 0;
+       return ((computedGrossAmt * pct) / 100).toFixed(2);
+    }, [computedGrossAmt, sgstPercent]);
+ 
+    const computedCgstAmt = useMemo(() => {
+       const pct = Number(cgstPercent) || 0;
+       return ((computedGrossAmt * pct) / 100).toFixed(2);
+    }, [computedGrossAmt, cgstPercent]);
+ 
+    const computedIgstAmt = useMemo(() => {
+       const pct = Number(igstPercent) || 0;
+       return ((computedGrossAmt * pct) / 100).toFixed(2);
+    }, [computedGrossAmt, igstPercent]);
+ 
+    const computedNetAmt = useMemo(() => {
+       const gross = computedGrossAmt;
+       const sgst = Number(computedSgstAmt) || 0;
+       const cgst = Number(computedCgstAmt) || 0;
+       const igst = Number(computedIgstAmt) || 0;
+ 
+       const lessVal = Number(lessAmt) || 0;
+       const otherLess = Number(otherLessAmt) || 0;
+       const otherAdd = Number(otherAddAmt) || 0;
+ 
+       return gross + sgst + cgst + igst - lessVal - otherLess + otherAdd;
+    }, [computedGrossAmt, computedSgstAmt, computedCgstAmt, computedIgstAmt, lessAmt, otherLessAmt, otherAddAmt]);
+ 
+    const computedRoundOff = useMemo(() => {
+       const net = computedNetAmt;
+       const rounded = Math.round(net);
+       return (rounded - net).toFixed(2);
+    }, [computedNetAmt]);
+ 
+    const computedFinalAmt = useMemo(() => {
+       const net = computedNetAmt;
+       const tds = Number(tdsAmt) || 0;
+       return Math.round(net - tds);
+    }, [computedNetAmt, tdsAmt]);
 
    const handleSubmit = async (e) => {
       e.preventDefault();
       if (!selectedJobId) {
          notifyWarning('Please select a pending process job card');
+         return;
+      }
+      if (!billGpNo || String(billGpNo).trim() === '') {
+         notifyWarning('Please enter Bill/GP No.');
          return;
       }
       const receivedQtyVal = Number(gridFinishMts) || 0;
@@ -284,10 +447,21 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
             receivedPcs: Number(gridFPcs) || 0,
             wastage: Math.max(0, Number(gridGreyMts) - receivedQtyVal),
             charges: computedGrossAmt,
-            gstAmount: totalGst
+            gstAmount: totalGst,
+            billGpNo: billGpNo.trim()
          });
          notifySuccess('Challan received and finished lots added to stock!');
          setSelectedJobId('');
+         setBillGpNo('');
+         setGridLotNo('');
+         setGridChlnNo('');
+         setGridItemName('');
+         setGridGPcs('0');
+         setGridGreyMts('0.00');
+         setGridFinishMts('0.00');
+         setGridFinalMts('0.00');
+         setGridFPcs('0');
+         setGridJobRate('0.00');
          setActiveTab('View Mill Rec');
          await fetchJobs();
          await fetchInventory();
@@ -475,29 +649,43 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     <td className="border-r border-slate-300 p-0.5">
                                        <input
                                           type="text"
-                                          data-enter-nav="off"
-                                          className="w-full h-6 px-1 border-none focus:outline-none focus:ring-1 focus:ring-blue-500 bg-sky-100 font-mono"
+                                          className="w-full h-6 px-1 border-none bg-slate-100 text-slate-500 font-mono"
                                           value={gridLotNo}
-                                          onChange={(e) => setGridLotNo(e.target.value)}
-                                          onKeyDown={(e) => {
-                                             if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                if (!selectedJobPartyId) {
-                                                   notifyWarning('Please select a Job Party first');
-                                                   return;
-                                                }
-                                                setShowLotDropdown(true);
-                                             }
-                                          }}
-                                          placeholder="Press Enter..."
+                                          readOnly
+                                          disabled
+                                          placeholder="Auto-filled"
                                        />
                                     </td>
                                     <td className="border-r border-slate-300 p-0.5">
                                        <input
+                                          id="grid-chln-no"
                                           type="text"
-                                          className="w-full h-6 px-1 border-none focus:outline-none bg-transparent"
+                                          className="w-full h-6 px-1 border-none focus:outline-none focus:ring-1 focus:ring-blue-500 bg-sky-100 font-mono cursor-pointer"
                                           value={gridChlnNo}
                                           onChange={(e) => setGridChlnNo(e.target.value)}
+                                          onClick={() => {
+                                             if (!selectedJobPartyId) {
+                                                notifyWarning('Please select a Job Party first');
+                                                return;
+                                             }
+                                             setShowLotDropdown(true);
+                                          }}
+                                          onKeyDown={(e) => {
+                                             if (e.key === 'Enter') {
+                                                if (!gridChlnNo || !selectedJobId) {
+                                                   e.preventDefault();
+                                                   e.stopPropagation();
+                                                   if (!selectedJobPartyId) {
+                                                      notifyWarning('Please select a Job Party first');
+                                                      return;
+                                                   }
+                                                   setShowLotDropdown(true);
+                                                } else {
+                                                   handleChlnNoEnter(e);
+                                                }
+                                             }
+                                          }}
+                                          placeholder="Press Enter or Click..."
                                        />
                                     </td>
                                     <td className="border-r border-slate-300 p-0.5">
@@ -511,6 +699,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     </td>
                                     <td className="border-r border-slate-300 p-0.5">
                                        <input
+                                          id="grid-g-pcs"
                                           type="number"
                                           className="w-full h-6 px-1 border-none text-right bg-transparent"
                                           value={gridGPcs}
@@ -519,6 +708,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     </td>
                                     <td className="border-r border-slate-300 p-0.5">
                                        <input
+                                          id="grid-grey-mts"
                                           type="number"
                                           className="w-full h-6 px-1 border-none text-right bg-transparent"
                                           value={gridGreyMts}
@@ -527,6 +717,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     </td>
                                     <td className="border-r border-slate-300 p-0.5">
                                        <input
+                                          id="grid-finish-mts"
                                           type="number"
                                           className="w-full h-6 px-1 border-none text-right bg-transparent"
                                           value={gridFinishMts}
@@ -543,7 +734,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     </td>
                                     <td className="border-r border-slate-300 p-0.5">
                                        <input
-                                          type="number"
+                                          type="text"
                                           className="w-full h-6 px-1 border-none text-right bg-slate-100"
                                           value={calculatedShortage}
                                           disabled
@@ -582,19 +773,23 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                        />
                                     </td>
                                     <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          type="text"
-                                          className="w-full h-6 px-1 border-none bg-transparent"
+                                       <select
+                                          className="w-full h-6 px-1 border-none bg-transparent text-[10px] focus:outline-none uppercase font-bold"
                                           value={gridFinishItem}
                                           onChange={(e) => setGridFinishItem(e.target.value)}
-                                       />
+                                       >
+                                          <option value="">- Select -</option>
+                                          {finishItemOptions.map(opt => (
+                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                          ))}
+                                       </select>
                                     </td>
                                     <td className="border-r border-slate-300 p-0.5">
                                        <input
                                           type="text"
                                           className="w-full h-6 px-1 border-none text-center bg-transparent"
                                           value={gridCut}
-                                          onChange={(e) => setGridCut(e.target.value)}
+                                          onChange={(e) => handleCutChange(e.target.value)}
                                        />
                                     </td>
                                     <td className="border-r border-slate-300 p-0.5">
@@ -602,7 +797,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                           type="number"
                                           className="w-full h-6 px-1 border-none text-right bg-transparent"
                                           value={gridFPcs}
-                                          onChange={(e) => setGridFPcs(e.target.value)}
+                                          onChange={(e) => handleFPcsChange(e.target.value)}
                                        />
                                     </td>
                                     <td className="border-r border-slate-300 p-0.5">
@@ -650,7 +845,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     type="number"
                                     className="classic-erp-input w-12 text-center bg-white"
                                     value={lessPercent}
-                                    onChange={(e) => setLessPercent(e.target.value)}
+                                    onChange={(e) => handleLessPercentChange(e.target.value)}
                                  />
                                  <input
                                     type="number"
@@ -665,7 +860,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     type="number"
                                     className="classic-erp-input w-12 text-center bg-white"
                                     value={otherLessPercent}
-                                    onChange={(e) => setOtherLessPercent(e.target.value)}
+                                    onChange={(e) => handleOtherLessPercentChange(e.target.value)}
                                  />
                                  <input
                                     type="number"
@@ -680,7 +875,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     type="number"
                                     className="classic-erp-input w-12 text-center bg-white"
                                     value={otherAddPercent}
-                                    onChange={(e) => setOtherAddPercent(e.target.value)}
+                                    onChange={(e) => handleOtherAddPercentChange(e.target.value)}
                                  />
                                  <input
                                     type="number"
@@ -722,7 +917,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                  <input
                                     type="number"
                                     className="classic-erp-input flex-1 text-right bg-white"
-                                    value={computedTdsAmt}
+                                    value={tdsAmt}
                                     onChange={(e) => setTdsAmt(e.target.value)}
                                  />
                                  <button
@@ -924,14 +1119,19 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                   )}
                </div>
 
-               {/* Classic ERP Lot Lookup Dialog Sub-Window */}
-               {showLotDropdown && selectedJobPartyId && createPortal(
+                {/* Classic ERP Lot Lookup Dialog Sub-Window */}
+                {showLotDropdown && selectedJobPartyId && createPortal(
                   <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
-                     <div className="w-[580px] bg-[#d4d0c8] border-2 border-white border-r-[#808080] border-b-[#808080] shadow-md flex flex-col font-mono text-[11px]">
-
+                     <div
+                        ref={dropdownRef}
+                        tabIndex={0}
+                        onKeyDown={handleDropdownKeyDown}
+                        className="w-[580px] bg-[#d4d0c8] border-2 border-white border-r-[#808080] border-b-[#808080] shadow-md flex flex-col font-mono text-[11px] outline-none"
+                     >
+ 
                         {/* Dialog Header */}
                         <div className="bg-[#858178] px-2 py-1 text-white font-bold flex justify-between items-center select-none">
-                           <span>Select Lot Number [ Associated Mill Issues ]</span>
+                           <span>Select Challan [ Associated Mill Issues ]</span>
                            <button
                               type="button"
                               onClick={() => setShowLotDropdown(false)}
@@ -940,36 +1140,37 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                               &times;
                            </button>
                         </div>
-
+ 
                         {/* Dialog Body */}
                         <div className="p-2 space-y-2">
                            <div className="text-[10px] text-red-800 font-bold mb-1">
-                              Press ESC to Close &middot; Click on a row to select and autofill
+                              Arrow keys to Navigate &middot; Enter to Select &middot; ESC to Close
                            </div>
                            <div className="border border-[#808080] bg-white max-h-[250px] overflow-y-auto">
                               <table className="w-full text-left border-collapse text-[11px]">
                                  <thead>
                                     <tr className="bg-[#e2e8f0] border-b border-[#808080] text-slate-800 font-bold">
-                                       <th className="p-1 border-r border-[#808080]">Lot Number</th>
                                        <th className="p-1 border-r border-[#808080]">Challan No</th>
+                                       <th className="p-1 border-r border-[#808080]">Lot Number</th>
                                        <th className="p-1 border-r border-[#808080]">Item Name</th>
                                        <th className="p-1 text-right">Issued Qty</th>
                                     </tr>
                                  </thead>
                                  <tbody>
                                     {associatedLots.length > 0 ? (
-                                       associatedLots.map((job) => (
+                                       associatedLots.map((job, i) => (
                                           <tr
                                              key={job._id}
                                              onClick={() => {
                                                 handleSelectLot(job);
                                                 setShowLotDropdown(false);
                                              }}
-                                             className="border-b border-slate-200 hover:bg-sky-100 cursor-pointer text-slate-900"
+                                             onMouseEnter={() => setDropdownSelectIdx(i)}
+                                             className={`border-b border-slate-200 cursor-pointer ${i === dropdownSelectIdx ? 'bg-blue-600 text-white' : 'hover:bg-sky-100 text-slate-900'}`}
                                           >
-                                             <td className="p-1.5 border-r border-slate-200 font-bold text-blue-900">{job.lotId?.lotId || job.lotId || 'N/A'}</td>
-                                             <td className="p-1.5 border-r border-slate-200">{job.jobCardNo}</td>
-                                             <td className="p-1.5 border-r border-slate-200 uppercase font-sans">{job.lotId?.itemName || 'N/A'}</td>
+                                             <td className={`p-1.5 border-r border-slate-200 font-bold ${i === dropdownSelectIdx ? 'text-white' : 'text-blue-900'}`}>{job.challanNo || job.jobCardNo}</td>
+                                             <td className="p-1.5 border-r border-slate-200">{job.lotId?.lotId || job.lotId || 'N/A'}</td>
+                                             <td className="p-1.5 border-r border-slate-200 uppercase font-sans">{job.lotId?.itemId?.name || job.lotId?.itemName || 'N/A'}</td>
                                              <td className="p-1.5 text-right font-bold">{job.issueQty} Mts</td>
                                           </tr>
                                        ))
@@ -982,7 +1183,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                               </table>
                            </div>
                         </div>
-
+ 
                         {/* Dialog Footer */}
                         <div className="p-2 border-t border-[#808080] flex justify-end gap-1">
                            <button

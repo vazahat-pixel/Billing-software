@@ -588,8 +588,15 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                           }
                           if (c.readOnly) {
                             return (
-                              <td key={c.key} className="text-right font-mono text-slate-500">
-                                {line[c.key] !== '' && line[c.key] != null ? Number(line[c.key]).toFixed(c.key === 'issueMtsRef' ? 2 : 0) : ''}
+                              <td
+                                key={c.key}
+                                className={`${c.key === 'itemName' ? 'text-left font-bold uppercase' : 'text-right font-mono'} text-slate-500 px-1`}
+                              >
+                                {c.key === 'itemName'
+                                  ? (line[c.key] || '')
+                                  : (line[c.key] !== '' && line[c.key] != null
+                                    ? Number(line[c.key]).toFixed(c.key === 'issueMtsRef' ? 2 : 0)
+                                    : '')}
                               </td>
                             );
                           }

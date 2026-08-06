@@ -51,6 +51,13 @@ class JobService {
       issueData.jobCardNo =
         issueData.jobCardNo && issueData.jobCardNo !== 'AUTO' ? issueData.jobCardNo : `JC-${seq}`;
 
+      if (issueData.jobCardNo && issueData.jobCardNo !== 'AUTO') {
+        const existingJob = await Job.findOne({ jobCardNo: issueData.jobCardNo, companyId }).session(session);
+        if (existingJob) {
+          throw AppError.badRequest(`Challan number "${issueData.jobCardNo}" is already occupied. Please use a different challan number.`);
+        }
+      }
+
       const lot = await loadLotForUpdate(session, lotId, companyId);
 
       if (chainTemplateId) {
@@ -131,11 +138,22 @@ class JobService {
     session.startTransaction();
 
     try {
-      const { jobId, receivedQty, receivedPcs, companyId } = receiveData;
+      const { jobId, receivedQty, receivedPcs, companyId, billGpNo } = receiveData;
 
       const job = await Job.findOne({ _id: jobId, companyId }).session(session);
       if (!job) throw AppError.notFound('Job record not found');
       if (job.status === 'Received') throw AppError.badRequest('This job has already been received');
+
+      if (billGpNo) {
+        const existingReceipt = await Job.findOne({
+          billGpNo: String(billGpNo).trim(),
+          companyId,
+          status: 'Received',
+        }).session(session);
+        if (existingReceipt) {
+          throw AppError.badRequest(`Bill/GP No. "${billGpNo}" is already occupied. Please use a different one.`);
+        }
+      }
 
       // Validate receivedQty does not exceed issuedQty
       const received = Number(receivedQty || 0);
@@ -186,6 +204,7 @@ class JobService {
       job.processGstAmount = gstAmount;
       job.status = 'Received';
       job.receiveDate = new Date();
+      job.billGpNo = billGpNo || '';
 
       if (job.steps?.length) {
         const idx = job.currentStepIndex ?? 0;
@@ -557,7 +576,13 @@ class JobService {
     const query = { companyId };
     if (status) query.status = status;
     return Job.find(query)
-      .populate('lotId')
+      .populate({
+        path: 'lotId',
+        populate: {
+          path: 'itemId',
+          select: 'name'
+        }
+      })
       .populate('workerId', 'name gstin state')
       .populate('outputItemId', 'name category')
       .populate('finishedLotId', 'lotId remainingMtrs')
