@@ -681,6 +681,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     if (e) e.preventDefault();
     if (saving) return;
     if (!header.billNo) return toast.error('Bill No is required');
+    if (!header.city) return toast.error('City is required');
 
     const validLines = gridItems.filter((i) => i.itemId || i.desc || Number(i.mts) || Number(i.pcs) || Number(i.saleRate));
     if (validLines.length === 0) {
@@ -1069,6 +1070,10 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Gstin:</span>
                   <input type="text" className="classic-erp-input" value={header.gstin} readOnly />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label red-label">City *:</span>
+                  <input type="text" className="classic-erp-input" value={header.city} onChange={e => setHeader({ ...header, city: e.target.value })} disabled={locked} />
                 </div>
               </div>
               <div className="classic-erp-meta-grid--3 erp-sales-broker-row">
