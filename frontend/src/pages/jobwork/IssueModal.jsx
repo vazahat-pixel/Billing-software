@@ -43,7 +43,7 @@ const FINISH_OPTIONS = [
 ];
 
 const emptyForm = (book) => ({
-  challanNo: 'AUTO',
+  challanNo: '',
   date: today(),
   millId: '',
   weaver: '',
@@ -193,24 +193,35 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   );
 
   const availableLots = useMemo(() => {
+    const issuedLotIds = new Set(
+      (jobWorkEntries || [])
+        .filter((j) => j.status === 'Issued')
+        .map((j) => String(j.lotId?._id || j.lotId || ''))
+        .filter(Boolean)
+    );
+
     const open = (inventoryLots || []).filter(
       (lot) =>
         Number(lot.remainingMtrs || 0) > 0 &&
         lot.status !== 'Closed' &&
-        (lot.holdStatus === 'None' || !lot.holdStatus)
+        (lot.holdStatus === 'None' || !lot.holdStatus) &&
+        !issuedLotIds.has(String(lot._id || lot.id))
     );
     let list = open;
     if (fromPurchase && purchaseLots.length) {
-      const purchaseIds = new Set(purchaseLots.map((l) => String(l._id || l.id)));
+      const activePurchaseLots = purchaseLots.filter(
+        (lot) => !issuedLotIds.has(String(lot._id || lot.id))
+      );
+      const purchaseIds = new Set(activePurchaseLots.map((l) => String(l._id || l.id)));
       const rest = open.filter((l) => !purchaseIds.has(String(l._id || l.id)));
-      list = [...purchaseLots, ...rest];
+      list = [...activePurchaseLots, ...rest];
     }
     return [...list].sort((a, b) => {
       const la = String(a.lotId || '');
       const lb = String(b.lotId || '');
       return lotSort === 'asc' ? la.localeCompare(lb) : lb.localeCompare(la);
     });
-  }, [inventoryLots, fromPurchase, purchaseLots, lotSort]);
+  }, [inventoryLots, fromPurchase, purchaseLots, lotSort, jobWorkEntries]);
 
   const lotOptions = useMemo(
     () =>
@@ -226,6 +237,15 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       }),
     [availableLots, fromPurchase, purchaseLots]
   );
+
+  const itemOptions = useMemo(() => {
+    const names = new Set();
+    (availableLots || []).forEach((lot) => {
+      const name = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
+      if (name) names.add(name.trim());
+    });
+    return Array.from(names).sort().map((name) => ({ value: name, label: name }));
+  }, [availableLots]);
 
   const processOptions = useMemo(
     () => PROCESS_TYPES.map((p) => ({ value: p, label: p })),
@@ -346,11 +366,10 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     }));
   };
 
-  const handlePuBillChange = (val, option) => {
+  const handleItemChange = (val) => {
     if (!val) {
       setForm((f) => ({
         ...f,
-        puBillNo: '',
         itemName: '',
         lotId: '',
         issPcs: '',
@@ -359,8 +378,15 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       }));
       return;
     }
-    const row = option?.raw;
-    applyPuBillRow(row);
+    const lot = availableLots.find((l) => {
+      const name = l.itemName || l.itemId?.name || l.itemId?.itemName || '';
+      return name.trim().toLowerCase() === val.trim().toLowerCase();
+    });
+    if (lot) {
+      applyLot(lot._id || lot.id);
+    } else {
+      setField('itemName', val);
+    }
   };
 
   const applyLot = (lotId) => {
@@ -482,6 +508,19 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       toast.error('Select Lot No.');
       return false;
     }
+    if (!form.puBillNo || String(form.puBillNo).trim() === '') {
+      toast.error('Enter Purchase Bill No.');
+      return false;
+    }
+    const typedPuBill = String(form.puBillNo).trim().toLowerCase();
+    const isPuBillOccupied = jobWorkEntries.some(j => 
+      j.status === 'Issued' && 
+      String(j.purchaseBillNo || '').trim().toLowerCase() === typedPuBill
+    );
+    if (isPuBillOccupied) {
+      toast.error(`Purchase Bill No. "${form.puBillNo}" is already occupied (currently in process).`);
+      return false;
+    }
     const qty = Number(form.issQty);
     const pcs = Number(form.issPcs || 0);
     if (!qty || qty <= 0) {
@@ -493,13 +532,22 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       return false;
     }
 
+    if (!form.challanNo || String(form.challanNo).trim() === '') {
+      toast.error('Enter Challan No.');
+      return false;
+    }
+    if (String(form.challanNo).trim().toUpperCase() === 'AUTO') {
+      toast.error('Challan No. cannot be "AUTO". Please enter a valid challan number.');
+      return false;
+    }
+
     setSaving(true);
     try {
       const remark = [form.remark1, form.remark2].filter(Boolean).join('\n');
       const { millId, procType, finish, jobRate } = form;
       await issueToMill({
-        jobCardNo: form.challanNo === 'AUTO' || !form.challanNo ? 'AUTO' : form.challanNo,
-        challanNo: form.challanNo === 'AUTO' ? '' : form.challanNo,
+        jobCardNo: form.challanNo,
+        challanNo: form.challanNo,
         issueDate: form.date,
         date: form.date,
         lotId: form.lotId,
@@ -705,30 +753,30 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                   </div>
 
                   <div className="classic-erp-field classic-erp-field--lg">
-                    <span className="classic-erp-label">Pu.BillNo</span>
-                    <div className="classic-erp-control">
-                      <ERPCombobox
-                        value={form.puBillNo}
-                        onChange={handlePuBillChange}
-                        disabled={locked}
-                        options={puBillOptions}
-                        placeholder={form.weaver ? "Select purchase bill…" : "Select weaver first…"}
-                        recentKey="mill-issue-pubill"
-                        allowClear
-                      />
-                    </div>
+                    <span className="classic-erp-label red-label">Pu.BillNo</span>
+                    <input
+                      type="text"
+                      className="classic-erp-input font-bold uppercase"
+                      value={form.puBillNo}
+                      onChange={(e) => setField('puBillNo', e.target.value)}
+                      disabled={locked}
+                      placeholder="Enter Purchase Bill No…"
+                    />
                   </div>
 
                   <div className="classic-erp-field classic-erp-field--lg">
                     <span className="classic-erp-label red-label">Item Name</span>
-                    <input
-                      type="text"
-                      className="classic-erp-input font-bold uppercase"
-                      value={form.itemName}
-                      readOnly
-                      disabled={locked}
-                      title="Filled from Lot No."
-                    />
+                    <div className="classic-erp-control">
+                      <ERPCombobox
+                        value={form.itemName}
+                        onChange={handleItemChange}
+                        disabled={locked}
+                        options={itemOptions}
+                        placeholder="Select Item Name…"
+                        recentKey="mill-issue-item"
+                        allowClear
+                      />
+                    </div>
                   </div>
 
                   <div className="erp-job-issue-metrics">
@@ -841,14 +889,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                     />
                   </div>
 
-                  <button
-                    type="button"
-                    className="classic-erp-btn"
-                    onClick={handleJobCard}
-                    disabled={locked}
-                  >
-                    Job Card
-                  </button>
+
 
                   <div className="classic-erp-field">
                     <span className="classic-erp-label">Finish</span>

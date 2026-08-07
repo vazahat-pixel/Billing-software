@@ -186,15 +186,22 @@ exports.createPaymentVoucher = async (req, res) => {
     const paymentDetails = normalizePaymentDetails(req.body);
     const { paymentMode, paymentSplits, chequeNo, utrNo, paymentNarration } = paymentDetails;
 
-    let partyLedger = await LedgerMaster.findOne({ _id: partyLedgerId, companyId });
-    if (!partyLedger) {
+    const resolvedPartyLedgerId = partyLedgerId || req.body.partyId;
+    let partyLedger = await LedgerMaster.findOne({ _id: resolvedPartyLedgerId, companyId });
+    if (!partyLedger && resolvedPartyLedgerId) {
       try {
-        partyLedger = await accountingService.getOrCreatePartyLedger(companyId, partyLedgerId);
+        partyLedger = await accountingService.getOrCreatePartyLedger(companyId, resolvedPartyLedgerId);
       } catch (err) {
         // ignore and let next block throw if not found
       }
     }
-    const bankLedger = await LedgerMaster.findOne({ _id: bankLedgerId, companyId });
+
+    let resolvedBankLedgerId = bankLedgerId;
+    if (!resolvedBankLedgerId) {
+      const defaultBank = await LedgerMaster.findOne({ companyId, name: 'Bank A/c' });
+      if (defaultBank) resolvedBankLedgerId = defaultBank._id;
+    }
+    const bankLedger = await LedgerMaster.findOne({ _id: resolvedBankLedgerId, companyId });
 
     if (!partyLedger || !bankLedger) {
       throw new Error('Invalid party or bank ledger selection');
@@ -212,7 +219,7 @@ exports.createPaymentVoucher = async (req, res) => {
       amount,
       paymentMode,
       paymentSplits,
-      bankLedgerId,
+      bankLedgerId: bankLedger._id,
       chequeNo,
       chequeDate,
       utrNo,
@@ -256,7 +263,7 @@ exports.createPaymentVoucher = async (req, res) => {
           narration: `Payment Voucher #${voucherNo}`
         },
         {
-          ledgerId: bankLedgerId,
+          ledgerId: bankLedger._id,
           ledgerName: bankLedger.name,
           type: 'Cr',
           amount: parseFloat(amount),
@@ -352,16 +359,22 @@ exports.createReceiptVoucher = async (req, res) => {
 
     const paymentDetails = normalizePaymentDetails(req.body);
     const { paymentMode, paymentSplits, chequeNo, utrNo, paymentNarration } = paymentDetails;
-
-    let partyLedger = await LedgerMaster.findOne({ _id: partyLedgerId, companyId });
-    if (!partyLedger) {
+    const resolvedPartyLedgerId = partyLedgerId || req.body.partyId;
+    let partyLedger = await LedgerMaster.findOne({ _id: resolvedPartyLedgerId, companyId });
+    if (!partyLedger && resolvedPartyLedgerId) {
       try {
-        partyLedger = await accountingService.getOrCreatePartyLedger(companyId, partyLedgerId);
+        partyLedger = await accountingService.getOrCreatePartyLedger(companyId, resolvedPartyLedgerId);
       } catch (err) {
         // ignore and let next block throw if not found
       }
     }
-    const bankLedger = await LedgerMaster.findOne({ _id: bankLedgerId, companyId });
+
+    let resolvedBankLedgerId = bankLedgerId;
+    if (!resolvedBankLedgerId) {
+      const defaultBank = await LedgerMaster.findOne({ companyId, name: 'Bank A/c' });
+      if (defaultBank) resolvedBankLedgerId = defaultBank._id;
+    }
+    const bankLedger = await LedgerMaster.findOne({ _id: resolvedBankLedgerId, companyId });
 
     if (!partyLedger || !bankLedger) {
       throw new Error('Invalid party or bank ledger selection');
@@ -379,7 +392,7 @@ exports.createReceiptVoucher = async (req, res) => {
       amount,
       paymentMode,
       paymentSplits,
-      bankLedgerId,
+      bankLedgerId: bankLedger._id,
       chequeNo,
       chequeDate,
       utrNo,
@@ -415,7 +428,7 @@ exports.createReceiptVoucher = async (req, res) => {
 
       const lines = [
         {
-          ledgerId: bankLedgerId,
+          ledgerId: bankLedger._id,
           ledgerName: bankLedger.name,
           type: 'Dr',
           amount: parseFloat(amount),

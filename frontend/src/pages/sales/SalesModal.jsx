@@ -307,10 +307,28 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
   // Rates for GST
   const [gstRates, setGstRates] = useState({
-    cgstRate: 2.5,
-    sgstRate: 2.5,
-    igstRate: 5.0
+    cgstRate: 0,
+    sgstRate: 0,
+    igstRate: 0
   });
+
+  useEffect(() => {
+    const itemWithGst = gridItems.find(item => Number(item.gstPer) > 0);
+    if (itemWithGst) {
+      const totalGst = Number(itemWithGst.gstPer);
+      setGstRates({
+        cgstRate: Number((totalGst / 2).toFixed(2)),
+        sgstRate: Number((totalGst / 2).toFixed(2)),
+        igstRate: totalGst
+      });
+    } else {
+      setGstRates({
+        cgstRate: 0,
+        sgstRate: 0,
+        igstRate: 0
+      });
+    }
+  }, [gridItems]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -677,21 +695,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       return toast.error('Order Date is required');
     }
     if (showBroker && !header.broker) return toast.error('Broker is required');
-    if (billFields.footer('transport') && !String(footer.transport || '').trim()) {
-      return toast.error('Transport is required');
-    }
-    if (!String(footer.station || '').trim()) return toast.error('City is required');
-    if (billFields.footer('lrNo') && !String(footer.lrNo || '').trim()) {
-      return toast.error('Lr No is required');
-    }
-    if (!footer.lrDate) return toast.error('Lr Date is required');
-    if (billFields.footer('bale') && !String(footer.baleNo || '').trim()) {
-      return toast.error('Bale No is required');
-    }
-    if (billFields.footer('weight') && !(Number(footer.weight) > 0)) {
-      return toast.error('Weight is required');
-    }
-    if (!String(footer.remarks || '').trim()) return toast.error('Remark is required');
+
 
     const validLines = gridItems.filter((i) => i.itemId || i.desc || Number(i.mts) || Number(i.pcs) || Number(i.saleRate));
     if (validLines.length === 0) {
@@ -1489,39 +1493,38 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
               
               {billFields.footer('transport') && (
               <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label">Transport *:</span>
+                <span className="classic-erp-label">Transport:</span>
                 <input type="text" className="classic-erp-input" value={footer.transport} onChange={e => setFooter({ ...footer, transport: e.target.value })} disabled={locked} />
               </div>
               )}
               <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label">City *:</span>
+                <span className="classic-erp-label">City:</span>
                 <input type="text" className="classic-erp-input" value={footer.station} onChange={e => setFooter({ ...footer, station: e.target.value })} disabled={locked} />
               </div>
-
               <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label">Remark *:</span>
+                <span className="classic-erp-label">Remark:</span>
                 <input type="text" className="classic-erp-input" value={footer.remarks} onChange={e => setFooter({ ...footer, remarks: e.target.value })} disabled={locked} />
               </div>
               <div className="classic-erp-meta-grid">
                 {billFields.footer('lrNo') && (
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Lr No *:</span>
+                  <span className="classic-erp-label">Lr No:</span>
                   <input type="text" className="classic-erp-input" value={footer.lrNo} onChange={e => setFooter({ ...footer, lrNo: e.target.value })} disabled={locked} />
                 </div>
                 )}
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Lr Dt *:</span>
+                  <span className="classic-erp-label">Lr Dt:</span>
                   <input type="date" className="classic-erp-input" value={footer.lrDate} onChange={e => setFooter({ ...footer, lrDate: e.target.value })} disabled={locked} />
                 </div>
                 {billFields.footer('bale') && (
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Bale *:</span>
+                  <span className="classic-erp-label">Bale:</span>
                   <input type="text" className="classic-erp-input" value={footer.baleNo} onChange={e => setFooter({ ...footer, baleNo: e.target.value })} disabled={locked} />
                 </div>
                 )}
                 {billFields.footer('weight') && (
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Weight *:</span>
+                  <span className="classic-erp-label">Weight:</span>
                   <input type="number" className="classic-erp-input" value={footer.weight || ''} onChange={e => setFooter({ ...footer, weight: Number(e.target.value) })} disabled={locked} />
                 </div>
                 )}

@@ -19,11 +19,11 @@ const weekday = (iso) => {
   }
 };
 
-const blankLine = () => ({
+const blankLine = (chln = '') => ({
   id: Math.random().toString(),
   lotId: '',
   lotNo: '',
-  chlnNo: '',
+  chlnNo: chln,
   itemName: '',
   pcs: '',
   cut: '',
@@ -74,7 +74,23 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
   });
 
   // Form Lines State
-  const [lines, setLines] = useState([blankLine()]);
+  const [lines, setLines] = useState([blankLine('1')]);
+
+  // Keep all line chlnNo synchronized with header challanNo
+  useEffect(() => {
+    const fullChallan = header.challanNo === 'AUTO' || !header.challanNo
+      ? 'AUTO'
+      : `${header.challanNo}${header.challanNoSuffix ? '-' + header.challanNoSuffix : ''}`;
+
+    setLines((prev) => {
+      const hasMismatch = prev.some((l) => l.chlnNo !== fullChallan);
+      if (!hasMismatch) return prev;
+      return prev.map((l) => ({
+        ...l,
+        chlnNo: fullChallan,
+      }));
+    });
+  }, [header.challanNo, header.challanNoSuffix, lines.length]);
 
   // Form Footer State
   const [footer, setFooter] = useState({
@@ -204,10 +220,18 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
     });
   }, []);
 
-  const addLine = () => setLines((prev) => [...prev, blankLine()]);
+  const addLine = () => {
+    const fullChallan = header.challanNo === 'AUTO' || !header.challanNo
+      ? 'AUTO'
+      : `${header.challanNo}${header.challanNoSuffix ? '-' + header.challanNoSuffix : ''}`;
+    setLines((prev) => [...prev, blankLine(fullChallan)]);
+  };
 
   const removeLine = (idx) => {
-    setLines((prev) => (prev.length <= 1 ? [blankLine()] : prev.filter((_, i) => i !== idx)));
+    const fullChallan = header.challanNo === 'AUTO' || !header.challanNo
+      ? 'AUTO'
+      : `${header.challanNo}${header.challanNoSuffix ? '-' + header.challanNoSuffix : ''}`;
+    setLines((prev) => (prev.length <= 1 ? [blankLine(fullChallan)] : prev.filter((_, i) => i !== idx)));
   };
 
   const openLotLookup = (idx) => {
@@ -217,6 +241,10 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
   };
 
   const handleLotSelect = (row) => {
+    const fullChallan = header.challanNo === 'AUTO' || !header.challanNo
+      ? 'AUTO'
+      : `${header.challanNo}${header.challanNoSuffix ? '-' + header.challanNoSuffix : ''}`;
+
     setLines((prev) => {
       const next = [...prev];
       const targetIdx = lotLookupTargetIdx != null ? lotLookupTargetIdx : prev.findIndex((l) => !l.lotId);
@@ -229,7 +257,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
         id: next[targetIdx]?.id || Math.random().toString(),
         lotId: row.lotId || '',
         lotNo: row.lotCode || '',
-        chlnNo: row.billNo || '',
+        chlnNo: fullChallan,
         itemName: row.itemName || '',
         pcs: pcs > 0 ? String(pcs) : '',
         cut: cut > 0 ? String(cut) : '',
@@ -273,7 +301,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       baleNo: '',
       taxRate: '5',
     });
-    setLines([blankLine()]);
+    setLines([blankLine('1')]);
   };
 
   const handleEdit = () => {
@@ -412,7 +440,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
 
   const gridCols = [
     { key: 'lotNo', label: 'CNo (LotNo)', w: 'w-28', lookup: true },
-    { key: 'chlnNo', label: 'ChlnNo', w: 'w-24' },
+    { key: 'chlnNo', label: 'ChlnNo', w: 'w-24', readOnly: true },
     { key: 'itemName', label: 'Item Name', w: 'flex-1', readOnly: true },
     { key: 'pcs', label: 'Pcs', w: 'w-16', align: 'right' },
     { key: 'cut', label: 'Cut', w: 'w-16', align: 'right' },

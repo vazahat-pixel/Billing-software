@@ -134,8 +134,12 @@ describe('Full business flow with critical fixes', () => {
   });
 
   it('Fix #1: GSTR-3B correctly excludes ITC from None-eligible purchase', async () => {
+    const { periodKey } = require('../../utils/gstDetermination');
+    const now = new Date();
+    const period = periodKey(now);
+
     const res = await request(app)
-      .get('/api/gst-returns/gstr3b?period=Q1-2026')
+      .get(`/api/gst/gstr3b?period=${period}`)
       .set(authHeader(token));
     assert.equal(res.status, 200);
     const gstr3b = unwrapBody(res);
@@ -224,34 +228,42 @@ describe('Full business flow with critical fixes', () => {
     // Lock current GST period
     const Company = require('../../models/Company');
     const GstPeriod = require('../../models/GstPeriod');
+    const { periodKey, periodBounds } = require('../../utils/gstDetermination');
 
     const company = await Company.findOne();
     const now = new Date();
-    const periodKey = `${now.getFullYear()}-Q1`;
+    const key = periodKey(now);
+    const bounds = periodBounds(key);
 
     await GstPeriod.create({
       companyId: company._id,
-      period: periodKey,
+      period: key,
       status: 'Locked',
+      ...bounds,
     });
 
-    // Try to create return (should fail)
-    const res = await request(app)
-      .post('/api/returns')
-      .set(authHeader(token))
-      .send({
-        returnType: 'Sales',
-        invoiceNo: 'AUTO',
-        originalInvoiceNo: 'AUTO',
-        partyId: customerId,
-        date: now.toISOString(),
-        items: [{ itemId, lotId: lotOid1, mts: 5, pcs: 0 }],
-        taxableAmount: 425,
-        gstAmount: 42.5,
-        netAmount: 467.5,
-      });
-    assert.equal(res.status, 400, 'Should reject return in locked period');
-    assert.ok(res.body.message.includes('locked'), 'Error should mention period is locked');
+    try {
+      // Try to create return (should fail)
+      const res = await request(app)
+        .post('/api/returns')
+        .set(authHeader(token))
+        .send({
+          returnType: 'Sales',
+          invoiceNo: 'AUTO',
+          originalInvoiceNo: 'AUTO',
+          partyId: customerId,
+          date: now.toISOString(),
+          items: [{ itemId, lotId: lotOid1, mts: 5, pcs: 0 }],
+          taxableAmount: 425,
+          gstAmount: 42.5,
+          netAmount: 467.5,
+        });
+      assert.equal(res.status, 400, 'Should reject return in locked period');
+      assert.ok(res.body.message.toLowerCase().includes('locked'), 'Error should mention period is locked');
+    } finally {
+      // Clean up locked period so subsequent tests are not blocked
+      await GstPeriod.deleteMany({ companyId: company._id });
+    }
   });
 
   it('Receipt voucher: Links payment to sales invoice', async () => {
@@ -266,6 +278,7 @@ describe('Full business flow with critical fixes', () => {
         chequeNo: 'CHQ001',
         chequeDate: new Date().toISOString(),
         againstInvoices: [{ invoiceId: saleId, amount: 3570 }],
+        status: 'Posted',
       });
     assert.equal(res.status, 201);
 
@@ -318,6 +331,7 @@ describe('Full business flow with critical fixes', () => {
       });
 
     // Note should succeed and be atomically created (tx + atomicNote number)
+    assert.equal(res.status, 201, `Failed to create note: ${res.body.message || JSON.stringify(res.body)}`);
     if (res.status === 201) {
       const note = unwrapBody(res);
       assert.ok(note.noteNo, 'Note should have auto-generated number');
@@ -326,7 +340,7 @@ describe('Full business flow with critical fixes', () => {
       // Verify audit log exists
       const AuditLog = require('../../models/AuditLog');
       const audit = await AuditLog.findOne({
-        resourceId: note._id,
+        referenceId: note._id,
         action: { $in: ['CREATE_CREDIT_NOTE', 'CREATE_DEBIT_NOTE'] }
       });
       assert.ok(audit, 'Audit log should exist for note creation');
