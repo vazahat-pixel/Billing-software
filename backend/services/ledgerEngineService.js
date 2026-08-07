@@ -81,7 +81,35 @@ class LedgerEngineService {
    * Correct statement: opening = master OB + movements before `from`.
    */
   async getStatement(companyId, ledgerId, { from, to } = {}) {
-    const ledger = await LedgerMaster.findOne({ _id: ledgerId, companyId });
+    let ledger = null;
+    const cleanId = String(ledgerId || '').replace(/^party:/, '');
+
+    if (mongoose.Types.ObjectId.isValid(cleanId)) {
+      ledger = await LedgerMaster.findOne({ _id: cleanId, companyId });
+    }
+    if (!ledger) {
+      ledger = await LedgerMaster.findOne({ companyId, linkedPartyId: cleanId });
+    }
+    if (!ledger) {
+      const Party = require('../models/Party');
+      const party = await Party.findOne({
+        companyId,
+        $or: [
+          ...(mongoose.Types.ObjectId.isValid(cleanId) ? [{ _id: cleanId }] : []),
+          { name: { $regex: new RegExp('^' + cleanId + '$', 'i') } }
+        ]
+      });
+      if (party) {
+        const accountingService = require('./accountingService');
+        ledger = await accountingService.getOrCreatePartyLedger(companyId, party._id);
+      }
+    }
+    if (!ledger && cleanId) {
+      ledger = await LedgerMaster.findOne({
+        companyId,
+        name: { $regex: new RegExp('^' + cleanId + '$', 'i') }
+      });
+    }
     if (!ledger) throw new Error('Ledger not found');
 
     let openingSigned = this.signedOpening(ledger);

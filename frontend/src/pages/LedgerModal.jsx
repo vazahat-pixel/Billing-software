@@ -36,19 +36,52 @@ const voucherLabel = (type = '') =>
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .toUpperCase();
 
-const acName = (o) => o.ledger?.name || o.party?.name || o.label || '';
-const acGroup = (o) => o.ledger?.group || o.ledger?.accountType || 'Party';
+const acName = (o) => o.ledger?.name || o.party?.name || o.name || o.label || '';
+const acGroup = (o) => {
+  if (o.ledger?.group) return o.ledger.subGroup ? `${o.ledger.group} (${o.ledger.subGroup})` : o.ledger.group;
+  if (o.ledger?.accountType) return o.ledger.accountType;
+  if (o.party?.type) return `Party (${o.party.type})`;
+  if (o.party?.group) return `Party (${o.party.group})`;
+  return o.group || 'Party';
+};
+const acId = (o) => {
+  const id = o.ledger?._id || o.ledger?.id || o.party?._id || o.party?.id || o.value || '';
+  return String(id).replace(/^party:/, '').slice(-6).toUpperCase();
+};
+
+/** Head list dropdown */
+function HeadListPanel({ heads, highlightIdx, onSelect }) {
+  return (
+    <div className="ledger-head-list">
+      <div
+        className={`ledger-head-item ${highlightIdx === -1 ? 'is-active' : ''}`}
+        onMouseDown={(e) => { e.preventDefault(); onSelect(''); }}
+      >
+        <span className="font-bold">-- ALL ACCOUNT HEADS --</span>
+      </div>
+      {heads.map((h, idx) => (
+        <div
+          key={h}
+          className={`ledger-head-item ${idx === highlightIdx ? 'is-active' : ''}`}
+          onMouseDown={(e) => { e.preventDefault(); onSelect(h); }}
+        >
+          <span>{h}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** Inline account list — opens on focus/type */
-function AccountListPanel({ rows, highlightIdx, onSelect, emptyText = 'No accounts' }) {
+function AccountListPanel({ rows, highlightIdx, onSelect, emptyText = 'No accounts found' }) {
   return (
     <div className="ledger-ac-list">
       <table className="ledger-ac-list-table">
         <thead>
           <tr>
             <th>AC_NAME</th>
-            <th>ST_NAME</th>
-            <th>AC_ID</th>
+            <th>ST_NAME (HEAD)</th>
+            <th className="text-right">AC_ID</th>
           </tr>
         </thead>
         <tbody>
@@ -56,13 +89,13 @@ function AccountListPanel({ rows, highlightIdx, onSelect, emptyText = 'No accoun
             <tr><td colSpan={3} className="ledger-ac-empty">{emptyText}</td></tr>
           ) : rows.map((o, idx) => (
             <tr
-              key={o.value}
+              key={o.value || idx}
               className={idx === highlightIdx ? 'is-active' : ''}
               onMouseDown={(e) => { e.preventDefault(); onSelect(o); }}
             >
-              <td>{acName(o)}</td>
-              <td>{acGroup(o)}</td>
-              <td>{String(o.ledger?._id || o.ledger?.id || o.value).slice(-6)}</td>
+              <td className="font-semibold">{acName(o)}</td>
+              <td><span className="ac-group-tag">{acGroup(o)}</span></td>
+              <td className="text-right font-mono text-[10px]">{acId(o)}</td>
             </tr>
           ))}
         </tbody>
@@ -159,13 +192,15 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
 
   const filteredAccounts = useMemo(() => {
     let list = ledgerOptions;
-    if (accHead.trim()) {
-      const q = accHead.trim().toLowerCase();
-      list = list.filter((o) => acGroup(o).toLowerCase().includes(q));
-    }
     if (accountText.trim()) {
       const q = accountText.trim().toLowerCase();
-      list = list.filter((o) => acName(o).toLowerCase().includes(q));
+      const textMatched = list.filter((o) => acName(o).toLowerCase().includes(q) || acGroup(o).toLowerCase().includes(q));
+      if (textMatched.length > 0) return textMatched;
+    }
+    if (accHead.trim()) {
+      const q = accHead.trim().toLowerCase();
+      const headMatched = list.filter((o) => acGroup(o).toLowerCase().includes(q));
+      if (headMatched.length > 0) return headMatched;
     }
     return list;
   }, [ledgerOptions, accHead, accountText]);
@@ -175,7 +210,8 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     if (id.startsWith('party:')) {
       const partyId = id.slice(6);
       const linked = (ledgers || []).find((l) => String(l.linkedPartyId) === partyId);
-      return linked ? String(linked._id || linked.id) : null;
+      if (linked) return String(linked._id || linked.id);
+      return partyId; // Backend auto-creates/resolves party ledger
     }
     return id;
   };
@@ -217,14 +253,10 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
   const runLedger = async (overrideRange) => {
     const picked = resolveAccountFromText() || ledgerId;
     const id = resolveLedgerId(picked);
-    if (!picked) {
+    if (!picked || !id) {
       toast.warning('Select an account');
       setListOpen('account');
       accountRef.current?.focus();
-      return false;
-    }
-    if (!id) {
-      toast.warning('No ledger linked for this party yet. Create a bill/payment first.');
       return false;
     }
     const effFrom = overrideRange?.from ?? from;
@@ -371,11 +403,10 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
               placeholder="Type to filter head…"
             />
             {listOpen === 'head' && (
-              <AccountListPanel
-                rows={filteredHeads.map((h) => ({ value: h, label: h, ledger: { name: h, group: h } }))}
+              <HeadListPanel
+                heads={filteredHeads}
                 highlightIdx={listIdx}
-                onSelect={(item) => pickHead(item.value)}
-                emptyText="No account heads"
+                onSelect={(h) => pickHead(h)}
               />
             )}
           </div>
@@ -658,6 +689,26 @@ const ledgerStyles = `
   .ledger-entry-footer {
     display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px;
     border-top: 1px solid #c4b8a8; background: #f3f0e6;
+  }
+  .ledger-head-list {
+    position: absolute; left: 0; right: 0; top: 100%; z-index: 60;
+    max-height: 200px; overflow-y: auto;
+    border: 2px solid #2b60db; background: #fff;
+    box-shadow: 0 8px 24px rgba(0,0,0,.2);
+  }
+  .ledger-head-item {
+    padding: 6px 10px; font-size: 11px; font-weight: 700; color: #1e293b;
+    cursor: pointer; border-bottom: 1px solid #f1f5f9;
+  }
+  .ledger-head-item:hover, .ledger-head-item.is-active {
+    background: #2563eb; color: #ffffff;
+  }
+  .ac-group-tag {
+    display: inline-block; padding: 1px 5px; border-radius: 3px;
+    background: #e2e8f0; color: #334155; font-size: 10px; font-weight: 700;
+  }
+  .ledger-ac-list-table tr:hover .ac-group-tag, .ledger-ac-list-table tr.is-active .ac-group-tag {
+    background: #1d4ed8; color: #ffffff;
   }
   .ledger-ac-list {
     position: absolute; left: 0; right: 0; top: 100%; z-index: 50;

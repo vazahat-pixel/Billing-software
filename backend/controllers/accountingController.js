@@ -129,8 +129,15 @@ exports.listLedgers = async (req, res) => {
     // SECURITY FIX: Always use server-side companyId from JWT
     const companyId = req.companyId;
     const { group, search, partyId } = req.query;
+
+    // Auto-seed system ledgers (Cash, Bank, Sales, Purchase, Taxes) if count is 0
+    const count = await LedgerMaster.countDocuments({ companyId });
+    if (count === 0) {
+      await accountingService.seedSystemLedgers(companyId);
+    }
+
     const filter = { companyId: new mongoose.Types.ObjectId(companyId) };
-    
+
     if (group) {
       filter.group = group;
     }
@@ -140,7 +147,7 @@ exports.listLedgers = async (req, res) => {
     if (search) {
       filter.name = { $regex: search, $options: 'i' };
     }
-    
+
     const ledgers = await LedgerMaster.find(filter).sort({ name: 1 });
     res.status(200).json({ success: true, data: ledgers });
   } catch (error) {
