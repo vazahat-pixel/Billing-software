@@ -36,7 +36,7 @@ export const COLUMN_DEFS = {
   hsn: {
     id: 'hsn',
     key: 'hsn',
-    label: 'HSN CODE',
+    label: 'HSN ACS',
     width: '9%',
     align: 'center',
     getValue: (line) => line.hsn || '—',
@@ -89,10 +89,43 @@ export const COLUMN_DEFS = {
   mts: {
     id: 'mts',
     key: 'mts',
-    label: 'Mts',
+    label: 'Mtrs',
     width: '6%',
     align: 'right',
-    getValue: (line) => num(line.mts),
+    getValue: (line) => {
+      const u = String(line.unit || 'MTRS').toUpperCase();
+      const isMeter = ['MTRS', 'MTS', 'QTY', 'NETQTY'].includes(u);
+      return isMeter ? num(line.mts) : 0;
+    },
+    isEmpty: (line) => num(line.mts) == null,
+  },
+  netMts: {
+    id: 'netMts',
+    key: 'netMts',
+    label: 'Net Mtrs',
+    width: '6%',
+    align: 'right',
+    getValue: (line) => {
+      const u = String(line.unit || 'MTRS').toUpperCase();
+      const isMeter = ['MTRS', 'MTS', 'QTY', 'NETQTY'].includes(u);
+      if (!isMeter) return 0;
+      // If pcsDetails exist, sum netQty from breakdown
+      if (Array.isArray(line.pcsDetails) && line.pcsDetails.length > 0) {
+        const sum = line.pcsDetails.reduce((s, r) => {
+          const rowPcs = Number(r.pcs ?? r.qty) || 0;
+          const qtyBndl = Number(r.qtyBndl ?? r.qtyPerBndl) || 0;
+          if (rowPcs > 0 && qtyBndl > 0) return s + rowPcs * qtyBndl;
+          return s + (Number(r.netQty ?? r.kgs) || 0);
+        }, 0);
+        if (sum > 0) return Number(sum.toFixed(3));
+      }
+      const rawMts = Number(line.mts) || 0;
+      const fold = Number(line.fold || 0);
+      if (rawMts > 0 && fold > 0 && fold < 100) {
+        return Number(((rawMts * fold) / 100).toFixed(3));
+      }
+      return rawMts > 0 ? rawMts : 0;
+    },
     isEmpty: (line) => num(line.mts) == null,
   },
   qty: {
@@ -311,11 +344,10 @@ export const COLUMN_DEFS = {
 export const COLUMN_PRESETS = {
   standard: ['sno', 'item', 'hsn', 'qty', 'rate', 'amount'],
   gstDetailed: ['sno', 'item', 'hsn', 'qty', 'rate', 'taxable', 'gst', 'gstAmt', 'amount'],
-  /** Surat textile tax invoice — matches classic ERP print (Pcs + Kgs) */
-  textileClassic: ['sno', 'item', 'hsn', 'pcs', 'mts', 'rate', 'amount'],
+  /** Surat textile tax invoice — matches classic ERP print format (Fold, Cut, Pcs, Mtrs, Net Mtrs, Rate, Amount) */
+  textileClassic: ['sno', 'item', 'hsn', 'fold', 'cut', 'pcs', 'mts', 'netMts', 'rate', 'amount'],
   textileSuratFull: [
-    'sno', 'fold', 'cut', 'pcs', 'mts', 'rate', 'unit', 'amount',
-    'dis1Per', 'dis1Amt', 'dis2Per', 'dis2Amt', 'addAmt', 'gst', 'gstAmt'
+    'sno', 'item', 'hsn', 'fold', 'cut', 'pcs', 'mts', 'netMts', 'rate', 'amount',
   ],
   textile: ['sno', 'item', 'hsn', 'lot', 'fold', 'cut', 'pcs', 'mts', 'rate', 'discount', 'amount'],
   textileFull: [
@@ -352,21 +384,29 @@ export function resolvePrintColumns({ templateId, lines = [], businessType = '',
   const cols = ids.map((id) => COLUMN_DEFS[id]).filter(Boolean);
 
   const visible = cols.filter((col) => {
+    if (presetKey === 'textileSuratFull' || presetKey === 'textileClassic') return true;
     if (core.has(col.id)) return true;
     if (!col.isEmpty) return true;
     return lines.some((line) => !col.isEmpty(line));
   });
 
-  // Mts → Kgs label when any line uses KG unit
-  const useKg = lines.some((l) => /KG/i.test(l.unit || ''));
-  return visible.map((col) =>
-    col.id === 'mts' && useKg ? { ...col, label: 'Kgs' } : col
-  );
+  return visible.map((col) => {
+    if (col.id === 'mts' && presetKey !== 'textileSuratFull' && presetKey !== 'textileClassic') {
+      const useKg = lines.some((l) => /KG/i.test(l.unit || ''));
+      if (useKg) return { ...col, label: 'Kgs' };
+    }
+    return col;
+  });
 }
 
 export function formatCellValue(col, line, fmt) {
   const raw = col.getValue(line);
-  if (raw == null || raw === '') return '—';
+  // For numeric / money columns, show 0.00 instead of '—' so empty fields still display
+  if (raw == null || raw === '') {
+    if (col.format === 'money') return '0.00';
+    if (col.id === 'pcs' || col.id === 'mts' || col.id === 'netMts' || col.id === 'cut' || col.id === 'fold') return '0.00';
+    return '';
+  }
   if (col.format === 'money') return fmt.money(raw).replace(/^₹\s*/, '');
   if (col.format === 'num') return fmt.num(raw);
   return raw;

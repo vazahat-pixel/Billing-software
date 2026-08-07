@@ -41,10 +41,21 @@ const lineQty = (row) => {
   return Number(row?.mts || 0);
 };
 
+/**
+ * Sum breakdown details.
+ * NetQty per row = Pcs × Qty/Bndl (stored as qtyBndl).
+ * Falls back to stored netQty/kgs for old data.
+ */
 const sumPcsDetails = (details = []) => {
   const rows = Array.isArray(details) ? details : [];
-  const pcs = rows.reduce((s, r) => s + (Number(r.pcs || r.qty) || 0), 0);
-  const netQty = rows.reduce((s, r) => s + (Number(r.netQty || r.kgs) || 0), 0);
+  const pcs = rows.reduce((s, r) => s + (Number(r.pcs ?? r.qty) || 0), 0);
+  const netQty = rows.reduce((s, r) => {
+    // Prefer computed: pcs × qtyBndl; fallback to stored netQty/kgs
+    const rowPcs = Number(r.pcs ?? r.qty) || 0;
+    const qtyBndl = Number(r.qtyBndl ?? r.qtyPerBndl) || 0;
+    if (rowPcs > 0 && qtyBndl > 0) return s + rowPcs * qtyBndl;
+    return s + (Number(r.netQty ?? r.kgs) || 0);
+  }, 0);
   return { pcs, netQty: Number(netQty.toFixed(3)), kgs: Number(netQty.toFixed(3)), qty: pcs };
 };
 
@@ -78,6 +89,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const [printInvoiceId, setPrintInvoiceId] = useState(null);
   const openedOnceRef = useRef(false);
   const modalContainerRef = useRef(null);
+  const lastEnterRef = useRef({ time: 0, idx: -1 });
 
   const [header, setHeader] = useState({
     party: '',
@@ -133,34 +145,32 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     const qty = lineQty({ ...row, pcs, mts });
     const unit = String(row.unit || 'MTRS').toUpperCase();
     const isNetQty = unit === 'NETQTY';
-    const isQtyOrPcs = unit === 'QTY' || unit === 'PCS';
+    const isQtyOrPcs = unit === 'QTY' || unit === 'PCS' || unit === 'PC' || unit === 'MTRS' || unit === 'MTS';
 
     // Step 1: Gross amount from qty × rate
     const grossAmt = qty > 0 && rate > 0 ? Number((qty * rate).toFixed(2)) : Number(row.amount || 0);
 
     // Step 2 (NETQTY only): Apply fold % reduction BEFORE discounts.
-    //   formula: y = grossAmt × (100 - fold) / 100
-    //            baseAmt = grossAmt - y
-    //   e.g. fold=95, grossAmt=6000 → y=300 → baseAmt=5700
     let foldDeductionAmt = 0;
     let foldLessAmt = 0;
     let foldAddAmt = 0;
     let baseAmt = grossAmt;
     if (isNetQty && !row._amountManual) {
       const fold = Number(row.fold || 0);
-      foldDeductionAmt = Number(((grossAmt * (100 - fold)) / 100).toFixed(2));
-      baseAmt = Number((grossAmt - foldDeductionAmt).toFixed(2));
+      if (fold > 0) {
+        foldDeductionAmt = Number(((grossAmt * (100 - fold)) / 100).toFixed(2));
+        baseAmt = Number((grossAmt - foldDeductionAmt).toFixed(2));
+      }
     }
 
-    // Step 2b (QTY unit only): Fold Less / Fold Add
-    //   Amount column always shows GROSS (Meter × Rate).
+    // Step 2b (QTY / PCS / MTRS units): Fold Less / Fold Add
     //   baseAmt (used for discounts / GST / taxable) is adjusted by fold:
     //     fold = 100 → no adjustment
     //     fold < 100 → foldLessAmt = grossAmt × (100 − fold) / 100; baseAmt = grossAmt − foldLessAmt
     //     fold > 100 → foldAddAmt  = grossAmt × (fold − 100) / 100; baseAmt = grossAmt + foldAddAmt
-    if (unit === 'QTY' && !row._amountManual) {
-      const fold = Number(row.fold ?? 100);
-      if (fold < 100) {
+    if ((isQtyOrPcs || unit === 'QTY') && !row._amountManual) {
+      const fold = Number(row.fold || 100);
+      if (fold > 0 && fold < 100) {
         foldLessAmt = Number(((grossAmt * (100 - fold)) / 100).toFixed(2));
         baseAmt = Number((grossAmt - foldLessAmt).toFixed(2));
       } else if (fold > 100) {
@@ -277,7 +287,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     { id: 1, itemId: '', itemName: '', desc: '', fold: 0, cut: 0, pcs: 0, mts: 0, saleRate: 0, unit: 'MTRS', mrp: 0, rdPer: 0, amount: 0, foldDeductionAmt: 0, foldLessAmt: 0, foldAddAmt: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0, addAmt: 0, gstPer: 0, gstAmt: 0, pcsDetails: [] }
   ]);
   const [extraUnits, setExtraUnits] = useState([]);
-  const [pcsBreakdown, setPcsBreakdown] = useState({ open: false, lineIdx: -1 });
+  const [pcsBreakdown, setPcsBreakdown] = useState({ open: false, lineIdx: -1, calcType: 'Mts' });
 
   const [footer, setFooter] = useState({
     transport: '',
@@ -385,6 +395,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   }, [isOpen, initialData, readOnly, selectedBook, fetchParties, fetchItems, fetchSales, fetchInventory]);
 
   const loadInvoiceData = (inv) => {
+    const invId = inv._id || inv.id || '';
+    if (invId) setSelectedInvoiceId(invId);
     setHeader({
       party: inv.customerId?._id || inv.customerId || '',
       add: inv.remarks || '',
@@ -498,11 +510,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     let totalFoldAdd = 0;
     
     gridItems.forEach(item => {
-      const u = String(item.unit || '').toUpperCase();
-      if (u === 'QTY') {
-        totalFoldLess += Number(item.foldLessAmt || 0);
-        totalFoldAdd += Number(item.foldAddAmt || 0);
-      }
+      totalFoldLess += Number(item.foldLessAmt || 0);
+      totalFoldAdd += Number(item.foldAddAmt || 0);
     });
 
     setFooter(prev => {
@@ -631,6 +640,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   };
 
   const handleNew = () => {
+    setSelectedInvoiceId('');
     setHeader({
       party: '',
       add: '',
@@ -691,9 +701,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       const line = validLines[i];
       const n = i + 1;
       if (!line.itemId) return toast.error(`Item Name is required on line ${n}`);
-      if (!String(line.desc || '').trim()) return toast.error(`Desc is required on line ${n}`);
-      if (!(Number(line.pcs) > 0)) return toast.error(`Pcs is required on line ${n}`);
-      if (!(Number(line.mts) > 0)) return toast.error(`Mts is required on line ${n}`);
+      if (!(Number(line.pcs) > 0 || Number(line.mts) > 0)) return toast.error(`Quantity (Pcs or Mts) is required on line ${n}`);
       if (!(Number(line.saleRate) > 0)) return toast.error(`Rate is required on line ${n}`);
     }
     setSaving(true);
@@ -770,11 +778,19 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         igst: calculations.igst
       };
 
-      const saved =
-        mode === 'Edit' && selectedInvoiceId
-          ? await updateSale(selectedInvoiceId, payload)
-          : await addSale(payload);
-      const savedId = saved?._id || saved?.id;
+      let targetId = selectedInvoiceId || initialData?._id || initialData?.id;
+      if (!targetId && header.billNo && header.billNo !== 'AUTO') {
+        const existingBill = (sales || []).find((s) => String(s.invoiceNo || '').trim() === String(header.billNo || '').trim());
+        if (existingBill) {
+          targetId = existingBill._id || existingBill.id;
+        }
+      }
+      const isUpdating = !!targetId || mode === 'Edit';
+
+      const saved = isUpdating && targetId
+        ? await updateSale(targetId, payload)
+        : await addSale(payload);
+      const savedId = saved?._id || saved?.id || targetId;
       if (savedId) setSelectedInvoiceId(savedId);
       setSaveNextActions({
         id: savedId,
@@ -910,21 +926,67 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   };
 
   const openPcsBreakdown = (idx) => {
-    setPcsBreakdown({ open: true, lineIdx: idx });
+    // Infer current calcType from the line's unit
+    const unit = String(gridItems[idx]?.unit || '').toUpperCase();
+    let ct = 'Mts';
+    if (['PCS', 'PC', 'NOS', 'NO'].includes(unit)) ct = 'Pcs';
+    else if (unit === 'KGS' || unit === 'KG') ct = 'Kgs';
+    else if (unit === 'MTRS' || unit === 'MTS' || unit === 'NETQTY' || unit === 'QTY') ct = 'Mts';
+    // Use stored calcType if available
+    ct = gridItems[idx]?._calcType || ct;
+    setPcsBreakdown({ open: true, lineIdx: idx, calcType: ct });
   };
 
-  const handlePcsBreakdownSave = (details) => {
+  /**
+   * Called when PcsBreakdownModal hits OK.
+   * @param {Array} details - breakdown rows
+   * @param {string} calcType - 'Pcs' | 'Mts' | 'Kgs'
+   *
+   * Logic:
+   *   calcType === 'Pcs'  → unit = 'PCS',  qty driver = totalPcs
+   *   calcType === 'Mts'  → unit = 'MTRS', qty driver = totalNetQty (mts)
+   *   calcType === 'Kgs'  → unit = 'KGS',  qty driver = totalNetQty (kgs)
+   *
+   *   Amount only calculates when row.unit matches lineQty logic → 0 for mismatched.
+   */
+  const handlePcsBreakdownSave = (details, calcType = 'Mts') => {
     const idx = pcsBreakdown.lineIdx;
     if (idx < 0) return;
     const { pcs, netQty } = sumPcsDetails(details);
+
+    // Determine unit and mts based on calcType
+    let newUnit = gridItems[idx]?.unit || 'MTRS';
+    let newMts = gridItems[idx]?.mts || 0;
+    let newPcs = pcs > 0 ? pcs : (gridItems[idx]?.pcs || 0);
+
+    if (calcType === 'Pcs') {
+      // Amount = NetQty × Rate (NetQty = total pieces)
+      // PCS field = totalNetQty (210), MTS = 0
+      newUnit = 'PCS';
+      newPcs = netQty > 0 ? netQty : pcs;  // 210 pieces in PCS field
+      newMts = 0;                            // meter nahi hoga
+    } else if (calcType === 'Kgs') {
+      // Amount = NetQty (kgs) × Rate
+      newUnit = 'KGS';
+      newPcs = pcs > 0 ? pcs : (gridItems[idx]?.pcs || 0);  // bundle count
+      newMts = netQty > 0 ? netQty : (gridItems[idx]?.mts || 0);  // kgs as mts
+    } else {
+      // Mts — Amount = NetQty (mts) × Rate
+      newUnit = 'MTRS';
+      newPcs = pcs > 0 ? pcs : (gridItems[idx]?.pcs || 0);  // bundle count
+      newMts = netQty > 0 ? netQty : (gridItems[idx]?.mts || 0);  // total meters
+    }
+
     patchLine(idx, {
       pcsDetails: details,
-      pcs: pcs > 0 ? pcs : gridItems[idx]?.pcs,
-      mts: netQty > 0 ? netQty : gridItems[idx]?.mts,
+      pcs: newPcs,
+      mts: newMts,
+      unit: newUnit,
+      _calcType: calcType,
       _mtsManual: true,
       _amountManual: false,
     }, 'pcsDetails');
-    setPcsBreakdown({ open: false, lineIdx: -1 });
+    setPcsBreakdown({ open: false, lineIdx: -1, calcType: 'Mts' });
   };
 
   const onGridItemSelect = (val, idx) => {
@@ -1217,16 +1279,26 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                           value={row.pcs > 0 ? row.pcs : ''}
                           onChange={e => patchLine(idx, { pcs: Number(e.target.value) || 0, _mtsManual: false }, 'pcs')}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
+                            if (e.key === '#') {
                               e.preventDefault();
                               openPcsBreakdown(idx);
+                            } else if (e.key === 'Enter') {
+                              const now = Date.now();
+                              if (lastEnterRef.current.idx === idx && now - lastEnterRef.current.time < 500) {
+                                e.preventDefault();
+                                lastEnterRef.current = { time: 0, idx: -1 };
+                                openPcsBreakdown(idx);
+                              } else {
+                                lastEnterRef.current = { time: now, idx };
+                              }
                             }
                           }}
+                          onDoubleClick={() => !locked && openPcsBreakdown(idx)}
                           disabled={locked}
                           min="0"
                           step="1"
                           placeholder="0"
-                          title="Press Enter on Pcs to open breakdown modal (or click #)"
+                          title="Double Enter or Double Click on Pcs to open breakdown (or press #)"
                         />
                         {!locked && (
                           <button
@@ -1684,10 +1756,11 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
     <PcsBreakdownModal
       isOpen={pcsBreakdown.open}
-      onClose={() => setPcsBreakdown({ open: false, lineIdx: -1 })}
+      onClose={() => setPcsBreakdown({ open: false, lineIdx: -1, calcType: 'Mts' })}
       rows={pcsBreakdown.lineIdx >= 0 ? gridItems[pcsBreakdown.lineIdx]?.pcsDetails : []}
       onSave={handlePcsBreakdownSave}
       locked={locked}
+      initialCalcType={pcsBreakdown.calcType}
     />
     </>
   );

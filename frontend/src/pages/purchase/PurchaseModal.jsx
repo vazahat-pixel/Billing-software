@@ -23,6 +23,7 @@ import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import useConfigStore from '../../store/useConfigStore';
 import { resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
 import { money, lineTaxable } from '../../utils/salesBillCalc';
+import PcsBreakdownModal from '../sales/PcsBreakdownModal';
 
 const today = () => new Date().toISOString().split('T')[0];
 const DEFAULT_UNITS = ['PCS', 'KGS', 'NETQTY', 'QTY'];
@@ -75,6 +76,9 @@ const PurchaseModal = ({
   const openedOnceRef = useRef(false);
   const modalContainerRef = useRef(null);
   const suppBillRef = useRef(null);
+  const lastEnterRef = useRef({ time: 0, idx: -1 });
+
+  const [pcsBreakdown, setPcsBreakdown] = useState({ open: false, lineIdx: -1, calcType: 'Mts' });
 
   const [warehouses, setWarehouses] = useState([]);
   const [billAttachment, setBillAttachment] = useState(null);
@@ -108,14 +112,70 @@ const PurchaseModal = ({
   ]);
   const [extraUnits, setExtraUnits] = useState([]);
 
+  const sumPcsDetails = (details) => {
+    const rows = Array.isArray(details) ? details : [];
+    const pcs = rows.reduce((s, r) => s + (Number(r.pcs ?? r.qty) || 0), 0);
+    const netQty = rows.reduce((s, r) => {
+      const rowPcs = Number(r.pcs ?? r.qty) || 0;
+      const qtyBndl = Number(r.qtyBndl ?? r.qtyPerBndl) || 0;
+      if (rowPcs > 0 && qtyBndl > 0) return s + rowPcs * qtyBndl;
+      return s + (Number(r.netQty ?? r.kgs) || 0);
+    }, 0);
+    return { pcs, netQty: Number(netQty.toFixed(3)), kgs: Number(netQty.toFixed(3)), qty: pcs };
+  };
+
+  const openPcsBreakdown = (idx) => {
+    const unit = String(gridItems[idx]?.unit || '').toUpperCase();
+    let ct = 'Mts';
+    if (['PCS', 'PC', 'NOS', 'NO'].includes(unit)) ct = 'Pcs';
+    else if (unit === 'KGS' || unit === 'KG') ct = 'Kgs';
+    else if (unit === 'MTRS' || unit === 'MTS' || unit === 'NETQTY' || unit === 'QTY') ct = 'Mts';
+    ct = gridItems[idx]?._calcType || ct;
+    setPcsBreakdown({ open: true, lineIdx: idx, calcType: ct });
+  };
+
+  const handlePcsBreakdownSave = (details, calcType = 'Mts') => {
+    const idx = pcsBreakdown.lineIdx;
+    if (idx < 0) return;
+    const { pcs, netQty } = sumPcsDetails(details);
+
+    let newUnit = gridItems[idx]?.unit || 'MTRS';
+    let newMts = gridItems[idx]?.mts || 0;
+    let newPcs = pcs > 0 ? pcs : (gridItems[idx]?.pcs || 0);
+
+    if (calcType === 'Pcs') {
+      newUnit = 'PCS';
+      newPcs = netQty > 0 ? netQty : pcs;
+      newMts = 0;
+    } else if (calcType === 'Kgs') {
+      newUnit = 'KGS';
+      newPcs = pcs > 0 ? pcs : (gridItems[idx]?.pcs || 0);
+      newMts = netQty > 0 ? netQty : (gridItems[idx]?.mts || 0);
+    } else {
+      newUnit = 'MTRS';
+      newPcs = pcs > 0 ? pcs : (gridItems[idx]?.pcs || 0);
+      newMts = netQty > 0 ? netQty : (gridItems[idx]?.mts || 0);
+    }
+
+    patchLine(idx, {
+      pcsDetails: details,
+      pcs: newPcs,
+      mts: newMts,
+      unit: newUnit,
+      _calcType: calcType,
+      _mtsManual: true,
+      _amountManual: false,
+    }, 'pcsDetails');
+    setPcsBreakdown({ open: false, lineIdx: -1, calcType: 'Mts' });
+  };
+
   const lineQty = (row) => {
     const unit = String(row?.unit || 'MTRS').toUpperCase();
     if (['PCS', 'PC', 'NOS', 'NO'].includes(unit)) {
       return Number(row?.pcs || 0);
     }
-    // NETQTY and QTY: use full mts as qty
-    if (unit === 'NETQTY' || unit === 'QTY') {
-      return Number(row?.mts || 0);
+    if (['KGS', 'KG'].includes(unit)) {
+      return Number(row?.mts || row?.kgs || row?.netQty || row?.pcs || 0);
     }
     return Number(row?.mts || 0);
   };
@@ -296,6 +356,8 @@ const PurchaseModal = ({
   }, [isOpen, readOnly, selectedBook, fetchParties, fetchItems, fetchPurchases]);
 
   const loadPurchaseData = (pur) => {
+    const purId = pur._id || pur.id || '';
+    if (purId) setSelectedPurchaseId(purId);
     setBillAttachment(pur.billAttachment || null);
     setHeader({
       party: pur.supplierId?._id || pur.supplierId || '',
@@ -337,6 +399,7 @@ const PurchaseModal = ({
       addAmt: item.addAmt || 0,
       gstPer: item.gstPer || 0,
       gstAmt: item.gstAmt || 0,
+      pcsDetails: Array.isArray(item.pcsDetails) ? item.pcsDetails : [],
     })));
 
     setFooter({
@@ -555,6 +618,7 @@ const PurchaseModal = ({
   };
 
   const handleNew = () => {
+    setSelectedPurchaseId('');
     setBillAttachment(null);
     setHeader({
       party: '',
@@ -720,7 +784,8 @@ const PurchaseModal = ({
           dis2Amt: Number(i.dis2Amt || 0),
           addAmt: Number(i.addAmt || 0),
           gstPer: Number(i.gstPer || 0),
-          gstAmt: Number(i.gstAmt || 0)
+          gstAmt: Number(i.gstAmt || 0),
+          pcsDetails: Array.isArray(i.pcsDetails) ? i.pcsDetails : [],
         })),
         taxableAmount: calculations.taxable,
         gstAmount: calculations.gstAmt,
@@ -731,11 +796,19 @@ const PurchaseModal = ({
         igst: calculations.igst,
       };
 
-      const saved =
-        mode === 'Edit' && selectedPurchaseId
-          ? await updatePurchase(selectedPurchaseId, payload)
-          : await addPurchase(payload);
-      const savedId = saved?._id || saved?.id;
+      let targetId = selectedPurchaseId || initialData?._id || initialData?.id;
+      if (!targetId && header.billNo && header.billNo !== 'AUTO') {
+        const existingBill = (purchases || []).find((s) => String(s.supplierInvoiceNo || s.invoiceNo || '').trim() === String(header.billNo || '').trim());
+        if (existingBill) {
+          targetId = existingBill._id || existingBill.id;
+        }
+      }
+      const isUpdating = !!targetId || mode === 'Edit';
+
+      const saved = isUpdating && targetId
+        ? await updatePurchase(targetId, payload)
+        : await addPurchase(payload);
+      const savedId = saved?._id || saved?.id || targetId;
       if (savedId) {
         setSelectedPurchaseId(savedId);
       }
@@ -1152,7 +1225,45 @@ const PurchaseModal = ({
                           <input type="number" className="classic-erp-input w-full text-center border-0" value={row.cut || ''} onChange={e => patchLine(idx, { cut: Number(e.target.value) || 0, _mtsManual: false }, 'cut')} disabled={locked} placeholder="0" />
                         </td>
                         <td className="col-num">
-                          <input type="number" className="classic-erp-input w-full text-center border-0 font-bold" value={row.pcs > 0 ? row.pcs : ''} onChange={e => patchLine(idx, { pcs: Number(e.target.value) || 0, _mtsManual: false }, 'pcs')} disabled={locked} min="0" step="1" placeholder="0" />
+                          <div className="flex items-center w-full relative">
+                            <input
+                              type="number"
+                              className="classic-erp-input w-full text-center border-0 font-bold"
+                              value={row.pcs > 0 ? row.pcs : ''}
+                              onChange={e => patchLine(idx, { pcs: Number(e.target.value) || 0, _mtsManual: false }, 'pcs')}
+                              onKeyDown={(e) => {
+                                if (e.key === '#') {
+                                  e.preventDefault();
+                                  openPcsBreakdown(idx);
+                                } else if (e.key === 'Enter') {
+                                  const now = Date.now();
+                                  if (lastEnterRef.current.idx === idx && now - lastEnterRef.current.time < 500) {
+                                    e.preventDefault();
+                                    lastEnterRef.current = { time: 0, idx: -1 };
+                                    openPcsBreakdown(idx);
+                                  } else {
+                                    lastEnterRef.current = { time: now, idx };
+                                  }
+                                }
+                              }}
+                              onDoubleClick={() => !locked && openPcsBreakdown(idx)}
+                              disabled={locked}
+                              min="0"
+                              step="1"
+                              placeholder="0"
+                              title="Double Enter or Double Click on Pcs to open breakdown (or press #)"
+                            />
+                            {!locked && (
+                              <button
+                                type="button"
+                                onClick={() => openPcsBreakdown(idx)}
+                                title="Open detailed Kgs/Pcs breakdown"
+                                className="px-1 text-[10px] text-blue-600 hover:text-blue-800 font-bold shrink-0 border-l border-slate-200"
+                              >
+                                #
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="col-qty">
                           <input type="number" className="classic-erp-input w-full text-center border-0" value={row.mts > 0 ? row.mts : ''} onChange={e => patchLine(idx, { mts: Number(e.target.value) || 0, _mtsManual: true, _amountManual: false }, 'mts')} disabled={locked} min="0" step="0.001" placeholder="0.000" title="Auto = Cut × Pcs. Type to override." />
@@ -1351,6 +1462,15 @@ const PurchaseModal = ({
             title="Drag to resize"
           />
         )}
+
+        <PcsBreakdownModal
+          isOpen={pcsBreakdown.open}
+          onClose={() => setPcsBreakdown({ open: false, lineIdx: -1, calcType: 'Mts' })}
+          rows={pcsBreakdown.lineIdx >= 0 ? gridItems[pcsBreakdown.lineIdx]?.pcsDetails || [] : []}
+          initialCalcType={pcsBreakdown.calcType}
+          onSave={handlePcsBreakdownSave}
+          locked={locked}
+        />
 
         <AccountMasterModal
           isOpen={inlineModal.type === 'account'}

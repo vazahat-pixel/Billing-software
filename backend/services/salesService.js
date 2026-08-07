@@ -334,7 +334,10 @@ class SalesService {
 
       if (!sale.stockFromChallan) {
         const { applyLotMovement, loadLotForUpdate, pickLotForSale } = require('../utils/inventoryStockHelper');
-        for (const item of sale.items || []) {
+        const revision = Date.now();
+        const itemsList = sale.items || [];
+        for (let idx = 0; idx < itemsList.length; idx += 1) {
+          const item = itemsList[idx];
           const qty = Number(item.mts || 0) || Number(item.pcs || 0);
           if (qty <= 0 && !item.itemId && !item.desc) continue;
           let lot;
@@ -355,7 +358,7 @@ class SalesService {
             deltaPcs: -(item.pcs || 0),
             type: 'SALE',
             referenceId: sale._id,
-            idempotencyKey: `SALE:${sale._id}:${lot._id}:${revision}`,
+            idempotencyKey: `SALE:${sale._id}:${lot._id}:${revision}:${idx}`,
             remarks: `Sales Inv (Edit): ${sale.invoiceNo}`,
           });
         }

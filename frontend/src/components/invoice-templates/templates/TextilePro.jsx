@@ -193,60 +193,126 @@ export default function TextilePro({ data }) {
         {/* ── Items ── */}
         <ClassicItemTable data={data} paymentTerms={meta.paymentTerms} />
 
-        {/* ── Bank Details & UPI QR Code ── */}
+        {/* ── Bank Details + Totals side-by-side ── */}
         <table className="ipe-classic-grid">
           <tbody>
             <tr>
-              <td style={{ width: bank?.upiQrUrl ? '75%' : '100%', fontSize: '8.5pt', verticalAlign: 'middle' }}>
-                <div>
-                  <span className="ipe-classic-label">Bank Details: </span>
+              {/* Left: Bank Details */}
+              <td style={{ width: '45%', fontSize: '8.5pt', verticalAlign: 'top', padding: '2mm' }}>
+                <div style={{ marginBottom: '1.5mm' }}>
+                  <span className="ipe-classic-label">Bank Detail</span>
                   {bank?.bankName ? (
-                    <>
+                    <span style={{ marginLeft: '2mm' }}>
                       <strong>{bank.bankName}</strong>{bank.branch ? `, ${bank.branch}` : ''}
-                      {' · '}<strong>A/c No:</strong> {bank.accountNo || '—'}
+                      {' · '}<strong>A/c:</strong> {bank.accountNo || '—'}
                       {' · '}<strong>IFSC:</strong> {bank.ifsc || '—'}
-                    </>
+                    </span>
                   ) : (
-                    <span style={{ color: '#666' }}>Bank account details available on request</span>
+                    <span style={{ color: '#666', marginLeft: '2mm' }}>Available on request</span>
                   )}
                 </div>
                 {bank?.upiId && (
-                  <div style={{ marginTop: '1mm', fontSize: '8pt' }}>
-                    <span className="ipe-classic-label">UPI ID / VPA: </span>
+                  <div style={{ fontSize: '8pt', marginBottom: '1.5mm' }}>
+                    <span className="ipe-classic-label">UPI ID: </span>
                     <strong style={{ color: '#1e3a8a' }}>{bank.upiId}</strong>
                   </div>
                 )}
+                <div style={{ marginTop: '3mm', fontSize: '8pt' }}>
+                  <span className="ipe-classic-label">Due Days: </span>
+                  <strong>{meta.dueDays ?? 0}</strong>
+                  {'   '}
+                  <span className="ipe-classic-label">Due Date: </span>
+                  <strong>{meta.dueDate || ''}</strong>
+                </div>
               </td>
-              {bank?.upiQrUrl && (
-                <td style={{ width: '25%', textAlign: 'center', padding: '1mm', borderLeft: '1px solid #000' }}>
-                  <img
-                    src={bank.upiQrUrl}
-                    alt="Scan & Pay UPI QR"
-                    style={{ width: '24mm', height: '24mm', display: 'block', margin: '0 auto' }}
-                  />
-                  <div style={{ fontSize: '6.5pt', fontWeight: 700, marginTop: '0.5mm', color: '#1e3a8a' }}>
-                    SCAN &amp; PAY VIA UPI
-                  </div>
-                </td>
-              )}
+
+              {/* Right: Totals matching image layout */}
+              <td style={{ width: '55%', verticalAlign: 'top', padding: '0' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
+                  <tbody>
+                    {/* Fold Less row — only if foldLess > 0 */}
+                    {totals.foldLess > 0 && (
+                      <tr>
+                        <td style={{ padding: '1mm 2mm', fontWeight: 600, borderBottom: '0.5px solid #bbb' }}>FOLD LESS :</td>
+                        <td style={{ padding: '1mm 2mm', textAlign: 'right', fontWeight: 600, borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
+                          {fmt.money(totals.foldLess).replace(/^₹\s*/, '')}
+                        </td>
+                      </tr>
+                    )}
+                    {/* Taxable Value */}
+                    <tr>
+                      <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>Taxable Value</td>
+                      <td style={{ padding: '1mm 2mm', textAlign: 'right', borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb', fontWeight: 600 }}>
+                        {fmt.money(totals.taxable).replace(/^₹\s*/, '')}
+                      </td>
+                    </tr>
+                    {/* CGST — only if not IGST */}
+                    {!data.isIgst && (
+                      <tr>
+                        <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>
+                          Add: CGST @ {data.gstRate ? `${(data.gstRate / 2).toFixed(2)}%` : '2.50%'}
+                        </td>
+                        <td style={{ padding: '1mm 2mm', textAlign: 'right', borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
+                          {fmt.money(totals.cgst).replace(/^₹\s*/, '')}
+                        </td>
+                      </tr>
+                    )}
+                    {/* SGST — only if not IGST */}
+                    {!data.isIgst && (
+                      <tr>
+                        <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>
+                          Add: SGST @ {data.gstRate ? `${(data.gstRate / 2).toFixed(2)}%` : '2.50%'}
+                        </td>
+                        <td style={{ padding: '1mm 2mm', textAlign: 'right', borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
+                          {fmt.money(totals.sgst).replace(/^₹\s*/, '')}
+                        </td>
+                      </tr>
+                    )}
+                    {/* IGST — only if IGST */}
+                    {data.isIgst && (
+                      <tr>
+                        <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>
+                          Add: IGST @ {data.gstRate ? `${data.gstRate.toFixed(2)}%` : '5.00%'}
+                        </td>
+                        <td style={{ padding: '1mm 2mm', textAlign: 'right', borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
+                          {fmt.money(totals.igst).replace(/^₹\s*/, '')}
+                        </td>
+                      </tr>
+                    )}
+                    {/* Tax Amount of GST */}
+                    <tr style={{ background: '#f0f0f0' }}>
+                      <td style={{ padding: '1mm 2mm', fontWeight: 700, borderBottom: '0.5px solid #bbb' }}>Tax Amount Of GST :</td>
+                      <td style={{ padding: '1mm 2mm', textAlign: 'right', fontWeight: 700, borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
+                        {fmt.money(totals.gst).replace(/^₹\s*/, '')}
+                      </td>
+                    </tr>
+                    {/* Total Amount After Tax */}
+                    <tr style={{ background: '#e8e8e8' }}>
+                      <td style={{ padding: '1.5mm 2mm', fontWeight: 800, fontSize: '9.5pt', borderBottom: '1px solid #000' }}>Total Amount After Tax</td>
+                      <td style={{ padding: '1.5mm 2mm', textAlign: 'right', fontWeight: 800, fontSize: '9.5pt', borderBottom: '1px solid #000', borderLeft: '0.5px solid #bbb' }}>
+                        {fmt.money(totals.grandTotal).replace(/^₹\s*/, '')}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </td>
             </tr>
           </tbody>
         </table>
 
-        {/* ── Tax grid + GST totals ── */}
-        <TextileTaxGrid data={data} />
-
-        {/* ── Net Amount row ── */}
+        {/* ── Amount in words ── */}
         <table className="ipe-classic-grid">
           <tbody>
             <tr>
-              <td style={{ width: '68%', fontSize: '8.5pt', verticalAlign: 'middle' }}>
-                <span className="ipe-classic-label">Amount Chargeable (in words): </span>
-                <span style={{ fontStyle: 'italic', fontWeight: 600 }}>{totals.amountWords}</span>
+              <td style={{ fontSize: '8.5pt', padding: '1.5mm 2mm' }}>
+                <span className="ipe-classic-label">RS. </span>
+                <span style={{ fontWeight: 700, fontStyle: 'italic' }}>{totals.amountWords?.toUpperCase()}</span>
               </td>
-              <td style={{ width: '32%', textAlign: 'right', fontWeight: 800, fontSize: '11pt', verticalAlign: 'middle' }}>
-                <div style={{ fontSize: '7.5pt', fontWeight: 700, color: '#475569', marginBottom: '0.5mm' }}>Net Payable Amount (Rs.)</div>
-                <span className="ipe-num" style={{ fontSize: '12pt', color: '#0f172a' }}>{fmt.money(totals.grandTotal).replace(/^₹\s*/, '')}</span>
+              <td style={{ width: '40%', textAlign: 'right', fontSize: '7.5pt', verticalAlign: 'middle', padding: '1.5mm 2mm', borderLeft: '1px solid #000' }}>
+                <span style={{ fontSize: '7pt', color: '#555' }}>GST Payable on Reverse Charge : </span>
+                <strong style={{ color: '#1e3a8a' }}>{meta.reverseCharge || 'N'}</strong>
+                <br />
+                <span style={{ fontSize: '7pt', color: '#555' }}>Certified that the particulars given above are true and correct.</span>
               </td>
             </tr>
           </tbody>

@@ -183,46 +183,78 @@ export default function SuratBold({ data }) {
         <table className="sb-table">
           <thead>
             <tr>
-              <th style={{ width: '5%' }}>S.No.</th>
-              <th style={{ width: '27%', textAlign: 'left' }}>Description of Goods</th>
+              <th style={{ width: '4%' }}>S.No.</th>
+              <th style={{ width: '24%', textAlign: 'left' }}>Description of Goods</th>
               <th style={{ width: '6%' }}>HSN</th>
+              <th style={{ width: '5%' }}>Fold</th>
               <th style={{ width: '5%' }}>Cut</th>
               <th style={{ width: '6%' }}>PCS</th>
               <th style={{ width: '8%' }}>Mtrs</th>
-              <th style={{ width: '5%' }}>Unit</th>
+              <th style={{ width: '7%' }}>Net Mtrs</th>
               <th style={{ width: '8%' }}>Rate</th>
-              <th style={{ width: '6%' }}>Dis%</th>
-              <th style={{ width: '10%' }}>Taxable (Rs.)</th>
-              <th style={{ width: '7%' }}>GST%</th>
-              <th style={{ width: '7%' }}>Amount (Rs.)</th>
+              <th style={{ width: '10%' }}>Amount (Rs.)</th>
             </tr>
           </thead>
           <tbody>
-            {(lines || []).map((line) => (
+            {(lines || []).map((line) => {
+                const u = String(line.unit || 'MTRS').toUpperCase();
+                const isMeter = ['MTRS', 'MTS', 'QTY', 'NETQTY'].includes(u);
+                let displayMts = isMeter ? (Number(line.mts) || 0) : 0;
+                let displayNetMts = 0;
+                if (isMeter) {
+                  if (Array.isArray(line.pcsDetails) && line.pcsDetails.length > 0) {
+                    const sum = line.pcsDetails.reduce((s, r) => {
+                      const rowPcs = Number(r.pcs ?? r.qty) || 0;
+                      const qtyBndl = Number(r.qtyBndl ?? r.qtyPerBndl) || 0;
+                      if (rowPcs > 0 && qtyBndl > 0) return s + rowPcs * qtyBndl;
+                      return s + (Number(r.netQty ?? r.kgs) || 0);
+                    }, 0);
+                    if (sum > 0) displayNetMts = sum;
+                  }
+                  if (!displayNetMts) {
+                    const fold = Number(line.fold || 0);
+                    if (displayMts > 0 && fold > 0 && fold < 100) {
+                      displayNetMts = Number(((displayMts * fold) / 100).toFixed(2));
+                    } else {
+                      displayNetMts = displayMts;
+                    }
+                  }
+                }
+                return (
               <tr key={line.sno}>
                 <td className="sb-center">{line.sno}</td>
                 <td>
                   <div style={{ fontWeight: 600 }}>{line.name}</div>
+                  {line.desc && <div style={{ fontSize: '6.5pt', color: MUTED }}>{line.desc}</div>}
                   {line.colour && <div style={{ fontSize: '6.5pt', color: MUTED }}>Colour: {line.colour}</div>}
-                  {line.designNo && <div style={{ fontSize: '6.5pt', color: MUTED }}>Design: {line.designNo}</div>}
-                  {line.quality && <div style={{ fontSize: '6.5pt', color: MUTED }}>Quality: {line.quality}</div>}
+                  {Array.isArray(line.pcsDetails) && line.pcsDetails.length > 0 && (
+                    <div style={{ fontSize: '6.5pt', color: '#334155' }}>
+                      {line.pcsDetails.map((pd) => {
+                        const pcs = Number(pd.pcs ?? pd.qty ?? 1);
+                        let qtyBndl = Number(pd.qtyBndl ?? pd.qtyPerBndl ?? 0);
+                        if (!qtyBndl && pcs > 0 && Number(pd.netQty ?? pd.kgs)) {
+                          qtyBndl = Number(((Number(pd.netQty ?? pd.kgs) || 0) / pcs).toFixed(2));
+                        }
+                        return `${qtyBndl > 0 ? qtyBndl.toFixed(2) : '0.00'}x${pcs}`;
+                      }).join(' , ')}
+                    </div>
+                  )}
                 </td>
-                <td className="sb-center">{line.hsn}</td>
-                <td className="sb-center">{line.cut || '—'}</td>
-                <td className="sb-num">{line.pcs || ''}</td>
-                <td className="sb-num">{line.mts ? fmt.num(line.mts) : ''}</td>
-                <td className="sb-center">{line.unit}</td>
+                <td className="sb-center">{line.hsn || '0.00'}</td>
+                <td className="sb-num">{line.fold != null && line.fold !== '' ? line.fold : '0.00'}</td>
+                <td className="sb-num">{line.cut != null && line.cut !== '' ? line.cut : '0.00'}</td>
+                <td className="sb-num">{line.pcs != null ? line.pcs : '0.00'}</td>
+                <td className="sb-num">{displayMts ? displayMts.toFixed(2) : '0.00'}</td>
+                <td className="sb-num">{displayNetMts ? displayNetMts.toFixed(2) : '0.00'}</td>
                 <td className="sb-num">{money(line.rate)}</td>
-                <td className="sb-center">{line.dis1Per ? `${line.dis1Per}%` : (line.discount ? `${line.discount}` : '—')}</td>
-                <td className="sb-num">{money(line.taxable)}</td>
-                <td className="sb-center">{line.gstPer ? `${line.gstPer}%` : '—'}</td>
-                <td className="sb-num" style={{ fontWeight: 700 }}>{money(line.total)}</td>
+                <td className="sb-num" style={{ fontWeight: 700 }}>{money(line.amount)}</td>
               </tr>
-            ))}
+                );
+            })}
             {/* Empty rows */}
             {Array.from({ length: Math.max(0, 6 - (lines || []).length) }).map((_, i) => (
               <tr key={`e-${i}`}>
-                {Array.from({ length: 12 }).map((__, j) => (
+                {Array.from({ length: 10 }).map((__, j) => (
                   <td key={j} style={{ height: '7mm' }}>&nbsp;</td>
                 ))}
               </tr>
@@ -230,13 +262,28 @@ export default function SuratBold({ data }) {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={4} style={{ fontWeight: 700, textAlign: 'center', background: NAVY, color: '#fff' }}>TOTAL</td>
-              <td className="sb-num">{totalPcs || ''}</td>
-              <td className="sb-num">{totalMts ? fmt.num(totalMts) : ''}</td>
-              <td colSpan={3}>&nbsp;</td>
-              <td className="sb-num">{money(totals.taxable)}</td>
-              <td>&nbsp;</td>
-              <td className="sb-num" style={{ fontSize: '9pt', color: NAVY }}>{money(totals.grandTotal)}</td>
+              <td colSpan={3} style={{ fontWeight: 700, textAlign: 'center', background: NAVY, color: '#fff' }}>TOTAL</td>
+              <td className="sb-num">&nbsp;</td>
+              <td className="sb-num">&nbsp;</td>
+              <td className="sb-num">{totalPcs || 0}</td>
+              <td className="sb-num">{(() => {
+                const isMeter = (u) => ['MTRS', 'MTS', 'QTY', 'NETQTY'].includes(String(u || 'MTRS').toUpperCase());
+                const tm = (lines || []).reduce((s, l) => s + (isMeter(l.unit) ? (Number(l.mts) || 0) : 0), 0);
+                return tm > 0 ? tm.toFixed(2) : '0.00';
+              })()}</td>
+              <td className="sb-num">{(() => {
+                const isMeter = (u) => ['MTRS', 'MTS', 'QTY', 'NETQTY'].includes(String(u || 'MTRS').toUpperCase());
+                const tnm = (lines || []).reduce((s, l) => {
+                  if (!isMeter(l.unit)) return s;
+                  const rawMts = Number(l.mts) || 0;
+                  const fold = Number(l.fold || 0);
+                  if (rawMts > 0 && fold > 0 && fold < 100) return s + Number(((rawMts * fold) / 100).toFixed(2));
+                  return s + rawMts;
+                }, 0);
+                return tnm > 0 ? tnm.toFixed(2) : '0.00';
+              })()}</td>
+              <td className="sb-num">&nbsp;</td>
+              <td className="sb-num" style={{ fontSize: '9pt', color: NAVY }}>{money(totalAmt)}</td>
             </tr>
           </tfoot>
         </table>

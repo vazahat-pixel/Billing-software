@@ -380,7 +380,7 @@ class PurchaseService {
           qtyMtrs: item.mts || 0,
           balanceMtrs: item.mts || 0,
           referenceId: purchase._id,
-          idempotencyKey: `PURCHASE:${purchase._id}:${item.lotId}`,
+          idempotencyKey: `PURCHASE:${purchase._id}:${item.lotId}:${Date.now()}`,
           remarks: `Purchase Bill (Edit): ${purchase.invoiceNo}`,
           companyId: purchase.companyId,
         });

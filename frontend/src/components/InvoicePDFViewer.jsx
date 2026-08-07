@@ -48,17 +48,24 @@ const InvoicePDFViewer = ({
   const configCompany = useConfigStore((s) => s.company);
 
   useEffect(() => {
-    if (companySettings) hydrateFromSettings(companySettings);
+    // Only hydrate from settings if user hasn't manually picked a template
+    if (companySettings) {
+      const { forceTemplate } = useInvoiceTemplateStore.getState();
+      if (!forceTemplate) {
+        hydrateFromSettings(companySettings);
+      }
+    }
   }, [companySettings, hydrateFromSettings]);
 
-  // Prefer last chosen professional template; map deleted festive → formal
+  // Normalize deleted/renamed template IDs only once on first open
   useEffect(() => {
     const id = normalizeTemplateId(selectedTemplateId);
     if (id !== selectedTemplateId) setSelectedTemplateId(id);
     if (pageSize.startsWith('thermal') && id !== 'compact-thermal') {
       setPageSize('a4');
     }
-  }, [invoice?._id || invoice?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Live company settings always win over any stale prop
   const firm = useMemo(
@@ -309,112 +316,135 @@ const InvoicePDFViewer = ({
 
   return (
     <div
-      className={`invoice-pdf-overlay invoice-page-${effectivePageSize} fixed inset-0 z-[10000] bg-[#2a2a2a]/80 flex flex-col print:static print:inset-auto print:block print:h-auto print:min-h-0 print:bg-white print:z-auto`}
+      className={`invoice-pdf-overlay invoice-page-${effectivePageSize} fixed inset-0 z-[10000] bg-[#1e293b]/90 flex flex-col print:static print:inset-auto print:block print:h-auto print:min-h-0 print:bg-white print:z-auto`}
     >
-      <div className="invoice-pdf-toolbar shrink-0 flex items-center justify-between gap-3 px-3 py-2 bg-[#f5f0e8] border-b border-[#3d2914] print:hidden">
-        <div className="min-w-0">
-          <div className="text-[13px] font-bold text-[#3d2914] tracking-wide">{docTitle}</div>
-          <div className="text-[11px] text-slate-600">
-            No. {docNo} · {docDate}
+      {/* ── Compact Sleek Top Toolbar ── */}
+      <div className="invoice-pdf-toolbar shrink-0 flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-[#0f172a] text-white border-b border-slate-700 shadow-md print:hidden text-xs">
+        {/* Left: Invoice Title + Template Selector + Copy + Paper + Zoom */}
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 mr-2">
+            <span className="font-bold text-amber-400 text-sm">{docTitle}</span>
+            <span className="text-slate-400 text-[11px] font-mono">#{docNo}</span>
+          </div>
+
+          {/* Design Dropdown */}
+          <div className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded border border-slate-600">
+            <span className="text-slate-400 font-bold text-[10px] uppercase">Design:</span>
+            <select
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer"
+            >
+              <option value="surat-bold" className="bg-slate-900 text-white">🧵 Surat Bold (Recommended)</option>
+              <option value="textile-pro" className="bg-slate-900 text-white">📄 Textile Pro (Classic Grid)</option>
+              <option value="royal-gold" className="bg-slate-900 text-white">👑 Royal Gold (Luxury)</option>
+              <option value="ocean-blue" className="bg-slate-900 text-white">🌊 Ocean Blue (Corporate)</option>
+              <option value="slate-elegant" className="bg-slate-900 text-white">⚡ Slate Elegant (Modern)</option>
+              <option value="modern-enterprise" className="bg-slate-900 text-white">🏢 Modern Enterprise (ERP)</option>
+              <option value="luxury-corporate" className="bg-slate-900 text-white">💼 Luxury Corporate</option>
+              <option value="premium-minimal" className="bg-slate-900 text-white">✨ Premium Minimal</option>
+              <option value="international-biz" className="bg-slate-900 text-white">🌐 International Business</option>
+              <option value="compact-thermal" className="bg-slate-900 text-white">🖨️ Thermal POS</option>
+            </select>
+          </div>
+
+          {/* Copy Selector */}
+          <div className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded border border-slate-600">
+            <span className="text-slate-400 font-bold text-[10px] uppercase">Copy:</span>
+            <select
+              value={copyLabel}
+              onChange={(e) => setCopyLabel(e.target.value)}
+              className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer"
+            >
+              <option value="ORIGINAL" className="bg-slate-900 text-white">Original</option>
+              <option value="DUPLICATE" className="bg-slate-900 text-white">Duplicate</option>
+              <option value="TRIPLICATE" className="bg-slate-900 text-white">Triplicate</option>
+            </select>
+          </div>
+
+          {/* Paper Selector */}
+          <div className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded border border-slate-600">
+            <span className="text-slate-400 font-bold text-[10px] uppercase">Paper:</span>
+            <select
+              value={effectivePageSize}
+              onChange={(e) => setPageSize(e.target.value)}
+              className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer"
+            >
+              <option value="a4" className="bg-slate-900 text-white">A4</option>
+              <option value="a5" className="bg-slate-900 text-white">A5</option>
+              <option value="thermal-80" className="bg-slate-900 text-white">Thermal 80mm</option>
+              <option value="thermal-58" className="bg-slate-900 text-white">Thermal 58mm</option>
+            </select>
+          </div>
+
+          {/* Zoom Controls */}
+          <div className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded border border-slate-600">
+            <button type="button" onClick={() => setZoom(Math.max(50, zoom - 5))} className="px-1 font-bold text-slate-300 hover:text-white">
+              −
+            </button>
+            <span className="font-mono text-xs font-bold w-9 text-center text-amber-300">{zoom}%</span>
+            <button type="button" onClick={() => setZoom(Math.min(130, zoom + 5))} className="px-1 font-bold text-slate-300 hover:text-white">
+              +
+            </button>
+            <button
+              type="button"
+              className="ml-1 text-[10px] font-bold px-1.5 py-0.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
+              onClick={() => {
+                const pane = previewPaneRef.current;
+                if (!pane) return;
+                const avail = pane.clientWidth - 32;
+                const targetMm = effectivePageSize === 'a5' ? 148 : 210;
+                const targetPx = (targetMm / 25.4) * 96;
+                setZoom(Math.min(100, Math.max(55, Math.floor((avail / targetPx) * 100))));
+              }}
+            >
+              Fit
+            </button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button type="button" onClick={handleDownloadPdf} disabled={downloading} className={btnPrimary}>
-            {downloading ? <ButtonLoader label="Preparing PDF…" /> : 'Export PDF'}
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            disabled={downloading}
+            className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded shadow text-xs flex items-center gap-1"
+          >
+            {downloading ? <ButtonLoader label="PDF…" /> : 'Export PDF'}
           </button>
-          <button type="button" onClick={handlePrint} className={btnPrimary}>
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded shadow text-xs"
+          >
             Print
           </button>
-          <button type="button" onClick={handleWhatsApp} className={btn}>
+          <button
+            type="button"
+            onClick={handleWhatsApp}
+            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded shadow text-xs"
+          >
             WhatsApp
           </button>
-          <button type="button" onClick={onClose} className={btn}>
-            Close
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded text-xs ml-1"
+          >
+            Close ✕
           </button>
         </div>
       </div>
 
+      {/* ── Main Full-Width Centered Preview Body ── */}
       <div className="flex-1 flex min-h-0 print:block print:h-auto print:min-h-0 print:overflow-visible">
-        <aside className="invoice-pdf-sidebar print:hidden w-[200px] shrink-0 bg-[#faf8f5] border-r border-[#c4b8a8] overflow-y-auto flex flex-col">
-          <div className="px-2.5 py-2 border-b border-[#c4b8a8] bg-[#efe8dc]">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#3d2914]">Invoice Style</div>
-          </div>
-          <div className="p-2">
-            <TemplatePicker selectedId={selectedTemplateId} onSelect={setSelectedTemplateId} />
-          </div>
-
-          <div className="px-2.5 py-2 border-y border-[#c4b8a8] bg-[#efe8dc] mt-1">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#3d2914]">Options</div>
-          </div>
-          <div className="p-2.5 flex flex-col gap-2.5 text-[11px]">
-            <label className="flex flex-col gap-0.5">
-              <span className="font-bold text-slate-600">Copy</span>
-              <select
-                value={copyLabel}
-                onChange={(e) => setCopyLabel(e.target.value)}
-                className="h-8 border border-slate-400 bg-white px-2 text-[11px] font-semibold"
-              >
-                <option value="ORIGINAL">Original</option>
-                <option value="DUPLICATE">Duplicate</option>
-                <option value="TRIPLICATE">Triplicate</option>
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-0.5">
-              <span className="font-bold text-slate-600">Paper</span>
-              <select
-                value={effectivePageSize}
-                onChange={(e) => setPageSize(e.target.value)}
-                className="h-8 border border-slate-400 bg-white px-2 text-[11px] font-semibold"
-              >
-                <option value="a4">A4</option>
-                <option value="a5">A5</option>
-                <option value="thermal-80">Thermal 80mm</option>
-                <option value="thermal-58">Thermal 58mm</option>
-              </select>
-            </label>
-
-            <div>
-              <span className="font-bold text-slate-600 block mb-1">Zoom</span>
-              <div className="flex items-center border border-slate-400 bg-white h-8">
-                <button type="button" onClick={() => setZoom(zoom - 5)} className="w-8 font-bold text-slate-700">
-                  −
-                </button>
-                <span className="flex-1 text-center text-[11px] font-bold">{zoom}%</span>
-                <button type="button" onClick={() => setZoom(zoom + 5)} className="w-8 font-bold text-slate-700">
-                  +
-                </button>
-              </div>
-              <button
-                type="button"
-                className="mt-1 w-full h-7 border border-slate-400 bg-white text-[10px] font-bold text-slate-700 hover:bg-slate-50"
-                onClick={() => {
-                  const pane = previewPaneRef.current;
-                  if (!pane) return;
-                  const avail = pane.clientWidth - 32;
-                  const targetMm = effectivePageSize === 'a5' ? 148 : 210;
-                  const targetPx = (targetMm / 25.4) * 96;
-                  setZoom(Math.min(100, Math.max(55, Math.floor((avail / targetPx) * 100))));
-                }}
-              >
-                Fit to width
-              </button>
-            </div>
-          </div>
-
-          {viewModel.warnings?.length ? (
-            <div className="mt-auto p-2 border-t border-[#c4b8a8]">
-              <WarningsBanner warnings={viewModel.warnings} />
-            </div>
-          ) : null}
-        </aside>
-
         <div
           ref={previewPaneRef}
-          className="invoice-print-body flex-1 overflow-auto p-4 bg-[#d6d0c4] print:p-0 print:m-0 print:overflow-visible print:bg-white print:h-auto print:min-h-0"
+          className="invoice-print-body flex-1 overflow-auto p-4 bg-slate-900/90 flex justify-center print:p-0 print:m-0 print:overflow-visible print:bg-white print:h-auto print:min-h-0"
         >
           <div
-            className="invoice-print-scale mx-auto print:!transform-none print:!zoom-100 print:m-0 print:w-full"
+            className="invoice-print-scale print:!transform-none print:!zoom-100 print:m-0 print:w-full"
             style={{
               width: paperWidth,
               zoom: scale,
@@ -422,7 +452,7 @@ const InvoicePDFViewer = ({
                 typeof CSS !== 'undefined' && !CSS.supports?.('zoom', '1')
                   ? `scale(${scale})`
                   : undefined,
-              transformOrigin: 'top left',
+              transformOrigin: 'top center',
             }}
           >
             <div
@@ -432,7 +462,7 @@ const InvoicePDFViewer = ({
               style={{
                 width: paperWidth,
                 boxSizing: 'border-box',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
               }}
             >
               <InvoiceTemplate

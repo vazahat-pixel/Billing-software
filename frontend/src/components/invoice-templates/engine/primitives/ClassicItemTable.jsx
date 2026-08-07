@@ -44,12 +44,15 @@ export default function ClassicItemTable({ data, templateId = 'textile-pro', pay
                 >
                   {val}
                   {col.id === 'item' && Array.isArray(line.pcsDetails) && line.pcsDetails.length > 0 && (
-                    <div style={{ fontSize: '7pt', color: '#334155', marginTop: '1mm', fontStyle: 'italic', fontWeight: 500 }}>
-                      {line.pcsDetails.map((pd, pidx) => (
-                        <span key={pidx} style={{ marginRight: '2.5mm', display: 'inline-block' }}>
-                          {pd.pcs || 1} Pcs × {(pd.netQty || pd.kgs || pd.qty || 0).toFixed(2)} = {((pd.pcs || 1) * (pd.netQty || pd.kgs || pd.qty || 0)).toFixed(2)} {pd.remark ? `(${pd.remark})` : ''}
-                        </span>
-                      ))}
+                    <div style={{ fontSize: '7.5pt', color: '#1e293b', marginTop: '0.8mm', fontStyle: 'normal', fontWeight: 400 }}>
+                      {line.pcsDetails.map((pd) => {
+                        const pcs = Number(pd.pcs ?? pd.qty ?? 1);
+                        let qtyBndl = Number(pd.qtyBndl ?? pd.qtyPerBndl ?? 0);
+                        if (!qtyBndl && pcs > 0 && Number(pd.netQty ?? pd.kgs)) {
+                          qtyBndl = Number(((Number(pd.netQty ?? pd.kgs) || 0) / pcs).toFixed(2));
+                        }
+                        return `${qtyBndl > 0 ? qtyBndl.toFixed(2) : '0.00'}x${pcs}`;
+                      }).join(' , ')}
                     </div>
                   )}
                 </td>
@@ -90,9 +93,37 @@ export default function ClassicItemTable({ data, templateId = 'textile-pro', pay
               );
             }
             if (col.id === 'mts') {
+              const isMeterUnit = (u) => ['MTRS', 'MTS', 'QTY', 'NETQTY'].includes(String(u || 'MTRS').toUpperCase());
+              const totalMts = (lines || []).reduce((s, l) => s + (isMeterUnit(l.unit) ? (Number(l.mts) || 0) : 0), 0);
               return (
                 <td key={col.id} className="ipe-num" style={{ textAlign: 'right' }}>
-                  {lineTotals?.mts ? fmt.num(lineTotals.mts) : ''}
+                  {totalMts > 0 ? totalMts.toFixed(2) : '0.00'}
+                </td>
+              );
+            }
+            if (col.id === 'netMts') {
+              const isMeterUnit = (u) => ['MTRS', 'MTS', 'QTY', 'NETQTY'].includes(String(u || 'MTRS').toUpperCase());
+              const totalNetMts = (lines || []).reduce((s, l) => {
+                if (!isMeterUnit(l.unit)) return s;
+                if (Array.isArray(l.pcsDetails) && l.pcsDetails.length > 0) {
+                  const sum = l.pcsDetails.reduce((ss, r) => {
+                    const rowPcs = Number(r.pcs ?? r.qty) || 0;
+                    const qtyBndl = Number(r.qtyBndl ?? r.qtyPerBndl) || 0;
+                    if (rowPcs > 0 && qtyBndl > 0) return ss + rowPcs * qtyBndl;
+                    return ss + (Number(r.netQty ?? r.kgs) || 0);
+                  }, 0);
+                  if (sum > 0) return s + sum;
+                }
+                const rawMts = Number(l.mts) || 0;
+                const fold = Number(l.fold || 0);
+                if (rawMts > 0 && fold > 0 && fold < 100) {
+                  return s + Number(((rawMts * fold) / 100).toFixed(2));
+                }
+                return s + rawMts;
+              }, 0);
+              return (
+                <td key={col.id} className="ipe-num" style={{ textAlign: 'right', fontWeight: 700 }}>
+                  {totalNetMts > 0 ? totalNetMts.toFixed(2) : '0.00'}
                 </td>
               );
             }

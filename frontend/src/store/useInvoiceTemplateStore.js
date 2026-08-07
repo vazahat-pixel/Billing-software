@@ -35,10 +35,11 @@ const useInvoiceTemplateStore = create(
         set({ selectedTemplateId: 'textile-pro', forceTemplate: false }),
 
       hydrateFromSettings: (settings = {}) => {
+        const current = get();
         const next = {};
-        if (settings.invoiceTemplateId) {
+        // Only apply companySettings template if user hasn't manually picked one
+        if (settings.invoiceTemplateId && !current.forceTemplate) {
           next.selectedTemplateId = normalizeTemplateId(settings.invoiceTemplateId);
-          next.forceTemplate = true;
         }
         if (typeof settings.showFestivalGreeting === 'boolean') {
           next.showFestivalGreeting = settings.showFestivalGreeting;
