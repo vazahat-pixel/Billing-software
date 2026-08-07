@@ -1074,7 +1074,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
               <div className="classic-erp-meta-grid--3 erp-sales-broker-row">
                 {showBroker ? (
                   <div className="classic-erp-field">
-                    <span className="classic-erp-label">Broker *:</span>
+                    <span className="classic-erp-label">Broker:</span>
                     <div style={{display:'flex',alignItems:'center',gap:4,minWidth:0}}>
                       <ERPCombobox
                         value={header.broker}
@@ -1106,7 +1106,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                   <div />
                 )}
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Type *:</span>
+                  <span className="classic-erp-label">Type:</span>
                   <select className="classic-erp-select" value={header.type} onChange={e => setHeader({ ...header, type: e.target.value })} disabled={locked}>
                     <option value="INVOICE IN STATE">INVOICE IN STATE</option>
                     <option value="INVOICE OUT OF STATE">INVOICE OUT OF STATE</option>
