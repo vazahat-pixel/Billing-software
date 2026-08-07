@@ -680,22 +680,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const handleSave = async (e) => {
     if (e) e.preventDefault();
     if (saving) return;
-    if (!header.party) return toast.error('Party is required');
     if (!header.billNo) return toast.error('Bill No is required');
-    if (!header.billDate) return toast.error('Bill Date is required');
-    if (!header.type) return toast.error('Invoice Type is required');
-    if (showChallan && !String(header.challanNo || '').trim()) {
-      return toast.error('Challan No is required');
-    }
-    if (showChallan && !header.chDate) return toast.error('Challan Date is required');
-    if (billFields.header('orderNo') && !String(header.orderNo || '').trim()) {
-      return toast.error('Order No is required');
-    }
-    if (billFields.header('orderDate') && !header.orderDate) {
-      return toast.error('Order Date is required');
-    }
-    if (showBroker && !header.broker) return toast.error('Broker is required');
-
 
     const validLines = gridItems.filter((i) => i.itemId || i.desc || Number(i.mts) || Number(i.pcs) || Number(i.saleRate));
     if (validLines.length === 0) {
@@ -1084,10 +1069,6 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Gstin:</span>
                   <input type="text" className="classic-erp-input" value={header.gstin} readOnly />
-                </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">City:</span>
-                  <input type="text" className="classic-erp-input" value={header.city} readOnly />
                 </div>
               </div>
               <div className="classic-erp-meta-grid--3 erp-sales-broker-row">
