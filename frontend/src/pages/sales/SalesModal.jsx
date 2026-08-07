@@ -1008,7 +1008,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                   />
                 </div>
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">Date *:</span>
+                  <span className="classic-erp-label">Date:</span>
                   <input type="date" className="classic-erp-input" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
                 </div>
               </div>
@@ -1018,24 +1018,24 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                   {showChallan ? (
                     <>
                       <div className="classic-erp-field">
-                        <span className="classic-erp-label">Challan *:</span>
+                        <span className="classic-erp-label">Challan:</span>
                         <input type="text" className="classic-erp-input" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
                       </div>
                       <div className="classic-erp-field">
-                        <span className="classic-erp-label">Ch Date *:</span>
+                        <span className="classic-erp-label">Ch Date:</span>
                         <input type="date" className="classic-erp-input" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
                       </div>
                     </>
                   ) : null}
                   {billFields.header('orderNo') ? (
                     <div className="classic-erp-field">
-                      <span className="classic-erp-label">Order No *:</span>
+                      <span className="classic-erp-label">Order No:</span>
                       <input type="text" className="classic-erp-input" value={header.orderNo} onChange={e => setHeader({ ...header, orderNo: e.target.value })} disabled={locked} />
                     </div>
                   ) : null}
                   {billFields.header('orderDate') ? (
                     <div className="classic-erp-field">
-                      <span className="classic-erp-label">Ord Date *:</span>
+                      <span className="classic-erp-label">Ord Date:</span>
                       <input type="date" className="classic-erp-input" value={header.orderDate} onChange={e => setHeader({ ...header, orderDate: e.target.value })} disabled={locked} />
                     </div>
                   ) : null}
@@ -1045,7 +1045,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
             <div className="classic-erp-stack classic-erp-header-party">
               <div className="classic-erp-field classic-erp-field--lg">
-                <span className="classic-erp-label red-label">Party *:</span>
+                <span className="classic-erp-label">Party:</span>
                 <div className="classic-erp-control" style={{display:'flex',alignItems:'center',gap:4}}>
                   <ERPCombobox
                     value={header.party}
