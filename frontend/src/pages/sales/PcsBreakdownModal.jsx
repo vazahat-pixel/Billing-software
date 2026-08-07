@@ -62,7 +62,7 @@ export default function PcsBreakdownModal({ isOpen, onClose, rows = [], onSave, 
       // preserve kgs/qty backward compatibility for backend schema
       kgs: r.netQty,
       qty: r.pcs,
-      qtyPerBndl: r.pcs > 0 ? Number((r.netQty / r.pcs).toFixed(2)) : r.netQty,
+      qtyPerBndl: Number((r.netQty * r.pcs).toFixed(2)),
     }));
     onSave?.(formatted.length ? formatted : []);
     onClose?.();
@@ -112,7 +112,7 @@ export default function PcsBreakdownModal({ isOpen, onClose, rows = [], onSave, 
             </thead>
             <tbody>
               {localRows.map((row, idx) => {
-                const qtyPerBndl = row.pcs > 0 ? (row.netQty / row.pcs).toFixed(2) : (row.netQty || 0).toFixed(2);
+                const qtyPerBndl = (row.netQty * row.pcs).toFixed(2);
                 return (
                   <tr key={row.srNo} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="py-0.5 text-center font-mono text-slate-600 text-[11px] border-r border-slate-200">
