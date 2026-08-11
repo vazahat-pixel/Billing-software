@@ -1,4 +1,4 @@
-import { get, post, unwrap, asArray } from './http';
+import { get, post, put, unwrap, asArray } from './http';
 import { stage3Api } from './stage3.api';
 
 export const accountingApi = {
@@ -8,6 +8,8 @@ export const accountingApi = {
   payments: (body) => unwrap(post('/accounting/payments', body)),
   receipts: (body) => unwrap(post('/accounting/receipts', body)),
   listVouchers: (params) => unwrap(get('/accounting/payments', params)).then((d) => asArray(d, ['vouchers', 'payments'])),
+  /** Edit a posted voucher — backend reverses and re-posts atomically, number preserved. */
+  updateVoucher: (id, body) => unwrap(put(`/accounting/payments/${id}`, body)),
   reverseVoucher: (id, body = {}) => unwrap(post(`/accounting/payments/${id}/reverse`, body)),
   trialBalance: (params) => unwrap(get('/accounting/trial-balance', params)),
   groupedTrialBalance: (params) => unwrap(get('/accounting/trial-balance/grouped', params)),

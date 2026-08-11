@@ -68,7 +68,15 @@ function placeOfSupply({ partyGstin, partyStateCode, companyStateCode }) {
 /**
  * Compute tax components from taxable + rate + type.
  */
-function computeTaxComponents(taxableAmount, gstRate, gstType, cessRate = 0) {
+/**
+ * @param {'split-total'|'half-rate'} splitMode how CGST/SGST are derived on intra-state supply.
+ *   'split-total' (default, existing behaviour): round the full tax, then halve it — the two
+ *      components always add back to that rounded total.
+ *   'half-rate': charge each component at half the rate on the taxable value, rounding each
+ *      independently. This is what the reference ERP does (85,714.29 @ 5% -> 2,142.86 + 2,142.86
+ *      = 4,285.72, where 'split-total' yields 4,285.71). Differences are at most one paise.
+ */
+function computeTaxComponents(taxableAmount, gstRate, gstType, cessRate = 0, splitMode = 'split-total') {
   const taxable = Number(Number(taxableAmount || 0).toFixed(2));
   const rate = Number(gstRate || 0);
   const cessR = Number(cessRate || 0);
@@ -81,6 +89,9 @@ function computeTaxComponents(taxableAmount, gstRate, gstType, cessRate = 0) {
     igst = Number(((taxable * rate) / 100).toFixed(2));
   } else if (gstType === 'Exempt' || gstType === 'NilRated' || gstType === 'NonGST') {
     // zero
+  } else if (splitMode === 'half-rate') {
+    cgst = Number(((taxable * (rate / 2)) / 100).toFixed(2));
+    sgst = Number(((taxable * (rate / 2)) / 100).toFixed(2));
   } else {
     const total = Number(((taxable * rate) / 100).toFixed(2));
     cgst = Number((total / 2).toFixed(2));

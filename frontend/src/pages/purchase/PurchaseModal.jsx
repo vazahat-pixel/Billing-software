@@ -796,7 +796,7 @@ const PurchaseModal = ({
         igst: calculations.igst,
       };
 
-      let targetId = selectedPurchaseId || initialData?._id || initialData?.id;
+      let targetId = selectedPurchaseId;
       if (!targetId && header.billNo && header.billNo !== 'AUTO') {
         const existingBill = (purchases || []).find((s) => String(s.supplierInvoiceNo || s.invoiceNo || '').trim() === String(header.billNo || '').trim());
         if (existingBill) {

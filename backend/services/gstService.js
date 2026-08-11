@@ -205,8 +205,11 @@ class GstService {
         noteNo: n.noteNo,
         date: n.date,
         noteType: n.noteType,
+        // Which book the note adjusts — sales-side feeds GSTR-1, purchase-side affects ITC.
+        noteSide: n.noteSide || (n.noteType === 'Credit' ? 'Sales' : 'Purchase'),
         partyName: n.partyLedgerId?.name,
         amount: n.amount || 0,
+        netAmount: n.netAmount || 0,
         againstInvoiceNo: n.againstInvoiceNo || ''
       })),
       warnings

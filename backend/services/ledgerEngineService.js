@@ -5,6 +5,22 @@ const LedgerMaster = require('../models/LedgerMaster');
 const round2 = (n) => Number(Number(n || 0).toFixed(2));
 
 /**
+ * The set of journal entries that count as live money.
+ *
+ * A reversal leaves TWO entries behind: the original (flagged isReversed) and the
+ * flipped Reversal entry (which carries reversedFromId). Filtering on `isReversed:false`
+ * alone drops the original but keeps the reversal, so a reversed voucher left a phantom
+ * one-sided movement in every ledger it touched. Both halves must go, together.
+ *
+ * Drafts are excluded here too, so opening balance and the statement rows agree.
+ */
+const LIVE_ENTRY_FILTER = {
+  isReversed: false,
+  reversedFromId: { $in: [null, undefined] },
+  status: { $ne: 'Draft' },
+};
+
+/**
  * Ledger Engine — Sprint 3.3
  * All balances derived from journals + master OB (when no Opening journal).
  */
@@ -21,8 +37,7 @@ class LedgerEngineService {
   async aggregateByLedger(companyId, { from, to, ledgerIds } = {}) {
     const match = {
       companyId: new mongoose.Types.ObjectId(companyId),
-      isReversed: false,
-      status: { $ne: 'Draft' },
+      ...LIVE_ENTRY_FILTER,
     };
     if (from || to) {
       match.entryDate = {};
@@ -78,6 +93,45 @@ class LedgerEngineService {
   }
 
   /**
+   * Batch-load the documents behind a set of journal entries so each statement row can
+   * show the Bill/VNo, ChqNo and Remark the operator actually recognises, instead of only
+   * the internal journal number. One query per document type — never per row.
+   */
+  async loadSourceDocs(companyId, entries) {
+    const idsByType = {};
+    for (const e of entries) {
+      if (!e.refId || !e.refType) continue;
+      (idsByType[e.refType] = idsByType[e.refType] || []).push(e.refId);
+    }
+    const map = {};
+    const collect = (docs, pick) => {
+      for (const d of docs) map[String(d._id)] = pick(d);
+    };
+
+    const load = async (refTypes, modelName, pick, fields) => {
+      const ids = refTypes.flatMap((t) => idsByType[t] || []);
+      if (!ids.length) return;
+      const Model = require(`../models/${modelName}`);
+      const docs = await Model.find({ _id: { $in: ids }, companyId }).select(fields).lean();
+      collect(docs, pick);
+    };
+
+    await Promise.all([
+      load(['Payment', 'Receipt'], 'PaymentVoucher',
+        (d) => ({ docNo: d.voucherNo, chequeNo: d.chequeNo || '', remarks: d.narration || d.remark2 || '' }),
+        'voucherNo chequeNo narration remark2'),
+      load(['SalesInvoice'], 'Sales',
+        (d) => ({ docNo: d.invoiceNo, remarks: d.narration || d.remarks || '' }),
+        'invoiceNo narration remarks'),
+      load(['PurchaseBill'], 'Purchase',
+        (d) => ({ docNo: d.invoiceNo, remarks: d.narration || d.remarks || '' }),
+        'invoiceNo narration remarks'),
+    ]);
+
+    return map;
+  }
+
+  /**
    * Correct statement: opening = master OB + movements before `from`.
    */
   async getStatement(companyId, ledgerId, { from, to } = {}) {
@@ -115,17 +169,22 @@ class LedgerEngineService {
     let openingSigned = this.signedOpening(ledger);
 
     if (from) {
+      // Must use the RESOLVED ledger._id, not the caller's raw input. The caller may pass
+      // a Party id, a "party:<id>" token or an account name, and keying the aggregate on
+      // that silently returned zero prior movement — so Opening Balance collapsed to the
+      // master OB and every ledger opened on the wrong figure.
+      const priorTo = new Date(new Date(from).getTime() - 1);
       const prior = await this.aggregateByLedger(companyId, {
-        to: new Date(new Date(from).getTime() - 1),
-        ledgerIds: [ledgerId],
+        to: priorTo,
+        ledgerIds: [ledger._id],
       });
-      const row = prior[ledgerId.toString()] || { totalDr: 0, totalCr: 0 };
+      const row = prior[ledger._id.toString()] || { totalDr: 0, totalCr: 0 };
       openingSigned += (row.totalDr - row.totalCr);
     }
 
     const entryFilter = {
       companyId,
-      isReversed: false,
+      ...LIVE_ENTRY_FILTER,
       'lines.ledgerId': ledger._id,
     };
     if (from || to) {
@@ -135,6 +194,7 @@ class LedgerEngineService {
     }
 
     const entries = await AccountingEntry.find(entryFilter).sort({ entryDate: 1, createdAt: 1 });
+    const sourceMap = await this.loadSourceDocs(companyId, entries);
     let current = openingSigned;
     const statement = [];
 
@@ -145,6 +205,8 @@ class LedgerEngineService {
         .filter(Boolean);
       const contra = [...new Set(contraNames)].join(', ');
 
+      const src = sourceMap[String(entry.refId)] || {};
+
       for (const line of entry.lines) {
         if (line.ledgerId.toString() !== ledger._id.toString()) continue;
         if (line.type === 'Dr') current += line.amount;
@@ -153,6 +215,11 @@ class LedgerEngineService {
           _id: entry._id,
           date: entry.entryDate,
           voucherNo: entry.entryNo,
+          // Bill/VNo shows the document the operator knows (invoice no / voucher no),
+          // falling back to the journal number when there is no source document.
+          billVoucherNo: src.docNo || entry.entryNo,
+          chequeNo: src.chequeNo || '',
+          remarks: src.remarks || '',
           voucherType: entry.voucherType,
           narration: line.narration || entry.narration || '',
           particulars: line.narration || entry.narration || contra || entry.refType || '',
@@ -163,6 +230,16 @@ class LedgerEngineService {
           balanceType: current >= 0 ? 'Dr' : 'Cr',
           refType: entry.refType,
           refId: entry.refId,
+          // Every leg of the journal, so the (*) drill-down shows the real voucher
+          // rather than a reconstruction guessed from this one line.
+          journalLines: entry.lines.map((l) => ({
+            ledgerId: l.ledgerId,
+            ledgerName: l.ledgerName,
+            type: l.type,
+            amount: round2(l.amount),
+            narration: l.narration || '',
+          })),
+          entryNarration: entry.narration || '',
         });
       }
     }
@@ -190,3 +267,5 @@ class LedgerEngineService {
 }
 
 module.exports = new LedgerEngineService();
+/** Reused by every report so "what counts as live money" is defined in exactly one place. */
+module.exports.LIVE_ENTRY_FILTER = LIVE_ENTRY_FILTER;

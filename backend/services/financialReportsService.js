@@ -207,7 +207,7 @@ class FinancialReportsService {
   async cashFlow(companyId, { from, to } = {}) {
     const match = {
       companyId,
-      isReversed: false,
+      ...ledgerEngine.LIVE_ENTRY_FILTER,
     };
     if (from || to) {
       match.entryDate = {};
@@ -309,13 +309,13 @@ class FinancialReportsService {
     const entries = await AccountingEntry.find({
       companyId,
       entryDate: { $gte: start, $lte: end },
-      isReversed: false,
+      ...ledgerEngine.LIVE_ENTRY_FILTER,
     }).sort({ createdAt: 1 }).lean();
     return { date: start, entries, count: entries.length };
   }
 
   async journalRegister(companyId, { from, to, voucherType } = {}) {
-    const filter = { companyId, isReversed: false };
+    const filter = { companyId, ...ledgerEngine.LIVE_ENTRY_FILTER };
     if (voucherType) filter.voucherType = voucherType;
     if (from || to) {
       filter.entryDate = {};

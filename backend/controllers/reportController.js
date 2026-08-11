@@ -41,6 +41,9 @@ exports.getOutstanding = async (req, res) => {
       onlyPartReceived: onlyPartReceived === 'true',
       includeLastYear: includeLastYear !== 'false',
       fyStartDate,
+      onlyRgPending: req.query.onlyRgPending === 'true',
+      onlyDirectBillClose: req.query.onlyDirectBillClose === 'true',
+      withLedgerBalance: req.query.withLedgerBalance === 'true',
     });
     res.status(200).json({ success: true, data: outstanding });
   } catch (error) {

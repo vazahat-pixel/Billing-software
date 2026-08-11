@@ -517,6 +517,9 @@ async function run() {
         paymentMode: 'Cash',
         bankLedgerId: cashLedger._id,
         status: 'Posted',
+        // No bill reference — this is an on-account payment, so Acc/Bill must be "A".
+        // "B" now requires bills whose Adjust total ties exactly to the amount.
+        accBill: 'A',
         narration: 'Job work charges paid to Mill C via Cash'
       }
     });

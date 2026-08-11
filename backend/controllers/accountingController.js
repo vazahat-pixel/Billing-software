@@ -56,9 +56,9 @@ function normalizePaymentDetails(body) {
     if (split.mode === 'Cheque' && !split.reference && !body.chequeNo) {
       throw new Error('Cheque number is required for cheque payments');
     }
-    if (['NEFT', 'RTGS', 'UPI'].includes(split.mode) && !split.reference && !body.utrNo) {
-      throw new Error(`Reference/UTR is required for ${split.mode} payments`);
-    }
+    // NEFT/RTGS/UPI reference stays optional: a bank receipt is normally entered from the
+    // pay-in slip on the day the money lands, before the UTR is known. It is recorded
+    // whenever supplied, but demanding it here made cheque-less bank receipts unsaveable.
   }
 
   const paymentMode = splits.length === 1 ? splits[0].mode : 'Mixed';
@@ -106,6 +106,335 @@ function itemDeductionTotal(item) {
 
 function sumAcrossInvoices(againstInvoices, key) {
   return (againstInvoices || []).reduce((s, item) => s + Number(item[key] || 0), 0);
+}
+
+const round2 = (n) => Number(Number(n || 0).toFixed(2));
+
+/** Compare money as whole paise — 0.1 + 0.2 style drift must never pass as "equal". */
+const toPaise = (n) => Math.round(Number(n || 0) * 100);
+
+/**
+ * Cash & Bank Book vouchers must land in a ledger the corresponding book can see —
+ * cashBook()/bankBook() select purely on accountType, so a receipt posted to a
+ * General ledger would silently vanish from the book it belongs in.
+ */
+function assertBookLedgerType(ledger, bookKind) {
+  const kind = String(bookKind || '').toLowerCase();
+  const expected = kind === 'cash' ? 'Cash' : kind === 'bank' ? 'Bank' : null;
+
+  if (!expected) {
+    if (!['Cash', 'Bank'].includes(ledger.accountType)) {
+      throw new Error(
+        `"${ledger.name}" is a ${ledger.accountType} ledger — a receipt/payment must post to a Cash or Bank ledger`
+      );
+    }
+    return;
+  }
+  if (ledger.accountType !== expected) {
+    throw new Error(
+      `"${ledger.name}" is a ${ledger.accountType} ledger — a ${expected} Book voucher must post to a ${expected} ` +
+      `ledger, otherwise it will never appear in the ${expected} Book`
+    );
+  }
+}
+
+/**
+ * Resolve every against-invoice row to its real Sales/Purchase document and prove the
+ * allocation is legal BEFORE anything is written. Guards party ownership, duplicate
+ * rows, negative figures, per-bill overpayment and total over-allocation.
+ * Returns the loaded docs so the caller applies them without a second lookup.
+ */
+async function buildAllocationPlan(companyId, { partyLedger, accBill, againstInvoices, amount }, session) {
+  const rows = Array.isArray(againstInvoices) ? againstInvoices : [];
+
+  // Acc/Bill = "A" is an on-account receipt: it sits against the party, never a bill.
+  if (String(accBill || 'B').toUpperCase() === 'A') {
+    const carriesAllocation = rows.some(
+      (r) => Number(r.amount || 0) > 0 || itemDeductionTotal(r) > 0
+    );
+    if (carriesAllocation) {
+      throw new Error('Acc/Bill is "A" (on-account) — clear the bill rows or switch Acc/Bill to "B"');
+    }
+    return { plan: [], allocatedTotal: 0 };
+  }
+
+  // Acc/Bill = "B" means bill-against: the money must land on real bills.
+  if (!rows.some((r) => Number(r.amount || 0) > 0 || itemDeductionTotal(r) > 0)) {
+    throw new Error('Please select at least one Bill (Acc/Bill is "B" — switch to "A" for an on-account voucher)');
+  }
+
+  const expectedPartyId = partyLedger.linkedPartyId ? String(partyLedger.linkedPartyId) : null;
+  const seen = new Set();
+  const plan = [];
+  let allocatedTotal = 0;
+
+  for (const item of rows) {
+    const alloc = round2(item.amount);
+    const deductions = round2(itemDeductionTotal(item));
+    if (alloc < 0 || deductions < 0) {
+      throw new Error(`Bill ${item.invoiceNo || '(blank)'}: negative amounts are not allowed`);
+    }
+    const paidNow = round2(alloc + deductions);
+    if (paidNow <= 0) continue;
+
+    if (!item.invoiceId) {
+      throw new Error(
+        `Bill "${item.invoiceNo || '(blank)'}" is not linked to an invoice — pick it from the BillNo lookup`
+      );
+    }
+    const key = String(item.invoiceId);
+    if (seen.has(key)) {
+      throw new Error(`Bill ${item.invoiceNo || key} is allocated more than once in this voucher`);
+    }
+    seen.add(key);
+
+    let doc = await Sales.findOne({ _id: item.invoiceId, companyId }).session(session);
+    let kind = 'sales';
+    if (!doc) {
+      doc = await Purchase.findOne({ _id: item.invoiceId, companyId }).session(session);
+      kind = 'purchase';
+    }
+    if (!doc) {
+      throw new Error(`Bill ${item.invoiceNo || key} was not found for this company`);
+    }
+
+    // A voucher may only settle bills belonging to the party it is drawn on.
+    if (!expectedPartyId) {
+      throw new Error(
+        `Ledger "${partyLedger.name}" is not linked to a party — bill-wise allocation needs a party ledger`
+      );
+    }
+    const billPartyId = String(doc.customerId || doc.supplierId || '');
+    if (billPartyId !== expectedPartyId) {
+      throw new Error(
+        `Bill ${doc.invoiceNo || key} does not belong to ${partyLedger.name} — ` +
+        `a voucher cannot settle another party's bill`
+      );
+    }
+
+    const billAmount = round2(doc.netAmount || 0);
+    const outstanding = round2(billAmount - round2(doc.paidAmount || 0));
+    if (paidNow > outstanding + 0.01) {
+      throw new Error(
+        `Bill ${doc.invoiceNo || key}: allocating ₹${paidNow.toFixed(2)} exceeds its outstanding ₹${outstanding.toFixed(2)}`
+      );
+    }
+
+    allocatedTotal = round2(allocatedTotal + alloc);
+    plan.push({ doc, kind, paidNow });
+  }
+
+  // Bill-against vouchers must tie out to the paise, both ways — the reference ERP
+  // refuses ₹3 short just as firmly as ₹5 over ("Check Amount").
+  //
+  // Only Adjust counts here. Discount/TDS/RG/Claim/RD/Interest/Oth reduce the bill's
+  // outstanding without cash moving, so they are settled through their own ledger legs
+  // and must stay out of this comparison.
+  //
+  const received = round2(amount);
+  if (toPaise(allocatedTotal) !== toPaise(received)) {
+    throw new Error(
+      `Check Amount: Total Bill Adjustment must exactly equal Receipt Amount ` +
+      `(adjusted ₹${allocatedTotal.toFixed(2)} vs amount ₹${received.toFixed(2)})`
+    );
+  }
+
+  return { plan, allocatedTotal };
+}
+
+/**
+ * Undo a voucher's bill impact: drop paidAmount back, restore status and resync
+ * bill-wise outstanding. Shared by reverse and by edit (which un-applies the old
+ * allocation before re-applying the corrected one).
+ */
+async function rollbackAllocations(companyId, againstInvoices, session) {
+  if (!Array.isArray(againstInvoices) || againstInvoices.length === 0) return;
+  const outstandingEngine = require('../services/outstandingEngineService');
+
+  for (const item of againstInvoices) {
+    if (!item.invoiceId) continue;
+    const paidNow = round2(Number(item.amount || 0) + itemDeductionTotal(item));
+    if (paidNow <= 0) continue;
+
+    const saleDoc = await Sales.findOne({ _id: item.invoiceId, companyId }).session(session);
+    if (saleDoc) {
+      saleDoc.paidAmount = round2(Math.max(0, (saleDoc.paidAmount || 0) - paidNow));
+      if (saleDoc.paidAmount <= 0.009) {
+        saleDoc.paidAmount = 0;
+        saleDoc.status = saleDoc.status === 'cancelled' ? saleDoc.status : 'active';
+      } else if (saleDoc.paidAmount < saleDoc.netAmount) {
+        saleDoc.status = 'partial';
+      }
+      await saleDoc.save({ session });
+      await outstandingEngine.syncBillFromSales(companyId, saleDoc, session);
+      continue;
+    }
+
+    const purchaseDoc = await Purchase.findOne({ _id: item.invoiceId, companyId }).session(session);
+    if (purchaseDoc) {
+      purchaseDoc.paidAmount = round2(Math.max(0, (purchaseDoc.paidAmount || 0) - paidNow));
+      if (purchaseDoc.paidAmount <= 0.009) {
+        purchaseDoc.paidAmount = 0;
+        purchaseDoc.status = purchaseDoc.status === 'cancelled' ? purchaseDoc.status : 'active';
+      } else if (purchaseDoc.paidAmount < purchaseDoc.netAmount) {
+        purchaseDoc.status = 'partial';
+      }
+      await purchaseDoc.save({ session });
+      await outstandingEngine.syncBillFromPurchase(companyId, purchaseDoc, session);
+    }
+  }
+}
+
+/** Apply a validated plan: bump paidAmount/status and resync bill-wise outstanding. */
+async function applyAllocationPlan(companyId, plan, session) {
+  const outstandingEngine = require('../services/outstandingEngineService');
+  for (const { doc, kind, paidNow } of plan) {
+    doc.paidAmount = round2((doc.paidAmount || 0) + paidNow);
+    if (doc.paidAmount >= round2(doc.netAmount || 0) - 0.009) doc.status = 'paid';
+    else if (doc.paidAmount > 0) doc.status = 'partial';
+    await doc.save({ session });
+    if (kind === 'sales') await outstandingEngine.syncBillFromSales(companyId, doc, session);
+    else await outstandingEngine.syncBillFromPurchase(companyId, doc, session);
+  }
+}
+
+/**
+ * Post the double-entry journal for a Payment/Receipt and apply its bill allocation.
+ * Shared by create and edit so the two can never drift into different accounting.
+ *
+ * Direction is the whole difference between the two voucher types:
+ *   Receipt — money in : Dr Bank/Cash , Cr Party
+ *   Payment — money out: Dr Party     , Cr Bank/Cash
+ */
+async function postVoucherAccounting(companyId, voucher, ctx, session) {
+  const { partyLedger, bankLedger, amount, againstInvoices, narration, paymentNarration, date, plan } = ctx;
+  const isReceipt = voucher.voucherType === 'Receipt';
+  const voucherNo = voucher.voucherNo;
+
+  const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
+
+  const totalTds = sumAcrossInvoices(againstInvoices, 'tds');
+  const totalDiscount = sumAcrossInvoices(againstInvoices, 'discount');
+  const totalOther =
+    sumAcrossInvoices(againstInvoices, 'rg') +
+    sumAcrossInvoices(againstInvoices, 'claim') +
+    sumAcrossInvoices(againstInvoices, 'rd') +
+    sumAcrossInvoices(againstInvoices, 'interest') +
+    sumAcrossInvoices(againstInvoices, 'oth1') +
+    sumAcrossInvoices(againstInvoices, 'oth2');
+  // The party leg carries the cash plus every non-cash deduction that reduced the bill.
+  // Adjust alone is the cash; Discount/TDS/RG/Claim/RD/Interest/Oth get their own legs.
+  const partyTotal = parseFloat(amount) + totalTds + totalDiscount + totalOther;
+
+  const bankLine = {
+    ledgerId: bankLedger._id,
+    ledgerName: bankLedger.name,
+    type: isReceipt ? 'Dr' : 'Cr',
+    amount: parseFloat(amount),
+    narration: isReceipt ? `Received via ${paymentNarration}` : `Paid via ${paymentNarration}`
+  };
+  const partyLine = {
+    ledgerId: partyLedger._id,
+    ledgerName: partyLedger.name,
+    type: isReceipt ? 'Cr' : 'Dr',
+    amount: partyTotal,
+    narration: `${voucher.voucherType} Voucher #${voucherNo}`
+  };
+  const lines = isReceipt ? [bankLine, partyLine] : [partyLine, bankLine];
+
+  // Deduction legs balance the party leg; they sit opposite the party on both voucher types.
+  const sideType = isReceipt ? 'Dr' : 'Cr';
+  if (totalTds > 0.004) {
+    const tdsLedger = await accountingService.getSystemLedger(
+      companyId, isReceipt ? 'TDS Receivable' : 'TDS Payable', session
+    );
+    lines.push({
+      ledgerId: tdsLedger._id, ledgerName: tdsLedger.name, type: sideType, amount: totalTds,
+      narration: isReceipt
+        ? `TDS deducted by party — Voucher #${voucherNo}`
+        : `TDS withheld — Voucher #${voucherNo}`
+    });
+  }
+  if (totalDiscount > 0.004) {
+    const discLedger = await accountingService.getSystemLedger(
+      companyId, isReceipt ? 'Discount Allowed' : 'Discount Received', session
+    );
+    lines.push({
+      ledgerId: discLedger._id, ledgerName: discLedger.name, type: sideType, amount: totalDiscount,
+      narration: isReceipt
+        ? `Discount allowed — Voucher #${voucherNo}`
+        : `Discount received — Voucher #${voucherNo}`
+    });
+  }
+  if (totalOther > 0.004) {
+    const otherLedger = await accountingService.getSystemLedger(companyId, 'Other Adjustments A/c', session);
+    lines.push({
+      ledgerId: otherLedger._id, ledgerName: otherLedger.name, type: sideType, amount: totalOther,
+      narration: `Rg/Claim/RD/Interest/Other — Voucher #${voucherNo}`
+    });
+  }
+
+  const accountingEntry = await AccountingEntry.create([{
+    companyId,
+    entryNo,
+    entryDate: date,
+    voucherType: voucher.voucherType,
+    refType: voucher.voucherType,
+    refId: voucher._id,
+    lines,
+    narration: narration || (isReceipt
+      ? `Received from ${partyLedger.name} — ${paymentNarration}`
+      : `Paid to ${partyLedger.name} — ${paymentNarration}`)
+  }], { session });
+
+  voucher.accountingEntryId = accountingEntry[0]._id;
+
+  // Update invoice paidAmount + sync BillSettlement (Outstanding)
+  await applyAllocationPlan(companyId, plan, session);
+
+  return accountingEntry[0];
+}
+
+/**
+ * Resolve + validate the party ledger, the Cash/Bank ledger and the bill allocation for a
+ * voucher payload. Everything a Payment/Receipt needs proven before a write, in one place
+ * so create and edit enforce an identical rule set.
+ */
+async function resolveVoucherContext(companyId, body, { posting }, session) {
+  const { partyLedgerId, amount, bankLedgerId, againstInvoices } = body;
+
+  const resolvedPartyLedgerId = partyLedgerId || body.partyId;
+  let partyLedger = await LedgerMaster.findOne({ _id: resolvedPartyLedgerId, companyId });
+  if (!partyLedger && resolvedPartyLedgerId) {
+    try {
+      partyLedger = await accountingService.getOrCreatePartyLedger(companyId, resolvedPartyLedgerId);
+    } catch (err) {
+      // ignore and let the next block throw if not found
+    }
+  }
+
+  let resolvedBankLedgerId = bankLedgerId;
+  if (!resolvedBankLedgerId) {
+    const fallbackName = String(body.bookKind || '').toLowerCase() === 'cash' ? 'Cash A/c' : 'Bank A/c';
+    const defaultLedger = await LedgerMaster.findOne({ companyId, name: fallbackName });
+    if (defaultLedger) resolvedBankLedgerId = defaultLedger._id;
+  }
+  const bankLedger = await LedgerMaster.findOne({ _id: resolvedBankLedgerId, companyId });
+
+  if (!partyLedger || !bankLedger) {
+    throw new Error('Invalid party or bank ledger selection');
+  }
+  assertBookLedgerType(bankLedger, body.bookKind);
+
+  const { plan } = posting
+    ? await buildAllocationPlan(
+        companyId,
+        { partyLedger, accBill: body.accBill, againstInvoices, amount },
+        session
+      )
+    : { plan: [] };
+
+  return { partyLedger, bankLedger, plan };
 }
 
 // 1. Create Ledger Account
@@ -170,50 +499,53 @@ exports.getLedgerStatement = async (req, res) => {
   }
 };
 
-// 4. Create Payment Voucher (Posted = automatic Ledger entries)
-exports.createPaymentVoucher = async (req, res) => {
+// 4-5. Create Payment / Receipt Voucher (Posted = automatic Ledger entries)
+//
+// Payment and Receipt are the same voucher with the party/bank legs swapped and a
+// different side-ledger set, so they share one implementation — that way a validation
+// added for one can never go missing on the other.
+async function createCashBankVoucher(req, res, voucherType) {
   const session = await mongoose.startSession();
   session.startTransaction();
+  let committed = false;
   try {
     const companyId = req.companyId || req.body.companyId;
-    const { 
-      date, partyLedgerId, amount, 
-      bankLedgerId, chequeDate, status, againstInvoices, narration
-    } = req.body;
+    const { date, amount, chequeDate, status, againstInvoices, narration } = req.body;
 
     await checkPeriodLocked(companyId, date);
 
     const paymentDetails = normalizePaymentDetails(req.body);
     const { paymentMode, paymentSplits, chequeNo, utrNo, paymentNarration } = paymentDetails;
 
-    const resolvedPartyLedgerId = partyLedgerId || req.body.partyId;
-    let partyLedger = await LedgerMaster.findOne({ _id: resolvedPartyLedgerId, companyId });
-    if (!partyLedger && resolvedPartyLedgerId) {
-      try {
-        partyLedger = await accountingService.getOrCreatePartyLedger(companyId, resolvedPartyLedgerId);
-      } catch (err) {
-        // ignore and let next block throw if not found
+    const posting = String(status || 'Draft') === 'Posted';
+
+    // Replaying the same submission (double-click, retried request) returns the original
+    // voucher instead of moving the money a second time.
+    const idempotencyKey = String(req.body.idempotencyKey || '').trim();
+    if (idempotencyKey) {
+      // Matches uniq_voucher_idempotency exactly, so a replay takes this path rather
+      // than surfacing as a raw duplicate-key error.
+      const existing = await PaymentVoucher.findOne({ companyId, idempotencyKey });
+      if (existing) {
+        await session.abortTransaction();
+        return res.status(200).json({
+          success: true, data: existing, message: 'Voucher already recorded',
+        });
       }
     }
 
-    let resolvedBankLedgerId = bankLedgerId;
-    if (!resolvedBankLedgerId) {
-      const defaultBank = await LedgerMaster.findOne({ companyId, name: 'Bank A/c' });
-      if (defaultBank) resolvedBankLedgerId = defaultBank._id;
-    }
-    const bankLedger = await LedgerMaster.findOne({ _id: resolvedBankLedgerId, companyId });
+    // Everything is proven before a single write happens.
+    const { partyLedger, bankLedger, plan } = await resolveVoucherContext(
+      companyId, req.body, { posting }, session
+    );
 
-    if (!partyLedger || !bankLedger) {
-      throw new Error('Invalid party or bank ledger selection');
-    }
-
-    const voucherNo = await generateVoucherNo(companyId, 'Payment', session);
+    const voucherNo = await generateVoucherNo(companyId, voucherType, session);
 
     const voucher = new PaymentVoucher({
       companyId,
       voucherNo,
       date,
-      voucherType: 'Payment',
+      voucherType,
       partyLedgerId: partyLedger._id,
       partyName: partyLedger.name,
       amount,
@@ -222,6 +554,7 @@ exports.createPaymentVoucher = async (req, res) => {
       bankLedgerId: bankLedger._id,
       chequeNo,
       chequeDate,
+      clearDate: req.body.clearDate || undefined,
       utrNo,
       slipNo: req.body.slipNo || '',
       intBillNo: req.body.intBillNo || '',
@@ -234,287 +567,140 @@ exports.createPaymentVoucher = async (req, res) => {
       bookId: req.body.bookId || undefined,
       bookName: req.body.bookName || '',
       bookKind: req.body.bookKind || '',
+      idempotencyKey: idempotencyKey || undefined,
       narration,
       againstInvoices,
       status: status || 'Draft'
     });
 
-    if (status === 'Posted') {
-      // Create double-entry journal lines
-      const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
-
-      const totalTds = sumAcrossInvoices(againstInvoices, 'tds');
-      const totalDiscount = sumAcrossInvoices(againstInvoices, 'discount');
-      const totalOther =
-        sumAcrossInvoices(againstInvoices, 'rg') +
-        sumAcrossInvoices(againstInvoices, 'claim') +
-        sumAcrossInvoices(againstInvoices, 'rd') +
-        sumAcrossInvoices(againstInvoices, 'interest') +
-        sumAcrossInvoices(againstInvoices, 'oth1') +
-        sumAcrossInvoices(againstInvoices, 'oth2');
-      const partyDrTotal = parseFloat(amount) + totalTds + totalDiscount + totalOther;
-
-      const lines = [
-        {
-          ledgerId: partyLedger._id,
-          ledgerName: partyLedger.name,
-          type: 'Dr',
-          amount: partyDrTotal,
-          narration: `Payment Voucher #${voucherNo}`
-        },
-        {
-          ledgerId: bankLedger._id,
-          ledgerName: bankLedger.name,
-          type: 'Cr',
-          amount: parseFloat(amount),
-          narration: `Paid via ${paymentNarration}`
-        }
-      ];
-      if (totalTds > 0.004) {
-        const tdsLedger = await accountingService.getSystemLedger(companyId, 'TDS Payable', session);
-        lines.push({ ledgerId: tdsLedger._id, ledgerName: tdsLedger.name, type: 'Cr', amount: totalTds, narration: `TDS withheld — Voucher #${voucherNo}` });
-      }
-      if (totalDiscount > 0.004) {
-        const discLedger = await accountingService.getSystemLedger(companyId, 'Discount Received', session);
-        lines.push({ ledgerId: discLedger._id, ledgerName: discLedger.name, type: 'Cr', amount: totalDiscount, narration: `Discount received — Voucher #${voucherNo}` });
-      }
-      if (totalOther > 0.004) {
-        const otherLedger = await accountingService.getSystemLedger(companyId, 'Other Adjustments A/c', session);
-        lines.push({ ledgerId: otherLedger._id, ledgerName: otherLedger.name, type: 'Cr', amount: totalOther, narration: `Rg/Claim/RD/Interest/Other — Voucher #${voucherNo}` });
-      }
-
-      const accountingEntry = await AccountingEntry.create([{
-        companyId,
-        entryNo,
-        entryDate: date,
-        voucherType: 'Payment',
-        refType: 'Payment',
-        refId: voucher._id,
-        lines,
-        narration: narration || `Paid to ${partyLedger.name} — ${paymentNarration}`
-      }], { session });
-
-      voucher.accountingEntryId = accountingEntry[0]._id;
-
-      // Update invoice paidAmount + sync BillSettlement (Outstanding)
-      const outstandingEngine = require('../services/outstandingEngineService');
-      if (againstInvoices && againstInvoices.length > 0) {
-        for (const item of againstInvoices) {
-          const paidNow = parseFloat(item.amount || 0) + itemDeductionTotal(item);
-          if (paidNow <= 0) continue;
-
-          const saleDoc = await Sales.findOne({ _id: item.invoiceId, companyId }).session(session);
-          if (saleDoc) {
-            const nextPaid = parseFloat(((saleDoc.paidAmount || 0) + paidNow).toFixed(2));
-            if (nextPaid > parseFloat(saleDoc.netAmount || 0) + 0.01) {
-              throw new Error(`Overpayment on Sales #${saleDoc.invoiceNo}: paid would exceed bill amount`);
-            }
-            saleDoc.paidAmount = nextPaid;
-            if (saleDoc.paidAmount >= saleDoc.netAmount) saleDoc.status = 'paid';
-            else if (saleDoc.paidAmount > 0) saleDoc.status = 'partial';
-            await saleDoc.save({ session });
-            await outstandingEngine.syncBillFromSales(companyId, saleDoc, session);
-            continue;
-          }
-
-          const purchaseDoc = await Purchase.findOne({ _id: item.invoiceId, companyId }).session(session);
-          if (purchaseDoc) {
-            const nextPaid = parseFloat(((purchaseDoc.paidAmount || 0) + paidNow).toFixed(2));
-            if (nextPaid > parseFloat(purchaseDoc.netAmount || 0) + 0.01) {
-              throw new Error(`Overpayment on Purchase #${purchaseDoc.invoiceNo}: paid would exceed bill amount`);
-            }
-            purchaseDoc.paidAmount = nextPaid;
-            if (purchaseDoc.paidAmount >= purchaseDoc.netAmount) purchaseDoc.status = 'paid';
-            else if (purchaseDoc.paidAmount > 0) purchaseDoc.status = 'partial';
-            await purchaseDoc.save({ session });
-            await outstandingEngine.syncBillFromPurchase(companyId, purchaseDoc, session);
-          }
-        }
-      }
+    if (posting) {
+      await postVoucherAccounting(companyId, voucher, {
+        partyLedger, bankLedger, amount, againstInvoices, narration, paymentNarration, date, plan,
+      }, session);
     }
 
     await voucher.save({ session });
     await session.commitTransaction();
+    committed = true;
     res.status(201).json({ success: true, data: voucher });
   } catch (error) {
-    await session.abortTransaction();
+    if (!committed) await session.abortTransaction();
     res.status(400).json({ success: false, message: error.message });
   } finally {
     session.endSession();
   }
-};
+}
 
-// 5. Create Receipt Voucher
-exports.createReceiptVoucher = async (req, res) => {
+/**
+ * Edit a Posted Payment/Receipt in place.
+ *
+ * A posted voucher's accounting cannot simply be overwritten, so this un-does the old
+ * impact and re-posts the corrected one inside a single transaction:
+ *   1. reverse the original journal (both entries stay as an audit trail)
+ *   2. roll the old bill allocation back off the invoices
+ *   3. re-validate the new payload from scratch
+ *   4. post a fresh journal and apply the new allocation
+ * The voucher number is preserved — this is the same voucher corrected, not a new one.
+ * Either every step lands or none does.
+ */
+exports.updateVoucher = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
+  let committed = false;
   try {
     const companyId = req.companyId || req.body.companyId;
-    const { 
-      date, partyLedgerId, amount, 
-      bankLedgerId, chequeDate, status, againstInvoices, narration
-    } = req.body;
+    const voucherId = req.params.id;
 
+    const voucher = await PaymentVoucher.findOne({ _id: voucherId, companyId }).session(session);
+    if (!voucher) throw new Error('Voucher not found');
+    if (voucher.status === 'Reversed' || voucher.isReversed) {
+      throw new Error('A reversed voucher cannot be edited');
+    }
+
+    const { date, amount, chequeDate, againstInvoices, narration } = req.body;
+    // Both the period it is leaving and the period it is moving into must be open.
+    await checkPeriodLocked(companyId, voucher.date);
     await checkPeriodLocked(companyId, date);
 
     const paymentDetails = normalizePaymentDetails(req.body);
     const { paymentMode, paymentSplits, chequeNo, utrNo, paymentNarration } = paymentDetails;
-    const resolvedPartyLedgerId = partyLedgerId || req.body.partyId;
-    let partyLedger = await LedgerMaster.findOne({ _id: resolvedPartyLedgerId, companyId });
-    if (!partyLedger && resolvedPartyLedgerId) {
-      try {
-        partyLedger = await accountingService.getOrCreatePartyLedger(companyId, resolvedPartyLedgerId);
-      } catch (err) {
-        // ignore and let next block throw if not found
+
+    const wasPosted = voucher.status === 'Posted';
+    const posting = String(req.body.status || voucher.status) === 'Posted';
+
+    // Un-apply the original FIRST. The new allocation is validated against each bill's
+    // outstanding, and that outstanding still carries this voucher's own old payment —
+    // so a bill this voucher had fully settled would otherwise look like it has ₹0 left
+    // and reject any edit. Everything here shares one transaction, so a later validation
+    // failure rolls the un-apply back too.
+    if (wasPosted) {
+      if (voucher.accountingEntryId) {
+        const journalEngine = require('../services/journalEngineService');
+        const reversal = await journalEngine.reverseJournal(companyId, voucher.accountingEntryId, {
+          session,
+          userId: req.user?._id || req.user?.id,
+          reason: `Edit of ${voucher.voucherType} #${voucher.voucherNo}`,
+        });
+        voucher.reversalEntryId = reversal._id;
       }
+      await rollbackAllocations(companyId, voucher.againstInvoices, session);
     }
 
-    let resolvedBankLedgerId = bankLedgerId;
-    if (!resolvedBankLedgerId) {
-      const defaultBank = await LedgerMaster.findOne({ companyId, name: 'Bank A/c' });
-      if (defaultBank) resolvedBankLedgerId = defaultBank._id;
-    }
-    const bankLedger = await LedgerMaster.findOne({ _id: resolvedBankLedgerId, companyId });
+    // Now validate the replacement against the restored outstanding figures.
+    const { partyLedger, bankLedger, plan } = await resolveVoucherContext(
+      companyId, req.body, { posting }, session
+    );
 
-    if (!partyLedger || !bankLedger) {
-      throw new Error('Invalid party or bank ledger selection');
-    }
+    voucher.date = date || voucher.date;
+    voucher.partyLedgerId = partyLedger._id;
+    voucher.partyName = partyLedger.name;
+    voucher.amount = amount;
+    voucher.paymentMode = paymentMode;
+    voucher.paymentSplits = paymentSplits;
+    voucher.bankLedgerId = bankLedger._id;
+    voucher.chequeNo = chequeNo;
+    voucher.chequeDate = chequeDate;
+    voucher.clearDate = req.body.clearDate || undefined;
+    voucher.utrNo = utrNo;
+    voucher.slipNo = req.body.slipNo || '';
+    voucher.intBillNo = req.body.intBillNo || '';
+    voucher.intBillFlag = req.body.intBillFlag || 'N';
+    voucher.partyBank = req.body.partyBank || '';
+    voucher.accBill = req.body.accBill || 'B';
+    voucher.finance = Number(req.body.finance || 0);
+    voucher.financeFlag = !!req.body.financeFlag;
+    voucher.remark2 = req.body.remark2 || '';
+    voucher.bookId = req.body.bookId || voucher.bookId;
+    voucher.bookName = req.body.bookName || voucher.bookName;
+    voucher.bookKind = req.body.bookKind || voucher.bookKind;
+    voucher.narration = narration;
+    voucher.againstInvoices = againstInvoices;
+    voucher.status = posting ? 'Posted' : 'Draft';
+    voucher.accountingEntryId = undefined;
+    voucher.editedAt = new Date();
 
-    const voucherNo = await generateVoucherNo(companyId, 'Receipt', session);
-
-    const voucher = new PaymentVoucher({
-      companyId,
-      voucherNo,
-      date,
-      voucherType: 'Receipt',
-      partyLedgerId: partyLedger._id,
-      partyName: partyLedger.name,
-      amount,
-      paymentMode,
-      paymentSplits,
-      bankLedgerId: bankLedger._id,
-      chequeNo,
-      chequeDate,
-      utrNo,
-      slipNo: req.body.slipNo || '',
-      intBillNo: req.body.intBillNo || '',
-      intBillFlag: req.body.intBillFlag || 'N',
-      partyBank: req.body.partyBank || '',
-      accBill: req.body.accBill || 'B',
-      finance: Number(req.body.finance || 0),
-      financeFlag: !!req.body.financeFlag,
-      remark2: req.body.remark2 || '',
-      bookId: req.body.bookId || undefined,
-      bookName: req.body.bookName || '',
-      bookKind: req.body.bookKind || '',
-      narration,
-      againstInvoices,
-      status: status || 'Draft'
-    });
-
-    if (status === 'Posted') {
-      const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
-
-      const totalTds = sumAcrossInvoices(againstInvoices, 'tds');
-      const totalDiscount = sumAcrossInvoices(againstInvoices, 'discount');
-      const totalOther =
-        sumAcrossInvoices(againstInvoices, 'rg') +
-        sumAcrossInvoices(againstInvoices, 'claim') +
-        sumAcrossInvoices(againstInvoices, 'rd') +
-        sumAcrossInvoices(againstInvoices, 'interest') +
-        sumAcrossInvoices(againstInvoices, 'oth1') +
-        sumAcrossInvoices(againstInvoices, 'oth2');
-      const partyCrTotal = parseFloat(amount) + totalTds + totalDiscount + totalOther;
-
-      const lines = [
-        {
-          ledgerId: bankLedger._id,
-          ledgerName: bankLedger.name,
-          type: 'Dr',
-          amount: parseFloat(amount),
-          narration: `Received via ${paymentNarration}`
-        },
-        {
-          ledgerId: partyLedger._id,
-          ledgerName: partyLedger.name,
-          type: 'Cr',
-          amount: partyCrTotal,
-          narration: `Receipt Voucher #${voucherNo}`
-        }
-      ];
-      if (totalTds > 0.004) {
-        const tdsLedger = await accountingService.getSystemLedger(companyId, 'TDS Receivable', session);
-        lines.push({ ledgerId: tdsLedger._id, ledgerName: tdsLedger.name, type: 'Dr', amount: totalTds, narration: `TDS deducted by party — Voucher #${voucherNo}` });
-      }
-      if (totalDiscount > 0.004) {
-        const discLedger = await accountingService.getSystemLedger(companyId, 'Discount Allowed', session);
-        lines.push({ ledgerId: discLedger._id, ledgerName: discLedger.name, type: 'Dr', amount: totalDiscount, narration: `Discount allowed — Voucher #${voucherNo}` });
-      }
-      if (totalOther > 0.004) {
-        const otherLedger = await accountingService.getSystemLedger(companyId, 'Other Adjustments A/c', session);
-        lines.push({ ledgerId: otherLedger._id, ledgerName: otherLedger.name, type: 'Dr', amount: totalOther, narration: `Rg/Claim/RD/Interest/Other — Voucher #${voucherNo}` });
-      }
-
-      const accountingEntry = await AccountingEntry.create([{
-        companyId,
-        entryNo,
-        entryDate: date,
-        voucherType: 'Receipt',
-        refType: 'Receipt',
-        refId: voucher._id,
-        lines,
-        narration: narration || `Received from ${partyLedger.name} — ${paymentNarration}`
-      }], { session });
-
-      voucher.accountingEntryId = accountingEntry[0]._id;
-
-      const outstandingEngine = require('../services/outstandingEngineService');
-      if (againstInvoices && againstInvoices.length > 0) {
-        for (const item of againstInvoices) {
-          const paidNow = parseFloat(item.amount || 0) + itemDeductionTotal(item);
-          if (paidNow <= 0) continue;
-
-          const saleDoc = await Sales.findOne({ _id: item.invoiceId, companyId }).session(session);
-          if (saleDoc) {
-            const nextPaid = parseFloat(((saleDoc.paidAmount || 0) + paidNow).toFixed(2));
-            if (nextPaid > parseFloat(saleDoc.netAmount || 0) + 0.01) {
-              throw new Error(`Overpayment on Sales #${saleDoc.invoiceNo}: receipt would exceed bill amount`);
-            }
-            saleDoc.paidAmount = nextPaid;
-            if (saleDoc.paidAmount >= saleDoc.netAmount) saleDoc.status = 'paid';
-            else if (saleDoc.paidAmount > 0) saleDoc.status = 'partial';
-            await saleDoc.save({ session });
-            await outstandingEngine.syncBillFromSales(companyId, saleDoc, session);
-            continue;
-          }
-
-          const purchaseDoc = await Purchase.findOne({ _id: item.invoiceId, companyId }).session(session);
-          if (purchaseDoc) {
-            const nextPaid = parseFloat(((purchaseDoc.paidAmount || 0) + paidNow).toFixed(2));
-            if (nextPaid > parseFloat(purchaseDoc.netAmount || 0) + 0.01) {
-              throw new Error(`Overpayment on Purchase #${purchaseDoc.invoiceNo}: payment would exceed bill amount`);
-            }
-            purchaseDoc.paidAmount = nextPaid;
-            if (purchaseDoc.paidAmount >= purchaseDoc.netAmount) purchaseDoc.status = 'paid';
-            else if (purchaseDoc.paidAmount > 0) purchaseDoc.status = 'partial';
-            await purchaseDoc.save({ session });
-            await outstandingEngine.syncBillFromPurchase(companyId, purchaseDoc, session);
-          }
-        }
-      }
+    if (posting) {
+      await postVoucherAccounting(companyId, voucher, {
+        partyLedger, bankLedger, amount, againstInvoices, narration, paymentNarration,
+        date: voucher.date, plan,
+      }, session);
     }
 
     await voucher.save({ session });
     await session.commitTransaction();
-    res.status(201).json({ success: true, data: voucher });
+    committed = true;
+    res.status(200).json({ success: true, data: voucher, message: 'Voucher updated' });
   } catch (error) {
-    await session.abortTransaction();
+    if (!committed) await session.abortTransaction();
     res.status(400).json({ success: false, message: error.message });
   } finally {
     session.endSession();
   }
 };
 
+exports.createPaymentVoucher = (req, res) => createCashBankVoucher(req, res, 'Payment');
+
+exports.createReceiptVoucher = (req, res) => createCashBankVoucher(req, res, 'Receipt');
 // 6. List Payment / Receipt Vouchers
 exports.listVouchers = async (req, res) => {
   try {
@@ -576,41 +762,7 @@ exports.reverseVoucher = async (req, res) => {
       voucher.reversalEntryId = reversal._id;
     }
 
-    if (Array.isArray(voucher.againstInvoices) && voucher.againstInvoices.length > 0) {
-      const outstandingEngine = require('../services/outstandingEngineService');
-      for (const item of voucher.againstInvoices) {
-        if (!item.invoiceId) continue;
-        const paidNow = parseFloat(item.amount || 0) + itemDeductionTotal(item);
-        if (paidNow <= 0) continue;
-
-        const saleDoc = await Sales.findOne({ _id: item.invoiceId, companyId }).session(session);
-        if (saleDoc) {
-          saleDoc.paidAmount = parseFloat(Math.max(0, (saleDoc.paidAmount || 0) - paidNow).toFixed(2));
-          if (saleDoc.paidAmount <= 0.009) {
-            saleDoc.paidAmount = 0;
-            saleDoc.status = saleDoc.status === 'cancelled' ? saleDoc.status : 'active';
-          } else if (saleDoc.paidAmount < saleDoc.netAmount) {
-            saleDoc.status = 'partial';
-          }
-          await saleDoc.save({ session });
-          await outstandingEngine.syncBillFromSales(companyId, saleDoc, session);
-          continue;
-        }
-
-        const purchaseDoc = await Purchase.findOne({ _id: item.invoiceId, companyId }).session(session);
-        if (purchaseDoc) {
-          purchaseDoc.paidAmount = parseFloat(Math.max(0, (purchaseDoc.paidAmount || 0) - paidNow).toFixed(2));
-          if (purchaseDoc.paidAmount <= 0.009) {
-            purchaseDoc.paidAmount = 0;
-            purchaseDoc.status = purchaseDoc.status === 'cancelled' ? purchaseDoc.status : 'active';
-          } else if (purchaseDoc.paidAmount < purchaseDoc.netAmount) {
-            purchaseDoc.status = 'partial';
-          }
-          await purchaseDoc.save({ session });
-          await outstandingEngine.syncBillFromPurchase(companyId, purchaseDoc, session);
-        }
-      }
-    }
+    await rollbackAllocations(companyId, voucher.againstInvoices, session);
 
     voucher.status = 'Reversed';
     voucher.isReversed = true;

@@ -5,16 +5,20 @@ import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
 
+// Dev proxy target. Defaults to the normal local backend; the browser test suite points
+// it at an isolated in-memory-DB server so no test traffic can reach a real database.
+const API_TARGET = process.env.VITE_PROXY_TARGET || 'http://localhost:5000';
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: API_TARGET,
         changeOrigin: true
       },
       '/health': {
-        target: 'http://localhost:5000',
+        target: API_TARGET,
         changeOrigin: true
       }
     }

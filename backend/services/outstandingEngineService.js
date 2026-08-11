@@ -171,9 +171,11 @@ class OutstandingEngineService {
     const isReceivable = type === 'receivable';
     const billType = isReceivable ? 'SalesInvoice' : 'PurchaseBill';
 
-    // Always rebuild from live paidAmount so Outstanding stays accurate after receipts/payments
-    await this.rebuildSettlements(companyId);
-
+    // Deliberately NOT rebuilding here. This used to call rebuildSettlements(), which
+    // re-upserts a BillSettlement for every sale and purchase in the company — thousands
+    // of writes triggered by merely opening a report. Outstanding is a read-only report;
+    // settlements are already kept current by the posting paths (sales, purchase,
+    // receipt/payment, notes), and POST /outstanding/rebuild remains for a manual repair.
     const bills = await BillSettlement.find({
       companyId,
       billType,

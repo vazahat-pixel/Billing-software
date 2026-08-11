@@ -31,6 +31,12 @@ const SYSTEM_LEDGER_TEMPLATES = [
   { name: 'Sales Return A/c', group: 'Income', subGroup: 'Direct Income' },
   { name: 'Purchase Return A/c', group: 'Expenses', subGroup: 'Direct Expenses' },
   { name: 'Round Off', group: 'Expenses', subGroup: 'Indirect Expenses' },
+  // Cash & Bank Book deduction legs. Without templates these auto-created under the
+  // generic Expenses fallback, which parked "Discount Received" (an income) in the P&L
+  // expense column and misstated both sides.
+  { name: 'Discount Allowed', group: 'Expenses', subGroup: 'Indirect Expenses' },
+  { name: 'Discount Received', group: 'Income', subGroup: 'Indirect Income' },
+  { name: 'Other Adjustments A/c', group: 'Expenses', subGroup: 'Indirect Expenses' },
 ];
 
 class AccountingService {

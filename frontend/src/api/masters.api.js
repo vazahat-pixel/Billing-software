@@ -63,6 +63,10 @@ export const returnsApi = {
 export const notesApi = {
   list: (params) => unwrap(get('/notes', params)).then((d) => asArray(d, ['notes'])),
   create: (body) => unwrap(post('/notes', body)),
+  /** Edit re-posts atomically on the backend (reverse + repost), keeping the note number. */
+  update: (id, body) => unwrap(put(`/notes/${id}`, body)),
+  /** Delete is a reversal — financial history is retained, never hard-deleted. */
+  reverse: (id, body = {}) => unwrap(post(`/notes/${id}/reverse`, body)),
 };
 
 export const subMastersApi = {

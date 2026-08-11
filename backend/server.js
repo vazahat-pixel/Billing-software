@@ -92,15 +92,10 @@ try {
   logger.warn('monitoring middleware skipped', { error: err.message });
 }
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/billing_software';
-mongoose
-  .connect(MONGO_URI, {
-    maxPoolSize: Number(process.env.MONGO_MAX_POOL || 20),
-    minPoolSize: Number(process.env.MONGO_MIN_POOL || 2),
-    serverSelectionTimeoutMS: 10000,
-  })
+const { connectDB, dbCheckMiddleware, disconnectDB } = require('./config/db');
+
+connectDB()
   .then(() => {
-    logger.info('MongoDB connected', { pool: process.env.MONGO_MAX_POOL || 20 });
     try {
       require('./events/registerAutomation').registerAutomationListeners();
     } catch (err) {
@@ -122,7 +117,7 @@ mongoose
       logger.warn('cache/queue init skipped', { error: err.message });
     }
   })
-  .catch((err) => logger.error('MongoDB connection error', { error: err.message }));
+  .catch((err) => logger.error('MongoDB initial connection error', { error: err.message }));
 
 // Slow query logging (Stage 7.3)
 if (process.env.MONGO_DEBUG === 'true') {
@@ -157,7 +152,7 @@ app.get(['/health/ready', '/api/health/ready'], (req, res) => {
   });
 });
 
-app.use('/api', require('./routes/index.js'));
+app.use('/api', dbCheckMiddleware, require('./routes/index.js'));
 
 app.get('/', (req, res) => {
   res.json({
@@ -212,7 +207,7 @@ function gracefulShutdown(signal) {
     : Promise.resolve();
 
   closeHttp
-    .then(() => mongoose.connection.close(false))
+    .then(() => disconnectDB())
     .then(() => {
       logger.info('graceful.shutdown.complete');
       process.exit(0);

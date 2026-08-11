@@ -4,10 +4,10 @@ import { ERPCombobox } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
 import { toast } from '../../store/useToastStore';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import AccountMasterModal from '../masters/AccountMasterModal';
+import PuBillLookupModal from './PuBillLookupModal';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
-import { buildPuBillRows } from './puBillLookupUtils';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -105,6 +105,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   const [accountModal, setAccountModal] = useState({ open: false, initialData: null });
   const [findOpen, setFindOpen] = useState(false);
   const [fromPurchase, setFromPurchase] = useState(null);
+  const [puBillLookupOpen, setPuBillLookupOpen] = useState(false);
 
   const locked = mode === 'View';
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
@@ -170,22 +171,6 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       .sort((a, b) => a.localeCompare(b))
       .map((name) => ({ value: name, label: name }));
   }, [parties, inventoryLots, purchases]);
-
-  const puBillOptions = useMemo(() => {
-    if (!form.weaver) return [];
-    const rows = buildPuBillRows({
-      inventoryLots,
-      purchases,
-      items,
-      weaver: form.weaver,
-    });
-
-    return rows.map((r) => ({
-      value: r.billNo,
-      label: `${r.billNo} · ${r.itemName} · ${r.balPcs} pcs / ${Number(r.balMts).toFixed(2)} mts`,
-      raw: r,
-    }));
-  }, [inventoryLots, purchases, items, form.weaver]);
 
   const purchaseLots = useMemo(
     () => findLotsFromPurchase(inventoryLots, fromPurchase),
@@ -754,14 +739,29 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
 
                   <div className="classic-erp-field classic-erp-field--lg">
                     <span className="classic-erp-label red-label">Pu.BillNo</span>
-                    <input
-                      type="text"
-                      className="classic-erp-input font-bold uppercase"
-                      value={form.puBillNo}
-                      onChange={(e) => setField('puBillNo', e.target.value)}
-                      disabled={locked}
-                      placeholder="Enter Purchase Bill No…"
-                    />
+                    <div className="classic-erp-control">
+                      <input
+                        type="text"
+                        className="classic-erp-input font-bold uppercase"
+                        value={form.puBillNo}
+                        onChange={(e) => setField('puBillNo', e.target.value)}
+                        onClick={() => {
+                          if (!locked && !form.puBillNo) setPuBillLookupOpen(true);
+                        }}
+                        disabled={locked}
+                        placeholder="Enter or click 🔍 to select Purchase Bill…"
+                      />
+                      {!locked && (
+                        <button
+                          type="button"
+                          title="Browse Purchase Bills"
+                          onClick={() => setPuBillLookupOpen(true)}
+                          className="erp-job-issue-add-btn"
+                        >
+                          <Search size={11} /> Find
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="classic-erp-field classic-erp-field--lg">
@@ -1005,6 +1005,16 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         onClose={() => setAccountModal({ open: false, initialData: null })}
         initialData={accountModal.initialData}
         onSuccess={handleMillSuccess}
+      />
+
+      <PuBillLookupModal
+        isOpen={puBillLookupOpen}
+        onClose={() => setPuBillLookupOpen(false)}
+        weaver={form.weaver}
+        inventoryLots={inventoryLots}
+        purchases={purchases}
+        items={items}
+        onSelect={applyPuBillRow}
       />
     </>
   );

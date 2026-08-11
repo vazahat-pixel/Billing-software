@@ -1256,8 +1256,110 @@
   font-weight: bold;
   font-size: 13px;
   color: #1e3a8a;
-  border-top: 2px border #000;
+  border-top: 2px solid #000;
   padding-top: 4px;
+}
+
+/* Classic tax box column: SGST/CGST/IGST as [%] [amount] pairs, then Taxable/GstAmt/NetAmt */
+.classic-erp-window.erp-job-issue-window .erp-job-issue-taxbox {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 280px;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-taxbox-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-taxbox-row > span {
+  font-size: 11px;
+  font-weight: bold;
+  color: #334155;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-taxbox-row input {
+  height: 20px !important;
+  font-size: 11px !important;
+  padding: 0 4px !important;
+  text-align: right;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-sumrow {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+  width: 168px;
+  margin-left: auto;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-sumrow > span {
+  font-size: 11px;
+  font-weight: bold;
+  color: #334155;
+  text-align: right;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-sumrow input {
+  height: 20px !important;
+  font-size: 11px !important;
+  padding: 0 4px !important;
+  text-align: right;
+  background: #f1f5f9;
+  font-weight: bold;
+}
+
+/* Yellow "F4 To Qty Detail Entry" hint + orange current-stock strip */
+.classic-erp-window.erp-job-issue-window .erp-job-issue-f4hint {
+  background: #fef08a;
+  color: #713f12;
+  font-weight: bold;
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid #eab308;
+  white-space: nowrap;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-stockstrip {
+  background: #ffedd5;
+  color: #c2410c;
+  font-weight: bold;
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid #fdba74;
+  flex: 1;
+  white-space: nowrap;
+}
+
+/* Teal grid totals bar — TOTAL Pcs / Qty / Kgs */
+.classic-erp-window.erp-job-issue-window .erp-job-issue-totalbar {
+  background: #5eead4;
+  border: 1px solid #0d9488;
+  color: #0f172a;
+  font-weight: bold;
+  font-size: 11px;
+  padding: 3px 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 18px;
+}
+
+/* Job Party address block under the party picker */
+.classic-erp-window.erp-job-issue-window .erp-job-issue-party-address {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  font-size: 11px;
+  color: #475569;
+  padding: 3px 6px;
+  min-height: 34px;
+  white-space: pre-line;
+  overflow: hidden;
 }
 
 .classic-erp-window.erp-job-issue-window .erp-job-issue-footer {

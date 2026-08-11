@@ -18,6 +18,8 @@ router.get('/ledgers/:id/statement', read, accountingController.getLedgerStateme
 router.post('/payments', write, accountingController.createPaymentVoucher);
 router.post('/receipts', write, accountingController.createReceiptVoucher);
 router.get('/payments', read, accountingController.listVouchers);
+// Edit a posted voucher — reverses and re-posts atomically, keeping the voucher number.
+router.put('/payments/:id', requirePermission('accounting', 'update'), accountingController.updateVoucher);
 router.post('/payments/:id/reverse', write, accountingController.reverseVoucher);
 
 // Financial Reports

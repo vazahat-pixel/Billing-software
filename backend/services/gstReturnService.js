@@ -65,11 +65,23 @@ class GstReturnService {
       .lean();
   }
 
-  async _notesInPeriod(companyId, startDate, endDate) {
+  /**
+   * @param {'Sales'|'Purchase'} side which book's notes to return.
+   * GSTR-1 is an outward-supply return, so only Sales-side notes may appear in it —
+   * purchase-side notes adjust ITC and belong to the inward side. Legacy rows have no
+   * noteSide, and for those the old controller's mapping was Credit→Sales, Debit→Purchase.
+   */
+  async _notesInPeriod(companyId, startDate, endDate, side = 'Sales') {
+    const legacyType = side === 'Sales' ? 'Credit' : 'Debit';
     return DebitCreditNote.find({
       companyId,
       status: 'Posted',
       date: { $gte: startDate, $lte: endDate },
+      $or: [
+        { noteSide: side },
+        { noteSide: { $exists: false }, noteType: legacyType },
+        { noteSide: null, noteType: legacyType },
+      ],
     })
       .populate({
         path: 'partyLedgerId',
@@ -103,7 +115,8 @@ class GstReturnService {
     const sales = await this._salesInPeriod(companyId, startDate, endDate);
     const cancelledSales = await this._cancelledSalesInPeriod(companyId, startDate, endDate);
     const returns = await this._returnsInPeriod(companyId, startDate, endDate);
-    const notes = await this._notesInPeriod(companyId, startDate, endDate);
+    // Sales-side only — purchase notes adjust ITC and must never be filed as outward supply.
+    const notes = await this._notesInPeriod(companyId, startDate, endDate, 'Sales');
 
     const b2b = [];
     const b2cl = [];
@@ -252,7 +265,24 @@ class GstReturnService {
       });
     }
 
-    const cdnr = Object.values(cdnrByCtin).filter((g) => g.nt.length);
+    // CDNR carries notes issued to REGISTERED recipients (grouped by their CTIN).
+    // Notes to unregistered recipients are a separate GSTR-1 section, CDNUR, and are
+    // reported flat with a supply type rather than under a counter-party GSTIN.
+    const cdnr = Object.values(cdnrByCtin).filter((g) => g.ctin && g.nt.length);
+    const cdnur = Object.values(cdnrByCtin)
+      .filter((g) => !g.ctin && g.nt.length)
+      .flatMap((g) => g.nt.map((n) => ({
+        typ: n.igst > 0 || n.iamt > 0 ? 'B2CL' : 'B2CS',
+        ntty: n.ntty,
+        nt_num: n.nt_num,
+        nt_dt: n.nt_dt,
+        val: n.val,
+        txval: n.txval,
+        iamt: n.iamt,
+        camt: n.camt,
+        samt: n.samt,
+        rsn: n.rsn,
+      })));
     const cancelCount = cancelledSales.length;
     const totnum = sales.length + cancelCount;
     const allDocNos = [
@@ -269,6 +299,7 @@ class GstReturnService {
       b2cl,
       b2cs: Object.values(b2csMap),
       cdnr,
+      cdnur,
       hsn: { data: Object.values(hsnMap) },
       doc_issue: {
         doc_det: [{

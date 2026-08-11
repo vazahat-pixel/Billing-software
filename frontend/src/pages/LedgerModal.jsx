@@ -5,6 +5,7 @@ import { toast } from '../store/useToastStore';
 import Modal from '../components/ui/Modal';
 import ErpWindowedModal from '../components/erp/ErpWindowedModal';
 import { fmtDate, fmtMoney } from '../utils/invoiceHelpers';
+import { downloadCsv } from '../utils/reportExport';
 import { SkeletonTable, InlineLoader, ButtonLoader, ErpBusyOverlay } from '../components/ui/loaders';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -104,7 +105,7 @@ function AccountListPanel({ rows, highlightIdx, onSelect, emptyText = 'No accoun
   );
 }
 
-const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenReceipt }) => {
+const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenReceipt, onOpenOutstanding }) => {
   const {
     ledgers,
     parties,
@@ -140,9 +141,16 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
   const [listOpen, setListOpen] = useState(null);
   const [listIdx, setListIdx] = useState(0);
   const [busy, setBusy] = useState(false);
+  // F3 filters Description, F5 filters Remark_1 — both drive the one toolbar box.
+  const [filterField, setFilterField] = useState('description');
+  const [descFilter, setDescFilter] = useState('');
+  const [remarkFilter, setRemarkFilter] = useState('');
+  const [selectedRow, setSelectedRow] = useState(0);
+  const [jvRow, setJvRow] = useState(null);
   const printRef = useRef(null);
   const accHeadRef = useRef(null);
   const accountRef = useRef(null);
+  const filterRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -308,12 +316,31 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     return [];
   }, [statement]);
 
+  const rowDescription = (r) =>
+    String(r.particulars || r.narration || r.contraAccount || r.refType || '');
+  const rowRemark = (r) => String(r.remarks || r.narration || '');
+
+  /**
+   * Row filters never touch `runningBalance` — that comes from the full ledger, so hiding
+   * rows narrows what is listed without rewriting the account's actual balance history.
+   */
   const filteredRows = useMemo(() => {
     let data = [...rows];
     if (onlyDr && !onlyCr) data = data.filter((r) => Number(r.debit || 0) > 0);
     if (onlyCr && !onlyDr) data = data.filter((r) => Number(r.credit || 0) > 0);
+    const d = descFilter.trim().toLowerCase();
+    if (d) data = data.filter((r) => rowDescription(r).toLowerCase().includes(d));
+    const rm = remarkFilter.trim().toLowerCase();
+    if (rm) data = data.filter((r) => rowRemark(r).toLowerCase().includes(rm));
     return data;
-  }, [rows, onlyDr, onlyCr]);
+  }, [rows, onlyDr, onlyCr, descFilter, remarkFilter]);
+
+  const isFiltered =
+    (onlyDr && !onlyCr) || (onlyCr && !onlyDr) || !!descFilter.trim() || !!remarkFilter.trim();
+
+  // Clamped at render rather than reset via an effect, so a filter that shortens the list
+  // can never leave the highlight pointing past the end.
+  const activeRow = Math.min(selectedRow, Math.max(0, filteredRows.length - 1));
 
   const selectedMeta = ledgerOptions.find((o) => o.value === ledgerId) || null;
   const partyInfo = useMemo(() => {
@@ -336,19 +363,37 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
   useEffect(() => {
     if (!isOpen || view !== 'statement') return undefined;
     const onKeyDown = (e) => {
+      // F3/F5 must reach the filter box even while it has focus; everything else is
+      // ignored while typing so the shortcuts never fight ordinary input.
+      if (e.key === 'F3' || e.key === 'F5') {
+        e.preventDefault();
+        setFilterField(e.key === 'F3' ? 'description' : 'remark');
+        filterRef.current?.focus();
+        filterRef.current?.select();
+        return;
+      }
       const tag = (e.target?.tagName || '').toUpperCase();
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
-      if (e.key.toLowerCase() === 'l') {
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedRow((i) => Math.min(i + 1, Math.max(0, filteredRows.length - 1)));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedRow((i) => Math.max(i - 1, 0));
+      } else if (e.key.toLowerCase() === 'l') {
         e.preventDefault();
         setView('entry');
       } else if (e.key === '*') {
+        // Open JV — the actual journal entry behind the highlighted row.
         e.preventDefault();
-        if (onOpenJournal) onOpenJournal({ partyId, ledgerId: resolveLedgerId() });
-        else toast.info('Journal Voucher — open from Transaction > Journal (GST)');
+        const row = filteredRows[activeRow];
+        if (!row) return toast.warning('Select a ledger row first');
+        setJvRow(row);
       } else if (e.key === '-') {
         e.preventDefault();
         if (onOpenPayment) onOpenPayment({ partyId, ledgerId: resolveLedgerId() });
-        else toast.info('Cash Payment — open from Transaction > Cash Book');
+        else toast.info('Cash Payment — open from Transaction > Cash Payment');
       } else if (e.key === '+') {
         e.preventDefault();
         if (onOpenReceipt) onOpenReceipt({ partyId, ledgerId: resolveLedgerId() });
@@ -358,7 +403,7 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, view, partyId, onOpenJournal, onOpenPayment, onOpenReceipt]);
+  }, [isOpen, view, partyId, filteredRows, selectedRow, onOpenPayment, onOpenReceipt]);
 
   const ledgerName =
     statement?.ledgerName || statement?.ledger?.name || selectedMeta?.ledger?.name || accountText || '—';
@@ -371,6 +416,31 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
   const partyAddress = partyInfo
     ? [partyInfo.address, partyInfo.city, partyInfo.state, partyInfo.pincode].filter(Boolean).join(', ')
     : '';
+
+  /** Exports exactly the rows on screen, filters included, so it ties to the Grand Total. */
+  const handleExcel = () => {
+    if (!statement || filteredRows.length === 0) return toast.warning('Load ledger first');
+    const headers = ['Date', 'Bill/VNo', 'CP', 'ChqNo', 'Description', 'Debit', 'Credit', 'Balance', 'A.', 'Remark 1'];
+    const body = filteredRows.map((r) => [
+      fmtDate(r.date || r.entryDate),
+      r.billVoucherNo || r.voucherNo || '',
+      String((r.contraAccount || '').split(',')[0] || '').trim(),
+      r.chequeNo || '',
+      rowDescription(r),
+      Number(r.debit || 0).toFixed(2),
+      Number(r.credit || 0).toFixed(2),
+      Number(r.runningBalance ?? r.balance ?? 0).toFixed(2),
+      r.balanceType || '',
+      rowRemark(r),
+    ]);
+    body.unshift([fmtDate(from), 'OB', '', '', 'Opening Balance',
+      openingType === 'Dr' ? openingBal.toFixed(2) : '0.00',
+      openingType === 'Cr' ? openingBal.toFixed(2) : '0.00',
+      openingBal.toFixed(2), openingType, '']);
+    body.push(['', '', '', '', 'GRAND TOTAL',
+      periodDebit.toFixed(2), periodCredit.toFixed(2), closingBal.toFixed(2), closingType, '']);
+    downloadCsv(`Ledger_${(ledgerName || 'account').replace(/\W+/g, '_')}_${from}_to_${to}.csv`, headers, body);
+  };
 
   const handlePrint = () => {
     if (!statement) return toast.warning('Load ledger first');
@@ -511,11 +581,20 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
               <button type="button" className="classic-erp-btn" onClick={runLedger} disabled={isLoading}>
                 {isLoading ? <ButtonLoader label="Refreshing…" /> : 'Screen'}
               </button>
-              <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('Excel')}>Excel</button>
+              <button type="button" className="classic-erp-btn" onClick={handleExcel} disabled={!statement}>Excel</button>
               <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('Mail')}>Mail</button>
               <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('WhatsApp')}>Whatsapp</button>
               <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('ALL Reports')}>ALL Reports</button>
-              <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('O/S Reports')}>O/S Reports</button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                onClick={() => {
+                  if (onOpenOutstanding) onOpenOutstanding({ partyId, ledgerId: resolveLedgerId() });
+                  else toast.info('Outstanding — open from Reports > Outstanding');
+                }}
+              >
+                O/S Reports
+              </button>
               <button type="button" className="classic-erp-btn" onClick={() => shiftYear(1)} disabled={isLoading}>Next Year</button>
               <button type="button" className="classic-erp-btn" onClick={() => shiftYear(-1)} disabled={isLoading}>Back Year</button>
               <button type="button" className="classic-erp-btn" onClick={() => {
@@ -524,7 +603,43 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
                 setTo(range.to);
                 runLedger(range);
               }}>Current Year</button>
-              <input type="text" className="classic-erp-input ledger-toolbar-search" placeholder="" />
+              <select
+                className="classic-erp-select"
+                style={{ height: 24, fontSize: 11 }}
+                value={filterField}
+                onChange={(e) => setFilterField(e.target.value)}
+                title="F3 = Description, F5 = Remark_1"
+              >
+                <option value="description">Description</option>
+                <option value="remark">Remark_1</option>
+              </select>
+              <input
+                ref={filterRef}
+                type="text"
+                className="classic-erp-input ledger-toolbar-search"
+                placeholder={filterField === 'description' ? 'Filter Description…' : 'Filter Remark_1…'}
+                value={filterField === 'description' ? descFilter : remarkFilter}
+                onChange={(e) =>
+                  filterField === 'description' ? setDescFilter(e.target.value) : setRemarkFilter(e.target.value)
+                }
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    if (filterField === 'description') setDescFilter('');
+                    else setRemarkFilter('');
+                  }
+                }}
+              />
+              {isFiltered && (
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => { setDescFilter(''); setRemarkFilter(''); setOnlyDr(false); setOnlyCr(false); }}
+                  title="Clear all row filters"
+                >
+                  Clear
+                </button>
+              )}
               <div className="ledger-toolbar-hints">
                 <span>F3 &gt; Description Filter</span>
                 <span>F5 &gt; Remark_1 Filter</span>
@@ -561,6 +676,21 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
             </div>
 
             <div className="ledger-stmt-body" ref={printRef}>
+              {/* With Address — account/party address straight off the existing master. */}
+              {showAddress && (partyAddress || companyAddress) && (
+                <div className="ledger-address-bar">
+                  <div>
+                    <b>{ledgerName}</b>
+                    {partyAddress ? <span> — {partyAddress}</span> : null}
+                    {partyInfo?.phone ? <span> · {partyInfo.phone}</span> : null}
+                    {partyInfo?.gstin ? <span> · GSTIN {partyInfo.gstin}</span> : null}
+                  </div>
+                  <div className="ledger-address-comp">
+                    {compShortName ? (companyName || '').slice(0, 12) : companyName}
+                    {companyAddress ? ` — ${companyAddress}` : ''}
+                  </div>
+                </div>
+              )}
 
               <div className="ledger-stmt-table-wrap relative">
                 {(isLoading && !statement) ? (
@@ -588,12 +718,18 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
                         const credit = Number(row.credit || 0);
                         const bal = Number(row.runningBalance ?? row.balance ?? 0);
                         const balType = row.balanceType || '';
-                        const particular = row.particulars || row.narration || row.contraAccount || row.refType || '—';
+                        const particular = rowDescription(row) || '—';
                         const cp = String((row.contraAccount || '').split(',')[0] || '').trim();
                         return (
-                          <tr key={`${row._id || row.voucherNo || i}-${i}`}>
+                          <tr
+                            key={`${row._id || row.voucherNo || i}-${i}`}
+                            className={i === activeRow ? 'is-selected' : ''}
+                            onClick={() => setSelectedRow(i)}
+                            onDoubleClick={() => setJvRow(row)}
+                            title="Double-click (or press *) to open the journal voucher"
+                          >
                             <td className="nowrap">{fmtDate(row.date || row.entryDate)}</td>
-                            <td>{row.voucherNo || row.entryNo || '—'}</td>
+                            <td>{row.billVoucherNo || row.voucherNo || row.entryNo || '—'}</td>
                             <td>{cp || '—'}</td>
                             <td>{row.chequeNo || row.chqNo || '—'}</td>
                             <td>{particular}</td>
@@ -601,7 +737,7 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
                             <td className="num">{credit > 0 ? money(credit) : '—'}</td>
                             <td className="num bal">{money(bal)}</td>
                             <td>{balType || '—'}</td>
-                            <td>{showRemark ? (row.remarks || row.narration || '—') : '—'}</td>
+                            <td>{showRemark ? (rowRemark(row) || '—') : '—'}</td>
                           </tr>
                         );
                       })}
@@ -612,17 +748,24 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
             </div>
 
             <div className="ledger-grand-bar print:hidden">
-              <div className="ledger-grand-remark" />
+              <div className="ledger-grand-remark">
+                {isFiltered && (
+                  <span className="ledger-filter-note">
+                    Filtered view — Grand Total covers the {filteredRows.length} listed row(s) of {rows.length}.
+                    Balance column and Closing stay on the full account.
+                  </span>
+                )}
+              </div>
               <div className="ledger-grand-totals">
                 <div>Record<br /><b>{filteredRows.length}</b></div>
                 <div className="ledger-grand-labels">
-                  <span>Date Total</span>
                   <span>Grand Total</span>
+                  <span>Closing</span>
                 </div>
                 <div className="ledger-grand-boxes">
-                  <input type="text" className="classic-erp-input" readOnly value={money(periodDebit)} />
-                  <input type="text" className="classic-erp-input" readOnly value={money(periodCredit)} />
-                  <input type="text" className="classic-erp-input" readOnly value={`${money(closingBal)} ${closingType}`} />
+                  <input type="text" className="classic-erp-input" readOnly title="Total Debit of listed rows" value={money(periodDebit)} />
+                  <input type="text" className="classic-erp-input" readOnly title="Total Credit of listed rows" value={money(periodCredit)} />
+                  <input type="text" className="classic-erp-input" readOnly title="Closing balance of the account" value={`${money(closingBal)} ${closingType}`} />
                 </div>
               </div>
             </div>
@@ -633,12 +776,89 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
               <button type="button" className="classic-erp-btn" onClick={onClose}>Exit</button>
             </div>
           </div>
+          {jvRow && (
+            <JournalVoucherPanel
+              row={jvRow}
+              onClose={() => setJvRow(null)}
+              onOpenSource={() => {
+                // Hand off to the module that owns the source document.
+                const t = jvRow.refType;
+                if ((t === 'Payment' || t === 'Receipt')) {
+                  const open = t === 'Receipt' ? onOpenReceipt : onOpenPayment;
+                  if (open) { open({ partyId, ledgerId: resolveLedgerId(), voucherNo: jvRow.billVoucherNo }); setJvRow(null); return; }
+                }
+                if (onOpenJournal) { onOpenJournal({ partyId, ledgerId: resolveLedgerId(), entryNo: jvRow.voucherNo }); setJvRow(null); return; }
+                toast.info(`Source document: ${jvRow.refType || 'Journal'} ${jvRow.billVoucherNo || ''}`);
+              }}
+            />
+          )}
           <style>{ledgerStyles}</style>
         </>
       )}
     </ErpWindowedModal>
   );
 };
+
+/**
+ * Open JV — renders the actual AccountingEntry behind a ledger row, every Dr/Cr leg of it.
+ * The lines come from the journal itself, so this is the real voucher, not a reconstruction.
+ */
+function JournalVoucherPanel({ row, onClose, onOpenSource }) {
+  const lines = Array.isArray(row.journalLines) ? row.journalLines : [];
+  const totalDr = lines.filter((l) => l.type === 'Dr').reduce((s, l) => s + Number(l.amount || 0), 0);
+  const totalCr = lines.filter((l) => l.type === 'Cr').reduce((s, l) => s + Number(l.amount || 0), 0);
+
+  return (
+    <Modal isOpen onClose={onClose} className="max-w-[680px] w-full">
+      <div className="ledger-jv" onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+        <div className="ledger-jv-head">
+          <span>Journal Voucher — {row.voucherNo || '—'}</span>
+          <span className="ledger-jv-type">{voucherLabel(row.voucherType)}</span>
+        </div>
+        <div className="ledger-jv-meta">
+          <div><b>Date</b><span>{fmtDate(row.date)}</span></div>
+          <div><b>Bill/VNo</b><span>{row.billVoucherNo || '—'}</span></div>
+          <div><b>Ref Type</b><span>{row.refType || '—'}</span></div>
+          {row.chequeNo ? <div><b>Chq No</b><span>{row.chequeNo}</span></div> : null}
+        </div>
+        {(row.entryNarration || row.narration) && (
+          <div className="ledger-jv-narration">{row.entryNarration || row.narration}</div>
+        )}
+        <table className="ledger-jv-table">
+          <thead>
+            <tr><th>Account</th><th>Particulars</th><th className="num">Debit</th><th className="num">Credit</th></tr>
+          </thead>
+          <tbody>
+            {lines.length === 0 ? (
+              <tr><td colSpan={4} className="ledger-ac-empty">Journal lines unavailable for this row</td></tr>
+            ) : lines.map((l, i) => (
+              <tr key={i}>
+                <td className="font-semibold">{l.ledgerName}</td>
+                <td>{l.narration || '—'}</td>
+                <td className="num">{l.type === 'Dr' ? money(l.amount) : '—'}</td>
+                <td className="num">{l.type === 'Cr' ? money(l.amount) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={2}><b>Total</b></td>
+              <td className="num"><b>{money(totalDr)}</b></td>
+              <td className="num"><b>{money(totalCr)}</b></td>
+            </tr>
+          </tfoot>
+        </table>
+        <div className="ledger-jv-footer">
+          <span className={Math.abs(totalDr - totalCr) < 0.01 ? 'ledger-jv-ok' : 'ledger-jv-bad'}>
+            {Math.abs(totalDr - totalCr) < 0.01 ? 'Balanced' : `Out of balance by ${money(Math.abs(totalDr - totalCr))}`}
+          </span>
+          <button type="button" className="classic-erp-btn" onClick={onOpenSource}>Open Source</button>
+          <button type="button" className="classic-erp-btn" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 const ledgerStyles = `
   .ledger-entry-modal-wrap {
@@ -761,6 +981,39 @@ const ledgerStyles = `
   .ledger-stmt-table tbody tr:nth-child(even) { background: #f5f5f5; }
   .ledger-stmt-table tbody tr:hover { background: #1e40af; color: #fff; }
   .ledger-ob-row td { background: #efe8dc !important; font-weight: 600; }
+  .ledger-stmt-table tbody tr.is-selected td { background: #1d4ed8 !important; color: #fff !important; }
+  .ledger-stmt-table tbody tr { cursor: pointer; }
+  .ledger-address-bar {
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 4px 10px; font-size: 11px; color: #1e293b;
+    background: #f8fafc; border-bottom: 1px solid #cbd5e1;
+  }
+  .ledger-address-comp { color: #475569; text-align: right; }
+  .ledger-filter-note { font-size: 10px; font-weight: 700; color: #7a1212; padding: 0 6px; line-height: 1.3; }
+  .ledger-jv { background: #fff; font-size: 12px; }
+  .ledger-jv-head {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #374151; color: #fff; padding: 6px 10px; font-weight: 700;
+  }
+  .ledger-jv-type { font-size: 10px; opacity: .85; }
+  .ledger-jv-meta {
+    display: flex; flex-wrap: wrap; gap: 14px; padding: 6px 10px;
+    background: #f1f5f9; border-bottom: 1px solid #cbd5e1; font-size: 11px;
+  }
+  .ledger-jv-meta div { display: flex; flex-direction: column; }
+  .ledger-jv-meta b { font-size: 9px; text-transform: uppercase; color: #64748b; }
+  .ledger-jv-narration { padding: 5px 10px; font-size: 11px; color: #334155; border-bottom: 1px solid #e2e8f0; }
+  .ledger-jv-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .ledger-jv-table th { background: #e2e8f0; padding: 4px 8px; text-align: left; border-bottom: 1px solid #cbd5e1; }
+  .ledger-jv-table td { padding: 4px 8px; border-bottom: 1px solid #eef2f7; }
+  .ledger-jv-table .num { text-align: right; font-family: ui-monospace, Consolas, monospace; }
+  .ledger-jv-table tfoot td { background: #f8fafc; border-top: 2px solid #94a3b8; }
+  .ledger-jv-footer {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    background: #f3f0e6; border-top: 1px solid #c4b8a8;
+  }
+  .ledger-jv-ok { font-weight: 700; color: #15803d; margin-right: auto; }
+  .ledger-jv-bad { font-weight: 700; color: #b91c1c; margin-right: auto; }
   .ledger-grand-bar {
     display: flex; align-items: center; gap: 16px; padding: 6px 10px;
     background: #9bc89b; border-top: 1px solid #7eab7e;

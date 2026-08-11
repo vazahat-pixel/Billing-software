@@ -145,13 +145,17 @@ class JobService {
       if (job.status === 'Received') throw AppError.badRequest('This job has already been received');
 
       if (billGpNo) {
+        // Multiple challans for the SAME job worker can share one Bill/Gp No
+        // (combined mill receipt). Only block reuse across a different worker,
+        // which usually indicates an accidental duplicate/typo.
         const existingReceipt = await Job.findOne({
           billGpNo: String(billGpNo).trim(),
           companyId,
           status: 'Received',
+          workerId: { $ne: job.workerId },
         }).session(session);
         if (existingReceipt) {
-          throw AppError.badRequest(`Bill/GP No. "${billGpNo}" is already occupied. Please use a different one.`);
+          throw AppError.badRequest(`Bill/GP No. "${billGpNo}" is already used for a different Job Party. Please use a different one.`);
         }
       }
 

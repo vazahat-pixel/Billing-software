@@ -10,6 +10,14 @@ import BillNoLookupModal from './BillNoLookupModal';
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 
+const round2 = (n) => Number(Number(n || 0).toFixed(2));
+
+/** Mirrors toPaise() in accountingController — keeps the two rules from disagreeing. */
+const toPaise = (n) => Math.round(Number(n || 0) * 100);
+
+const newIdempotencyKey = () =>
+  `cbb-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
 const dayLabel = (iso) => {
   if (!iso) return '';
   const d = new Date(iso);
@@ -70,6 +78,7 @@ const CashBankBookModal = ({
     fetchVouchers,
     addPayment,
     addReceipt,
+    updateVoucher,
     reverseVoucher,
     updateParty,
   } = useStore();
@@ -84,6 +93,12 @@ const CashBankBookModal = ({
   const [billLookupOpen, setBillLookupOpen] = useState(false);
   const [billLookupTargetIdx, setBillLookupTargetIdx] = useState(null);
   const openedRef = useRef(false);
+  /** BillNo cells, indexed by row — drives the Enter → select → next-line loop. */
+  const billNoRefs = useRef([]);
+  /** Row to focus once the grid has re-rendered; a ref so it costs no extra render. */
+  const pendingFocusRowRef = useRef(null);
+  const partyFieldRef = useRef(null);
+  const idempotencyKeyRef = useRef(newIdempotencyKey());
 
   const [header, setHeader] = useState({
     voucherNo: 'AUTO',
@@ -152,27 +167,31 @@ const CashBankBookModal = ({
     return Array.from(names.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [selectedParty, vouchers, header.partyId, header.partyBank]);
 
+  /**
+   * Only genuine Cash/Bank ledgers may be picked. cashBook()/bankBook() select purely on
+   * accountType, so money posted anywhere else would never show up in its book — the old
+   * name-substring match with an all-ledgers fallback made exactly that possible.
+   */
   const bankCashLedgers = useMemo(() => {
-    let list = ledgers.filter((l) => {
-      const n = (l.name || '').toLowerCase();
-      const g = (l.group || l.accountType || '').toLowerCase();
-      if (!isBank) return n.includes('cash') || g.includes('cash');
-      return n.includes('bank') || g.includes('bank');
-    });
-    if (list.length === 0) {
-      list = ledgers.filter((l) => {
-        const n = (l.name || '').toLowerCase();
-        return n.includes('cash') || n.includes('bank');
-      });
-    }
-    if (list.length === 0) list = ledgers;
-    return list;
+    const want = isBank ? 'Bank' : 'Cash';
+    return ledgers.filter((l) => l.accountType === want && l.isActive !== false);
   }, [ledgers, isBank]);
+
+  const noBookLedger = !bootLoading && bankCashLedgers.length === 0;
 
   const partyOptions = useMemo(
     () => parties.map((p) => ({ value: p._id || p.id, label: p.name })),
     [parties]
   );
+
+  /** Every bill of the selected party, open or not — the party-ownership check needs all of them. */
+  const partyBillIds = useMemo(() => {
+    const docs =
+      voucherType === 'Receipt'
+        ? sales.filter((s) => String(s.customerId?._id || s.customerId) === String(header.partyId))
+        : purchases.filter((p) => String(p.supplierId?._id || p.supplierId) === String(header.partyId));
+    return new Set(docs.map((d) => String(d._id)));
+  }, [header.partyId, voucherType, sales, purchases]);
 
   const partyInvoices = useMemo(() => {
     if (!header.partyId) return [];
@@ -182,17 +201,14 @@ const CashBankBookModal = ({
         : purchases.filter((p) => (p.supplierId?._id || p.supplierId) === header.partyId);
 
     return docs
+      .filter((doc) => doc.status !== 'cancelled')
       .map((doc) => {
-        const docTotal = doc.netAmount || doc.totalAmount || 0;
-        const paid = (vouchers || [])
-          .filter((v) => v.status === 'Posted')
-          .reduce((sum, v) => {
-            const match = v.againstInvoices?.find(
-              (item) => String(item.invoiceId) === String(doc._id)
-            );
-            return sum + (match ? Number(match.amount || 0) : 0);
-          }, 0);
-        const outstanding = Math.max(0, docTotal - paid);
+        const docTotal = round2(doc.netAmount || doc.totalAmount || 0);
+        // paidAmount is the figure the posting/reversal path maintains and the one
+        // BillSettlement + the Outstanding report derive from. Re-deriving it here from
+        // the voucher list drifted the moment a voucher was reversed or filtered out.
+        const paid = round2(doc.paidAmount || 0);
+        const outstanding = round2(Math.max(0, docTotal - paid));
         const billDt = doc.date ? new Date(doc.date).toISOString().split('T')[0] : '';
         const osDy = billDt
           ? Math.max(0, Math.floor((Date.now() - new Date(billDt).getTime()) / 86400000))
@@ -202,17 +218,21 @@ const CashBankBookModal = ({
           invoiceNo: doc.invoiceNo || doc.billNo || '',
           billDt,
           billAmt: docTotal,
+          paidAmt: paid,
           osAmt: outstanding,
           osDy,
+          billType: doc.invoiceType || (voucherType === 'Receipt' ? 'SL' : 'PU'),
         };
       })
       .filter((inv) => inv.osAmt > 0.01);
-  }, [header.partyId, voucherType, sales, purchases, vouchers]);
+  }, [header.partyId, voucherType, sales, purchases]);
 
-  const unpaidTotal = useMemo(
+  /** Outstanding across the listed bills — feeds Cl.Bal, not the UnPaid box. */
+  const billsOutstandingTotal = useMemo(
     () => billRows.reduce((s, r) => s + (Number(r.osAmt) || 0), 0),
     [billRows]
   );
+  /** Paid = SUM(Adjust). Discount/TDS/RG/etc. are separate adjustments, not allocation. */
   const paidTotal = useMemo(
     () => billRows.reduce((s, r) => s + (Number(r.adjust) || 0), 0),
     [billRows]
@@ -222,10 +242,28 @@ const CashBankBookModal = ({
     if (!withDays.length) return 0;
     return withDays.reduce((s, r) => s + Number(r.osDy || 0), 0) / withDays.length;
   }, [billRows]);
-  const totalPcs = useMemo(
-    () => billRows.reduce((s, r) => s + (Number(r.pq) || 0), 0),
+  /** Rows actually carrying an allocation — pq is a text flag ('P'), never a count. */
+  const allocatedBillCount = useMemo(
+    () => billRows.filter((r) => r.invoiceId && Number(r.adjust) > 0).length,
     [billRows]
   );
+
+  const receivedAmount = useMemo(() => round2(header.amount), [header.amount]);
+  /** Amount blank ⇒ the voucher total is whatever the bill rows add up to. */
+  const effectiveReceived = receivedAmount > 0 ? receivedAmount : paidTotal;
+  /** UnPaid = Amount − Paid. Zero on a correctly allocated bill-against voucher. */
+  const unpaidTotal = useMemo(
+    () => round2(effectiveReceived - paidTotal),
+    [effectiveReceived, paidTotal]
+  );
+  /**
+   * The backend's rule, surfaced before the operator hits Save: a bill-against voucher
+   * must tie out exactly — ₹3 short is rejected just as firmly as ₹5 over. Vouchers with
+   * no bill rows are on-account and have nothing to tie out.
+   */
+  const hasBillAllocation = billRows.some((r) => r.invoiceId && Number(r.adjust) > 0);
+  const amountMismatch =
+    hasBillAllocation && toPaise(paidTotal) !== toPaise(effectiveReceived);
 
   /** Live per-column totals shown in the "(B.AMT-x)(TDS-x)..." breakdown bar. */
   const breakdownTotals = useMemo(() => {
@@ -247,11 +285,11 @@ const CashBankBookModal = ({
     if (selectedParty) {
       const recv = Number(selectedParty.outstandingReceivable || 0);
       const pay = Number(selectedParty.outstandingPayable || 0);
-      if (voucherType === 'Receipt') return recv || unpaidTotal;
-      return pay || unpaidTotal;
+      if (voucherType === 'Receipt') return recv || billsOutstandingTotal;
+      return pay || billsOutstandingTotal;
     }
-    return unpaidTotal;
-  }, [selectedParty, unpaidTotal, voucherType]);
+    return billsOutstandingTotal;
+  }, [selectedParty, billsOutstandingTotal, voucherType]);
 
   const viewList = useMemo(() => {
     const kind = isBank ? 'bank' : 'cash';
@@ -274,6 +312,7 @@ const CashBankBookModal = ({
       date: todayISO(),
       chequeNo: '',
       chequeDate: todayISO(),
+      clearDate: '',
       partyBank: '',
       partyId: '',
       amount: 0,
@@ -285,6 +324,9 @@ const CashBankBookModal = ({
     setFooter({ remark1: '', remark2: '', financeFlag: false, finance: 0 });
     setSelectedVoucherId('');
     setError('');
+    // A fresh form is a fresh submission — a retry of the *previous* save must not
+    // be mistaken for this one.
+    idempotencyKeyRef.current = newIdempotencyKey();
     setMode(readOnly ? 'View' : 'Add');
   };
 
@@ -326,6 +368,13 @@ const CashBankBookModal = ({
     }
   }, [bankCashLedgers, isOpen, locked, header.bankLedgerId]);
 
+  // Land on Party once the masters are in, so the Enter chain starts at step 1.
+  useEffect(() => {
+    if (!isOpen || locked || bootLoading) return;
+    const el = partyFieldRef.current?.querySelector('input');
+    if (el) el.focus();
+  }, [isOpen, locked, bootLoading]);
+
   const loadPartyBills = () => {
     if (!header.partyId || header.accBill !== 'B') {
       setBillRows([emptyBillRow()]);
@@ -338,12 +387,14 @@ const CashBankBookModal = ({
       billNo: inv.invoiceNo,
       billDt: inv.billDt,
       billAmt: inv.billAmt,
+      partRc: inv.paidAmt || 0,
       osAmt: inv.osAmt,
       osDy: inv.osDy,
       netOs: inv.osAmt,
       adjust: 0,
     }));
-    setBillRows(rows.length ? rows : [emptyBillRow()]);
+    // Always leave one blank line so Enter on it opens the lookup for the next bill.
+    setBillRows(rows.length ? [...rows, emptyBillRow()] : [emptyBillRow()]);
   };
 
   useEffect(() => {
@@ -372,22 +423,61 @@ const CashBankBookModal = ({
     return partyInvoices.filter((inv) => !usedElsewhere.has(inv._id));
   }, [partyInvoices, billRows, billLookupTargetIdx]);
 
+  /**
+   * Fill the target row from the picked bill, auto-allocate whatever of the receipt is
+   * still unspent (capped at the bill's own outstanding), open a fresh line if this was
+   * the last one, and hand focus to that next line so the operator can keep going on
+   * Enter alone — the loop described in the spec's §4.
+   */
   const handleBillSelect = (inv) => {
+    const idx = billLookupTargetIdx;
+    if (idx == null) return;
     setBillRows((rows) => {
       const next = [...rows];
-      const idx = billLookupTargetIdx;
+      const spentElsewhere = next.reduce(
+        (s, r, i) => (i === idx ? s : s + (Number(r.adjust) || 0)),
+        0
+      );
+      // With an Amount typed, spend only what is left of it; with Amount blank the
+      // operator is building the total up from the bills, so take the bill in full.
+      const received = Number(header.amount) || 0;
+      const stillUnallocated = received > 0
+        ? Math.max(0, round2(received - spentElsewhere))
+        : inv.osAmt;
+      const autoAdjust = round2(Math.min(stillUnallocated, inv.osAmt));
       next[idx] = {
         ...next[idx],
         invoiceId: inv._id,
         billNo: inv.invoiceNo,
         billDt: inv.billDt,
         billAmt: inv.billAmt,
+        partRc: inv.paidAmt || 0,
         osAmt: inv.osAmt,
         osDy: inv.osDy,
-        netOs: inv.osAmt,
+        billType: inv.billType || '',
+        adjust: autoAdjust,
+        netOs: round2(inv.osAmt - autoAdjust),
       };
+      if (idx === next.length - 1) next.push(emptyBillRow());
       return next;
     });
+    pendingFocusRowRef.current = idx + 1;
+  };
+
+  // Focus is applied once the new row exists in the DOM.
+  useEffect(() => {
+    const target = pendingFocusRowRef.current;
+    if (target == null) return;
+    pendingFocusRowRef.current = null;
+    const el = billNoRefs.current[target];
+    if (el) {
+      el.focus();
+      el.select?.();
+    }
+  }, [billRows]);
+
+  const removeBillRow = (idx) => {
+    setBillRows((rows) => (rows.length <= 1 ? [emptyBillRow()] : rows.filter((_, i) => i !== idx)));
   };
 
   const setH = (key) => (e) => {
@@ -452,6 +542,13 @@ const CashBankBookModal = ({
   const loadVoucher = (v) => {
     setSelectedVoucherId(v._id || v.id);
     setVoucherType(v.voucherType || voucherType);
+    // The voucher stores a LedgerMaster id, but the Party combobox is keyed on Party ids —
+    // resolve through the ledger's linkedPartyId or the party renders blank on recall.
+    const storedLedgerId = String(v.partyLedgerId?._id || v.partyLedgerId || '');
+    const partyLedger = ledgers.find((l) => String(l._id || l.id) === storedLedgerId);
+    const resolvedPartyId = partyLedger?.linkedPartyId
+      ? String(partyLedger.linkedPartyId)
+      : storedLedgerId;
     setHeader({
       voucherNo: v.voucherNo || '',
       intBillFlag: v.intBillFlag || 'N',
@@ -460,8 +557,9 @@ const CashBankBookModal = ({
       date: v.date ? new Date(v.date).toISOString().split('T')[0] : todayISO(),
       chequeNo: v.chequeNo || '',
       chequeDate: v.chequeDate ? new Date(v.chequeDate).toISOString().split('T')[0] : todayISO(),
+      clearDate: v.clearDate ? new Date(v.clearDate).toISOString().split('T')[0] : '',
       partyBank: v.partyBank || '',
-      partyId: v.partyLedgerId?._id || v.partyLedgerId || '',
+      partyId: resolvedPartyId,
       amount: v.amount || 0,
       accBill: v.accBill || 'B',
       bankLedgerId: v.bankLedgerId?._id || v.bankLedgerId || '',
@@ -506,11 +604,20 @@ const CashBankBookModal = ({
 
   const handleNew = () => resetNew();
 
+  /**
+   * Unlock the loaded voucher for correction. Saving from here reverses the original
+   * accounting and re-posts the corrected figures in one transaction, keeping the
+   * voucher number — it does not stack a second voucher on top of the first.
+   */
   const handleEdit = () => {
     if (!selectedVoucherId) return notifyWarning('Find / select a voucher first');
-    notifyWarning(
-      'Posted vouchers cannot be edited. Use Delete / Reverse, then create a new voucher.'
-    );
+    const v = viewList.find((x) => (x._id || x.id) === selectedVoucherId);
+    if (v && (v.status === 'Reversed' || v.isReversed)) {
+      return notifyWarning('A reversed voucher cannot be edited');
+    }
+    setMode('Edit');
+    setError('');
+    notifyWarning('Edit mode — saving re-posts this voucher and rebuilds its bill allocation');
   };
 
   const handleFind = () => {
@@ -571,12 +678,61 @@ const CashBankBookModal = ({
 
   const handleSave = async () => {
     setError('');
+    const moneyWord = voucherType === 'Payment' ? 'Payment' : 'Receipt';
+
     if (!header.partyId) {
-      setError('Select Party');
+      setError('Please select a Party.');
       return;
     }
     if (!header.bankLedgerId) {
-      setError(`Select ${isBank ? 'Bank' : 'Cash'} ledger`);
+      setError(`Please select a valid ${isBank ? 'Bank' : 'Cash'} account.`);
+      return;
+    }
+    if (effectiveReceived <= 0) {
+      setError(`Please enter a valid ${moneyWord} Amount.`);
+      return;
+    }
+
+    const isOnAccount = String(header.accBill || 'B').toUpperCase() === 'A';
+    if (isOnAccount && billRows.some((r) => Number(r.adjust) > 0)) {
+      setError('Acc/Bill is "A" (on-account) — clear the Adjust amounts or switch Acc/Bill to "B"');
+      return;
+    }
+    // Acc/Bill = B means bill-against: the money has to land on real bills.
+    if (!isOnAccount && !hasBillAllocation) {
+      setError('Please select at least one Bill.');
+      return;
+    }
+    // Same rule the backend enforces; catching it here saves a round trip.
+    if (!isOnAccount && amountMismatch) {
+      setError(
+        `Check Amount: Total Bill Adjust must exactly equal ${moneyWord} Amount ` +
+        `(adjust ₹${paidTotal.toFixed(2)} vs amount ₹${effectiveReceived.toFixed(2)})`
+      );
+      return;
+    }
+    const duplicateBill = (() => {
+      const seen = new Set();
+      for (const r of billRows) {
+        if (!r.invoiceId || Number(r.adjust) <= 0) continue;
+        const key = String(r.invoiceId);
+        if (seen.has(key)) return r.billNo || key;
+        seen.add(key);
+      }
+      return null;
+    })();
+    if (duplicateBill) {
+      setError(`This Bill is already selected: ${duplicateBill}`);
+      return;
+    }
+    // The picker only offers this party's bills, but a stale row could survive a party
+    // change. Checked against every bill of the party, not just the ones still open —
+    // an edit legitimately touches bills this voucher had already settled to zero.
+    const foreignBill = billRows.find(
+      (r) => r.invoiceId && Number(r.adjust) > 0 && !partyBillIds.has(String(r.invoiceId))
+    );
+    if (foreignBill) {
+      setError(`Selected Bill does not belong to the selected Party: ${foreignBill.billNo || ''}`);
       return;
     }
 
@@ -650,6 +806,7 @@ const CashBankBookModal = ({
         paymentMode: !isBank ? 'Cash' : header.chequeNo ? 'Cheque' : 'NEFT',
         chequeNo: isBank ? header.chequeNo || undefined : undefined,
         chequeDate: isBank && header.chequeNo ? header.chequeDate : undefined,
+        clearDate: isBank ? header.clearDate || undefined : undefined,
         slipNo: isBank ? (header.slipNo || '') : '',
         intBillNo: header.intBillNo || '',
         intBillFlag: header.intBillFlag || 'N',
@@ -662,14 +819,27 @@ const CashBankBookModal = ({
         bookName: bookTitle,
         bookKind: isBank ? 'bank' : 'cash',
         narration: footer.remark1 || `${voucherType} — ${selectedParty?.name || ''}`,
-        againstInvoices,
+        againstInvoices: isOnAccount ? [] : againstInvoices,
+        idempotencyKey: idempotencyKeyRef.current,
         status: 'Posted',
       };
 
-      if (voucherType === 'Receipt') await addReceipt(payload);
-      else await addPayment(payload);
+      if (mode === 'Edit' && selectedVoucherId) {
+        // Backend reverses the original posting and re-posts these figures atomically,
+        // keeping the voucher number. The idempotency key is dropped — this is a
+        // deliberate rewrite of an existing voucher, not a replay of a new one.
+        const editPayload = { ...payload };
+        delete editPayload.idempotencyKey;
+        await updateVoucher(selectedVoucherId, editPayload);
+        notifySuccess(`${voucherType} updated — ledger & bill outstanding re-posted`);
+      } else if (voucherType === 'Receipt') {
+        await addReceipt(payload);
+        notifySuccess(`${voucherType} saved successfully`);
+      } else {
+        await addPayment(payload);
+        notifySuccess(`${voucherType} saved successfully`);
+      }
 
-      notifySuccess(`${voucherType} saved successfully`);
       await fetchVouchers();
       resetNew();
       setMode('View');
@@ -740,10 +910,11 @@ const CashBankBookModal = ({
             <div
               className="cash-bank-row"
               style={{
+                // Date [+ Cheq No, Cheq Date, Clear Dt when bank] [+ P.Bank on a bank receipt]
                 gridTemplateColumns: isBankReceipt
-                  ? 'minmax(210px,1.1fr) minmax(140px,0.85fr) minmax(180px,1fr) minmax(220px,1.2fr)'
+                  ? 'minmax(180px,1fr) minmax(120px,0.8fr) minmax(150px,0.9fr) minmax(150px,0.9fr) minmax(200px,1.1fr)'
                   : isBank
-                    ? 'minmax(210px,1.1fr) minmax(140px,0.85fr) minmax(180px,1fr)'
+                    ? 'minmax(180px,1fr) minmax(130px,0.85fr) minmax(160px,1fr) minmax(160px,1fr)'
                     : 'minmax(240px,1fr)',
               }}
             >
@@ -763,6 +934,11 @@ const CashBankBookModal = ({
                   <div className="classic-erp-field classic-erp-field--xs">
                     <span className="classic-erp-label">Date:</span>
                     <input type="date" className="classic-erp-input" value={header.chequeDate} onChange={setH('chequeDate')} disabled={locked} />
+                  </div>
+                  {/* Blank until the instrument actually clears the bank. */}
+                  <div className="classic-erp-field classic-erp-field--xs" data-enter-skip>
+                    <span className="classic-erp-label">Clear Dt:</span>
+                    <input type="date" className="classic-erp-input" value={header.clearDate} onChange={setH('clearDate')} disabled={locked} title="Date the cheque/transfer cleared the bank" />
                   </div>
                 </>
               )}
@@ -798,7 +974,7 @@ const CashBankBookModal = ({
             </div>
 
             <div className="cash-bank-row cash-bank-row--3">
-              <div className="classic-erp-field">
+              <div className="classic-erp-field" ref={partyFieldRef}>
                 <span className="classic-erp-label">Party:</span>
                 <ERPCombobox
                   value={header.partyId}
@@ -815,7 +991,20 @@ const CashBankBookModal = ({
               </div>
             </div>
 
+            {/* Field order here IS the Enter-key order: Party → Bank/Cash → Amount → Acc/Bill → BillNo. */}
             <div className="cash-bank-row cash-bank-row--4">
+              <div className="classic-erp-field classic-erp-field--xs">
+                <span className="classic-erp-label">{isBank ? 'Bank:' : 'Cash:'}</span>
+                <ERPCombobox
+                  value={header.bankLedgerId}
+                  onChange={(val) => setHeader((h) => ({ ...h, bankLedgerId: val }))}
+                  options={bankCashLedgers.map((l) => ({ value: l._id || l.id, label: l.name }))}
+                  placeholder={noBookLedger ? `No ${isBank ? 'Bank' : 'Cash'} ledger` : `Select ${isBank ? 'Bank' : 'Cash'}…`}
+                  disabled={locked}
+                  recentKey={`cash-bank-ledger-${settlementKind}`}
+                  emptyMessage={`No ledger with account type "${isBank ? 'Bank' : 'Cash'}"`}
+                />
+              </div>
               <div className="classic-erp-field classic-erp-field--sm">
                 <span className="classic-erp-label">Amount:</span>
                 <input type="number" className="classic-erp-input text-right font-bold" value={header.amount} onChange={setH('amount')} disabled={locked} />
@@ -827,18 +1016,8 @@ const CashBankBookModal = ({
                   <option value="A">A</option>
                 </select>
               </div>
-              <div className="classic-erp-field classic-erp-field--xs">
-                <span className="classic-erp-label">{isBank ? 'Bank:' : 'Cash:'}</span>
-                <ERPCombobox
-                  value={header.bankLedgerId}
-                  onChange={(val) => setHeader((h) => ({ ...h, bankLedgerId: val }))}
-                  options={bankCashLedgers.map((l) => ({ value: l._id || l.id, label: l.name }))}
-                  placeholder={`Select ${isBank ? 'Bank' : 'Cash'}…`}
-                  disabled={locked}
-                  recentKey={`cash-bank-ledger-${settlementKind}`}
-                />
-              </div>
-              <div className="classic-erp-field classic-erp-field--xs">
+              {/* Preset by whichever menu opened this window — kept out of the Enter chain. */}
+              <div className="classic-erp-field classic-erp-field--xs" data-enter-skip>
                 <span className="classic-erp-label">Type:</span>
                 <select className="classic-erp-select" value={voucherType} onChange={(e) => setVoucherType(e.target.value)} disabled={locked || mode === 'Edit'}>
                   <option value="Receipt">Receipt</option>
@@ -846,6 +1025,13 @@ const CashBankBookModal = ({
                 </select>
               </div>
             </div>
+
+            {noBookLedger && (
+              <p className="text-red-700 font-bold text-[11px] px-1">
+                No ledger with account type “{isBank ? 'Bank' : 'Cash'}” exists. Create one in the
+                Chart of Accounts — otherwise this voucher cannot reach the {isBank ? 'Bank' : 'Cash'} Book.
+              </p>
+            )}
           </div>
 
           <div className="classic-erp-table-container flex-1 min-h-[200px]" style={{ background: '#f5ecd8' }}>
@@ -880,20 +1066,44 @@ const CashBankBookModal = ({
               <tbody>
                 {billRows.map((row, idx) => (
                   <tr key={row.id || idx}>
-                    <td className="text-center text-blue-800 font-bold">{idx === 0 ? '►' : ''}</td>
+                    <td className="text-center text-blue-800 font-bold">
+                      {locked ? (
+                        idx === 0 ? '►' : ''
+                      ) : (
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          title="Remove this line (Ctrl+Del in BillNo)"
+                          onClick={() => removeBillRow(idx)}
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b91c1c', fontWeight: 700, lineHeight: 1 }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </td>
                     <td>
                       <input
+                        ref={(el) => { billNoRefs.current[idx] = el; }}
                         type="text"
                         className="classic-erp-input w-full border-0 bg-transparent"
                         value={row.billNo}
                         onChange={(e) => updateRow(idx, 'billNo', e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
+                          // Reference ERP: SpaceBar → Open O/S Bill, F4 → Open Bill, Del → Delete Row.
+                          // Enter keeps working too, and Space/Del only fire on an empty cell so
+                          // neither one is stolen from ordinary typing.
+                          const cellEmpty = !String(row.billNo || '').length;
+                          if (e.key === 'Enter' || e.key === 'F4' || (e.key === ' ' && cellEmpty)) {
                             e.preventDefault();
+                            e.stopPropagation();
                             openBillLookup(idx);
+                          } else if (e.key === 'Delete' && (e.ctrlKey || e.shiftKey || cellEmpty)) {
+                            e.preventDefault();
+                            pendingFocusRowRef.current = Math.max(0, idx - 1);
+                            removeBillRow(idx);
                           }
                         }}
-                        placeholder="Type or Enter…"
+                        placeholder="Enter / Space ⇒ pick bill"
                         disabled={locked}
                       />
                     </td>
@@ -928,6 +1138,9 @@ const CashBankBookModal = ({
             <div className="cash-bank-toolbar">
               <button type="button" className="classic-erp-btn" onClick={() => setBillRows((r) => [...r, emptyBillRow()])}>+ Add Bill Row</button>
               <button type="button" className="classic-erp-btn" onClick={loadPartyBills} disabled={!header.partyId}>Load Outstanding Bills</button>
+              <span className="text-[10px] text-slate-500 self-center ml-2">
+                Enter / SpaceBar / F4 ⇒ Open O/S Bill · auto-allocates &amp; moves to next line · Del ⇒ Delete Row
+              </span>
             </div>
           )}
 
@@ -948,7 +1161,13 @@ const CashBankBookModal = ({
                 <input type="number" className="classic-erp-input text-right" style={{ width: 80 }} value={footer.finance} onChange={(e) => setFooter((f) => ({ ...f, finance: Number(e.target.value) }))} disabled={locked || !footer.financeFlag} />
                 <div className="classic-erp-field classic-erp-field--xs">
                   <span className="classic-erp-label">UnPaid:</span>
-                  <input type="text" className="classic-erp-input text-right font-mono" value={unpaidTotal.toFixed(2)} readOnly />
+                  <input
+                    type="text"
+                    className="classic-erp-input text-right font-mono"
+                    style={amountMismatch ? { color: '#b91c1c', fontWeight: 700 } : undefined}
+                    value={unpaidTotal.toFixed(2)}
+                    readOnly
+                  />
                 </div>
                 <div className="classic-erp-field classic-erp-field--xs">
                   <span className="classic-erp-label">Paid:</span>
@@ -968,13 +1187,43 @@ const CashBankBookModal = ({
                 <span>( OTH1- {breakdownTotals.oth1.toFixed(0)} )</span>
                 <span>( OTH2- {breakdownTotals.oth2.toFixed(0)} )</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="text-red-700 font-bold font-mono">{totalPcs || 0}</span>
-                <span className="text-red-700 font-bold">Pcs</span>
+              {/* Receipt vs allocation, recomputed on every keystroke (spec §6). */}
+              <div
+                style={{
+                  border: `1px solid ${amountMismatch ? '#dc2626' : '#cbd5e1'}`,
+                  background: amountMismatch ? '#fee2e2' : '#f8fafc',
+                  borderRadius: 4,
+                  padding: '3px 6px',
+                  fontSize: 11,
+                  display: 'grid',
+                  gridTemplateColumns: 'auto auto',
+                  gap: '1px 8px',
+                }}
+              >
+                <span className="text-slate-600">{receivedAmount > 0 ? 'Received' : 'Received (from bills)'}</span>
+                <span className="text-right font-mono font-bold">{effectiveReceived.toFixed(2)}</span>
+                <span className="text-slate-600">Allocated ({allocatedBillCount} bill{allocatedBillCount === 1 ? '' : 's'})</span>
+                <span className="text-right font-mono font-bold">{paidTotal.toFixed(2)}</span>
+                <span className={amountMismatch ? 'text-red-700 font-bold' : 'text-slate-600'}>
+                  {amountMismatch ? 'Check Amount' : 'Difference'}
+                </span>
+                <span className={`text-right font-mono font-bold ${amountMismatch ? 'text-red-700' : 'text-green-700'}`}>
+                  {unpaidTotal.toFixed(2)}
+                </span>
               </div>
               <div className="text-center text-xs text-slate-500">AVG DAYS: {avgDays.toFixed(2)}</div>
               <div className="bg-red-700 text-white text-center text-xs font-bold py-1 rounded">Chq. Return Status</div>
-              <button type="button" className="text-blue-700 text-xs underline self-center" onClick={() => notifyWarning(isBank ? 'Help: Party → Acc/Bill=B → Adjust → Save. Use Add on P.Bank to save bank on party.' : 'Help: Party → Acc/Bill=B → Adjust → Save. Cash book has no cheque / P.Bank fields.')}>Help</button>
+              <button
+                type="button"
+                className="text-blue-700 text-xs underline self-center"
+                onClick={() => notifyWarning(
+                  `Enter moves to the next field: Party → ${isBank ? 'Bank' : 'Cash'} → Amount → Acc/Bill → BillNo. ` +
+                  'Enter on BillNo opens the bill lookup; picking a bill allocates it and jumps to the next line. ' +
+                  'Ctrl+Del clears a line. Acc/Bill=A posts on-account with no bill rows.'
+                )}
+              >
+                Help
+              </button>
             </div>
           </div>
 
@@ -990,7 +1239,14 @@ const CashBankBookModal = ({
         <div className="classic-erp-form-footer flex-wrap">
           <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode === 'Add' || mode === 'Edit'}>New</button>
           <button className="classic-erp-btn" type="button" onClick={handleEdit} disabled={readOnly || mode !== 'View' || !selectedVoucherId}>Edit</button>
-          <button className="classic-erp-btn btn-blue" type="button" onClick={handleSave} disabled={locked || saving || bootLoading}>
+          <button
+            className="classic-erp-btn btn-blue"
+            type="button"
+            data-enter-save
+            onClick={handleSave}
+            disabled={locked || saving || bootLoading || noBookLedger || amountMismatch}
+            title={amountMismatch ? 'Check Amount: total Adjust must exactly equal the Amount' : undefined}
+          >
             <SaveButtonLabel saving={saving} />
           </button>
           <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked}>Cancel</button>

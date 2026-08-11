@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const InventoryLot = require('../models/InventoryLot');
 const Sales = require('../models/Sales');
 const Purchase = require('../models/Purchase');
@@ -5,7 +6,10 @@ const Party = require('../models/Party');
 const Item = require('../models/Item');
 const Job = require('../models/Job');
 const PaymentVoucher = require('../models/PaymentVoucher');
+const ReturnInvoice = require('../models/ReturnInvoice');
 const Book = require('../models/Book');
+
+const round2 = (n) => Number(Number(n || 0).toFixed(2));
 
 const buildDateQuery = (startDate, endDate, field = 'date') => {
   if (!startDate && !endDate) return {};
@@ -41,6 +45,107 @@ const lastPaymentDate = async (companyId, docId) => {
     'againstInvoices.invoiceId': docId,
   }).select('date').sort({ date: -1 }).limit(1).lean();
   return vouchers[0]?.date ? new Date(vouchers[0].date) : null;
+};
+
+/**
+ * Every settlement fact for a set of bills, in ONE aggregation.
+ *
+ * Replaces a per-bill lookup that ran inside a per-party loop — on a few hundred parties
+ * that was thousands of sequential round-trips for a single report.
+ *
+ * Splits the two things a voucher does to a bill, because the reference report shows them
+ * in separate columns:
+ *   paid     the cash actually allocated (Adjust)
+ *   addLess  the non-cash deductions that also close the bill — discount, TDS, RG,
+ *            claim, RD, interest, oth1/oth2
+ * Together they equal what the posting path writes to the bill's own paidAmount.
+ */
+const settlementsByBill = async (companyId, billIds) => {
+  const map = {};
+  if (!billIds.length) return map;
+
+  const rows = await PaymentVoucher.aggregate([
+    {
+      $match: {
+        companyId: new mongoose.Types.ObjectId(companyId),
+        status: 'Posted',
+        isReversed: { $ne: true },
+        'againstInvoices.invoiceId': { $in: billIds },
+      },
+    },
+    { $unwind: '$againstInvoices' },
+    { $match: { 'againstInvoices.invoiceId': { $in: billIds } } },
+    {
+      $group: {
+        _id: '$againstInvoices.invoiceId',
+        paid: { $sum: { $ifNull: ['$againstInvoices.amount', 0] } },
+        addLess: {
+          $sum: {
+            $add: [
+              { $ifNull: ['$againstInvoices.discount', 0] },
+              { $ifNull: ['$againstInvoices.tds', 0] },
+              { $ifNull: ['$againstInvoices.rg', 0] },
+              { $ifNull: ['$againstInvoices.claim', 0] },
+              { $ifNull: ['$againstInvoices.rd', 0] },
+              { $ifNull: ['$againstInvoices.interest', 0] },
+              { $ifNull: ['$againstInvoices.oth1', 0] },
+              { $ifNull: ['$againstInvoices.oth2', 0] },
+            ],
+          },
+        },
+        // RG is also inside addLess; carried separately so "With RG Pending" has real backing.
+        rg: { $sum: { $ifNull: ['$againstInvoices.rg', 0] } },
+        lastPaidDate: { $max: '$date' },
+        firstPaidDate: { $min: '$date' },
+        voucherCount: { $sum: 1 },
+      },
+    },
+  ]);
+
+  for (const r of rows) {
+    map[String(r._id)] = {
+      paid: round2(r.paid),
+      addLess: round2(r.addLess),
+      rg: round2(r.rg),
+      lastPaidDate: r.lastPaidDate || null,
+      firstPaidDate: r.firstPaidDate || null,
+      voucherCount: r.voucherCount || 0,
+    };
+  }
+  return map;
+};
+
+/**
+ * Goods returned against a set of bills, keyed by original invoice number.
+ * ReturnInvoice links back by invoice NUMBER (originalInvoiceNo), not by id, so the key
+ * is party + number to stop one party's return landing on another's identically-numbered bill.
+ */
+const returnsByBill = async (companyId, returnType, partyIds, invoiceNos) => {
+  const map = {};
+  if (!invoiceNos.length) return map;
+
+  const rows = await ReturnInvoice.aggregate([
+    {
+      $match: {
+        companyId: new mongoose.Types.ObjectId(companyId),
+        returnType,
+        status: { $ne: 'cancelled' },
+        partyId: { $in: partyIds },
+        originalInvoiceNo: { $in: invoiceNos },
+      },
+    },
+    {
+      $group: {
+        _id: { partyId: '$partyId', no: '$originalInvoiceNo' },
+        goodsRtn: { $sum: { $ifNull: ['$netAmount', 0] } },
+      },
+    },
+  ]);
+
+  for (const r of rows) {
+    map[`${r._id.partyId}::${r._id.no}`] = round2(r.goodsRtn);
+  }
+  return map;
 };
 
 class ReportService {
@@ -237,6 +342,16 @@ class ReportService {
       includeLastYear = true,
       fyStartDate,
       status = 'Pending',
+      /** Bills carrying an RG (rate-gap) adjustment recorded on a voucher allocation. */
+      onlyRgPending = false,
+      /**
+       * Bills that went from open to fully settled in a SINGLE voucher — no part-payment
+       * history. That is what "direct close" means against this data; there is no other
+       * stored flag for it.
+       */
+      onlyDirectBillClose = false,
+      /** Attach each party's ledger closing balance for side-by-side reconciliation. */
+      withLedgerBalance = false,
     } = filters;
 
     const partyGroup = isReceivable ? 'Customer' : 'Supplier';
@@ -247,86 +362,162 @@ class ReportService {
     if (mainGroups.length) partyFilter.mainGroupId = { $in: mainGroups };
 
     const parties = await Party.find(partyFilter).lean();
+    if (!parties.length) return [];
     const asOnDate = asOn ? new Date(asOn) : new Date();
-    const lines = [];
+    const selectedPartyIds = parties.map((p) => p._id);
 
-    for (const party of parties) {
-      const docFilter = { companyId, status: { $ne: 'cancelled' } };
-      docFilter[isReceivable ? 'customerId' : 'supplierId'] = party._id;
-      if (brokerIds.length) docFilter.brokerId = { $in: brokerIds };
-      if (bookIds.length) docFilter.bookId = { $in: bookIds };
-      if (isReceivable && stations.length) docFilter.station = { $in: stations };
-      if (isReceivable && hastes.length) docFilter.haste = { $in: hastes };
-      if (remarkSearch.trim()) docFilter.remarks = { $regex: remarkSearch.trim(), $options: 'i' };
-      if (!includeLastYear && fyStartDate) {
-        docFilter.date = { ...(docFilter.date || {}), $gte: new Date(fyStartDate) };
-      }
-      Object.assign(docFilter, buildDateQuery(billDateFrom, billDateTo));
+    // Every bill for every selected party in ONE query, instead of one query per party.
+    const docFilter = { companyId, status: { $ne: 'cancelled' } };
+    docFilter[isReceivable ? 'customerId' : 'supplierId'] = { $in: selectedPartyIds };
+    if (brokerIds.length) docFilter.brokerId = { $in: brokerIds };
+    if (bookIds.length) docFilter.bookId = { $in: bookIds };
+    if (isReceivable && stations.length) docFilter.station = { $in: stations };
+    if (isReceivable && hastes.length) docFilter.haste = { $in: hastes };
+    if (remarkSearch.trim()) docFilter.remarks = { $regex: remarkSearch.trim(), $options: 'i' };
+    if (!includeLastYear && fyStartDate) {
+      docFilter.date = { ...(docFilter.date || {}), $gte: new Date(fyStartDate) };
+    }
+    Object.assign(docFilter, buildDateQuery(billDateFrom, billDateTo));
 
-      const documents = isReceivable
-        ? await Sales.find(docFilter).lean()
-        : await Purchase.find(docFilter).lean();
+    const documents = isReceivable
+      ? await Sales.find(docFilter).lean()
+      : await Purchase.find(docFilter).lean();
+    if (!documents.length) return [];
 
-      let partyTotal = 0;
-      const aging = { bucket30: 0, bucket60: 0, bucket90: 0, bucket90Plus: 0 };
-      const invoices = [];
+    // Two more batched reads and the whole report has its facts — no per-bill round-trips.
+    const billIds = documents.map((d) => d._id);
+    const invoiceNos = [...new Set(documents.map((d) => d.invoiceNo || d.billNo).filter(Boolean))];
+    const [settlements, returns] = await Promise.all([
+      settlementsByBill(companyId, billIds),
+      returnsByBill(companyId, isReceivable ? 'Sales' : 'Purchase', selectedPartyIds, invoiceNos),
+    ]);
 
-      for (const doc of documents) {
-        const total = parseFloat(doc.netAmount || doc.totals?.total || doc.totalAmount || 0);
-        const paid = await paidAgainstDoc(companyId, doc._id);
-        const outstanding = total - paid;
-        if (status === 'Pending' && outstanding <= 0.01) continue;
-        if (onlyFullBill && paid > 0.01) continue;
-        if (onlyPartReceived && (paid <= 0.01 || outstanding <= 0.01)) continue;
+    const byParty = new Map();
+    for (const p of parties) byParty.set(String(p._id), { party: p, invoices: [], partyTotal: 0,
+      totals: { billAmt: 0, paid: 0, goodsRtn: 0, addLess: 0 },
+      aging: { bucket30: 0, bucket60: 0, bucket90: 0, bucket90Plus: 0 } });
 
-        const ageInDays = Math.floor((asOnDate - new Date(doc.date)) / 86400000);
-        if (dueDaysMin != null && ageInDays < Number(dueDaysMin)) continue;
+    for (const doc of documents) {
+      const pid = String(isReceivable ? doc.customerId : doc.supplierId);
+      const bucket = byParty.get(pid);
+      if (!bucket) continue;
 
-        if (paidDateFrom || paidDateTo) {
-          const paidOn = await lastPaymentDate(companyId, doc._id);
-          if (!paidOn) continue;
-          if (paidDateFrom && paidOn < new Date(paidDateFrom)) continue;
-          if (paidDateTo && paidOn > new Date(paidDateTo)) continue;
+      const total = round2(doc.netAmount || doc.totals?.total || doc.totalAmount || 0);
+      const s = settlements[String(doc._id)] || { paid: 0, addLess: 0, lastPaidDate: null, voucherCount: 0 };
+      const docNo = doc.invoiceNo || doc.billNo || '';
+      const goodsRtn = returns[`${pid}::${docNo}`] || 0;
+
+      // Balance = what was billed, less cash received, less non-cash adjustments,
+      // less goods sent back. Every term is a stored figure, none of it inferred.
+      const paid = round2(s.paid);
+      const addLess = round2(s.addLess);
+      const outstanding = round2(total - paid - addLess - goodsRtn);
+
+      if (status === 'Pending' && outstanding <= 0.01) continue;
+      // Settled by any means — cash, adjustment or return.
+      if (status === 'Paid' && outstanding > 0.01) continue;
+
+      const settledSoFar = round2(paid + addLess + goodsRtn);
+      if (onlyFullBill && settledSoFar > 0.01) continue;
+      if (onlyPartReceived && (settledSoFar <= 0.01 || outstanding <= 0.01)) continue;
+      if (onlyRgPending && round2(s.rg) <= 0.01) continue;
+      // Closed outright by one voucher — nothing left open, no part-payment history.
+      if (onlyDirectBillClose && !(outstanding <= 0.01 && s.voucherCount === 1)) continue;
+
+      const ageInDays = Math.floor((asOnDate - new Date(doc.date)) / 86400000);
+      if (dueDaysMin != null && ageInDays < Number(dueDaysMin)) continue;
+
+      if (paidDateFrom || paidDateTo) {
+        const paidOn = s.lastPaidDate ? new Date(s.lastPaidDate) : null;
+        if (!paidOn) continue;
+        if (paidDateFrom && paidOn < new Date(paidDateFrom)) continue;
+        if (paidDateTo) {
+          const end = new Date(paidDateTo);
+          end.setHours(23, 59, 59, 999);
+          if (paidOn > end) continue;
         }
-
-        partyTotal += outstanding;
-        if (ageInDays <= 30) aging.bucket30 += outstanding;
-        else if (ageInDays <= 60) aging.bucket60 += outstanding;
-        else if (ageInDays <= 90) aging.bucket90 += outstanding;
-        else aging.bucket90Plus += outstanding;
-
-        invoices.push({
-          docNo: doc.invoiceNo || doc.billNo,
-          date: doc.date,
-          total,
-          paid,
-          outstanding,
-          ageDays: ageInDays,
-          broker: doc.brokerId || null,
-          station: doc.station || '',
-          haste: doc.haste || '',
-          bookId: doc.bookId || '',
-          remarks: doc.remarks || '',
-        });
       }
 
-      if (partyTotal > 0.01 || (status === 'All' && invoices.length)) {
-        lines.push({
-          partyId: party._id,
-          partyName: party.name,
-          phone: party.mobile || party.phone,
-          address: party.address || '',
-          city: party.city || party.station || '',
-          state: party.state || '',
-          msmeType: party.msmeType || 'None',
-          gstin: party.gstin || '',
-          mainGroupId: party.mainGroupId || '',
-          banks: party.banks || [],
-          totalOutstanding: parseFloat(partyTotal.toFixed(2)),
-          aging,
-          invoices
-        });
+      bucket.partyTotal = round2(bucket.partyTotal + outstanding);
+      bucket.totals.billAmt = round2(bucket.totals.billAmt + total);
+      bucket.totals.paid = round2(bucket.totals.paid + paid);
+      bucket.totals.addLess = round2(bucket.totals.addLess + addLess);
+      bucket.totals.goodsRtn = round2(bucket.totals.goodsRtn + goodsRtn);
+
+      if (ageInDays <= 30) bucket.aging.bucket30 = round2(bucket.aging.bucket30 + outstanding);
+      else if (ageInDays <= 60) bucket.aging.bucket60 = round2(bucket.aging.bucket60 + outstanding);
+      else if (ageInDays <= 90) bucket.aging.bucket90 = round2(bucket.aging.bucket90 + outstanding);
+      else bucket.aging.bucket90Plus = round2(bucket.aging.bucket90Plus + outstanding);
+
+      bucket.invoices.push({
+        billId: doc._id,
+        docNo,
+        date: doc.date,
+        total,
+        paid,
+        paidDate: s.lastPaidDate || null,
+        firstPaidDate: s.firstPaidDate || null,
+        paymentCount: s.voucherCount,
+        goodsRtn,
+        addLess,
+        rg: round2(s.rg),
+        outstanding,
+        ageDays: ageInDays,
+        // The bill's own running figure — shown so a drift between the report and the
+        // document itself is visible rather than hidden.
+        billPaidAmount: round2(doc.paidAmount || 0),
+        broker: doc.brokerId || null,
+        station: doc.station || '',
+        haste: doc.haste || '',
+        bookId: doc.bookId || '',
+        remarks: doc.remarks || '',
+      });
+    }
+
+    // Ledger balances for the whole company in ONE pass, then mapped by linked party —
+    // never a statement call per party. Read-only: Outstanding never writes to the ledger.
+    let ledgerByParty = null;
+    if (withLedgerBalance) {
+      const ledgerEngine = require('./ledgerEngineService');
+      const balances = await ledgerEngine.computeBalances(companyId, { asOn });
+      ledgerByParty = {};
+      for (const b of balances) {
+        if (!b.ledger?.linkedPartyId) continue;
+        ledgerByParty[String(b.ledger.linkedPartyId)] = {
+          ledgerBalance: b.balance,
+          ledgerBalanceType: b.type,
+        };
       }
+    }
+
+    const lines = [];
+    for (const { party, invoices, partyTotal, totals, aging } of byParty.values()) {
+      if (!invoices.length) continue;
+      if (status === 'Pending' && partyTotal <= 0.01) continue;
+      const led = ledgerByParty ? ledgerByParty[String(party._id)] : null;
+      lines.push({
+        ...(led ? {
+          ledgerBalance: led.ledgerBalance,
+          ledgerBalanceType: led.ledgerBalanceType,
+          // Non-zero means bill-wise and ledger disagree — surfaced, never auto-corrected.
+          ledgerDiff: round2(led.ledgerBalance - partyTotal),
+        } : {}),
+        partyId: party._id,
+        partyName: party.name,
+        phone: party.mobile || party.phone,
+        address: party.address || '',
+        city: party.city || party.station || '',
+        state: party.state || '',
+        msmeType: party.msmeType || 'None',
+        gstin: party.gstin || '',
+        mainGroupId: party.mainGroupId || '',
+        banks: party.banks || [],
+        totalOutstanding: round2(partyTotal),
+        // TOTAL-PARTY row of the reference report, summed from the listed bills only.
+        partyTotals: totals,
+        aging,
+        invoices,
+      });
     }
     return lines.sort((a, b) => b.totalOutstanding - a.totalOutstanding);
   }

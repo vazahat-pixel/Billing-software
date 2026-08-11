@@ -1244,6 +1244,27 @@ const useStore = create((set, get) => ({
     }
   },
 
+  /** Edit posted payment/receipt — backend reverses the old impact and re-posts atomically */
+  updateVoucher: async (id, data) => {
+    set({ loading: true });
+    try {
+      const updated = normalizeVoucher(await accountingApi.updateVoucher(id, data));
+      set((state) => ({
+        vouchers: state.vouchers.map((v) => ((v._id || v.id) === id ? updated : v)),
+        payments: state.payments.map((v) => ((v._id || v.id) === id ? updated : v)),
+        receipts: state.receipts.map((v) => ((v._id || v.id) === id ? updated : v)),
+        loading: false,
+      }));
+      get().fetchVouchers();
+      get().fetchSales();
+      get().fetchPurchases();
+      return updated;
+    } catch (err) {
+      set({ loading: false });
+      throw err;
+    }
+  },
+
   /** Reverse posted payment/receipt — ledger + bill paidAmount rolled back */
   reverseVoucher: async (id, reason = '') => {
     set({ loading: true });
@@ -1655,6 +1676,24 @@ const useStore = create((set, get) => ({
       console.error('Add note failed:', err);
       throw err;
     }
+  },
+
+  /** Edit a posted note — backend reverses the old impact and re-posts in one transaction. */
+  updateNote: async (id, data) => {
+    const updated = await notesApi.update(id, data);
+    set((state) => ({ notes: state.notes.map((n) => ((n._id || n.id) === id ? updated : n)) }));
+    get().fetchSales();
+    get().fetchPurchases();
+    return updated;
+  },
+
+  /** Reverse a posted note — restores party balance, bill outstanding and GST/ITC. */
+  reverseNote: async (id, reason = '') => {
+    const reversed = await notesApi.reverse(id, { reason });
+    set((state) => ({ notes: state.notes.map((n) => ((n._id || n.id) === id ? reversed : n)) }));
+    get().fetchSales();
+    get().fetchPurchases();
+    return reversed;
   },
 
   /** Contra voucher — transfer between two Cash/Bank ledgers (Stage 3 financial engine). */

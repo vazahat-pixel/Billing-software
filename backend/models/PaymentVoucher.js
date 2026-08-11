@@ -55,6 +55,8 @@ const PaymentVoucherSchema = new mongoose.Schema({
   },
   chequeNo: String,
   chequeDate: Date,
+  /** Date the instrument actually cleared the bank — blank until it does. */
+  clearDate: Date,
   utrNo: String,
   slipNo: String,
   intBillNo: String,
@@ -113,10 +115,22 @@ const PaymentVoucherSchema = new mongoose.Schema({
   },
   reversedAt: Date,
   reverseReason: String,
+  /** Client-supplied per-form token — makes a retried submit return the original voucher. */
+  idempotencyKey: { type: String },
+  /** Set when a posted voucher is corrected via edit (reverse + repost, number kept). */
+  editedAt: Date,
 }, {
   timestamps: true
 });
 
 PaymentVoucherSchema.index({ voucherNo: 1, companyId: 1, voucherType: 1 }, { unique: true });
+PaymentVoucherSchema.index(
+  { companyId: 1, idempotencyKey: 1 },
+  {
+    unique: true,
+    name: 'uniq_voucher_idempotency',
+    partialFilterExpression: { idempotencyKey: { $type: 'string' } },
+  }
+);
 
 module.exports = mongoose.model('PaymentVoucher', PaymentVoucherSchema);

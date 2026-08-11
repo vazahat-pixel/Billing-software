@@ -16,6 +16,7 @@
     "seed:inventory": "node scripts/seed/seedInventory.js",
     "seed:users": "node scripts/seed/seedUsers.js",
     "seed:all": "node scripts/seed/seedAll.js",
+    "seed:purchases": "node scripts/seed/seedPurchases.js",
     "simulate": "node scripts/simulator/simulate.js",
     "verify": "node scripts/verifier/verify.js",
     "benchmark": "node scripts/benchmark/benchmark.js",
@@ -24,6 +25,7 @@
     "truncate": "node scripts/cleanup/truncate.js",
     "qa": "node scripts/qa/run.js",
     "test": "node --test tests/**/*.test.js",
+    "test:isolated": "node --test tests/integration/outstandingAndNotes.test.js",
     "test:unit": "node --test tests/unit/*.test.js",
     "test:integration": "node --test tests/integration/*.test.js",
     "test:certification": "node --test tests/certification/*.test.js",
@@ -54,6 +56,7 @@
   },
   "devDependencies": {
     "autocannon": "^8.0.0",
+    "mongodb-memory-server": "^11.2.0",
     "nodemon": "^3.1.0",
     "supertest": "^7.1.0"
   }

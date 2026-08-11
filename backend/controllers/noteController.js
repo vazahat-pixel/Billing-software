@@ -2,9 +2,16 @@ const mongoose = require('mongoose');
 const DebitCreditNote = require('../models/DebitCreditNote');
 const AccountingEntry = require('../models/AccountingEntry');
 const LedgerMaster = require('../models/LedgerMaster');
+const Party = require('../models/Party');
+const Sales = require('../models/Sales');
+const Purchase = require('../models/Purchase');
 const Counter = require('../models/Counter');
 const accountingService = require('../services/accountingService');
 const auditService = require('../services/auditService');
+
+const round2 = (n) => Number(Number(n || 0).toFixed(2));
+/** Compare money as whole paise — never trust float equality on currency. */
+const toPaise = (n) => Math.round(Number(n || 0) * 100);
 
 async function generateNoteNo(companyId, type, session = null) {
   const prefix = type === 'Debit' ? 'DN' : 'CN';
@@ -16,184 +23,610 @@ async function generateNoteNo(companyId, type, session = null) {
   return `${prefix}-${fy}-${seq.toString().padStart(4, '0')}`;
 }
 
+/**
+ * Which way the four note kinds move money.
+ *
+ *   partySign  +1 the party leg is Dr (they owe us more / we owe them less)
+ *              -1 the party leg is Cr
+ *   baseLedger the P&L account the adjustment lands in
+ *   gstLedgers Output GST for sales-side, Input GST for purchase-side
+ *
+ * Purchase Debit reduces the payable — the convention already posted in this database,
+ * so historical Debit Notes keep their meaning. Purchase Credit is its exact opposite.
+ */
+function noteDirection(noteSide, noteType) {
+  const isSales = noteSide === 'Sales';
+  const isDebit = noteType === 'Debit';
+
+  if (isSales) {
+    return {
+      partySign: isDebit ? +1 : -1,
+      // Debit raises the sale; Credit sends it back through Sales Return.
+      baseLedgerName: isDebit ? 'Sales A/c' : 'Sales Return A/c',
+      gstLedgerNames: { cgst: 'CGST Output', sgst: 'SGST Output', igst: 'IGST Output' },
+      // Sales Debit adds output tax (Cr); Sales Credit reverses it (Dr).
+      gstSign: isDebit ? -1 : +1,
+      baseSign: isDebit ? -1 : +1,
+    };
+  }
+  return {
+    partySign: isDebit ? +1 : -1,
+    baseLedgerName: isDebit ? 'Purchase Return A/c' : 'Purchase A/c',
+    gstLedgerNames: { cgst: 'CGST Input', sgst: 'SGST Input', igst: 'IGST Input' },
+    // Purchase Debit reverses ITC (Cr); Purchase Credit adds ITC (Dr).
+    gstSign: isDebit ? -1 : +1,
+    baseSign: isDebit ? -1 : +1,
+  };
+}
+
+const drCr = (sign) => (sign > 0 ? 'Dr' : 'Cr');
+
+/**
+ * Compute every monetary figure on the note from the taxable value up.
+ * Frontend numbers are never trusted — only Amount, rate and flags are inputs.
+ */
+async function computeNoteTotals(companyId, body, party) {
+  const { computeTaxComponents, determineGstType, placeOfSupply } = require('../utils/gstDetermination');
+
+  let companyGstin = '';
+  let companyStateCode = '';
+  try {
+    const gstConfigService = require('../services/gstConfigService');
+    const cfg = await gstConfigService.getOrCreate(companyId);
+    companyGstin = cfg.gstin;
+    companyStateCode = cfg.stateCode;
+  } catch (_) { /* optional */ }
+
+  const amount = round2(body.amount);
+  const rate = Number(body.gstRate || 0);
+  const cessRate = Number(body.cessRate || 0);
+  const mode = body.amountMode === 'Inclusive' ? 'Inclusive' : 'Exclusive';
+  // Exclusive is the reference behaviour: Amount is the taxable value, GST rides on top.
+  const taxable = round2(
+    mode === 'Inclusive' && rate > 0 ? amount / (1 + rate / 100) : amount
+  );
+
+  // Intra vs inter-state comes from the party's own registration, not a frontend flag.
+  const partyGstin = party?.gstin || body.partyGstin || '';
+  const partyStateCode = party?.stateCode || body.partyStateCode || '';
+  const resolvedType = determineGstType({
+    companyGstin,
+    companyStateCode,
+    partyGstin,
+    partyStateCode,
+    forceType: body.gstType === 'IGST' || body.gstType === 'CGST+SGST' ? body.gstType : undefined,
+  });
+
+  // half-rate split matches the reference screen exactly (2,142.86 + 2,142.86 = 4,285.72,
+  // giving the -0.01 round-off it shows). Sales/Purchase keep the existing split-total mode.
+  const tax = computeTaxComponents(taxable, rate, resolvedType, cessRate, 'half-rate');
+  const pos = placeOfSupply({ partyGstin, partyStateCode, companyStateCode });
+
+  // Reverse charge: the tax is our own liability, so it is not collected from the party.
+  const reverseCharge = !!body.reverseCharge;
+  const rcmAmount = reverseCharge ? round2(tax.gstAmount) : 0;
+  const partyGst = reverseCharge ? 0 : round2(tax.gstAmount + tax.cess);
+
+  const beforeRound = round2(tax.taxableAmount + partyGst);
+  // Round to the rupee the way the rest of the ERP does, and keep the difference visible.
+  const rounded = Math.round(beforeRound);
+  const roundOff = round2(rounded - beforeRound);
+  const netAmount = round2(beforeRound + roundOff);
+
+  const tdsPercent = Number(body.tdsPercent || 0);
+  const tdsAmount = tdsPercent > 0
+    ? round2((tax.taxableAmount * tdsPercent) / 100)
+    : round2(body.tdsAmount || 0);
+  const finalAmount = round2(netAmount - tdsAmount);
+
+  if (tdsAmount > netAmount + 0.01) {
+    throw new Error(`TDS ₹${tdsAmount.toFixed(2)} cannot exceed the note value ₹${netAmount.toFixed(2)}`);
+  }
+
+  return {
+    amountMode: mode,
+    taxable: tax.taxableAmount,
+    gstType: resolvedType,
+    gstRate: rate,
+    cessRate,
+    cgst: tax.cgst,
+    sgst: tax.sgst,
+    igst: tax.igst,
+    cess: tax.cess,
+    gstAmount: tax.gstAmount,
+    reverseCharge,
+    rcmAmount,
+    roundOff,
+    netAmount,
+    tdsPercent,
+    tdsAmount,
+    finalAmount,
+    placeOfSupply: pos.stateCode || '',
+  };
+}
+
+/**
+ * Resolve the original bill this note adjusts and prove it belongs to the same party.
+ * A note may never be attached to another party's invoice.
+ */
+async function resolveAgainstBill(companyId, body, party, noteSide, session) {
+  const id = body.againstInvoiceId;
+  if (!id) {
+    return { againstInvoiceId: undefined, againstInvoiceType: '', againstInvoiceNo: body.againstInvoiceNo || '' };
+  }
+
+  const isSales = noteSide === 'Sales';
+  const Model = isSales ? Sales : Purchase;
+  const doc = await Model.findOne({ _id: id, companyId }).session(session);
+  if (!doc) {
+    throw new Error(`Original ${isSales ? 'sales invoice' : 'purchase bill'} not found for this company`);
+  }
+
+  const billPartyId = String(doc.customerId || doc.supplierId || '');
+  const expected = party ? String(party._id) : '';
+  if (!expected) {
+    throw new Error('Party could not be resolved — bill linkage needs a real party');
+  }
+  if (billPartyId !== expected) {
+    throw new Error(`Bill ${doc.invoiceNo || id} does not belong to ${party.name} — a note cannot adjust another party's bill`);
+  }
+
+  return {
+    againstInvoiceId: doc._id,
+    againstInvoiceType: isSales ? 'SalesInvoice' : 'PurchaseBill',
+    againstInvoiceNo: doc.invoiceNo || body.againstInvoiceNo || '',
+    billDoc: doc,
+  };
+}
+
+/**
+ * Move the linked bill's outstanding by the note's value and resync bill-wise settlement.
+ * `sign` is +1 when the note reduces what is outstanding, −1 when it increases it.
+ */
+async function applyBillAdjustment(companyId, billDoc, noteSide, amount, sign, session) {
+  if (!billDoc || !amount) return;
+  const outstandingEngine = require('../services/outstandingEngineService');
+
+  const delta = round2(amount * sign);
+  const billTotal = round2(billDoc.netAmount || 0);
+  const nextPaid = round2((billDoc.paidAmount || 0) + delta);
+
+  if (nextPaid > billTotal + 0.01) {
+    throw new Error(
+      `Adjusting ₹${Math.abs(delta).toFixed(2)} against bill ${billDoc.invoiceNo || ''} ` +
+      `would exceed its value ₹${billTotal.toFixed(2)}`
+    );
+  }
+
+  billDoc.paidAmount = Math.max(0, nextPaid);
+  if (billDoc.paidAmount >= billTotal - 0.009) billDoc.status = 'paid';
+  else if (billDoc.paidAmount > 0) billDoc.status = 'partial';
+  else if (billDoc.status !== 'cancelled') billDoc.status = 'active';
+
+  await billDoc.save({ session });
+  if (noteSide === 'Sales') await outstandingEngine.syncBillFromSales(companyId, billDoc, session);
+  else await outstandingEngine.syncBillFromPurchase(companyId, billDoc, session);
+}
+
+/**
+ * Build and post the journal for a note. Every leg is derived from noteDirection(),
+ * so the four kinds can never share an accidentally-identical posting.
+ */
+async function postNoteJournal(companyId, note, totals, partyLedger, session) {
+  const dir = noteDirection(note.noteSide, note.noteType);
+  const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
+  const lines = [];
+
+  // Base leg — an explicit Head overrides the default return/sale account.
+  let baseLedger = null;
+  if (note.accountHeadLedgerId) {
+    baseLedger = await LedgerMaster.findOne({ _id: note.accountHeadLedgerId, companyId }).session(session);
+  }
+  if (!baseLedger) {
+    baseLedger = await accountingService.getSystemLedger(companyId, dir.baseLedgerName, session);
+  }
+  lines.push({
+    ledgerId: baseLedger._id,
+    ledgerName: baseLedger.name,
+    type: drCr(dir.baseSign),
+    amount: totals.taxable,
+    narration: `${note.noteSide} ${note.noteType} Note #${note.noteNo}${note.reason ? ` — ${note.reason}` : ''}`,
+  });
+
+  // GST legs. Under reverse charge the tax does not sit on the party at all: the input
+  // side is claimed and an equal RCM liability is raised, so the note still balances.
+  const gstPairs = [
+    ['cgst', totals.cgst], ['sgst', totals.sgst], ['igst', totals.igst],
+  ];
+  for (const [key, amt] of gstPairs) {
+    if (amt <= 0.004) continue;
+    const led = await accountingService.getSystemLedger(companyId, dir.gstLedgerNames[key], session);
+    lines.push({
+      ledgerId: led._id,
+      ledgerName: led.name,
+      type: drCr(dir.gstSign),
+      amount: amt,
+      narration: `${dir.gstLedgerNames[key]} — Note #${note.noteNo}`,
+    });
+  }
+  if (totals.reverseCharge && totals.rcmAmount > 0.004) {
+    const rcmLedger = await accountingService.getSystemLedger(
+      companyId, totals.gstType === 'IGST' ? 'IGST RCM' : 'CGST RCM', session
+    );
+    lines.push({
+      ledgerId: rcmLedger._id,
+      ledgerName: rcmLedger.name,
+      type: drCr(-dir.gstSign),
+      amount: totals.rcmAmount,
+      narration: `Reverse charge liability — Note #${note.noteNo}`,
+    });
+  }
+
+  if (Math.abs(totals.roundOff) > 0.004) {
+    const roundLedger = await accountingService.getSystemLedger(companyId, 'Round Off', session);
+    lines.push({
+      ledgerId: roundLedger._id,
+      ledgerName: roundLedger.name,
+      // Round-off sits on the same side as the base leg when it increases the note.
+      type: drCr(totals.roundOff > 0 ? dir.baseSign : -dir.baseSign),
+      amount: round2(Math.abs(totals.roundOff)),
+      narration: `Round off — Note #${note.noteNo}`,
+    });
+  }
+
+  // TDS is a withholding, never a tax on the supply — its own ledger, always.
+  if (totals.tdsAmount > 0.004) {
+    let tdsLedger = null;
+    if (note.tdsLedgerId) {
+      tdsLedger = await LedgerMaster.findOne({ _id: note.tdsLedgerId, companyId }).session(session);
+    }
+    if (!tdsLedger) {
+      tdsLedger = await accountingService.getSystemLedger(
+        companyId, note.noteSide === 'Sales' ? 'TDS Receivable' : 'TDS Payable', session
+      );
+    }
+    lines.push({
+      ledgerId: tdsLedger._id,
+      ledgerName: tdsLedger.name,
+      // Same side as the party: the party leg carries net-of-TDS, so the withheld
+      // portion sits beside it and together they equal the full note value.
+      type: drCr(dir.partySign),
+      amount: totals.tdsAmount,
+      narration: note.tdsRemark || `TDS — Note #${note.noteNo}`,
+    });
+  }
+
+  // Party leg carries what actually settles: net of GST treatment and net of TDS.
+  lines.push({
+    ledgerId: partyLedger._id,
+    ledgerName: partyLedger.name,
+    type: drCr(dir.partySign),
+    amount: totals.finalAmount,
+    narration: `${note.noteType} Note #${note.noteNo}`,
+  });
+
+  const entry = await AccountingEntry.create([{
+    companyId,
+    entryNo,
+    entryDate: note.date || new Date(),
+    voucherType: 'NoteAuto',
+    refType: note.noteType === 'Credit' ? 'CreditNote' : 'DebitNote',
+    refId: note._id,
+    lines,
+    narration: note.narration || note.reason || `${note.noteSide} ${note.noteType} Note`,
+  }], { session });
+
+  return entry[0];
+}
+
+/** Shared resolve+validate for create and edit. */
+async function resolveNoteContext(companyId, body, session) {
+  const noteType = body.noteType;
+  const noteSide = body.noteSide || (noteType === 'Credit' ? 'Sales' : 'Purchase');
+
+  if (!['Debit', 'Credit'].includes(noteType)) throw new Error('Note type must be Debit or Credit');
+  if (!['Purchase', 'Sales'].includes(noteSide)) throw new Error('Note side must be Purchase or Sales');
+  if (!body.partyLedgerId && !body.partyId) throw new Error('Please select a Party');
+  if (!(round2(body.amount) > 0)) throw new Error('Please enter a valid Amount');
+
+  const rawPartyId = body.partyLedgerId || body.partyId;
+  let partyLedger = await LedgerMaster.findOne({ _id: rawPartyId, companyId }).session(session);
+  if (!partyLedger) {
+    try {
+      partyLedger = await accountingService.getOrCreatePartyLedger(companyId, rawPartyId);
+    } catch (_) { /* handled below */ }
+  }
+  if (!partyLedger) throw new Error('Invalid party ledger selection');
+
+  const party = partyLedger.linkedPartyId
+    ? await Party.findOne({ _id: partyLedger.linkedPartyId, companyId }).session(session)
+    : null;
+
+  const totals = await computeNoteTotals(companyId, body, party);
+  const bill = await resolveAgainstBill(companyId, body, party, noteSide, session);
+
+  return { noteType, noteSide, partyLedger, party, totals, bill };
+}
+
 exports.createNote = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
+  let committed = false;
 
   try {
     const companyId = req.companyId;
-    const {
-      noteType, noteNo, partyLedgerId, date, amount, againstInvoiceNo, reason, status,
-      gstType, gstRate, taxableAmount: clientTaxable,
-    } = req.body;
+    const body = req.body;
+    const posting = body.status === 'Posted';
 
-    if (!noteType || !partyLedgerId || !amount) {
-      return res.status(400).json({ success: false, message: 'Type, party ledger, and amount are required' });
-    }
-
-    // Check GST period is not locked/filed (only if posting immediately)
-    if (status === 'Posted') {
+    if (posting) {
       const gstConfigService = require('../services/gstConfigService');
-      await gstConfigService.assertPeriodOpen(companyId, date || new Date());
+      await gstConfigService.assertPeriodOpen(companyId, body.date || new Date());
     }
 
-    let resolvedPartyLedger = await LedgerMaster.findById(partyLedgerId);
-    if (!resolvedPartyLedger) {
-      try {
-        resolvedPartyLedger = await accountingService.getOrCreatePartyLedger(companyId, partyLedgerId);
-      } catch (err) {
-        // let subsequent check handle missing ledger
+    const idempotencyKey = String(body.idempotencyKey || '').trim();
+    if (idempotencyKey) {
+      const existing = await DebitCreditNote.findOne({ companyId, idempotencyKey });
+      if (existing) {
+        await session.abortTransaction();
+        return res.status(200).json({ success: true, data: existing, message: 'Note already recorded' });
       }
     }
 
-    if (!resolvedPartyLedger) {
-      return res.status(400).json({ success: false, message: 'Invalid party ledger selection' });
-    }
+    const { noteType, noteSide, partyLedger, party, totals, bill } =
+      await resolveNoteContext(companyId, body, session);
 
-    const finalNoteNo = noteNo || await generateNoteNo(companyId, noteType, session);
+    const finalNoteNo = body.noteNo || await generateNoteNo(companyId, noteType, session);
 
-    // Stage 4: backend GST on notes
-    const { computeTaxComponents, determineGstType } = require('../utils/gstDetermination');
-    let companyGstin = '';
-    let companyStateCode = '';
-    try {
-      const gstConfigService = require('../services/gstConfigService');
-      const cfg = await gstConfigService.getOrCreate(companyId);
-      companyGstin = cfg.gstin;
-      companyStateCode = cfg.stateCode;
-    } catch (_) { /* optional */ }
-
-    const rate = Number(gstRate || 0);
-    const taxable = Number(clientTaxable != null ? clientTaxable : (rate > 0 ? amount / (1 + rate / 100) : amount));
-    const resolvedType = determineGstType({
-      companyGstin,
-      companyStateCode,
-      forceType: gstType || 'CGST+SGST',
-    });
-    const tax = computeTaxComponents(
-      Number(taxable.toFixed(2)),
-      rate,
-      resolvedType
-    );
-    const netAmount = Number((tax.taxableAmount + tax.gstAmount).toFixed(2));
-
-    const noteData = {
+    const created = await DebitCreditNote.create([{
       companyId,
       noteType,
+      noteSide,
       noteNo: finalNoteNo,
-      partyLedgerId: resolvedPartyLedger._id,
-      date: date || new Date(),
-      amount: parseFloat(amount),
-      taxableAmount: tax.taxableAmount,
-      gstType: tax.gstType,
-      gstRate: rate,
-      cgst: tax.cgst,
-      sgst: tax.sgst,
-      igst: tax.igst,
-      cess: tax.cess,
-      gstAmount: tax.gstAmount,
-      netAmount: netAmount || parseFloat(amount),
-      againstInvoiceNo,
-      reason,
-      status: status || 'Draft'
-    };
+      vNo: body.vNo || '',
+      partyLedgerId: partyLedger._id,
+      partyId: party?._id,
+      partyName: partyLedger.name,
+      partyGstin: party?.gstin || body.partyGstin || '',
+      date: body.date || new Date(),
+      billNo: body.billNo || '',
+      billDate: body.billDate || undefined,
+      againstInvoiceNo: bill.againstInvoiceNo,
+      againstInvoiceId: bill.againstInvoiceId,
+      againstInvoiceType: bill.againstInvoiceType,
+      amount: round2(body.amount),
+      amountMode: totals.amountMode,
+      taxableAmount: totals.taxable,
+      gstType: totals.gstType,
+      gstTreatment: body.gstTreatment || (party?.gstin ? 'Registered' : 'Unregistered'),
+      gstRate: totals.gstRate,
+      cessRate: totals.cessRate,
+      cgst: totals.cgst,
+      sgst: totals.sgst,
+      igst: totals.igst,
+      cess: totals.cess,
+      gstAmount: totals.gstAmount,
+      reverseCharge: totals.reverseCharge,
+      rcmAmount: totals.rcmAmount,
+      placeOfSupply: totals.placeOfSupply,
+      itcEligibility: body.itcEligibility || '',
+      hsnSac: body.hsnSac || '',
+      reasonCode: body.reasonCode || '',
+      reason: body.reason,
+      quc: body.quc || '',
+      accountHeadLedgerId: body.accountHeadLedgerId || undefined,
+      accountHeadName: body.accountHeadName || '',
+      tdsLedgerId: body.tdsLedgerId || undefined,
+      tdsPercent: totals.tdsPercent,
+      tdsAmount: totals.tdsAmount,
+      tdsRemark: body.tdsRemark || '',
+      roundOff: totals.roundOff,
+      netAmount: totals.netAmount,
+      finalAmount: totals.finalAmount,
+      narration: body.narration || '',
+      idempotencyKey: idempotencyKey || undefined,
+      status: body.status || 'Draft',
+    }], { session });
+    const note = created[0];
 
-    const noteResult = await DebitCreditNote.create([noteData], { session });
-    const note = noteResult[0];
+    if (posting) {
+      const entry = await postNoteJournal(companyId, note, totals, partyLedger, session);
+      note.accountingEntryId = entry._id;
+      await note.save({ session });
 
-    if (status === 'Posted') {
-      const entryNo = await accountingService.generateEntryNo(companyId, 'JNL', session);
-      const lines = [];
-      const baseAmt = tax.taxableAmount || parseFloat(amount);
-      const partyAmt = netAmount || parseFloat(amount);
-
-      if (noteType === 'Credit') {
-        const salesLedger = await accountingService.getSystemLedger(companyId, 'Sales Return A/c', session);
-        lines.push({
-          ledgerId: salesLedger._id,
-          ledgerName: salesLedger.name,
-          type: 'Dr',
-          amount: baseAmt,
-          narration: `Credit Note. Reason: ${reason || ''}`
-        });
-        if (tax.cgst > 0) {
-          const led = await accountingService.getSystemLedger(companyId, 'CGST Output', session);
-          lines.push({ ledgerId: led._id, ledgerName: led.name, type: 'Dr', amount: tax.cgst, narration: 'CGST reversal' });
-        }
-        if (tax.sgst > 0) {
-          const led = await accountingService.getSystemLedger(companyId, 'SGST Output', session);
-          lines.push({ ledgerId: led._id, ledgerName: led.name, type: 'Dr', amount: tax.sgst, narration: 'SGST reversal' });
-        }
-        if (tax.igst > 0) {
-          const led = await accountingService.getSystemLedger(companyId, 'IGST Output', session);
-          lines.push({ ledgerId: led._id, ledgerName: led.name, type: 'Dr', amount: tax.igst, narration: 'IGST reversal' });
-        }
-        lines.push({
-          ledgerId: resolvedPartyLedger._id,
-          ledgerName: resolvedPartyLedger.name,
-          type: 'Cr',
-          amount: partyAmt,
-          narration: `Credit Note #${finalNoteNo}`
-        });
-      } else {
-        const purchaseLedger = await accountingService.getSystemLedger(companyId, 'Purchase Return A/c', session);
-        lines.push({
-          ledgerId: resolvedPartyLedger._id,
-          ledgerName: resolvedPartyLedger.name,
-          type: 'Dr',
-          amount: partyAmt,
-          narration: `Debit Note #${finalNoteNo}`
-        });
-        lines.push({
-          ledgerId: purchaseLedger._id,
-          ledgerName: purchaseLedger.name,
-          type: 'Cr',
-          amount: baseAmt,
-          narration: `Debit Note. Reason: ${reason || ''}`
-        });
-        if (tax.cgst > 0) {
-          const led = await accountingService.getSystemLedger(companyId, 'CGST Input', session);
-          lines.push({ ledgerId: led._id, ledgerName: led.name, type: 'Cr', amount: tax.cgst, narration: 'CGST Input reversal' });
-        }
-        if (tax.sgst > 0) {
-          const led = await accountingService.getSystemLedger(companyId, 'SGST Input', session);
-          lines.push({ ledgerId: led._id, ledgerName: led.name, type: 'Cr', amount: tax.sgst, narration: 'SGST Input reversal' });
-        }
-        if (tax.igst > 0) {
-          const led = await accountingService.getSystemLedger(companyId, 'IGST Input', session);
-          lines.push({ ledgerId: led._id, ledgerName: led.name, type: 'Cr', amount: tax.igst, narration: 'IGST Input reversal' });
-        }
+      if (bill.billDoc) {
+        // Purchase Debit / Sales Credit reduce what is outstanding on the bill;
+        // the other two increase it.
+        const reducesOutstanding = noteDirection(noteSide, noteType).partySign === (noteSide === 'Sales' ? -1 : +1);
+        await applyBillAdjustment(
+          companyId, bill.billDoc, noteSide, totals.finalAmount, reducesOutstanding ? +1 : -1, session
+        );
       }
-
-      await AccountingEntry.create([{
-        companyId,
-        entryNo,
-        entryDate: date || new Date(),
-        voucherType: 'NoteAuto',
-        refType: noteType === 'Credit' ? 'CreditNote' : 'DebitNote',
-        refId: note._id,
-        lines,
-        narration: reason || `${noteType} Note adjustments`
-      }], { session });
     }
 
     await session.commitTransaction();
+    committed = true;
 
-    // Audit log
-    await auditService.log(req, `CREATE_${noteType.toUpperCase()}_NOTE`, 'DebitCreditNote', note._id, null, {
-      noteNo: note.noteNo,
-      noteType,
-      amount: note.netAmount,
-      status
-    });
+    await auditService.log(req, `CREATE_${noteSide.toUpperCase()}_${noteType.toUpperCase()}_NOTE`,
+      'DebitCreditNote', note._id, null,
+      { noteNo: note.noteNo, noteType, noteSide, amount: note.finalAmount, status: note.status });
 
     res.status(201).json({ success: true, data: note });
   } catch (error) {
-    await session.abortTransaction();
+    if (!committed) await session.abortTransaction();
     if (error.code === 11000) {
       return res.status(400).json({ success: false, message: 'A note with this number already exists' });
     }
-    res.status(500).json({ success: false, message: error.message });
+    res.status(400).json({ success: false, message: error.message });
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * Edit a posted note: un-apply the original accounting and bill adjustment, then re-post
+ * the corrected figures — all in one transaction, keeping the note number.
+ */
+exports.updateNote = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  let committed = false;
+
+  try {
+    const companyId = req.companyId;
+    const note = await DebitCreditNote.findOne({ _id: req.params.id, companyId }).session(session);
+    if (!note) throw new Error('Note not found');
+    if (note.status === 'Reversed' || note.isReversed) throw new Error('A reversed note cannot be edited');
+
+    const body = req.body;
+    const posting = String(body.status || note.status) === 'Posted';
+    const gstConfigService = require('../services/gstConfigService');
+    await gstConfigService.assertPeriodOpen(companyId, note.date);
+    if (posting) await gstConfigService.assertPeriodOpen(companyId, body.date || note.date);
+
+    // Un-apply first — the bill's outstanding still carries this note's own effect, so
+    // validating the replacement against it would measure against the wrong baseline.
+    if (note.status === 'Posted') {
+      await unpostNote(companyId, note, req, session);
+    }
+
+    const { noteType, noteSide, partyLedger, party, totals, bill } =
+      await resolveNoteContext(companyId, { ...body, noteType: note.noteType }, session);
+
+    Object.assign(note, {
+      noteSide,
+      vNo: body.vNo || note.vNo,
+      partyLedgerId: partyLedger._id,
+      partyId: party?._id,
+      partyName: partyLedger.name,
+      partyGstin: party?.gstin || body.partyGstin || '',
+      date: body.date || note.date,
+      billNo: body.billNo || '',
+      billDate: body.billDate || undefined,
+      againstInvoiceNo: bill.againstInvoiceNo,
+      againstInvoiceId: bill.againstInvoiceId,
+      againstInvoiceType: bill.againstInvoiceType,
+      amount: round2(body.amount),
+      amountMode: totals.amountMode,
+      taxableAmount: totals.taxable,
+      gstType: totals.gstType,
+      gstTreatment: body.gstTreatment || note.gstTreatment,
+      gstRate: totals.gstRate,
+      cessRate: totals.cessRate,
+      cgst: totals.cgst,
+      sgst: totals.sgst,
+      igst: totals.igst,
+      cess: totals.cess,
+      gstAmount: totals.gstAmount,
+      reverseCharge: totals.reverseCharge,
+      rcmAmount: totals.rcmAmount,
+      placeOfSupply: totals.placeOfSupply,
+      itcEligibility: body.itcEligibility || '',
+      hsnSac: body.hsnSac || '',
+      reasonCode: body.reasonCode || '',
+      reason: body.reason,
+      quc: body.quc || '',
+      accountHeadLedgerId: body.accountHeadLedgerId || undefined,
+      accountHeadName: body.accountHeadName || '',
+      tdsLedgerId: body.tdsLedgerId || undefined,
+      tdsPercent: totals.tdsPercent,
+      tdsAmount: totals.tdsAmount,
+      tdsRemark: body.tdsRemark || '',
+      roundOff: totals.roundOff,
+      netAmount: totals.netAmount,
+      finalAmount: totals.finalAmount,
+      narration: body.narration || '',
+      accountingEntryId: undefined,
+      status: posting ? 'Posted' : 'Draft',
+      editedAt: new Date(),
+    });
+
+    if (posting) {
+      const entry = await postNoteJournal(companyId, note, totals, partyLedger, session);
+      note.accountingEntryId = entry._id;
+      if (bill.billDoc) {
+        const reducesOutstanding = noteDirection(noteSide, noteType).partySign === (noteSide === 'Sales' ? -1 : +1);
+        await applyBillAdjustment(
+          companyId, bill.billDoc, noteSide, totals.finalAmount, reducesOutstanding ? +1 : -1, session
+        );
+      }
+    }
+
+    await note.save({ session });
+    await session.commitTransaction();
+    committed = true;
+
+    await auditService.log(req, 'UPDATE_NOTE', 'DebitCreditNote', note._id, null,
+      { noteNo: note.noteNo, amount: note.finalAmount });
+
+    res.status(200).json({ success: true, data: note, message: 'Note updated' });
+  } catch (error) {
+    if (!committed) await session.abortTransaction();
+    res.status(400).json({ success: false, message: error.message });
+  } finally {
+    session.endSession();
+  }
+};
+
+/** Reverse a posted note's journal and undo its bill adjustment. Shared by edit and delete. */
+async function unpostNote(companyId, note, req, session) {
+  if (note.accountingEntryId) {
+    const journalEngine = require('../services/journalEngineService');
+    const reversal = await journalEngine.reverseJournal(companyId, note.accountingEntryId, {
+      session,
+      userId: req.user?._id || req.user?.id,
+      reason: `Reversal of ${note.noteSide} ${note.noteType} Note #${note.noteNo}`,
+    });
+    note.reversalEntryId = reversal._id;
+  }
+
+  if (note.againstInvoiceId && note.finalAmount) {
+    const Model = note.againstInvoiceType === 'SalesInvoice' ? Sales : Purchase;
+    const billDoc = await Model.findOne({ _id: note.againstInvoiceId, companyId }).session(session);
+    if (billDoc) {
+      const reducesOutstanding =
+        noteDirection(note.noteSide, note.noteType).partySign === (note.noteSide === 'Sales' ? -1 : +1);
+      // Opposite sign to whatever posting applied.
+      await applyBillAdjustment(
+        companyId, billDoc, note.noteSide, note.finalAmount, reducesOutstanding ? -1 : +1, session
+      );
+    }
+  }
+}
+
+/** Delete = reverse. Financial history is never physically removed. */
+exports.reverseNote = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  let committed = false;
+
+  try {
+    const companyId = req.companyId;
+    const note = await DebitCreditNote.findOne({ _id: req.params.id, companyId }).session(session);
+    if (!note) throw new Error('Note not found');
+    if (note.status === 'Reversed' || note.isReversed) throw new Error('Note is already reversed');
+    if (note.status !== 'Posted') throw new Error('Only posted notes can be reversed');
+
+    const gstConfigService = require('../services/gstConfigService');
+    await gstConfigService.assertPeriodOpen(companyId, note.date);
+
+    await unpostNote(companyId, note, req, session);
+
+    note.status = 'Reversed';
+    note.isReversed = true;
+    note.reversedAt = new Date();
+    note.reverseReason = (req.body.reason || '').trim() || 'Reversed by user';
+    await note.save({ session });
+
+    await session.commitTransaction();
+    committed = true;
+
+    await auditService.log(req, 'REVERSE_NOTE', 'DebitCreditNote', note._id, null,
+      { noteNo: note.noteNo, reason: note.reverseReason });
+
+    res.status(200).json({ success: true, data: note, message: 'Note reversed' });
+  } catch (error) {
+    if (!committed) await session.abortTransaction();
+    res.status(400).json({ success: false, message: error.message });
   } finally {
     session.endSession();
   }
@@ -202,11 +635,16 @@ exports.createNote = async (req, res) => {
 exports.getNotes = async (req, res) => {
   try {
     const companyId = req.companyId;
-    const { noteType } = req.query;
+    const { noteType, noteSide, status, from, to } = req.query;
 
     const filter = { companyId };
-    if (noteType) {
-      filter.noteType = noteType;
+    if (noteType) filter.noteType = noteType;
+    if (noteSide) filter.noteSide = noteSide;
+    if (status) filter.status = status;
+    if (from || to) {
+      filter.date = {};
+      if (from) filter.date.$gte = new Date(from);
+      if (to) filter.date.$lte = new Date(to);
     }
 
     const list = await DebitCreditNote.find(filter).populate('partyLedgerId').sort({ date: -1 });
@@ -215,3 +653,6 @@ exports.getNotes = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Exported for tests / reuse — the direction table is the heart of the module.
+exports._noteDirection = noteDirection;

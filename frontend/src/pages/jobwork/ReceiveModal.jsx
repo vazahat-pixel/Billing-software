@@ -1,10 +1,50 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
+import { ERPSelect } from '../../components/forms/FormElements';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
+import { Plus, Trash2 } from 'lucide-react';
+
+const today = () => new Date().toISOString().substring(0, 10);
+
+/** One grid row = one Mill Issue challan being received against this bill. */
+const blankLine = () => ({
+   id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+   jobId: '',
+   lotNo: '',
+   chlnNo: '',
+   itemName: '',
+   gPcs: '0',
+   greyMts: '0.00',
+   finishMts: '0.00',
+   finalMts: '0.00',
+   jobRate: '0.00',
+   cp: '',
+   tp: '',
+   finishItem: '',
+   cut: '0',
+   fPcs: '0',
+   procType: '',
+   cuttingPending: '',
+});
+
+const lineShortagePct = (line) => {
+   const grey = Number(line.greyMts) || 0;
+   const finish = Number(line.finishMts) || 0;
+   if (grey <= 0 || finish <= 0) return '0.0';
+   const pct = ((grey - finish) / grey) * 100;
+   return isNaN(pct) ? '0.0' : pct.toFixed(1);
+};
+
+const lineJobAmt = (line) => {
+   const finalVal = Number(line.finalMts) || 0;
+   const finish = Number(line.finishMts) || 0;
+   const rateVal = Number(line.jobRate) || 0;
+   const qty = finalVal > 0 ? finalVal : finish;
+   return Number((qty * rateVal).toFixed(2));
+};
 
 const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
    const {
@@ -17,47 +57,27 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
    } = useStore();
 
    const [activeTab, setActiveTab] = useState('Mill Receive');
-   const [selectedJobId, setSelectedJobId] = useState('');
-   const [receivedPcs, setReceivedPcs] = useState('');
-   const [receivedQty, setReceivedQty] = useState('');
-   const [rate, setRate] = useState('');
-   const [gstPercent, setGstPercent] = useState('5');
    const [saving, setSaving] = useState(false);
    const [bootLoading, setBootLoading] = useState(false);
 
-   // New UI Structuring state variables (UI Only Phase)
+   // Header (bill-level — shared across every line in this receipt)
    const [selectedJobPartyId, setSelectedJobPartyId] = useState('');
-   const [jobParty, setJobParty] = useState('');
    const [gstin, setGstin] = useState('');
    const [billGpNo, setBillGpNo] = useState('');
    const [reverseCharge, setReverseCharge] = useState('No');
    const [hsnCd, setHsnCd] = useState('');
    const [billType, setBillType] = useState('Process');
-   const [totalProcessAmt, setTotalProcessAmt] = useState('1164');
-   const [serialNo, setSerialNo] = useState('4');
-   const [receiveDate, setReceiveDate] = useState(new Date().toISOString().substring(0, 10));
+   const [totalProcessAmt] = useState('1164');
+   const [serialNo] = useState('4');
+   const [receiveDate, setReceiveDate] = useState(today());
+
+   // Multi-row grid — one row per challan being received into this bill
+   const [lines, setLines] = useState([blankLine()]);
+
    const [showLotDropdown, setShowLotDropdown] = useState(false);
+   const [lookupTargetIdx, setLookupTargetIdx] = useState(null);
    const [dropdownSelectIdx, setDropdownSelectIdx] = useState(0);
    const dropdownRef = React.useRef(null);
-
-   // Grid fields (static single row representation for UI only)
-   const [gridLotNo, setGridLotNo] = useState('');
-   const [gridChlnNo, setGridChlnNo] = useState('');
-   const [gridItemName, setGridItemName] = useState('');
-   const [gridGPcs, setGridGPcs] = useState('0');
-   const [gridGreyMts, setGridGreyMts] = useState('0.00');
-   const [gridFinishMts, setGridFinishMts] = useState('0.00');
-   const [gridFinalMts, setGridFinalMts] = useState('0.00');
-   const [gridShtg, setGridShtg] = useState('0.0');
-   const [gridJobRate, setGridJobRate] = useState('0.00');
-   const [gridJobAmt, setGridJobAmt] = useState('0.00');
-   const [gridCP, setGridCP] = useState('');
-   const [gridTp, setGridTp] = useState('');
-   const [gridFinishItem, setGridFinishItem] = useState('');
-   const [gridCut, setGridCut] = useState('0');
-   const [gridFPcs, setGridFPcs] = useState('0');
-   const [gridProcType, setGridProcType] = useState('');
-   const [gridCuttingPending, setGridCuttingPending] = useState('');
 
    // Footer Adjustments
    const [lessPercent, setLessPercent] = useState('0');
@@ -75,18 +95,11 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
 
    // GST details
    const [sgstPercent, setSgstPercent] = useState('0');
-   const [sgstAmt, setSgstAmt] = useState('0');
    const [cgstPercent, setCgstPercent] = useState('0');
-   const [cgstAmt, setCgstAmt] = useState('0');
    const [igstPercent, setIgstPercent] = useState('0');
-   const [igstAmt, setIgstAmt] = useState('0');
 
    // Totals Block
-   const [grossAmt, setGrossAmt] = useState('0');
-   const [roundOff, setRoundOff] = useState('0.00');
    const [rcmGst, setRcmGst] = useState('0.00');
-   const [netAmt, setNetAmt] = useState('0.00');
-   const [finalAmt, setFinalAmt] = useState('0.00');
 
    useEffect(() => {
       if (!isOpen) {
@@ -139,334 +152,371 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
       }));
    }, [pendingJobs]);
 
-    const associatedLots = useMemo(() => {
-       if (!selectedJobPartyId) return [];
-       const list = pendingJobs.filter(j => {
-          if (!j.workerId) return false;
-          const workerIdStr = String(j.workerId._id || j.workerId.id || j.workerId);
-          return workerIdStr === String(selectedJobPartyId);
-       });
-       const q = String(gridLotNo || '').trim().toLowerCase();
-       if (!q) return list;
-       return list.filter(j => {
-          const lotVal = String(j.lotId?.lotId || j.lotId || '').toLowerCase();
-          const chlnVal = String(j.jobCardNo || '').toLowerCase();
-          const itemVal = String(j.lotId?.itemId?.name || j.lotId?.itemName || '').toLowerCase();
-          return lotVal.includes(q) || chlnVal.includes(q) || itemVal.includes(q);
-       });
-    }, [pendingJobs, selectedJobPartyId, gridLotNo]);
+   const partyPendingJobs = useMemo(() => {
+      if (!selectedJobPartyId) return [];
+      return pendingJobs.filter(j => {
+         if (!j.workerId) return false;
+         const workerIdStr = String(j.workerId._id || j.workerId.id || j.workerId);
+         return workerIdStr === String(selectedJobPartyId);
+      });
+   }, [pendingJobs, selectedJobPartyId]);
 
-   const gstOptions = [
-      { value: '0', label: '0%' },
-      { value: '5', label: '5%' },
-      { value: '12', label: '12%' },
-      { value: '18', label: '18%' },
-   ];
+   // Job cards already picked into another row of this same bill — don't offer them twice
+   const usedJobIds = useMemo(
+      () => new Set(lines.map(l => l.jobId).filter(Boolean).map(String)),
+      [lines]
+   );
+
+   const associatedLots = useMemo(() => {
+      if (!selectedJobPartyId) return [];
+      const targetLine = lookupTargetIdx != null ? lines[lookupTargetIdx] : null;
+      const excludeId = targetLine?.jobId ? String(targetLine.jobId) : null;
+      const available = partyPendingJobs.filter(
+         j => !usedJobIds.has(String(j._id)) || String(j._id) === excludeId
+      );
+      const q = String(targetLine?.chlnNo || '').trim().toLowerCase();
+      if (!q) return available;
+      return available.filter(j => {
+         const lotVal = String(j.lotId?.lotId || j.lotId || '').toLowerCase();
+         const chlnVal = String(j.jobCardNo || '').toLowerCase();
+         const itemVal = String(j.lotId?.itemId?.name || j.lotId?.itemName || '').toLowerCase();
+         return lotVal.includes(q) || chlnVal.includes(q) || itemVal.includes(q);
+      });
+   }, [partyPendingJobs, selectedJobPartyId, lines, lookupTargetIdx, usedJobIds]);
 
    const receivedJobs = useMemo(() => {
       return jobWorkEntries.filter(j => j.status === 'Received');
    }, [jobWorkEntries]);
 
-   const selectedJob = useMemo(() => {
-      return jobWorkEntries.find(j => j._id === selectedJobId) || null;
-   }, [selectedJobId, jobWorkEntries]);
+   const setLineField = (idx, key, value) => {
+      setLines(prev => {
+         const next = [...prev];
+         const line = { ...next[idx], [key]: value };
+         if (key === 'finishMts') {
+            const cutVal = Number(line.cut) || 0;
+            const finish = Number(value) || 0;
+            if (cutVal > 0 && finish > 0) line.fPcs = String(Math.round(finish / cutVal));
+         }
+         next[idx] = line;
+         return next;
+      });
+   };
 
-    const handleSelectLot = (job, options = {}) => {
-       setGridLotNo(job.lotId?.lotId || '');
-       setGridChlnNo(job.challanNo || job.jobCardNo || '');
-       setGridItemName(job.lotId?.itemId?.name || job.lotId?.itemName || '');
-       setGridCP('C');
-       setGridCuttingPending('P');
-       setGridProcType('Finish');
-        // Populate actuals from job issue
-        setGridGPcs(String(job.issuePcs || 0));
-        setGridGreyMts(Number(job.issueQty || 0).toFixed(2));
-        setGridFinishMts('0.00');
-        setGridFinalMts('0.00');
-        setGridFPcs(String(job.issuePcs || 0));
-        setGridJobRate(Number(job.jobRate || 0).toFixed(2));
- 
-       // Populate gstin, hsnCd, and tax defaults for the header/footer
-       setGstin(job.workerId?.gstin || '');
-       setHsnCd(job.hsnCd || '5407');
-       const gstPct = job.gstPercent ? Number(job.gstPercent) : 5;
-       setSgstPercent((gstPct / 2).toString());
-       setCgstPercent((gstPct / 2).toString());
-       setIgstPercent('0');
- 
-       // Keep legacy fields populated for backward compatibility with submit handlers
-       setReceivedPcs('0');
-       setReceivedQty('0');
-       setRate(0);
- 
-       // Save selected Job Card ID for submission
-       setSelectedJobId(job._id);
- 
-       // Focus the specified field or default to Challan No
-       const focusFieldId = options.focusField || 'grid-chln-no';
-       setTimeout(() => {
-          const el = document.getElementById(focusFieldId);
-          if (el) {
-             el.focus();
-             el.select?.();
-          }
-       }, 100);
-    };
+   const handleCutChange = (idx, val) => {
+      setLines(prev => {
+         const next = [...prev];
+         const finish = Number(next[idx].finishMts) || 0;
+         const cutVal = Number(val) || 0;
+         next[idx] = {
+            ...next[idx],
+            cut: val,
+            fPcs: cutVal > 0 && finish > 0 ? String(Math.round(finish / cutVal)) : next[idx].fPcs,
+         };
+         return next;
+      });
+   };
 
-    const handleChlnNoEnter = (e) => {
-       if (!selectedJobPartyId) {
-          notifyWarning('Please select a Job Party first');
-          return;
-       }
-        const typedChln = String(gridChlnNo || '').trim();
-        if (!typedChln) {
-           e.preventDefault();
-           e.stopPropagation();
-           setShowLotDropdown(true);
-           return;
-        }
-       
-       const query = typedChln.toLowerCase();
-       const matches = associatedLots.filter(j => 
-          String(j.jobCardNo || '').toLowerCase() === query || 
-          String(j.challanNo || '').toLowerCase() === query
-       );
-       
-       if (matches.length === 1) {
-          e.preventDefault();
-          e.stopPropagation();
-          handleSelectLot(matches[0], { focusField: 'grid-finish-mts' });
-          notifySuccess(`Loaded Challan ${matches[0].challanNo || matches[0].jobCardNo}`);
-       } else if (matches.length > 1) {
-          e.preventDefault();
-          e.stopPropagation();
-          setShowLotDropdown(true);
-       } else {
-          e.preventDefault();
-          e.stopPropagation();
-          setShowLotDropdown(true);
-          notifyWarning(`No pending issue found with Challan No: "${typedChln}"`);
-       }
-    };
+   const handleFPcsChange = (idx, val) => {
+      setLines(prev => {
+         const next = [...prev];
+         const finish = Number(next[idx].finishMts) || 0;
+         const pcsVal = Number(val) || 0;
+         next[idx] = {
+            ...next[idx],
+            fPcs: val,
+            cut: pcsVal > 0 && finish > 0 ? (finish / pcsVal).toFixed(2) : next[idx].cut,
+         };
+         return next;
+      });
+   };
 
-    useEffect(() => {
-       if (showLotDropdown) {
-          setDropdownSelectIdx(0);
-          setTimeout(() => {
-             dropdownRef.current?.focus();
-          }, 50);
-       }
-    }, [showLotDropdown]);
- 
-    const handleDropdownKeyDown = (e) => {
-       if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          setDropdownSelectIdx((prev) => Math.min(prev + 1, Math.max(0, associatedLots.length - 1)));
-       } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          setDropdownSelectIdx((prev) => Math.max(prev - 1, 0));
-       } else if (e.key === 'Enter') {
-          e.preventDefault();
-          if (associatedLots[dropdownSelectIdx]) {
-             handleSelectLot(associatedLots[dropdownSelectIdx]);
-             setShowLotDropdown(false);
-          }
-       } else if (e.key === 'Escape') {
-          e.preventDefault();
-          setShowLotDropdown(false);
-       }
-    };
+   const addLine = () => setLines(prev => [...prev, blankLine()]);
 
-   // Derived Calculations
-    const calculatedShortage = useMemo(() => {
-       const grey = Number(gridGreyMts) || 0;
-       const finish = Number(gridFinishMts) || 0;
-       if (isNaN(grey) || isNaN(finish) || grey <= 0 || finish <= 0) return '0.0';
-       const diff = grey - finish;
-       const pct = (diff / grey) * 100;
-       return isNaN(pct) ? '0.0' : pct.toFixed(1);
-    }, [gridGreyMts, gridFinishMts]);
+   const removeLine = (idx) => {
+      setLines(prev => (prev.length <= 1 ? [blankLine()] : prev.filter((_, i) => i !== idx)));
+   };
 
-    const calculatedJobAmt = useMemo(() => {
-       const finalVal = Number(gridFinalMts) || 0;
-       const finish = Number(gridFinishMts) || 0;
-       const rateVal = Number(gridJobRate) || 0;
-       const qty = finalVal > 0 ? finalVal : finish;
-       return (qty * rateVal).toFixed(2);
-    }, [gridFinishMts, gridFinalMts, gridJobRate]);
- 
-    const computedGrossAmt = useMemo(() => {
-       return Number(calculatedJobAmt) || 0;
-    }, [calculatedJobAmt]);
+   const openLotLookup = (idx) => {
+      if (!selectedJobPartyId) {
+         notifyWarning('Please select a Job Party first');
+         return;
+      }
+      setLookupTargetIdx(idx);
+      setShowLotDropdown(true);
+   };
 
-    const finishItemOptions = useMemo(() => {
-       return (items || []).map((item) => ({
-          value: item.name || item.itemName || '',
-          label: item.name || item.itemName || '',
-       })).sort((a, b) => a.label.localeCompare(b.label));
-    }, [items]);
- 
-    // Synchronize TDS base amount to Gross Amt automatically
-    useEffect(() => {
-       setOnTdsAmt(computedGrossAmt.toFixed(2));
-    }, [computedGrossAmt]);
- 
-    // Synchronize TDS Amt state from base/percent
-    useEffect(() => {
-       const base = Number(onTdsAmt) || computedGrossAmt;
-       const pct = Number(tdsPercent) || 0;
-       setTdsAmt(((base * pct) / 100).toFixed(2));
-    }, [onTdsAmt, computedGrossAmt, tdsPercent]);
+   const handleSelectLot = (job, idx, options = {}) => {
+      setLines(prev => {
+         const next = [...prev];
+         next[idx] = {
+            ...next[idx],
+            jobId: job._id,
+            lotNo: job.lotId?.lotId || '',
+            chlnNo: job.challanNo || job.jobCardNo || '',
+            itemName: job.lotId?.itemId?.name || job.lotId?.itemName || '',
+            cp: 'C',
+            cuttingPending: 'P',
+            procType: 'Finish',
+            gPcs: String(job.issuePcs || 0),
+            greyMts: Number(job.issueQty || 0).toFixed(2),
+            finishMts: '0.00',
+            finalMts: '0.00',
+            fPcs: String(job.issuePcs || 0),
+            jobRate: Number(job.jobRate || 0).toFixed(2),
+         };
+         return next;
+      });
 
-    // Handlers for Cut/FPcs change relations
-    const handleCutChange = (val) => {
-       setGridCut(val);
-       const cutVal = Number(val) || 0;
-       const finish = Number(gridFinishMts) || 0;
-       if (cutVal > 0 && finish > 0) {
-          setGridFPcs(String(Math.round(finish / cutVal)));
-       }
-    };
+      // Header GSTIN / HSN / default GST% come from the job worker on the first pick
+      setGstin(job.workerId?.gstin || '');
+      setHsnCd(job.hsnCd || '5407');
+      const gstPct = job.gstPercent ? Number(job.gstPercent) : 5;
+      setSgstPercent((gstPct / 2).toString());
+      setCgstPercent((gstPct / 2).toString());
+      setIgstPercent('0');
 
-    const handleFPcsChange = (val) => {
-       setGridFPcs(val);
-       const pcsVal = Number(val) || 0;
-       const finish = Number(gridFinishMts) || 0;
-       if (pcsVal > 0 && finish > 0) {
-          setGridCut((finish / pcsVal).toFixed(2));
-       }
-    };
+      const focusFieldId = options.focusField || `grid-finish-mts-${idx}`;
+      setTimeout(() => {
+         const el = document.getElementById(focusFieldId);
+         if (el) {
+            el.focus();
+            el.select?.();
+         }
+      }, 100);
+   };
 
-    // Sync pieces when Finish.Mts changes
-    useEffect(() => {
-       const finish = Number(gridFinishMts) || 0;
-       const cutVal = Number(gridCut) || 0;
-       if (cutVal > 0 && finish > 0) {
-          setGridFPcs(String(Math.round(finish / cutVal)));
-       }
-    }, [gridFinishMts]);
+   const handleChlnNoEnter = (e, idx) => {
+      if (!selectedJobPartyId) {
+         notifyWarning('Please select a Job Party first');
+         return;
+      }
+      const typedChln = String(lines[idx]?.chlnNo || '').trim();
+      if (!typedChln) {
+         e.preventDefault();
+         e.stopPropagation();
+         setLookupTargetIdx(idx);
+         setShowLotDropdown(true);
+         return;
+      }
 
-    // Handlers for percentage adjustments
-    const handleLessPercentChange = (val) => {
-       setLessPercent(val);
-       const gross = computedGrossAmt;
-       const pct = Number(val) || 0;
-       setLessAmt(((gross * pct) / 100).toFixed(2));
-    };
+      const query = typedChln.toLowerCase();
+      const excludeId = lines[idx]?.jobId ? String(lines[idx].jobId) : null;
+      const available = partyPendingJobs.filter(
+         j => !usedJobIds.has(String(j._id)) || String(j._id) === excludeId
+      );
+      const matches = available.filter(j =>
+         String(j.jobCardNo || '').toLowerCase() === query ||
+         String(j.challanNo || '').toLowerCase() === query
+      );
 
-    const handleOtherLessPercentChange = (val) => {
-       setOtherLessPercent(val);
-       const gross = computedGrossAmt;
-       const pct = Number(val) || 0;
-       setOtherLessAmt(((gross * pct) / 100).toFixed(2));
-    };
+      if (matches.length === 1) {
+         e.preventDefault();
+         e.stopPropagation();
+         handleSelectLot(matches[0], idx, { focusField: `grid-finish-mts-${idx}` });
+         notifySuccess(`Loaded Challan ${matches[0].challanNo || matches[0].jobCardNo}`);
+      } else if (matches.length > 1) {
+         e.preventDefault();
+         e.stopPropagation();
+         setLookupTargetIdx(idx);
+         setShowLotDropdown(true);
+      } else {
+         e.preventDefault();
+         e.stopPropagation();
+         setLookupTargetIdx(idx);
+         setShowLotDropdown(true);
+         notifyWarning(`No pending issue found with Challan No: "${typedChln}"`);
+      }
+   };
 
-    const handleOtherAddPercentChange = (val) => {
-       setOtherAddPercent(val);
-       const gross = computedGrossAmt;
-       const pct = Number(val) || 0;
-       setOtherAddAmt(((gross * pct) / 100).toFixed(2));
-    };
+   useEffect(() => {
+      if (showLotDropdown) {
+         setDropdownSelectIdx(0);
+         setTimeout(() => {
+            dropdownRef.current?.focus();
+         }, 50);
+      }
+   }, [showLotDropdown]);
 
-    // Sync footer adjustment amounts if gross amount changes
-    useEffect(() => {
-       const gross = computedGrossAmt;
+   const handleDropdownKeyDown = (e) => {
+      if (e.key === 'ArrowDown') {
+         e.preventDefault();
+         setDropdownSelectIdx((prev) => Math.min(prev + 1, Math.max(0, associatedLots.length - 1)));
+      } else if (e.key === 'ArrowUp') {
+         e.preventDefault();
+         setDropdownSelectIdx((prev) => Math.max(prev - 1, 0));
+      } else if (e.key === 'Enter') {
+         e.preventDefault();
+         if (associatedLots[dropdownSelectIdx] && lookupTargetIdx != null) {
+            handleSelectLot(associatedLots[dropdownSelectIdx], lookupTargetIdx);
+            setShowLotDropdown(false);
+         }
+      } else if (e.key === 'Escape') {
+         e.preventDefault();
+         setShowLotDropdown(false);
+      }
+   };
 
-       const pct1 = Number(lessPercent) || 0;
-       setLessAmt(((gross * pct1) / 100).toFixed(2));
+   // Derived per-line + bill-level calculations
+   const linesWithAmt = useMemo(
+      () => lines.map((l) => ({ ...l, jobAmt: lineJobAmt(l) })),
+      [lines]
+   );
 
-       const pct2 = Number(otherLessPercent) || 0;
-       setOtherLessAmt(((gross * pct2) / 100).toFixed(2));
+   const computedGrossAmt = useMemo(
+      () => linesWithAmt.reduce((s, l) => s + (Number(l.jobAmt) || 0), 0),
+      [linesWithAmt]
+   );
 
-       const pct3 = Number(otherAddPercent) || 0;
-       setOtherAddAmt(((gross * pct3) / 100).toFixed(2));
-    }, [computedGrossAmt]);
- 
-    const computedSgstAmt = useMemo(() => {
-       const pct = Number(sgstPercent) || 0;
-       return ((computedGrossAmt * pct) / 100).toFixed(2);
-    }, [computedGrossAmt, sgstPercent]);
- 
-    const computedCgstAmt = useMemo(() => {
-       const pct = Number(cgstPercent) || 0;
-       return ((computedGrossAmt * pct) / 100).toFixed(2);
-    }, [computedGrossAmt, cgstPercent]);
- 
-    const computedIgstAmt = useMemo(() => {
-       const pct = Number(igstPercent) || 0;
-       return ((computedGrossAmt * pct) / 100).toFixed(2);
-    }, [computedGrossAmt, igstPercent]);
- 
-    const computedNetAmt = useMemo(() => {
-       const gross = computedGrossAmt;
-       const sgst = Number(computedSgstAmt) || 0;
-       const cgst = Number(computedCgstAmt) || 0;
-       const igst = Number(computedIgstAmt) || 0;
- 
-       const lessVal = Number(lessAmt) || 0;
-       const otherLess = Number(otherLessAmt) || 0;
-       const otherAdd = Number(otherAddAmt) || 0;
- 
-       return gross + sgst + cgst + igst - lessVal - otherLess + otherAdd;
-    }, [computedGrossAmt, computedSgstAmt, computedCgstAmt, computedIgstAmt, lessAmt, otherLessAmt, otherAddAmt]);
- 
-    const computedRoundOff = useMemo(() => {
-       const net = computedNetAmt;
-       const rounded = Math.round(net);
-       return (rounded - net).toFixed(2);
-    }, [computedNetAmt]);
- 
-    const computedFinalAmt = useMemo(() => {
-       const net = computedNetAmt;
-       const tds = Number(tdsAmt) || 0;
-       return Math.round(net - tds);
-    }, [computedNetAmt, tdsAmt]);
+   const gridTotals = useMemo(
+      () =>
+         lines.reduce(
+            (acc, l) => ({
+               fPcs: acc.fPcs + (Number(l.fPcs) || 0),
+               greyMts: acc.greyMts + (Number(l.greyMts) || 0),
+               finishMts: acc.finishMts + (Number(l.finishMts) || 0),
+            }),
+            { fPcs: 0, greyMts: 0, finishMts: 0 }
+         ),
+      [lines]
+   );
+
+   const finishItemOptions = useMemo(() => {
+      return (items || []).map((item) => ({
+         value: item.name || item.itemName || '',
+         label: item.name || item.itemName || '',
+      })).sort((a, b) => a.label.localeCompare(b.label));
+   }, [items]);
+
+   // Synchronize TDS base amount to Gross Amt automatically
+   useEffect(() => {
+      setOnTdsAmt(computedGrossAmt.toFixed(2));
+   }, [computedGrossAmt]);
+
+   // Synchronize TDS Amt state from base/percent
+   useEffect(() => {
+      const base = Number(onTdsAmt) || computedGrossAmt;
+      const pct = Number(tdsPercent) || 0;
+      setTdsAmt(((base * pct) / 100).toFixed(2));
+   }, [onTdsAmt, computedGrossAmt, tdsPercent]);
+
+   // Handlers for percentage adjustments
+   const handleLessPercentChange = (val) => {
+      setLessPercent(val);
+      const gross = computedGrossAmt;
+      const pct = Number(val) || 0;
+      setLessAmt(((gross * pct) / 100).toFixed(2));
+   };
+
+   const handleOtherLessPercentChange = (val) => {
+      setOtherLessPercent(val);
+      const gross = computedGrossAmt;
+      const pct = Number(val) || 0;
+      setOtherLessAmt(((gross * pct) / 100).toFixed(2));
+   };
+
+   const handleOtherAddPercentChange = (val) => {
+      setOtherAddPercent(val);
+      const gross = computedGrossAmt;
+      const pct = Number(val) || 0;
+      setOtherAddAmt(((gross * pct) / 100).toFixed(2));
+   };
+
+   // Sync footer adjustment amounts if gross amount changes
+   useEffect(() => {
+      const gross = computedGrossAmt;
+
+      const pct1 = Number(lessPercent) || 0;
+      setLessAmt(((gross * pct1) / 100).toFixed(2));
+
+      const pct2 = Number(otherLessPercent) || 0;
+      setOtherLessAmt(((gross * pct2) / 100).toFixed(2));
+
+      const pct3 = Number(otherAddPercent) || 0;
+      setOtherAddAmt(((gross * pct3) / 100).toFixed(2));
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [computedGrossAmt]);
+
+   const computedSgstAmt = useMemo(() => {
+      const pct = Number(sgstPercent) || 0;
+      return ((computedGrossAmt * pct) / 100).toFixed(2);
+   }, [computedGrossAmt, sgstPercent]);
+
+   const computedCgstAmt = useMemo(() => {
+      const pct = Number(cgstPercent) || 0;
+      return ((computedGrossAmt * pct) / 100).toFixed(2);
+   }, [computedGrossAmt, cgstPercent]);
+
+   const computedIgstAmt = useMemo(() => {
+      const pct = Number(igstPercent) || 0;
+      return ((computedGrossAmt * pct) / 100).toFixed(2);
+   }, [computedGrossAmt, igstPercent]);
+
+   const computedNetAmt = useMemo(() => {
+      const gross = computedGrossAmt;
+      const sgst = Number(computedSgstAmt) || 0;
+      const cgst = Number(computedCgstAmt) || 0;
+      const igst = Number(computedIgstAmt) || 0;
+
+      const lessVal = Number(lessAmt) || 0;
+      const otherLess = Number(otherLessAmt) || 0;
+      const otherAdd = Number(otherAddAmt) || 0;
+      // RCM GST is paid directly to the government, not to the job worker —
+      // only fold it into the payable Net Amount when Reverse Charge applies.
+      const rcm = reverseCharge === 'Yes' ? (Number(rcmGst) || 0) : 0;
+
+      return gross + sgst + cgst + igst + rcm - lessVal - otherLess + otherAdd;
+   }, [computedGrossAmt, computedSgstAmt, computedCgstAmt, computedIgstAmt, lessAmt, otherLessAmt, otherAddAmt, reverseCharge, rcmGst]);
+
+   const computedRoundOff = useMemo(() => {
+      const net = computedNetAmt;
+      const rounded = Math.round(net);
+      return (rounded - net).toFixed(2);
+   }, [computedNetAmt]);
+
+   const computedFinalAmt = useMemo(() => {
+      const net = computedNetAmt;
+      const tds = Number(tdsAmt) || 0;
+      return Math.round(net - tds);
+   }, [computedNetAmt, tdsAmt]);
 
    const handleSubmit = async (e) => {
       e.preventDefault();
-      if (!selectedJobId) {
-         notifyWarning('Please select a pending process job card');
-         return;
-      }
       if (!billGpNo || String(billGpNo).trim() === '') {
          notifyWarning('Please enter Bill/GP No.');
          return;
       }
-      const receivedQtyVal = Number(gridFinishMts) || 0;
-      if (receivedQtyVal <= 0) {
-         notifyWarning('Please enter a valid received quantity (Finish.Mts)');
+      const receivable = linesWithAmt.filter(l => l.jobId && Number(l.finishMts) > 0);
+      if (receivable.length === 0) {
+         notifyWarning('Add at least one line with a linked challan and received Finish.Mts');
          return;
       }
 
       setSaving(true);
+      let ok = 0;
       try {
          const totalGst = Number(computedSgstAmt) + Number(computedCgstAmt) + Number(computedIgstAmt);
-         await receiveFromMill({
-            jobId: selectedJobId,
-            receivedQty: receivedQtyVal,
-            receivedPcs: Number(gridFPcs) || 0,
-            wastage: Math.max(0, Number(gridGreyMts) - receivedQtyVal),
-            charges: computedGrossAmt,
-            gstAmount: totalGst,
-            billGpNo: billGpNo.trim()
-         });
-         notifySuccess('Challan received and finished lots added to stock!');
-         setSelectedJobId('');
+         for (const line of receivable) {
+            const gstShare =
+               computedGrossAmt > 0 ? (line.jobAmt / computedGrossAmt) * totalGst : totalGst / receivable.length;
+            await receiveFromMill({
+               jobId: line.jobId,
+               receivedQty: Number(line.finishMts) || 0,
+               receivedPcs: Number(line.fPcs) || 0,
+               wastage: Math.max(0, Number(line.greyMts) - Number(line.finishMts)),
+               charges: Number(line.jobAmt) || 0,
+               gstAmount: Number(gstShare.toFixed(2)) || 0,
+               billGpNo: billGpNo.trim(),
+            });
+            ok += 1;
+         }
+         notifySuccess(`Challan(s) received — ${ok} finished lot(s) added to stock!`);
          setBillGpNo('');
-         setGridLotNo('');
-         setGridChlnNo('');
-         setGridItemName('');
-         setGridGPcs('0');
-         setGridGreyMts('0.00');
-         setGridFinishMts('0.00');
-         setGridFinalMts('0.00');
-         setGridFPcs('0');
-         setGridJobRate('0.00');
+         setLines([blankLine()]);
          setActiveTab('View Mill Rec');
          await fetchJobs();
          await fetchInventory();
       } catch (err) {
-         notifyError(err, 'Failed to receive job');
+         notifyError(err, { fallback: ok > 0 ? `Partial save: ${ok} received, then failed` : 'Failed to receive job' });
       } finally {
          setSaving(false);
       }
@@ -523,7 +573,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     value={selectedJobPartyId}
                                     onChange={(e) => {
                                        setSelectedJobPartyId(e.target.value);
-                                       setSelectedJobId(''); // Reset selected job card
+                                       setLines([blankLine()]); // switching party invalidates picked challans
                                     }}
                                     options={jobPartyOptions}
                                     placeholder="- Select Job Party -"
@@ -550,7 +600,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     disabled
                                  />
                               </div>
-                              <div className="col-span-1.5 flex items-center gap-1">
+                              <div className="col-span-1 flex items-center gap-1">
                                  <span className="text-slate-800 font-semibold">Serial No:</span>
                                  <input
                                     type="text"
@@ -559,7 +609,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     disabled
                                  />
                               </div>
-                              <div className="col-span-1.5 flex items-center gap-1">
+                              <div className="col-span-2 flex items-center gap-1">
                                  <span className="text-slate-800 font-semibold">Date:</span>
                                  <input
                                     type="date"
@@ -580,7 +630,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                  />
                               </div>
                               <div className="col-span-3 flex items-center px-1">
-                                 <span className="text-red-700 font-bold italic text-[9px]">Press (ALT+L) To LotNo Entry</span>
+                                 <span className="text-red-700 font-bold italic text-[9px]">Click ChlnNo cell (or Alt+L) to pick a challan — Add Line for more</span>
                               </div>
                               <div className="col-span-2 flex items-center gap-1">
                                  <span className="text-slate-800 font-semibold text-right w-24">Reverse Charge:</span>
@@ -617,9 +667,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                            </div>
                         </div>
 
-                        {/* 2. TRANSACTION GRID TABLE */}
-                        <div className="border border-[#808080] bg-white overflow-x-auto min-h-[180px] max-h-[220px]">
-                           <table className="min-w-[1400px] w-full text-[10px] font-mono border-collapse">
+                        {/* 2. TRANSACTION GRID TABLE (multi-row — one line per challan) */}
+                        <div className="border border-[#808080] bg-white overflow-x-auto min-h-[180px] max-h-[280px]">
+                           <table className="min-w-[1440px] w-full text-[10px] font-mono border-collapse">
                               <thead>
                                  <tr className="bg-[#e2e8f0] text-slate-800 border-b border-[#808080] text-[10px]">
                                     <th className="border-r border-[#808080] p-1 w-10 text-center">SrNo</th>
@@ -639,205 +689,214 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     <th className="border-r border-[#808080] p-1 w-16 text-center">Cut</th>
                                     <th className="border-r border-[#808080] p-1 w-20 text-right">F.Pcs</th>
                                     <th className="border-r border-[#808080] p-1 w-28 text-left">Proc Type</th>
-                                    <th className="p-1 w-28 text-left">Cutting Pending</th>
+                                    <th className="border-r border-[#808080] p-1 w-28 text-left">Cutting Pending</th>
+                                    <th className="p-1 w-8" />
                                  </tr>
                               </thead>
                               <tbody>
-                                 {/* Interactive structured inputs for UI only */}
-                                 <tr className="border-b border-slate-200 hover:bg-slate-50">
-                                    <td className="border-r border-slate-300 p-1 text-center bg-slate-100 font-bold">1</td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          type="text"
-                                          className="w-full h-6 px-1 border-none bg-slate-100 text-slate-500 font-mono"
-                                          value={gridLotNo}
-                                          readOnly
-                                          disabled
-                                          placeholder="Auto-filled"
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          id="grid-chln-no"
-                                          type="text"
-                                          className="w-full h-6 px-1 border-none focus:outline-none focus:ring-1 focus:ring-blue-500 bg-sky-100 font-mono cursor-pointer"
-                                          value={gridChlnNo}
-                                          onChange={(e) => setGridChlnNo(e.target.value)}
-                                          onClick={() => {
-                                             if (!selectedJobPartyId) {
-                                                notifyWarning('Please select a Job Party first');
-                                                return;
-                                             }
-                                             setShowLotDropdown(true);
-                                          }}
-                                          onKeyDown={(e) => {
-                                             if (e.key === 'Enter') {
-                                                if (!gridChlnNo || !selectedJobId) {
-                                                   e.preventDefault();
-                                                   e.stopPropagation();
-                                                   if (!selectedJobPartyId) {
-                                                      notifyWarning('Please select a Job Party first');
-                                                      return;
+                                 {linesWithAmt.map((line, idx) => (
+                                    <tr key={line.id} className="border-b border-slate-200 hover:bg-slate-50">
+                                       <td className="border-r border-slate-300 p-1 text-center bg-slate-100 font-bold">{idx + 1}</td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="text"
+                                             className="w-full h-6 px-1 border-none bg-slate-100 text-slate-500 font-mono"
+                                             value={line.lotNo}
+                                             readOnly
+                                             disabled
+                                             placeholder="Auto-filled"
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             id={`grid-chln-no-${idx}`}
+                                             type="text"
+                                             className="w-full h-6 px-1 border-none focus:outline-none focus:ring-1 focus:ring-blue-500 bg-sky-100 font-mono cursor-pointer"
+                                             value={line.chlnNo}
+                                             onChange={(e) => setLineField(idx, 'chlnNo', e.target.value)}
+                                             onClick={() => openLotLookup(idx)}
+                                             onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                   if (!line.chlnNo || !line.jobId) {
+                                                      e.preventDefault();
+                                                      e.stopPropagation();
+                                                      openLotLookup(idx);
+                                                   } else {
+                                                      handleChlnNoEnter(e, idx);
                                                    }
-                                                   setShowLotDropdown(true);
-                                                } else {
-                                                   handleChlnNoEnter(e);
                                                 }
-                                             }
-                                          }}
-                                          placeholder="Press Enter or Click..."
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          type="text"
-                                          className="w-full h-6 px-1 border-none bg-slate-100 text-slate-700"
-                                          value={gridItemName}
-                                          onChange={(e) => setGridItemName(e.target.value)}
-                                          disabled
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          id="grid-g-pcs"
-                                          type="number"
-                                          className="w-full h-6 px-1 border-none text-right bg-transparent"
-                                          value={gridGPcs}
-                                          onChange={(e) => setGridGPcs(e.target.value)}
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          id="grid-grey-mts"
-                                          type="number"
-                                          className="w-full h-6 px-1 border-none text-right bg-transparent"
-                                          value={gridGreyMts}
-                                          onChange={(e) => setGridGreyMts(e.target.value)}
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          id="grid-finish-mts"
-                                          type="number"
-                                          className="w-full h-6 px-1 border-none text-right bg-transparent"
-                                          value={gridFinishMts}
-                                          onChange={(e) => setGridFinishMts(e.target.value)}
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          type="number"
-                                          className="w-full h-6 px-1 border-none text-right bg-transparent"
-                                          value={gridFinalMts}
-                                          onChange={(e) => setGridFinalMts(e.target.value)}
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          type="text"
-                                          className="w-full h-6 px-1 border-none text-right bg-slate-100"
-                                          value={calculatedShortage}
-                                          disabled
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          type="number"
-                                          className="w-full h-6 px-1 border-none text-right bg-transparent font-bold"
-                                          value={gridJobRate}
-                                          onChange={(e) => setGridJobRate(e.target.value)}
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          type="number"
-                                          className="w-full h-6 px-1 border-none text-right bg-slate-100 font-bold"
-                                          value={calculatedJobAmt}
-                                          disabled
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          type="text"
-                                          className="w-full h-6 px-1 border-none text-center bg-transparent"
-                                          value={gridCP}
-                                          onChange={(e) => setGridCP(e.target.value)}
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          type="text"
-                                          className="w-full h-6 px-1 border-none text-center bg-transparent"
-                                          value={gridTp}
-                                          onChange={(e) => setGridTp(e.target.value)}
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <select
-                                          className="w-full h-6 px-1 border-none bg-transparent text-[10px] focus:outline-none uppercase font-bold"
-                                          value={gridFinishItem}
-                                          onChange={(e) => setGridFinishItem(e.target.value)}
-                                       >
-                                          <option value="">- Select -</option>
-                                          {finishItemOptions.map(opt => (
-                                             <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                          ))}
-                                       </select>
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          type="text"
-                                          className="w-full h-6 px-1 border-none text-center bg-transparent"
-                                          value={gridCut}
-                                          onChange={(e) => handleCutChange(e.target.value)}
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <input
-                                          type="number"
-                                          className="w-full h-6 px-1 border-none text-right bg-transparent"
-                                          value={gridFPcs}
-                                          onChange={(e) => handleFPcsChange(e.target.value)}
-                                       />
-                                    </td>
-                                    <td className="border-r border-slate-300 p-0.5">
-                                       <select
-                                          className="w-full h-6 px-1 border-none bg-transparent text-[10px] focus:outline-none"
-                                          value={gridProcType}
-                                          onChange={(e) => setGridProcType(e.target.value)}
-                                       >
-                                          <option value="">- Select -</option>
-                                          <option value="Finish">Finish</option>
-                                          <option value="Refinish">Refinish</option>
-                                          <option value="Return">Return</option>
-                                       </select>
-                                    </td>
-                                    <td className="p-0.5">
-                                       <input
-                                          type="text"
-                                          className="w-full h-6 px-1 border-none bg-transparent"
-                                          value={gridCuttingPending}
-                                          onChange={(e) => setGridCuttingPending(e.target.value)}
-                                       />
-                                    </td>
-                                 </tr>
+                                             }}
+                                             placeholder="Press Enter or Click..."
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="text"
+                                             className="w-full h-6 px-1 border-none bg-slate-100 text-slate-700"
+                                             value={line.itemName}
+                                             disabled
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="number"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                             value={line.gPcs}
+                                             onChange={(e) => setLineField(idx, 'gPcs', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="number"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                             value={line.greyMts}
+                                             onChange={(e) => setLineField(idx, 'greyMts', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             id={`grid-finish-mts-${idx}`}
+                                             type="number"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                             value={line.finishMts}
+                                             onChange={(e) => setLineField(idx, 'finishMts', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="number"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                             value={line.finalMts}
+                                             onChange={(e) => setLineField(idx, 'finalMts', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="text"
+                                             className="w-full h-6 px-1 border-none text-right bg-slate-100"
+                                             value={lineShortagePct(line)}
+                                             disabled
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="number"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent font-bold"
+                                             value={line.jobRate}
+                                             onChange={(e) => setLineField(idx, 'jobRate', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="number"
+                                             className="w-full h-6 px-1 border-none text-right bg-slate-100 font-bold"
+                                             value={line.jobAmt}
+                                             disabled
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="text"
+                                             className="w-full h-6 px-1 border-none text-center bg-transparent"
+                                             value={line.cp}
+                                             onChange={(e) => setLineField(idx, 'cp', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="text"
+                                             className="w-full h-6 px-1 border-none text-center bg-transparent"
+                                             value={line.tp}
+                                             onChange={(e) => setLineField(idx, 'tp', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <select
+                                             className="w-full h-6 px-1 border-none bg-transparent text-[10px] focus:outline-none uppercase font-bold"
+                                             value={line.finishItem}
+                                             onChange={(e) => setLineField(idx, 'finishItem', e.target.value)}
+                                          >
+                                             <option value="">- Select -</option>
+                                             {finishItemOptions.map(opt => (
+                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                             ))}
+                                          </select>
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="text"
+                                             className="w-full h-6 px-1 border-none text-center bg-transparent"
+                                             value={line.cut}
+                                             onChange={(e) => handleCutChange(idx, e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="number"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                             value={line.fPcs}
+                                             onChange={(e) => handleFPcsChange(idx, e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <select
+                                             className="w-full h-6 px-1 border-none bg-transparent text-[10px] focus:outline-none"
+                                             value={line.procType}
+                                             onChange={(e) => setLineField(idx, 'procType', e.target.value)}
+                                          >
+                                             <option value="">- Select -</option>
+                                             <option value="Finish">Finish</option>
+                                             <option value="Refinish">Refinish</option>
+                                             <option value="Return">Return</option>
+                                          </select>
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="text"
+                                             className="w-full h-6 px-1 border-none bg-transparent"
+                                             value={line.cuttingPending}
+                                             onChange={(e) => setLineField(idx, 'cuttingPending', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="p-0.5 text-center">
+                                          <button
+                                             type="button"
+                                             className="text-red-600 hover:text-red-800 disabled:opacity-30"
+                                             onClick={() => removeLine(idx)}
+                                             title="Remove line"
+                                          >
+                                             <Trash2 size={12} />
+                                          </button>
+                                       </td>
+                                    </tr>
+                                 ))}
                               </tbody>
                            </table>
                         </div>
 
+                        <div className="flex justify-start">
+                           <button
+                              type="button"
+                              className="px-3 py-1 text-[10px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1] flex items-center gap-1"
+                              onClick={addLine}
+                           >
+                              <Plus size={11} /> Add Line
+                           </button>
+                        </div>
+
                         {/* 3. SUMMARY BAR */}
                         <div className="bg-[#0f766e] text-white text-[11px] font-bold px-3 py-1 flex justify-between items-center uppercase border border-[#0d6059]">
-                           <div>TOTAL PCS : {Number(gridFPcs) || 0}</div>
-                           <div>Send.Mts : {Number(gridGreyMts) || 0}</div>
-                           <div>Rec.Mts : {Number(gridFinishMts) || 0}</div>
-                           <div>FnsPcs : {Number(gridFPcs) || 0}</div>
+                           <div>TOTAL PCS : {gridTotals.fPcs}</div>
+                           <div>Send.Mts : {gridTotals.greyMts.toFixed(2)}</div>
+                           <div>Rec.Mts : {gridTotals.finishMts.toFixed(2)}</div>
+                           <div>FnsPcs : {gridTotals.fPcs}</div>
                            <div>(Snd.Kgs : 0 &middot; Rec.Kgs : 0)</div>
                         </div>
 
                         {/* 4. FOOTER MULTI-COLUMN ADJUSTMENTS */}
                         <div className="grid grid-cols-12 gap-2 text-[11px] p-2 border border-[#808080] bg-[#d4d0c8]">
 
-                           {/* Column 1: Adjustments (4 cols) */}
+                           {/* Column 1: Adjustments */}
                            <div className="col-span-3 space-y-1.5 border-r border-[#a0a0a0] pr-2">
                               <div className="flex items-center gap-1">
                                  <span className="w-20 text-slate-800 font-semibold text-right">Less:</span>
@@ -895,8 +954,8 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                               </div>
                            </div>
 
-                           {/* Column 2: TDS Details (2.5 cols) */}
-                           <div className="col-span-2.5 space-y-1.5 border-r border-[#a0a0a0] px-2">
+                           {/* Column 2: TDS Details */}
+                           <div className="col-span-2 space-y-1.5 border-r border-[#a0a0a0] px-2">
                               <div className="flex items-center gap-1">
                                  <span className="w-24 text-slate-800 font-semibold text-right">On Tds Amount:</span>
                                  <input
@@ -930,7 +989,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                               </div>
                            </div>
 
-                           {/* Column 3: GST Details (3 cols) */}
+                           {/* Column 3: GST Details */}
                            <div className="col-span-3 space-y-1.5 border-r border-[#a0a0a0] px-2">
                               <div className="flex items-center gap-1">
                                  <span className="w-16 text-slate-800 font-semibold text-right">SGST %:</span>
@@ -979,8 +1038,8 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                               </div>
                            </div>
 
-                           {/* Column 4: Totals Block (3.5 cols) */}
-                           <div className="col-span-3.5 space-y-1 pl-2">
+                           {/* Column 4: Totals Block */}
+                           <div className="col-span-4 space-y-1 pl-2">
                               <div className="flex items-center gap-1">
                                  <span className="w-24 text-slate-700 font-semibold text-right">Gross Amt:</span>
                                  <input
@@ -1006,6 +1065,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     className="classic-erp-input flex-1 text-right bg-amber-50 text-amber-900"
                                     value={rcmGst}
                                     onChange={(e) => setRcmGst(e.target.value)}
+                                    disabled={reverseCharge !== 'Yes'}
                                  />
                               </div>
                               <div className="flex items-center gap-1 border-t border-slate-300 pt-1">
@@ -1040,7 +1100,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                               <button
                                  type="submit"
                                  onClick={handleSubmit}
-                                 disabled={saving || !selectedJobId}
+                                 disabled={saving || !selectedJobPartyId}
                                  className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]"
                               >
                                  <SaveButtonLabel saving={saving} idle="Save" busy="Saving…" />
@@ -1080,6 +1140,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                  <tr>
                                     <th className="w-24">Date</th>
                                     <th className="w-32">Job Card No</th>
+                                    <th className="w-28">Bill/Gp No</th>
                                     <th>Mill Partner</th>
                                     <th className="w-28">Process</th>
                                     <th className="w-28 text-right">Issued Qty</th>
@@ -1093,6 +1154,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     <tr key={job._id}>
                                        <td className="font-mono">{job.receiveDate ? new Date(job.receiveDate).toLocaleDateString() : 'N/A'}</td>
                                        <td className="font-bold text-blue-900">{job.jobCardNo}</td>
+                                       <td className="font-mono text-slate-700">{job.billGpNo || ''}</td>
                                        <td className="font-bold uppercase">{job.workerId?.name || 'N/A'}</td>
                                        <td className="uppercase font-mono text-slate-700">{job.processType}</td>
                                        <td className="text-right font-mono">{job.issueQty} Mts</td>
@@ -1107,7 +1169,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                  ))}
                                  {receivedJobs.length === 0 && (
                                     <tr>
-                                       <td colSpan="8" className="py-8 text-center text-slate-400 font-bold uppercase">
+                                       <td colSpan="9" className="py-8 text-center text-slate-400 font-bold uppercase">
                                           No Received Receipts Found
                                        </td>
                                     </tr>
@@ -1128,7 +1190,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                         onKeyDown={handleDropdownKeyDown}
                         className="w-[580px] bg-[#d4d0c8] border-2 border-white border-r-[#808080] border-b-[#808080] shadow-md flex flex-col font-mono text-[11px] outline-none"
                      >
- 
+
                         {/* Dialog Header */}
                         <div className="bg-[#858178] px-2 py-1 text-white font-bold flex justify-between items-center select-none">
                            <span>Select Challan [ Associated Mill Issues ]</span>
@@ -1140,7 +1202,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                               &times;
                            </button>
                         </div>
- 
+
                         {/* Dialog Body */}
                         <div className="p-2 space-y-2">
                            <div className="text-[10px] text-red-800 font-bold mb-1">
@@ -1162,7 +1224,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                           <tr
                                              key={job._id}
                                              onClick={() => {
-                                                handleSelectLot(job);
+                                                if (lookupTargetIdx != null) handleSelectLot(job, lookupTargetIdx);
                                                 setShowLotDropdown(false);
                                              }}
                                              onMouseEnter={() => setDropdownSelectIdx(i)}
@@ -1183,7 +1245,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                               </table>
                            </div>
                         </div>
- 
+
                         {/* Dialog Footer */}
                         <div className="p-2 border-t border-[#808080] flex justify-end gap-1">
                            <button

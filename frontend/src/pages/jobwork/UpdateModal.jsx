@@ -64,7 +64,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
     challanNo: '1',
     challanNoSuffix: '',
     date: today(),
-    reFinish: false,
+    reFinish: '',
     gstType: 'INVOICE IN STATE',
     gstin: '',
     partyId: '',
@@ -121,6 +121,13 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
     [parties]
   );
 
+  /** Address block shown under Job Party, matching the classic two-line party box. */
+  const partyAddress = useMemo(() => {
+    const p = (parties || []).find((x) => String(x._id || x.id) === String(header.partyId));
+    if (!p) return '';
+    return [p.address, p.city, p.state].filter(Boolean).join(', ');
+  }, [parties, header.partyId]);
+
   const jobOptions = useMemo(() => {
     const list = [...(jobWorkEntries || [])];
     list.sort((a, b) => {
@@ -163,6 +170,10 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
     const totalGst = cgstAmt + sgstAmt + igstAmt;
     const net = Number((gross + totalGst).toFixed(2));
 
+    const totalPcs = linesWithAmt.reduce((s, l) => s + (Number(l.pcs) || 0), 0);
+    const totalQty = linesWithAmt.reduce((s, l) => s + (Number(l.qty) || 0), 0);
+    const totalKgs = linesWithAmt.reduce((s, l) => s + (Number(l.kgs) || 0), 0);
+
     return {
       linesWithAmt,
       gross,
@@ -174,8 +185,27 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       igstAmt,
       totalGst,
       net,
+      totalPcs,
+      totalQty,
+      totalKgs,
     };
   }, [lines, footer.taxRate, header.gstType]);
+
+  /** Live balance of every lot currently picked into the grid — the classic "Current Stock" strip. */
+  const currentStock = useMemo(() => {
+    const pickedIds = new Set(lines.map((l) => String(l.lotId)).filter(Boolean));
+    return (inventoryLots || []).reduce(
+      (acc, lot) => {
+        if (!pickedIds.has(String(lot._id || lot.id))) return acc;
+        return {
+          pcs: acc.pcs + (Number(lot.remainingPcs) || 0),
+          qty: acc.qty + (Number(lot.remainingMtrs) || 0),
+          kgs: acc.kgs + (Number(lot.remainingKgs ?? lot.totalKgs) || 0),
+        };
+      },
+      { pcs: 0, qty: 0, kgs: 0 }
+    );
+  }, [lines, inventoryLots]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -285,7 +315,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       challanNo: '1',
       challanNoSuffix: '',
       date: today(),
-      reFinish: false,
+      reFinish: '',
       gstType: 'INVOICE IN STATE',
       gstin: '',
       partyId: '',
@@ -331,7 +361,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       challanNo: job.challanNo || job.jobCardNo || '',
       challanNoSuffix: '',
       date: job.issueDate ? String(job.issueDate).slice(0, 10) : today(),
-      reFinish: job.reFinish || false,
+      reFinish: job.reFinish || '',
       gstType: job.gstType || 'INVOICE IN STATE',
       gstin: job.workerId?.gstin || '',
       partyId: job.workerId?._id || job.workerId || '',
@@ -439,7 +469,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
   const titleBook = selectedBook || header.book || 'JOBWORK BOOK';
 
   const gridCols = [
-    { key: 'lotNo', label: 'CNo (LotNo)', w: 'w-28', lookup: true },
+    { key: 'lotNo', label: 'CNo', w: 'w-28', lookup: true },
     { key: 'chlnNo', label: 'ChlnNo', w: 'w-24', readOnly: true },
     { key: 'itemName', label: 'Item Name', w: 'flex-1', readOnly: true },
     { key: 'pcs', label: 'Pcs', w: 'w-16', align: 'right' },
@@ -495,52 +525,50 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
               <div className="classic-erp-frame erp-job-issue-header shrink-0">
                 <div className="erp-job-issue-header-grid">
                   <div className="classic-erp-stack">
-                    <div className="classic-erp-meta-grid erp-job-issue-meta-row">
-                      <div className="classic-erp-field">
-                        <span className="classic-erp-label red-label">Challan No</span>
-                        <div className="flex gap-1">
-                          <input
-                            type="text"
-                            className="classic-erp-input text-center font-bold flex-1"
-                            value={header.challanNo}
-                            onChange={(e) => setHeader({ ...header, challanNo: e.target.value })}
-                            disabled={locked}
-                          />
-                          <input
-                            type="text"
-                            className="classic-erp-input text-center w-10 shrink-0"
-                            value={header.challanNoSuffix}
-                            onChange={(e) => setHeader({ ...header, challanNoSuffix: e.target.value })}
-                            disabled={locked}
-                            placeholder="Suffix"
-                          />
-                        </div>
+                    <div className="classic-erp-field classic-erp-field--lg">
+                      <span className="classic-erp-label red-label">Challan No</span>
+                      <div className="flex gap-1 items-center">
+                        <input
+                          type="text"
+                          className="classic-erp-input text-center font-bold"
+                          style={{ width: 110, flex: '0 0 110px' }}
+                          value={header.challanNo}
+                          onChange={(e) => setHeader({ ...header, challanNo: e.target.value })}
+                          disabled={locked}
+                        />
+                        <input
+                          type="text"
+                          className="classic-erp-input text-center"
+                          style={{ width: 52, flex: '0 0 52px' }}
+                          value={header.challanNoSuffix}
+                          onChange={(e) => setHeader({ ...header, challanNoSuffix: e.target.value })}
+                          disabled={locked}
+                        />
+                        <span className="text-slate-400 font-bold ml-1">-</span>
                       </div>
-                      <div className="classic-erp-field">
-                        <span className="classic-erp-label red-label">Date</span>
-                        <div className="classic-erp-control">
-                          <input
-                            type="date"
-                            className="classic-erp-input erp-job-issue-date"
-                            value={header.date}
-                            onChange={(e) => setHeader({ ...header, date: e.target.value })}
-                            disabled={locked}
-                            required
-                          />
-                          <span className="erp-job-issue-weekday">{weekday(header.date)}</span>
-                        </div>
-                      </div>
-                      <div className="classic-erp-field justify-center pl-2">
-                        <label className="flex items-center gap-1.5 cursor-pointer text-[11px] font-bold">
-                          <input
-                            type="checkbox"
-                            className="w-3.5 h-3.5 border-slate-400 bg-white"
-                            checked={header.reFinish}
-                            onChange={(e) => setHeader({ ...header, reFinish: e.target.checked })}
-                            disabled={locked}
-                          />
-                          ReFinish
-                        </label>
+                    </div>
+
+                    <div className="classic-erp-field classic-erp-field--lg mt-1">
+                      <span className="classic-erp-label red-label">Date</span>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="date"
+                          className="classic-erp-input erp-job-issue-date"
+                          value={header.date}
+                          onChange={(e) => setHeader({ ...header, date: e.target.value })}
+                          disabled={locked}
+                          required
+                        />
+                        <span className="erp-job-issue-weekday">{weekday(header.date)}</span>
+                        <span className="classic-erp-label !w-auto ml-3">ReFinish</span>
+                        <input
+                          type="text"
+                          className="classic-erp-input text-center font-bold"
+                          style={{ width: 72, flex: '0 0 72px' }}
+                          value={header.reFinish}
+                          onChange={(e) => setHeader({ ...header, reFinish: e.target.value })}
+                          disabled={locked}
+                        />
                       </div>
                     </div>
 
@@ -555,6 +583,11 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                         recentKey="job-issue-party"
                         allowClear
                       />
+                    </div>
+
+                    <div className="classic-erp-field classic-erp-field--lg">
+                      <span className="classic-erp-label" />
+                      <div className="erp-job-issue-party-address">{partyAddress || ','}</div>
                     </div>
 
                     <div className="classic-erp-field classic-erp-field--lg mt-1">
@@ -580,6 +613,13 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                           disabled={locked}
                         />
                       </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="erp-job-issue-f4hint">F4 To Qty Detail Entry</span>
+                      <span className="erp-job-issue-stockstrip">
+                        Current Stock : Pcs: {currentStock.pcs} &nbsp; Qty: {currentStock.qty.toFixed(2)} &nbsp; Kgs: {currentStock.kgs.toFixed(2)}
+                      </span>
                     </div>
                   </div>
 
@@ -608,44 +648,50 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                       </div>
                     </div>
 
-                    <div className="erp-job-issue-tax-panel mt-2">
-                      <div className="classic-erp-totals">
-                        <div className="text-[10px] text-slate-400 font-bold uppercase">Tax Rate %</div>
+                    <div className="erp-job-issue-taxbox mt-2">
+                      <div className="erp-job-issue-taxbox-row">
+                        <span>Tax %</span>
                         <input
                           type="number"
-                          className="classic-erp-input text-center font-bold"
+                          className="classic-erp-input font-bold"
                           value={footer.taxRate}
                           onChange={(e) => setFooter({ ...footer, taxRate: e.target.value })}
                           disabled={locked}
                         />
+                        <span className="text-[10px] text-slate-400 font-normal">rate</span>
                       </div>
-                      <div className="col-span-2 flex flex-col gap-1 border-r pr-2 border-slate-200">
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-500">SGST ({calc.sgstPct}%):</span>
-                          <span className="font-mono font-bold">₹{calc.sgstAmt.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-500">CGST ({calc.cgstPct}%):</span>
-                          <span className="font-mono font-bold">₹{calc.cgstAmt.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-500">IGST ({calc.igstPct}%):</span>
-                          <span className="font-mono font-bold">₹{calc.igstAmt.toFixed(2)}</span>
-                        </div>
+                      <div className="erp-job-issue-taxbox-row">
+                        <span>SGST</span>
+                        <input type="text" className="classic-erp-input" value={calc.sgstPct.toFixed(2)} readOnly />
+                        <input type="text" className="classic-erp-input font-mono" value={calc.sgstAmt.toFixed(2)} readOnly />
                       </div>
-                      <div className="erp-job-issue-totals pl-1">
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-400">Taxable:</span>
-                          <span className="font-mono font-bold">₹{calc.gross.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-400">GstAmt:</span>
-                          <span className="font-mono font-bold text-slate-700">₹{calc.totalGst.toFixed(2)}</span>
-                        </div>
-                        <div className="erp-job-issue-final-row border-t pt-1 mt-1">
-                          <span className="text-blue-900">NetAmt:</span>
-                          <span className="font-mono text-blue-900 text-[14px]">₹{calc.net.toFixed(2)}</span>
-                        </div>
+                      <div className="erp-job-issue-taxbox-row">
+                        <span>CGST</span>
+                        <input type="text" className="classic-erp-input" value={calc.cgstPct.toFixed(2)} readOnly />
+                        <input type="text" className="classic-erp-input font-mono" value={calc.cgstAmt.toFixed(2)} readOnly />
+                      </div>
+                      <div className="erp-job-issue-taxbox-row">
+                        <span>IGST</span>
+                        <input type="text" className="classic-erp-input" value={calc.igstPct.toFixed(2)} readOnly />
+                        <input type="text" className="classic-erp-input font-mono" value={calc.igstAmt.toFixed(2)} readOnly />
+                      </div>
+
+                      <div className="erp-job-issue-sumrow mt-1.5">
+                        <span>Taxable</span>
+                        <input type="text" className="classic-erp-input font-mono" value={calc.gross.toFixed(2)} readOnly />
+                      </div>
+                      <div className="erp-job-issue-sumrow">
+                        <span className="!text-[10px] !text-slate-500">GstAmt</span>
+                        <input type="text" className="classic-erp-input font-mono" value={calc.totalGst.toFixed(2)} readOnly />
+                      </div>
+                      <div className="erp-job-issue-sumrow">
+                        <span className="!text-[12px] !text-blue-900">NetAmt</span>
+                        <input
+                          type="text"
+                          className="classic-erp-input font-mono !text-blue-900 !text-[12px]"
+                          value={calc.net.toFixed(2)}
+                          readOnly
+                        />
                       </div>
                     </div>
                   </div>
@@ -728,6 +774,14 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                       ))}
                     </tbody>
                   </table>
+                </div>
+
+                <div className="erp-job-issue-totalbar">
+                  <span>TOTAL Pcs : {calc.totalPcs}</span>
+                  <span>/</span>
+                  <span>Qty : {calc.totalQty.toFixed(2)}</span>
+                  <span>/</span>
+                  <span>Kgs : {calc.totalKgs.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -826,11 +880,54 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                 <button type="button" className="classic-erp-btn btn-red" disabled={saving || locked || !selectedJobId}>
                   Delete
                 </button>
-                <button type="button" className="classic-erp-btn" onClick={handlePrint} disabled={!selectedJobId}>
-                  Print
-                </button>
                 <button type="button" className="classic-erp-btn" onClick={onClose}>
                   Exit
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => notifyInfo('JobCard Reports — coming soon')}
+                >
+                  JobCard Reports
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => notifyInfo('Open Mill Receive for receipt detail')}
+                >
+                  ReceiptDetail
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  disabled={saving}
+                  onClick={async () => {
+                    await Promise.all([fetchJobs(), fetchInventory(), fetchPurchases()]);
+                    notifySuccess('Refreshed');
+                  }}
+                >
+                  Refresh
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => notifyInfo('Last year lot — use CNo lookup')}
+                >
+                  LastYear
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => {
+                    setFindOpen(true);
+                    setMode('View');
+                  }}
+                  disabled={saving}
+                >
+                  Sp.FInd
+                </button>
+                <button type="button" className="classic-erp-btn" onClick={handlePrint} disabled={!selectedJobId}>
+                  Print
                 </button>
               </div>
             </form>

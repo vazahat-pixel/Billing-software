@@ -57,7 +57,8 @@ export default function BillNoLookupModal({ isOpen, onClose, invoices = [], part
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-[640px] w-full">
-      <div className="flex flex-col bg-white overflow-hidden" onKeyDown={onKeyDown}>
+      {/* Opt out of the global Enter→next-field handler: in here Enter means "select this bill". */}
+      <div className="flex flex-col bg-white overflow-hidden" onKeyDown={onKeyDown} data-enter-nav="off">
         <div className="bg-[#374151] text-white px-3 py-1.5 text-[12px] font-bold flex justify-between items-center">
           <span>BillNo Entry — Outstanding Bills {partyName ? `for ${partyName}` : ''}</span>
           <span className="text-[10px] font-normal opacity-80">{rows.length} pending</span>
@@ -81,9 +82,11 @@ export default function BillNoLookupModal({ isOpen, onClose, invoices = [], part
           <table className="w-full border-collapse text-[11px]" style={{ tableLayout: 'fixed' }}>
             <thead className="sticky top-0 bg-slate-200">
               <tr>
-                <th className="px-1 py-1 border w-28">BillNo</th>
+                <th className="px-1 py-1 border w-24">BillNo</th>
                 <th className="px-1 py-1 border w-20">BillDt</th>
+                <th className="px-1 py-1 border w-12 text-center">Type</th>
                 <th className="px-1 py-1 border w-20 text-right">BillAmt</th>
+                <th className="px-1 py-1 border w-20 text-right">Paid</th>
                 <th className="px-1 py-1 border w-20 text-right">OsAmt</th>
                 <th className="px-1 py-1 border w-14 text-center">OsDy</th>
               </tr>
@@ -91,7 +94,7 @@ export default function BillNoLookupModal({ isOpen, onClose, invoices = [], part
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-6 text-slate-400">
+                  <td colSpan={7} className="text-center py-6 text-slate-400">
                     {partyName ? 'No outstanding bills for this party' : 'Select Party first'}
                   </td>
                 </tr>
@@ -108,7 +111,9 @@ export default function BillNoLookupModal({ isOpen, onClose, invoices = [], part
                   >
                     <td className="px-1 py-0.5 border font-bold truncate">{r.invoiceNo || '—'}</td>
                     <td className="px-1 py-0.5 border">{fmtDate(r.billDt)}</td>
+                    <td className="px-1 py-0.5 border text-center">{r.billType || ''}</td>
                     <td className="px-1 py-0.5 border text-right font-mono">{num(r.billAmt)}</td>
+                    <td className="px-1 py-0.5 border text-right font-mono">{num(r.paidAmt)}</td>
                     <td className="px-1 py-0.5 border text-right font-mono">{num(r.osAmt)}</td>
                     <td className="px-1 py-0.5 border text-center font-mono">{r.osDy || 0}</td>
                   </tr>

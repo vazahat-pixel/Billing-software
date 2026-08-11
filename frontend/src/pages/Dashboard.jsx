@@ -96,6 +96,8 @@ const MODULE_PARENT_MAP = {
   purchase: 'purchase',
   receipt: 'accounting',
   payment: 'accounting',
+  cashPayment: 'accounting',
+  cashReceipt: 'accounting',
   cashBook: 'accounting',
   bankBook: 'accounting',
   millIssue: 'jobWork',
@@ -120,6 +122,8 @@ const MODULE_SUBMENU_MAP = {
   purchase: 'Purchase Bill',
   receipt: 'Bank Receipt',
   payment: 'Bank Payment',
+  cashPayment: 'Cash Payment',
+  cashReceipt: 'Cash Receipt',
   cashBook: 'Cash Book',
   bankBook: 'Bank Book',
   millIssue: 'Mill Issue',
@@ -268,6 +272,8 @@ const Dashboard = () => {
       purchase: false,
       receipt: false,
       payment: false,
+      cashPayment: false,
+      cashReceipt: false,
       cashBook: false,
       bankBook: false,
       millIssue: false,
@@ -424,11 +430,13 @@ const Dashboard = () => {
       if (match) return { badge: match[1], text: match[2] };
       return { badge: null, text: label };
    };
-   const CORE_MODULES_WITH_BOOKS = ['sales', 'purchase', 'receipt', 'payment', 'cashBook', 'bankBook', 'millIssue', 'millRec', 'jobIssue', 'jobRec'];
+   const CORE_MODULES_WITH_BOOKS = ['sales', 'purchase', 'receipt', 'payment', 'cashPayment', 'cashReceipt', 'cashBook', 'bankBook', 'millIssue', 'millRec', 'jobIssue', 'jobRec'];
 
    const BOOK_MODULE_ALIAS = {
       cashBook: 'receipt',
       bankBook: 'receipt',
+      cashPayment: 'payment',
+      cashReceipt: 'receipt',
    };
 
    const toggleModal = (key, val) => {
@@ -493,11 +501,13 @@ const Dashboard = () => {
       }));
    };
 
-   const openNote = (type) => {
+   /** side = Purchase | Sales, type = Debit | Credit — the two axes of a note. */
+   const openNote = (type, side = 'Sales') => {
       setModals(prev => ({
          ...prev,
          note: true,
-         noteType: type
+         noteType: type,
+         noteSide: side
       }));
    };
 
@@ -620,9 +630,14 @@ const Dashboard = () => {
          { label: 'Bank Book', action: () => toggleModal('bankBook', true) },
          { label: 'Bank Receipt', action: () => toggleModal('receipt', true) },
          { label: 'Bank Payment', action: () => toggleModal('payment', true) },
+         { label: 'Cash Receipt', action: () => toggleModal('cashReceipt', true) },
+         { label: 'Cash Payment', action: () => toggleModal('cashPayment', true) },
          { label: 'Voucher Entry', action: () => setModals(prev => ({ ...prev, contraVoucher: true })) },
          { label: 'Journal (GST)', action: () => openJournal() },
-         { label: 'Debit/Credit Note', action: () => openNote('Credit') },
+         { label: 'Debit Note On Purchase - GSTR2', action: () => openNote('Debit', 'Purchase') },
+         { label: 'Credit Note On Purchase - GSTR2', action: () => openNote('Credit', 'Purchase') },
+         { label: 'Debit Note On Sales - GSTR1', action: () => openNote('Debit', 'Sales') },
+         { label: 'Credit Note On Sales - GSTR1', action: () => openNote('Credit', 'Sales') },
          { label: 'Tds Entry', action: () => setModals(prev => ({ ...prev, tdsEntry: true })) },
          { label: 'Sales Return', action: () => openReturn('Sales') },
          { label: 'Purchase Return', action: () => openReturn('Purchase') },
@@ -1074,6 +1089,22 @@ const Dashboard = () => {
             selectedBook={selectedBooks.payment}
             readOnly={!permissions.canSave}
          />
+         <CashBankBookModal
+            isOpen={modals.cashPayment}
+            onClose={() => toggleModal('cashPayment', false)}
+            bookKind="cash"
+            initialType="Payment"
+            selectedBook={selectedBooks.cashPayment}
+            readOnly={!permissions.canSave}
+         />
+         <CashBankBookModal
+            isOpen={modals.cashReceipt}
+            onClose={() => toggleModal('cashReceipt', false)}
+            bookKind="cash"
+            initialType="Receipt"
+            selectedBook={selectedBooks.cashReceipt}
+            readOnly={!permissions.canSave}
+         />
          <IssueModal
             isOpen={modals.millIssue}
             onClose={() => {
@@ -1091,8 +1122,9 @@ const Dashboard = () => {
             isOpen={modals.ledger}
             onClose={() => toggleModal('ledger', false)}
             onOpenJournal={() => setModals(prev => ({ ...prev, journal: true }))}
-            onOpenPayment={() => toggleModal('payment', true)}
-            onOpenReceipt={() => toggleModal('receipt', true)}
+            onOpenPayment={() => toggleModal('cashPayment', true)}
+            onOpenReceipt={() => toggleModal('cashReceipt', true)}
+            onOpenOutstanding={() => toggleModal('outstanding', true)}
          />
          <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters} />
          <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} readOnly={permissions.readOnlyMasters} />
@@ -1212,7 +1244,7 @@ const Dashboard = () => {
             moduleName={bookSelection.bookModule || bookSelection.module}
             onSelectBook={handleSelectBook}
             bookFilter={
-              bookSelection.module === 'cashBook'
+              ['cashBook', 'cashPayment', 'cashReceipt'].includes(bookSelection.module)
                 ? (b) => /cash/i.test(b.name || '')
                 : bookSelection.module === 'bankBook'
                   ? (b) => /bank/i.test(b.name || '') && !/cash/i.test(b.name || '')
@@ -1301,10 +1333,12 @@ const Dashboard = () => {
             onClose={() => setModals(prev => ({ ...prev, returnInv: false }))} 
             initialType={modals.returnType} 
          />
-         <NoteModal 
-            isOpen={modals.note} 
-            onClose={() => setModals(prev => ({ ...prev, note: false }))} 
-            initialType={modals.noteType} 
+         <NoteModal
+            isOpen={modals.note}
+            onClose={() => setModals(prev => ({ ...prev, note: false }))}
+            initialType={modals.noteType}
+            initialSide={modals.noteSide || 'Sales'}
+            readOnly={!permissions.canSave}
          />
          <JournalEntryModal
             isOpen={modals.journal}
