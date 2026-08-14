@@ -55,9 +55,45 @@ function recalcSalesTotals(items = [], {
   });
 
   let taxable = mapped.reduce((s, it) => s + lineTaxable(it), 0);
-  const lessAmt = Number(extras.lessAmt || 0) + Number(extras.discountAmt || 0) + Number(extras.rdAmt || 0);
-  const addAmt = Number(extras.addAmt || 0) + Number(extras.freight || 0);
-  taxable = Math.max(0, Number((taxable - lessAmt + addAmt).toFixed(2)));
+
+  // Mirrors calcSalesBillTotals() in the frontend exactly — same five footer adjustments,
+  // same +/- sign handling per field. FOLD LESS was missing here entirely (server ignored
+  // it while the form correctly netted it out), which silently inflated every invoice that
+  // used NETQTY/QTY fold pricing: the saved/printed amount came out higher than the screen.
+  let totalAdd = Number(extras.freight || 0);
+  let totalLess = 0;
+
+  const foldLessAmt = Number(extras.foldLess || 0);
+  if (foldLessAmt > 0) {
+    if (extras.foldLessSign === '+') totalAdd += foldLessAmt;
+    else totalLess += foldLessAmt;
+  }
+
+  const rdAmtVal = Number(extras.rdAmt || 0);
+  if (rdAmtVal > 0) {
+    if (extras.rdAmtSign === '+') totalAdd += rdAmtVal;
+    else totalLess += rdAmtVal;
+  }
+
+  const discountAmtVal = Number(extras.discountAmt || 0);
+  if (discountAmtVal > 0) {
+    if (extras.discountSign === '+') totalAdd += discountAmtVal;
+    else totalLess += discountAmtVal;
+  }
+
+  const lessAmtVal = Number(extras.lessAmt || 0);
+  if (lessAmtVal > 0) {
+    if (extras.lessSign === '+') totalAdd += lessAmtVal;
+    else totalLess += lessAmtVal;
+  }
+
+  const addAmtVal = Number(extras.addAmt || 0);
+  if (addAmtVal > 0) {
+    if (extras.addSign === '-') totalLess += addAmtVal;
+    else totalAdd += addAmtVal;
+  }
+
+  taxable = Math.max(0, Number((taxable - totalLess + totalAdd).toFixed(2)));
 
   const rates = mapped
     .map((it) => Number(it.gstRate || it.itemId?.gstRate || gstRate))

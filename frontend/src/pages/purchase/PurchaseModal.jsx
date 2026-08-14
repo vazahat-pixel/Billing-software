@@ -488,6 +488,10 @@ const PurchaseModal = ({
     };
 
     let taxable = linesTaxable;
+    // FOLD LESS on QTY-unit lines lives only as a per-line, gross-based amount (item.amount
+    // stays gross for QTY so the grid can keep showing Meter × Rate) — the "Auto-sync footer
+    // fold less/add values" effect below rolls it into footer.lessAmt/addAmt, which is netted
+    // out right here via adjust(footer.lessAmt, ...), so no separate handling is needed.
     taxable = money(taxable + adjust(footer.discountAmt, footer.discountSign));
     taxable = money(taxable + adjust(footer.lessAmt, footer.lessSign));
     taxable = money(taxable + adjust(footer.addAmt, footer.addSign));
@@ -862,10 +866,12 @@ const PurchaseModal = ({
     setMode('View');
   };
 
+  // Purchase is billed from Suppliers only — Customers/Job Workers etc. showing up here
+  // was the exact confusion this list is meant to prevent.
   const vendorOptions = useMemo(
     () =>
       parties
-        .filter((p) => p.type !== 'Broker')
+        .filter((p) => ['Supplier', 'Both'].includes(p.type) || !p.type)
         .map((p) => ({
           value: p._id || p.id,
           label: p.name,
@@ -967,9 +973,15 @@ const PurchaseModal = ({
       key: 'millIssue',
       label: '2. Mill Issue (from purchased stock)',
       onClick: () => {
+        const inv = saveNextActions?.invoice || purchases.find((p) => String(p._id || p.id) === String(saveNextActions?.id));
+        const suppObj = parties.find((p) => String(p._id || p.id) === String(inv?.supplierId?._id || inv?.supplierId || header.party));
+        const sName = suppObj?.name || inv?.supplierName || inv?.partyName || '';
         const ctx = {
           purchaseId: saveNextActions?.id,
           invoiceNo: saveNextActions?.invoiceNo || saveNextActions?.invoice?.invoiceNo,
+          supplierName: sName,
+          partyName: sName,
+          weaver: sName,
           lotCodes: (saveNextActions?.invoice?.items || [])
             .map((i) => i.lotId)
             .filter(Boolean),
@@ -1164,8 +1176,6 @@ const PurchaseModal = ({
                       <th className="col-amt text-right">Amount</th>
                       <th className="col-pct text-center">DIS1%</th>
                       <th className="col-amt text-right">DISAMT</th>
-                      <th className="col-pct text-center">DIS2%</th>
-                      <th className="col-amt text-right">DISAMT.</th>
                       <th className="col-amt text-right">AddAmt</th>
                       <th className="col-pct text-center">GST%</th>
                       <th className="col-amt text-right">GSTAmt</th>
@@ -1304,12 +1314,6 @@ const PurchaseModal = ({
                         <td className="col-amt">
                           <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis1Amt || ''} onChange={e => patchLine(idx, { dis1Amt: Number(e.target.value) })} disabled={locked} />
                         </td>
-                        <td className="col-pct">
-                          <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.dis2Per || ''} onChange={e => patchLine(idx, { dis2Per: Number(e.target.value) })} disabled={locked} />
-                        </td>
-                        <td className="col-amt">
-                          <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis2Amt || ''} onChange={e => patchLine(idx, { dis2Amt: Number(e.target.value) })} disabled={locked} />
-                        </td>
                         <td className="col-amt">
                           <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0" value={row.addAmt || ''} onChange={e => patchLine(idx, { addAmt: Number(e.target.value) })} disabled={locked} />
                         </td>
@@ -1375,61 +1379,63 @@ const PurchaseModal = ({
                   <textarea className="classic-erp-textarea w-full resize-none text-[11px]" rows={4} value={footer.remarks} onChange={e => setFooter({ ...footer, remarks: e.target.value })} disabled={locked} placeholder="Optional remarks…" />
                 </div>
 
-                <div className="col-span-4 classic-erp-frame classic-erp-stack p-2 bg-[var(--accent-light)] pb-3">
-                  <div className="classic-erp-total-row font-bold">
-                    <span className="classic-erp-label text-slate-800">Gross Amt:</span>
-                    <span className="font-mono text-black">₹{calculations.gross.toFixed(2)}</span>
-                  </div>
-                  {Number(footer.foldLess || 0) > 0 && (
+                <div className="col-span-4 classic-erp-frame flex flex-col justify-between p-2 bg-[var(--accent-light)] pb-2.5 text-[11px]">
+                  <div className="space-y-1">
                     <div className="classic-erp-total-row font-bold">
-                      <span className="classic-erp-label text-orange-700">Fold Less:</span>
-                      <span className="font-mono text-orange-700">
-                        {footer.foldLessSign === '+' ? '+' : '-'}₹{Number(footer.foldLess).toFixed(2)}
-                      </span>
+                      <span className="classic-erp-label text-slate-800">Gross Amt:</span>
+                      <span className="font-mono text-black">₹{calculations.gross.toFixed(2)}</span>
                     </div>
-                  )}
-                  <div className="classic-erp-total-row font-bold border-t border-[var(--border)] pt-1">
-                    <span className="classic-erp-label text-slate-800">Taxable Amt:</span>
-                    <span className="font-mono text-black shrink-0">₹{calculations.taxable.toFixed(2)}</span>
-                  </div>
-                  {header.type === 'INVOICE IN STATE' ? (
-                    <>
+                    {Number(footer.foldLess || 0) > 0 && (
                       <div className="classic-erp-total-row font-bold">
-                        <span className="classic-erp-label text-slate-800">CGST:</span>
-                        <span className="font-mono text-black">₹{calculations.cgst.toFixed(2)}</span>
+                        <span className="classic-erp-label text-orange-700">Fold Less:</span>
+                        <span className="font-mono text-orange-700">
+                          {footer.foldLessSign === '+' ? '+' : '-'}₹{Number(footer.foldLess).toFixed(2)}
+                        </span>
                       </div>
-                      <div className="classic-erp-total-row font-bold">
-                        <span className="classic-erp-label text-slate-800">SGST:</span>
-                        <span className="font-mono text-black">₹{calculations.sgst.toFixed(2)}</span>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="classic-erp-total-row font-bold">
-                      <span className="classic-erp-label text-slate-800">IGST:</span>
-                      <span className="font-mono text-black">₹{calculations.igst.toFixed(2)}</span>
+                    )}
+                    <div className="classic-erp-total-row font-bold border-t border-[var(--border)] pt-0.5">
+                      <span className="classic-erp-label text-slate-800">Taxable Amt:</span>
+                      <span className="font-mono text-black shrink-0">₹{calculations.taxable.toFixed(2)}</span>
                     </div>
-                  )}
-                  <div className="classic-erp-adj-row font-bold">
-                    <span className="classic-erp-label text-slate-800">RCM:</span>
-                    <select className="classic-erp-select text-center font-bold" value={footer.rcmChargeSign} onChange={e => setFooter({ ...footer, rcmChargeSign: e.target.value })} disabled={locked}>
-                      <option value="-">-</option>
-                      <option value="+">+</option>
-                    </select>
-                    <input type="number" className="classic-erp-input text-right font-mono" value={footer.rcmCharge || ''} onChange={e => setFooter({ ...footer, rcmCharge: Number(e.target.value) })} disabled={locked} />
+                    {header.type === 'INVOICE IN STATE' ? (
+                      <>
+                        <div className="classic-erp-total-row font-bold">
+                          <span className="classic-erp-label text-slate-800">CGST:</span>
+                          <span className="font-mono text-black">₹{calculations.cgst.toFixed(2)}</span>
+                        </div>
+                        <div className="classic-erp-total-row font-bold">
+                          <span className="classic-erp-label text-slate-800">SGST:</span>
+                          <span className="font-mono text-black">₹{calculations.sgst.toFixed(2)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="classic-erp-total-row font-bold">
+                        <span className="classic-erp-label text-slate-800">IGST:</span>
+                        <span className="font-mono text-black">₹{calculations.igst.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="classic-erp-adj-row font-bold">
+                      <span className="classic-erp-label text-slate-800">RCM:</span>
+                      <select className="classic-erp-select text-center font-bold" value={footer.rcmChargeSign} onChange={e => setFooter({ ...footer, rcmChargeSign: e.target.value })} disabled={locked}>
+                        <option value="-">-</option>
+                        <option value="+">+</option>
+                      </select>
+                      <input type="number" className="classic-erp-input text-right font-mono" value={footer.rcmCharge || ''} onChange={e => setFooter({ ...footer, rcmCharge: Number(e.target.value) })} disabled={locked} />
+                    </div>
+                    <div className="classic-erp-total-row font-bold border-t border-[var(--border)] pt-0.5">
+                      <span className="classic-erp-label text-slate-800">Round Off:</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="classic-erp-input w-24 text-right font-mono"
+                        value={footer.roundOff}
+                        onChange={e => setFooter({ ...footer, roundOff: Number(e.target.value), roundOffManual: true })}
+                        disabled={locked}
+                        title="Auto-rounded to nearest rupee (Section 170 CGST Act). Type to override."
+                      />
+                    </div>
                   </div>
-                  <div className="classic-erp-total-row font-bold border-t border-[var(--border)] pt-1">
-                    <span className="classic-erp-label text-slate-800">Round Off:</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="classic-erp-input w-24 text-right font-mono"
-                      value={footer.roundOff}
-                      onChange={e => setFooter({ ...footer, roundOff: Number(e.target.value), roundOffManual: true })}
-                      disabled={locked}
-                      title="Auto-rounded to the nearest rupee. Type to override."
-                    />
-                  </div>
-                  <div className="classic-erp-total-row font-bold pt-2 border-t-2 border-[#000] mt-1">
+                  <div className="classic-erp-total-row font-bold pt-1.5 border-t-2 border-[#000] mt-1">
                     <span className="classic-erp-label text-blue-900 text-sm">NET AMOUNT:</span>
                     <span className="font-mono text-blue-900 text-lg shrink-0">₹{calculations.net.toFixed(2)}</span>
                   </div>

@@ -103,7 +103,7 @@ const LoginPage = () => {
                                 </button>
                             ))}
                             <p className="text-[9px] text-emerald-700/80 mt-2">
-                                Prefills fields — click Sign In. Seed via <code className="font-mono">backend/seed.js</code> if login fails.
+                                Prefills fields — click Sign In. If login fails, run <code className="font-mono">npm run seed:users</code> in <code className="font-mono">backend/</code> (QA Admin is a test fixture and can be wiped by QA test runs).
                             </p>
                         </div>
                     )}

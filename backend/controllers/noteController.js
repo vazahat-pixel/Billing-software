@@ -5,6 +5,7 @@ const LedgerMaster = require('../models/LedgerMaster');
 const Party = require('../models/Party');
 const Sales = require('../models/Sales');
 const Purchase = require('../models/Purchase');
+const Job = require('../models/Job');
 const Counter = require('../models/Counter');
 const accountingService = require('../services/accountingService');
 const auditService = require('../services/auditService');
@@ -148,6 +149,9 @@ async function computeNoteTotals(companyId, body, party) {
 /**
  * Resolve the original bill this note adjusts and prove it belongs to the same party.
  * A note may never be attached to another party's invoice.
+ *
+ * Purchase-side notes also cover Job Work Charges — a Job Worker's "bill" is the
+ * processCharges + processGstAmount posted on Job Receive, not a Purchase document.
  */
 async function resolveAgainstBill(companyId, body, party, noteSide, session) {
   const id = body.againstInvoiceId;
@@ -156,38 +160,69 @@ async function resolveAgainstBill(companyId, body, party, noteSide, session) {
   }
 
   const isSales = noteSide === 'Sales';
-  const Model = isSales ? Sales : Purchase;
-  const doc = await Model.findOne({ _id: id, companyId }).session(session);
+  let doc = null;
+  let billKind = null;
+
+  if (isSales) {
+    doc = await Sales.findOne({ _id: id, companyId }).session(session);
+    billKind = 'sales';
+  } else {
+    doc = await Purchase.findOne({ _id: id, companyId }).session(session);
+    billKind = 'purchase';
+    if (!doc) {
+      doc = await Job.findOne({ _id: id, companyId }).session(session);
+      billKind = 'job';
+    }
+  }
   if (!doc) {
-    throw new Error(`Original ${isSales ? 'sales invoice' : 'purchase bill'} not found for this company`);
+    throw new Error(`Original ${isSales ? 'sales invoice' : 'purchase bill / job work charges'} not found for this company`);
   }
 
-  const billPartyId = String(doc.customerId || doc.supplierId || '');
+  const billPartyId = billKind === 'job' ? String(doc.workerId || '') : String(doc.customerId || doc.supplierId || '');
   const expected = party ? String(party._id) : '';
   if (!expected) {
     throw new Error('Party could not be resolved — bill linkage needs a real party');
   }
   if (billPartyId !== expected) {
-    throw new Error(`Bill ${doc.invoiceNo || id} does not belong to ${party.name} — a note cannot adjust another party's bill`);
+    throw new Error(`Bill ${doc.invoiceNo || doc.jobCardNo || id} does not belong to ${party.name} — a note cannot adjust another party's bill`);
   }
 
   return {
     againstInvoiceId: doc._id,
-    againstInvoiceType: isSales ? 'SalesInvoice' : 'PurchaseBill',
-    againstInvoiceNo: doc.invoiceNo || body.againstInvoiceNo || '',
+    againstInvoiceType: billKind === 'sales' ? 'SalesInvoice' : billKind === 'purchase' ? 'PurchaseBill' : 'JobWorkCharges',
+    againstInvoiceNo: doc.invoiceNo || doc.jobCardNo || body.againstInvoiceNo || '',
     billDoc: doc,
+    billKind,
   };
 }
 
 /**
  * Move the linked bill's outstanding by the note's value and resync bill-wise settlement.
  * `sign` is +1 when the note reduces what is outstanding, −1 when it increases it.
+ * `billKind` defaults to inferring Sales-vs-Purchase from noteSide for backward
+ * compatibility with existing callers; pass 'job' explicitly for Job Work Charges.
  */
-async function applyBillAdjustment(companyId, billDoc, noteSide, amount, sign, session) {
+async function applyBillAdjustment(companyId, billDoc, noteSide, amount, sign, session, billKind) {
   if (!billDoc || !amount) return;
-  const outstandingEngine = require('../services/outstandingEngineService');
 
+  const kind = billKind || (noteSide === 'Sales' ? 'sales' : 'purchase');
   const delta = round2(amount * sign);
+
+  if (kind === 'job') {
+    const billTotal = round2((billDoc.processCharges || 0) + (billDoc.processGstAmount || 0));
+    const nextPaid = round2((billDoc.chargesPaidAmount || 0) + delta);
+    if (nextPaid > billTotal + 0.01) {
+      throw new Error(
+        `Adjusting ₹${Math.abs(delta).toFixed(2)} against Job ${billDoc.jobCardNo || ''} ` +
+        `would exceed its charges ₹${billTotal.toFixed(2)}`
+      );
+    }
+    billDoc.chargesPaidAmount = Math.max(0, nextPaid);
+    await billDoc.save({ session });
+    return;
+  }
+
+  const outstandingEngine = require('../services/outstandingEngineService');
   const billTotal = round2(billDoc.netAmount || 0);
   const nextPaid = round2((billDoc.paidAmount || 0) + delta);
 
@@ -199,12 +234,12 @@ async function applyBillAdjustment(companyId, billDoc, noteSide, amount, sign, s
   }
 
   billDoc.paidAmount = Math.max(0, nextPaid);
-  if (billDoc.paidAmount >= billTotal - 0.009) billDoc.status = 'paid';
+  if (billDoc.paidAmount >= billTotal - 0.99) billDoc.status = 'paid';
   else if (billDoc.paidAmount > 0) billDoc.status = 'partial';
   else if (billDoc.status !== 'cancelled') billDoc.status = 'active';
 
   await billDoc.save({ session });
-  if (noteSide === 'Sales') await outstandingEngine.syncBillFromSales(companyId, billDoc, session);
+  if (kind === 'sales') await outstandingEngine.syncBillFromSales(companyId, billDoc, session);
   else await outstandingEngine.syncBillFromPurchase(companyId, billDoc, session);
 }
 
@@ -348,6 +383,114 @@ async function resolveNoteContext(companyId, body, session) {
   return { noteType, noteSide, partyLedger, party, totals, bill };
 }
 
+/**
+ * Core note creation, reusable inside an ALREADY-OPEN session/transaction — used by both
+ * the standalone Note screen and any other flow that needs to raise a note as a side
+ * effect of its own save (e.g. a Discount typed on a Payment/Receipt voucher). Never
+ * starts or commits a session itself; the caller owns the transaction.
+ *
+ * `options.skipFinancialPosting` — the note still gets its full GST/taxable breakup and
+ * status: 'Posted' (so it counts for GSTR-1/CDNR), but does NOT post its own journal or
+ * touch the bill's outstanding. Use this when the caller's OWN posting already moved that
+ * money — e.g. a Payment/Receipt voucher's "Discount" column already reduces the bill and
+ * books Discount Allowed/Received; the auto-raised note would otherwise double-count both.
+ *
+ * `options.autoGenerated` / `sourceVoucherId` / `sourceVoucherType` — stamps the note as
+ * system-raised and links it back to whatever posted it. Deliberately only settable via
+ * `options` (server-controlled), never `body` (client-controlled) — see updateNote/
+ * reverseNote, which refuse to touch a note carrying this flag.
+ */
+async function createNoteInternal(companyId, body, session, options = {}) {
+  const posting = body.status === 'Posted' && !options.skipFinancialPosting;
+
+  if (posting) {
+    const gstConfigService = require('../services/gstConfigService');
+    await gstConfigService.assertPeriodOpen(companyId, body.date || new Date());
+  }
+
+  const idempotencyKey = String(body.idempotencyKey || '').trim();
+  if (idempotencyKey) {
+    const existing = await DebitCreditNote.findOne({ companyId, idempotencyKey }).session(session);
+    if (existing) return { note: existing, created: false };
+  }
+
+  const { noteType, noteSide, partyLedger, party, totals, bill } =
+    await resolveNoteContext(companyId, body, session);
+
+  const finalNoteNo = body.noteNo || await generateNoteNo(companyId, noteType, session);
+
+  const created = await DebitCreditNote.create([{
+    companyId,
+    noteType,
+    noteSide,
+    noteNo: finalNoteNo,
+    vNo: body.vNo || '',
+    partyLedgerId: partyLedger._id,
+    partyId: party?._id,
+    partyName: partyLedger.name,
+    partyGstin: party?.gstin || body.partyGstin || '',
+    date: body.date || new Date(),
+    billNo: body.billNo || '',
+    billDate: body.billDate || undefined,
+    againstInvoiceNo: bill.againstInvoiceNo,
+    againstInvoiceId: bill.againstInvoiceId,
+    againstInvoiceType: bill.againstInvoiceType,
+    amount: round2(body.amount),
+    amountMode: totals.amountMode,
+    taxableAmount: totals.taxable,
+    gstType: totals.gstType,
+    gstTreatment: body.gstTreatment || (party?.gstin ? 'Registered' : 'Unregistered'),
+    gstRate: totals.gstRate,
+    cessRate: totals.cessRate,
+    cgst: totals.cgst,
+    sgst: totals.sgst,
+    igst: totals.igst,
+    cess: totals.cess,
+    gstAmount: totals.gstAmount,
+    reverseCharge: totals.reverseCharge,
+    rcmAmount: totals.rcmAmount,
+    placeOfSupply: totals.placeOfSupply,
+    itcEligibility: body.itcEligibility || '',
+    hsnSac: body.hsnSac || '',
+    reasonCode: body.reasonCode || '',
+    reason: body.reason,
+    quc: body.quc || '',
+    accountHeadLedgerId: body.accountHeadLedgerId || undefined,
+    accountHeadName: body.accountHeadName || '',
+    tdsLedgerId: body.tdsLedgerId || undefined,
+    tdsPercent: totals.tdsPercent,
+    tdsAmount: totals.tdsAmount,
+    tdsRemark: body.tdsRemark || '',
+    roundOff: totals.roundOff,
+    netAmount: totals.netAmount,
+    finalAmount: totals.finalAmount,
+    narration: body.narration || '',
+    idempotencyKey: idempotencyKey || undefined,
+    autoGenerated: !!options.autoGenerated,
+    sourceVoucherId: options.sourceVoucherId || undefined,
+    sourceVoucherType: options.sourceVoucherType || '',
+    status: body.status || 'Draft',
+  }], { session });
+  const note = created[0];
+
+  if (posting) {
+    const entry = await postNoteJournal(companyId, note, totals, partyLedger, session);
+    note.accountingEntryId = entry._id;
+    await note.save({ session });
+
+    if (bill.billDoc) {
+      // Purchase Debit / Sales Credit reduce what is outstanding on the bill;
+      // the other two increase it.
+      const reducesOutstanding = noteDirection(noteSide, noteType).partySign === (noteSide === 'Sales' ? -1 : +1);
+      await applyBillAdjustment(
+        companyId, bill.billDoc, noteSide, totals.finalAmount, reducesOutstanding ? +1 : -1, session, bill.billKind
+      );
+    }
+  }
+
+  return { note, created: true, noteType, noteSide };
+}
+
 exports.createNote = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -355,92 +498,11 @@ exports.createNote = async (req, res) => {
 
   try {
     const companyId = req.companyId;
-    const body = req.body;
-    const posting = body.status === 'Posted';
+    const { note, created, noteType, noteSide } = await createNoteInternal(companyId, req.body, session);
 
-    if (posting) {
-      const gstConfigService = require('../services/gstConfigService');
-      await gstConfigService.assertPeriodOpen(companyId, body.date || new Date());
-    }
-
-    const idempotencyKey = String(body.idempotencyKey || '').trim();
-    if (idempotencyKey) {
-      const existing = await DebitCreditNote.findOne({ companyId, idempotencyKey });
-      if (existing) {
-        await session.abortTransaction();
-        return res.status(200).json({ success: true, data: existing, message: 'Note already recorded' });
-      }
-    }
-
-    const { noteType, noteSide, partyLedger, party, totals, bill } =
-      await resolveNoteContext(companyId, body, session);
-
-    const finalNoteNo = body.noteNo || await generateNoteNo(companyId, noteType, session);
-
-    const created = await DebitCreditNote.create([{
-      companyId,
-      noteType,
-      noteSide,
-      noteNo: finalNoteNo,
-      vNo: body.vNo || '',
-      partyLedgerId: partyLedger._id,
-      partyId: party?._id,
-      partyName: partyLedger.name,
-      partyGstin: party?.gstin || body.partyGstin || '',
-      date: body.date || new Date(),
-      billNo: body.billNo || '',
-      billDate: body.billDate || undefined,
-      againstInvoiceNo: bill.againstInvoiceNo,
-      againstInvoiceId: bill.againstInvoiceId,
-      againstInvoiceType: bill.againstInvoiceType,
-      amount: round2(body.amount),
-      amountMode: totals.amountMode,
-      taxableAmount: totals.taxable,
-      gstType: totals.gstType,
-      gstTreatment: body.gstTreatment || (party?.gstin ? 'Registered' : 'Unregistered'),
-      gstRate: totals.gstRate,
-      cessRate: totals.cessRate,
-      cgst: totals.cgst,
-      sgst: totals.sgst,
-      igst: totals.igst,
-      cess: totals.cess,
-      gstAmount: totals.gstAmount,
-      reverseCharge: totals.reverseCharge,
-      rcmAmount: totals.rcmAmount,
-      placeOfSupply: totals.placeOfSupply,
-      itcEligibility: body.itcEligibility || '',
-      hsnSac: body.hsnSac || '',
-      reasonCode: body.reasonCode || '',
-      reason: body.reason,
-      quc: body.quc || '',
-      accountHeadLedgerId: body.accountHeadLedgerId || undefined,
-      accountHeadName: body.accountHeadName || '',
-      tdsLedgerId: body.tdsLedgerId || undefined,
-      tdsPercent: totals.tdsPercent,
-      tdsAmount: totals.tdsAmount,
-      tdsRemark: body.tdsRemark || '',
-      roundOff: totals.roundOff,
-      netAmount: totals.netAmount,
-      finalAmount: totals.finalAmount,
-      narration: body.narration || '',
-      idempotencyKey: idempotencyKey || undefined,
-      status: body.status || 'Draft',
-    }], { session });
-    const note = created[0];
-
-    if (posting) {
-      const entry = await postNoteJournal(companyId, note, totals, partyLedger, session);
-      note.accountingEntryId = entry._id;
-      await note.save({ session });
-
-      if (bill.billDoc) {
-        // Purchase Debit / Sales Credit reduce what is outstanding on the bill;
-        // the other two increase it.
-        const reducesOutstanding = noteDirection(noteSide, noteType).partySign === (noteSide === 'Sales' ? -1 : +1);
-        await applyBillAdjustment(
-          companyId, bill.billDoc, noteSide, totals.finalAmount, reducesOutstanding ? +1 : -1, session
-        );
-      }
+    if (!created) {
+      await session.abortTransaction();
+      return res.status(200).json({ success: true, data: note, message: 'Note already recorded' });
     }
 
     await session.commitTransaction();
@@ -462,6 +524,31 @@ exports.createNote = async (req, res) => {
   }
 };
 
+exports.createNoteInternal = createNoteInternal;
+
+/**
+ * An auto-generated note is a reporting/document representation of accounting its source
+ * voucher already posted (see accountingController.syncDiscountNotesForVoucher) — it has
+ * no independent journal or bill adjustment of its own to safely un-apply. Editing or
+ * reversing it here would instead reverse the SOURCE VOUCHER's whole journal (bank/cash +
+ * party + every deduction leg) and move the bill's outstanding by an amount nothing here
+ * actually applied. Block it and point the user at the voucher, which keeps its own note
+ * in sync automatically on edit/reverse.
+ */
+async function assertNotAutoGenerated(companyId, note, session) {
+  if (!note.autoGenerated) return;
+  let label = note.sourceVoucherType || 'its source voucher';
+  if (note.sourceVoucherId) {
+    const PaymentVoucher = require('../models/PaymentVoucher');
+    const src = await PaymentVoucher.findOne({ _id: note.sourceVoucherId, companyId }).session(session);
+    if (src) label = `${src.voucherType} #${src.voucherNo}`;
+  }
+  throw new Error(
+    `This note was automatically generated from ${label} for a settlement discount. ` +
+    `Edit or reverse that Receipt/Payment instead — its linked note will update automatically.`
+  );
+}
+
 /**
  * Edit a posted note: un-apply the original accounting and bill adjustment, then re-post
  * the corrected figures — all in one transaction, keeping the note number.
@@ -476,6 +563,7 @@ exports.updateNote = async (req, res) => {
     const note = await DebitCreditNote.findOne({ _id: req.params.id, companyId }).session(session);
     if (!note) throw new Error('Note not found');
     if (note.status === 'Reversed' || note.isReversed) throw new Error('A reversed note cannot be edited');
+    await assertNotAutoGenerated(companyId, note, session);
 
     const body = req.body;
     const posting = String(body.status || note.status) === 'Posted';
@@ -546,7 +634,7 @@ exports.updateNote = async (req, res) => {
       if (bill.billDoc) {
         const reducesOutstanding = noteDirection(noteSide, noteType).partySign === (noteSide === 'Sales' ? -1 : +1);
         await applyBillAdjustment(
-          companyId, bill.billDoc, noteSide, totals.finalAmount, reducesOutstanding ? +1 : -1, session
+          companyId, bill.billDoc, noteSide, totals.finalAmount, reducesOutstanding ? +1 : -1, session, bill.billKind
         );
       }
     }
@@ -569,6 +657,8 @@ exports.updateNote = async (req, res) => {
 
 /** Reverse a posted note's journal and undo its bill adjustment. Shared by edit and delete. */
 async function unpostNote(companyId, note, req, session) {
+  if (note.autoGenerated) return; // Auto notes do not have independent journal/bill reversals
+
   if (note.accountingEntryId) {
     const journalEngine = require('../services/journalEngineService');
     const reversal = await journalEngine.reverseJournal(companyId, note.accountingEntryId, {
@@ -580,14 +670,17 @@ async function unpostNote(companyId, note, req, session) {
   }
 
   if (note.againstInvoiceId && note.finalAmount) {
-    const Model = note.againstInvoiceType === 'SalesInvoice' ? Sales : Purchase;
+    const billKind = note.againstInvoiceType === 'SalesInvoice' ? 'sales'
+      : note.againstInvoiceType === 'JobWorkCharges' ? 'job'
+      : 'purchase';
+    const Model = billKind === 'sales' ? Sales : billKind === 'job' ? Job : Purchase;
     const billDoc = await Model.findOne({ _id: note.againstInvoiceId, companyId }).session(session);
     if (billDoc) {
       const reducesOutstanding =
         noteDirection(note.noteSide, note.noteType).partySign === (note.noteSide === 'Sales' ? -1 : +1);
       // Opposite sign to whatever posting applied.
       await applyBillAdjustment(
-        companyId, billDoc, note.noteSide, note.finalAmount, reducesOutstanding ? -1 : +1, session
+        companyId, billDoc, note.noteSide, note.finalAmount, reducesOutstanding ? -1 : +1, session, billKind
       );
     }
   }
@@ -605,6 +698,7 @@ exports.reverseNote = async (req, res) => {
     if (!note) throw new Error('Note not found');
     if (note.status === 'Reversed' || note.isReversed) throw new Error('Note is already reversed');
     if (note.status !== 'Posted') throw new Error('Only posted notes can be reversed');
+    await assertNotAutoGenerated(companyId, note, session);
 
     const gstConfigService = require('../services/gstConfigService');
     await gstConfigService.assertPeriodOpen(companyId, note.date);

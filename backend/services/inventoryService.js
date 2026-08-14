@@ -5,11 +5,11 @@ const Item = require('../models/Item');
 
 class InventoryService {
   async getInventory(companyId, filters = {}) {
-    const query = { companyId, ...filters };
+    const query = { companyId, isDeleted: { $ne: true }, ...filters };
     return await InventoryLot.find(query)
       .populate('itemId', 'name category fabricType brand quality')
       .populate('warehouseId', 'name code type')
-      .sort({ createdAt: -1 });
+      .sort({ updatedAt: -1, createdAt: -1 });
   }
 
   async getLotDetails(lotId, companyId) {
@@ -23,9 +23,18 @@ class InventoryService {
   }
 
   async getStockByItem(itemId, companyId) {
-    const lots = await InventoryLot.find({ itemId, companyId, remainingMtrs: { $gt: 0 } });
-    const totalMtrs = lots.reduce((acc, lot) => acc + lot.remainingMtrs, 0);
-    const totalPcs = lots.reduce((acc, lot) => acc + lot.remainingPcs, 0);
+    // Include negative-stock lots so over-sold items show correct negative balance
+    const lots = await InventoryLot.find({
+      itemId,
+      companyId,
+      $or: [
+        { remainingMtrs: { $ne: 0 } },
+        { remainingPcs: { $ne: 0 } },
+        { status: 'Negative Stock' },
+      ],
+    });
+    const totalMtrs = lots.reduce((acc, lot) => acc + (lot.remainingMtrs || 0), 0);
+    const totalPcs = lots.reduce((acc, lot) => acc + (lot.remainingPcs || 0), 0);
     return { totalMtrs, totalPcs, lotCount: lots.length };
   }
 
@@ -34,7 +43,12 @@ class InventoryService {
       {
         $match: {
           companyId: new mongoose.Types.ObjectId(String(companyId)),
-          $or: [{ remainingMtrs: { $gt: 0 } }, { remainingPcs: { $gt: 0 } }],
+          // Include negative-stock lots so over-sold items show correct negative balances
+          $or: [
+            { remainingMtrs: { $ne: 0 } },
+            { remainingPcs: { $ne: 0 } },
+            { status: 'Negative Stock' },
+          ],
         },
       },
       {

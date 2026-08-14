@@ -28,6 +28,16 @@ const blankLine = () => ({
    fPcs: '0',
    procType: '',
    cuttingPending: '',
+   // Defaults to a full/final receive — matches how this screen always behaved before
+   // partial receiving existed. Uncheck when more is still expected from this challan.
+   isFinal: true,
+   pendingQty: 0,
+   pendingPcs: 0,
+});
+
+const jobPending = (job) => ({
+   qty: job.pendingQty ?? Math.max(0, Number(job.issueQty || 0) - Number(job.receivedQty || 0)),
+   pcs: job.pendingPcs ?? Math.max(0, Number(job.issuePcs || 0) - Number(job.receivedPcs || 0)),
 });
 
 const lineShortagePct = (line) => {
@@ -49,7 +59,9 @@ const lineJobAmt = (line) => {
 const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
    const {
       jobWorkEntries,
+      parties,
       fetchJobs,
+      fetchParties,
       receiveFromMill,
       fetchInventory,
       items,
@@ -108,7 +120,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
       }
       let cancelled = false;
       setBootLoading(true);
-      Promise.all([fetchJobs(), fetchInventory?.(), fetchItems?.()])
+      Promise.all([fetchJobs(), fetchParties?.(), fetchInventory?.(), fetchItems?.()])
          .catch(() => { })
          .finally(() => {
             if (!cancelled) setBootLoading(false);
@@ -116,7 +128,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
       return () => {
          cancelled = true;
       };
-   }, [isOpen, fetchJobs, fetchInventory, fetchItems]);
+   }, [isOpen, fetchJobs, fetchParties, fetchInventory, fetchItems]);
 
    // Handle escape key globally to close lookup dialog
    useEffect(() => {
@@ -134,32 +146,57 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
    }, [showLotDropdown]);
 
    const pendingJobs = useMemo(() => {
-      return jobWorkEntries.filter(j => j.status === 'Issued');
+      return (jobWorkEntries || []).filter(j => {
+         const s = String(j.status || '').toLowerCase();
+         return s !== 'received' && s !== 'cancelled';
+      });
    }, [jobWorkEntries]);
 
    const jobPartyOptions = useMemo(() => {
       const uniqueParties = {};
+      (parties || []).forEach((p) => {
+         uniqueParties[String(p._id || p.id)] = p.name;
+      });
       pendingJobs.forEach(j => {
          if (j.workerId) {
-            const id = String(j.workerId._id || j.workerId.id || j.workerId);
-            const name = typeof j.workerId === 'object' ? j.workerId.name : 'Worker';
-            uniqueParties[id] = name;
+            const id = String(typeof j.workerId === 'object' ? j.workerId._id || j.workerId.id : j.workerId);
+            const name = typeof j.workerId === 'object' ? j.workerId.name : null;
+            if (id && name) uniqueParties[id] = name;
          }
       });
       return Object.entries(uniqueParties).map(([id, name]) => ({
          value: id,
          label: name
       }));
-   }, [pendingJobs]);
+   }, [pendingJobs, parties]);
 
    const partyPendingJobs = useMemo(() => {
       if (!selectedJobPartyId) return [];
+      const targetPartyObj = (parties || []).find((p) => String(p._id || p.id) === String(selectedJobPartyId));
+      const targetName = (targetPartyObj?.name || '').trim().toLowerCase();
+      const targetId = String(selectedJobPartyId).trim();
+
       return pendingJobs.filter(j => {
-         if (!j.workerId) return false;
-         const workerIdStr = String(j.workerId._id || j.workerId.id || j.workerId);
-         return workerIdStr === String(selectedJobPartyId);
+         const rawWorker = j.workerId;
+         const workerIdStr = String(
+            (typeof rawWorker === 'object' ? rawWorker?._id || rawWorker?.id : rawWorker) ||
+            (typeof j.partyId === 'object' ? j.partyId?._id || j.partyId?.id : j.partyId) ||
+            ''
+         ).trim();
+
+         if (workerIdStr && workerIdStr === targetId) return true;
+
+         const workerName = String(
+            j.workerId?.name || j.workerName || j.partyName || j.weaver || ''
+         ).trim().toLowerCase();
+
+         if (targetName && workerName && (workerName === targetName || workerName.includes(targetName) || targetName.includes(workerName))) {
+            return true;
+         }
+
+         return false;
       });
-   }, [pendingJobs, selectedJobPartyId]);
+   }, [pendingJobs, selectedJobPartyId, parties]);
 
    // Job cards already picked into another row of this same bill — don't offer them twice
    const usedJobIds = useMemo(
@@ -168,24 +205,25 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
    );
 
    const associatedLots = useMemo(() => {
-      if (!selectedJobPartyId) return [];
       const targetLine = lookupTargetIdx != null ? lines[lookupTargetIdx] : null;
       const excludeId = targetLine?.jobId ? String(targetLine.jobId) : null;
-      const available = partyPendingJobs.filter(
+      const pool = partyPendingJobs.length > 0 ? partyPendingJobs : pendingJobs;
+      const available = pool.filter(
          j => !usedJobIds.has(String(j._id)) || String(j._id) === excludeId
       );
       const q = String(targetLine?.chlnNo || '').trim().toLowerCase();
-      if (!q) return available;
-      return available.filter(j => {
+      if (!q || targetLine?.jobId) return available;
+      const filtered = available.filter(j => {
          const lotVal = String(j.lotId?.lotId || j.lotId || '').toLowerCase();
-         const chlnVal = String(j.jobCardNo || '').toLowerCase();
+         const chlnVal = String(j.jobCardNo || j.challanNo || '').toLowerCase();
          const itemVal = String(j.lotId?.itemId?.name || j.lotId?.itemName || '').toLowerCase();
          return lotVal.includes(q) || chlnVal.includes(q) || itemVal.includes(q);
       });
-   }, [partyPendingJobs, selectedJobPartyId, lines, lookupTargetIdx, usedJobIds]);
+      return filtered.length > 0 ? filtered : available;
+   }, [partyPendingJobs, pendingJobs, lines, lookupTargetIdx, usedJobIds]);
 
    const receivedJobs = useMemo(() => {
-      return jobWorkEntries.filter(j => j.status === 'Received');
+      return jobWorkEntries.filter(j => j.status === 'Received' || j.status === 'Partial');
    }, [jobWorkEntries]);
 
    const setLineField = (idx, key, value) => {
@@ -246,6 +284,10 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
    };
 
    const handleSelectLot = (job, idx, options = {}) => {
+      // Pre-fill from what's still PENDING on this job, not the original issued amount —
+      // a job already carrying an earlier partial receive should default to the balance
+      // still owed, not the full challan quantity all over again.
+      const pending = jobPending(job);
       setLines(prev => {
          const next = [...prev];
          next[idx] = {
@@ -257,22 +299,25 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
             cp: 'C',
             cuttingPending: 'P',
             procType: 'Finish',
-            gPcs: String(job.issuePcs || 0),
-            greyMts: Number(job.issueQty || 0).toFixed(2),
+            gPcs: String(pending.pcs),
+            greyMts: pending.qty.toFixed(2),
             finishMts: '0.00',
             finalMts: '0.00',
-            fPcs: String(job.issuePcs || 0),
+            fPcs: String(pending.pcs),
             jobRate: Number(job.jobRate || 0).toFixed(2),
+            isFinal: true,
+            pendingQty: pending.qty,
+            pendingPcs: pending.pcs,
          };
          return next;
       });
 
-      // Header GSTIN / HSN / default GST% come from the job worker on the first pick
+      // Header GSTIN / HSN come from the job worker on the first pick, default GST% is 0 (no tax)
       setGstin(job.workerId?.gstin || '');
       setHsnCd(job.hsnCd || '5407');
-      const gstPct = job.gstPercent ? Number(job.gstPercent) : 5;
-      setSgstPercent((gstPct / 2).toString());
-      setCgstPercent((gstPct / 2).toString());
+      const gstPct = job.gstPercent != null && job.gstPercent !== '' ? Number(job.gstPercent) : 0;
+      setSgstPercent(gstPct > 0 ? (gstPct / 2).toString() : '0');
+      setCgstPercent(gstPct > 0 ? (gstPct / 2).toString() : '0');
       setIgstPercent('0');
 
       const focusFieldId = options.focusField || `grid-finish-mts-${idx}`;
@@ -502,10 +547,10 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                jobId: line.jobId,
                receivedQty: Number(line.finishMts) || 0,
                receivedPcs: Number(line.fPcs) || 0,
-               wastage: Math.max(0, Number(line.greyMts) - Number(line.finishMts)),
                charges: Number(line.jobAmt) || 0,
                gstAmount: Number(gstShare.toFixed(2)) || 0,
                billGpNo: billGpNo.trim(),
+               isFinal: line.isFinal !== false,
             });
             ok += 1;
          }
@@ -557,9 +602,12 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                   ))}
                </div>
 
-               <div className="flex-1 flex flex-col justify-start overflow-hidden bg-[#d4d0c8] p-2">
+               <div className="flex-1 flex flex-col justify-start overflow-hidden bg-[#d4d0c8]">
                   {activeTab === 'Mill Receive' ? (
-                     <div className="w-full flex flex-col overflow-y-auto no-scrollbar gap-2 pb-2">
+                     <div className="w-full flex-1 flex flex-col min-h-0 overflow-hidden">
+                        
+                        {/* SCROLLABLE FORM CONTENT */}
+                        <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5">
 
                         {/* 1. TOP HEADER GRID FORM */}
                         <div className="border border-[#808080] p-2 bg-[#d4d0c8] shadow-[inset_1px_1px_0px_#fff]">
@@ -668,7 +716,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                         </div>
 
                         {/* 2. TRANSACTION GRID TABLE (multi-row — one line per challan) */}
-                        <div className="border border-[#808080] bg-white overflow-x-auto min-h-[180px] max-h-[280px]">
+                        <div className="border border-[#808080] bg-white overflow-x-auto min-h-[140px] max-h-[220px]">
                            <table className="min-w-[1440px] w-full text-[10px] font-mono border-collapse">
                               <thead>
                                  <tr className="bg-[#e2e8f0] text-slate-800 border-b border-[#808080] text-[10px]">
@@ -690,6 +738,8 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                     <th className="border-r border-[#808080] p-1 w-20 text-right">F.Pcs</th>
                                     <th className="border-r border-[#808080] p-1 w-28 text-left">Proc Type</th>
                                     <th className="border-r border-[#808080] p-1 w-28 text-left">Cutting Pending</th>
+                                    <th className="border-r border-[#808080] p-1 w-20 text-right">Pending</th>
+                                    <th className="border-r border-[#808080] p-1 w-14 text-center">Final?</th>
                                     <th className="p-1 w-8" />
                                  </tr>
                               </thead>
@@ -856,6 +906,17 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                              className="w-full h-6 px-1 border-none bg-transparent"
                                              value={line.cuttingPending}
                                              onChange={(e) => setLineField(idx, 'cuttingPending', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5 text-right bg-slate-100 text-slate-600" title="Still pending on this challan before this line">
+                                          {line.jobId ? Number(line.pendingQty || 0).toFixed(2) : ''}
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5 text-center">
+                                          <input
+                                             type="checkbox"
+                                             checked={line.isFinal !== false}
+                                             onChange={(e) => setLineField(idx, 'isFinal', e.target.checked)}
+                                             title="Checked: this closes the job (any shortfall books as wastage). Unchecked: more is still expected — job stays Partial."
                                           />
                                        </td>
                                        <td className="p-0.5 text-center">
@@ -1090,18 +1151,20 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
 
                         </div>
 
-                        {/* 5. ACTION BUTTONS FOOTER BAR */}
-                        <div className="flex flex-col gap-2 p-2 border border-[#808080] bg-[#d4d0c8]">
+                        </div>
+
+                        {/* 5. ACTION BUTTONS FOOTER BAR (PINNED AT BOTTOM) */}
+                        <div className="shrink-0 flex flex-col gap-1.5 p-2 border-t-2 border-[#808080] bg-[#d4d0c8] shadow-md z-10">
 
                            {/* Row 1: Primary Toolbar */}
-                           <div className="flex justify-start gap-1 flex-wrap">
+                           <div className="flex justify-start gap-1.5 flex-wrap items-center">
                               <button type="button" className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">New</button>
                               <button type="button" className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Edit</button>
                               <button
                                  type="submit"
                                  onClick={handleSubmit}
                                  disabled={saving || !selectedJobPartyId}
-                                 className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]"
+                                 className="px-6 py-1 text-[11px] font-extrabold border border-blue-900 bg-blue-700 hover:bg-blue-800 text-white active:bg-blue-900 disabled:opacity-50 shadow-sm"
                               >
                                  <SaveButtonLabel saving={saving} idle="Save" busy="Saving…" />
                               </button>
@@ -1215,7 +1278,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                        <th className="p-1 border-r border-[#808080]">Challan No</th>
                                        <th className="p-1 border-r border-[#808080]">Lot Number</th>
                                        <th className="p-1 border-r border-[#808080]">Item Name</th>
-                                       <th className="p-1 text-right">Issued Qty</th>
+                                       <th className="p-1 border-r border-[#808080] text-right">Issued Qty</th>
+                                       <th className="p-1 border-r border-[#808080] text-right">Received So Far</th>
+                                       <th className="p-1 text-right">Pending</th>
                                     </tr>
                                  </thead>
                                  <tbody>
@@ -1233,7 +1298,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                              <td className={`p-1.5 border-r border-slate-200 font-bold ${i === dropdownSelectIdx ? 'text-white' : 'text-blue-900'}`}>{job.challanNo || job.jobCardNo}</td>
                                              <td className="p-1.5 border-r border-slate-200">{job.lotId?.lotId || job.lotId || 'N/A'}</td>
                                              <td className="p-1.5 border-r border-slate-200 uppercase font-sans">{job.lotId?.itemId?.name || job.lotId?.itemName || 'N/A'}</td>
-                                             <td className="p-1.5 text-right font-bold">{job.issueQty} Mts</td>
+                                             <td className="p-1.5 border-r border-slate-200 text-right">{job.issueQty} Mts</td>
+                                             <td className="p-1.5 border-r border-slate-200 text-right">{Number(job.receivedQty || 0)} Mts</td>
+                                             <td className="p-1.5 text-right font-bold">{jobPending(job).qty.toFixed(2)} Mts</td>
                                           </tr>
                                        ))
                                     ) : (

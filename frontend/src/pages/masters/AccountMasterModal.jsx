@@ -48,12 +48,15 @@ const EMPTY_ACCOUNT = {
   maxLevel: 0,
   minLevel: 0,
   tdsPer: 0,
-  tcsPer: 0
+  tcsPer: 0,
+  banks: []
 };
 
-const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null, readOnly = false }) => {
+const emptyBankRow = () => ({ name: '', accountNo: '', ifsc: '' });
+
+const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null, readOnly = false, initialTab = 'Account', prefillBankName = '' }) => {
   const { addParty, updateParty, deleteParty, parties, fetchParties } = useStore();
-  const [activeTab, setActiveTab] = useState('Account');
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [mode, setMode] = useState('View'); // 'View', 'Add', 'Edit'
   const [selectedPartyId, setSelectedPartyId] = useState('');
   const [saving, setSaving] = useState(false);
@@ -61,10 +64,14 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   
   const [formData, setFormData] = useState({ ...EMPTY_ACCOUNT });
 
+  // Fetch once per open — NOT keyed on `initialData` (an object). fetchParties() always
+  // returns a fresh array/object references even when the data is unchanged, so keying
+  // this effect on the object itself would refire → refetch → new reference → refire …
+  // forever, which is exactly what made "Loading accounts…" spin indefinitely.
   useEffect(() => {
     if (!isOpen) {
       setBootLoading(false);
-      return;
+      return undefined;
     }
     let cancelled = false;
     setBootLoading(true);
@@ -73,11 +80,26 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       .finally(() => {
         if (!cancelled) setBootLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, fetchParties]);
+
+  // Populate the form keyed on the PARTY ID, not the initialData object reference —
+  // a caller re-rendering with a re-memoized (but same-party) object must not reset the form.
+  const initialPartyId = initialData?._id || initialData?.id || '';
+  useEffect(() => {
+    if (!isOpen) return;
+    setActiveTab(initialTab);
     if (initialData) {
-      setFormData({ ...EMPTY_ACCOUNT, ...initialData });
-      setSelectedPartyId(initialData._id || initialData.id || '');
-      const hasId = !!(initialData._id || initialData.id);
-      setMode(readOnly ? 'View' : hasId ? 'Edit' : 'Add');
+      const merged = { ...EMPTY_ACCOUNT, ...initialData };
+      const wantedBank = String(prefillBankName || '').trim().toUpperCase();
+      if (wantedBank && !(merged.banks || []).some((b) => String(b.name || '').toUpperCase() === wantedBank)) {
+        merged.banks = [...(merged.banks || []), { name: wantedBank, accountNo: '', ifsc: '' }];
+      }
+      setFormData(merged);
+      setSelectedPartyId(initialPartyId);
+      setMode(readOnly ? 'View' : initialPartyId ? 'Edit' : 'Add');
     } else if (readOnly) {
       setMode('View');
     } else {
@@ -85,10 +107,8 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       setSelectedPartyId('');
       setMode('Add');
     }
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, initialData, readOnly, fetchParties]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialPartyId, readOnly, initialTab, prefillBankName]);
 
   // Derive State Details from GSTIN
   useEffect(() => {
@@ -160,7 +180,15 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       else if (g.includes('BROKER')) type = 'Broker';
       else if (g.includes('JOB') || g.includes('WORKER')) type = 'Job Worker';
       
-      const payload = { ...formData, name: formData.name.trim(), type };
+      const banks = (formData.banks || [])
+        .map((b) => ({
+          name: String(b.name || '').trim().toUpperCase(),
+          accountNo: String(b.accountNo || '').trim(),
+          ifsc: String(b.ifsc || '').trim().toUpperCase(),
+        }))
+        .filter((b) => b.name);
+
+      const payload = { ...formData, name: formData.name.trim(), type, banks };
       
       let result;
       if (mode === 'Edit' && (formData._id || formData.id)) {
@@ -220,6 +248,24 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
     setFormData((prev) => ({ ...prev, [key]: val }));
   };
 
+  const addBankRow = () => {
+    setFormData((prev) => ({ ...prev, banks: [...(prev.banks || []), emptyBankRow()] }));
+  };
+
+  const updateBankRow = (idx, key) => (e) => {
+    const raw = e.target.value;
+    const val = key === 'name' || key === 'ifsc' ? raw.toUpperCase() : raw;
+    setFormData((prev) => {
+      const banks = [...(prev.banks || [])];
+      banks[idx] = { ...banks[idx], [key]: val };
+      return { ...prev, banks };
+    });
+  };
+
+  const removeBankRow = (idx) => {
+    setFormData((prev) => ({ ...prev, banks: (prev.banks || []).filter((_, i) => i !== idx) }));
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-5xl">
       <div className="classic-erp-window">
@@ -236,6 +282,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
         {/* Tab Selection */}
         <div className="classic-erp-tabs">
           <button className={`classic-erp-tab-button ${activeTab === 'Account' ? 'active' : ''}`} onClick={() => setActiveTab('Account')}>Account</button>
+          <button className={`classic-erp-tab-button ${activeTab === 'Bank Details' ? 'active' : ''}`} onClick={() => setActiveTab('Bank Details')}>Bank Details{formData.banks?.length ? ` (${formData.banks.length})` : ''}</button>
           <button className={`classic-erp-tab-button ${activeTab === 'Other Detail' ? 'active' : ''}`} onClick={() => setActiveTab('Other Detail')}>Other Detail</button>
         </div>
 
@@ -257,7 +304,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
             </div>
           )}
 
-          {activeTab === 'Account' ? (
+          {activeTab === 'Account' && (
             <div className="space-y-3">
               <div className="classic-erp-frame">
                 <div className="classic-erp-field-row">
@@ -433,7 +480,58 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                 </div>
               </div>
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'Bank Details' && (
+            <div className="classic-erp-frame">
+              <div className="flex items-center justify-between mb-2">
+                <span className="classic-erp-label red-label">Party Bank Accounts</span>
+                {!locked && (
+                  <button type="button" className="classic-erp-btn" onClick={addBankRow}>+ Add Bank</button>
+                )}
+              </div>
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="text-left">
+                    <th className="classic-erp-label pb-1">Bank Name</th>
+                    <th className="classic-erp-label pb-1">Account No</th>
+                    <th className="classic-erp-label pb-1">IFSC Code</th>
+                    {!locked && <th className="classic-erp-label pb-1 w-10"></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(formData.banks || []).length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="text-center text-gray-400 py-4">
+                        No bank accounts added{!locked ? ' — click "+ Add Bank"' : ''}
+                      </td>
+                    </tr>
+                  ) : (
+                    formData.banks.map((b, idx) => (
+                      <tr key={idx}>
+                        <td className="pr-2 py-1">
+                          <input type="text" className="classic-erp-input w-full" value={b.name} onChange={updateBankRow(idx, 'name')} disabled={locked} placeholder="Bank name" />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input type="text" className="classic-erp-input w-full" value={b.accountNo} onChange={updateBankRow(idx, 'accountNo')} disabled={locked} placeholder="Account number" />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input type="text" className="classic-erp-input w-full" value={b.ifsc} onChange={updateBankRow(idx, 'ifsc')} disabled={locked} placeholder="IFSC" maxLength={11} />
+                        </td>
+                        {!locked && (
+                          <td className="py-1">
+                            <button type="button" className="classic-erp-btn btn-red" style={{ padding: '2px 8px' }} onClick={() => removeBankRow(idx)}>×</button>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {activeTab === 'Other Detail' && (
             /* Other Detail Tab */
             <div className="classic-erp-frame grid grid-cols-2 gap-4">
               <div className="space-y-2">

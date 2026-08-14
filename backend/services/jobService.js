@@ -133,16 +133,44 @@ class JobService {
     }
   }
 
+  /**
+   * Receive material back from a job worker. Supports MULTIPLE partial receives against
+   * the same job: each call is one tranche, added on top of whatever was already banked
+   * (job.receivedQty/receivedPcs are cumulative). The job only becomes 'Received' when
+   * the CALLER explicitly says this tranche is the last one (receiveData.isFinal) — it is
+   * never inferred from quantity, because real job-work almost never returns 100% of the
+   * issued material (shrinkage/wastage is normal), so "received >= issued" would rarely
+   * fire. isFinal defaults to true, so any existing caller that doesn't send it keeps
+   * today's exact one-call-and-done behaviour.
+   *
+   * Financial postings are split deliberately:
+   *   - job-work CHARGES/GST post every tranche (this tranche's own amount only) — a
+   *     worker is commonly paid incrementally as goods come back.
+   *   - stock VALUATION (WIP -> Stock) and wastage post ONLY on the final tranche.
+   *     accountingService.onJobReceiveStockPost values that entry off job.issueQty (the
+   *     full original amount), not whatever is passed as receivedQty — by design, so one
+   *     posting clears the WIP the issue created. Calling it once, at closure, reproduces
+   *     that exactly; calling it per tranche would re-post the full value every time.
+   * Physical stock quantity (applyLotMovement) is always per tranche — inventory that
+   * has genuinely arrived should be immediately available, closure or not.
+   *
+   * Configurable multi-step process chains (job.steps.length > 0) are a different,
+   * separate feature (advanceStep/performQc already model "one step at a time") — for
+   * those, a receive still completes the current step in one shot, exactly as before.
+   */
   async receiveFromJob(receiveData) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-      const { jobId, receivedQty, receivedPcs, companyId, billGpNo } = receiveData;
+      const { jobId, companyId, billGpNo } = receiveData;
+      const trancheQty = Number(receiveData.receivedQty || 0);
+      const tranchePcs = Number(receiveData.receivedPcs || 0);
 
       const job = await Job.findOne({ _id: jobId, companyId }).session(session);
       if (!job) throw AppError.notFound('Job record not found');
-      if (job.status === 'Received') throw AppError.badRequest('This job has already been received');
+      if (job.status === 'Received') throw AppError.badRequest('This job has already been fully received');
+      if (job.status === 'Cancelled') throw AppError.badRequest('Cannot receive against a cancelled job');
 
       if (billGpNo) {
         // Multiple challans for the SAME job worker can share one Bill/Gp No
@@ -151,7 +179,7 @@ class JobService {
         const existingReceipt = await Job.findOne({
           billGpNo: String(billGpNo).trim(),
           companyId,
-          status: 'Received',
+          status: { $in: ['Received', 'Partial'] },
           workerId: { $ne: job.workerId },
         }).session(session);
         if (existingReceipt) {
@@ -159,13 +187,35 @@ class JobService {
         }
       }
 
-      // Validate receivedQty does not exceed issuedQty
-      const received = Number(receivedQty || 0);
-      if (received < 0) throw AppError.badRequest('Received quantity cannot be negative');
-      if (received > Number(job.issueQty || 0)) {
-        throw AppError.badRequest(`Received quantity (${received}) cannot exceed issued quantity (${job.issueQty})`);
+      if (trancheQty < 0) throw AppError.badRequest('Received quantity cannot be negative');
+
+      const isChainJob = Array.isArray(job.steps) && job.steps.length > 0;
+      const previouslyReceivedQty = isChainJob ? 0 : Number(job.receivedQty || 0);
+      const previouslyReceivedPcs = isChainJob ? 0 : Number(job.receivedPcs || 0);
+      const pendingQty = Number((Number(job.issueQty || 0) - previouslyReceivedQty).toFixed(4));
+
+      if (!isChainJob && trancheQty > pendingQty + 0.0001) {
+        throw AppError.badRequest(
+          `Received quantity (${trancheQty}) cannot exceed the pending balance (${pendingQty})` +
+          (previouslyReceivedQty > 0
+            ? ` — ${previouslyReceivedQty} of ${job.issueQty} already received against this job`
+            : ` (issued quantity ${job.issueQty})`)
+        );
       }
 
+      const cumulativeReceivedQty = isChainJob
+        ? trancheQty
+        : Number((previouslyReceivedQty + trancheQty).toFixed(4));
+      const cumulativeReceivedPcs = isChainJob ? tranchePcs : previouslyReceivedPcs + tranchePcs;
+
+      // Defaults to final/complete — matches every existing caller's expectation that one
+      // receive call closes the job (any shortfall books as wastage). A caller must
+      // EXPLICITLY pass isFinal: false to keep the job open for another tranche; this can
+      // never be inferred from the remaining balance, because normal job-work almost
+      // never returns exactly 100% of the issued quantity (see docblock above) — if
+      // "remaining <= 0" gated finality, an ordinary receive with real wastage would get
+      // stuck Partial forever instead of closing with that shortfall as wastage.
+      const isFinal = isChainJob || receiveData.isFinal !== false;
       const openStep = job.steps?.length
         ? job.steps.find((s) => ['In-Process', 'QC-Pending', 'QC-Pass'].includes(s.status))
         : null;
@@ -177,9 +227,6 @@ class JobService {
         .populate({ path: 'purchaseId', select: 'taxableAmount' })
         .session(session);
       if (!originalLot) throw AppError.notFound('Source lot not found');
-
-      const tolerancePct = job.toleranceWastagePct ?? 3;
-      const { wastage, abnormalWastage } = computeWastageSplit(job.issueQty, receivedQty, tolerancePct);
 
       const outputItemId =
         receiveData.outputItemId ||
@@ -193,27 +240,47 @@ class JobService {
       }
       if (!greyCostPerMtr) greyCostPerMtr = 100;
 
-      const charges = parseFloat(receiveData.charges) || parseFloat(job.processCharges) || 0;
-      const gstAmount = parseFloat(receiveData.gstAmount) || parseFloat(job.processGstAmount) || 0;
-      const greyMaterialCost = greyCostPerMtr * job.issueQty;
-      const finishedRate =
-        receivedQty > 0
-          ? Number(((greyMaterialCost + charges) / receivedQty).toFixed(4))
+      // This tranche's own job-work charges — never the job's running cumulative total,
+      // or every subsequent tranche would re-post everything already booked by earlier
+      // ones. Falls back to this tranche's share at the agreed per-unit job rate.
+      const charges = parseFloat(receiveData.charges) || Number(((job.jobRate || 0) * trancheQty).toFixed(2)) || 0;
+      const gstAmount = parseFloat(receiveData.gstAmount) || 0;
+      const greyMaterialCost = greyCostPerMtr * trancheQty;
+      const trancheFinishedRate =
+        trancheQty > 0
+          ? Number(((greyMaterialCost + charges) / trancheQty).toFixed(4))
           : greyCostPerMtr;
 
-      job.receivedQty = receivedQty;
-      job.receivedPcs = receivedPcs || 0;
-      job.wastage = wastage;
-      job.processCharges = charges;
-      job.processGstAmount = gstAmount;
-      job.status = 'Received';
-      job.receiveDate = new Date();
-      job.billGpNo = billGpNo || '';
+      // Wastage is only meaningful once the job is actually closing — computed against
+      // whatever ends up NOT received (issueQty - cumulativeReceivedQty at closure).
+      let wastage = 0;
+      let abnormalWastage = 0;
+      if (isFinal) {
+        const tolerancePct = job.toleranceWastagePct ?? 3;
+        ({ wastage, abnormalWastage } = computeWastageSplit(job.issueQty, cumulativeReceivedQty, tolerancePct));
+      }
 
-      if (job.steps?.length) {
+      job.receivedQty = cumulativeReceivedQty;
+      job.receivedPcs = cumulativeReceivedPcs;
+      job.wastage = wastage;
+      // issueToJob seeds job.processCharges with the raw per-unit jobRate as a
+      // placeholder (not a total) when no explicit processCharges is given at issue time
+      // — safe to overwrite under the old flat-assignment design, but this is now a
+      // running total, so that placeholder must never be added onto. Only trust the
+      // existing value as a real baseline once a receive tranche has actually written it
+      // (previouslyReceivedQty > 0); the very first tranche always starts from zero.
+      const chargesBase = previouslyReceivedQty > 0 ? Number(job.processCharges || 0) : 0;
+      const gstBase = previouslyReceivedQty > 0 ? Number(job.processGstAmount || 0) : 0;
+      job.processCharges = Number((chargesBase + charges).toFixed(2));
+      job.processGstAmount = Number((gstBase + gstAmount).toFixed(2));
+      job.status = isFinal ? 'Received' : 'Partial';
+      job.receiveDate = new Date();
+      job.billGpNo = billGpNo || job.billGpNo || '';
+
+      if (isChainJob) {
         const idx = job.currentStepIndex ?? 0;
         if (job.steps[idx]) {
-          job.steps[idx].receivedQty = receivedQty;
+          job.steps[idx].receivedQty = trancheQty;
           job.steps[idx].wastage = wastage;
           job.steps[idx].charges = charges;
           job.steps[idx].status = 'Completed';
@@ -229,64 +296,94 @@ class JobService {
         processName: job.processType,
         workerId: job.workerId,
         issueQty: job.issueQty,
-        receivedQty,
+        receivedQty: trancheQty,
         wastage,
         charges,
         completedAt: job.receiveDate,
       };
 
-      const inheritedHistory = (originalLot.processHistory || []).map((h) => ({ ...h }));
-      inheritedHistory.push(processHistoryEntry);
+      // Grow the SAME finished lot across tranches instead of fragmenting stock into one
+      // lot per partial receive.
+      let finishedLot = job.finishedLotId
+        ? await InventoryLot.findById(job.finishedLotId).session(session)
+        : null;
 
-      const [newLotDoc] = await InventoryLot.create(
-        [
-          {
-            lotId: `${originalLot.lotId}-FIN-${Date.now()}`,
-            itemId: outputItemId,
-            purchaseId: originalLot.purchaseId?._id || originalLot.purchaseId || null,
-            source: 'job_receive',
-            parentLotId: originalLot._id,
-            sourceJobId: job._id,
-            processHistory: inheritedHistory,
-            totalPcs: receivedPcs || 0,
-            remainingPcs: 0,
-            totalMtrs: receivedQty,
-            remainingMtrs: 0,
-            rate: finishedRate,
-            warehouseId: originalLot.warehouseId || null,
-            status: 'Available',
-            companyId,
-          },
-        ],
-        { session }
-      );
+      if (!finishedLot) {
+        const inheritedHistory = (originalLot.processHistory || []).map((h) => ({ ...h }));
+        inheritedHistory.push(processHistoryEntry);
+        [finishedLot] = await InventoryLot.create(
+          [
+            {
+              lotId: `${originalLot.lotId}-FIN-${Date.now()}`,
+              itemId: outputItemId,
+              purchaseId: originalLot.purchaseId?._id || originalLot.purchaseId || null,
+              source: 'job_receive',
+              parentLotId: originalLot._id,
+              sourceJobId: job._id,
+              processHistory: inheritedHistory,
+              totalPcs: 0,
+              remainingPcs: 0,
+              totalMtrs: 0,
+              remainingMtrs: 0,
+              rate: trancheFinishedRate,
+              warehouseId: originalLot.warehouseId || null,
+              status: 'Available',
+              companyId,
+            },
+          ],
+          { session }
+        );
+      } else {
+        finishedLot.processHistory = finishedLot.processHistory || [];
+        finishedLot.processHistory.push(processHistoryEntry);
+        // Blend the finished rate across tranches by value, not a flat overwrite.
+        const existingValue = Number(finishedLot.rate || 0) * Number(finishedLot.totalMtrs || 0);
+        const trancheValue = trancheFinishedRate * trancheQty;
+        const newTotalMtrs = Number(finishedLot.totalMtrs || 0) + trancheQty;
+        finishedLot.rate = newTotalMtrs > 0
+          ? Number(((existingValue + trancheValue) / newTotalMtrs).toFixed(4))
+          : trancheFinishedRate;
+      }
+
+      finishedLot.totalPcs = Number(finishedLot.totalPcs || 0) + tranchePcs;
+      finishedLot.totalMtrs = Number(finishedLot.totalMtrs || 0) + trancheQty;
+      await finishedLot.save({ session });
 
       await applyLotMovement({
         session,
-        lot: newLotDoc,
+        lot: finishedLot,
         companyId,
-        deltaMts: receivedQty,
-        deltaPcs: receivedPcs || 0,
+        deltaMts: trancheQty,
+        deltaPcs: tranchePcs,
         type: 'RECEIVE',
         referenceId: job._id,
-        idempotencyKey: `RECEIVE:${job._id}:${newLotDoc._id}`,
-        remarks: `Received from Job: ${job.jobCardNo}`,
+        idempotencyKey: `RECEIVE:${job._id}:${finishedLot._id}:${Date.now()}`,
+        remarks: `Received from Job: ${job.jobCardNo}${isFinal ? '' : ' (partial)'}`,
       });
 
-      newLotDoc.remainingPcs = receivedPcs || 0;
-      await newLotDoc.save({ session });
-
-      job.finishedLotId = newLotDoc._id;
+      job.finishedLotId = finishedLot._id;
       await job.save({ session });
 
       const accountingService = require('./accountingService');
 
-      // Ledger: WIP → Stock (material return from mill)
-      await accountingService.onJobReceiveStockPost(
-        job,
-        { greyCostPerMtr, receivedQty },
-        session
-      );
+      if (isFinal) {
+        // WIP → Stock, valued off job.issueQty by design (see docblock) — must fire
+        // exactly once per job, which "only on the final tranche" guarantees.
+        await accountingService.onJobReceiveStockPost(
+          job,
+          { greyCostPerMtr, receivedQty: cumulativeReceivedQty },
+          session
+        );
+        if (abnormalWastage > 0 && greyCostPerMtr > 0) {
+          await accountingService.onAbnormalWastagePost(
+            companyId,
+            abnormalWastage,
+            greyCostPerMtr,
+            job._id,
+            session
+          );
+        }
+      }
 
       if (charges > 0 || gstAmount > 0) {
         await accountingService.onJobWorkChargesPost(
@@ -302,16 +399,6 @@ class JobService {
         );
       }
 
-      if (abnormalWastage > 0 && greyCostPerMtr > 0) {
-        await accountingService.onAbnormalWastagePost(
-          companyId,
-          abnormalWastage,
-          greyCostPerMtr,
-          job._id,
-          session
-        );
-      }
-
       await session.commitTransaction();
       try {
         const eventBus = require('../events/eventBus');
@@ -319,12 +406,21 @@ class JobService {
           companyId: String(companyId),
           jobId: job._id?.toString?.(),
           jobCardNo: job.jobCardNo,
-          finishedLotId: newLotDoc._id?.toString?.(),
+          finishedLotId: finishedLot._id?.toString?.(),
+          isFinal,
         });
       } catch {
         /* optional */
       }
-      return { job, newLot: newLotDoc, wastage, abnormalWastage, finishedRate };
+      return {
+        job,
+        newLot: finishedLot,
+        wastage,
+        abnormalWastage,
+        finishedRate: trancheFinishedRate,
+        isFinal,
+        pendingQty: isFinal ? 0 : Number((Number(job.issueQty || 0) - cumulativeReceivedQty).toFixed(4)),
+      };
     } catch (error) {
       await session.abortTransaction();
       throw error;
@@ -399,7 +495,7 @@ class JobService {
   }
 
   async updateProcess(jobId, status, companyId) {
-    const validStatuses = ['Issued', 'In-Process', 'Received', 'Cancelled'];
+    const validStatuses = ['Issued', 'In-Process', 'Received', 'Partial', 'Cancelled'];
     if (!validStatuses.includes(status)) throw AppError.badRequest(`Invalid job status: ${status}`);
 
     if (status !== 'Cancelled') {
@@ -500,8 +596,10 @@ class JobService {
     try {
       const job = await Job.findOne({ _id: jobId, companyId }).session(session);
       if (!job) throw AppError.notFound('Job not found');
-      if (job.status !== 'Received') {
-        throw AppError.badRequest('Only received jobs can be reversed. Current status: ' + job.status);
+      // Reversal undoes EVERYTHING received so far in one shot (all tranches at once),
+      // not just the most recent one — there is no per-tranche undo.
+      if (job.status !== 'Received' && job.status !== 'Partial') {
+        throw AppError.badRequest('Only received (or partially received) jobs can be reversed. Current status: ' + job.status);
       }
 
       const AccountingEntry = require('../models/AccountingEntry');
@@ -528,7 +626,12 @@ class JobService {
       if (job.finishedLotId) {
         const finishedLot = await InventoryLot.findById(job.finishedLotId).session(session);
         if (finishedLot) {
-          finishedLot.status = 'Deleted';
+          // Pre-existing bug fixed here: InventoryLot.status only allows
+          // ['Available', 'Partially Used', 'Closed'] — 'Deleted' has never been a valid
+          // value on this model, so this save always threw a validation error and
+          // reverseJobReceive could never actually complete. 'Closed' is the closest
+          // valid equivalent to "voided, no longer active stock."
+          finishedLot.status = 'Closed';
           finishedLot.remainingMtrs = 0;
           finishedLot.remainingPcs = 0;
           await finishedLot.save({ session });
@@ -545,8 +648,18 @@ class JobService {
         }
       }
 
-      // Update job status back to Issued
+      // Update job status back to Issued — and, since receivedQty/receivedPcs now
+      // ACCUMULATE across tranches (see receiveFromJob), reset every figure a receive
+      // wrote so a fresh receive afterward starts from zero rather than adding onto
+      // stale pre-reversal totals.
       job.status = 'Issued';
+      job.receivedQty = 0;
+      job.receivedPcs = 0;
+      job.wastage = 0;
+      job.processCharges = 0;
+      job.processGstAmount = 0;
+      job.billGpNo = '';
+      job.finishedLotId = null;
       job.receiveReversedAt = new Date();
       // Store the first reversal entry ID for audit trail
       if (entriesToReverse.length > 0) {

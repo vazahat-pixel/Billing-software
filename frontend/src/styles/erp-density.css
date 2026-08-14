@@ -936,220 +936,427 @@
   border-radius: 4px;
 }
 
+/* ==========================================================================
+   ULTRA-COMPACT DENSE JOB WORK WINDOWS — 100% ZERO SCROLLBAR VIEWPORT FIT
+   ========================================================================== */
 
-.classic-erp-window.erp-job-receipt-window {
-  --erp-label-w: 88px;
-  --erp-gap: 6px;
+.classic-erp-window.erp-job-receipt-window,
+.classic-erp-window.erp-job-issue-window,
+.classic-erp-window.erp-mill-issue-window,
+.classic-erp-window.erp-mill-receive-window {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  font-family: inherit;
 }
 
-.classic-erp-window.erp-job-receipt-window .erp-job-receipt-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px !important;
-  padding: 8px 10px !important;
-  min-height: 0;
+/* Modal Form / Body Container — STRICTLY NO SCROLLBAR */
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-body,
+.classic-erp-window.erp-job-issue-window .erp-job-issue-body,
+.classic-erp-window.erp-mill-issue-window .erp-job-issue-body,
+.classic-erp-window.erp-mill-receive-window .erp-mill-receive-body {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important; /* NO VERTICAL SCROLLBAR */
+  padding: 3px 6px !important;
+  gap: 2px !important;
 }
 
-.classic-erp-window.erp-job-receipt-window .erp-job-receipt-header {
-  padding: 10px 12px !important;
+/* Fields & Labels — Compact 10px Typography */
+.classic-erp-window.erp-job-receipt-window .classic-erp-label,
+.classic-erp-window.erp-job-issue-window .classic-erp-label {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+  line-height: 1.1 !important;
+  color: #334155 !important;
+  margin-right: 2px !important;
+  flex-shrink: 0 !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .classic-erp-label.red-label,
+.classic-erp-window.erp-job-issue-window .classic-erp-label.red-label {
+  color: #b91c1c !important;
+}
+
+/* Input, Select, Combobox controls — Ultra Dense 21px Height */
+.classic-erp-window.erp-job-receipt-window input.classic-erp-input,
+.classic-erp-window.erp-job-receipt-window select.classic-erp-select,
+.classic-erp-window.erp-job-receipt-window .classic-erp-control input,
+.classic-erp-window.erp-job-issue-window input.classic-erp-input,
+.classic-erp-window.erp-job-issue-window select.classic-erp-select,
+.classic-erp-window.erp-job-issue-window .classic-erp-control input {
+  height: 21px !important;
+  min-height: 21px !important;
+  max-height: 21px !important;
+  font-size: 10px !important;
+  padding: 0 4px !important;
+  line-height: 19px !important;
+  border-radius: 2px !important;
+  border: 1px solid #cbd5e1 !important;
+  box-sizing: border-box !important;
+}
+
+/* Prevent numeric input spin buttons from causing text truncation */
+.classic-erp-window input[type="number"]::-webkit-inner-spin-button,
+.classic-erp-window input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+.classic-erp-window input[type="number"] {
+  -moz-appearance: textfield !important;
+}
+
+/* Header frames */
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-header,
+.classic-erp-window.erp-job-issue-window .erp-job-issue-header {
+  padding: 3px 6px !important;
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-subtle, #cbd5e1);
+  border-radius: 3px;
+  margin-bottom: 1px !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-header-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr);
-  gap: 12px;
-  align-items: start;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr) !important;
+  gap: 6px !important;
+  align-items: start !important;
 }
 
-.classic-erp-window.erp-job-receipt-window .erp-job-receipt-meta-row {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px 8px;
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-meta-row-1 {
+  display: grid !important;
+  grid-template-columns: 1.05fr 0.95fr 1.15fr !important;
+  gap: 4px !important;
+  align-items: center !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-meta-row-2 {
+  display: grid !important;
+  grid-template-columns: 0.95fr 1.1fr 0.85fr 1.25fr !important;
+  gap: 4px !important;
+  align-items: center !important;
+  margin-top: 2px !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-date {
-  width: 132px !important;
-  flex: 0 0 132px !important;
+  width: 100% !important;
+  flex: 1 1 auto !important;
 }
 
-.classic-erp-window.erp-job-receipt-window .erp-job-receipt-weekday {
-  font-size: 11px;
-  font-weight: 700;
-  color: #475569;
-  white-space: nowrap;
+/* Party address box (2-line classic ERP box) */
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-party-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
 }
 
-.classic-erp-window.erp-job-receipt-window .erp-rcm-highlight {
-  background: #fef9c3 !important;
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-party-field {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
 }
 
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-address-box {
+  min-height: 20px !important;
+  height: 20px !important;
+  max-height: 20px !important;
+  margin-top: 2px !important;
+  padding: 1px 4px !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #f8fafc !important;
+  font-size: 10px !important;
+  color: #334155 !important;
+  border-radius: 2px !important;
+  line-height: 18px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-gstin-badge {
+  flex: 0 0 auto !important;
+  font-size: 9.5px !important;
+  font-weight: 800 !important;
+  font-family: ui-monospace, monospace !important;
+  color: #9a3412 !important;
+  background: #ffedd5 !important;
+  border: 1px solid #fdba74 !important;
+  padding: 1px 4px !important;
+  white-space: nowrap !important;
+  border-radius: 2px !important;
+}
+
+/* Toolbar under header */
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-subtle, #cbd5e1);
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-top: 3px !important;
+  padding-top: 3px !important;
+  border-top: 1px solid var(--border-subtle, #cbd5e1) !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-toolbar .classic-erp-btn {
+  height: 20px !important;
+  min-height: 20px !important;
+  font-size: 9.5px !important;
+  padding: 0 4px !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-pending-tag {
-  margin-left: auto;
-  font-size: 10px;
-  font-weight: 700;
-  color: #b91c1c;
-  text-transform: uppercase;
+  margin-left: auto !important;
+  font-size: 9.5px !important;
+  font-weight: 800 !important;
+  color: #dc2626 !important;
+  text-transform: uppercase !important;
 }
 
+/* Table Grid Section — Takes flex-1 space with strict max-height */
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-grid-wrap {
   padding: 0 !important;
-  min-height: 160px;
+  border: 1px solid #cbd5e1 !important;
+  flex: 1 1 auto !important;
+  min-height: 80px !important;
+  max-height: 140px !important;
+  margin-bottom: 0 !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-grid {
-  max-height: min(38vh, 280px);
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
 }
 
-.classic-erp-window.erp-job-receipt-window .erp-job-receipt-table th,
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  table-layout: fixed !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-table th {
+  background: #f1f5f9 !important;
+  color: #1e293b !important;
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  padding: 2px 2px !important;
+  border: 1px solid #cbd5e1 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  height: 18px !important;
+}
+
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-table td {
-  padding: 2px 4px !important;
-  vertical-align: middle;
+  padding: 0 1px !important;
+  border: 1px solid #cbd5e1 !important;
+  vertical-align: middle !important;
+  height: 20px !important;
+  box-sizing: border-box !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-table .classic-erp-input,
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-table .classic-erp-select {
-  height: 26px !important;
-  min-height: 26px !important;
-  font-size: 11px !important;
-  padding: 0 4px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  font-size: 10px !important;
+  padding: 0 3px !important;
+  border-radius: 1px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
 }
 
-.classic-erp-window.erp-job-receipt-window .erp-job-receipt-del {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 1px solid var(--border-subtle, #cbd5e1);
-  border-radius: 3px;
-  background: #fff;
-  color: #b91c1c;
-  cursor: pointer;
+/* Active JobAmt cell styling */
+.classic-erp-window.erp-job-receipt-window .erp-jobamt-highlight {
+  background: #1d4ed8 !important;
+  color: #ffffff !important;
+  font-weight: bold !important;
+  padding: 1px 3px !important;
+  border-radius: 1px !important;
+  text-align: right !important;
+  display: block !important;
+  width: 100% !important;
+  font-size: 10px !important;
 }
 
+/* Teal Grid Totals Bar */
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-totalbar {
+  background: #00ceb6 !important;
+  border: 1px solid #00a896 !important;
+  border-top: none !important;
+  color: #042f2e !important;
+  font-weight: 800 !important;
+  font-size: 10px !important;
+  padding: 1px 8px !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  gap: 12px !important;
+  height: 18px !important;
+  line-height: 16px !important;
+}
+
+/* Footer layout */
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(240px, 0.75fr);
-  gap: 8px;
-  align-items: stretch;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.65fr) minmax(230px, 0.8fr) !important;
+  gap: 6px !important;
+  align-items: stretch !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-adjust {
-  padding: 10px 12px !important;
+  padding: 3px 6px !important;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 3px !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-adj-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 10px;
-  margin-bottom: 6px;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 2px 6px !important;
+  margin-bottom: 2px !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-tds-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 6px;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 6px !important;
+  margin-bottom: 2px !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-tax-panel {
-  display: grid;
-  grid-template-columns: 72px 1fr minmax(0, 1.2fr);
-  gap: 8px;
-  align-items: start;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-subtle, #cbd5e1);
+  display: grid !important;
+  grid-template-columns: 58px 95px minmax(0, 1fr) !important;
+  gap: 4px !important;
+  align-items: start !important;
+  margin-top: 2px !important;
+  padding-top: 2px !important;
+  border-top: 1px solid #e2e8f0 !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-tax-rate {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: center;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+  align-items: center !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-tax-rate .classic-erp-input {
-  width: 48px;
-  text-align: center;
-  font-weight: 700;
+  width: 40px !important;
+  text-align: center !important;
+  font-weight: 700 !important;
+  height: 18px !important;
+  min-height: 18px !important;
 }
 
+/* GST Table in Tax Panel — Super Compact to Prevent Bottom Cutoff */
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-gst-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 10px;
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 9px !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-gst-table th,
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-gst-table td {
-  border: 1px solid var(--border-subtle, #94a3b8);
-  padding: 2px 4px;
-  text-align: center;
+  border: 1px solid #cbd5e1 !important;
+  padding: 0 2px !important;
+  text-align: center !important;
+  height: 15px !important;
+  font-size: 8.5px !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-gst-table .classic-erp-input {
-  height: 24px !important;
-  min-height: 24px !important;
-  font-size: 10px !important;
+  height: 14px !important;
+  min-height: 14px !important;
+  font-size: 8.5px !important;
+  padding: 0 1px !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-totals {
-  padding: 10px 12px !important;
-  background: #f8fafc;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  padding: 3px 6px !important;
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 3px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1.5px !important;
+  justify-content: space-between !important;
 }
 
-.classic-erp-window.erp-job-receipt-window .erp-job-receipt-final-row {
-  margin-top: 4px;
-  padding-top: 8px;
-  border-top: 2px solid #0f172a;
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-totals .classic-erp-total-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-size: 10px !important;
+  height: 16px !important;
 }
 
+.classic-erp-window.erp-job-receipt-window .erp-rcm-highlight {
+  background: #ffff7e !important;
+  color: #000000 !important;
+  font-weight: 700 !important;
+  height: 17px !important;
+  min-height: 17px !important;
+  font-size: 10px !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-pending-status {
+  text-align: center !important;
+  color: #dc2626 !important;
+  font-weight: 800 !important;
+  font-size: 9.5px !important;
+  line-height: 11px !important;
+  margin: 0 !important;
+}
+
+/* Action Button Footer Bar */
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer {
+  display: flex !important;
+  align-items: center !important;
   flex-wrap: nowrap !important;
-  overflow-x: auto;
-  gap: 5px !important;
-  padding: 8px 10px !important;
-  border-top: 1px solid var(--border-subtle, #cbd5e1);
-  background: var(--bg-base, #fff);
+  overflow-x: auto !important;
+  gap: 2px !important;
+  padding: 2px 4px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  border-top: 1px solid #cbd5e1 !important;
+  background: #f8fafc !important;
 }
 
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer .classic-erp-btn {
-  flex: 0 0 auto;
-  min-width: 68px;
-  min-height: 30px;
-  padding: 0 8px;
-  font-size: 10px;
+  flex: 0 0 auto !important;
+  min-width: 44px !important;
+  height: 20px !important;
+  min-height: 20px !important;
+  padding: 0 4px !important;
+  font-size: 9.5px !important;
+  font-weight: 600 !important;
+  border: 1px solid #94a3b8 !important;
+  border-radius: 2px !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%) !important;
+  color: #1e293b !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer .btn-red-text {
+  color: #dc2626 !important;
+  font-weight: 700 !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer .nav-btn-corner {
+  font-size: 9px !important;
+  min-width: 36px !important;
+  height: 19px !important;
 }
 
 @media (max-width: 960px) {
   .classic-erp-window.erp-job-receipt-window .erp-job-receipt-header-grid,
   .classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .classic-erp-window.erp-job-receipt-window .erp-job-receipt-meta-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .classic-erp-window.erp-job-receipt-window .erp-job-receipt-tax-panel {
-    grid-template-columns: 1fr;
-  }
-
-  .classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer {
-    flex-wrap: wrap !important;
+    grid-template-columns: 1fr !important;
   }
 }
 
@@ -1169,14 +1376,45 @@
 }
 
 .classic-erp-window.erp-job-issue-window .erp-job-issue-header {
-  padding: 10px 12px !important;
+  padding: 8px 10px !important;
 }
 
 .classic-erp-window.erp-job-issue-window .erp-job-issue-header-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 16px;
   align-items: start;
+}
+
+/* Flat compact GST column — no card box, hugs the fixed 260px right rail */
+.classic-erp-window.erp-job-issue-window .erp-job-issue-tax-col {
+  padding-left: 12px;
+  border-left: 1px solid var(--border-subtle, #e2e8f0);
+  gap: 0;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-tax-head {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-tax-head .classic-erp-field {
+  width: 100%;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-gstin-badge {
+  align-self: flex-end;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  color: #c2410c;
+  background: #ffedd5;
+  border: 1px solid #fdba74;
+  padding: 3px 6px;
+  white-space: nowrap;
+  border-radius: 2px;
 }
 
 .classic-erp-window.erp-job-issue-window .erp-job-issue-meta-row {
@@ -1265,9 +1503,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  width: 280px;
-  max-width: 100%;
-  margin-left: auto;
+  width: 100%;
 }
 
 .classic-erp-window.erp-job-issue-window .erp-job-issue-taxbox-row {
@@ -1348,6 +1584,83 @@
   display: flex;
   justify-content: flex-end;
   gap: 18px;
+}
+
+/* Recent Challans — compact history strip for the item currently being issued */
+.classic-erp-window.erp-job-issue-window .erp-job-issue-history {
+  border: 1px solid #0d9488;
+  border-top: none;
+  max-height: 150px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-history-head {
+  background: #0d9488;
+  color: #fff;
+  font-weight: bold;
+  font-size: 10.5px;
+  padding: 3px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-history-refresh {
+  background: #fff;
+  color: #0f766e;
+  border: none;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 8px;
+  cursor: pointer;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-history-refresh:hover {
+  background: #ccfbf1;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-history-body {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-history-table thead th {
+  position: sticky;
+  top: 0;
+  background: #99f6e4;
+  color: #0f172a;
+  font-weight: bold;
+  text-align: left;
+  padding: 2px 6px;
+  border-bottom: 1px solid #0d9488;
+  white-space: nowrap;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-history-table tbody td {
+  padding: 2px 6px;
+  border-bottom: 1px solid #d1fae5;
+  color: #134e4a;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-history-table tbody tr:nth-child(even) {
+  background: #f0fdfa;
+}
+
+.classic-erp-window.erp-job-issue-window .erp-job-issue-history-table tbody tr:hover {
+  background: #ccfbf1;
 }
 
 /* Job Party address block under the party picker */

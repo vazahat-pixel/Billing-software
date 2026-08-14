@@ -46,13 +46,15 @@ const GROUPS = ['Master', 'Inventory', 'Transaction'];
 
 const StatusBadge = ({ status }) => {
   const s = (status || 'active').toLowerCase();
-  const cls = s.includes('cancel') || s === 'closed'
-    ? 'bg-red-50 text-red-700 border-red-100'
-    : s.includes('received') || s.includes('completed') || s === 'paid'
-      ? 'bg-green-50 text-green-700 border-green-100'
-      : s.includes('partial') || s.includes('pending') || s.includes('issued')
-        ? 'bg-amber-50 text-amber-700 border-amber-100'
-        : 'bg-slate-50 text-slate-600 border-slate-100';
+  const cls = s.includes('negative')
+    ? 'bg-orange-100 text-orange-800 border-orange-300 font-extrabold'
+    : s.includes('cancel') || s === 'closed'
+      ? 'bg-red-50 text-red-700 border-red-100'
+      : s.includes('received') || s.includes('completed') || s === 'paid'
+        ? 'bg-green-50 text-green-700 border-green-100'
+        : s.includes('partial') || s.includes('pending') || s.includes('issued')
+          ? 'bg-amber-50 text-amber-700 border-amber-100'
+          : 'bg-slate-50 text-slate-600 border-slate-100';
   return (
     <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${cls}`}>
       {status || 'Active'}

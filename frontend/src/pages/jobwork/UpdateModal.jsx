@@ -5,7 +5,7 @@ import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
 import { notifySuccess, notifyError, notifyWarning, notifyInfo } from '../../utils/notify';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Search } from 'lucide-react';
 import PuBillLookupModal from './PuBillLookupModal';
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -19,11 +19,12 @@ const weekday = (iso) => {
   }
 };
 
-const blankLine = (chln = '') => ({
+// chlnNo/cno are derived per row position (see calc.linesWithAmt) — never stored here.
+const blankLine = () => ({
   id: Math.random().toString(),
+  itemId: '',
   lotId: '',
   lotNo: '',
-  chlnNo: chln,
   itemName: '',
   pcs: '',
   cut: '',
@@ -74,23 +75,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
   });
 
   // Form Lines State
-  const [lines, setLines] = useState([blankLine('1')]);
-
-  // Keep all line chlnNo synchronized with header challanNo
-  useEffect(() => {
-    const fullChallan = header.challanNo === 'AUTO' || !header.challanNo
-      ? 'AUTO'
-      : `${header.challanNo}${header.challanNoSuffix ? '-' + header.challanNoSuffix : ''}`;
-
-    setLines((prev) => {
-      const hasMismatch = prev.some((l) => l.chlnNo !== fullChallan);
-      if (!hasMismatch) return prev;
-      return prev.map((l) => ({
-        ...l,
-        chlnNo: fullChallan,
-      }));
-    });
-  }, [header.challanNo, header.challanNoSuffix, lines.length]);
+  const [lines, setLines] = useState([blankLine()]);
 
   // Form Footer State
   const [footer, setFooter] = useState({
@@ -99,13 +84,16 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
     transport: '',
     lrNo: '',
     baleNo: '',
-    taxRate: '5',
+    taxRate: '0',
   });
 
   const [selectedJobId, setSelectedJobId] = useState('');
   const [findOpen, setFindOpen] = useState(false);
   const [lotLookupOpen, setLotLookupOpen] = useState(false);
   const [lotLookupTargetIdx, setLotLookupTargetIdx] = useState(null);
+  // Last item touched in the grid — drives the live "Current Stock" strip, same as the
+  // reference software: pick the item first, stock shows immediately, no purchase lookup needed.
+  const [activeItemId, setActiveItemId] = useState('');
 
   const locked = mode === 'View';
 
@@ -141,17 +129,27 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
     }));
   }, [jobWorkEntries]);
 
+  // One Challan No can carry several item lines to the same Job Party in a single save —
+  // each line becomes its own trackable Job Card (Job Receive matches against it later),
+  // but they all stay visibly grouped under the same parent number: 125, 125/1, 125/2 …
+  const baseChallan = header.challanNo === 'AUTO' || !header.challanNo
+    ? 'AUTO'
+    : `${header.challanNo}${header.challanNoSuffix ? '-' + header.challanNoSuffix : ''}`;
+
   // Derived Grid and Tax Calculations
   const calc = useMemo(() => {
-    const linesWithAmt = lines.map((l) => {
+    const linesWithAmt = lines.map((l, idx) => {
       const qty = Number(l.qty) || 0;
-      const rateVal = Number(l.rate) || 0;
+      // Amount is always Qty × Fab.Rt (fabric rate) — the Rate column is not used for billing.
+      const rateVal = Number(l.fabRate) || 0;
       const jobAmt = Number((qty * rateVal).toFixed(2));
-      return { ...l, jobAmt };
+      const cno = baseChallan === 'AUTO' ? '' : idx === 0 ? '' : `/${idx}`;
+      const chlnNo = baseChallan === 'AUTO' ? 'AUTO' : `${baseChallan}${cno}`;
+      return { ...l, jobAmt, cno, chlnNo };
     });
 
     const gross = linesWithAmt.reduce((sum, l) => sum + l.jobAmt, 0);
-    const taxRate = Number(footer.taxRate || 5);
+    const taxRate = Number(footer.taxRate || 0);
 
     let cgstPct = 0;
     let sgstPct = 0;
@@ -189,23 +187,92 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       totalQty,
       totalKgs,
     };
-  }, [lines, footer.taxRate, header.gstType]);
+  }, [lines, footer.taxRate, header.gstType, baseChallan]);
 
-  /** Live balance of every lot currently picked into the grid — the classic "Current Stock" strip. */
-  const currentStock = useMemo(() => {
-    const pickedIds = new Set(lines.map((l) => String(l.lotId)).filter(Boolean));
-    return (inventoryLots || []).reduce(
-      (acc, lot) => {
-        if (!pickedIds.has(String(lot._id || lot.id))) return acc;
+  /** Total available stock for an item across ALL its open lots — not just what's in the grid. */
+  const itemStockTotals = useCallback(
+    (itemId) => {
+      if (!itemId) return { pcs: 0, qty: 0, kgs: 0 };
+      return (inventoryLots || []).reduce(
+        (acc, lot) => {
+          if (String(lot.itemId?._id || lot.itemId || '') !== String(itemId)) return acc;
+          if (lot.status === 'Closed') return acc;
+          if (lot.holdStatus && lot.holdStatus !== 'None') return acc;
+          return {
+            pcs: acc.pcs + (Number(lot.remainingPcs) || 0),
+            qty: acc.qty + (Number(lot.remainingMtrs) || 0),
+            kgs: acc.kgs + (Number(lot.remainingKgs ?? lot.totalKgs) || 0),
+          };
+        },
+        { pcs: 0, qty: 0, kgs: 0 }
+      );
+    },
+    [inventoryLots]
+  );
+
+  /** Item picker options — stock badge shown right on each row so a no-stock item is
+   *  obvious before it's picked, not after. In-stock items sort to the top. */
+  const itemOptions = useMemo(() => {
+    const withStock = (items || []).map((it) => {
+      const id = it._id || it.id;
+      const stock = itemStockTotals(id);
+      const hasStock = stock.pcs > 0 || stock.qty > 0;
+      return {
+        value: id,
+        label: it.name || it.itemName || 'Item',
+        _hasStock: hasStock,
+        badge: hasStock
+          ? { text: `${stock.qty > 0 ? stock.qty.toFixed(2) + ' qty' : stock.pcs + ' pcs'}`, tone: 'ok' }
+          : { text: 'No Stock', tone: 'warn' },
+      };
+    });
+    return withStock.sort((a, b) => {
+      if (a._hasStock !== b._hasStock) return a._hasStock ? -1 : 1;
+      return a.label.localeCompare(b.label);
+    });
+  }, [items, itemStockTotals]);
+
+  /** Earliest open lot for an item (FIFO) — auto-picked behind the scenes on Item Name select. */
+  const resolveLotForItem = useCallback(
+    (itemId, excludeLotIds = new Set()) => {
+      const candidates = (inventoryLots || []).filter((lot) => {
+        if (excludeLotIds.has(String(lot._id || lot.id))) return false;
+        if (String(lot.itemId?._id || lot.itemId || '') !== String(itemId)) return false;
+        if (lot.status === 'Closed') return false;
+        if (lot.holdStatus && lot.holdStatus !== 'None') return false;
+        return Number(lot.remainingMtrs || 0) > 0 || Number(lot.remainingPcs || 0) > 0;
+      });
+      candidates.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+      return candidates[0] || null;
+    },
+    [inventoryLots]
+  );
+
+  /** Live balance for the item currently being worked on — the classic "Current Stock" strip. */
+  const currentStock = useMemo(() => itemStockTotals(activeItemId), [itemStockTotals, activeItemId]);
+
+  /** Recent challans for the active item — the compact history panel below the grid. */
+  const recentChallans = useMemo(() => {
+    if (!activeItemId) return [];
+    return (jobWorkEntries || [])
+      .filter((j) => String(j.lotId?.itemId?._id || j.lotId?.itemId || '') === String(activeItemId))
+      .sort((a, b) => new Date(b.issueDate || b.createdAt || 0) - new Date(a.issueDate || a.createdAt || 0))
+      .slice(0, 15)
+      .map((j) => {
+        const pcs = Number(j.issuePcs || 0);
+        const qty = Number(j.issueQty || 0);
         return {
-          pcs: acc.pcs + (Number(lot.remainingPcs) || 0),
-          qty: acc.qty + (Number(lot.remainingMtrs) || 0),
-          kgs: acc.kgs + (Number(lot.remainingKgs ?? lot.totalKgs) || 0),
+          id: j._id || j.id,
+          chlnNo: j.jobCardNo || j.challanNo || '',
+          chlnDate: j.issueDate || j.createdAt || '',
+          pcs,
+          cut: pcs > 0 ? Number((qty / pcs).toFixed(3)) : 0,
+          qty,
+          jRate: j.jobRate ?? j.processCharges ?? 0,
+          narration: j.remark || j.remarks || '',
         };
-      },
-      { pcs: 0, qty: 0, kgs: 0 }
-    );
-  }, [lines, inventoryLots]);
+      });
+  }, [jobWorkEntries, activeItemId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -250,18 +317,50 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
     });
   }, []);
 
+  /** Item Name picked directly on a grid row — FIFO-resolves the lot behind the scenes,
+   *  no purchase-bill lookup required. Also drives the live Current Stock strip. */
+  const handleLineItemChange = (idx, itemId) => {
+    setActiveItemId(itemId || '');
+    if (!itemId) {
+      setLines((prev) => {
+        const next = [...prev];
+        next[idx] = { ...next[idx], itemId: '', itemName: '', lotId: '', lotNo: '', fabRate: '' };
+        return next;
+      });
+      return;
+    }
+    const item = (items || []).find((it) => String(it._id || it.id) === String(itemId));
+    const itemName = item?.name || item?.itemName || '';
+    const usedLotIds = new Set(
+      lines
+        .filter((_, i) => i !== idx)
+        .map((l) => String(l.lotId))
+        .filter(Boolean)
+    );
+    const lot = resolveLotForItem(itemId, usedLotIds);
+    setLines((prev) => {
+      const next = [...prev];
+      next[idx] = {
+        ...next[idx],
+        itemId,
+        itemName,
+        lotId: lot ? String(lot._id || lot.id) : '',
+        lotNo: lot ? lot.lotId || '' : '',
+        fabRate: lot ? String(lot.rate || lot.purchaseRate || '') : next[idx].fabRate,
+      };
+      return next;
+    });
+    if (!lot) {
+      notifyWarning(`No available stock for "${itemName}" — check inventory`);
+    }
+  };
+
   const addLine = () => {
-    const fullChallan = header.challanNo === 'AUTO' || !header.challanNo
-      ? 'AUTO'
-      : `${header.challanNo}${header.challanNoSuffix ? '-' + header.challanNoSuffix : ''}`;
-    setLines((prev) => [...prev, blankLine(fullChallan)]);
+    setLines((prev) => [...prev, blankLine()]);
   };
 
   const removeLine = (idx) => {
-    const fullChallan = header.challanNo === 'AUTO' || !header.challanNo
-      ? 'AUTO'
-      : `${header.challanNo}${header.challanNoSuffix ? '-' + header.challanNoSuffix : ''}`;
-    setLines((prev) => (prev.length <= 1 ? [blankLine(fullChallan)] : prev.filter((_, i) => i !== idx)));
+    setLines((prev) => (prev.length <= 1 ? [blankLine()] : prev.filter((_, i) => i !== idx)));
   };
 
   const openLotLookup = (idx) => {
@@ -271,9 +370,9 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
   };
 
   const handleLotSelect = (row) => {
-    const fullChallan = header.challanNo === 'AUTO' || !header.challanNo
-      ? 'AUTO'
-      : `${header.challanNo}${header.challanNoSuffix ? '-' + header.challanNoSuffix : ''}`;
+    const matchedLot = (inventoryLots || []).find((l) => String(l._id || l.id) === String(row.lotId));
+    const itemId = matchedLot?.itemId?._id || matchedLot?.itemId || '';
+    if (itemId) setActiveItemId(String(itemId));
 
     setLines((prev) => {
       const next = [...prev];
@@ -285,9 +384,9 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
 
       const lineData = {
         id: next[targetIdx]?.id || Math.random().toString(),
+        itemId: itemId ? String(itemId) : '',
         lotId: row.lotId || '',
         lotNo: row.lotCode || '',
-        chlnNo: fullChallan,
         itemName: row.itemName || '',
         pcs: pcs > 0 ? String(pcs) : '',
         cut: cut > 0 ? String(cut) : '',
@@ -311,6 +410,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
     setMode('Add');
     setSelectedJobId('');
     setFindOpen(false);
+    setActiveItemId('');
     setHeader({
       challanNo: '1',
       challanNoSuffix: '',
@@ -329,9 +429,9 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       transport: '',
       lrNo: '',
       baleNo: '',
-      taxRate: '5',
+      taxRate: '0',
     });
-    setLines([blankLine('1')]);
+    setLines([blankLine()]);
   };
 
   const handleEdit = () => {
@@ -370,8 +470,10 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       book: job.book || 'JOBWORK BOOK',
     });
 
+    const lineItemId = job.lotId?.itemId?._id || job.lotId?.itemId || '';
     const itemLine = {
       id: Math.random().toString(),
+      itemId: lineItemId ? String(lineItemId) : '',
       lotId: job.lotId?._id || job.lotId || '',
       lotNo: job.lotId?.lotId || '',
       chlnNo: job.purchaseBillNo || '',
@@ -385,6 +487,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       jobId: job._id,
     };
     setLines([itemLine]);
+    setActiveItemId(lineItemId ? String(lineItemId) : '');
 
     setFooter({
       remark: remarks,
@@ -392,7 +495,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       transport: job.transport || '',
       lrNo: job.lrNo || '',
       baleNo: job.baleNo || '',
-      taxRate: job.taxRate != null ? String(job.taxRate) : '5',
+      taxRate: job.taxRate != null ? String(job.taxRate) : '0',
     });
   };
 
@@ -409,20 +512,41 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
 
     const activeLines = calc.linesWithAmt.filter((l) => l.lotId && Number(l.qty) > 0);
     if (activeLines.length === 0) {
-      notifyWarning('Add at least one line with linked Lot No and quantity');
+      notifyWarning('Add at least one line — pick an Item and enter quantity');
+      return;
+    }
+
+    // Two lines can legally draw from the SAME lot (e.g. same item split across rows) —
+    // check the combined draw per lot against its real remaining stock, not line-by-line.
+    const qtyByLot = new Map();
+    activeLines.forEach((l) => {
+      const key = String(l.lotId);
+      qtyByLot.set(key, (qtyByLot.get(key) || 0) + Number(l.qty || 0));
+    });
+    const overIssued = [...qtyByLot.entries()].find(([lotId, totalQty]) => {
+      const lot = (inventoryLots || []).find((iv) => String(iv._id || iv.id) === lotId);
+      return lot && totalQty > Number(lot.remainingMtrs || 0) + 0.0001;
+    });
+    if (overIssued) {
+      const [lotId, totalQty] = overIssued;
+      const lot = (inventoryLots || []).find((iv) => String(iv._id || iv.id) === lotId);
+      notifyWarning(`Lot ${lot?.lotId || lotId} — combined Qty ${totalQty.toFixed(2)} exceeds available stock (${Number(lot?.remainingMtrs || 0).toFixed(2)})`);
       return;
     }
 
     setSaving(true);
     let ok = 0;
     try {
+      // Each line saves as its own Job Card — jobCardNo already carries the per-line
+      // suffix computed in `calc` (125, 125/1, 125/2 …), so a multi-item challan no
+      // longer collides on a duplicate number the way a single shared value would.
       for (const line of activeLines) {
-        const fullChallan = header.challanNo === 'AUTO' || !header.challanNo 
-          ? 'AUTO' 
-          : `${header.challanNo}${header.challanNoSuffix ? '-' + header.challanNoSuffix : ''}`;
+        // Same source as the on-screen Taxable/NetAmt calc — Fab.Rt only, not Rate.
+        // Keeping these in sync means what you saved always matches what you saw before saving.
+        const effectiveRate = Number(line.fabRate) || 0;
 
         await issueToMill({
-          jobCardNo: fullChallan,
+          jobCardNo: line.chlnNo,
           issueDate: header.date,
           date: header.date,
           lotId: line.lotId,
@@ -433,9 +557,9 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
           weaver: '',
           purchaseBillNo: line.chlnNo || '',
           purchaseRate: Number(line.fabRate) || 0,
-          jobRate: Number(line.rate) || 0,
-          processCharges: Number(line.rate) || 0,
-          chargesRate: Number(line.rate) || 0,
+          jobRate: effectiveRate,
+          processCharges: effectiveRate,
+          chargesRate: effectiveRate,
           remark: footer.remark || '',
           remarks: footer.remark || '',
           transport: footer.transport || '',
@@ -469,9 +593,9 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
   const titleBook = selectedBook || header.book || 'JOBWORK BOOK';
 
   const gridCols = [
-    { key: 'lotNo', label: 'CNo', w: 'w-28', lookup: true },
+    { key: 'cno', label: 'CNo', w: 'w-14', readOnly: true },
     { key: 'chlnNo', label: 'ChlnNo', w: 'w-24', readOnly: true },
-    { key: 'itemName', label: 'Item Name', w: 'flex-1', readOnly: true },
+    { key: 'itemName', label: 'Item Name', w: 'flex-1', itemPicker: true },
     { key: 'pcs', label: 'Pcs', w: 'w-16', align: 'right' },
     { key: 'cut', label: 'Cut', w: 'w-16', align: 'right' },
     { key: 'qty', label: 'Qty', w: 'w-20', align: 'right' },
@@ -503,7 +627,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
 
             <form
               onSubmit={handleSave}
-              className="classic-erp-body erp-job-issue-body flex-1 overflow-y-auto min-h-0"
+              className="classic-erp-body erp-job-issue-body flex-1 overflow-hidden min-h-0 flex flex-col justify-between"
             >
               {findOpen && (
                 <div className="classic-erp-frame erp-job-issue-find shrink-0">
@@ -623,9 +747,9 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                     </div>
                   </div>
 
-                  {/* GST Panel */}
-                  <div className="classic-erp-stack bg-slate-50 p-2 border border-slate-300 rounded-sm">
-                    <div className="grid grid-cols-3 gap-2">
+                  {/* GST Panel — flat, compact column matching the classic reference layout */}
+                  <div className="classic-erp-stack erp-job-issue-tax-col">
+                    <div className="erp-job-issue-tax-head">
                       <div className="classic-erp-field">
                         <span className="classic-erp-label">GstType</span>
                         <ERPSelect
@@ -636,60 +760,20 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                           disabled={locked}
                         />
                       </div>
-                      <div className="classic-erp-field col-span-2">
-                        <span className="classic-erp-label">Gstin</span>
-                        <input
-                          type="text"
-                          className="classic-erp-input font-mono uppercase"
-                          value={header.gstin}
-                          readOnly
-                          placeholder="—"
-                        />
-                      </div>
+                      <span className="erp-job-issue-gstin-badge">GSTIN:-{header.gstin || '—'}</span>
                     </div>
 
                     <div className="erp-job-issue-taxbox mt-2">
-                      <div className="erp-job-issue-taxbox-row">
-                        <span>Tax %</span>
-                        <input
-                          type="number"
-                          className="classic-erp-input font-bold"
-                          value={footer.taxRate}
-                          onChange={(e) => setFooter({ ...footer, taxRate: e.target.value })}
-                          disabled={locked}
-                        />
-                        <span className="text-[10px] text-slate-400 font-normal">rate</span>
-                      </div>
-                      <div className="erp-job-issue-taxbox-row">
-                        <span>SGST</span>
-                        <input type="text" className="classic-erp-input" value={calc.sgstPct.toFixed(2)} readOnly />
-                        <input type="text" className="classic-erp-input font-mono" value={calc.sgstAmt.toFixed(2)} readOnly />
-                      </div>
-                      <div className="erp-job-issue-taxbox-row">
-                        <span>CGST</span>
-                        <input type="text" className="classic-erp-input" value={calc.cgstPct.toFixed(2)} readOnly />
-                        <input type="text" className="classic-erp-input font-mono" value={calc.cgstAmt.toFixed(2)} readOnly />
-                      </div>
-                      <div className="erp-job-issue-taxbox-row">
-                        <span>IGST</span>
-                        <input type="text" className="classic-erp-input" value={calc.igstPct.toFixed(2)} readOnly />
-                        <input type="text" className="classic-erp-input font-mono" value={calc.igstAmt.toFixed(2)} readOnly />
-                      </div>
-
                       <div className="erp-job-issue-sumrow mt-1.5">
-                        <span>Taxable</span>
+                        <span>Total Amount</span>
                         <input type="text" className="classic-erp-input font-mono" value={calc.gross.toFixed(2)} readOnly />
                       </div>
-                      <div className="erp-job-issue-sumrow">
-                        <span className="!text-[10px] !text-slate-500">GstAmt</span>
-                        <input type="text" className="classic-erp-input font-mono" value={calc.totalGst.toFixed(2)} readOnly />
-                      </div>
-                      <div className="erp-job-issue-sumrow">
-                        <span className="!text-[12px] !text-blue-900">NetAmt</span>
+                      <div className="erp-job-issue-sumrow mt-2 border-t pt-1.5">
+                        <span className="!text-[12px] !text-blue-900 font-bold">NetAmt</span>
                         <input
                           type="text"
-                          className="classic-erp-input font-mono !text-blue-900 !text-[12px]"
-                          value={calc.net.toFixed(2)}
+                          className="classic-erp-input font-mono !text-blue-900 !text-[12px] font-bold"
+                          value={calc.gross.toFixed(2)}
                           readOnly
                         />
                       </div>
@@ -729,18 +813,32 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                         <tr key={line.id}>
                           <td className="text-center text-slate-500 font-bold">{idx + 1}</td>
                           {gridCols.map((c) => {
-                            if (c.key === 'lotNo') {
+                            if (c.key === 'itemName') {
                               return (
                                 <td key={c.key} className={c.w}>
-                                  <button
-                                    type="button"
-                                    className="classic-erp-input w-full text-left font-bold truncate disabled:cursor-default"
-                                    onClick={() => openLotLookup(idx)}
-                                    disabled={locked}
-                                    title="Pick which weaver lot to issue"
-                                  >
-                                    {line.lotNo || '— Select Lot —'}
-                                  </button>
+                                  <div className="flex items-center gap-0.5" title={line.lotNo ? `Auto-picked lot: ${line.lotNo}` : ''}>
+                                    <div className="flex-1 min-w-0">
+                                      <ERPCombobox
+                                        value={line.itemId}
+                                        onChange={(val) => handleLineItemChange(idx, val)}
+                                        disabled={locked}
+                                        options={itemOptions}
+                                        placeholder="Select Item Name…"
+                                        recentKey="job-issue-item"
+                                        allowClear
+                                      />
+                                    </div>
+                                    {!locked && (
+                                      <button
+                                        type="button"
+                                        className="text-slate-400 hover:text-blue-600 shrink-0 px-0.5"
+                                        onClick={() => openLotLookup(idx)}
+                                        title="Advanced: pick a specific lot manually"
+                                      >
+                                        <Search size={11} />
+                                      </button>
+                                    )}
+                                  </div>
                                 </td>
                               );
                             }
@@ -784,6 +882,63 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                   <span>Kgs : {calc.totalKgs.toFixed(2)}</span>
                 </div>
               </div>
+
+              {/* Recent Challans — history for the item currently being issued */}
+              {activeItemId && (
+                <div className="erp-job-issue-history shrink-0">
+                  <div className="erp-job-issue-history-head">
+                    <span>
+                      Recent Challans — {itemOptions.find((o) => String(o.value) === String(activeItemId))?.label || 'Item'}
+                    </span>
+                    <button
+                      type="button"
+                      className="erp-job-issue-history-refresh"
+                      onClick={async () => {
+                        await fetchJobs();
+                        notifySuccess('Refreshed');
+                      }}
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  <div className="erp-job-issue-history-body">
+                    <table className="erp-job-issue-history-table">
+                      <thead>
+                        <tr>
+                          <th>ChlnNo</th>
+                          <th>ChlnDate</th>
+                          <th className="text-right">Pcs</th>
+                          <th className="text-right">Cut</th>
+                          <th className="text-right">Qty</th>
+                          <th className="text-right">J.Rate</th>
+                          <th>Narration</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recentChallans.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="text-center text-slate-400 py-2">
+                              No previous challans for this item
+                            </td>
+                          </tr>
+                        ) : (
+                          recentChallans.map((r) => (
+                            <tr key={r.id}>
+                              <td className="font-bold">{r.chlnNo}</td>
+                              <td>{r.chlnDate ? new Date(r.chlnDate).toLocaleDateString('en-IN') : ''}</td>
+                              <td className="text-right font-mono">{r.pcs}</td>
+                              <td className="text-right font-mono">{r.cut.toFixed(2)}</td>
+                              <td className="text-right font-mono">{r.qty.toFixed(3)}</td>
+                              <td className="text-right font-mono">{Number(r.jRate).toFixed(2)}</td>
+                              <td className="truncate">{r.narration}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {/* Footer */}
               <div className="classic-erp-frame erp-job-issue-footer-grid shrink-0">

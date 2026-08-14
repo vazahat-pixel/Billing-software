@@ -33,8 +33,8 @@ const floatingPos = (box, id) => {
  * @param {{ id?: string, title?: string, onClose?: () => void }} options
  */
 export default function useErpWindow(isOpen, options = {}) {
-  const { id = 'window', title = 'Window', onClose } = options;
-  const [mode, setMode] = useState('maximized');
+  const { id = 'window', title = 'Window', onClose, defaultMode = 'maximized' } = options;
+  const [mode, setMode] = useState(defaultMode);
   const [box, setBox] = useState(floatingSize);
   const [pos, setPos] = useState(() => floatingPos(floatingSize(), id));
   const resizing = useRef(null);
@@ -46,10 +46,10 @@ export default function useErpWindow(isOpen, options = {}) {
 
   useEffect(() => {
     if (!isOpen) {
-      setMode('maximized');
+      setMode(defaultMode);
       useWindowDockStore.getState().unregister(id);
     }
-  }, [isOpen, id]);
+  }, [isOpen, id, defaultMode]);
 
   // Register / unregister minimized chip in global tray
   useEffect(() => {

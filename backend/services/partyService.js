@@ -1,6 +1,18 @@
 const Party = require('../models/Party');
 const LedgerMaster = require('../models/LedgerMaster');
 
+/** Trim/normalize party bank rows and drop any without a bank name. */
+function sanitizeBanks(banks) {
+  if (!Array.isArray(banks)) return [];
+  return banks
+    .map((b) => ({
+      name: String(b?.name || b?.bankName || '').trim().toUpperCase(),
+      accountNo: String(b?.accountNo || '').trim(),
+      ifsc: String(b?.ifsc || '').trim().toUpperCase(),
+    }))
+    .filter((b) => b.name);
+}
+
 class PartyService {
   async createParty(partyData) {
     const name = (partyData.name || '').trim();
@@ -68,6 +80,7 @@ class PartyService {
       tcsPer: Number(partyData.tcsPer || 0),
       paymentTermsId: partyData.paymentTermsId || null,
       isFavorite: !!partyData.isFavorite,
+      banks: sanitizeBanks(partyData.banks),
     };
 
     const existing = await Party.findOne({
@@ -162,6 +175,7 @@ class PartyService {
     allowed.forEach((key) => {
       if (updateData[key] !== undefined) patch[key] = updateData[key];
     });
+    if (patch.banks !== undefined) patch.banks = sanitizeBanks(patch.banks);
     if (patch.station && !patch.city) patch.city = patch.station;
     if (patch.group && !patch.type) {
       const g = String(patch.group).toUpperCase();

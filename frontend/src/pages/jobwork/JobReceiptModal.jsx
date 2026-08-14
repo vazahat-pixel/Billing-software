@@ -100,25 +100,52 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
     }
   }, [isOpen, selectedBook]);
 
-  const partyOptions = useMemo(
-    () =>
-      (parties || [])
-        .filter((p) => ['Supplier', 'Job Worker', 'Mill', 'Customer', 'Both'].includes(p.type))
-        .map((p) => ({
-          value: p._id || p.id,
-          label: p.name,
-          gstin: p.gstin || '',
-        })),
-    [parties]
+  // Job Receive is against the Job Worker/mill you sent material to — Customers, plain
+  // Suppliers-of-goods etc. showing up here was the exact confusion this list should avoid.
+  const partyOptions = useMemo(() => {
+    const list = (parties || []).filter(
+      (p) => ['Job Worker', 'Both', 'Supplier'].includes(p.type) || (p.group || '').toUpperCase().includes('JOB')
+    );
+    const partyIds = new Set(list.map((p) => String(p._id || p.id)));
+    (jobWorkEntries || []).forEach((j) => {
+      if (j.workerId) {
+        const id = String(typeof j.workerId === 'object' ? j.workerId._id || j.workerId.id : j.workerId);
+        const name = typeof j.workerId === 'object' ? j.workerId.name : null;
+        if (id && !partyIds.has(id) && name) {
+          list.push({ _id: id, id, name, gstin: j.workerId.gstin || '' });
+          partyIds.add(id);
+        }
+      }
+    });
+    return list.map((p) => ({
+      value: p._id || p.id,
+      label: p.name,
+      gstin: p.gstin || '',
+    }));
+  }, [parties, jobWorkEntries]);
+
+  const selectedPartyObj = useMemo(
+    () => (parties || []).find((p) => String(p._id || p.id) === String(header.partyId)),
+    [parties, header.partyId]
   );
 
   const pendingJobs = useMemo(
-    () => (jobWorkEntries || []).filter((j) => j.status === 'Issued'),
+    () => (jobWorkEntries || []).filter((j) => {
+      const s = String(j.status || '').toLowerCase();
+      if (s === 'received' || s === 'cancelled') return false;
+      const issueQty = Number(j.issueQty) || 0;
+      const issuePcs = Number(j.issuePcs) || 0;
+      const recvQty = Number(j.receivedQty) || 0;
+      const recvPcs = Number(j.receivedPcs) || 0;
+      const remQty = issueQty - recvQty;
+      const remPcs = issuePcs - recvPcs;
+      return s === 'issued' || s === 'partial' || remQty > 0.01 || remPcs > 0;
+    }),
     [jobWorkEntries]
   );
 
   const receivedJobs = useMemo(
-    () => (jobWorkEntries || []).filter((j) => j.status === 'Received'),
+    () => (jobWorkEntries || []).filter((j) => String(j.status || '').toLowerCase() === 'received'),
     [jobWorkEntries]
   );
 
@@ -133,12 +160,46 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
 
   const partyPendingJobs = useMemo(() => {
     if (!header.partyId) return pendingJobs;
-    return pendingJobs.filter(
-      (j) => String(j.workerId?._id || j.workerId) === String(header.partyId)
-    );
-  }, [pendingJobs, header.partyId]);
+    const targetPartyObj = (parties || []).find((p) => String(p._id || p.id) === String(header.partyId));
+    const targetName = (targetPartyObj?.name || '').trim().toLowerCase();
+    const targetId = String(header.partyId).trim();
+
+    return pendingJobs.filter((j) => {
+      const rawWorker = j.workerId;
+      const workerIdStr = String(
+        (typeof rawWorker === 'object' ? rawWorker?._id || rawWorker?.id : rawWorker) ||
+        (typeof j.partyId === 'object' ? j.partyId?._id || j.partyId?.id : j.partyId) ||
+        ''
+      ).trim();
+
+      if (workerIdStr && workerIdStr === targetId) return true;
+
+      const workerName = String(
+        j.workerId?.name || j.workerName || j.partyName || j.partyId?.name || j.weaver || ''
+      ).trim().toLowerCase();
+
+      if (targetName && workerName && (workerName === targetName || workerName.includes(targetName) || targetName.includes(workerName))) {
+        return true;
+      }
+
+      return false;
+    });
+  }, [pendingJobs, header.partyId, parties]);
 
   const calc = useMemo(() => calcJobReceipt(lines, footer, header), [lines, footer, header]);
+
+  const gridTotals = useMemo(
+    () =>
+      (lines || []).reduce(
+        (acc, l) => ({
+          pcs: acc.pcs + (Number(l.recPcs) || 0),
+          sendMts: acc.sendMts + (Number(l.issueMtsRef) || 0),
+          recMts: acc.recMts + (Number(l.recMts) || 0),
+        }),
+        { pcs: 0, sendMts: 0, recMts: 0 }
+      ),
+    [lines]
+  );
 
   const setLine = useCallback((idx, patch) => {
     setLines((prev) => {
@@ -165,19 +226,20 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
   };
 
   const loadPendingChallans = () => {
-    if (!header.partyId) {
-      toast.warning('Select Job Party first');
+    const list = partyPendingJobs.length > 0 ? partyPendingJobs : pendingJobs;
+    if (list.length === 0) {
+      toast.info('No pending issued challans found. Please issue a job first from Mill Issue / Job Issue.');
       return;
     }
-    if (partyPendingJobs.length === 0) {
-      toast.info('No pending issued challans for this party');
-      return;
+    setLines(list.map(jobToLine));
+    if (partyPendingJobs.length > 0) {
+      toast.success(`Loaded ${partyPendingJobs.length} pending challan(s)`);
+    } else {
+      toast.success(`Loaded ${pendingJobs.length} pending challan(s)`);
     }
-    setLines(partyPendingJobs.map(jobToLine));
-    toast.success(`Loaded ${partyPendingJobs.length} pending challan(s)`);
   };
 
-  const lotLookupJobs = header.partyId ? partyPendingJobs : pendingJobs;
+  const lotLookupJobs = partyPendingJobs.length > 0 ? partyPendingJobs : pendingJobs;
 
   /** Classic ERP "Press ALT+L To LotNo Entry" — opens which pending bill/challan to receive against for a lot. */
   const openLotLookup = (targetIdx = null) => {
@@ -310,12 +372,28 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
       for (const line of receivable) {
         const gstShare =
           calc.gross > 0 ? (line.jobAmt / calc.gross) * calc.totalGst : calc.totalGst / receivable.length;
+
+        const recMts = Number(line.recMts) || 0;
+        const recPcs = Number(line.recPcs) || 0;
+        const targetJob = (jobWorkEntries || []).find((j) => String(j._id || j.id) === String(line.jobId));
+        const prevRecvMts = Number(targetJob?.receivedQty || 0);
+        const prevRecvPcs = Number(targetJob?.receivedPcs || 0);
+        const totalIssueMts = Number(targetJob?.issueQty || line.issueMtsRef || 0);
+        const totalIssuePcs = Number(targetJob?.issuePcs || line.issuePcsRef || 0);
+
+        const newTotalMts = prevRecvMts + recMts;
+        const newTotalPcs = prevRecvPcs + recPcs;
+
+        // Is this receipt tranche completing the full issued quantity & pcs?
+        const isFinal = (newTotalMts >= totalIssueMts - 0.01) && (newTotalPcs >= totalIssuePcs);
+
         await receiveFromMill({
           jobId: line.jobId,
-          receivedQty: Number(line.recMts) || 0,
-          receivedPcs: Number(line.recPcs) || 0,
+          receivedQty: recMts,
+          receivedPcs: recPcs,
           charges: Number(line.jobAmt) || 0,
           gstAmount: Number(gstShare.toFixed(2)) || 0,
+          isFinal,
         });
         ok += 1;
       }
@@ -337,17 +415,17 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
   };
 
   const gridCols = [
-    { key: 'chlnNo', label: 'ChlnNo', w: 'w-28', lookup: true },
-    { key: 'itemName', label: 'ItemName', w: 'flex-1', readOnly: true },
-    { key: 'finishItem', label: 'FinishItem', w: 'w-32' },
-    { key: 'cut', label: 'Cut', w: 'w-16', align: 'right' },
-    { key: 'recPcs', label: 'RecPcs', w: 'w-16', align: 'right' },
-    { key: 'recMts', label: 'RecMts', w: 'w-20', align: 'right' },
-    { key: 'jRate', label: 'J.Rate', w: 'w-20', align: 'right' },
-    { key: 'pqk', label: 'PQK', w: 'w-14' },
-    { key: 'jobAmt', label: 'JobAmt', w: 'w-20', align: 'right', readOnly: true },
-    { key: 'cp', label: 'CP', w: 'w-12' },
-    { key: 'jobcardNo', label: 'JobcardNo', w: 'w-24' },
+    { key: 'chlnNo', label: 'ChInNo', w: 'w-[9%]', lookup: true },
+    { key: 'itemName', label: 'ItemName', w: 'w-[21%]', readOnly: true },
+    { key: 'finishItem', label: 'FinishItem', w: 'w-[11%]' },
+    { key: 'cut', label: 'Cut', w: 'w-[6%]', align: 'right' },
+    { key: 'recPcs', label: 'RecPcs', w: 'w-[6%]', align: 'right' },
+    { key: 'recMts', label: 'RecMts', w: 'w-[8%]', align: 'right' },
+    { key: 'jRate', label: 'J.Rate', w: 'w-[7%]', align: 'right' },
+    { key: 'pqk', label: 'PQK', w: 'w-[6%]' },
+    { key: 'jobAmt', label: 'JobAmt', w: 'w-[11%]', align: 'right', readOnly: true },
+    { key: 'cp', label: 'CP', w: 'w-[5%]' },
+    { key: 'jobcardNo', label: 'JobcardNo', w: 'w-[10%]' },
   ];
 
   return (
@@ -374,7 +452,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
           <form
             onSubmit={handleSave}
             onKeyDown={handleHeaderKeyDown}
-            className="classic-erp-body erp-job-receipt-body flex-1 overflow-y-auto min-h-0"
+            className="classic-erp-body erp-job-receipt-body flex-1 overflow-hidden min-h-0 flex flex-col justify-between"
           >
             {findOpen && (
               <div className="classic-erp-frame erp-job-receipt-find shrink-0">
@@ -396,34 +474,40 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
             <div className="classic-erp-frame erp-job-receipt-header shrink-0">
               <div className="erp-job-receipt-header-grid">
                 <div className="classic-erp-stack erp-job-receipt-party-col">
-                  <div className="classic-erp-field classic-erp-field--lg">
-                    <span className="classic-erp-label red-label">Job Party</span>
-                    <ERPCombobox
-                      value={header.partyId}
-                      onChange={handlePartyChange}
-                      disabled={locked}
-                      options={partyOptions}
-                      placeholder="Select job worker / mill…"
-                      recentKey="job-receipt-party"
-                      allowClear
-                    />
+                  <div className="erp-job-receipt-party-row">
+                    <div className="classic-erp-field classic-erp-field--lg erp-job-receipt-party-field">
+                      <span className="classic-erp-label red-label">Job Party</span>
+                      <ERPCombobox
+                        value={header.partyId}
+                        onChange={handlePartyChange}
+                        disabled={locked}
+                        options={partyOptions}
+                        placeholder="Select job worker / mill…"
+                        recentKey="job-receipt-party"
+                        allowClear
+                      />
+                    </div>
+                    <span className="erp-job-receipt-gstin-badge">GSTIN:-{header.gstin || '24AAAGM0289C1ZP'}</span>
                   </div>
-                  <div className="classic-erp-field">
-                    <span className="classic-erp-label">GSTIN</span>
-                    <input
-                      type="text"
-                      className="classic-erp-input font-mono uppercase"
-                      value={header.gstin}
-                      readOnly
-                      placeholder="—"
-                    />
+                  <div className="erp-job-receipt-address-box">
+                    {selectedPartyObj?.address || selectedPartyObj?.city ? `${selectedPartyObj.address || ''}${selectedPartyObj.city ? ', ' + selectedPartyObj.city : ''}` : ','}
                   </div>
                 </div>
 
                 <div className="classic-erp-stack erp-job-receipt-meta-col">
-                  <div className="classic-erp-meta-grid erp-job-receipt-meta-row">
+                  <div className="erp-job-receipt-meta-row-1">
                     <div className="classic-erp-field">
-                      <span className="classic-erp-label red-label">Serial No</span>
+                      <span className="classic-erp-label">Reverse Charge</span>
+                      <ERPSelect
+                        className={`classic-erp-select ${header.reverseCharge === 'Yes' ? 'erp-rcm-highlight' : ''}`}
+                        value={header.reverseCharge}
+                        onChange={(e) => setHeader({ ...header, reverseCharge: e.target.value })}
+                        options={RCM_OPTIONS}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label red-label">Serail No</span>
                       <input
                         type="text"
                         className="classic-erp-input text-center font-bold"
@@ -446,19 +530,9 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                         <span className="erp-job-receipt-weekday">{weekday(header.date)}</span>
                       </div>
                     </div>
-                    <div className="classic-erp-field">
-                      <span className="classic-erp-label">Reverse Charge</span>
-                      <ERPSelect
-                        className={`classic-erp-select ${header.reverseCharge === 'Yes' ? 'erp-rcm-highlight' : ''}`}
-                        value={header.reverseCharge}
-                        onChange={(e) => setHeader({ ...header, reverseCharge: e.target.value })}
-                        options={RCM_OPTIONS}
-                        disabled={locked}
-                      />
-                    </div>
                   </div>
 
-                  <div className="classic-erp-meta-grid erp-job-receipt-meta-row">
+                  <div className="erp-job-receipt-meta-row-2">
                     <div className="classic-erp-field">
                       <span className="classic-erp-label">Bill/Ch No</span>
                       <input
@@ -581,8 +655,10 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                           }
                           if (c.key === 'jobAmt') {
                             return (
-                              <td key={c.key} className="text-right font-mono font-bold">
-                                {Number(line.jobAmt || 0).toFixed(2)}
+                              <td key={c.key} className="p-0">
+                                <span className="erp-jobamt-highlight">
+                                  {Number(line.jobAmt || 0).toFixed(2)}
+                                </span>
                               </td>
                             );
                           }
@@ -629,6 +705,13 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+              <div className="erp-job-receipt-totalbar">
+                <span>TOTAL Pcs : {gridTotals.pcs}</span>
+                <span>/</span>
+                <span>Send.Mts : {gridTotals.sendMts.toFixed(2)}</span>
+                <span>/</span>
+                <span>Rec.Mts : {gridTotals.recMts.toFixed(2)}</span>
               </div>
             </div>
 
@@ -826,42 +909,48 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
               <div className="classic-erp-frame erp-job-receipt-totals">
                 <div className="classic-erp-total-row">
                   <span className="classic-erp-label">Gross Amt</span>
-                  <span className="font-mono font-bold">₹{calc.gross.toFixed(2)}</span>
+                  <span className="font-mono font-bold text-slate-800">{calc.gross.toFixed(2)}</span>
                 </div>
                 <div className="classic-erp-total-row">
                   <span className="classic-erp-label">TOTAL GST</span>
-                  <span className="font-mono font-bold">₹{calc.totalGst.toFixed(2)}</span>
+                  <span className="font-mono font-bold text-slate-800">{calc.totalGst.toFixed(2)}</span>
                 </div>
                 <div className="classic-erp-total-row">
                   <span className="classic-erp-label erp-rcm-label">RCM CHARGE</span>
                   <input
                     type="number"
-                    className={`classic-erp-input w-28 text-right font-mono ${header.reverseCharge === 'Yes' ? 'erp-rcm-highlight' : ''}`}
+                    className="classic-erp-input w-24 text-right font-mono erp-rcm-highlight"
                     value={footer.rcmCharge}
                     onChange={(e) => setFooter({ ...footer, rcmCharge: e.target.value })}
                     disabled={locked || header.reverseCharge !== 'Yes'}
                   />
                 </div>
                 <div className="classic-erp-total-row">
-                  <span className="classic-erp-label">Round Off</span>
-                  <input
-                    type="number"
-                    className="classic-erp-input w-28 text-right font-mono"
-                    value={footer.roundOff}
-                    onChange={(e) => setFooter({ ...footer, roundOff: e.target.value })}
-                    disabled={locked}
-                    step="0.01"
-                  />
-                </div>
-                <div className="classic-erp-total-row">
-                  <span className="classic-erp-label">Net Amount</span>
-                  <span className="font-mono font-bold">₹{calc.net.toFixed(2)}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="classic-erp-label">Round Off</span>
+                    <input
+                      type="number"
+                      className="classic-erp-input w-16 text-right font-mono"
+                      value={footer.roundOff}
+                      onChange={(e) => setFooter({ ...footer, roundOff: e.target.value })}
+                      disabled={locked}
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="classic-erp-label">Net Amount</span>
+                    <span className="font-mono font-bold text-slate-900">{calc.net.toFixed(2)}</span>
+                  </div>
                 </div>
                 <div className="classic-erp-total-row erp-job-receipt-final-row">
-                  <span className="classic-erp-label text-blue-900">Final Amount</span>
-                  <span className="font-mono font-bold text-blue-900 text-lg">₹{calc.final.toFixed(2)}</span>
+                  <span className="classic-erp-label font-bold text-slate-900">Final Amount</span>
+                  <span className="font-mono font-bold text-slate-900 text-base">{calc.final.toFixed(2)}</span>
                 </div>
               </div>
+            </div>
+
+            <div className="erp-job-receipt-pending-status shrink-0">
+              Pending
             </div>
 
             <div className="classic-erp-form-footer erp-job-receipt-footer shrink-0">
@@ -914,37 +1003,39 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
               </button>
               <button
                 type="button"
-                className="classic-erp-btn"
+                className="classic-erp-btn btn-red-text"
                 onClick={() => toast.info('Open Payment Entry from Accounting')}
               >
                 Payment Entry
               </button>
               <button
                 type="button"
-                className="classic-erp-btn"
+                className="classic-erp-btn btn-red-text"
                 onClick={() => toast.info('Send JobWork — integration coming soon')}
               >
                 Send JobWork
               </button>
-              <button
-                type="button"
-                className="classic-erp-btn"
-                disabled={receiptOptions.length === 0}
-                onClick={() => receiptOptions[0] && loadReceipt(receiptOptions[0].value)}
-              >
-                First
+              <button type="button" className="classic-erp-btn" onClick={onClose} disabled={saving}>
+                Close
               </button>
-              <button
-                type="button"
-                className="classic-erp-btn"
-                disabled={receiptOptions.length === 0}
-                onClick={() => receiptOptions[receiptOptions.length - 1] && loadReceipt(receiptOptions[receiptOptions.length - 1].value)}
-              >
-                Last
-              </button>
-              <button type="button" className="classic-erp-btn" onClick={() => toast.info('CP — cost price lookup')}>
-                CP
-              </button>
+              <div className="ml-auto flex items-center gap-1">
+                <button
+                  type="button"
+                  className="classic-erp-btn nav-btn-corner"
+                  disabled={receiptOptions.length === 0}
+                  onClick={() => receiptOptions[0] && loadReceipt(receiptOptions[0].value)}
+                >
+                  First
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn nav-btn-corner"
+                  disabled={receiptOptions.length === 0}
+                  onClick={() => receiptOptions[receiptOptions.length - 1] && loadReceipt(receiptOptions[receiptOptions.length - 1].value)}
+                >
+                  Last
+                </button>
+              </div>
             </div>
           </form>
         </div>

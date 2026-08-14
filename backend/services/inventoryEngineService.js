@@ -43,7 +43,7 @@ class InventoryEngineService {
 
   /** Availability by item or lot — physical minus reservations */
   async getAvailability(companyId, { itemId, lotId, warehouseId } = {}) {
-    const filter = { companyId, remainingMtrs: { $gt: 0 }, holdStatus: { $in: ['None', null] } };
+    const filter = { companyId, isDeleted: { $ne: true }, holdStatus: { $in: ['None', null] } };
     if (itemId) filter.itemId = itemId;
     if (lotId) filter._id = lotId;
     if (warehouseId) filter.warehouseId = warehouseId;

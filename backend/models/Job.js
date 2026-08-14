@@ -50,6 +50,8 @@ const JobSchema = new mongoose.Schema({
   toleranceWastagePct: { type: Number, default: 3, min: 0 },
   processCharges: { type: Number, default: 0, min: 0 },
   processGstAmount: { type: Number, default: 0, min: 0 },
+  /** Bill-wise settlement of Job Work Charges via Payment voucher (mirrors Purchase.paidAmount). */
+  chargesPaidAmount: { type: Number, default: 0, min: 0 },
   finishedLotId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'InventoryLot',
@@ -106,7 +108,12 @@ const JobSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Issued', 'In-Process', 'Received', 'Cancelled'],
+    /**
+     * 'Partial' — some, but not all, of issueQty/issuePcs has come back across one or
+     * more receive events; the job stays open for further receives until the full
+     * issued quantity is banked, at which point it becomes 'Received'.
+     */
+    enum: ['Issued', 'In-Process', 'Received', 'Partial', 'Cancelled'],
     default: 'Issued'
   },
   issueDate: {
@@ -130,11 +137,21 @@ const JobSchema = new mongoose.Schema({
     index: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true },
 });
 
 JobSchema.index({ jobCardNo: 1, companyId: 1 }, { unique: true });
 JobSchema.index({ companyId: 1, status: 1, issueDate: -1 });
+
+/** What's left to receive against this job — the Receive screen pre-fills from this. */
+JobSchema.virtual('pendingQty').get(function pendingQty() {
+  return Math.max(0, Number((Number(this.issueQty || 0) - Number(this.receivedQty || 0)).toFixed(4)));
+});
+JobSchema.virtual('pendingPcs').get(function pendingPcs() {
+  return Math.max(0, Number(this.issuePcs || 0) - Number(this.receivedPcs || 0));
+});
 
 const { enterpriseIntegrityPlugin } = require('./mixins/enterpriseMetaSchema');
 JobSchema.plugin(enterpriseIntegrityPlugin);

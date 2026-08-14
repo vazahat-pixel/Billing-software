@@ -1121,9 +1121,12 @@ const Dashboard = () => {
          <LedgerModal
             isOpen={modals.ledger}
             onClose={() => toggleModal('ledger', false)}
-            onOpenJournal={() => setModals(prev => ({ ...prev, journal: true }))}
-            onOpenPayment={() => toggleModal('cashPayment', true)}
-            onOpenReceipt={() => toggleModal('cashReceipt', true)}
+            onOpenJournal={(data) => { toggleModal('journal', true); }}
+            onOpenPayment={(data) => { toggleModal('cashPayment', true); }}
+            onOpenReceipt={(data) => { toggleModal('cashReceipt', true); }}
+            onOpenSales={(data) => { toggleModal('sales', true); }}
+            onOpenPurchase={(data) => { toggleModal('purchase', true); }}
+            onOpenNote={(data) => { toggleModal('note', true); }}
             onOpenOutstanding={() => toggleModal('outstanding', true)}
          />
          <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters} />

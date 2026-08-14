@@ -118,14 +118,25 @@ class LedgerEngineService {
 
     await Promise.all([
       load(['Payment', 'Receipt'], 'PaymentVoucher',
-        (d) => ({ docNo: d.voucherNo, chequeNo: d.chequeNo || '', remarks: d.narration || d.remark2 || '' }),
-        'voucherNo chequeNo narration remark2'),
+        (d) => {
+          const billNos = (d.againstInvoices || []).map((x) => x.invoiceNo).filter(Boolean).join(', ');
+          const billRemark = billNos ? `Bill No.: ${billNos}` : '';
+          return {
+            docNo: d.voucherNo,
+            chequeNo: d.chequeNo || '',
+            remarks: billRemark || d.narration || d.remark2 || '',
+          };
+        },
+        'voucherNo chequeNo narration remark2 againstInvoices'),
       load(['SalesInvoice'], 'Sales',
-        (d) => ({ docNo: d.invoiceNo, remarks: d.narration || d.remarks || '' }),
+        (d) => ({ docNo: d.invoiceNo, remarks: d.narration || d.remarks || `Sales Invoice #${d.invoiceNo || ''}` }),
         'invoiceNo narration remarks'),
       load(['PurchaseBill'], 'Purchase',
-        (d) => ({ docNo: d.invoiceNo, remarks: d.narration || d.remarks || '' }),
+        (d) => ({ docNo: d.invoiceNo, remarks: d.narration || d.remarks || `Purchase Bill #${d.invoiceNo || ''}` }),
         'invoiceNo narration remarks'),
+      load(['DebitNote', 'CreditNote'], 'DebitCreditNote',
+        (d) => ({ docNo: d.vNo || d.noteNo, remarks: d.reason || d.narration || `${d.noteType} Note #${d.vNo || d.noteNo || ''}` }),
+        'vNo noteNo noteType reason narration'),
     ]);
 
     return map;
@@ -169,10 +180,6 @@ class LedgerEngineService {
     let openingSigned = this.signedOpening(ledger);
 
     if (from) {
-      // Must use the RESOLVED ledger._id, not the caller's raw input. The caller may pass
-      // a Party id, a "party:<id>" token or an account name, and keying the aggregate on
-      // that silently returned zero prior movement — so Opening Balance collapsed to the
-      // master OB and every ledger opened on the wrong figure.
       const priorTo = new Date(new Date(from).getTime() - 1);
       const prior = await this.aggregateByLedger(companyId, {
         to: priorTo,
@@ -199,48 +206,92 @@ class LedgerEngineService {
     const statement = [];
 
     for (const entry of entries) {
-      const contraNames = entry.lines
-        .filter((l) => l.ledgerId && l.ledgerId.toString() !== ledger._id.toString())
-        .map((l) => l.ledgerName)
-        .filter(Boolean);
-      const contra = [...new Set(contraNames)].join(', ');
-
       const src = sourceMap[String(entry.refId)] || {};
 
       for (const line of entry.lines) {
         if (line.ledgerId.toString() !== ledger._id.toString()) continue;
-        if (line.type === 'Dr') current += line.amount;
-        else current -= line.amount;
-        statement.push({
-          _id: entry._id,
-          date: entry.entryDate,
-          voucherNo: entry.entryNo,
-          // Bill/VNo shows the document the operator knows (invoice no / voucher no),
-          // falling back to the journal number when there is no source document.
-          billVoucherNo: src.docNo || entry.entryNo,
-          chequeNo: src.chequeNo || '',
-          remarks: src.remarks || '',
-          voucherType: entry.voucherType,
-          narration: line.narration || entry.narration || '',
-          particulars: line.narration || entry.narration || contra || entry.refType || '',
-          contraAccount: contra,
-          debit: line.type === 'Dr' ? line.amount : 0,
-          credit: line.type === 'Cr' ? line.amount : 0,
-          runningBalance: round2(Math.abs(current)),
-          balanceType: current >= 0 ? 'Dr' : 'Cr',
-          refType: entry.refType,
-          refId: entry.refId,
-          // Every leg of the journal, so the (*) drill-down shows the real voucher
-          // rather than a reconstruction guessed from this one line.
-          journalLines: entry.lines.map((l) => ({
-            ledgerId: l.ledgerId,
-            ledgerName: l.ledgerName,
-            type: l.type,
-            amount: round2(l.amount),
-            narration: l.narration || '',
-          })),
-          entryNarration: entry.narration || '',
-        });
+
+        // Find all opposite (contra) lines in this journal entry
+        const oppositeLines = entry.lines.filter(
+          (l) => l.ledgerId && l.ledgerId.toString() !== ledger._id.toString()
+        );
+
+        // If it's a Payment/Receipt/Journal with multiple contra legs (e.g. Bank + Discount),
+        // split into separate rows for each contra leg so user sees Bank and Discount lines separately!
+        if (oppositeLines.length > 1 && ['Payment', 'Receipt', 'Journal'].includes(entry.voucherType)) {
+          const totalOppositeAmt = oppositeLines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+
+          for (const opp of oppositeLines) {
+            const oppAmt = Number(opp.amount) || 0;
+            const portion = totalOppositeAmt > 0
+              ? round2((line.amount * oppAmt) / totalOppositeAmt)
+              : oppAmt;
+
+            if (line.type === 'Dr') current += portion;
+            else current -= portion;
+
+            statement.push({
+              _id: `${entry._id}_${opp.ledgerId}`,
+              date: entry.entryDate,
+              voucherNo: entry.entryNo,
+              billVoucherNo: src.docNo || entry.entryNo,
+              chequeNo: src.chequeNo || '',
+              remarks: src.remarks || opp.narration || '',
+              voucherType: entry.voucherType,
+              narration: opp.narration || line.narration || entry.narration || '',
+              particulars: opp.ledgerName || 'CONTRA A/C',
+              contraAccount: opp.ledgerName || '',
+              debit: line.type === 'Dr' ? portion : 0,
+              credit: line.type === 'Cr' ? portion : 0,
+              runningBalance: round2(Math.abs(current)),
+              balanceType: current >= 0 ? 'Dr' : 'Cr',
+              refType: entry.refType,
+              refId: entry.refId,
+              journalLines: entry.lines.map((l) => ({
+                ledgerId: l.ledgerId,
+                ledgerName: l.ledgerName,
+                type: l.type,
+                amount: round2(l.amount),
+                narration: l.narration || '',
+              })),
+              entryNarration: entry.narration || '',
+            });
+          }
+        } else {
+          // Single contra line or Sales/Purchase bill — single row
+          const contraNames = oppositeLines.map((l) => l.ledgerName).filter(Boolean);
+          const contra = [...new Set(contraNames)].join(', ');
+
+          if (line.type === 'Dr') current += line.amount;
+          else current -= line.amount;
+
+          statement.push({
+            _id: entry._id,
+            date: entry.entryDate,
+            voucherNo: entry.entryNo,
+            billVoucherNo: src.docNo || entry.entryNo,
+            chequeNo: src.chequeNo || '',
+            remarks: src.remarks || '',
+            voucherType: entry.voucherType,
+            narration: line.narration || entry.narration || '',
+            particulars: contra || (entry.voucherType === 'Sales' ? 'SALES BOOK' : entry.voucherType === 'Purchase' ? 'PURCHASE BOOK' : entry.refType || ''),
+            contraAccount: contra,
+            debit: line.type === 'Dr' ? line.amount : 0,
+            credit: line.type === 'Cr' ? line.amount : 0,
+            runningBalance: round2(Math.abs(current)),
+            balanceType: current >= 0 ? 'Dr' : 'Cr',
+            refType: entry.refType,
+            refId: entry.refId,
+            journalLines: entry.lines.map((l) => ({
+              ledgerId: l.ledgerId,
+              ledgerName: l.ledgerName,
+              type: l.type,
+              amount: round2(l.amount),
+              narration: l.narration || '',
+            })),
+            entryNarration: entry.narration || '',
+          });
+        }
       }
     }
 

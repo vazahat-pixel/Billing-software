@@ -34,7 +34,7 @@ export default function JobLotLookupModal({ isOpen, onClose, jobs = [], partyNam
       job: j,
       lotNo: j.lotId?.lotId || j.lotId?.code || '',
       chlnNo: j.challanNo || j.jobCardNo || '',
-      millName: j.workerId?.name || '',
+      millName: j.workerId?.name || j.partyName || j.workerName || '',
       itemName: j.lotId?.itemId?.name || j.lotId?.itemName || '',
       issuePcs: j.issuePcs || 0,
       issueQty: j.issueQty || 0,
@@ -43,9 +43,10 @@ export default function JobLotLookupModal({ isOpen, onClose, jobs = [], partyNam
     }));
     const q = search.trim().toLowerCase();
     if (!q) return list;
-    return list.filter((r) =>
+    const filtered = list.filter((r) =>
       [r.lotNo, r.chlnNo, r.millName, r.itemName].filter(Boolean).join(' ').toLowerCase().includes(q)
     );
+    return filtered.length > 0 ? filtered : list;
   }, [jobs, search]);
 
   const pick = (row) => {

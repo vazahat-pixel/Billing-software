@@ -50,6 +50,51 @@ const acId = (o) => {
   return String(id).replace(/^party:/, '').slice(-6).toUpperCase();
 };
 
+const fmtDateDMY = (isoDate) => {
+  if (!isoDate) return '';
+  const d = new Date(isoDate);
+  if (isNaN(d.getTime())) return isoDate;
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+const rowCP = (r) => {
+  if (r.cp) return r.cp;
+  if (r.contraShortCode) return r.contraShortCode;
+  const contra = String(r.contraAccount || '').trim();
+  if (contra) return contra.slice(0, 5).toUpperCase();
+  return 'SCC';
+};
+
+const rowDescriptionClean = (r) => {
+  if (r._material) {
+    return r.particulars || 'JOB WORK MATERIAL';
+  }
+  const contra = String(r.contraAccount || '').trim();
+  if (contra) return contra.toUpperCase();
+  const part = String(r.particulars || r.narration || r.voucherType || '').trim();
+  return part.toUpperCase() || 'SALES BOOK';
+};
+
+const rowRemark1Clean = (r) => {
+  if (r.remark1) return r.remark1;
+  if (r.remarks) return r.remarks;
+  if (r.narration) return r.narration;
+  if (r.billVoucherNo || r.voucherNo) {
+    return `Bill No.:${r.billVoucherNo || r.voucherNo}`;
+  }
+  return '—';
+};
+
+const rowAuditMark = (r) => {
+  if (r.auditMark) return r.auditMark;
+  if (r.accBill) return r.accBill;
+  if (r.billVoucherNo || r.voucherNo) return 'B';
+  return '—';
+};
+
 /** Head list dropdown */
 function HeadListPanel({ heads, highlightIdx, onSelect }) {
   return (
@@ -105,12 +150,14 @@ function AccountListPanel({ rows, highlightIdx, onSelect, emptyText = 'No accoun
   );
 }
 
-const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenReceipt, onOpenOutstanding }) => {
+const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenReceipt, onOpenSales, onOpenPurchase, onOpenNote, onOpenOutstanding }) => {
   const {
     ledgers,
     parties,
+    jobWorkEntries,
     fetchLedgers,
     fetchParties,
+    fetchJobs,
     fetchLedgerStatement,
     currentLedgerStatement,
     loading,
@@ -146,6 +193,7 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
   const [descFilter, setDescFilter] = useState('');
   const [remarkFilter, setRemarkFilter] = useState('');
   const [selectedRow, setSelectedRow] = useState(0);
+  const [checkedRows, setCheckedRows] = useState(new Set());
   const [jvRow, setJvRow] = useState(null);
   const printRef = useRef(null);
   const accHeadRef = useRef(null);
@@ -156,6 +204,7 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     if (!isOpen) return;
     fetchLedgers().catch(() => {});
     fetchParties().catch(() => {});
+    fetchJobs().catch(() => {});
     setView('entry');
     setLedgerId('');
     setAccHead('');
@@ -163,7 +212,8 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     setListOpen(null);
     setFrom(fyStartISO());
     setTo(todayISO());
-  }, [isOpen, fetchLedgers, fetchParties]);
+    setCheckedRows(new Set());
+  }, [isOpen, fetchLedgers, fetchParties, fetchJobs]);
 
   const ledgerOptions = useMemo(() => {
     const map = new Map();
@@ -219,7 +269,7 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
       const partyId = id.slice(6);
       const linked = (ledgers || []).find((l) => String(l.linkedPartyId) === partyId);
       if (linked) return String(linked._id || linked.id);
-      return partyId; // Backend auto-creates/resolves party ledger
+      return partyId;
     }
     return id;
   };
@@ -282,7 +332,6 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     }
   };
 
-  /** Next Year / Back Year — shifts the whole Apr–Mar window relative to whatever's currently shown. */
   const shiftYear = (direction) => {
     const startYear = fyStartYearOf(from) + direction;
     const range = fyRange(startYear);
@@ -316,32 +365,6 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     return [];
   }, [statement]);
 
-  const rowDescription = (r) =>
-    String(r.particulars || r.narration || r.contraAccount || r.refType || '');
-  const rowRemark = (r) => String(r.remarks || r.narration || '');
-
-  /**
-   * Row filters never touch `runningBalance` — that comes from the full ledger, so hiding
-   * rows narrows what is listed without rewriting the account's actual balance history.
-   */
-  const filteredRows = useMemo(() => {
-    let data = [...rows];
-    if (onlyDr && !onlyCr) data = data.filter((r) => Number(r.debit || 0) > 0);
-    if (onlyCr && !onlyDr) data = data.filter((r) => Number(r.credit || 0) > 0);
-    const d = descFilter.trim().toLowerCase();
-    if (d) data = data.filter((r) => rowDescription(r).toLowerCase().includes(d));
-    const rm = remarkFilter.trim().toLowerCase();
-    if (rm) data = data.filter((r) => rowRemark(r).toLowerCase().includes(rm));
-    return data;
-  }, [rows, onlyDr, onlyCr, descFilter, remarkFilter]);
-
-  const isFiltered =
-    (onlyDr && !onlyCr) || (onlyCr && !onlyDr) || !!descFilter.trim() || !!remarkFilter.trim();
-
-  // Clamped at render rather than reset via an effect, so a filter that shortens the list
-  // can never leave the highlight pointing past the end.
-  const activeRow = Math.min(selectedRow, Math.max(0, filteredRows.length - 1));
-
   const selectedMeta = ledgerOptions.find((o) => o.value === ledgerId) || null;
   const partyInfo = useMemo(() => {
     const stmtLedger = currentLedgerStatement?.ledger;
@@ -358,13 +381,137 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
 
   const partyId = partyInfo ? String(partyInfo._id || partyInfo.id) : '';
 
-  // Classic ERP power-user shortcuts, active only while viewing a statement:
-  // L = change account, * = Journal Voucher, - = Cash Payment, + = Cash Receipt.
+  const materialRows = useMemo(() => {
+    if (!partyId) return [];
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(`${to}T23:59:59.999`) : null;
+    return (jobWorkEntries || [])
+      .filter((j) => String(j.workerId?._id || j.workerId || '') === partyId)
+      .filter((j) => {
+        const d = new Date(j.issueDate || j.createdAt);
+        if (fromDate && d < fromDate) return false;
+        if (toDate && d > toDate) return false;
+        return true;
+      })
+      .map((j) => {
+        const issued = Number(j.issueQty || 0);
+        const received = Number(j.receivedQty || 0);
+        const wastage = Number(j.wastage || 0);
+        const isReceived = j.status === 'Received';
+        const itemName = j.lotId?.itemName || j.lotId?.itemId?.name || '';
+        return {
+          _material: true,
+          date: isReceived ? (j.receiveDate || j.issueDate) : j.issueDate,
+          billVoucherNo: j.jobCardNo || j.challanNo || '',
+          voucherType: isReceived ? 'Job Receive' : 'Job Issue',
+          particulars: isReceived
+            ? `[Material] Job Receive — ${itemName ? itemName + ' — ' : ''}Issued ${issued.toFixed(2)} / Received ${received.toFixed(2)}${wastage > 0 ? ` / Wastage ${wastage.toFixed(2)}` : ''}`
+            : `[Material] Job Issue — ${itemName ? itemName + ' — ' : ''}${issued.toFixed(2)} mts sent (${j.processType || 'Process'})`,
+          debit: 0,
+          credit: 0,
+          refType: isReceived ? 'JobReceive' : 'JobIssue',
+          refId: j._id,
+        };
+      });
+  }, [jobWorkEntries, partyId, from, to]);
+
+  const mergedRows = useMemo(() => {
+    if (materialRows.length === 0) return rows;
+    const combined = [...rows.map((r) => ({ ...r, _material: false })), ...materialRows];
+    combined.sort((a, b) => new Date(a.date) - new Date(b.date));
+    let lastBal = 0;
+    let lastType = 'Dr';
+    return combined.map((r) => {
+      if (!r._material) {
+        lastBal = r.runningBalance ?? r.balance ?? lastBal;
+        lastType = r.balanceType || lastType;
+        return r;
+      }
+      return { ...r, runningBalance: lastBal, balanceType: lastType };
+    });
+  }, [rows, materialRows]);
+
+  const rowDescription = (r) =>
+    String(r.particulars || r.narration || r.contraAccount || r.refType || '');
+  const rowRemark = (r) => String(r.remarks || r.narration || '');
+
+  const filteredRows = useMemo(() => {
+    let data = [...mergedRows];
+    if (onlyDr && !onlyCr) data = data.filter((r) => Number(r.debit || 0) > 0);
+    if (onlyCr && !onlyDr) data = data.filter((r) => Number(r.credit || 0) > 0);
+    const d = descFilter.trim().toLowerCase();
+    if (d) data = data.filter((r) => rowDescription(r).toLowerCase().includes(d));
+    const rm = remarkFilter.trim().toLowerCase();
+    if (rm) data = data.filter((r) => rowRemark(r).toLowerCase().includes(rm));
+    return data;
+  }, [mergedRows, onlyDr, onlyCr, descFilter, remarkFilter]);
+
+  const isFiltered =
+    (onlyDr && !onlyCr) || (onlyCr && !onlyDr) || !!descFilter.trim() || !!remarkFilter.trim();
+
+  const activeRow = Math.min(selectedRow, Math.max(0, filteredRows.length - 1));
+
+  const toggleRowCheck = (id, e) => {
+    if (e) e.stopPropagation();
+    setCheckedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const allChecked = useMemo(() => {
+    if (filteredRows.length === 0) return false;
+    return filteredRows.every((r, idx) => checkedRows.has(r._id || r.refId || idx));
+  }, [filteredRows, checkedRows]);
+
+  const toggleSelectAll = () => {
+    if (allChecked) {
+      setCheckedRows(new Set());
+    } else {
+      const next = new Set();
+      filteredRows.forEach((r, idx) => next.add(r._id || r.refId || idx));
+      setCheckedRows(next);
+    }
+  };
+
+  /** Direct form opener — opens the edit form corresponding to any selected ledger row */
+  const handleRowOpen = (row) => {
+    if (!row) return;
+    if (row._material) {
+      toast.info(`Material entry: ${row.particulars || 'Job Work'}`);
+      return;
+    }
+    const refType = String(row.refType || row.voucherType || '').toLowerCase();
+    const docNo = row.billVoucherNo || row.voucherNo || row.entryNo || '';
+
+    if (refType.includes('payment')) {
+      if (onOpenPayment) onOpenPayment({ partyId, ledgerId: resolveLedgerId(), voucherNo: docNo, row });
+      else toast.info(`Payment Voucher #${docNo}`);
+    } else if (refType.includes('receipt')) {
+      if (onOpenReceipt) onOpenReceipt({ partyId, ledgerId: resolveLedgerId(), voucherNo: docNo, row });
+      else toast.info(`Receipt Voucher #${docNo}`);
+    } else if (refType.includes('sale')) {
+      if (onOpenSales) onOpenSales({ partyId, ledgerId: resolveLedgerId(), invoiceNo: docNo, row });
+      else toast.info(`Sales Invoice #${docNo}`);
+    } else if (refType.includes('purchase')) {
+      if (onOpenPurchase) onOpenPurchase({ partyId, ledgerId: resolveLedgerId(), invoiceNo: docNo, row });
+      else toast.info(`Purchase Bill #${docNo}`);
+    } else if (refType.includes('note')) {
+      if (onOpenNote) onOpenNote({ partyId, ledgerId: resolveLedgerId(), docNo, row });
+      else toast.info(`Note #${docNo}`);
+    } else if (refType.includes('journal')) {
+      if (onOpenJournal) onOpenJournal({ partyId, ledgerId: resolveLedgerId(), entryNo: docNo, row });
+      else setJvRow(row);
+    } else {
+      setJvRow(row);
+    }
+  };
+
   useEffect(() => {
     if (!isOpen || view !== 'statement') return undefined;
     const onKeyDown = (e) => {
-      // F3/F5 must reach the filter box even while it has focus; everything else is
-      // ignored while typing so the shortcuts never fight ordinary input.
       if (e.key === 'F3' || e.key === 'F5') {
         e.preventDefault();
         setFilterField(e.key === 'F3' ? 'description' : 'remark');
@@ -381,11 +528,14 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedRow((i) => Math.max(i - 1, 0));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const row = filteredRows[activeRow];
+        if (row) handleRowOpen(row);
       } else if (e.key.toLowerCase() === 'l') {
         e.preventDefault();
         setView('entry');
       } else if (e.key === '*') {
-        // Open JV — the actual journal entry behind the highlighted row.
         e.preventDefault();
         const row = filteredRows[activeRow];
         if (!row) return toast.warning('Select a ledger row first');
@@ -402,8 +552,7 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, view, partyId, filteredRows, selectedRow, onOpenPayment, onOpenReceipt]);
+  }, [isOpen, view, partyId, filteredRows, activeRow, selectedRow, onOpenPayment, onOpenReceipt]);
 
   const ledgerName =
     statement?.ledgerName || statement?.ledger?.name || selectedMeta?.ledger?.name || accountText || '—';
@@ -417,28 +566,27 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     ? [partyInfo.address, partyInfo.city, partyInfo.state, partyInfo.pincode].filter(Boolean).join(', ')
     : '';
 
-  /** Exports exactly the rows on screen, filters included, so it ties to the Grand Total. */
   const handleExcel = () => {
     if (!statement || filteredRows.length === 0) return toast.warning('Load ledger first');
     const headers = ['Date', 'Bill/VNo', 'CP', 'ChqNo', 'Description', 'Debit', 'Credit', 'Balance', 'A.', 'Remark 1'];
     const body = filteredRows.map((r) => [
-      fmtDate(r.date || r.entryDate),
+      fmtDateDMY(r.date || r.entryDate),
       r.billVoucherNo || r.voucherNo || '',
-      String((r.contraAccount || '').split(',')[0] || '').trim(),
+      rowCP(r),
       r.chequeNo || '',
-      rowDescription(r),
+      rowDescriptionClean(r),
       Number(r.debit || 0).toFixed(2),
       Number(r.credit || 0).toFixed(2),
-      Number(r.runningBalance ?? r.balance ?? 0).toFixed(2),
-      r.balanceType || '',
-      rowRemark(r),
+      `${Number(r.runningBalance ?? r.balance ?? 0).toFixed(2)} ${(r.balanceType || '').toUpperCase()}`,
+      rowAuditMark(r),
+      rowRemark1Clean(r),
     ]);
-    body.unshift([fmtDate(from), 'OB', '', '', 'Opening Balance',
+    body.unshift([fmtDateDMY(from), 'OB', '', '', 'OPENING BALANCE',
       openingType === 'Dr' ? openingBal.toFixed(2) : '0.00',
       openingType === 'Cr' ? openingBal.toFixed(2) : '0.00',
-      openingBal.toFixed(2), openingType, '']);
+      `${openingBal.toFixed(2)} ${openingType.toUpperCase()}`, '', '']);
     body.push(['', '', '', '', 'GRAND TOTAL',
-      periodDebit.toFixed(2), periodCredit.toFixed(2), closingBal.toFixed(2), closingType, '']);
+      periodDebit.toFixed(2), periodCredit.toFixed(2), `${closingBal.toFixed(2)} ${closingType.toUpperCase()}`, '', '']);
     downloadCsv(`Ledger_${(ledgerName || 'account').replace(/\W+/g, '_')}_${from}_to_${to}.csv`, headers, body);
   };
 
@@ -565,8 +713,15 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     );
   }
 
+  const activeRowObj = filteredRows[activeRow];
+  const activeDetailText = activeRowObj
+    ? rowRemark1Clean(activeRowObj) !== '—'
+      ? rowRemark1Clean(activeRowObj)
+      : rowDescriptionClean(activeRowObj)
+    : '';
+
   return (
-    <ErpWindowedModal isOpen={isOpen} onClose={onClose} title="Zoom Ledger" windowId="ledger" bare>
+    <ErpWindowedModal isOpen={isOpen} onClose={onClose} title="Zoom Ledger" windowId="ledger" defaultMode="maximized" bare>
       {({ WindowControls }) => (
         <>
           <div className="classic-erp-window ledger-stmt-window h-full min-h-0 !max-h-none flex flex-col">
@@ -649,7 +804,14 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
             <div className="ledger-toolbar2 print:hidden">
               <div className="ledger-toolbar2-left">
                 <div className="ledger-toolbar2-row">
-                  <input type="text" className="classic-erp-input ledger-party-box" value={ledgerName} readOnly />
+                  <input
+                    type="text"
+                    className="classic-erp-input ledger-party-box"
+                    value={accountText || ledgerName}
+                    readOnly
+                    onClick={() => setView('entry')}
+                    title="Click or press L to change account"
+                  />
                   <span className="classic-erp-label">Date</span>
                   <input type="date" className="classic-erp-input ledger-date-red" value={from} onChange={(e) => setFrom(e.target.value)} />
                   <span className="classic-erp-label">To</span>
@@ -662,10 +824,10 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
                 <div className="ledger-toolbar2-row">
                   <button type="button" className="classic-erp-btn ledger-green-btn" onClick={() => setView('entry')}>Filter</button>
                   <span className="ledger-l-hint">To Change Account = Press L</span>
-                  {financialYear ? <span>{financialYear}</span> : null}
-                  <span>{companyName}</span>
+                  <span className="font-bold text-gray-700">SC27</span>
+                  <span className="font-bold text-blue-900">{companyName}</span>
                   <span className="ml-auto classic-erp-label">Opening Bal</span>
-                  <input type="text" className="classic-erp-input ledger-openingbal-box" value={fmtMoney(openingBal)} readOnly />
+                  <input type="text" className="classic-erp-input ledger-openingbal-box" value={money(openingBal)} readOnly />
                 </div>
               </div>
               <div className="ledger-toolbar2-hints">
@@ -676,7 +838,6 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
             </div>
 
             <div className="ledger-stmt-body" ref={printRef}>
-              {/* With Address — account/party address straight off the existing master. */}
               {showAddress && (partyAddress || companyAddress) && (
                 <div className="ledger-address-bar">
                   <div>
@@ -696,48 +857,80 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
                 {(isLoading && !statement) ? (
                   <div className="p-4">
                     <InlineLoader message="Loading ledger…" className="mb-3" />
-                    <SkeletonTable rows={10} cols={10} />
+                    <SkeletonTable rows={10} cols={11} />
                   </div>
                 ) : (
                   <table className="ledger-stmt-table">
                     <thead>
                       <tr>
-                        <th>Date</th><th>Bill/Vno</th><th>CP</th><th>ChqNo</th><th>Description</th>
-                        <th className="num">Debit</th><th className="num">Credit</th><th className="num">Balance</th><th>A.</th><th>Remark 1</th>
+                        <th className="w-7 text-center">
+                          <input type="checkbox" checked={allChecked} onChange={toggleSelectAll} title="Select All" />
+                        </th>
+                        <th>Date</th>
+                        <th>Bill/VNo</th>
+                        <th>CP</th>
+                        <th>ChqNo</th>
+                        <th>Description</th>
+                        <th className="num">Debit</th>
+                        <th className="num">Credit</th>
+                        <th className="num">Balance</th>
+                        <th className="text-center">A.</th>
+                        <th>Remark 1</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr className="ledger-ob-row">
-                        <td>{fmtDate(from)}</td><td>OB</td><td>—</td><td>—</td><td><b>Opening Balance</b></td>
-                        <td className="num">{openingType === 'Dr' ? money(openingBal) : '—'}</td>
-                        <td className="num">{openingType === 'Cr' ? money(openingBal) : '—'}</td>
-                        <td className="num"><b>{money(openingBal)}</b></td><td><b>{openingType}</b></td><td>—</td>
+                        <td className="text-center">
+                          <input type="checkbox" disabled />
+                        </td>
+                        <td>{fmtDateDMY(from)}</td>
+                        <td>OB</td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td><b>OPENING BALANCE</b></td>
+                        <td className="num">{openingType === 'Dr' ? money(openingBal) : '0.00'}</td>
+                        <td className="num">{openingType === 'Cr' ? money(openingBal) : '0.00'}</td>
+                        <td className="num"><b>{money(openingBal)} {openingType.toUpperCase()}</b></td>
+                        <td className="text-center">—</td>
+                        <td>—</td>
                       </tr>
                       {filteredRows.map((row, i) => {
+                        const rowKey = row._id || row.refId || i;
+                        const isChecked = checkedRows.has(rowKey);
                         const debit = Number(row.debit || 0);
                         const credit = Number(row.credit || 0);
                         const bal = Number(row.runningBalance ?? row.balance ?? 0);
                         const balType = row.balanceType || '';
-                        const particular = rowDescription(row) || '—';
-                        const cp = String((row.contraAccount || '').split(',')[0] || '').trim();
+                        const cp = rowCP(row);
+                        const desc = rowDescriptionClean(row);
+                        const remark1 = rowRemark1Clean(row);
+                        const audit = rowAuditMark(row);
+                        const isMaterial = !!row._material;
                         return (
                           <tr
-                            key={`${row._id || row.voucherNo || i}-${i}`}
-                            className={i === activeRow ? 'is-selected' : ''}
+                            key={`${rowKey}-${i}`}
+                            className={`${i === activeRow ? 'is-selected' : ''} ${isMaterial ? 'ledger-material-row' : ''}`}
                             onClick={() => setSelectedRow(i)}
-                            onDoubleClick={() => setJvRow(row)}
-                            title="Double-click (or press *) to open the journal voucher"
+                            onDoubleClick={() => handleRowOpen(row)}
+                            title={isMaterial ? 'Material movement — no money impact on this ledger' : 'Press Enter or double-click to open form for editing'}
                           >
-                            <td className="nowrap">{fmtDate(row.date || row.entryDate)}</td>
+                            <td className="text-center" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => toggleRowCheck(rowKey, e)}
+                              />
+                            </td>
+                            <td className="nowrap">{fmtDateDMY(row.date || row.entryDate)}</td>
                             <td>{row.billVoucherNo || row.voucherNo || row.entryNo || '—'}</td>
-                            <td>{cp || '—'}</td>
+                            <td>{cp}</td>
                             <td>{row.chequeNo || row.chqNo || '—'}</td>
-                            <td>{particular}</td>
-                            <td className="num">{debit > 0 ? money(debit) : '—'}</td>
-                            <td className="num">{credit > 0 ? money(credit) : '—'}</td>
-                            <td className="num bal">{money(bal)}</td>
-                            <td>{balType || '—'}</td>
-                            <td>{showRemark ? (rowRemark(row) || '—') : '—'}</td>
+                            <td className="font-semibold">{desc}</td>
+                            <td className="num">{money(debit)}</td>
+                            <td className="num">{money(credit)}</td>
+                            <td className="num bal font-bold">{money(bal)} {balType.toUpperCase()}</td>
+                            <td className="text-center font-bold">{audit}</td>
+                            <td>{showRemark ? remark1 : '—'}</td>
                           </tr>
                         );
                       })}
@@ -748,24 +941,27 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
             </div>
 
             <div className="ledger-grand-bar print:hidden">
-              <div className="ledger-grand-remark">
-                {isFiltered && (
-                  <span className="ledger-filter-note">
-                    Filtered view — Grand Total covers the {filteredRows.length} listed row(s) of {rows.length}.
-                    Balance column and Closing stay on the full account.
-                  </span>
-                )}
+              <div className="ledger-grand-remark flex-1">
+                <input
+                  type="text"
+                  className="classic-erp-input ledger-bottom-detail-box w-full font-bold"
+                  value={activeDetailText}
+                  readOnly
+                />
               </div>
               <div className="ledger-grand-totals">
-                <div>Record<br /><b>{filteredRows.length}</b></div>
+                <div className="ledger-record-counter text-center">
+                  <span className="block text-[10px] text-gray-800 font-bold">Record</span>
+                  <span className="block text-xs font-extrabold text-black">{filteredRows.length}</span>
+                </div>
                 <div className="ledger-grand-labels">
+                  <span>Date Total</span>
                   <span>Grand Total</span>
-                  <span>Closing</span>
                 </div>
                 <div className="ledger-grand-boxes">
-                  <input type="text" className="classic-erp-input" readOnly title="Total Debit of listed rows" value={money(periodDebit)} />
-                  <input type="text" className="classic-erp-input" readOnly title="Total Credit of listed rows" value={money(periodCredit)} />
-                  <input type="text" className="classic-erp-input" readOnly title="Closing balance of the account" value={`${money(closingBal)} ${closingType}`} />
+                  <input type="text" className="classic-erp-input font-bold" readOnly title="Total Debit of listed rows" value={money(periodDebit)} />
+                  <input type="text" className="classic-erp-input font-bold" readOnly title="Total Credit of listed rows" value={money(periodCredit)} />
+                  <input type="text" className="classic-erp-input font-extrabold text-red-700" readOnly title="Closing balance of the account" value={`${money(closingBal)} ${closingType.toUpperCase()}`} />
                 </div>
               </div>
             </div>
@@ -781,7 +977,6 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
               row={jvRow}
               onClose={() => setJvRow(null)}
               onOpenSource={() => {
-                // Hand off to the module that owns the source document.
                 const t = jvRow.refType;
                 if ((t === 'Payment' || t === 'Receipt')) {
                   const open = t === 'Receipt' ? onOpenReceipt : onOpenPayment;
@@ -801,7 +996,6 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
 
 /**
  * Open JV — renders the actual AccountingEntry behind a ledger row, every Dr/Cr leg of it.
- * The lines come from the journal itself, so this is the real voucher, not a reconstruction.
  */
 function JournalVoucherPanel({ row, onClose, onOpenSource }) {
   const lines = Array.isArray(row.journalLines) ? row.journalLines : [];
@@ -816,7 +1010,7 @@ function JournalVoucherPanel({ row, onClose, onOpenSource }) {
           <span className="ledger-jv-type">{voucherLabel(row.voucherType)}</span>
         </div>
         <div className="ledger-jv-meta">
-          <div><b>Date</b><span>{fmtDate(row.date)}</span></div>
+          <div><b>Date</b><span>{fmtDateDMY(row.date)}</span></div>
           <div><b>Bill/VNo</b><span>{row.billVoucherNo || '—'}</span></div>
           <div><b>Ref Type</b><span>{row.refType || '—'}</span></div>
           {row.chequeNo ? <div><b>Chq No</b><span>{row.chequeNo}</span></div> : null}
@@ -959,11 +1153,14 @@ const ledgerStyles = `
   }
   .ledger-toolbar2-left { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
   .ledger-toolbar2-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: #111; }
-  .ledger-party-box { width: 160px; color: #b91c1c; font-weight: 800; }
-  .ledger-date-red { border-color: #c00 !important; color: #c00; font-weight: 700; }
-  .ledger-green-btn { background: #bff0bf !important; border-color: #6ba86b !important; }
-  .ledger-l-hint { color: #b91c1c; font-weight: 800; }
-  .ledger-openingbal-box { width: 90px; text-align: right; font-family: ui-monospace, Consolas, monospace; }
+  .ledger-party-box {
+    width: 170px; color: #b91c1c !important; font-weight: 800 !important; font-size: 13px !important;
+    background: #ffffff !important; border: 1px solid #7eab7e !important; cursor: pointer;
+  }
+  .ledger-date-red { border-color: #c00 !important; color: #c00 !important; font-weight: 700 !important; background: #fff !important; }
+  .ledger-green-btn { background: #bff0bf !important; border-color: #6ba86b !important; font-weight: 700 !important; color: #1e3a1e !important; }
+  .ledger-l-hint { color: #b91c1c; font-weight: 800; font-size: 11px; }
+  .ledger-openingbal-box { width: 90px; text-align: right; font-family: ui-monospace, Consolas, monospace; font-weight: 700; background: #fff !important; }
   .ledger-toolbar2-hints {
     display: flex; flex-direction: column; justify-content: center; text-align: right;
     font-size: 10px; font-weight: 700; color: #7a1212; line-height: 1.5; white-space: nowrap;
@@ -973,23 +1170,26 @@ const ledgerStyles = `
   .ledger-stmt-table-wrap { flex: 1; min-height: 280px; overflow: auto; }
   .ledger-stmt-table { width: 100%; border-collapse: collapse; font-size: 11px; }
   .ledger-stmt-table thead th {
-    position: sticky; top: 0; z-index: 1; background: #fff; color: #111; border-bottom: 2px solid #333;
-    padding: 6px 8px; font-size: 11px; font-weight: 800;
+    position: sticky; top: 0; z-index: 2; background: #9bc89b; color: #111; border-bottom: 2px solid #5a8a5a;
+    padding: 5px 6px; font-size: 11px; font-weight: 800; text-align: left;
   }
   .ledger-stmt-table thead th.num, .ledger-stmt-table td.num { text-align: right; font-family: ui-monospace, Consolas, monospace; }
-  .ledger-stmt-table td { padding: 4px 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
-  .ledger-stmt-table tbody tr:nth-child(even) { background: #f5f5f5; }
-  .ledger-stmt-table tbody tr:hover { background: #1e40af; color: #fff; }
-  .ledger-ob-row td { background: #efe8dc !important; font-weight: 600; }
-  .ledger-stmt-table tbody tr.is-selected td { background: #1d4ed8 !important; color: #fff !important; }
+  .ledger-stmt-table td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+  .ledger-stmt-table tbody tr:nth-child(even) { background: #f8fafc; }
+  .ledger-stmt-table tbody tr:hover { background: #dbeafe; }
+  .ledger-ob-row td { background: #efe8dc !important; font-weight: 700; color: #443010; }
+  .ledger-stmt-table tbody tr.is-selected td { background: #0066cc !important; color: #ffffff !important; font-weight: 600; }
+  .ledger-stmt-table tbody tr.is-selected input[type="checkbox"] { accent-color: #ffffff; }
   .ledger-stmt-table tbody tr { cursor: pointer; }
+  .ledger-stmt-table tbody tr.ledger-material-row td { background: #ecfdf5 !important; color: #065f46; font-style: italic; }
+  .ledger-stmt-table tbody tr.ledger-material-row:hover td { background: #a7f3d0 !important; color: #064e3b !important; }
+  .ledger-stmt-table tbody tr.ledger-material-row.is-selected td { background: #059669 !important; color: #fff !important; font-style: normal; }
   .ledger-address-bar {
     display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
     padding: 4px 10px; font-size: 11px; color: #1e293b;
     background: #f8fafc; border-bottom: 1px solid #cbd5e1;
   }
   .ledger-address-comp { color: #475569; text-align: right; }
-  .ledger-filter-note { font-size: 10px; font-weight: 700; color: #7a1212; padding: 0 6px; line-height: 1.3; }
   .ledger-jv { background: #fff; font-size: 12px; }
   .ledger-jv-head {
     display: flex; justify-content: space-between; align-items: center;
@@ -1015,14 +1215,19 @@ const ledgerStyles = `
   .ledger-jv-ok { font-weight: 700; color: #15803d; margin-right: auto; }
   .ledger-jv-bad { font-weight: 700; color: #b91c1c; margin-right: auto; }
   .ledger-grand-bar {
-    display: flex; align-items: center; gap: 16px; padding: 6px 10px;
+    display: flex; align-items: center; gap: 12px; padding: 6px 10px;
     background: #9bc89b; border-top: 1px solid #7eab7e;
   }
-  .ledger-grand-remark { flex: 1; height: 30px; background: #fff; border: 1px solid #7eab7e; border-radius: 2px; }
+  .ledger-bottom-detail-box {
+    background: #ffffff !important; border: 1px solid #7eab7e !important; color: #111111 !important;
+    font-weight: 700 !important; font-size: 12px !important; height: 26px !important;
+  }
   .ledger-grand-totals { display: flex; align-items: center; gap: 10px; font-size: 11px; font-weight: 700; }
-  .ledger-grand-labels { display: flex; flex-direction: column; text-align: right; line-height: 1.3; }
+  .ledger-grand-labels { display: flex; flex-direction: column; text-align: right; line-height: 1.3; font-weight: 800; color: #1e3a1e; }
   .ledger-grand-boxes { display: flex; gap: 6px; }
-  .ledger-grand-boxes input { width: 100px; text-align: right; font-family: ui-monospace, Consolas, monospace; font-weight: 700; }
+  .ledger-grand-boxes input {
+    width: 105px; text-align: right; font-family: ui-monospace, Consolas, monospace; font-weight: 700; background: #fff !important; height: 26px !important;
+  }
   @media print {
     body * { visibility: hidden !important; }
     .ledger-stmt-window, .ledger-stmt-window * { visibility: visible !important; }

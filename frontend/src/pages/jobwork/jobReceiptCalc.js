@@ -58,6 +58,13 @@ export const lineJobAmt = (line) => {
 
 export const jobToLine = (job) => {
   const issueQty = Number(job.issueQty) || 0;
+  const issuePcs = Number(job.issuePcs) || 0;
+  const receivedQty = Number(job.receivedQty) || 0;
+  const receivedPcs = Number(job.receivedPcs) || 0;
+
+  const pendingQty = Math.max(0, Number((issueQty - receivedQty).toFixed(2)));
+  const pendingPcs = Math.max(0, issuePcs - receivedPcs);
+
   const rate =
     Number(job.jobRate) ||
     (issueQty > 0 ? Number(job.processCharges || 0) / issueQty : 0) ||
@@ -76,10 +83,10 @@ export const jobToLine = (job) => {
     itemName,
     finishItem: job.outputItemId?.name || job.finish || '',
     cut: '',
-    issuePcsRef: job.issuePcs ?? '',
-    issueMtsRef: job.issueQty ?? '',
-    recPcs: job.issuePcs ?? '',
-    recMts: job.issueQty ?? '',
+    issuePcsRef: pendingPcs > 0 ? pendingPcs : (issuePcs || ''),
+    issueMtsRef: pendingQty > 0 ? pendingQty : (issueQty || ''),
+    recPcs: pendingPcs > 0 ? pendingPcs : (issuePcs || ''),
+    recMts: pendingQty > 0 ? pendingQty : (issueQty || ''),
     jRate: rate ? rate.toFixed(2) : '',
     pqk: 'Q',
     jobAmt: 0,

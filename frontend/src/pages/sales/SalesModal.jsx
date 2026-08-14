@@ -852,10 +852,12 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     setMode('View');
   };
 
+  // Sales is billed to Customers only — Suppliers/Job Workers/Employees etc. showing up
+  // here was the exact confusion this list is meant to prevent.
   const partyOptions = useMemo(
     () =>
       parties
-        .filter((p) => p.type !== 'Broker')
+        .filter((p) => ['Customer', 'Both'].includes(p.type) || !p.type)
         .map((p) => ({
           value: p._id || p.id,
           label: p.name,

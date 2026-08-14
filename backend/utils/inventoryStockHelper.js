@@ -4,11 +4,11 @@ const AppError = require('./AppError');
 
 /** Physical remaining minus active reservations */
 function availableMtrs(lot) {
-  return Math.max(0, Number(lot.remainingMtrs || 0) - Number(lot.reservedMtrs || 0));
+  return Number(lot.remainingMtrs || 0) - Number(lot.reservedMtrs || 0);
 }
 
 function availablePcs(lot) {
-  return Math.max(0, Number(lot.remainingPcs || 0) - Number(lot.reservedPcs || 0));
+  return Number(lot.remainingPcs || 0) - Number(lot.reservedPcs || 0);
 }
 
 function assertLotIssuable(lot) {
@@ -22,6 +22,7 @@ function assertLotIssuable(lot) {
 /**
  * Apply quantity delta to lot and append immutable StockMovement.
  * Negative delta = issue; positive = receipt/adjustment in.
+ * Negative stock is allowed on sales & issue movements.
  */
 async function applyLotMovement({
   session,
@@ -36,29 +37,27 @@ async function applyLotMovement({
 }) {
   assertLotIssuable(lot);
 
+  // Track meters when the lot was created with meters, still has meter balance,
+  // OR when the movement being applied is explicitly a meter-based delta.
+  // This ensures a closed lot (totalMtrs=0, remainingMtrs=0) still goes
+  // to 'Negative Stock' when further meter sales are applied to it.
+  const tracksMtrs =
+    Number(lot.totalMtrs || 0) > 0 ||
+    (lot.remainingMtrs !== 0) ||
+    (deltaMts !== 0 && deltaPcs === 0);
+
   const newRemainingMtrs = Number((lot.remainingMtrs + deltaMts).toFixed(4));
-  const newRemainingPcs = Math.max(0, (lot.remainingPcs || 0) + deltaPcs);
+  const newRemainingPcs = Number(((lot.remainingPcs || 0) + deltaPcs).toFixed(4));
 
-  if (newRemainingMtrs < -0.0001) {
-    throw AppError.badRequest(
-      `Negative stock blocked on lot ${lot.lotId}. Available ${availableMtrs(lot)} mtrs, requested ${Math.abs(deltaMts)}`
-    );
-  }
-
-  // When issuing, also respect reservations
-  if (deltaMts < 0) {
-    const need = Math.abs(deltaMts);
-    if (need - availableMtrs(lot) > 0.0001) {
-      throw AppError.badRequest(
-        `Insufficient available stock on lot ${lot.lotId}. Available ${availableMtrs(lot)} mtrs (after reservations)`
-      );
-    }
-  }
-
-  lot.remainingMtrs = Math.max(0, newRemainingMtrs);
+  lot.remainingMtrs = newRemainingMtrs;
   lot.remainingPcs = newRemainingPcs;
-  if (lot.remainingMtrs <= 0) lot.status = 'Closed';
-  else if (lot.remainingMtrs < lot.totalMtrs) lot.status = 'Partially Used';
+
+  const remainingForStatus = tracksMtrs ? lot.remainingMtrs : lot.remainingPcs;
+  const totalForStatus = tracksMtrs ? lot.totalMtrs : lot.totalPcs;
+
+  if (remainingForStatus < 0) lot.status = 'Negative Stock';
+  else if (remainingForStatus === 0) lot.status = 'Closed';
+  else if (totalForStatus > 0 && remainingForStatus < totalForStatus) lot.status = 'Partially Used';
   else lot.status = 'Available';
 
   const version = lot.version || 1;
@@ -106,14 +105,9 @@ async function loadLotForUpdate(session, lotOid, companyId) {
 
 /**
  * Create an opening lot so sales can post when purchase stock was never entered.
- * Qty matches the bill line; after SALE movement remaining becomes 0.
+ * Starts at 0 balance so sales push it into exact negative values.
  */
 async function createOpeningLotForSale(session, companyId, itemId, needMts = 0, needPcs = 0) {
-  const mts = Math.max(Number(needMts) || 0, 0);
-  const pcs = Math.max(Number(needPcs) || 0, 0);
-  // Ensure lot has something to deduct (applyLotMovement blocks negative)
-  const totalMtrs = mts > 0 ? mts : pcs > 0 ? 0 : 0.001;
-  const totalPcs = pcs;
   const lotId = `OPEN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
   const [lot] = await InventoryLot.create(
@@ -123,10 +117,10 @@ async function createOpeningLotForSale(session, companyId, itemId, needMts = 0, 
         itemId,
         lotId,
         source: 'opening',
-        totalMtrs,
-        remainingMtrs: totalMtrs,
-        totalPcs,
-        remainingPcs: totalPcs,
+        totalMtrs: 0,
+        remainingMtrs: 0,
+        totalPcs: 0,
+        remainingPcs: 0,
         status: 'Available',
         holdStatus: 'None',
         reservedMtrs: 0,
@@ -136,16 +130,13 @@ async function createOpeningLotForSale(session, companyId, itemId, needMts = 0, 
     { session }
   );
 
-  // Lot qty is already on hand — SALE movement will post when invoice deducts.
-  // Do not create StockMovement here: referenceId is required and sale id is not known yet.
-
   return lot;
 }
 
 /**
  * FIFO pick an open lot for a sales line when UI does not send lotId.
- * If no purchase stock exists (or not enough), auto-creates an opening lot
- * so the sales bill can still be saved.
+ * Picks existing lot for the item (even if in negative balance) or creates one
+ * so sales continue and negative stock accumulates properly.
  */
 async function pickLotForSale(session, companyId, itemId, needMts = 0, needPcs = 0) {
   if (!itemId) {
@@ -157,7 +148,6 @@ async function pickLotForSale(session, companyId, itemId, needMts = 0, needPcs =
     companyId,
     itemId,
     isDeleted: { $ne: true },
-    status: { $nin: ['Closed', 'Exhausted'] },
     $or: [{ holdStatus: { $exists: false } }, { holdStatus: 'None' }, { holdStatus: null }],
   })
     .sort({ createdAt: 1 })
@@ -166,32 +156,22 @@ async function pickLotForSale(session, companyId, itemId, needMts = 0, needPcs =
   const candidates = lots.filter((lot) => {
     try {
       assertLotIssuable(lot);
+      return true;
     } catch {
       return false;
     }
-    return availableMtrs(lot) > 0.0001 || availablePcs(lot) > 0;
   });
 
   if (!candidates.length) {
     return createOpeningLotForSale(session, companyId, itemId, qtyMts, qtyPcs);
   }
 
-  let best =
-    candidates.find(
-      (lot) =>
-        availableMtrs(lot) + 0.0001 >= qtyMts && availablePcs(lot) >= qtyPcs
-    ) || null;
+  // 1. Prefer an existing lot with positive stock
+  let best = candidates.find((lot) => (qtyMts > 0 ? (lot.remainingMtrs || 0) > 0 : (lot.remainingPcs || 0) > 0));
 
-  if (!best && qtyMts > 0) {
-    best = candidates.find((lot) => availableMtrs(lot) + 0.0001 >= qtyMts) || null;
-  }
+  // 2. Otherwise pick the first existing lot for this item so negative stock accumulates on it!
   if (!best) {
     best = candidates[0];
-  }
-
-  if (qtyMts > 0 && availableMtrs(best) + 0.0001 < qtyMts) {
-    // Not enough on existing lots — open stock for this bill line
-    return createOpeningLotForSale(session, companyId, itemId, qtyMts, qtyPcs);
   }
 
   return best;

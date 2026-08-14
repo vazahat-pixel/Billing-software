@@ -1175,12 +1175,12 @@ const useStore = create((set, get) => ({
     set({ loading: true });
     if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
-      const _pay = await accountingApi.payments({
+      const env = await accountingApi.payments({
         ...data,
         companyId: get().user?.companyId
       });
-      const res = { data: { data: _pay } };
-      const newVoucher = normalizeVoucher(res.data.data);
+      const newVoucher = normalizeVoucher(env.data);
+      const discountNotes = env.raw?.discountNotes || [];
       set(state => ({ 
         payments: [newVoucher, ...state.payments],
         vouchers: [newVoucher, ...state.vouchers],
@@ -1189,7 +1189,7 @@ const useStore = create((set, get) => ({
       get().fetchVouchers();
       get().fetchSales();
       get().fetchPurchases();
-      return newVoucher;
+      return { voucher: newVoucher, discountNotes };
     } catch (err) {
       set({ loading: false });
       if (isNetworkError(err) && canSaveOffline(get)) return saveLocal();
@@ -1222,12 +1222,12 @@ const useStore = create((set, get) => ({
     set({ loading: true });
     if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
-      const _rcp = await accountingApi.receipts({
+      const env = await accountingApi.receipts({
         ...data,
         companyId: get().user?.companyId
       });
-      const res = { data: { data: _rcp } };
-      const newVoucher = normalizeVoucher(res.data.data);
+      const newVoucher = normalizeVoucher(env.data);
+      const discountNotes = env.raw?.discountNotes || [];
       set(state => ({ 
         receipts: [newVoucher, ...state.receipts],
         vouchers: [newVoucher, ...state.vouchers],
@@ -1236,7 +1236,7 @@ const useStore = create((set, get) => ({
       get().fetchVouchers();
       get().fetchSales();
       get().fetchPurchases();
-      return newVoucher;
+      return { voucher: newVoucher, discountNotes };
     } catch (err) {
       set({ loading: false });
       if (isNetworkError(err) && canSaveOffline(get)) return saveLocal();
@@ -1248,7 +1248,9 @@ const useStore = create((set, get) => ({
   updateVoucher: async (id, data) => {
     set({ loading: true });
     try {
-      const updated = normalizeVoucher(await accountingApi.updateVoucher(id, data));
+      const env = await accountingApi.updateVoucher(id, data);
+      const updated = normalizeVoucher(env.data);
+      const discountNotes = env.raw?.discountNotes || [];
       set((state) => ({
         vouchers: state.vouchers.map((v) => ((v._id || v.id) === id ? updated : v)),
         payments: state.payments.map((v) => ((v._id || v.id) === id ? updated : v)),
@@ -1258,7 +1260,7 @@ const useStore = create((set, get) => ({
       get().fetchVouchers();
       get().fetchSales();
       get().fetchPurchases();
-      return updated;
+      return { voucher: updated, discountNotes };
     } catch (err) {
       set({ loading: false });
       throw err;

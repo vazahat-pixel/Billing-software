@@ -67,7 +67,7 @@ const findLotsFromPurchase = (lots, data) => {
   const purchaseId = data.purchaseId != null ? String(data.purchaseId) : '';
   const codes = new Set((data.lotCodes || []).map((c) => String(c)).filter(Boolean));
   return (lots || []).filter((lot) => {
-    if (Number(lot.remainingMtrs || 0) <= 0) return false;
+    if (Number(lot.remainingMtrs || 0) <= 0 && Number(lot.remainingPcs || 0) <= 0) return false;
     if (lot.status === 'Closed') return false;
     if (lot.holdStatus && lot.holdStatus !== 'None') return false;
     const pid = lot.purchaseId?._id || lot.purchaseId;
@@ -134,22 +134,17 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   const weaverOptions = useMemo(() => {
     const weaverNames = new Set();
 
-    // 1. Add all suppliers/weavers from the master Parties list
+    // 1. Add all parties from the master Parties list
     (parties || []).forEach((p) => {
-      const type = String(p.type || '');
-      const group = String(p.group || '').toUpperCase();
-      if (
-        type === 'Supplier' ||
-        type === 'Both' ||
-        group.includes('SUPPLIER') ||
-        group.includes('WEAVER')
-      ) {
-        if (p.name) weaverNames.add(p.name.trim());
-      }
+      if (p.name) weaverNames.add(p.name.trim());
     });
 
-    // 2. Add any associated suppliers/weavers from inventory lots
+    // 2. Add any associated suppliers/weavers from inventory lots and purchases
     const purchaseById = new Map((purchases || []).map((p) => [String(p._id || p.id), p]));
+    (purchases || []).forEach((p) => {
+      const sName = p.supplierId?.name || p.supplierName || p.partyName || '';
+      if (sName) weaverNames.add(sName.trim());
+    });
     (inventoryLots || []).forEach((lot) => {
       const pid = String(lot.purchaseId?._id || lot.purchaseId || '');
       const purchase = pid ? purchaseById.get(pid) : null;
@@ -159,12 +154,8 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         purchase?.partyName ||
         '';
 
-      if (supplierName) {
-        weaverNames.add(supplierName.trim());
-      }
-      if (lot.weaver) {
-        weaverNames.add(lot.weaver.trim());
-      }
+      if (supplierName) weaverNames.add(supplierName.trim());
+      if (lot.weaver) weaverNames.add(lot.weaver.trim());
     });
 
     return Array.from(weaverNames)
@@ -187,7 +178,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
 
     const open = (inventoryLots || []).filter(
       (lot) =>
-        Number(lot.remainingMtrs || 0) > 0 &&
+        (Number(lot.remainingMtrs || 0) > 0 || Number(lot.remainingPcs || 0) > 0) &&
         lot.status !== 'Closed' &&
         (lot.holdStatus === 'None' || !lot.holdStatus) &&
         !issuedLotIds.has(String(lot._id || lot.id))
@@ -208,20 +199,22 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     });
   }, [inventoryLots, fromPurchase, purchaseLots, lotSort, jobWorkEntries]);
 
-  const lotOptions = useMemo(
-    () =>
-      availableLots.map((lot) => {
-        const id = lot._id || lot.id;
-        const name = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || 'Item';
-        const fromPur =
-          fromPurchase && purchaseLots.some((p) => String(p._id || p.id) === String(id));
-        return {
-          value: id,
-          label: `${fromPur ? '★ ' : ''}${lot.lotId || id.slice(-6)} · ${name} · ${Number(lot.remainingMtrs || 0).toFixed(2)} mts`,
-        };
-      }),
-    [availableLots, fromPurchase, purchaseLots]
-  );
+  const lotOptions = useMemo(() => {
+    return availableLots.map((lot) => {
+      const id = lot._id || lot.id;
+      const name = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || 'Item';
+      const fromPur =
+        fromPurchase && purchaseLots.some((p) => String(p._id || p.id) === String(id));
+      const qtyLabel =
+        Number(lot.totalMtrs || 0) > 0
+          ? `${Number(lot.remainingMtrs || 0).toFixed(2)} mts`
+          : `${Number(lot.remainingPcs || 0)} pcs`;
+      return {
+        value: id,
+        label: `${fromPur ? '★ ' : ''}${lot.lotId || id.slice(-6)} · ${name} · ${qtyLabel}`,
+      };
+    });
+  }, [availableLots, fromPurchase, purchaseLots]);
 
   const itemOptions = useMemo(() => {
     const names = new Set();
@@ -261,7 +254,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     setFindOpen(false);
   }, [selectedBook]);
 
-  const applyPurchasePrefill = useCallback((data, lots) => {
+  const applyPurchasePrefill = useCallback((data, lots, purchasesList, partiesList) => {
     if (!data?.purchaseId && !(data?.lotCodes || []).length) {
       setFromPurchase(null);
       return;
@@ -272,6 +265,27 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       lotCodes: data.lotCodes || [],
     });
     const matched = findLotsFromPurchase(lots, data);
+
+    const purchaseById = new Map((purchasesList || []).map((p) => [String(p._id || p.id), p]));
+    const pid = String(data.purchaseId || (matched[0]?.purchaseId?._id || matched[0]?.purchaseId) || '');
+    const purchase = pid ? purchaseById.get(pid) : null;
+
+    let supplierName =
+      data.supplierName ||
+      data.partyName ||
+      data.weaver ||
+      purchase?.supplierId?.name ||
+      purchase?.supplierName ||
+      purchase?.partyName ||
+      (matched[0]?.weaver) ||
+      '';
+
+    if (!supplierName && purchase?.supplierId) {
+      const pIdStr = String(purchase.supplierId._id || purchase.supplierId);
+      const partyObj = (partiesList || []).find((p) => String(p._id || p.id) === pIdStr);
+      if (partyObj) supplierName = partyObj.name;
+    }
+
     if (matched.length) {
       const lot = matched[0];
       const lotId = lot._id || lot.id;
@@ -285,6 +299,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         issQty: String(lot.remainingMtrs ?? ''),
         puRate: puRate !== '' && puRate != null ? String(puRate) : f.puRate,
         puBillNo: data.invoiceNo || f.puBillNo,
+        weaver: supplierName || f.weaver || '',
       }));
       toast.success(
         matched.length === 1
@@ -292,6 +307,11 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
           : `${matched.length} lots from Purchase ${data.invoiceNo || ''} — first lot selected`
       );
     } else {
+      setForm((f) => ({
+        ...f,
+        puBillNo: data.invoiceNo || f.puBillNo,
+        weaver: supplierName || f.weaver || '',
+      }));
       toast.info('Purchase stock not in inventory yet — pick lot manually');
     }
   }, []);
@@ -309,8 +329,10 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     Promise.all([fetchParties(), fetchItems(), fetchPurchases(), fetchInventory(), fetchJobs()])
       .then((results) => {
         if (cancelled) return;
+        const partyList = results[0] || [];
+        const purchaseList = results[2] || [];
         const lots = results[3] || [];
-        if (initialData) applyPurchasePrefill(initialData, lots);
+        if (initialData) applyPurchasePrefill(initialData, lots, purchaseList, partyList);
       })
       .catch(() => {})
       .finally(() => {
@@ -319,8 +341,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, selectedBook, initialData]);
+  }, [isOpen, selectedBook, initialData, applyPurchasePrefill, fetchParties, fetchItems, fetchPurchases, fetchInventory, fetchJobs, resetForm]);
 
   const applyPuBillRow = (row) => {
     if (!row) return;
@@ -329,6 +350,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     setForm((f) => ({
       ...f,
       puBillNo: row.billNo || f.puBillNo,
+      weaver: row.weaver || row.supplierName || row.partyName || f.weaver,
       itemName: row.itemName || f.itemName,
       lotId: row.lotId || f.lotId,
       issPcs: finalPcs != null ? String(finalPcs) : f.issPcs,
@@ -388,12 +410,18 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     const purchaseById = new Map((purchases || []).map((p) => [String(p._id || p.id), p]));
     const pid = String(lot.purchaseId?._id || lot.purchaseId || '');
     const purchase = pid ? purchaseById.get(pid) : null;
-    const supplierName =
+    let supplierName =
       purchase?.supplierId?.name ||
       purchase?.supplierName ||
       purchase?.partyName ||
       lot.weaver ||
       '';
+
+    if (!supplierName && purchase?.supplierId) {
+      const pIdStr = String(purchase.supplierId._id || purchase.supplierId);
+      const partyObj = (parties || []).find((p) => String(p._id || p.id) === pIdStr);
+      if (partyObj) supplierName = partyObj.name;
+    }
 
     setForm((f) => ({
       ...f,
@@ -403,7 +431,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       issQty: String(lot.remainingMtrs ?? ''),
       puRate: puRate !== '' && puRate != null ? String(puRate) : f.puRate,
       puBillNo: f.puBillNo || lot.invoiceNo || lot.purchaseInvoiceNo || '',
-      weaver: f.weaver || supplierName || '',
+      weaver: supplierName || f.weaver || '',
     }));
   };
 
@@ -506,15 +534,30 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       toast.error(`Purchase Bill No. "${form.puBillNo}" is already occupied (currently in process).`);
       return false;
     }
-    const qty = Number(form.issQty);
+    const qty = Number(form.issQty || 0);
     const pcs = Number(form.issPcs || 0);
-    if (!qty || qty <= 0) {
-      toast.error('Enter Iss Qty');
-      return false;
-    }
-    if (selectedLot && qty > Number(selectedLot.remainingMtrs || 0) + 0.0001) {
-      toast.error(`Iss Qty exceeds stock (${Number(selectedLot.remainingMtrs || 0).toFixed(2)})`);
-      return false;
+    // Pcs-only lots (item purchased/tracked by piece count, no running meters) always
+    // have totalMtrs === 0 — validate against pcs instead, or the check below would
+    // always fail since remainingMtrs never has anything to give.
+    const lotTracksMtrs = selectedLot ? Number(selectedLot.totalMtrs || 0) > 0 : true;
+    if (lotTracksMtrs) {
+      if (!qty || qty <= 0) {
+        toast.error('Enter Iss Qty');
+        return false;
+      }
+      if (selectedLot && qty > Number(selectedLot.remainingMtrs || 0) + 0.0001) {
+        toast.error(`Iss Qty exceeds stock (${Number(selectedLot.remainingMtrs || 0).toFixed(2)})`);
+        return false;
+      }
+    } else {
+      if (!pcs || pcs <= 0) {
+        toast.error('Enter Iss Pcs');
+        return false;
+      }
+      if (selectedLot && pcs > Number(selectedLot.remainingPcs || 0) + 0.0001) {
+        toast.error(`Iss Pcs exceeds stock (${Number(selectedLot.remainingPcs || 0)})`);
+        return false;
+      }
     }
 
     if (!form.challanNo || String(form.challanNo).trim() === '') {
@@ -642,7 +685,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
 
             <form
               onSubmit={(e) => handleSave(e)}
-              className="classic-erp-body erp-job-issue-body flex-1 overflow-y-auto min-h-0"
+              className="classic-erp-body erp-job-issue-body flex-1 overflow-hidden min-h-0 flex flex-col justify-between"
             >
               {fromPurchase && (
                 <div className="erp-mill-issue-purchase-bar shrink-0">

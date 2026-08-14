@@ -29,6 +29,8 @@ const InventoryPage = () => {
             return <span className="px-3 py-1 bg-amber-50 text-amber-600 text-[10px] font-bold uppercase rounded-md border border-amber-100">PARTIALLY USED</span>;
          case 'Closed':
             return <span className="px-3 py-1 bg-red-50 text-red-600 text-[10px] font-bold uppercase rounded-md border border-red-100">CLOSED</span>;
+         case 'Negative Stock':
+            return <span className="px-3 py-1 bg-orange-100 text-orange-700 text-[10px] font-bold uppercase rounded-md border border-orange-300">⚠ NEGATIVE</span>;
          default:
             return <span className="px-3 py-1 bg-slate-50 text-slate-400 text-[10px] font-bold uppercase rounded-md border border-slate-100">{status}</span>;
       }
@@ -42,11 +44,12 @@ const InventoryPage = () => {
          if (!matchSearch) return false;
          if (activeTab === 'LOW') return lot.status === 'Partially Used';
          if (activeTab === 'OUT') return lot.status === 'Closed';
+         if (activeTab === 'NEG') return lot.status === 'Negative Stock';
          return true;
       });
    }, [inventoryLots, activeTab, searchQuery]);
 
-   const tabs = ['ALL', 'LOW', 'OUT'];
+   const tabs = ['ALL', 'LOW', 'OUT', 'NEG'];
 
    return (
       <div className="p-8 space-y-8 bg-[#FDFCF9] min-h-screen">
@@ -160,10 +163,10 @@ const InventoryPage = () => {
                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{lot.itemId?.category || lot.category || 'N/A'}</p>
                            </td>
                            <td className="px-8 py-6 text-right">
-                              <p className="text-[11px] font-black text-black uppercase tracking-widest">{lot.remainingPcs || 0} Pcs</p>
+                              <p className={`text-[11px] font-black uppercase tracking-widest ${(lot.remainingPcs || 0) < 0 ? 'text-red-600' : 'text-black'}`}>{lot.remainingPcs || 0} Pcs</p>
                            </td>
                            <td className="px-8 py-6 text-right">
-                              <p className="text-[11px] font-black text-black uppercase tracking-widest">{lot.remainingMtrs.toFixed(2)} Mtrs</p>
+                              <p className={`text-[11px] font-black uppercase tracking-widest ${(lot.remainingMtrs || 0) < 0 ? 'text-red-600' : 'text-black'}`}>{(lot.remainingMtrs || 0).toFixed(2)} Mtrs</p>
                            </td>
                            <td className="px-8 py-6 text-center">
                               {getStatusBadge(lot.status)}

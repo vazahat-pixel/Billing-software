@@ -263,6 +263,11 @@ export default function ERPCombobox({
                 )}
               </span>
               {opt.meta ? <span className="erp-combobox-option-meta">{opt.meta}</span> : null}
+              {opt.badge ? (
+                <span className={`erp-combobox-option-badge erp-combobox-option-badge--${opt.badge.tone || 'default'}`}>
+                  {opt.badge.text}
+                </span>
+              ) : null}
               {isRecent && idx < recentIds.length ? (
                 <span className="erp-combobox-recent-badge">Recent</span>
               ) : null}
