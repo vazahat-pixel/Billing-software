@@ -7,6 +7,7 @@ import { notifySuccess, notifyError, notifyWarning, notifyInfo } from '../../uti
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import { Trash2, Plus, Search } from 'lucide-react';
 import PuBillLookupModal from './PuBillLookupModal';
+import JobWorkPrint from '../../components/print/JobWorkPrint';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -89,6 +90,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
 
   const [selectedJobId, setSelectedJobId] = useState('');
   const [findOpen, setFindOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
   const [lotLookupOpen, setLotLookupOpen] = useState(false);
   const [lotLookupTargetIdx, setLotLookupTargetIdx] = useState(null);
   // Last item touched in the grid — drives the live "Current Stock" strip, same as the
@@ -585,9 +587,31 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
     }
   };
 
+  /**
+   * Print payload built from the live header + calc.linesWithAmt the grid is already
+   * showing, so the challan sheet always matches the form exactly.
+   */
+  const printData = useMemo(() => {
+    const party = partyOptions.find((p) => String(p.value) === String(header.partyId));
+    const rows = (calc.linesWithAmt || []).filter(
+      (l) => l.itemName || Number(l.pcs) || Number(l.qty)
+    );
+    return {
+      book: selectedBook || header.book || 'JOBWORK BOOK',
+      partyName: party?.label || '',
+      partyPhone: header.partyPhone || '',
+      gstin: header.gstin,
+      stateCode: header.stateCode || (header.gstin ? String(header.gstin).slice(0, 2) : ''),
+      broker: header.broker,
+      challanNo: [header.challanNo, header.challanNoSuffix].filter(Boolean).join('-'),
+      date: header.date,
+      lines: rows.map((l) => ({ ...l, hsnCd: l.hsnCd || header.hsnCd })),
+    };
+  }, [calc, header, partyOptions, selectedBook]);
+
   const handlePrint = () => {
-    if (!selectedJobId) return notifyWarning('Find a challan to print');
-    notifyInfo('Print preview — coming soon');
+    if (!printData.lines.length) return notifyWarning('Nothing to print — add at least one line');
+    setPrintOpen(true);
   };
 
   const titleBook = selectedBook || header.book || 'JOBWORK BOOK';
@@ -1081,7 +1105,9 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                 >
                   Sp.FInd
                 </button>
-                <button type="button" className="classic-erp-btn" onClick={handlePrint} disabled={!selectedJobId}>
+                {/* Prints whatever the form currently shows, so an unsaved challan can be
+                    previewed too — handlePrint guards against an empty grid. */}
+                <button type="button" className="classic-erp-btn" onClick={handlePrint}>
                   Print
                 </button>
               </div>
@@ -1099,6 +1125,10 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
         items={items}
         onSelect={handleLotSelect}
       />
+
+      {printOpen && (
+        <JobWorkPrint variant="jobIssue" data={printData} onClose={() => setPrintOpen(false)} />
+      )}
     </>
   );
 }

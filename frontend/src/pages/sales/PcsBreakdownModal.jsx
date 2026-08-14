@@ -55,14 +55,23 @@ export default function PcsBreakdownModal({
   const [localRows, setLocalRows] = useState(() => normalizeRows(rows));
   const [calcType, setCalcType] = useState(initialCalcType || 'Mts');
   const firstPcsRef = useRef(null);
+  const wasOpenRef = useRef(false);
 
+  // Seed local (editable-draft) state ONLY on the closed->open transition. The parent
+  // (SalesModal) recomputes its line-items on every keystroke elsewhere in the form, so
+  // the `rows` prop is a fresh array reference on nearly every parent render — keying this
+  // effect off `rows` itself re-seeds from the original data on every one of those
+  // re-renders, silently wiping out whatever the user just typed here. Once open, this
+  // modal's own localRows is the source of truth until OK/Cancel.
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
       setLocalRows(normalizeRows(rows));
       setCalcType(initialCalcType || 'Mts');
       requestAnimationFrame(() => firstPcsRef.current?.focus());
     }
-  }, [isOpen, rows, initialCalcType]);
+    wasOpenRef.current = isOpen;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // NetQty per row = Pcs × Qty/Bndl (auto)
   const rowsWithNetQty = useMemo(

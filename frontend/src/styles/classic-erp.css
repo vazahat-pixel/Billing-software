@@ -153,6 +153,38 @@
   cursor: not-allowed;
 }
 
+/* Compact Date Input & WebKit Calendar Icon Styling */
+.classic-erp-input[type="date"] {
+  padding-left: 4px !important;
+  padding-right: 2px !important;
+  font-size: 11px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.classic-erp-input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  width: 13px;
+  height: 13px;
+  opacity: 0.75;
+}
+
+.classic-erp-input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.classic-erp-input[type="date"]::-webkit-datetime-edit {
+  padding: 0;
+}
+
+.classic-erp-input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+  padding: 0;
+}
+
 .classic-erp-table-container {
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-card) !important;
@@ -535,6 +567,22 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px 12px;
   align-items: center;
+}
+
+/* Multi-column grid field auto-label adjustment so inputs fit tightly without line overflow */
+.classic-erp-meta-grid .classic-erp-field,
+.classic-erp-meta-grid--3 .classic-erp-field {
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  gap: 4px 6px !important;
+}
+
+.classic-erp-meta-grid .classic-erp-field > .classic-erp-label,
+.classic-erp-meta-grid--3 .classic-erp-field > .classic-erp-label {
+  width: auto !important;
+  min-width: 0 !important;
+  justify-content: flex-end !important;
+  text-align: right !important;
+  white-space: nowrap !important;
 }
 
 .classic-erp-header-split {

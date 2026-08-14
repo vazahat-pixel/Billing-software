@@ -4,7 +4,7 @@ import { DEFAULT_THEME_ID, getTheme, THEMES } from '../theme/themes';
 const STORAGE_KEY = 'erp-theme-id';
 
 const useThemeStore = create((set, get) => ({
-  themeId: (typeof localStorage !== 'undefined' && localStorage.getItem(STORAGE_KEY)) || DEFAULT_THEME_ID,
+  themeId: (typeof localStorage !== 'undefined' && localStorage.getItem(STORAGE_KEY)) || DEFAULT_THEME_ID || 'high-contrast',
 
   setTheme: (themeId) => {
     const theme = getTheme(themeId);

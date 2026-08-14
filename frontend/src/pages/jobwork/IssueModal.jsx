@@ -8,6 +8,7 @@ import { Plus, Search } from 'lucide-react';
 import AccountMasterModal from '../masters/AccountMasterModal';
 import PuBillLookupModal from './PuBillLookupModal';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
+import JobWorkPrint from '../../components/print/JobWorkPrint';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -104,6 +105,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   const [lotSort, setLotSort] = useState('asc');
   const [accountModal, setAccountModal] = useState({ open: false, initialData: null });
   const [findOpen, setFindOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
   const [fromPurchase, setFromPurchase] = useState(null);
   const [puBillLookupOpen, setPuBillLookupOpen] = useState(false);
 
@@ -657,9 +659,39 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   };
 
   const handleDelete = () => toast.warning('Delete issued challan from Mill Receive / Cancel flow');
+  /**
+   * Mill Challan sheet from the live form. The reference challan lists takas individually
+   * in its A/B/C/D grid; this form captures the issue as totals only (Iss Pcs / Iss Qty),
+   * so the grid is left blank rather than inventing per-taka meters, and the Total Taka /
+   * Total Mts. figures printed are exactly the ones typed on screen.
+   */
+  const printData = useMemo(() => {
+    const mill = mills.find((m) => String(m._id || m.id) === String(form.millId));
+    return {
+      millName: mill?.name || '',
+      millGstin: mill?.gstin || '',
+      millStateCode: mill?.stateCode || (mill?.gstin ? String(mill.gstin).slice(0, 2) : ''),
+      challanNo: form.challanNo,
+      date: form.date,
+      puBillNo: form.puBillNo,
+      itemName: form.itemName,
+      hsnCd: form.hsnCd || '',
+      weaver: form.weaver,
+      procType: form.procType || 'Process',
+      takas: [],
+      totalTaka: form.issPcs,
+      totalMts: form.issQty,
+      taxableAmt: 0,
+      rate: form.jobRate,
+      remark: [form.remark1, form.remark2].filter(Boolean).join(' '),
+    };
+  }, [form, mills]);
+
   const handlePrint = () => {
-    if (!selectedJobId) return toast.warning('Find a challan to print');
-    toast.info('Print preview — coming soon');
+    if (!form.millId && !form.itemName) {
+      return toast.warning('Nothing to print — select a mill / item first');
+    }
+    setPrintOpen(true);
   };
 
   const titleBook = selectedBook || 'PROCESS ISSUE BOOK';
@@ -1059,6 +1091,10 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         items={items}
         onSelect={applyPuBillRow}
       />
+
+      {printOpen && (
+        <JobWorkPrint variant="millIssue" data={printData} onClose={() => setPrintOpen(false)} />
+      )}
     </>
   );
 };

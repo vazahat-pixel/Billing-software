@@ -649,7 +649,7 @@ export const THEMES = {
 
 export const DARK_THEME_IDS = new Set(['dark-pro', 'midnight', 'ocean-dark', 'forest-dark']);
 
-export const DEFAULT_THEME_ID = 'light-pro';
+export const DEFAULT_THEME_ID = 'high-contrast';
 
 export function getTheme(id) {
   return THEMES[id] || THEMES[DEFAULT_THEME_ID];

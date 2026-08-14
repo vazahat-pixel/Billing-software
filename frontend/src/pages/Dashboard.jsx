@@ -64,6 +64,7 @@ import {
    Gstr1ErrorChekModal,
    GstComplianceModal
 } from './gst/GstModals';
+import GstReportsHub from './gst/GstReportsHub';
 import CADashboardModal from './gst/CADashboardModal';
 import VisitLogModal from './crm/VisitLogModal';
 import PartyModal from './masters/PartyModal';
@@ -752,6 +753,7 @@ const Dashboard = () => {
       { id: 15, label: 'Update Job', icon: faScrewdriverWrench, key: 'updateJob' },
       { id: 9, label: 'CA Desk', icon: faUserTie, key: 'caDashboard', flag: 'ca_desk' },
       { id: 10, label: 'GSTR-1', icon: faChartPie, key: 'gstr1' },
+      { id: 16, label: 'GST Reports', icon: faChartPie, key: 'gstReports' },
       { id: 11, label: 'GSTR-2', icon: faChartPie, key: 'gst2bMatching' },
       { id: 12, label: 'ETB', icon: faFileInvoiceDollar, key: 'gstCompliance' },
       { id: 13, label: 'Visit Log', icon: faHandshake, key: 'visit' },
@@ -1195,6 +1197,7 @@ const Dashboard = () => {
          {/* GST Compliance Modals */}
          <Gst3bMonthlyModal isOpen={modals.gst3bMonthly} onClose={() => toggleModal('gst3bMonthly', false)} />
          <Gstr1Modal isOpen={modals.gstr1} onClose={() => toggleModal('gstr1', false)} />
+         <GstReportsHub isOpen={modals.gstReports} onClose={() => toggleModal('gstReports', false)} />
          <Gst2bMatchingModal isOpen={modals.gst2bMatching} onClose={() => toggleModal('gst2bMatching', false)} />
          <Gst3bDetailModal isOpen={modals.gst3bDetail} onClose={() => toggleModal('gst3bDetail', false)} />
          <Gstr1ErrorChekModal isOpen={modals.gstr1Errorchek} onClose={() => toggleModal('gstr1Errorchek', false)} />

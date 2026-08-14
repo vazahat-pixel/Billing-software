@@ -6,6 +6,7 @@ import BillNoLookupModal from '../accounting/BillNoLookupModal';
 import { notifySuccess, notifyWarning, notifyError } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
+import { notesApi } from '../../api/masters.api';
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 const round2 = (n) => Number(Number(n || 0).toFixed(2));
@@ -136,13 +137,26 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
   useEffect(() => {
     if (!isOpen || !initialNoteId || bootLoading) return;
     if (initialNoteLoadedRef.current === initialNoteId) return;
+    // Try local store first (fast path)
     const target = (notes || []).find((n) => String(n._id || n.id) === String(initialNoteId));
     if (target) {
       initialNoteLoadedRef.current = initialNoteId;
       if (target.noteSide) setNoteSide(target.noteSide);
       if (target.noteType) setNoteType(target.noteType);
       loadNote(target);
+      return;
     }
+    // Not in store yet (e.g. freshly auto-generated from a payment) — fetch directly
+    initialNoteLoadedRef.current = initialNoteId;
+    notesApi.getById(initialNoteId)
+      .then((fetched) => {
+        if (!fetched) return;
+        const n = fetched.data || fetched;
+        if (n.noteSide) setNoteSide(n.noteSide);
+        if (n.noteType) setNoteType(n.noteType);
+        loadNote(n);
+      })
+      .catch(() => { /* silently ignore */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialNoteId, bootLoading, notes]);
 

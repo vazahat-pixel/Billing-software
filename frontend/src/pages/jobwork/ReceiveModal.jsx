@@ -5,6 +5,7 @@ import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
+import JobWorkPrint from '../../components/print/JobWorkPrint';
 import { Plus, Trash2 } from 'lucide-react';
 
 const today = () => new Date().toISOString().substring(0, 10);
@@ -86,6 +87,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
    // Multi-row grid — one row per challan being received into this bill
    const [lines, setLines] = useState([blankLine()]);
 
+   const [printOpen, setPrintOpen] = useState(false);
    const [showLotDropdown, setShowLotDropdown] = useState(false);
    const [lookupTargetIdx, setLookupTargetIdx] = useState(null);
    const [dropdownSelectIdx, setDropdownSelectIdx] = useState(0);
@@ -523,6 +525,51 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
       const tds = Number(tdsAmt) || 0;
       return Math.round(net - tds);
    }, [computedNetAmt, tdsAmt]);
+
+   /**
+    * Job Card / Cutting Report sheet, built from the live grid rows and the header the
+    * operator is looking at. Shortage is the same Grey−Finish figure the grid derives, so
+    * the printed report cannot disagree with the screen.
+    */
+   const printData = useMemo(() => {
+      const rows = linesWithAmt.filter((l) => l.jobId || Number(l.greyMts) || Number(l.finishMts));
+      const partyName = (parties || []).find(
+         (p) => String(p._id || p.id) === String(selectedJobPartyId)
+      )?.name || '';
+      return {
+         millName: partyName,
+         weaver: rows[0]?.weaver || '',
+         quality: rows[0]?.itemName || '',
+         billGpNo,
+         chlnNo: rows[0]?.chlnNo || '',
+         lotNo: rows[0]?.lotNo || '',
+         serialNo,
+         lines: rows.map((l) => ({
+            greyMts: l.greyMts,
+            recMts: l.finishMts,
+            shortage: Math.max(0, Number(l.greyMts || 0) - Number(l.finishMts || 0)),
+            remark,
+            chekMts: '',
+            secondMts: '',
+            recDate: receiveDate,
+         })),
+         totalPcs: gridTotals.fPcs,
+         tpPcs: gridTotals.fPcs,
+         totalShortage: Math.max(0, gridTotals.greyMts - gridTotals.finishMts),
+         puRate: rows[0]?.jobRate || 0,
+         puAmt: computedGrossAmt,
+         gpRate: rows[0]?.jobRate || 0,
+         gpAmount: computedGrossAmt,
+      };
+   }, [linesWithAmt, parties, selectedJobPartyId, billGpNo, serialNo, remark, receiveDate, gridTotals, computedGrossAmt]);
+
+   const handlePrint = () => {
+      if (!printData.lines.length) {
+         notifyWarning('Nothing to print — add at least one challan line');
+         return;
+      }
+      setPrintOpen(true);
+   };
 
    const handleSubmit = async (e) => {
       e.preventDefault();
@@ -1187,7 +1234,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                               <div className="flex gap-1.5">
                                  <button type="button" className="px-4 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Close Bill</button>
                                  <button type="button" className="px-4 py-1 text-[11px] font-bold border border-red-400 text-red-700 bg-red-50 hover:bg-red-100 active:bg-red-200">Payment Entry</button>
-                                 <button type="button" className="px-4 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Print</button>
+                                 <button type="button" onClick={handlePrint} className="px-4 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Print</button>
                               </div>
                            </div>
 
@@ -1327,6 +1374,10 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                      </div>
                   </div>,
                   document.body
+               )}
+
+               {printOpen && (
+                  <JobWorkPrint variant="millReceive" data={printData} onClose={() => setPrintOpen(false)} />
                )}
 
             </div>

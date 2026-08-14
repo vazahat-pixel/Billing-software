@@ -109,9 +109,21 @@ class GstReturnService {
   /**
    * GSTR-1 — B2B, B2CL, B2CS, CDNR, HSN, docs
    */
-  async buildGstr1(companyId, period) {
+  /**
+   * @param {object} [range] Optional explicit {startDate, endDate} that overrides the
+   *   month derived from `period`. A GST RETURN is always filed for one month, so `period`
+   *   remains the filing identity (fp/version in the payload); this override exists only
+   *   so the on-screen report can honour an arbitrary From/To range the user picked.
+   *   Without it, a multi-month range silently collapsed to a single month on the sales
+   *   side while purchases used the full range — the two halves of the same report were
+   *   then measuring different windows.
+   */
+  async buildGstr1(companyId, period, range = null) {
     const cfg = await this._companyCtx(companyId);
-    const { startDate, endDate } = periodBounds(period);
+    const bounds = periodBounds(period);
+    const startDate = range?.startDate ? new Date(range.startDate) : bounds.startDate;
+    const endDate = range?.endDate ? new Date(range.endDate) : bounds.endDate;
+    if (range?.endDate) endDate.setHours(23, 59, 59, 999);
     const sales = await this._salesInPeriod(companyId, startDate, endDate);
     const cancelledSales = await this._cancelledSalesInPeriod(companyId, startDate, endDate);
     const returns = await this._returnsInPeriod(companyId, startDate, endDate);

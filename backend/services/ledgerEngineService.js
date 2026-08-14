@@ -117,25 +117,29 @@ class LedgerEngineService {
     };
 
     await Promise.all([
+      // Payment/Receipt: store raw bill numbers in remarks (no prefix — frontend adds it per-row)
       load(['Payment', 'Receipt'], 'PaymentVoucher',
         (d) => {
           const billNos = (d.againstInvoices || []).map((x) => x.invoiceNo).filter(Boolean).join(', ');
-          const billRemark = billNos ? `Bill No.: ${billNos}` : '';
           return {
             docNo: d.voucherNo,
             chequeNo: d.chequeNo || '',
-            remarks: billRemark || d.narration || d.remark2 || '',
+            // raw bill nos — frontend formats as "Bill No.:<nos>" for Payment/Receipt rows
+            remarks: billNos || d.narration || d.remark2 || '',
           };
         },
         'voucherNo chequeNo narration remark2 againstInvoices'),
+      // Sales: remark = just the invoice number; description will be SALES BOOK
       load(['SalesInvoice'], 'Sales',
-        (d) => ({ docNo: d.invoiceNo, remarks: d.narration || d.remarks || `Sales Invoice #${d.invoiceNo || ''}` }),
+        (d) => ({ docNo: d.invoiceNo, remarks: d.invoiceNo || d.narration || '' }),
         'invoiceNo narration remarks'),
+      // Purchase: remark = just the invoice number; description will be PURCHASE BOOK
       load(['PurchaseBill'], 'Purchase',
-        (d) => ({ docNo: d.invoiceNo, remarks: d.narration || d.remarks || `Purchase Bill #${d.invoiceNo || ''}` }),
+        (d) => ({ docNo: d.invoiceNo, remarks: d.invoiceNo || d.narration || '' }),
         'invoiceNo narration remarks'),
+      // Credit/Debit notes: remark = note number
       load(['DebitNote', 'CreditNote'], 'DebitCreditNote',
-        (d) => ({ docNo: d.vNo || d.noteNo, remarks: d.reason || d.narration || `${d.noteType} Note #${d.vNo || d.noteNo || ''}` }),
+        (d) => ({ docNo: d.vNo || d.noteNo, remarks: d.vNo || d.noteNo || d.reason || d.narration || '' }),
         'vNo noteNo noteType reason narration'),
     ]);
 
@@ -259,11 +263,25 @@ class LedgerEngineService {
           }
         } else {
           // Single contra line or Sales/Purchase bill — single row
-          const contraNames = oppositeLines.map((l) => l.ledgerName).filter(Boolean);
-          const contra = [...new Set(contraNames)].join(', ');
-
           if (line.type === 'Dr') current += line.amount;
           else current -= line.amount;
+
+          // Description (particulars): match reference software naming exactly
+          const vt = entry.voucherType || entry.refType || '';
+          let particulars;
+          if (vt === 'SalesInvoice' || vt === 'Sales') {
+            particulars = 'SALES BOOK';
+          } else if (vt === 'PurchaseBill' || vt === 'Purchase') {
+            particulars = 'PURCHASE BOOK';
+          } else if (vt === 'JobWorkCharges' || vt === 'JobWork') {
+            particulars = 'JOB WORK CHARGES';
+          } else {
+            // For Journal/Payment/Receipt with single contra — use the actual contra ledger name
+            const mainContra = oppositeLines[0];
+            particulars = mainContra?.ledgerName
+              ? mainContra.ledgerName.toUpperCase()
+              : (oppositeLines.map((l) => l.ledgerName).filter(Boolean).join(', ').toUpperCase() || vt.toUpperCase() || 'CONTRA A/C');
+          }
 
           statement.push({
             _id: entry._id,
@@ -274,10 +292,10 @@ class LedgerEngineService {
             remarks: src.remarks || '',
             voucherType: entry.voucherType,
             narration: line.narration || entry.narration || '',
-            particulars: contra || (entry.voucherType === 'Sales' ? 'SALES BOOK' : entry.voucherType === 'Purchase' ? 'PURCHASE BOOK' : entry.refType || ''),
-            contraAccount: contra,
-            debit: line.type === 'Dr' ? line.amount : 0,
-            credit: line.type === 'Cr' ? line.amount : 0,
+            particulars,
+            contraAccount: particulars,
+            debit: line.type === 'Dr' ? round2(line.amount) : 0,
+            credit: line.type === 'Cr' ? round2(line.amount) : 0,
             runningBalance: round2(Math.abs(current)),
             balanceType: current >= 0 ? 'Dr' : 'Cr',
             refType: entry.refType,

@@ -62,6 +62,7 @@ export const returnsApi = {
 
 export const notesApi = {
   list: (params) => unwrap(get('/notes', params)).then((d) => asArray(d, ['notes'])),
+  getById: (id) => unwrap(get(`/notes/${id}`)),
   create: (body) => unwrap(post('/notes', body)),
   /** Edit re-posts atomically on the backend (reverse + repost), keeping the note number. */
   update: (id, body) => unwrap(put(`/notes/${id}`, body)),

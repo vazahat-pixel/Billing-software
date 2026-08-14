@@ -28,6 +28,12 @@ import PcsBreakdownModal from '../sales/PcsBreakdownModal';
 const today = () => new Date().toISOString().split('T')[0];
 const DEFAULT_UNITS = ['PCS', 'KGS', 'NETQTY', 'QTY'];
 
+// Fold Less/Add (the % adjustment entered in the Fold cell) applies to Qty- AND Pcs-billed
+// lines — matching the reference software, where a piece-billed item (e.g. a garment) gets
+// the same Fold-based Less/Add treatment as a Qty-billed one. NetQty uses its own, separate
+// fold-DEDUCTION formula below and is not part of this set.
+const FOLD_LESS_ADD_UNITS = ['QTY', 'PCS'];
+
 const blankLine = () => ({
   id: Date.now(),
   itemId: '',
@@ -199,7 +205,7 @@ const PurchaseModal = ({
     const qty = lineQty({ ...row, pcs, mts });
     const unit = String(row.unit || 'MTRS').toUpperCase();
     const isNetQty = unit === 'NETQTY';
-    const isQty = unit === 'QTY';
+    const isQty = FOLD_LESS_ADD_UNITS.includes(unit);
 
     // Step 1: Gross amount from qty × rate
     const grossAmt = qty > 0 && rate > 0 ? Number((qty * rate).toFixed(2)) : Number(row.amount || 0);
@@ -215,7 +221,7 @@ const PurchaseModal = ({
       baseAmt = Number((grossAmt - foldDeductionAmt).toFixed(2));
     }
 
-    // Step 2b (QTY unit only): Fold Less / Fold Add
+    // Step 2b (Qty/Pcs units): Fold Less / Fold Add
     if (isQty && !row._amountManual) {
       const fold = Number(row.fold ?? 100);
       if (fold < 100) {
@@ -464,7 +470,7 @@ const PurchaseModal = ({
       linesGst = money(linesGst + money(item.gstAmt));
 
       const unit = String(item.unit || 'MTRS').toUpperCase();
-      const isQty = unit === 'QTY';
+      const isQty = FOLD_LESS_ADD_UNITS.includes(unit);
       let rowBase = money(item.amount);
       if (isQty) {
         rowBase = money(rowBase - money(item.foldLessAmt) + money(item.foldAddAmt));
@@ -557,7 +563,7 @@ const PurchaseModal = ({
     
     gridItems.forEach(item => {
       const u = String(item.unit || '').toUpperCase();
-      if (u === 'QTY') {
+      if (FOLD_LESS_ADD_UNITS.includes(u)) {
         totalFoldLess += Number(item.foldLessAmt || 0);
         totalFoldAdd += Number(item.foldAddAmt || 0);
       }
@@ -707,7 +713,10 @@ const PurchaseModal = ({
           mts: Number(r.mts || 0),
           rate: Number(r.rate || 0),
           amount: Number(r.amount || 0),
-          gstPer: Number(r.gstPer || 5),
+          // Use the rate actually parsed off the supplier's bill; default to 0 (no GST)
+          // rather than assuming 5% — guessing a rate the scanned bill never showed puts
+          // tax on the invoice that the supplier did not charge.
+          gstPer: Number(r.gstPer || 0),
           gstAmt: Number(r.gstAmt || 0),
         }))
       );
@@ -787,8 +796,12 @@ const PurchaseModal = ({
           dis2Per: Number(i.dis2Per || 0),
           dis2Amt: Number(i.dis2Amt || 0),
           addAmt: Number(i.addAmt || 0),
-          gstPer: Number(i.gstPer || 0),
-          gstAmt: Number(i.gstAmt || 0),
+          // Unregistered supplier: no GST on the bill at all. The header totals and the
+          // server both force this to 0 already, so the per-line figures must match —
+          // otherwise the saved lines claim tax that the bill itself doesn't carry, and
+          // any line-level GST report would double-count against a zero-GST invoice.
+          gstPer: calculations.isUnregistered ? 0 : Number(i.gstPer || 0),
+          gstAmt: calculations.isUnregistered ? 0 : Number(i.gstAmt || 0),
           pcsDetails: Array.isArray(i.pcsDetails) ? i.pcsDetails : [],
         })),
         taxableAmount: calculations.taxable,
@@ -956,7 +969,13 @@ const PurchaseModal = ({
       cut: Number(item?.cut || gridItems[idx].cut || 0),
       rate: item?.purRate || item?.purchaseRate || 0,
       unit: String(item?.unit || 'MTRS').toUpperCase(),
-      gstPer: Number(item?.gstRate || 0),
+      // GST% is deliberately NOT auto-filled from the item master on a purchase bill.
+      // A supplier bill carries whatever tax the SUPPLIER charged, which is a property of
+      // that bill — not of our item master — and it is commonly nil (unregistered,
+      // composition, exempt/nil-rated). Auto-applying the item's rate silently added tax
+      // to every purchase with no way to decline it. The operator types the rate when the
+      // bill actually has one, matching the reference ERP.
+      // (To restore auto-fill, set: gstPer: Number(item?.gstRate || 0))
     }, 'itemId');
   };
 
@@ -1154,6 +1173,12 @@ const PurchaseModal = ({
                       <select className="classic-erp-select" value={header.type} onChange={e => setHeader({ ...header, type: e.target.value })} disabled={locked}>
                         <option value="INVOICE IN STATE">INVOICE IN STATE</option>
                         <option value="INVOICE OUT OF STATE">INVOICE OUT OF STATE</option>
+                        {/* Unregistered supplier — no GST is charged on the bill. The
+                            calculations memo already zeroes GST for any type matching
+                            /UNREGISTERED/, but without these options that branch was
+                            unreachable from the UI. */}
+                        <option value="UNREGISTERED INVOICE (IN STATE)">UNREGISTERED INVOICE (IN STATE)</option>
+                        <option value="UNREGISTERED INVOICE (OUT OF STATE)">UNREGISTERED INVOICE (OUT OF STATE)</option>
                       </select>
                     </div>
                   </div>
@@ -1212,7 +1237,7 @@ const PurchaseModal = ({
                         </td>
                         <td className="col-num">
                           <input type="number" className="classic-erp-input w-full text-center border-0" value={row.fold || ''} onChange={e => patchLine(idx, { fold: Number(e.target.value) })} disabled={locked} />
-                          {String(row.unit || '').toUpperCase() === 'QTY' && (row.foldLessAmt || 0) > 0 && (
+                          {FOLD_LESS_ADD_UNITS.includes(String(row.unit || '').toUpperCase()) && (row.foldLessAmt || 0) > 0 && (
                             <span
                               className="block text-center font-mono leading-none"
                               style={{ fontSize: 9, color: '#c2410c', paddingTop: 1 }}
@@ -1221,7 +1246,7 @@ const PurchaseModal = ({
                               less {(row.foldLessAmt || 0).toFixed(2)}
                             </span>
                           )}
-                          {String(row.unit || '').toUpperCase() === 'QTY' && (row.foldAddAmt || 0) > 0 && (
+                          {FOLD_LESS_ADD_UNITS.includes(String(row.unit || '').toUpperCase()) && (row.foldAddAmt || 0) > 0 && (
                             <span
                               className="block text-center font-mono leading-none"
                               style={{ fontSize: 9, color: '#16a34a', paddingTop: 1 }}
@@ -1318,10 +1343,10 @@ const PurchaseModal = ({
                           <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0" value={row.addAmt || ''} onChange={e => patchLine(idx, { addAmt: Number(e.target.value) })} disabled={locked} />
                         </td>
                         <td className="col-pct">
-                          <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.gstPer || ''} onChange={e => patchLine(idx, { gstPer: Number(e.target.value) })} disabled={locked} />
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={calculations.isUnregistered ? 0 : (row.gstPer || '')} onChange={e => patchLine(idx, { gstPer: Number(e.target.value) })} disabled={locked || calculations.isUnregistered} title={calculations.isUnregistered ? 'No GST on an unregistered-supplier bill' : undefined} />
                         </td>
                         <td className="col-amt">
-                          <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono font-bold text-blue-800" value={row.gstAmt || ''} onChange={e => patchLine(idx, { gstAmt: Number(e.target.value) })} disabled={locked} />
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono font-bold text-blue-800" value={calculations.isUnregistered ? 0 : (row.gstAmt || '')} onChange={e => patchLine(idx, { gstAmt: Number(e.target.value) })} disabled={locked || calculations.isUnregistered} title={calculations.isUnregistered ? 'No GST on an unregistered-supplier bill' : undefined} />
                         </td>
                         <td className="col-del text-center">
                           <button type="button" onClick={() => {
@@ -1397,7 +1422,11 @@ const PurchaseModal = ({
                       <span className="classic-erp-label text-slate-800">Taxable Amt:</span>
                       <span className="font-mono text-black shrink-0">₹{calculations.taxable.toFixed(2)}</span>
                     </div>
-                    {header.type === 'INVOICE IN STATE' ? (
+                    {/* Intra-state shows the CGST/SGST pair, inter-state shows IGST. Keyed off
+                        the same isOutOfState test the totals use — an exact match on
+                        'INVOICE IN STATE' would wrongly show IGST for the UNREGISTERED
+                        (IN STATE) type, which is still an intra-state bill. */}
+                    {!calculations.isOutOfState ? (
                       <>
                         <div className="classic-erp-total-row font-bold">
                           <span className="classic-erp-label text-slate-800">CGST:</span>

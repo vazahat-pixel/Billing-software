@@ -5,6 +5,7 @@ import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
 import { toast } from '../../store/useToastStore';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
+import JobWorkPrint from '../../components/print/JobWorkPrint';
 import { Plus, Trash2 } from 'lucide-react';
 import {
   blankLine,
@@ -64,6 +65,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
 
   const [mode, setMode] = useState('Add');
   const [findOpen, setFindOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
   const [selectedReceiptId, setSelectedReceiptId] = useState('');
   const [header, setHeader] = useState(emptyHeader(selectedBook));
   const [footer, setFooter] = useState(emptyFooter());
@@ -409,9 +411,39 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
   };
 
   const handleDelete = () => toast.warning('Delete from admin / reverse receive flow');
+  /**
+   * Build the print payload from the SAME state the form is rendering — header, the live
+   * `lines`, and the already-computed `calc` totals — so the sheet can never disagree with
+   * what is on screen. Nothing is re-derived or re-fetched here.
+   */
+  const printData = useMemo(() => {
+    const rows = (calc.linesWithAmt || lines || []).filter(
+      (l) => l.itemName || Number(l.recPcs) || Number(l.recMts) || Number(l.jobAmt)
+    );
+    return {
+      book: header.book,
+      partyName: partyOptions.find((p) => String(p.value) === String(header.partyId))?.label || '',
+      broker: header.broker,
+      serialNo: header.serialNo,
+      billChNo: header.billChNo,
+      date: header.date,
+      lines: rows,
+      totalPcs: rows.reduce((s, l) => Number(s) + (Number(l.recPcs) || 0), 0),
+      totalQty: rows.reduce((s, l) => Number(s) + (Number(l.recMts) || 0), 0),
+      gross: calc.gross,
+      addAmt: footer.addAmt,
+      lessAmt: footer.lessAmt,
+      otherLess: (Number(footer.otherLess1Amt) || 0) + (Number(footer.otherLess2Amt) || 0),
+      tdsPercent: footer.tdsPercent,
+      tdsAmt: calc.tdsAmt,
+      final: calc.final,
+      remark: footer.remark,
+    };
+  }, [calc, lines, header, footer, partyOptions]);
+
   const handlePrint = () => {
-    if (!selectedReceiptId) return toast.warning('Find a receipt to print');
-    toast.info('Print preview — coming soon');
+    if (!printData.lines.length) return toast.warning('Nothing to print — add at least one receipt line');
+    setPrintOpen(true);
   };
 
   const gridCols = [
@@ -1049,6 +1081,10 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null }) => {
       partyName={header.partyId ? partyOptions.find((p) => String(p.value) === String(header.partyId))?.label : ''}
       onSelect={handleLotSelect}
     />
+
+    {printOpen && (
+      <JobWorkPrint variant="jobReceive" data={printData} onClose={() => setPrintOpen(false)} />
+    )}
     </>
   );
 };

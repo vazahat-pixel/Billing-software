@@ -70,13 +70,34 @@ function recalcPurchaseTotals(items = [], {
   // Unregistered-dealer purchase — no GST is charged on the bill (rate forced to 0).
   const isUnregistered = /UNREGISTERED/i.test(extras.invoiceType || '');
 
-  // Prefer per-line rates when present; else invoice-level rate
-  const rates = mapped.map((it) => Number(it.gstRate || it.itemId?.gstRate || gstRate)).filter((r) => r > 0);
+  // Per-line GST rate, honouring what the operator actually typed.
+  //
+  // Two bugs lived here:
+  //   1. Only `gstRate` was read, but PurchaseModal sends the rate as `gstPer` — so every
+  //      per-line rate the user entered was silently ignored and the invoice-level
+  //      fallback (default 5) was applied instead.
+  //   2. `it.gstRate || …` treats an explicit 0 as "missing" and falls through to that
+  //      same 5% fallback, making a genuinely zero-GST purchase impossible to record.
+  // A stated 0 is a real answer ("this bill carries no GST"), not an absent one.
+  const lineRate = (it) => {
+    const raw = [it.gstPer, it.gstRate, it.itemId?.gstRate]
+      .find((v) => v !== undefined && v !== null && v !== '');
+    return raw === undefined ? null : Number(raw) || 0;
+  };
+
+  const statedRates = mapped.map(lineRate).filter((r) => r !== null);
+  const positiveRates = statedRates.filter((r) => r > 0);
+
   const effectiveRate = isUnregistered
     ? 0
-    : rates.length
-      ? Number((rates.reduce((a, b) => a + b, 0) / rates.length).toFixed(2))
-      : Number(gstRate);
+    : positiveRates.length
+      // Mixed/positive rates: average them, as before.
+      ? Number((positiveRates.reduce((a, b) => a + b, 0) / positiveRates.length).toFixed(2))
+      : statedRates.length
+        // Every line explicitly said 0 → the bill genuinely carries no GST.
+        ? 0
+        // Nothing stated at all (legacy/partial payload) → invoice-level fallback.
+        : Number(gstRate);
 
   const resolvedType = determineGstType({
     companyGstin,

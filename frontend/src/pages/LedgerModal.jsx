@@ -80,10 +80,22 @@ const rowDescriptionClean = (r) => {
 
 const rowRemark1Clean = (r) => {
   if (r.remark1) return r.remark1;
-  if (r.remarks) return r.remarks;
-  if (r.narration) return r.narration;
+  const remarks = String(r.remarks || '').trim();
+  const rt = String(r.refType || r.voucherType || '').toLowerCase();
+  if (remarks) {
+    // Payment/Receipt: backend sends raw bill numbers — add prefix to match reference format
+    if (rt === 'payment' || rt === 'receipt') return `Bill No.:${remarks}`;
+    // Sales/Purchase: remarks is the invoice/bill number directly
+    if (rt === 'salesinvoice' || rt === 'sales') return remarks;
+    if (rt === 'purchasebill' || rt === 'purchase') return remarks;
+    // Notes: show the note number
+    if (rt === 'debitnote' || rt === 'creditnote') return remarks;
+    return remarks;
+  }
   if (r.billVoucherNo || r.voucherNo) {
-    return `Bill No.:${r.billVoucherNo || r.voucherNo}`;
+    const no = r.billVoucherNo || r.voucherNo;
+    if (rt === 'payment' || rt === 'receipt') return `Bill No.:${no}`;
+    return no;
   }
   return '—';
 };
@@ -154,10 +166,8 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
   const {
     ledgers,
     parties,
-    jobWorkEntries,
     fetchLedgers,
     fetchParties,
-    fetchJobs,
     fetchLedgerStatement,
     currentLedgerStatement,
     loading,
@@ -204,7 +214,6 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     if (!isOpen) return;
     fetchLedgers().catch(() => {});
     fetchParties().catch(() => {});
-    fetchJobs().catch(() => {});
     setView('entry');
     setLedgerId('');
     setAccHead('');
@@ -213,7 +222,7 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     setFrom(fyStartISO());
     setTo(todayISO());
     setCheckedRows(new Set());
-  }, [isOpen, fetchLedgers, fetchParties, fetchJobs]);
+  }, [isOpen, fetchLedgers, fetchParties]);
 
   const ledgerOptions = useMemo(() => {
     const map = new Map();
@@ -381,55 +390,8 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
 
   const partyId = partyInfo ? String(partyInfo._id || partyInfo.id) : '';
 
-  const materialRows = useMemo(() => {
-    if (!partyId) return [];
-    const fromDate = from ? new Date(from) : null;
-    const toDate = to ? new Date(`${to}T23:59:59.999`) : null;
-    return (jobWorkEntries || [])
-      .filter((j) => String(j.workerId?._id || j.workerId || '') === partyId)
-      .filter((j) => {
-        const d = new Date(j.issueDate || j.createdAt);
-        if (fromDate && d < fromDate) return false;
-        if (toDate && d > toDate) return false;
-        return true;
-      })
-      .map((j) => {
-        const issued = Number(j.issueQty || 0);
-        const received = Number(j.receivedQty || 0);
-        const wastage = Number(j.wastage || 0);
-        const isReceived = j.status === 'Received';
-        const itemName = j.lotId?.itemName || j.lotId?.itemId?.name || '';
-        return {
-          _material: true,
-          date: isReceived ? (j.receiveDate || j.issueDate) : j.issueDate,
-          billVoucherNo: j.jobCardNo || j.challanNo || '',
-          voucherType: isReceived ? 'Job Receive' : 'Job Issue',
-          particulars: isReceived
-            ? `[Material] Job Receive — ${itemName ? itemName + ' — ' : ''}Issued ${issued.toFixed(2)} / Received ${received.toFixed(2)}${wastage > 0 ? ` / Wastage ${wastage.toFixed(2)}` : ''}`
-            : `[Material] Job Issue — ${itemName ? itemName + ' — ' : ''}${issued.toFixed(2)} mts sent (${j.processType || 'Process'})`,
-          debit: 0,
-          credit: 0,
-          refType: isReceived ? 'JobReceive' : 'JobIssue',
-          refId: j._id,
-        };
-      });
-  }, [jobWorkEntries, partyId, from, to]);
+  const mergedRows = rows; // only financial journal rows — material movements excluded
 
-  const mergedRows = useMemo(() => {
-    if (materialRows.length === 0) return rows;
-    const combined = [...rows.map((r) => ({ ...r, _material: false })), ...materialRows];
-    combined.sort((a, b) => new Date(a.date) - new Date(b.date));
-    let lastBal = 0;
-    let lastType = 'Dr';
-    return combined.map((r) => {
-      if (!r._material) {
-        lastBal = r.runningBalance ?? r.balance ?? lastBal;
-        lastType = r.balanceType || lastType;
-        return r;
-      }
-      return { ...r, runningBalance: lastBal, balanceType: lastType };
-    });
-  }, [rows, materialRows]);
 
   const rowDescription = (r) =>
     String(r.particulars || r.narration || r.contraAccount || r.refType || '');
@@ -905,14 +867,21 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
                         const desc = rowDescriptionClean(row);
                         const remark1 = rowRemark1Clean(row);
                         const audit = rowAuditMark(row);
-                        const isMaterial = !!row._material;
+                        const rowVt = String(row.voucherType || row.refType || '').toLowerCase();
+                        const rowTypeClass = rowVt.includes('sale') ? 'ledger-row-sales'
+                          : rowVt.includes('purchase') ? 'ledger-row-purchase'
+                          : rowVt.includes('payment') ? 'ledger-row-payment'
+                          : rowVt.includes('receipt') ? 'ledger-row-receipt'
+                          : rowVt.includes('journal') ? 'ledger-row-journal'
+                          : rowVt.includes('job') ? 'ledger-row-job'
+                          : '';
                         return (
                           <tr
                             key={`${rowKey}-${i}`}
-                            className={`${i === activeRow ? 'is-selected' : ''} ${isMaterial ? 'ledger-material-row' : ''}`}
+                            className={`${i === activeRow ? 'is-selected' : ''} ${rowTypeClass}`}
                             onClick={() => setSelectedRow(i)}
                             onDoubleClick={() => handleRowOpen(row)}
-                            title={isMaterial ? 'Material movement — no money impact on this ledger' : 'Press Enter or double-click to open form for editing'}
+                            title="Press Enter or double-click to open form for editing"
                           >
                             <td className="text-center" onClick={(e) => e.stopPropagation()}>
                               <input
@@ -1181,9 +1150,13 @@ const ledgerStyles = `
   .ledger-stmt-table tbody tr.is-selected td { background: #0066cc !important; color: #ffffff !important; font-weight: 600; }
   .ledger-stmt-table tbody tr.is-selected input[type="checkbox"] { accent-color: #ffffff; }
   .ledger-stmt-table tbody tr { cursor: pointer; }
-  .ledger-stmt-table tbody tr.ledger-material-row td { background: #ecfdf5 !important; color: #065f46; font-style: italic; }
-  .ledger-stmt-table tbody tr.ledger-material-row:hover td { background: #a7f3d0 !important; color: #064e3b !important; }
-  .ledger-stmt-table tbody tr.ledger-material-row.is-selected td { background: #059669 !important; color: #fff !important; font-style: normal; }
+  /* Transaction-type row coloring — matches reference software color coding */
+  .ledger-stmt-table tbody tr.ledger-row-sales td { color: #1d4ed8; }
+  .ledger-stmt-table tbody tr.ledger-row-purchase td { color: #92400e; }
+  .ledger-stmt-table tbody tr.ledger-row-receipt td { color: #065f46; }
+  .ledger-stmt-table tbody tr.ledger-row-payment td { color: #7c2d12; }
+  .ledger-stmt-table tbody tr.ledger-row-journal td { color: #581c87; }
+  .ledger-stmt-table tbody tr.ledger-row-job td { color: #0f4c4c; }
   .ledger-address-bar {
     display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
     padding: 4px 10px; font-size: 11px; color: #1e293b;

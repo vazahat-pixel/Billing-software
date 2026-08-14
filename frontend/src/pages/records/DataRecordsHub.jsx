@@ -12,6 +12,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import SalesPrint from '../sales/SalesPrint';
 import PurchasePrint from '../purchase/PurchasePrint';
+import ListPrint from '../../components/print/ListPrint';
+import JobWorkPrint from '../../components/print/JobWorkPrint';
 import { EmptyStateSVG } from '../../components/ui/Illustrations';
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-IN') : '—');
@@ -32,6 +34,7 @@ const RECORD_SECTIONS = [
   { id: 'sales', label: 'Sales Invoices', group: 'Transaction', icon: faFileInvoiceDollar },
   { id: 'purchases', label: 'Purchase Bills', group: 'Transaction', icon: faCartFlatbed },
   { id: 'millIssue', label: 'Mill Issue', group: 'Transaction', icon: faTruckArrowRight },
+  { id: 'millReceive', label: 'Mill Receive', group: 'Transaction', icon: faWarehouse },
   { id: 'receipts', label: 'Bank Receipts', group: 'Transaction', icon: faMoneyCheckDollar },
   { id: 'payments', label: 'Bank Payments', group: 'Transaction', icon: faHandHoldingDollar },
   { id: 'salesOrders', label: 'Sales Orders', group: 'Transaction', icon: faClipboardList },
@@ -43,6 +46,70 @@ const RECORD_SECTIONS = [
 ];
 
 const GROUPS = ['Master', 'Inventory', 'Transaction'];
+
+/**
+ * Map a SAVED Job record onto the shape JobWorkPrint expects. Mill Issue and Mill Receive
+ * are two views of the same Job document — issuing creates it, receiving updates it — so
+ * both sheets are built from one record here, using only fields the record actually
+ * carries (nothing is invented to fill the reference layout).
+ */
+const buildJobPrintData = (job, variant, parties) => {
+  if (!job) return null;
+  const worker = job.workerId && typeof job.workerId === 'object' ? job.workerId : null;
+  const millName = worker?.name || resolveName(job.workerId, parties);
+  const gstin = worker?.gstin || '';
+  const itemName =
+    job.lotId?.itemId?.name || job.lotId?.itemName || job.itemName || '';
+
+  if (variant === 'millReceive') {
+    const issued = Number(job.issueQty || 0);
+    const received = Number(job.receivedQty || 0);
+    return {
+      millName,
+      weaver: job.weaver || '',
+      quality: itemName,
+      billGpNo: job.billGpNo || '',
+      chlnNo: job.challanNo || job.jobCardNo || '',
+      lotNo: job.lotId?.lotId || '',
+      serialNo: job.jobCardNo || '',
+      lines: [{
+        greyMts: issued,
+        recMts: received,
+        shortage: Math.max(0, issued - received),
+        remark: job.remark || '',
+        chekMts: '',
+        secondMts: '',
+        recDate: job.receiveDate || job.issueDate,
+      }],
+      totalPcs: job.receivedPcs || 0,
+      tpPcs: job.issuePcs || 0,
+      totalShortage: Math.max(0, issued - received),
+      puRate: job.purchaseRate || 0,
+      puAmt: Number(job.purchaseRate || 0) * issued,
+      gpRate: job.jobRate || 0,
+      gpAmount: Number(job.processCharges || 0),
+    };
+  }
+
+  return {
+    millName,
+    millGstin: gstin,
+    millStateCode: worker?.stateCode || (gstin ? String(gstin).slice(0, 2) : ''),
+    challanNo: job.challanNo || job.jobCardNo || '',
+    date: job.issueDate,
+    puBillNo: job.purchaseBillNo || '',
+    itemName,
+    hsnCd: '',
+    weaver: job.weaver || '',
+    procType: job.processType || 'Process',
+    takas: [],
+    totalTaka: job.issuePcs || 0,
+    totalMts: job.issueQty || 0,
+    taxableAmt: 0,
+    rate: job.jobRate || 0,
+    remark: job.remark || '',
+  };
+};
 
 const StatusBadge = ({ status }) => {
   const s = (status || 'active').toLowerCase();
@@ -116,6 +183,8 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [printSalesId, setPrintSalesId] = useState(null);
   const [printPurchaseId, setPrintPurchaseId] = useState(null);
+  const [printListOpen, setPrintListOpen] = useState(false);
+  const [printJob, setPrintJob] = useState(null); // { job, variant }
 
   useEffect(() => {
     if (isOpen) {
@@ -139,6 +208,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
     sales: sales.length,
     purchases: purchases.length,
     millIssue: jobWorkEntries.length,
+    millReceive: jobWorkEntries.filter(j => Number(j.receivedQty || 0) > 0 || j.receiveDate).length,
     receipts: vouchers.filter(v => v.voucherType === 'Receipt').length,
     payments: vouchers.filter(v => v.voucherType === 'Payment').length,
     salesOrders: orders.filter(o => o.orderType === 'Sales').length,
@@ -307,11 +377,48 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             { key: 'issueQty', label: 'Issued Qty', align: 'right', render: r => `${r.issueQty || 0} Mtrs` },
             { key: 'receivedQty', label: 'Received', align: 'right', render: r => `${r.receivedQty || 0} Mtrs` },
             { key: 'status', label: 'Status', align: 'center', render: r => <StatusBadge status={r.status} /> },
+            { key: 'actions', label: '', align: 'center', render: r => (
+                <button type="button" onClick={() => setPrintJob({ job: r, variant: 'millIssue' })} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="Print Mill Challan">
+                  <FontAwesomeIcon icon={faPrint} />
+                </button>
+            ) },
           ],
           rows: jobWorkEntries.filter(j =>
             filterText(j.jobCardNo) || filterText(resolveName(j.workerId, parties)) || filterText(j.processType)
           ).map(j => ({ ...j, _key: j._id, process: j.processType })),
           emptyText: 'No mill issues. Create from Transaction → Mill Issue.',
+        };
+
+      /**
+       * Receiving does not create its own document — receiveFromMill updates the SAME Job
+       * record the issue created (receivedQty / receiveDate / status). So this is the issue
+       * register filtered to cards that have something back, not a separate collection.
+       */
+      case 'millReceive':
+        return {
+          title: 'Mill Receive List',
+          subtitle: `${counts.millReceive} received / partial job cards`,
+          columns: [
+            { key: 'recDate', label: 'Rec. Date', render: r => fmtDate(r.receiveDate || r.issueDate) },
+            { key: 'jobCardNo', label: 'Job Card', render: r => <span className="font-bold uppercase">{r.jobCardNo}</span> },
+            { key: 'billGpNo', label: 'Bill / GP No' },
+            { key: 'worker', label: 'Mill / Worker', render: r => resolveName(r.workerId, parties) },
+            { key: 'issueQty', label: 'Issued', align: 'right', render: r => `${r.issueQty || 0} Mtrs` },
+            { key: 'receivedQty', label: 'Received', align: 'right', render: r => `${r.receivedQty || 0} Mtrs` },
+            { key: 'pending', label: 'Pending', align: 'right', render: r => `${Math.max(0, Number(r.issueQty || 0) - Number(r.receivedQty || 0)).toFixed(2)} Mtrs` },
+            { key: 'wastage', label: 'Wastage', align: 'right', render: r => `${r.wastage || 0} Mtrs` },
+            { key: 'status', label: 'Status', align: 'center', render: r => <StatusBadge status={r.status} /> },
+            { key: 'actions', label: '', align: 'center', render: r => (
+                <button type="button" onClick={() => setPrintJob({ job: r, variant: 'millReceive' })} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="Print Job Card / Receive Report">
+                  <FontAwesomeIcon icon={faPrint} />
+                </button>
+            ) },
+          ],
+          rows: jobWorkEntries.filter(j => Number(j.receivedQty || 0) > 0 || j.receiveDate)
+            .filter(j =>
+              filterText(j.jobCardNo) || filterText(resolveName(j.workerId, parties)) || filterText(j.billGpNo)
+            ).map(j => ({ ...j, _key: j._id })),
+          emptyText: 'Nothing received yet. Receive against a challan from Transaction → Mill Receive.',
         };
 
       case 'receipts':
@@ -535,6 +642,17 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
                   className="pl-8 pr-3 h-8 w-48 rounded-lg border border-[var(--border)] text-[12px] outline-none focus:border-[var(--accent)]"
                 />
               </div>
+              {/* Prints the list exactly as shown — current tab, current search filter. */}
+              <button
+                type="button"
+                onClick={() => setPrintListOpen(true)}
+                disabled={loading}
+                title={`Print ${tableConfig.title}`}
+                className="erp-btn erp-btn-secondary h-8 px-3 text-[11px] flex items-center gap-1.5"
+              >
+                <FontAwesomeIcon icon={faPrint} className="text-[10px]" />
+                Print
+              </button>
               <button
                 type="button"
                 onClick={handleRefresh}
@@ -558,6 +676,22 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
       </div>
       {printSalesId && <SalesPrint invoiceId={printSalesId} onClose={() => setPrintSalesId(null)} />}
       {printPurchaseId && <PurchasePrint invoiceId={printPurchaseId} onClose={() => setPrintPurchaseId(null)} />}
+      {printListOpen && (
+        <ListPrint
+          title={tableConfig.title}
+          subtitle={tableConfig.subtitle}
+          columns={tableConfig.columns}
+          rows={tableConfig.rows}
+          onClose={() => setPrintListOpen(false)}
+        />
+      )}
+      {printJob && (
+        <JobWorkPrint
+          variant={printJob.variant}
+          data={buildJobPrintData(printJob.job, printJob.variant, parties)}
+          onClose={() => setPrintJob(null)}
+        />
+      )}
     </Modal>
   );
 };

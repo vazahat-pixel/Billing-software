@@ -9,7 +9,14 @@ class GstService {
     const { periodKey } = require('../utils/gstDetermination');
     const gstReturnService = require('./gstReturnService');
     const period = startDate ? periodKey(new Date(startDate)) : periodKey();
-    const built = await gstReturnService.buildGstr1(companyId, period);
+    // Honour the caller's actual From/To window. Previously endDate was dropped and the
+    // sales side was clamped to the single month containing startDate, while getGstr2
+    // below used the full range — so any multi-month query compared different periods.
+    const built = await gstReturnService.buildGstr1(
+      companyId,
+      period,
+      startDate || endDate ? { startDate, endDate } : null
+    );
 
     // Flatten for CA dashboard / legacy consumers
     const invoices = [];
@@ -96,16 +103,16 @@ class GstService {
       }).populate('partyLedgerId', 'name').lean()
     ]);
 
-    let outwardTaxable = 0;
-    let outwardCgst = 0;
-    let outwardSgst = 0;
-    let outwardIgst = 0;
-    (gstr1.invoices || []).forEach((inv) => {
-      outwardTaxable += inv.taxable || 0;
-      outwardCgst += inv.cgst || 0;
-      outwardSgst += inv.sgst || 0;
-      outwardIgst += inv.igst || 0;
-    });
+    // Outward totals come from gstr1.totals, which buildGstr1 computes across EVERY
+    // section (B2B + B2CL + B2CS). The flattened `invoices` array below carries B2B rows
+    // only — summing that instead reported ₹0 outward for a business selling purely to
+    // unregistered customers, which understated the liability and made GSTR-3B show a
+    // net ITC credit instead of tax payable.
+    const g1Totals = gstr1.totals || {};
+    const outwardTaxable = Number(g1Totals.taxable || 0);
+    const outwardCgst = Number(g1Totals.cgst || 0);
+    const outwardSgst = Number(g1Totals.sgst || 0);
+    const outwardIgst = Number(g1Totals.igst || 0);
 
     let inwardTaxable = 0;
     let itcCgst = 0;
@@ -152,7 +159,8 @@ class GstService {
       },
       period: { startDate: startDate || null, endDate: endDate || null, fp: gstr1.fp },
       summary: {
-        salesCount: (gstr1.invoices || []).length,
+        // Same reason as the outward totals above — invoiceCount spans all sections.
+        salesCount: Number(g1Totals.invoiceCount || (gstr1.invoices || []).length),
         purchaseCount: gstr2.length,
         b2bCount: (gstr1.b2b || []).length,
         b2clCount: (gstr1.b2cl || []).length,
