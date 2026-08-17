@@ -11,13 +11,30 @@ export const downloadCsv = (filename, headers, rows) => {
     headers.map(escape).join(','),
     ...rows.map((row) => row.map(escape).join(','))
   ];
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  // Add \uFEFF UTF-8 BOM so Microsoft Excel opens it directly with correct encoding
+  const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename;
+  a.download = filename.endsWith('.csv') ? filename : `${filename}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+};
+
+export const exportTableToExcel = (filename, columns, rows) => {
+  const headers = columns.map((c) => (typeof c === 'string' ? c : c.label || c.key || ''));
+  const body = rows.map((r) =>
+    columns.map((c) => {
+      const key = typeof c === 'string' ? c : c.key;
+      const val = r[key];
+      if (c.render && typeof c.render === 'function') {
+        const res = c.render(r);
+        if (typeof res === 'string' || typeof res === 'number') return res;
+      }
+      return val ?? '';
+    })
+  );
+  downloadCsv(filename.endsWith('.csv') ? filename : `${filename}.csv`, headers, body);
 };
 
 export const getMonthRange = (monthStr) => {
@@ -32,3 +49,4 @@ export const getMonthRange = (monthStr) => {
 
 export const fmtAmt = (n) => (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 export const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-IN') : '—');
+

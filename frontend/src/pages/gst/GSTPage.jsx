@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import useStore from '../../store/useStore';
 import { downloadJson, getMonthDateRange, buildGstr1Filename } from '../../utils/gstExport';
+import { downloadCsv } from '../../utils/reportExport';
 import { FileText, Download, TrendingUp, TrendingDown, Landmark, PieChart, ArrowRight } from 'lucide-react';
 import { notifyError } from '../../utils/notify';
 
@@ -21,9 +22,24 @@ const GSTPage = () => {
     }
   };
 
+  const handleExcelExport = () => {
+    const headers = ['Audit Ref', 'Date', 'GSTIN', 'Taxable Subtotal', 'CGST', 'SGST', 'IGST', 'Invoice Total'];
+    const rows = sales.map((sale) => [
+      sale.invoiceNo || '',
+      sale.date || '',
+      sale.gstin || '',
+      sale.totals?.subtotal || 0,
+      sale.totals?.cgst || 0,
+      sale.totals?.sgst || 0,
+      sale.totals?.igst || 0,
+      sale.totals?.total || 0,
+    ]);
+    downloadCsv(`GST_Audit_Report_${startDate}_to_${endDate}.csv`, headers, rows);
+  };
+
   const gstSummary = useMemo(() => {
-    const outputTax = sales.reduce((acc, s) => acc + (parseFloat(s.totals.igst || 0) + parseFloat(s.totals.cgst || 0) + parseFloat(s.totals.sgst || 0)), 0);
-    const inputTax = purchases.reduce((acc, p) => acc + (parseFloat(p.totals.igst || 0) + parseFloat(p.totals.cgst || 0) + parseFloat(p.totals.sgst || 0)), 0);
+    const outputTax = sales.reduce((acc, s) => acc + (parseFloat(s.totals?.igst || 0) + parseFloat(s.totals?.cgst || 0) + parseFloat(s.totals?.sgst || 0)), 0);
+    const inputTax = purchases.reduce((acc, p) => acc + (parseFloat(p.totals?.igst || 0) + parseFloat(p.totals?.cgst || 0) + parseFloat(p.totals?.sgst || 0)), 0);
     const netPayable = outputTax - inputTax;
 
     return { outputTax, inputTax, netPayable };
@@ -49,11 +65,18 @@ const GSTPage = () => {
         <div className="flex gap-4">
            <button
              type="button"
+             onClick={handleExcelExport}
+             className="flex items-center gap-3 px-8 py-3 bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-black uppercase tracking-widest transition-all"
+           >
+             <Download size={14} /> Export Excel (.csv)
+           </button>
+           <button
+             type="button"
              onClick={handleGstr1Export}
              disabled={exporting}
-             className="flex items-center gap-3 px-10 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-50"
+             className="flex items-center gap-3 px-8 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-50"
            >
-             <Download size={14} /> {exporting ? 'Exporting...' : 'GSTR-1 Schema JSON'}
+             <Download size={14} /> {exporting ? 'Exporting...' : 'GSTR-1 JSON (Govt)'}
            </button>
         </div>
       </div>

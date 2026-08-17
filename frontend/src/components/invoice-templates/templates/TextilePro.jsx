@@ -104,6 +104,7 @@ function TextileTaxGrid({ data }) {
 export default function TextilePro({ data }) {
   const { company, meta, billTo, shipTo, totals, fmt, bank, termsList } = data;
   const delivery = shipTo?.name !== billTo?.name ? shipTo : billTo;
+  const money = (n) => fmt.money(n).replace(/^₹\s*/, '');
 
   return (
     <InvoicePrintRoot templateId="textile-pro" data={data} showFooter={false}>
@@ -181,7 +182,7 @@ export default function TextilePro({ data }) {
                   <Field label="L.R. No." value={meta.lrNo} />
                   <Field label="Case No" value={meta.baleNo} />
                   <Field label="L.R. Dt." value={meta.lrDate} />
-                  <Field label="Freight" value={fmt.money(meta.freight || 0).replace(/^₹\s*/, '')} />
+                  <Field label="Freight" value={money(meta.freight || 0)} />
                   <div />
                   <Field label="Weight" value={meta.weight ? fmt.num(meta.weight) : '0.000'} />
                 </div>
@@ -197,7 +198,7 @@ export default function TextilePro({ data }) {
         <table className="ipe-classic-grid">
           <tbody>
             <tr>
-              {/* Left: Bank Details */}
+              {/* Left: Bank Details + Due Days */}
               <td style={{ width: '45%', fontSize: '8.5pt', verticalAlign: 'top', padding: '2mm' }}>
                 <div style={{ marginBottom: '1.5mm' }}>
                   <span className="ipe-classic-label">Bank Detail</span>
@@ -218,79 +219,112 @@ export default function TextilePro({ data }) {
                   </div>
                 )}
                 <div style={{ marginTop: '3mm', fontSize: '8pt' }}>
-                  <span className="ipe-classic-label">Due Days: </span>
+                  <span className="ipe-classic-label">Due Days : </span>
                   <strong>{meta.dueDays ?? 0}</strong>
-                  {'   '}
-                  <span className="ipe-classic-label">Due Date: </span>
+                  {'        '}
+                  <span className="ipe-classic-label">Due Date : </span>
                   <strong>{meta.dueDate || ''}</strong>
                 </div>
               </td>
 
-              {/* Right: Totals matching image layout */}
+              {/* Right: Totals — matching reference invoice layout exactly */}
               <td style={{ width: '55%', verticalAlign: 'top', padding: '0' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
                   <tbody>
-                    {/* Fold Less row — only if foldLess > 0 */}
+                    {/* FOLD LESS — only if > 0 */}
                     {totals.foldLess > 0 && (
                       <tr>
                         <td style={{ padding: '1mm 2mm', fontWeight: 600, borderBottom: '0.5px solid #bbb' }}>FOLD LESS :</td>
                         <td style={{ padding: '1mm 2mm', textAlign: 'right', fontWeight: 600, borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
-                          {fmt.money(totals.foldLess).replace(/^₹\s*/, '')}
+                          {money(totals.foldLess)}
                         </td>
+                      </tr>
+                    )}
+                    {/* DISCOUNT — only if > 0, with @ % label */}
+                    {totals.discountAmt > 0 && (
+                      <tr>
+                        <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>
+                          DISCOUNT
+                          {totals.discountPer > 0 && (
+                            <span style={{ marginLeft: '8mm' }}>@ {totals.discountPer.toFixed(2)}%</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '1mm 2mm', textAlign: 'right', fontWeight: 700, borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
+                          {money(totals.discountAmt)}
+                        </td>
+                      </tr>
+                    )}
+                    {/* LESS — only if > 0, with @ % label */}
+                    {totals.lessAmt > 0 && (
+                      <tr>
+                        <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>
+                          LESS
+                          {totals.lessPer > 0 && (
+                            <span style={{ marginLeft: '8mm' }}>@ {totals.lessPer.toFixed(2)}%</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '1mm 2mm', textAlign: 'right', fontWeight: 700, borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
+                          {money(totals.lessAmt)}
+                        </td>
+                      </tr>
+                    )}
+                    {/* Blank 0.00 row — shown when any deduction exists, matches reference */}
+                    {(totals.discountAmt > 0 || totals.lessAmt > 0) && (
+                      <tr>
+                        <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>&nbsp;</td>
+                        <td style={{ padding: '1mm 2mm', textAlign: 'right', borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>0.00</td>
                       </tr>
                     )}
                     {/* Taxable Value */}
                     <tr>
                       <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>Taxable Value</td>
                       <td style={{ padding: '1mm 2mm', textAlign: 'right', borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb', fontWeight: 600 }}>
-                        {fmt.money(totals.taxable).replace(/^₹\s*/, '')}
+                        {money(totals.taxable)}
                       </td>
                     </tr>
-                    {/* CGST — only if not IGST */}
+                    {/* SGST first (reference layout: SGST before CGST) */}
                     {!data.isIgst && (
                       <tr>
                         <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>
-                          Add: CGST @ {data.gstRate ? `${(data.gstRate / 2).toFixed(2)}%` : '2.50%'}
+                          Add: SGST
+                          <span style={{ marginLeft: '4mm' }}>@ {data.gstRate ? (data.gstRate / 2).toFixed(2) : '2.50'}%</span>
                         </td>
                         <td style={{ padding: '1mm 2mm', textAlign: 'right', borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
-                          {fmt.money(totals.cgst).replace(/^₹\s*/, '')}
+                          {money(totals.sgst)}
                         </td>
                       </tr>
                     )}
-                    {/* SGST — only if not IGST */}
+                    {/* CGST second */}
                     {!data.isIgst && (
                       <tr>
                         <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>
-                          Add: SGST @ {data.gstRate ? `${(data.gstRate / 2).toFixed(2)}%` : '2.50%'}
+                          Add: CGST
+                          <span style={{ marginLeft: '4mm' }}>@ {data.gstRate ? (data.gstRate / 2).toFixed(2) : '2.50'}%</span>
                         </td>
                         <td style={{ padding: '1mm 2mm', textAlign: 'right', borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
-                          {fmt.money(totals.sgst).replace(/^₹\s*/, '')}
+                          {money(totals.cgst)}
                         </td>
                       </tr>
                     )}
-                    {/* IGST — only if IGST */}
-                    {data.isIgst && (
-                      <tr>
-                        <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>
-                          Add: IGST @ {data.gstRate ? `${data.gstRate.toFixed(2)}%` : '5.00%'}
-                        </td>
-                        <td style={{ padding: '1mm 2mm', textAlign: 'right', borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
-                          {fmt.money(totals.igst).replace(/^₹\s*/, '')}
-                        </td>
-                      </tr>
-                    )}
-                    {/* Tax Amount of GST */}
+                    {/* IGST — always shown (0.00 for intra-state), matching reference invoice */}
+                    <tr>
+                      <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>Add: IGST</td>
+                      <td style={{ padding: '1mm 2mm', textAlign: 'right', borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
+                        {data.isIgst ? money(totals.igst) : '0.00'}
+                      </td>
+                    </tr>
+                    {/* Tax Amount Of GST */}
                     <tr style={{ background: '#f0f0f0' }}>
                       <td style={{ padding: '1mm 2mm', fontWeight: 700, borderBottom: '0.5px solid #bbb' }}>Tax Amount Of GST :</td>
                       <td style={{ padding: '1mm 2mm', textAlign: 'right', fontWeight: 700, borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
-                        {fmt.money(totals.gst).replace(/^₹\s*/, '')}
+                        {money(totals.gst)}
                       </td>
                     </tr>
                     {/* Total Amount After Tax */}
                     <tr style={{ background: '#e8e8e8' }}>
-                      <td style={{ padding: '1.5mm 2mm', fontWeight: 800, fontSize: '9.5pt', borderBottom: '1px solid #000' }}>Total Amount After Tax</td>
+                      <td style={{ padding: '1.5mm 2mm', fontWeight: 800, fontSize: '9.5pt', borderBottom: '1px solid #000' }}>Total Amount  After Tax</td>
                       <td style={{ padding: '1.5mm 2mm', textAlign: 'right', fontWeight: 800, fontSize: '9.5pt', borderBottom: '1px solid #000', borderLeft: '0.5px solid #bbb' }}>
-                        {fmt.money(totals.grandTotal).replace(/^₹\s*/, '')}
+                        {money(totals.grandTotal)}
                       </td>
                     </tr>
                   </tbody>

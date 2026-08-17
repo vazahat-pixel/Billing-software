@@ -126,20 +126,22 @@ class LedgerEngineService {
             chequeNo: d.chequeNo || '',
             // raw bill nos — frontend formats as "Bill No.:<nos>" for Payment/Receipt rows
             remarks: billNos || d.narration || d.remark2 || '',
+            accBill: d.accBill || 'B',
+            scCode: d.scCode || 'SCC',
           };
         },
-        'voucherNo chequeNo narration remark2 againstInvoices'),
+        'voucherNo chequeNo narration remark2 againstInvoices accBill scCode'),
       // Sales: remark = just the invoice number; description will be SALES BOOK
       load(['SalesInvoice'], 'Sales',
-        (d) => ({ docNo: d.invoiceNo, remarks: d.invoiceNo || d.narration || '' }),
+        (d) => ({ docNo: d.invoiceNo, remarks: d.invoiceNo || d.narration || '', accBill: 'B', scCode: 'SCC' }),
         'invoiceNo narration remarks'),
       // Purchase: remark = just the invoice number; description will be PURCHASE BOOK
       load(['PurchaseBill'], 'Purchase',
-        (d) => ({ docNo: d.invoiceNo, remarks: d.invoiceNo || d.narration || '' }),
+        (d) => ({ docNo: d.invoiceNo, remarks: d.invoiceNo || d.narration || '', accBill: 'B', scCode: 'SCC' }),
         'invoiceNo narration remarks'),
       // Credit/Debit notes: remark = note number
       load(['DebitNote', 'CreditNote'], 'DebitCreditNote',
-        (d) => ({ docNo: d.vNo || d.noteNo, remarks: d.vNo || d.noteNo || d.reason || d.narration || '' }),
+        (d) => ({ docNo: d.vNo || d.noteNo, remarks: d.vNo || d.noteNo || d.reason || d.narration || '', accBill: 'B', scCode: 'SCC' }),
         'vNo noteNo noteType reason narration'),
     ]);
 
@@ -215,17 +217,21 @@ class LedgerEngineService {
       for (const line of entry.lines) {
         if (line.ledgerId.toString() !== ledger._id.toString()) continue;
 
-        // Find all opposite (contra) lines in this journal entry
+        // Find all opposite (contra) lines in this journal entry that are on the opposite side (Dr vs Cr)
         const oppositeLines = entry.lines.filter(
+          (l) => l.ledgerId && l.ledgerId.toString() !== ledger._id.toString() && l.type !== line.type
+        );
+        const allOtherLines = entry.lines.filter(
           (l) => l.ledgerId && l.ledgerId.toString() !== ledger._id.toString()
         );
+        const effectiveOppositeLines = oppositeLines.length > 0 ? oppositeLines : allOtherLines;
 
         // If it's a Payment/Receipt/Journal with multiple contra legs (e.g. Bank + Discount),
         // split into separate rows for each contra leg so user sees Bank and Discount lines separately!
-        if (oppositeLines.length > 1 && ['Payment', 'Receipt', 'Journal'].includes(entry.voucherType)) {
-          const totalOppositeAmt = oppositeLines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+        if (effectiveOppositeLines.length > 1 && ['Payment', 'Receipt', 'Journal'].includes(entry.voucherType)) {
+          const totalOppositeAmt = effectiveOppositeLines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
 
-          for (const opp of oppositeLines) {
+          for (const opp of effectiveOppositeLines) {
             const oppAmt = Number(opp.amount) || 0;
             const portion = totalOppositeAmt > 0
               ? round2((line.amount * oppAmt) / totalOppositeAmt)
@@ -241,6 +247,9 @@ class LedgerEngineService {
               billVoucherNo: src.docNo || entry.entryNo,
               chequeNo: src.chequeNo || '',
               remarks: src.remarks || opp.narration || '',
+              accBill: src.accBill || (['SalesInvoice', 'PurchaseBill', 'Sales', 'Purchase'].includes(entry.voucherType || entry.refType) ? 'B' : (entry.voucherType === 'Contra' ? 'A' : 'B')),
+              cp: src.scCode || 'SCC',
+              contraShortCode: src.scCode || 'SCC',
               voucherType: entry.voucherType,
               narration: opp.narration || line.narration || entry.narration || '',
               particulars: opp.ledgerName || 'CONTRA A/C',
@@ -277,10 +286,10 @@ class LedgerEngineService {
             particulars = 'JOB WORK CHARGES';
           } else {
             // For Journal/Payment/Receipt with single contra — use the actual contra ledger name
-            const mainContra = oppositeLines[0];
+            const mainContra = effectiveOppositeLines[0];
             particulars = mainContra?.ledgerName
               ? mainContra.ledgerName.toUpperCase()
-              : (oppositeLines.map((l) => l.ledgerName).filter(Boolean).join(', ').toUpperCase() || vt.toUpperCase() || 'CONTRA A/C');
+              : (effectiveOppositeLines.map((l) => l.ledgerName).filter(Boolean).join(', ').toUpperCase() || vt.toUpperCase() || 'CONTRA A/C');
           }
 
           statement.push({
@@ -290,6 +299,9 @@ class LedgerEngineService {
             billVoucherNo: src.docNo || entry.entryNo,
             chequeNo: src.chequeNo || '',
             remarks: src.remarks || '',
+            accBill: src.accBill || (['SalesInvoice', 'PurchaseBill', 'Sales', 'Purchase'].includes(entry.voucherType || entry.refType) ? 'B' : (entry.voucherType === 'Contra' ? 'A' : 'B')),
+            cp: src.scCode || 'SCC',
+            contraShortCode: src.scCode || 'SCC',
             voucherType: entry.voucherType,
             narration: line.narration || entry.narration || '',
             particulars,
@@ -307,7 +319,6 @@ class LedgerEngineService {
               amount: round2(l.amount),
               narration: l.narration || '',
             })),
-            entryNarration: entry.narration || '',
           });
         }
       }

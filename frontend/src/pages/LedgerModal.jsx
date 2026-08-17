@@ -162,7 +162,20 @@ function AccountListPanel({ rows, highlightIdx, onSelect, emptyText = 'No accoun
   );
 }
 
-const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenReceipt, onOpenSales, onOpenPurchase, onOpenNote, onOpenOutstanding }) => {
+const LedgerModal = ({
+  isOpen,
+  onClose,
+  initialLedgerId = null,
+  initialAccountText = '',
+  autoRun = false,
+  onOpenJournal,
+  onOpenPayment,
+  onOpenReceipt,
+  onOpenSales,
+  onOpenPurchase,
+  onOpenNote,
+  onOpenOutstanding,
+}) => {
   const {
     ledgers,
     parties,
@@ -210,20 +223,6 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
   const accountRef = useRef(null);
   const filterRef = useRef(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    fetchLedgers().catch(() => {});
-    fetchParties().catch(() => {});
-    setView('entry');
-    setLedgerId('');
-    setAccHead('');
-    setAccountText('');
-    setListOpen(null);
-    setFrom(fyStartISO());
-    setTo(todayISO());
-    setCheckedRows(new Set());
-  }, [isOpen, fetchLedgers, fetchParties]);
-
   const ledgerOptions = useMemo(() => {
     const map = new Map();
     (ledgers || []).forEach((l) => {
@@ -259,15 +258,18 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
 
   const filteredAccounts = useMemo(() => {
     let list = ledgerOptions;
+    if (accHead.trim()) {
+      const qHead = accHead.trim().toLowerCase();
+      list = list.filter((o) => acGroup(o).toLowerCase().includes(qHead));
+    }
     if (accountText.trim()) {
       const q = accountText.trim().toLowerCase();
-      const textMatched = list.filter((o) => acName(o).toLowerCase().includes(q) || acGroup(o).toLowerCase().includes(q));
-      if (textMatched.length > 0) return textMatched;
-    }
-    if (accHead.trim()) {
-      const q = accHead.trim().toLowerCase();
-      const headMatched = list.filter((o) => acGroup(o).toLowerCase().includes(q));
-      if (headMatched.length > 0) return headMatched;
+      list = list.filter(
+        (o) =>
+          acName(o).toLowerCase().includes(q) ||
+          acGroup(o).toLowerCase().includes(q) ||
+          acId(o).toLowerCase().includes(q)
+      );
     }
     return list;
   }, [ledgerOptions, accHead, accountText]);
@@ -283,12 +285,82 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
     return id;
   };
 
-  const pickAccount = (o) => {
+  const runLedgerForId = async (targetId, overrideRange) => {
+    const id = resolveLedgerId(targetId);
+    if (!id) return false;
+    const effFrom = overrideRange?.from ?? from;
+    const effTo = overrideRange?.to ?? to;
+    setBusy(true);
+    try {
+      await fetchLedgerStatement({ ledgerId: id, from: effFrom, to: effTo });
+      setView('statement');
+      return true;
+    } catch (err) {
+      toast.error(err, { fallback: 'Failed to load ledger' });
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetchLedgers().catch(() => {});
+    fetchParties().catch(() => {});
+    setCheckedRows(new Set());
+    setFrom(fyStartISO());
+    setTo(todayISO());
+
+    if (initialLedgerId) {
+      setLedgerId(initialLedgerId);
+      const opt = ledgerOptions.find(
+        (o) =>
+          o.value === initialLedgerId ||
+          o.ledger?._id === initialLedgerId ||
+          o.ledger?.id === initialLedgerId
+      );
+      if (opt) {
+        setAccountText(acName(opt));
+        setAccHead(acGroup(opt));
+      } else if (initialAccountText) {
+        setAccountText(initialAccountText);
+      }
+      if (autoRun) {
+        runLedgerForId(initialLedgerId);
+      } else {
+        setView('entry');
+      }
+    } else if (initialAccountText) {
+      setAccountText(initialAccountText);
+      setView('entry');
+    } else {
+      setView('entry');
+      setLedgerId('');
+      setAccHead('');
+      setAccountText('');
+    }
+    setListOpen(null);
+  }, [isOpen, initialLedgerId, initialAccountText, autoRun]);
+
+  useEffect(() => {
+    if (isOpen && view === 'entry') {
+      const t = setTimeout(() => {
+        accountRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen, view]);
+
+  const pickAccount = (o, shouldRun = false) => {
     setLedgerId(o.value);
     setAccountText(acName(o));
     setAccHead(acGroup(o));
     setListOpen(null);
-    accountRef.current?.focus();
+    if (shouldRun) {
+      runLedgerForId(o.value);
+    } else {
+      accountRef.current?.focus();
+    }
   };
 
   const pickHead = (head) => {
@@ -326,19 +398,7 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
       accountRef.current?.focus();
       return false;
     }
-    const effFrom = overrideRange?.from ?? from;
-    const effTo = overrideRange?.to ?? to;
-    setBusy(true);
-    try {
-      await fetchLedgerStatement({ ledgerId: id, from: effFrom, to: effTo });
-      setView('statement');
-      return true;
-    } catch (err) {
-      toast.error(err, { fallback: 'Failed to load ledger' });
-      return false;
-    } finally {
-      setBusy(false);
-    }
+    return runLedgerForId(id, overrideRange);
   };
 
   const shiftYear = (direction) => {
@@ -350,16 +410,29 @@ const LedgerModal = ({ isOpen, onClose, onOpenJournal, onOpenPayment, onOpenRece
   };
 
   const handleListKey = (e, list, onPick) => {
-    if (!listOpen) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      if (!listOpen) {
+        setListOpen('account');
+        setListIdx(0);
+        return;
+      }
       setListIdx((i) => Math.min(i + 1, Math.max(0, list.length - 1)));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      if (!listOpen) {
+        setListOpen('account');
+        setListIdx(0);
+        return;
+      }
       setListIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' && list[listIdx]) {
+    } else if (e.key === 'Enter') {
       e.preventDefault();
-      onPick(list[listIdx]);
+      if (listOpen && list[listIdx]) {
+        onPick(list[listIdx], true);
+      } else {
+        runLedger();
+      }
     } else if (e.key === 'Escape') {
       setListOpen(null);
     }
@@ -1104,46 +1177,59 @@ const ledgerStyles = `
     position: sticky; top: 0; background: #f1f5f9;
     border-bottom: 1px solid #cbd5e1; padding: 4px 6px; text-align: left;
   }
-  .ledger-ac-list-table td { border-bottom: 1px solid #e2e8f0; padding: 4px 6px; cursor: pointer; }
+  .ledger-ac-list-table td { border-bottom: 1px solid #e2e8f0; padding: 2px 5px; cursor: pointer; height: 20px; }
   .ledger-ac-list-table tr:hover td, .ledger-ac-list-table tr.is-active td { background: #2563eb; color: #fff; }
-  .ledger-ac-empty { text-align: center; color: #94a3b8; padding: 12px; }
+  .ledger-ac-empty { text-align: center; color: #94a3b8; padding: 8px; }
   .ledger-toolbar {
-    display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 8px;
-    background: #9bc89b; border-bottom: 1px solid #7eab7e; align-items: center;
+    display: flex; flex-wrap: nowrap; gap: 3px; padding: 2px 6px;
+    background: #9bc89b; border-bottom: 1px solid #7eab7e; align-items: center; height: 26px; min-height: 26px; overflow-x: auto;
   }
-  .ledger-toolbar-search { width: 160px; height: 24px; }
+  .ledger-toolbar .classic-erp-btn { height: 20px !important; padding: 0 5px !important; font-size: 10px !important; white-space: nowrap; line-height: 18px; }
+  .ledger-toolbar-search { width: 120px !important; min-width: 120px !important; max-width: 120px !important; height: 20px !important; font-size: 10px !important; padding: 0 4px !important; }
   .ledger-toolbar-hints {
     display: flex; flex-direction: column; margin-left: auto; text-align: right;
-    font-size: 10px; font-weight: 700; color: #7a1212; line-height: 1.3;
+    font-size: 9px; font-weight: 700; color: #7a1212; line-height: 1.1; white-space: nowrap;
   }
   .ledger-toolbar2 {
-    display: flex; gap: 12px; padding: 4px 8px;
-    background: #9bc89b; border-bottom: 1px solid #7eab7e; align-items: stretch;
+    display: flex; gap: 6px; padding: 2px 6px;
+    background: #9bc89b; border-bottom: 1px solid #7eab7e; align-items: center; min-height: 28px;
   }
-  .ledger-toolbar2-left { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
-  .ledger-toolbar2-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: #111; }
+  .ledger-toolbar2-left { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+  .ledger-toolbar2-row { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #111; }
   .ledger-party-box {
-    width: 170px; color: #b91c1c !important; font-weight: 800 !important; font-size: 13px !important;
-    background: #ffffff !important; border: 1px solid #7eab7e !important; cursor: pointer;
+    width: 150px !important; min-width: 150px !important; max-width: 150px !important; height: 20px !important;
+    color: #b91c1c !important; font-weight: 800 !important; font-size: 11px !important;
+    background: #ffffff !important; border: 1px solid #7eab7e !important; cursor: pointer; padding: 0 4px !important; display: inline-block !important;
   }
-  .ledger-date-red { border-color: #c00 !important; color: #c00 !important; font-weight: 700 !important; background: #fff !important; }
-  .ledger-green-btn { background: #bff0bf !important; border-color: #6ba86b !important; font-weight: 700 !important; color: #1e3a1e !important; }
-  .ledger-l-hint { color: #b91c1c; font-weight: 800; font-size: 11px; }
-  .ledger-openingbal-box { width: 90px; text-align: right; font-family: ui-monospace, Consolas, monospace; font-weight: 700; background: #fff !important; }
+  .ledger-date-red {
+    border-color: #c00 !important; color: #c00 !important; font-weight: 700 !important; background: #fff !important;
+    height: 20px !important; font-size: 10px !important; padding: 0 2px !important;
+    width: 105px !important; min-width: 105px !important; max-width: 105px !important; display: inline-block !important;
+  }
+  .ledger-stmt-check {
+    display: inline-flex !important; align-items: center !important; gap: 2px !important; font-size: 10px !important; font-weight: 700 !important; cursor: pointer; margin: 0; white-space: nowrap;
+  }
+  .ledger-stmt-check input { margin: 0 !important; }
+  .ledger-green-btn { background: #bff0bf !important; border-color: #6ba86b !important; font-weight: 700 !important; color: #1e3a1e !important; height: 20px !important; padding: 0 6px !important; font-size: 10px !important; line-height: 18px; }
+  .ledger-l-hint { color: #b91c1c; font-weight: 800; font-size: 10px; white-space: nowrap; }
+  .ledger-openingbal-box {
+    width: 80px !important; min-width: 80px !important; max-width: 80px !important; height: 20px !important;
+    font-size: 10.5px !important; text-align: right; font-family: ui-monospace, Consolas, monospace; font-weight: 700; background: #fff !important; padding: 0 4px !important; display: inline-block !important;
+  }
   .ledger-toolbar2-hints {
     display: flex; flex-direction: column; justify-content: center; text-align: right;
-    font-size: 10px; font-weight: 700; color: #7a1212; line-height: 1.5; white-space: nowrap;
+    font-size: 9px; font-weight: 700; color: #7a1212; line-height: 1.2; white-space: nowrap;
   }
   .ledger-toolbar2-hints b { color: #1d4ed8; }
   .ledger-stmt-body { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #fff; overflow: hidden; }
-  .ledger-stmt-table-wrap { flex: 1; min-height: 280px; overflow: auto; }
-  .ledger-stmt-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .ledger-stmt-table-wrap { flex: 1; min-height: 180px; overflow: auto; }
+  .ledger-stmt-table { width: 100%; border-collapse: collapse; font-size: 10.5px; line-height: 1.15; }
   .ledger-stmt-table thead th {
     position: sticky; top: 0; z-index: 2; background: #9bc89b; color: #111; border-bottom: 2px solid #5a8a5a;
-    padding: 5px 6px; font-size: 11px; font-weight: 800; text-align: left;
+    padding: 2px 4px; font-size: 10px; font-weight: 800; text-align: left; height: 21px; white-space: nowrap;
   }
   .ledger-stmt-table thead th.num, .ledger-stmt-table td.num { text-align: right; font-family: ui-monospace, Consolas, monospace; }
-  .ledger-stmt-table td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+  .ledger-stmt-table td { padding: 1px 4px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; height: 19px; }
   .ledger-stmt-table tbody tr:nth-child(even) { background: #f8fafc; }
   .ledger-stmt-table tbody tr:hover { background: #dbeafe; }
   .ledger-ob-row td { background: #efe8dc !important; font-weight: 700; color: #443010; }
@@ -1158,48 +1244,50 @@ const ledgerStyles = `
   .ledger-stmt-table tbody tr.ledger-row-journal td { color: #581c87; }
   .ledger-stmt-table tbody tr.ledger-row-job td { color: #0f4c4c; }
   .ledger-address-bar {
-    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-    padding: 4px 10px; font-size: 11px; color: #1e293b;
-    background: #f8fafc; border-bottom: 1px solid #cbd5e1;
+    display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap;
+    padding: 1px 6px; font-size: 10px; color: #1e293b;
+    background: #f8fafc; border-bottom: 1px solid #cbd5e1; height: 20px; align-items: center;
   }
   .ledger-address-comp { color: #475569; text-align: right; }
-  .ledger-jv { background: #fff; font-size: 12px; }
+  .ledger-jv { background: #fff; font-size: 11px; }
   .ledger-jv-head {
     display: flex; justify-content: space-between; align-items: center;
-    background: #374151; color: #fff; padding: 6px 10px; font-weight: 700;
+    background: #374151; color: #fff; padding: 3px 6px; font-weight: 700;
   }
-  .ledger-jv-type { font-size: 10px; opacity: .85; }
+  .ledger-jv-type { font-size: 9px; opacity: .85; }
   .ledger-jv-meta {
-    display: flex; flex-wrap: wrap; gap: 14px; padding: 6px 10px;
-    background: #f1f5f9; border-bottom: 1px solid #cbd5e1; font-size: 11px;
+    display: flex; flex-wrap: wrap; gap: 8px; padding: 3px 6px;
+    background: #f1f5f9; border-bottom: 1px solid #cbd5e1; font-size: 10px;
   }
   .ledger-jv-meta div { display: flex; flex-direction: column; }
-  .ledger-jv-meta b { font-size: 9px; text-transform: uppercase; color: #64748b; }
-  .ledger-jv-narration { padding: 5px 10px; font-size: 11px; color: #334155; border-bottom: 1px solid #e2e8f0; }
-  .ledger-jv-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  .ledger-jv-table th { background: #e2e8f0; padding: 4px 8px; text-align: left; border-bottom: 1px solid #cbd5e1; }
-  .ledger-jv-table td { padding: 4px 8px; border-bottom: 1px solid #eef2f7; }
+  .ledger-jv-meta b { font-size: 8px; text-transform: uppercase; color: #64748b; }
+  .ledger-jv-narration { padding: 2px 6px; font-size: 10px; color: #334155; border-bottom: 1px solid #e2e8f0; }
+  .ledger-jv-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  .ledger-jv-table th { background: #e2e8f0; padding: 2px 5px; text-align: left; border-bottom: 1px solid #cbd5e1; }
+  .ledger-jv-table td { padding: 1px 5px; border-bottom: 1px solid #eef2f7; }
   .ledger-jv-table .num { text-align: right; font-family: ui-monospace, Consolas, monospace; }
   .ledger-jv-table tfoot td { background: #f8fafc; border-top: 2px solid #94a3b8; }
   .ledger-jv-footer {
-    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    display: flex; align-items: center; gap: 6px; padding: 3px 6px;
     background: #f3f0e6; border-top: 1px solid #c4b8a8;
   }
-  .ledger-jv-ok { font-weight: 700; color: #15803d; margin-right: auto; }
-  .ledger-jv-bad { font-weight: 700; color: #b91c1c; margin-right: auto; }
+  .ledger-jv-ok { font-weight: 700; color: #15803d; margin-right: auto; font-size: 10.5px; }
+  .ledger-jv-bad { font-weight: 700; color: #b91c1c; margin-right: auto; font-size: 10.5px; }
   .ledger-grand-bar {
-    display: flex; align-items: center; gap: 12px; padding: 6px 10px;
-    background: #9bc89b; border-top: 1px solid #7eab7e;
+    display: flex; align-items: center; gap: 6px; padding: 2px 6px;
+    background: #9bc89b; border-top: 1px solid #7eab7e; height: 26px; min-height: 26px;
   }
   .ledger-bottom-detail-box {
     background: #ffffff !important; border: 1px solid #7eab7e !important; color: #111111 !important;
-    font-weight: 700 !important; font-size: 12px !important; height: 26px !important;
+    font-weight: 700 !important; font-size: 10.5px !important; height: 20px !important; padding: 0 4px !important;
   }
-  .ledger-grand-totals { display: flex; align-items: center; gap: 10px; font-size: 11px; font-weight: 700; }
-  .ledger-grand-labels { display: flex; flex-direction: column; text-align: right; line-height: 1.3; font-weight: 800; color: #1e3a1e; }
-  .ledger-grand-boxes { display: flex; gap: 6px; }
+  .ledger-grand-totals { display: flex; align-items: center; gap: 6px; font-size: 9.5px; font-weight: 700; }
+  .ledger-grand-labels { display: flex; flex-direction: column; text-align: right; line-height: 1.1; font-weight: 800; color: #1e3a1e; font-size: 9px; }
+  .ledger-grand-boxes { display: flex; gap: 4px; }
   .ledger-grand-boxes input {
-    width: 105px; text-align: right; font-family: ui-monospace, Consolas, monospace; font-weight: 700; background: #fff !important; height: 26px !important;
+    width: 85px !important; min-width: 85px !important; max-width: 85px !important; text-align: right;
+    font-family: ui-monospace, Consolas, monospace; font-weight: 700; background: #fff !important;
+    height: 20px !important; font-size: 10px !important; padding: 0 4px !important; display: inline-block !important;
   }
   @media print {
     body * { visibility: hidden !important; }

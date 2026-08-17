@@ -372,30 +372,53 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
   };
 
   const handleLotSelect = (row) => {
-    const matchedLot = (inventoryLots || []).find((l) => String(l._id || l.id) === String(row.lotId));
-    const itemId = matchedLot?.itemId?._id || matchedLot?.itemId || '';
+    if (!row) return;
+
+    // 1. Try finding lot by lotId
+    let matchedLot = (inventoryLots || []).find((l) => String(l._id || l.id) === String(row.lotId));
+
+    // 2. If not found by lotId, find by itemId or item name
+    if (!matchedLot && row.itemId) {
+      matchedLot = (inventoryLots || []).find((l) => String(l.itemId?._id || l.itemId || '') === String(row.itemId));
+    }
+    if (!matchedLot && row.itemName) {
+      const targetName = row.itemName.trim().toLowerCase();
+      matchedLot = (inventoryLots || []).find((l) => {
+        const name = (l.itemName || l.itemId?.name || l.itemId?.itemName || '').trim().toLowerCase();
+        return name === targetName;
+      });
+    }
+
+    const resolvedLotId = matchedLot?._id || matchedLot?.id || row.lotId || '';
+    const itemId =
+      matchedLot?.itemId?._id ||
+      matchedLot?.itemId ||
+      row.itemId ||
+      (items || []).find((i) => (i.name || i.itemName || '').trim().toLowerCase() === (row.itemName || '').trim().toLowerCase())?._id ||
+      '';
+
     if (itemId) setActiveItemId(String(itemId));
 
     setLines((prev) => {
       const next = [...prev];
       const targetIdx = lotLookupTargetIdx != null ? lotLookupTargetIdx : prev.findIndex((l) => !l.lotId);
 
-      const pcs = row.balPcs || 0;
-      const qty = row.balMts || 0;
+      const pcs = row.balPcs || row.pcs || 0;
+      const qty = row.balMts || row.mts || 0;
       const cut = pcs > 0 ? Number((qty / pcs).toFixed(3)) : 0;
 
       const lineData = {
         id: next[targetIdx]?.id || Math.random().toString(),
         itemId: itemId ? String(itemId) : '',
-        lotId: row.lotId || '',
-        lotNo: row.lotCode || '',
-        itemName: row.itemName || '',
+        lotId: resolvedLotId,
+        lotNo: row.lotCode || (matchedLot ? matchedLot.lotId : row.billNo),
+        itemName: row.itemName || (matchedLot ? matchedLot.itemName || matchedLot.itemId?.name : ''),
         pcs: pcs > 0 ? String(pcs) : '',
         cut: cut > 0 ? String(cut) : '',
         qty: qty > 0 ? String(qty) : '',
         rate: '',
-        fabRate: row.puRate > 0 ? String(row.puRate) : '',
-        narration: '',
+        fabRate: row.puRate > 0 ? String(row.puRate) : (matchedLot ? String(matchedLot.rate || matchedLot.purchaseRate || '') : ''),
+        narration: row.billNo ? `From Pur Bill: ${row.billNo}` : '',
         jobId: '',
       };
 
@@ -406,6 +429,11 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
         return next;
       }
     });
+
+    if (row.supplierName && !header.broker) {
+      setHeader((h) => ({ ...h, broker: row.supplierName }));
+    }
+    toast.success(`Loaded from Purchase ${row.billNo} · ${row.itemName}`);
   };
 
   const handleNew = () => {
@@ -806,10 +834,23 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                 </div>
 
                 {!locked && (
-                  <div className="erp-job-issue-toolbar">
-                    <button type="button" className="classic-erp-btn" onClick={addLine}>
-                      <Plus size={12} className="inline mr-0.5" /> Add Line
-                    </button>
+                  <div className="erp-job-issue-toolbar flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <button type="button" className="classic-erp-btn" onClick={addLine}>
+                        <Plus size={12} className="inline mr-0.5" /> Add Line
+                      </button>
+                      <button
+                        type="button"
+                        className="classic-erp-btn bg-blue-600 text-white font-bold hover:bg-blue-700 transition-all flex items-center gap-1 shadow-sm"
+                        onClick={() => {
+                          setLotLookupTargetIdx(null);
+                          setLotLookupOpen(true);
+                        }}
+                        title="Fetch item / lot directly from Purchase Bills"
+                      >
+                        <Search size={11} /> Fetch From Purchase Bill
+                      </button>
+                    </div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase">
                       Grid Row Count: {lines.length}
                     </span>

@@ -349,17 +349,32 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     if (!row) return;
     const finalPcs = Number(row.balPcs) > 0 ? row.balPcs : (row.pcs || '');
     const finalMts = Number(row.balMts) > 0 ? row.balMts : (row.mts || '');
+
+    // Resolve matching inventory lot if row.lotId is empty
+    let resolvedLotId = row.lotId || '';
+    if (!resolvedLotId) {
+      const match = (inventoryLots || []).find((l) => {
+        if (row.itemId && String(l.itemId?._id || l.itemId || '') === String(row.itemId)) return true;
+        const nameA = (l.itemName || l.itemId?.name || '').trim().toLowerCase();
+        const nameB = (row.itemName || '').trim().toLowerCase();
+        return nameA && nameB && nameA === nameB;
+      });
+      if (match) {
+        resolvedLotId = match._id || match.id;
+      }
+    }
+
     setForm((f) => ({
       ...f,
       puBillNo: row.billNo || f.puBillNo,
       weaver: row.weaver || row.supplierName || row.partyName || f.weaver,
       itemName: row.itemName || f.itemName,
-      lotId: row.lotId || f.lotId,
+      lotId: resolvedLotId || f.lotId,
       issPcs: finalPcs != null ? String(finalPcs) : f.issPcs,
       issQty: finalMts != null ? String(finalMts) : f.issQty,
       puRate: row.puRate != null ? String(row.puRate) : f.puRate,
     }));
-    toast.success(`Loaded ${row.billNo} · ${row.itemName}`);
+    toast.success(`Loaded from Purchase ${row.billNo} · ${row.itemName}`);
   };
 
   const handleWeaverChange = (val) => {
@@ -719,6 +734,30 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
               onSubmit={(e) => handleSave(e)}
               className="classic-erp-body erp-job-issue-body flex-1 overflow-hidden min-h-0 flex flex-col justify-between"
             >
+              <div className="flex items-center justify-between px-3 py-1.5 bg-blue-50/90 border-b border-blue-200 text-xs shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-700">Material Source:</span>
+                  <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold border border-emerald-300">
+                    Warehouse Stock
+                  </span>
+                  <span className="text-slate-400 font-bold">OR</span>
+                  <button
+                    type="button"
+                    onClick={() => setPuBillLookupOpen(true)}
+                    disabled={locked}
+                    className="px-2.5 py-0.5 rounded bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-sm flex items-center gap-1 transition-all"
+                    title="Fetch items directly from Purchase Bills"
+                  >
+                    <Search size={11} /> Fetch From Purchase Bill
+                  </button>
+                </div>
+                {fromPurchase && (
+                  <div className="font-bold text-blue-900">
+                    From Purchase: {fromPurchase.invoiceNo}
+                  </div>
+                )}
+              </div>
+
               {fromPurchase && (
                 <div className="erp-mill-issue-purchase-bar shrink-0">
                   From Purchase {fromPurchase.invoiceNo || ''}

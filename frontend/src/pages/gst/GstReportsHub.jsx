@@ -4,11 +4,12 @@ import { gstApi } from '../../api/gst.api';
 import { notifyError } from '../../utils/notify';
 import { toast } from '../../store/useToastStore';
 import { downloadJson } from '../../utils/gstExport';
+import { exportTableToExcel } from '../../utils/reportExport';
 import ListPrint from '../../components/print/ListPrint';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faFileInvoiceDollar, faCartFlatbed, faScaleBalanced, faLayerGroup,
-  faNoteSticky, faChartPie, faSync, faPrint, faDownload, faTriangleExclamation,
+  faNoteSticky, faChartPie, faSync, faPrint, faDownload, faFileExcel, faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 
 /**
@@ -232,6 +233,36 @@ export default function GstReportsHub({ isOpen, onClose }) {
     setPrintCfg({ title: cfg[0], columns: cfg[1], rows: cfg[2] });
   };
 
+  const exportExcel = () => {
+    if (!data) return;
+    const map = {
+      gstr1: [`GSTR1_Sales_${from}_to_${to}`, COLS.b2b, b2bRows],
+      gstr2: [`GSTR2_Purchase_${from}_to_${to}`, COLS.gstr2, g2.map((r, i) => ({ ...r, _key: i }))],
+      hsn: [`HSN_Summary_${from}_to_${to}`, COLS.hsn, hsnRows],
+      cdn: [`Credit_Debit_Notes_${from}_to_${to}`, COLS.cdn, cdnRows],
+    };
+    const cfg = map[tab];
+    if (!cfg) {
+      // Export all summary sections
+      exportTableToExcel(`GST_Summary_${from}_to_${to}`, [
+        { key: 'section', label: 'Section' },
+        { key: 'count', label: 'Invoices/Notes' },
+        { key: 'taxable', label: 'Taxable Amount' },
+        { key: 'cgst', label: 'CGST' },
+        { key: 'sgst', label: 'SGST' },
+        { key: 'igst', label: 'IGST' },
+        { key: 'totalTax', label: 'Total Tax' },
+      ], [
+        { section: 'Outward (GSTR-1 B2B)', count: g1.counts?.b2b || 0, taxable: g1.taxable?.b2b || 0, cgst: (g1.tax?.b2b || 0)/2, sgst: (g1.tax?.b2b || 0)/2, igst: 0, totalTax: g1.tax?.b2b || 0 },
+        { section: 'Inward (GSTR-2 ITC)', count: g2.length, taxable: g2.reduce((s,x)=>s+(x.taxableAmount||0),0), cgst: g2.reduce((s,x)=>s+(x.cgst||0),0), sgst: g2.reduce((s,x)=>s+(x.sgst||0),0), igst: g2.reduce((s,x)=>s+(x.igst||0),0), totalTax: g2.reduce((s,x)=>s+(x.gstAmount||0),0) }
+      ]);
+      toast.success('GST Summary Excel exported');
+      return;
+    }
+    exportTableToExcel(cfg[0], cfg[1], cfg[2]);
+    toast.success(`${cfg[0]} Excel exported`);
+  };
+
   const exportJson = () => {
     if (!data) return;
     // Ships the exact server payload the tables above render — one source, no re-compute.
@@ -443,8 +474,11 @@ export default function GstReportsHub({ isOpen, onClose }) {
               <button type="button" onClick={activePrint} disabled={loading || !data} className="erp-btn erp-btn-secondary h-8 px-3 text-[11px] flex items-center gap-1.5">
                 <FontAwesomeIcon icon={faPrint} className="text-[10px]" /> Print
               </button>
-              <button type="button" onClick={exportJson} disabled={loading || !data} className="erp-btn erp-btn-primary h-8 px-3 text-[11px] flex items-center gap-1.5">
-                <FontAwesomeIcon icon={faDownload} className="text-[10px]" /> GSTR-1 JSON
+              <button type="button" onClick={exportExcel} disabled={loading || !data} className="erp-btn erp-btn-primary h-8 px-3 text-[11px] flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white">
+                <FontAwesomeIcon icon={faFileExcel} className="text-[10px]" /> Export Excel (.csv)
+              </button>
+              <button type="button" onClick={exportJson} disabled={loading || !data} className="erp-btn erp-btn-secondary h-8 px-3 text-[11px] flex items-center gap-1.5">
+                <FontAwesomeIcon icon={faDownload} className="text-[10px]" /> GSTR-1 JSON (Govt)
               </button>
               <button type="button" onClick={onClose} className="erp-btn erp-btn-secondary h-8 px-3 text-[11px]">Close</button>
             </div>

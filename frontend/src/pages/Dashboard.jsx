@@ -1251,10 +1251,8 @@ const Dashboard = () => {
             onSelectBook={handleSelectBook}
             bookFilter={
               ['cashBook', 'cashPayment', 'cashReceipt'].includes(bookSelection.module)
-                ? (b) => /cash/i.test(b.name || '')
-                : bookSelection.module === 'bankBook'
-                  ? (b) => /bank/i.test(b.name || '') && !/cash/i.test(b.name || '')
-                  : null
+                ? (b) => /cash/i.test(b.name || '') || b.accountType === 'Cash'
+                : null
             }
          />
 

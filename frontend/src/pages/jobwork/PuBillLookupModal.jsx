@@ -44,8 +44,13 @@ export default function PuBillLookupModal({
 
   const pick = (row) => {
     if (!row) return;
-    onSelect?.(row);
-    onClose?.();
+    try {
+      onSelect?.(row);
+    } catch (err) {
+      console.error('PuBillLookupModal onSelect error:', err);
+    } finally {
+      onClose?.();
+    }
   };
 
   const onKeyDown = (e) => {
@@ -112,12 +117,10 @@ export default function PuBillLookupModal({
               ) : (
                 rows.map((r, i) => (
                   <tr
-                    key={`${r.lotId}-${r.srNo}`}
+                    key={r.id || `${r.purchaseId}_${r.billNo}_${r.srNo}_${i}`}
                     className={`cursor-pointer ${i === idx ? 'bg-blue-600 text-white' : 'hover:bg-blue-50'}`}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      pick(r);
-                    }}
+                    onClick={() => pick(r)}
+                    onDoubleClick={() => pick(r)}
                     onMouseEnter={() => setIdx(i)}
                   >
                     <td className="px-1 py-0.5 border text-center">{r.sralNo}</td>

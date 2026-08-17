@@ -162,9 +162,19 @@ export function buildInvoiceViewModel({
   const sgst = Number(invoice.sgst ?? (isIgst ? 0 : gst / 2));
   const igst = Number(invoice.igst ?? (isIgst ? gst : 0));
   const cess = Number(invoice.cess || 0);
-  const discountTotal = Number(invoice.discountAmt || invoice.lessAmt || 0);
-  const footerAdd = Number(invoice.addAmt || 0);
+  // Separate discount and less so templates can render them as distinct labelled rows
+  const discountAmt = Number(invoice.discountAmt || 0);
   const footerLess = Number(invoice.lessAmt || 0);
+  const footerAdd = Number(invoice.addAmt || 0);
+  const discountTotal = discountAmt + footerLess;
+  // Compute gross base (before deductions) so we can derive percentages for display
+  const grossBase = taxable + discountTotal + Number(invoice.foldLess || 0);
+  const discountPer = grossBase > 0 && discountAmt > 0
+    ? Math.round((discountAmt / grossBase) * 10000) / 100
+    : Number(invoice.discountPer || 0);
+  const lessPer = grossBase > 0 && footerLess > 0
+    ? Math.round((footerLess / (grossBase - discountAmt)) * 10000) / 100
+    : Number(invoice.lessPer || 0);
 
   // Prefer line gstPer; else bill gstRate; else derive from taxable
   let gstRate = Number(invoice.gstRate || 0);
@@ -419,8 +429,11 @@ export function buildInvoiceViewModel({
       grossAmount: taxable + discountTotal + Number(invoice.foldLess || 0),
       subtotal: taxable + discountTotal,
       discount: discountTotal,
+      discountAmt,
+      discountPer: Number(invoice.discountPer || 0),
       foldLess: Number(invoice.foldLess || 0),
       lessAmt: footerLess,
+      lessPer: Number(invoice.lessPer || 0),
       addAmt: footerAdd,
       freight: Number(invoice.freight || 0),
       packing: Number(invoice.packing || invoice.totalAdd || 0),

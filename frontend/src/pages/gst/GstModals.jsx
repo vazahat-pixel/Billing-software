@@ -5,6 +5,7 @@ import { toast } from '../../store/useToastStore';
 import { SkeletonTable } from '../../components/ui/loaders';
 import { notifyError } from '../../utils/notify';
 import { downloadJson, getMonthDateRange, buildGstr1Filename } from '../../utils/gstExport';
+import { exportTableToExcel } from '../../utils/reportExport';
 import { stage4Api } from '../../api/stage4.api';
 import {
    Check,
@@ -249,6 +250,48 @@ export const Gstr1Modal = ({ isOpen, onClose }) => {
       }
    };
 
+   const handleDownloadExcel = async () => {
+      setExporting(true);
+      try {
+         const data = gstr1Data || (await fetchGstr1(startDate, endDate));
+         const b2bRows = (data?.b2b || []).flatMap((b) =>
+            (b.inv || []).map((i) => ({
+               ctin: b.ctin,
+               invNo: i.inum,
+               invDate: i.idt,
+               val: i.val,
+               pos: i.pos,
+               rchrg: i.rchrg,
+               taxable: (i.itms || []).reduce((s, x) => s + (x.itm_det?.txval || 0), 0),
+               cgst: (i.itms || []).reduce((s, x) => s + (x.itm_det?.camt || 0), 0),
+               sgst: (i.itms || []).reduce((s, x) => s + (x.itm_det?.samt || 0), 0),
+               igst: (i.itms || []).reduce((s, x) => s + (x.itm_det?.iamt || 0), 0),
+            }))
+         );
+         exportTableToExcel(
+            `GSTR1_Sales_Report_${selectedMonth}.csv`,
+            [
+               { key: 'ctin', label: 'GSTIN' },
+               { key: 'invNo', label: 'Invoice No' },
+               { key: 'invDate', label: 'Date' },
+               { key: 'val', label: 'Total Value' },
+               { key: 'pos', label: 'POS' },
+               { key: 'rchrg', label: 'Reverse Charge' },
+               { key: 'taxable', label: 'Taxable Amount' },
+               { key: 'cgst', label: 'CGST' },
+               { key: 'sgst', label: 'SGST' },
+               { key: 'igst', label: 'IGST' },
+            ],
+            b2bRows
+         );
+         toast.success(`GSTR-1 Excel exported for ${selectedMonth}`);
+      } catch (err) {
+         notifyError(err, 'GSTR-1 Excel export failed');
+      } finally {
+         setExporting(false);
+      }
+   };
+
    const invoiceData = useMemo(() => {
       const payload = gstr1Data?.payload || gstr1Data || {};
       const b2b = [];
@@ -328,11 +371,19 @@ export const Gstr1Modal = ({ isOpen, onClose }) => {
                   </div>
                   <button
                      type="button"
+                     onClick={handleDownloadExcel}
+                     disabled={exporting || loading}
+                     className="px-6 py-3 bg-emerald-700 text-white rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center gap-2 hover:bg-emerald-800 transition-all disabled:opacity-50"
+                  >
+                     <Download size={14} /> Export Excel (.csv)
+                  </button>
+                  <button
+                     type="button"
                      onClick={handleDownloadJson}
                      disabled={exporting || loading}
-                     className="px-8 py-3 bg-black text-white rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center gap-3 hover:bg-slate-800 transition-all disabled:opacity-50"
+                     className="px-6 py-3 bg-slate-800 text-white rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center gap-2 hover:bg-slate-900 transition-all disabled:opacity-50"
                   >
-                     <Download size={14} /> {exporting ? 'Exporting...' : 'Download JSON'}
+                     <Download size={14} /> {exporting ? 'Exporting...' : 'JSON (Govt)'}
                   </button>
                </div>
             </div>

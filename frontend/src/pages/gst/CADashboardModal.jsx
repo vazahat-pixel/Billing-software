@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
 import { downloadJson, buildGstr1Filename } from '../../utils/gstExport';
+import { exportTableToExcel } from '../../utils/reportExport';
+import { toast } from '../../store/useToastStore';
 import {
   RefreshCw, Download, FileText, AlertTriangle, CheckCircle2,
   Calculator, TrendingUp, TrendingDown, Scale, ShieldCheck
@@ -133,6 +135,41 @@ const CADashboardModal = ({ isOpen, onClose, onOpenGstr1, onOpenGstr2, onOpenGst
     downloadJson(data.gstr1, buildGstr1Filename(data.company?.gstin, startDate));
   };
 
+  const handleExportExcel = () => {
+    if (!data?.gstr1) return;
+    const rows = (data.gstr1.b2b || []).flatMap((b) =>
+      (b.inv || []).map((i) => ({
+        ctin: b.ctin,
+        invNo: i.inum,
+        invDate: i.idt,
+        val: i.val,
+        pos: i.pos,
+        rchrg: i.rchrg,
+        taxable: (i.itms || []).reduce((s, x) => s + (x.itm_det?.txval || 0), 0),
+        cgst: (i.itms || []).reduce((s, x) => s + (x.itm_det?.camt || 0), 0),
+        sgst: (i.itms || []).reduce((s, x) => s + (x.itm_det?.samt || 0), 0),
+        igst: (i.itms || []).reduce((s, x) => s + (x.itm_det?.iamt || 0), 0),
+      }))
+    );
+    exportTableToExcel(
+      `GSTR1_CA_Report_${month}.csv`,
+      [
+        { key: 'ctin', label: 'GSTIN' },
+        { key: 'invNo', label: 'Invoice No' },
+        { key: 'invDate', label: 'Date' },
+        { key: 'val', label: 'Total Value' },
+        { key: 'pos', label: 'POS' },
+        { key: 'rchrg', label: 'Reverse Charge' },
+        { key: 'taxable', label: 'Taxable Amount' },
+        { key: 'cgst', label: 'CGST' },
+        { key: 'sgst', label: 'SGST' },
+        { key: 'igst', label: 'IGST' },
+      ],
+      rows
+    );
+    toast.success('GSTR-1 CA Desk Excel exported');
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -144,31 +181,33 @@ const CADashboardModal = ({ isOpen, onClose, onOpenGstr1, onOpenGstr2, onOpenGst
         {/* Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-card)]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[var(--accent)] text-white flex items-center justify-center">
-              <Calculator size={18} />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-[var(--text-primary)]">{data?.company?.name || 'Company'}</p>
-              <p className="text-[10px] text-[var(--text-muted)]">
-                GSTIN: {data?.company?.gstin || '—'}
-                {data?.generatedAt && (
-                  <span className="ml-2 text-emerald-600 font-semibold">● Live</span>
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Month:</span>
             <input
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="h-8 px-2 text-xs border border-[var(--border-strong)] rounded-lg bg-[var(--bg-card)]"
+              className="h-8 px-2 text-[12px] font-medium rounded border border-[var(--border)] bg-[var(--bg-base)] text-[var(--text-primary)]"
             />
-            <button type="button" onClick={load} disabled={loading} className="erp-btn erp-btn-secondary h-8 px-3 text-[11px] gap-1">
+            <button
+              type="button"
+              onClick={load}
+              disabled={loading}
+              className="erp-btn erp-btn-secondary h-8 px-3 text-[11px] gap-1"
+            >
               <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh
             </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="erp-btn erp-btn-primary h-8 px-3 text-[11px] gap-1 bg-emerald-700 hover:bg-emerald-800 text-white"
+            >
+              <Download size={12} /> Export Excel (.csv)
+            </button>
             <button type="button" onClick={handleExportGstr1} className="erp-btn erp-btn-secondary h-8 px-3 text-[11px] gap-1">
-              <Download size={12} /> GSTR-1 JSON
+              <Download size={12} /> GSTR-1 JSON (Govt)
             </button>
           </div>
         </div>

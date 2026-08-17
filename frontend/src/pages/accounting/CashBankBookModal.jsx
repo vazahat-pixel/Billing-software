@@ -10,6 +10,7 @@ import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import BillNoLookupModal from './BillNoLookupModal';
 import AccountMasterModal from '../masters/AccountMasterModal';
 import NoteModal from '../transactions/NoteModal';
+import LedgerModal from '../LedgerModal';
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 
@@ -98,6 +99,7 @@ const CashBankBookModal = ({
   const [billLookupOpen, setBillLookupOpen] = useState(false);
   const [billLookupTargetIdx, setBillLookupTargetIdx] = useState(null);
   const [bankMasterOpen, setBankMasterOpen] = useState(false);
+  const [bankLedgerOpen, setBankLedgerOpen] = useState(false);
   // Credit Note modal — opened when user clicks toast action after a discounted receipt save
   const [creditNoteModal, setCreditNoteModal] = useState({ open: false, noteId: null, type: 'Credit', side: 'Sales' });
   const openedRef = useRef(false);
@@ -403,12 +405,29 @@ const CashBankBookModal = ({
 
   useEffect(() => {
     if (!isOpen || locked) return;
+    if (selectedBook) {
+      const bookName = (selectedBook.name || '').trim().toLowerCase();
+      const matched = bankCashLedgers.find(
+        (l) =>
+          (l.name || '').trim().toLowerCase() === bookName ||
+          (selectedBook.ledgerId && String(l._id || l.id) === String(selectedBook.ledgerId))
+      );
+      if (matched) {
+        setHeader((h) => ({
+          ...h,
+          bankLedgerId: matched._id || matched.id,
+          bookName: selectedBook.name,
+          bookId: selectedBook._id,
+        }));
+        return;
+      }
+    }
     if (header.bankLedgerId) return;
     const first = bankCashLedgers[0];
     if (first) {
       setHeader((h) => ({ ...h, bankLedgerId: first._id || first.id }));
     }
-  }, [bankCashLedgers, isOpen, locked, header.bankLedgerId]);
+  }, [bankCashLedgers, isOpen, locked, selectedBook, header.bankLedgerId]);
 
   // Land on Party once the masters are in, so the Enter chain starts at step 1.
   useEffect(() => {
@@ -1059,7 +1078,19 @@ const CashBankBookModal = ({
             {/* Field order here IS the Enter-key order: Party → Bank/Cash → Amount → Acc/Bill → BillNo. */}
             <div className={`cash-bank-row ${isOnAccount ? 'cash-bank-row--4' : 'cash-bank-row--5'}`}>
               <div className="classic-erp-field classic-erp-field--xs">
-                <span className="classic-erp-label">{isBank ? 'Bank:' : 'Cash:'}</span>
+                <div className="flex items-center justify-between">
+                  <span className="classic-erp-label">{isBank ? 'Bank:' : 'Cash:'}</span>
+                  {header.bankLedgerId && (
+                    <button
+                      type="button"
+                      className="text-[10px] text-blue-700 hover:text-blue-900 font-bold underline cursor-pointer"
+                      onClick={() => setBankLedgerOpen(true)}
+                      title="Open Bank Ledger Statement (Zoom Ledger)"
+                    >
+                      Zoom Ledger
+                    </button>
+                  )}
+                </div>
                 <ERPCombobox
                   value={header.bankLedgerId}
                   onChange={(val) => setHeader((h) => ({ ...h, bankLedgerId: val }))}
@@ -1387,6 +1418,7 @@ const CashBankBookModal = ({
           <button className="classic-erp-btn" type="button" onClick={handleFind}>Find</button>
           <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || !selectedVoucherId || mode !== 'View'} title="Reverses posted voucher — ledger entries and bill outstanding are undone, not hard-deleted">Delete</button>
           <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
+          <button className="classic-erp-btn font-bold text-blue-800" type="button" onClick={() => setBankLedgerOpen(true)} disabled={!header.bankLedgerId} title="Open Bank/Cash Ledger (Zoom Ledger)">Zoom Ledger</button>
           {isBank && <button className="classic-erp-btn" type="button" onClick={() => notifyWarning('Cheque return — use Bank Reconciliation.')}>Cheq Rt</button>}
           <button className="classic-erp-btn" type="button" onClick={() => { setFindQuery(''); handleFind(); }}>Sp.Find</button>
           {isBankReceipt && <button className="classic-erp-btn" type="button" onClick={handlePrint}>Slip.Print</button>}
@@ -1427,6 +1459,15 @@ const CashBankBookModal = ({
       initialSide={creditNoteModal.side}
       initialNoteId={creditNoteModal.noteId}
     />
+
+    {bankLedgerOpen && (
+      <LedgerModal
+        isOpen={bankLedgerOpen}
+        onClose={() => setBankLedgerOpen(false)}
+        initialLedgerId={header.bankLedgerId}
+        autoRun={true}
+      />
+    )}
     </>
   );
 };

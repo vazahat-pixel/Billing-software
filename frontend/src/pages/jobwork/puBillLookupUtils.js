@@ -6,78 +6,102 @@ export function buildPuBillRows({ inventoryLots = [], purchases = [], items = []
   const rows = [];
   let sral = 0;
 
-  // Build maps for quick lookup of inventory lots
-  // Key: purchaseId + lotCode or purchaseId + itemId
+  // Index inventory lots by various lookup keys
   const lotMap = new Map();
-  inventoryLots.forEach((lot) => {
+  (inventoryLots || []).forEach((lot) => {
     const pid = String(lot.purchaseId?._id || lot.purchaseId || '');
     const itemId = String(lot.itemId?._id || lot.itemId || '');
     const lotCode = String(lot.lotId || '');
+
     if (pid) {
       if (lotCode) lotMap.set(`${pid}_${lotCode}`, lot);
-      lotMap.set(`${pid}_${itemId}`, lot);
+      if (itemId) lotMap.set(`${pid}_${itemId}`, lot);
     }
+    if (lotCode) lotMap.set(lotCode, lot);
+    if (itemId && !lotMap.has(itemId)) lotMap.set(itemId, lot);
   });
 
   const itemNameOf = (itemObj) => {
-    const found = items.find((i) => String(i._id || i.id) === String(itemObj.itemId?._id || itemObj.itemId || ''));
+    const found = (items || []).find((i) => String(i._id || i.id) === String(itemObj.itemId?._id || itemObj.itemId || ''));
     return found?.itemName || found?.name || itemObj.itemName || 'Item';
   };
 
-  purchases.forEach((p) => {
-    const pid = String(p._id || p.id || '');
-    const supplierName = p.supplierId?.name || p.supplierName || p.partyName || '';
-    
-    // Filter by weaver if specified
-    if (weaverKey) {
-      const match =
-        supplierName.toLowerCase().includes(weaverKey) ||
-        weaverKey.includes(supplierName.toLowerCase());
-      if (!match) return;
-    }
+  const processPurchaseList = (list, filterWeaver = true) => {
+    (list || []).forEach((p) => {
+      const pid = String(p._id || p.id || '');
+      const supplierName = p.supplierId?.name || p.supplierName || p.partyName || p.weaver || '';
 
-    const billNo = p.invoiceNo || p.supplierInvoiceNo || p.billNo || '';
-    const lineItems = Array.isArray(p.items) ? p.items : [];
+      if (filterWeaver && weaverKey) {
+        const supLower = supplierName.toLowerCase();
+        const match = supLower.includes(weaverKey) || weaverKey.includes(supLower);
+        if (!match) return;
+      }
 
-    lineItems.forEach((li, idx) => {
-      // Find corresponding inventory lot
-      const lotCode = String(li.lotId || '');
-      const itemId = String(li.itemId?._id || li.itemId || '');
-      const lot = lotMap.get(`${pid}_${lotCode}`) || lotMap.get(`${pid}_${itemId}`);
+      const billNo = p.invoiceNo || p.supplierInvoiceNo || p.billNo || '';
+      const lineItems = Array.isArray(p.items) ? p.items : [];
 
-      const balPcs = lot ? Number(lot.remainingPcs || 0) : Number(li.pcs || 0);
-      const balMts = lot ? Number(lot.remainingMtrs || 0) : Number(li.mts || 0);
-      const balKgs = lot ? Number(lot.remainingKgs || lot.totalKgs || 0) : Number(li.kgs || 0);
+      lineItems.forEach((li, idx) => {
+        const lotCode = String(li.lotId || '');
+        const itemId = String(li.itemId?._id || li.itemId || '');
+        const lot =
+          lotMap.get(`${pid}_${lotCode}`) ||
+          lotMap.get(`${pid}_${itemId}`) ||
+          (lotCode ? lotMap.get(lotCode) : null) ||
+          (itemId ? lotMap.get(itemId) : null);
 
-      const puRate = Number(lot?.rate || li.rate || li.purchaseRate || 0);
+        const balPcs = lot ? Number(lot.remainingPcs || 0) : Number(li.pcs || 0);
+        const balMts = lot ? Number(lot.remainingMtrs || 0) : Number(li.mts || 0);
+        const balKgs = lot ? Number(lot.remainingKgs || lot.totalKgs || 0) : Number(li.kgs || 0);
 
-      rows.push({
-        sralNo: ++sral,
-        billNo,
-        billDt: p.date || p.createdAt || lot?.createdAt || '',
-        srNo: idx + 1,
-        itemName: lot ? (lot.itemName || lot.itemId?.name || lot.itemId?.itemName || itemNameOf(li)) : itemNameOf(li),
-        balPcs,
-        balMts,
-        balKgs,
-        puRate,
-        pcs: Number(li.pcs || 0),
-        mts: Number(li.mts || 0),
-        lrNo: p.lrNo || '',
-        transport: p.transport || '',
-        lotId: lot?._id || lot?.id || '',
-        lotCode: lotCode || lot?.lotId || '',
-        purchaseId: pid,
-        supplierName,
+        const puRate = Number(lot?.rate || li.rate || li.purchaseRate || 0);
+        const resolvedItemId = itemId || lot?.itemId?._id || lot?.itemId || '';
+        const resolvedItemName = lot
+          ? (lot.itemName || lot.itemId?.name || lot.itemId?.itemName || itemNameOf(li))
+          : itemNameOf(li);
+
+        rows.push({
+          id: `${pid}_${billNo}_line${idx}_${sral}`,
+          sralNo: ++sral,
+          billNo,
+          billDt: p.date || p.createdAt || lot?.createdAt || '',
+          srNo: idx + 1,
+          itemId: resolvedItemId,
+          itemName: resolvedItemName,
+          balPcs,
+          balMts,
+          balKgs,
+          puRate,
+          pcs: Number(li.pcs || 0),
+          mts: Number(li.mts || 0),
+          lrNo: p.lrNo || '',
+          transport: p.transport || '',
+          lotId: lot?._id || lot?.id || '',
+          lotCode: lotCode || lot?.lotId || billNo,
+          purchaseId: pid,
+          supplierName,
+          weaver: supplierName,
+        });
       });
     });
-  });
+  };
 
-  return rows.sort((a, b) => {
-    const da = new Date(a.billDt || 0).getTime();
-    const db = new Date(b.billDt || 0).getTime();
-    return db - da;
-  }).map((r, i) => ({ ...r, sralNo: i + 1 }));
+  // First try with weaver filter if weaverKey present
+  if (weaverKey) {
+    processPurchaseList(purchases, true);
+  }
+  // If no rows matched weaver or weaver is empty, include all purchase bills
+  if (rows.length === 0) {
+    sral = 0;
+    processPurchaseList(purchases, false);
+  }
+
+  return rows
+    .sort((a, b) => {
+      const da = new Date(a.billDt || 0).getTime();
+      const db = new Date(b.billDt || 0).getTime();
+      return db - da;
+    })
+    .map((r, i) => ({ ...r, sralNo: i + 1 }));
 }
 
 export function fmtBillDate(d) {

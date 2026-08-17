@@ -3,6 +3,8 @@ import useStore from '../../store/useStore';
 import { ERPButton, ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import { FileSpreadsheet, FileDown, Printer, Search, Calendar, Filter, ArrowRight } from 'lucide-react';
 
+import { downloadCsv } from '../../utils/reportExport';
+
 const GSTReport = () => {
   const { sales, purchases, currentCompany } = useStore();
   const [filterText, setFilterText] = useState('');
@@ -54,6 +56,21 @@ const GSTReport = () => {
       netPayable: outputTax - inputTax
     };
   }, [gstr1, gstr2]);
+
+  const exportToExcel = () => {
+    const headers = ['Date', 'Invoice No', 'Party ID / Name', 'Taxable Amount', 'CGST', 'SGST', 'IGST', 'Total Amount'];
+    const rows = gstr1.map(s => [
+      s.date || '',
+      s.invoice || '',
+      s.party || '',
+      s.taxable || 0,
+      s.cgst || 0,
+      s.sgst || 0,
+      s.igst || 0,
+      s.total || 0
+    ]);
+    downloadCsv(`GST_Sales_Report_${startDate}_to_${endDate}.csv`, headers, rows);
+  };
 
   const exportToJSON = () => {
     const data = { gstr1, gstr2, summary, company: currentCompany };
@@ -171,11 +188,18 @@ const GSTReport = () => {
             
             <div className="flex items-center gap-3">
                <button 
-                  onClick={exportToJSON}
-                  className="p-3 border-2 border-black text-black hover:bg-black hover:text-white transition-all"
-                  title="XLS EXPORT"
+                  onClick={exportToExcel}
+                  className="p-3 border-2 border-black bg-emerald-700 text-white hover:bg-emerald-800 transition-all flex items-center gap-2 text-xs font-bold"
+                  title="Export Excel (.csv)"
                >
-                  <FileSpreadsheet size={16} />
+                  <FileSpreadsheet size={16} /> Export Excel (.csv)
+               </button>
+               <button 
+                  onClick={exportToJSON}
+                  className="p-3 border-2 border-black text-black hover:bg-black hover:text-white transition-all text-xs font-bold"
+                  title="Export JSON (Govt Portal)"
+               >
+                  <FileDown size={16} /> JSON (Govt)
                </button>
                <button 
                   onClick={exportToJSON}
