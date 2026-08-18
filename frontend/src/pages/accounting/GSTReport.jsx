@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import useStore from '../../store/useStore';
 import { ERPButton, ERPInput, ERPSelect } from '../../components/forms/FormElements';
-import { FileSpreadsheet, FileDown, Printer, Search, Calendar, Filter, ArrowRight } from 'lucide-react';
-
+import { FileSpreadsheet, FileDown, Printer, Search, Calendar, Filter, ArrowRight, FileText } from 'lucide-react';
+import { ModalLoader } from '../../components/ui/loaders';
 import { downloadCsv } from '../../utils/reportExport';
 
 const GSTReport = () => {
@@ -11,41 +11,71 @@ const GSTReport = () => {
   const [startDate, setStartDate] = useState('2026-04-01');
   const [endDate, setEndDate] = useState('2026-05-05');
   const [gstType, setGstType] = useState('All');
+  const [isLoading, setIsLoading] = useState(false);
 
   const gstr1 = useMemo(() => {
     return sales
       .filter(s => {
-        const matchesSearch = s.invoiceNo?.toLowerCase().includes(filterText.toLowerCase()) || 
-                              s.customerId?.toLowerCase().includes(filterText.toLowerCase());
-        const matchesGst = gstType === 'All' || 
-                           (gstType === 'IGST' && parseFloat(s.igst) > 0) ||
-                           (gstType === 'CGST/SGST' && parseFloat(s.cgst) > 0);
-        return matchesSearch && matchesGst;
+        const saleDate = new Date(s.date);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const dateInRange = saleDate >= start && saleDate <= end;
+
+        const matchesSearch = s.invoiceNo?.toLowerCase().includes(filterText.toLowerCase()) ||
+                              s.customerId?.name?.toLowerCase?.().includes(filterText.toLowerCase()) ||
+                              String(s.customerId).toLowerCase().includes(filterText.toLowerCase());
+        const matchesGst = gstType === 'All' ||
+                           (gstType === 'IGST' && Number(s.igst) > 0) ||
+                           (gstType === 'CGST/SGST' && Number(s.cgst) > 0);
+        return dateInRange && matchesSearch && matchesGst;
       })
-      .map(s => ({
-        date: s.date,
-        invoice: s.invoiceNo,
-        party: s.customerId,
-        taxable: parseFloat(s.taxableAmount) || 0,
-        cgst: parseFloat(s.cgst) || 0,
-        sgst: parseFloat(s.sgst) || 0,
-        igst: parseFloat(s.igst) || 0,
-        total: parseFloat(s.netAmount) || 0
-      }));
-  }, [sales, filterText, gstType]);
+      .map(s => {
+        const taxable = Number(s.taxableAmount) || 0;
+        const cgst = Number(s.cgst) || 0;
+        const sgst = Number(s.sgst) || 0;
+        const igst = Number(s.igst) || 0;
+        const total = Number(s.netAmount) || (taxable + cgst + sgst + igst);
+
+        return {
+          date: s.date ? new Date(s.date).toISOString().split('T')[0] : '',
+          invoice: s.invoiceNo || '',
+          party: s.customerId?.name || s.customerId || '',
+          taxable: Number(taxable.toFixed(2)),
+          cgst: Number(cgst.toFixed(2)),
+          sgst: Number(sgst.toFixed(2)),
+          igst: Number(igst.toFixed(2)),
+          total: Number(total.toFixed(2))
+        };
+      });
+  }, [sales, filterText, gstType, startDate, endDate]);
 
   const gstr2 = useMemo(() => {
-    return purchases.map(p => ({
-      date: p.date,
-      invoice: p.invoiceNo,
-      party: p.supplierId,
-      taxable: parseFloat(p.taxableAmount) || 0,
-      cgst: parseFloat(p.cgst) || 0,
-      sgst: parseFloat(p.sgst) || 0,
-      igst: parseFloat(p.igst) || 0,
-      total: parseFloat(p.netAmount) || 0
-    }));
-  }, [purchases]);
+    return purchases
+      .filter(p => {
+        const purchaseDate = new Date(p.date);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        return purchaseDate >= start && purchaseDate <= end;
+      })
+      .map(p => {
+        const taxable = Number(p.taxableAmount) || 0;
+        const cgst = Number(p.cgst) || 0;
+        const sgst = Number(p.sgst) || 0;
+        const igst = Number(p.igst) || 0;
+        const total = Number(p.netAmount) || (taxable + cgst + sgst + igst);
+
+        return {
+          date: p.date ? new Date(p.date).toISOString().split('T')[0] : '',
+          invoice: p.invoiceNo || p.supplierInvoiceNo || '',
+          party: p.supplierId?.name || p.supplierId || '',
+          taxable: Number(taxable.toFixed(2)),
+          cgst: Number(cgst.toFixed(2)),
+          sgst: Number(sgst.toFixed(2)),
+          igst: Number(igst.toFixed(2)),
+          total: Number(total.toFixed(2))
+        };
+      });
+  }, [purchases, startDate, endDate]);
 
   const summary = useMemo(() => {
     const outputTax = gstr1.reduce((acc, s) => acc + s.cgst + s.sgst + s.igst, 0);
@@ -57,33 +87,55 @@ const GSTReport = () => {
     };
   }, [gstr1, gstr2]);
 
-  const exportToExcel = () => {
-    const headers = ['Date', 'Invoice No', 'Party ID / Name', 'Taxable Amount', 'CGST', 'SGST', 'IGST', 'Total Amount'];
-    const rows = gstr1.map(s => [
-      s.date || '',
-      s.invoice || '',
-      s.party || '',
-      s.taxable || 0,
-      s.cgst || 0,
-      s.sgst || 0,
-      s.igst || 0,
-      s.total || 0
-    ]);
-    downloadCsv(`GST_Sales_Report_${startDate}_to_${endDate}.csv`, headers, rows);
+  const exportToExcel = async () => {
+    try {
+      setIsLoading(true);
+      const headers = ['Date', 'Invoice No', 'Party ID / Name', 'Taxable Amount', 'CGST', 'SGST', 'IGST', 'Total Amount'];
+      const rows = gstr1.map(s => [
+        s.date || '',
+        s.invoice || '',
+        s.party || '',
+        Number(s.taxable).toFixed(2),
+        Number(s.cgst).toFixed(2),
+        Number(s.sgst).toFixed(2),
+        Number(s.igst).toFixed(2),
+        Number(s.total).toFixed(2)
+      ]);
+      downloadCsv(`GST_Sales_Report_${startDate}_to_${endDate}.csv`, headers, rows);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const exportToJSON = () => {
-    const data = { gstr1, gstr2, summary, company: currentCompany };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `GST_Report_${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
+  const exportToJSON = async () => {
+    try {
+      setIsLoading(true);
+      const data = {
+        gstr1: gstr1.map(s => ({ ...s, taxable: Number(s.taxable.toFixed(2)), cgst: Number(s.cgst.toFixed(2)), sgst: Number(s.sgst.toFixed(2)), igst: Number(s.igst.toFixed(2)), total: Number(s.total.toFixed(2)) })),
+        gstr2: gstr2.map(p => ({ ...p, taxable: Number(p.taxable.toFixed(2)), cgst: Number(p.cgst.toFixed(2)), sgst: Number(p.sgst.toFixed(2)), igst: Number(p.igst.toFixed(2)), total: Number(p.total.toFixed(2)) })),
+        summary: {
+          outputTax: Number(summary.outputTax.toFixed(2)),
+          inputTax: Number(summary.inputTax.toFixed(2)),
+          netPayable: Number(summary.netPayable.toFixed(2))
+        },
+        company: currentCompany,
+        generatedAt: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `GST_Report_${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="space-y-10 animate-fadeIn pb-10">
+    <div className="space-y-10 animate-fadeIn pb-10 relative">
+      {isLoading && <ModalLoader message="Generating GST Report…" />}
       
       {/* Summary Matrix */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
