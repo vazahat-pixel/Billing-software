@@ -68,6 +68,7 @@ const CashBankBookModal = ({
   initialType = 'Receipt',
   selectedBook = null,
   readOnly = false,
+  initialVoucherId = null,
 }) => {
   const {
     parties,
@@ -396,12 +397,23 @@ const CashBankBookModal = ({
     setVoucherType(initialType);
     if (!openedRef.current) {
       openedRef.current = true;
-      resetNew();
+      if (!initialVoucherId) {
+        resetNew();
+      }
     }
     return () => {
       cancelled = true;
     };
-  }, [isOpen, initialType, bookKind]);
+  }, [isOpen, initialType, bookKind, initialVoucherId]);
+
+  useEffect(() => {
+    if (!isOpen || !initialVoucherId) return;
+    const target = (vouchers || []).find((v) => String(v._id || v.id) === String(initialVoucherId));
+    if (target) {
+      if (target.voucherType) setVoucherType(target.voucherType);
+      loadVoucher(target);
+    }
+  }, [isOpen, initialVoucherId, vouchers]);
 
   useEffect(() => {
     if (!isOpen || locked) return;

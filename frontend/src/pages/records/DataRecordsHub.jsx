@@ -15,6 +15,12 @@ import PurchasePrint from '../purchase/PurchasePrint';
 import ListPrint from '../../components/print/ListPrint';
 import JobWorkPrint from '../../components/print/JobWorkPrint';
 import { EmptyStateSVG } from '../../components/ui/Illustrations';
+import NoteModal from '../transactions/NoteModal';
+import SalesModal from '../sales/SalesModal';
+import PurchaseModal from '../purchase/PurchaseModal';
+import CashBankBookModal from '../accounting/CashBankBookModal';
+import IssueModal from '../jobwork/IssueModal';
+import ReceiveModal from '../jobwork/ReceiveModal';
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-IN') : '—');
 const fmtAmt = (n) => `₹ ${(Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -129,7 +135,7 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const RecordsTable = ({ columns, rows, emptyText }) => (
+const RecordsTable = ({ columns, rows, emptyText, onRowClick }) => (
   <div className="border border-[var(--border)] rounded-xl overflow-hidden">
     <div className="overflow-x-auto max-h-[calc(90vh-220px)] overflow-y-auto">
       <table className="w-full text-left text-xs">
@@ -153,7 +159,11 @@ const RecordsTable = ({ columns, rows, emptyText }) => (
               </td>
             </tr>
           ) : rows.map((row, i) => (
-            <tr key={row._key || i} className="hover:bg-[var(--bg-base)] transition-colors">
+            <tr
+              key={row._key || i}
+              onClick={() => onRowClick?.(row)}
+              className={`transition-colors ${onRowClick ? 'cursor-pointer hover:bg-blue-50/80 active:bg-blue-100' : 'hover:bg-[var(--bg-base)]'}`}
+            >
               {columns.map(col => (
                 <td key={col.key} className={`px-4 py-3 text-[11px] ${col.align === 'right' ? 'text-right font-semibold' : col.align === 'center' ? 'text-center' : ''}`}>
                   {col.render ? col.render(row) : row[col.key]}
@@ -185,6 +195,12 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
   const [printPurchaseId, setPrintPurchaseId] = useState(null);
   const [printListOpen, setPrintListOpen] = useState(false);
   const [printJob, setPrintJob] = useState(null); // { job, variant }
+  const [noteModal, setNoteModal] = useState({ open: false, noteId: null, type: 'Credit', side: 'Sales' });
+  const [salesModal, setSalesModal] = useState({ open: false, invoice: null });
+  const [purchaseModal, setPurchaseModal] = useState({ open: false, purchase: null });
+  const [cashBankModal, setCashBankModal] = useState({ open: false, voucher: null, bookKind: 'Receipt' });
+  const [issueModal, setIssueModal] = useState({ open: false, initialData: null });
+  const [receiveModal, setReceiveModal] = useState({ open: false, initialData: null });
 
   useEffect(() => {
     if (isOpen) {
@@ -318,7 +334,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             { key: 'payment', label: 'Payment Mode', render: r => <span className="text-[10px] font-medium">{getSalePayments(r._id)}</span> },
             { key: 'status', label: 'Status', align: 'center', render: r => <StatusBadge status={r.status} /> },
             { key: 'actions', label: '', align: 'center', render: r => (
-                <button type="button" onClick={() => setPrintSalesId(r._id || r.id)} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="PDF / Print Invoice">
+                <button type="button" onClick={(e) => { e.stopPropagation(); setPrintSalesId(r._id || r.id); }} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="PDF / Print Invoice">
                   <FontAwesomeIcon icon={faPrint} />
                 </button>
             ) },
@@ -327,6 +343,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             filterText(s.invoiceNo) || filterText(resolveName(s.customerId || s.partyId, parties))
           ).map(s => ({ ...s, _key: s._id })),
           emptyText: 'No sales invoices. Create from Transaction → Sales Billing.',
+          onRowClick: (r) => setSalesModal({ open: true, invoice: r }),
         };
       }
 
@@ -353,7 +370,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             { key: 'payment', label: 'Payment Mode', render: r => <span className="text-[10px] font-medium">{getPurchasePayments(r._id)}</span> },
             { key: 'status', label: 'Status', align: 'center', render: r => <StatusBadge status={r.status} /> },
             { key: 'actions', label: '', align: 'center', render: r => (
-                <button type="button" onClick={() => setPrintPurchaseId(r._id || r.id)} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="PDF / Print Bill">
+                <button type="button" onClick={(e) => { e.stopPropagation(); setPrintPurchaseId(r._id || r.id); }} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="PDF / Print Bill">
                   <FontAwesomeIcon icon={faPrint} />
                 </button>
             ) },
@@ -362,6 +379,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             filterText(p.billNo || p.invoiceNo) || filterText(resolveName(p.supplierId || p.partyId, parties))
           ).map(p => ({ ...p, _key: p._id })),
           emptyText: 'No purchase bills. Create from Transaction → Purchase.',
+          onRowClick: (r) => setPurchaseModal({ open: true, purchase: r }),
         };
       }
 
@@ -378,7 +396,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             { key: 'receivedQty', label: 'Received', align: 'right', render: r => `${r.receivedQty || 0} Mtrs` },
             { key: 'status', label: 'Status', align: 'center', render: r => <StatusBadge status={r.status} /> },
             { key: 'actions', label: '', align: 'center', render: r => (
-                <button type="button" onClick={() => setPrintJob({ job: r, variant: 'millIssue' })} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="Print Mill Challan">
+                <button type="button" onClick={(e) => { e.stopPropagation(); setPrintJob({ job: r, variant: 'millIssue' }); }} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="Print Mill Challan">
                   <FontAwesomeIcon icon={faPrint} />
                 </button>
             ) },
@@ -387,13 +405,9 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             filterText(j.jobCardNo) || filterText(resolveName(j.workerId, parties)) || filterText(j.processType)
           ).map(j => ({ ...j, _key: j._id, process: j.processType })),
           emptyText: 'No mill issues. Create from Transaction → Mill Issue.',
+          onRowClick: (r) => setIssueModal({ open: true, initialData: r }),
         };
 
-      /**
-       * Receiving does not create its own document — receiveFromMill updates the SAME Job
-       * record the issue created (receivedQty / receiveDate / status). So this is the issue
-       * register filtered to cards that have something back, not a separate collection.
-       */
       case 'millReceive':
         return {
           title: 'Mill Receive List',
@@ -409,7 +423,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             { key: 'wastage', label: 'Wastage', align: 'right', render: r => `${r.wastage || 0} Mtrs` },
             { key: 'status', label: 'Status', align: 'center', render: r => <StatusBadge status={r.status} /> },
             { key: 'actions', label: '', align: 'center', render: r => (
-                <button type="button" onClick={() => setPrintJob({ job: r, variant: 'millReceive' })} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="Print Job Card / Receive Report">
+                <button type="button" onClick={(e) => { e.stopPropagation(); setPrintJob({ job: r, variant: 'millReceive' }); }} className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors p-1" title="Print Job Card / Receive Report">
                   <FontAwesomeIcon icon={faPrint} />
                 </button>
             ) },
@@ -419,6 +433,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
               filterText(j.jobCardNo) || filterText(resolveName(j.workerId, parties)) || filterText(j.billGpNo)
             ).map(j => ({ ...j, _key: j._id })),
           emptyText: 'Nothing received yet. Receive against a challan from Transaction → Mill Receive.',
+          onRowClick: (r) => setReceiveModal({ open: true, initialData: r }),
         };
 
       case 'receipts':
@@ -438,6 +453,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             filterText(v.voucherNo) || filterText(v.partyName) || filterText(formatPaymentSplits(v))
           ).map(v => ({ ...v, _key: v._id })),
           emptyText: 'No bank receipts. Create from Transaction → Bank Receipt.',
+          onRowClick: (r) => setCashBankModal({ open: true, voucher: r, bookKind: 'Receipt' }),
         };
 
       case 'payments':
@@ -457,6 +473,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             filterText(v.voucherNo) || filterText(v.partyName) || filterText(formatPaymentSplits(v))
           ).map(v => ({ ...v, _key: v._id })),
           emptyText: 'No bank payments. Create from Transaction → Bank Payment.',
+          onRowClick: (r) => setCashBankModal({ open: true, voucher: r, bookKind: 'Payment' }),
         };
 
       case 'salesOrders':
@@ -547,6 +564,12 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
             filterText(n.noteNo || n.invoiceNo) || filterText(n.noteType) || filterText(resolveName(n.partyId, parties))
           ).map(n => ({ ...n, _key: n._id })),
           emptyText: 'No debit/credit notes. Create from Transaction → Debit/Credit Note.',
+          onRowClick: (r) => setNoteModal({
+            open: true,
+            noteId: r._id || r.id,
+            type: r.noteType || 'Credit',
+            side: r.noteSide || (r.noteType === 'Debit' ? 'Purchase' : 'Sales'),
+          }),
         };
 
       case 'visits':
@@ -670,6 +693,7 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
               columns={tableConfig.columns}
               rows={tableConfig.rows}
               emptyText={tableConfig.emptyText}
+              onRowClick={tableConfig.onRowClick}
             />
           </div>
         </div>
@@ -690,6 +714,55 @@ const DataRecordsHub = ({ isOpen, onClose, initialTab = 'accounts' }) => {
           variant={printJob.variant}
           data={buildJobPrintData(printJob.job, printJob.variant, parties)}
           onClose={() => setPrintJob(null)}
+        />
+      )}
+
+      {noteModal.open && (
+        <NoteModal
+          isOpen={noteModal.open}
+          onClose={() => setNoteModal({ open: false, noteId: null, type: 'Credit', side: 'Sales' })}
+          initialType={noteModal.type}
+          initialSide={noteModal.side}
+          initialNoteId={noteModal.noteId}
+        />
+      )}
+      {salesModal.open && (
+        <SalesModal
+          isOpen={salesModal.open}
+          onClose={() => setSalesModal({ open: false, invoice: null })}
+          initialData={salesModal.invoice}
+          readOnly
+        />
+      )}
+      {purchaseModal.open && (
+        <PurchaseModal
+          isOpen={purchaseModal.open}
+          onClose={() => setPurchaseModal({ open: false, purchase: null })}
+          initialData={purchaseModal.purchase}
+          readOnly
+        />
+      )}
+      {cashBankModal.open && (
+        <CashBankBookModal
+          isOpen={cashBankModal.open}
+          onClose={() => setCashBankModal({ open: false, voucher: null, bookKind: 'Receipt' })}
+          initialType={cashBankModal.voucher?.voucherType || 'Receipt'}
+          initialVoucherId={cashBankModal.voucher?._id || cashBankModal.voucher?.id}
+          bookKind={cashBankModal.bookKind}
+        />
+      )}
+      {issueModal.open && (
+        <IssueModal
+          isOpen={issueModal.open}
+          onClose={() => setIssueModal({ open: false, initialData: null })}
+          initialData={issueModal.initialData}
+        />
+      )}
+      {receiveModal.open && (
+        <ReceiveModal
+          isOpen={receiveModal.open}
+          onClose={() => setReceiveModal({ open: false, initialData: null })}
+          initialData={receiveModal.initialData}
         />
       )}
     </Modal>

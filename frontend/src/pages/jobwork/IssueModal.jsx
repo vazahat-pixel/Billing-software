@@ -682,6 +682,9 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
    */
   const printData = useMemo(() => {
     const mill = mills.find((m) => String(m._id || m.id) === String(form.millId));
+    const effectiveRate = Number(form.puRate || form.jobRate || 0);
+    const effectiveMts = Number(form.issQty || 0);
+    const taxableAmt = Number((effectiveMts * effectiveRate).toFixed(2));
     return {
       millName: mill?.name || '',
       millGstin: mill?.gstin || '',
@@ -693,11 +696,11 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       hsnCd: form.hsnCd || '',
       weaver: form.weaver,
       procType: form.procType || 'Process',
-      takas: [],
+      takas: Array.isArray(form.pcsDetails) && form.pcsDetails.length > 0 ? form.pcsDetails : [],
       totalTaka: form.issPcs,
       totalMts: form.issQty,
-      taxableAmt: 0,
-      rate: form.jobRate,
+      taxableAmt: taxableAmt,
+      rate: effectiveRate,
       remark: [form.remark1, form.remark2].filter(Boolean).join(' '),
     };
   }, [form, mills]);
@@ -860,7 +863,11 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                         value={form.puBillNo}
                         onChange={(e) => setField('puBillNo', e.target.value)}
                         onClick={() => {
-                          if (!locked && !form.puBillNo) setPuBillLookupOpen(true);
+                          if (!locked && !form.puBillNo) {
+                            fetchPurchases();
+                            fetchInventory();
+                            setPuBillLookupOpen(true);
+                          }
                         }}
                         disabled={locked}
                         placeholder="Enter or click 🔍 to select Purchase Bill…"
@@ -869,7 +876,11 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                         <button
                           type="button"
                           title="Browse Purchase Bills"
-                          onClick={() => setPuBillLookupOpen(true)}
+                          onClick={() => {
+                            fetchPurchases();
+                            fetchInventory();
+                            setPuBillLookupOpen(true);
+                          }}
                           className="erp-job-issue-add-btn"
                         >
                           <Search size={11} /> Find

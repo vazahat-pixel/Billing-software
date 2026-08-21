@@ -58,10 +58,10 @@ const Modal = ({
       {isOpen && (
         <div
           className={twMerge(
-            'fixed inset-0 z-[900]',
+            'fixed inset-0 z-[1200]',
             inertBackdrop
               ? 'pointer-events-none overflow-hidden'
-              : 'z-[999] flex items-center justify-center p-1.5 sm:p-2 overflow-hidden'
+              : 'z-[1200] flex items-center justify-center p-1.5 sm:p-2 overflow-hidden'
           )}
         >
           {!inertBackdrop && (
@@ -83,7 +83,7 @@ const Modal = ({
             style={style}
             className={twMerge(
               'relative flex flex-col w-full max-h-[calc(100dvh-12px)] overflow-hidden border border-slate-200/80 shadow-[0_20px_50px_rgba(15,23,42,0.12)]',
-              inertBackdrop ? 'pointer-events-auto z-[910]' : 'z-[1000]',
+              inertBackdrop ? 'pointer-events-auto z-[2000]' : 'z-[1500]',
               bare
                 ? 'max-w-5xl rounded-[var(--radius-card)] bg-[var(--bg-card)]'
                 : 'max-w-4xl rounded-2xl bg-[var(--bg-card)]',

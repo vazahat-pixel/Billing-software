@@ -10,6 +10,7 @@ const read = requirePermission('sales', 'read');
 const write = requirePermission('sales', 'create');
 
 router.get('/', read, returnController.getReturns);
+router.get('/bills', read, returnController.getOriginalBills);
 router.post('/', write, returnController.createReturn);
 
 module.exports = router;

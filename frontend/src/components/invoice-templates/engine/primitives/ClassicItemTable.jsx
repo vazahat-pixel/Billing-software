@@ -105,6 +105,7 @@ export default function ClassicItemTable({ data, templateId = 'textile-pro', pay
               const isMeterUnit = (u) => ['MTRS', 'MTS', 'QTY', 'NETQTY'].includes(String(u || 'MTRS').toUpperCase());
               const totalNetMts = (lines || []).reduce((s, l) => {
                 if (!isMeterUnit(l.unit)) return s;
+                let grossMts = Number(l.mts) || 0;
                 if (Array.isArray(l.pcsDetails) && l.pcsDetails.length > 0) {
                   const sum = l.pcsDetails.reduce((ss, r) => {
                     const rowPcs = Number(r.pcs ?? r.qty) || 0;
@@ -112,9 +113,9 @@ export default function ClassicItemTable({ data, templateId = 'textile-pro', pay
                     if (rowPcs > 0 && qtyBndl > 0) return ss + rowPcs * qtyBndl;
                     return ss + (Number(r.netQty ?? r.kgs) || 0);
                   }, 0);
-                  if (sum > 0) return s + sum;
+                  if (sum > 0) grossMts = sum;
                 }
-                const rawMts = Number(l.mts) || 0;
+                const rawMts = grossMts;
                 const fold = Number(l.fold || 0);
                 if (rawMts > 0 && fold > 0 && fold < 100) {
                   return s + Number(((rawMts * fold) / 100).toFixed(2));

@@ -16,18 +16,22 @@ export default function PuBillLookupModal({
   onSelect,
 }) {
   const [search, setSearch] = useState('');
+  const [filterByWeaver, setFilterByWeaver] = useState(true);
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
     if (isOpen) {
       setSearch('');
+      setFilterByWeaver(true);
       setIdx(0);
     }
   }, [isOpen, weaver]);
 
+  const activeWeaver = filterByWeaver ? weaver : '';
+
   const allRows = useMemo(
-    () => buildPuBillRows({ inventoryLots, purchases, items, weaver }),
-    [inventoryLots, purchases, items, weaver]
+    () => buildPuBillRows({ inventoryLots, purchases, items, weaver: activeWeaver }),
+    [inventoryLots, purchases, items, activeWeaver]
   );
 
   const rows = useMemo(() => {
@@ -72,15 +76,15 @@ export default function PuBillLookupModal({
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-[920px] w-full">
       <div className="flex flex-col bg-white overflow-hidden" onKeyDown={onKeyDown}>
         <div className="bg-[#374151] text-white px-3 py-1.5 text-[12px] font-bold flex justify-between items-center">
-          <span>Select Purchase Bill {weaver ? `— ${weaver}` : ''}</span>
+          <span>Select Purchase Bill {activeWeaver ? `— ${activeWeaver}` : filterByWeaver === false && weaver ? `(All Weavers)` : ''}</span>
           <span className="text-[10px] font-normal opacity-80">{rows.length} line(s)</span>
         </div>
 
-        <div className="px-2 py-1 bg-slate-100 border-b">
+        <div className="px-2 py-1 bg-slate-100 border-b flex items-center gap-2">
           <input
             autoFocus
             type="text"
-            className="w-full h-7 px-2 text-[12px] border border-slate-300 rounded-sm outline-none focus:border-blue-500"
+            className="flex-1 h-7 px-2 text-[12px] border border-slate-300 rounded-sm outline-none focus:border-blue-500"
             placeholder="Filter Bill No, Item, LR, Transport…"
             value={search}
             onChange={(e) => {
@@ -88,6 +92,20 @@ export default function PuBillLookupModal({
               setIdx(0);
             }}
           />
+          {weaver && (
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-700 cursor-pointer font-medium select-none whitespace-nowrap bg-white px-2 py-1 border border-slate-300 rounded-sm hover:bg-slate-50">
+              <input
+                type="checkbox"
+                checked={filterByWeaver}
+                onChange={(e) => {
+                  setFilterByWeaver(e.target.checked);
+                  setIdx(0);
+                }}
+                className="rounded text-blue-600 focus:ring-0 cursor-pointer"
+              />
+              Filter by Weaver: <span className="font-bold text-blue-800">{weaver}</span>
+            </label>
+          )}
         </div>
 
         <div className="max-h-[280px] overflow-auto">

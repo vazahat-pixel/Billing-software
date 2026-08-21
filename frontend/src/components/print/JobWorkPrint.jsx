@@ -58,46 +58,82 @@ const Field = ({ label, value, w }) => (
 /* ── 1. Mill Issue — MILL CHALLAN ────────────────────────────────── */
 
 const MillIssueSheet = ({ d, firm }) => {
-  // Reference sheet lays takas out in four vertical blocks (A/B/C/D) of 12 rows.
-  // Only blocks the form actually has data for are filled; the rest stay blank exactly
-  // as the reference prints them.
-  const ROWS = 12;
-  const takas = Array.isArray(d.takas) ? d.takas.filter((t) => n(t.meters) > 0) : [];
+  const rawTakas = Array.isArray(d.takas) ? d.takas.filter((t) => n(t.meters ?? t.netQty ?? t.mts) > 0) : [];
+  
+  let takas = rawTakas.map((t, idx) => ({
+    label: t.pcs ?? t.label ?? idx + 1,
+    meters: n(t.meters ?? t.netQty ?? t.mts ?? 0),
+  }));
+
+  // If no detailed takas array provided, but totalTaka & totalMts are present
+  if (takas.length === 0 && (n(d.totalTaka) > 0 || n(d.totalMts) > 0)) {
+    takas = [
+      {
+        label: d.totalTaka || '1',
+        meters: n(d.totalMts || 0),
+      },
+    ];
+  }
+
+  const ROWS = Math.max(1, Math.ceil(takas.length / 4));
   const blocks = [0, 1, 2, 3].map((b) => takas.slice(b * ROWS, b * ROWS + ROWS));
   const blockTotal = (b) => blocks[b].reduce((s, t) => s + n(t.meters), 0);
 
   return (
-    <div className="jwp-sheet">
-      <Header firm={firm} title={`MILL CHALLAN (${d.procType || 'Process'})`} />
-
-      <div className="jwp-band">
-        <div className="jwp-col">
-          <Field label="M/s. :" value={d.millName} />
+    <div className="jwp-sheet mc-sheet">
+      {/* ── 1. Firm Header ── */}
+      <div className="mc-firm-block">
+        <div className="mc-firm-title">{firm.name}</div>
+        <div className="mc-firm-sub">
+          {[firm.addressLine || firm.address, firm.city, firm.state].filter(Boolean).join(', ')}
         </div>
-        <div className="jwp-col jwp-right">
-          <Field label="Challan No.   :" value={d.challanNo} />
-          <Field label="Challan Date :" value={fmtDate(d.date)} />
-          <Field label="Pu.BillNo     :" value={d.puBillNo} />
+        {firm.phone && <div className="mc-firm-sub">{firm.phone}</div>}
+      </div>
+
+      <div className="mc-title-bar">
+        <div className="mc-gstin-tag">
+          GSTIN :- <strong>{firm.gstin || ''}</strong>
+        </div>
+        <div className="mc-title-text">MILL CHALLAN (Process)</div>
+      </div>
+
+      {/* ── 2. Metadata Box ── */}
+      <div className="mc-meta-box">
+        <div className="mc-meta-row flex justify-between items-start">
+          <div className="mc-meta-left">
+            <span className="mc-lbl">M/s. :</span> <strong className="mc-val text-[12px]">{d.millName || '—'}</strong>
+          </div>
+          <div className="mc-meta-right text-right">
+            <div><span className="mc-lbl">Challan No. :</span> <strong className="mc-val">{d.challanNo || '—'}</strong></div>
+            <div><span className="mc-lbl">Challan Date :</span> <span className="mc-val">{fmtDate(d.date)}</span></div>
+            <div><span className="mc-lbl">Pu.BillNo :</span> <span className="mc-val">{d.puBillNo || '—'}</span></div>
+          </div>
+        </div>
+
+        <div className="mc-meta-row flex gap-12 mt-1">
+          <div><span className="mc-lbl">GST :</span> <span className="mc-val">{d.millGstin || ''}</span></div>
+          <div><span className="mc-lbl">State Code :</span> <span className="mc-val">{d.millStateCode || '0'}</span></div>
+        </div>
+
+        <div className="mc-meta-row flex gap-8 mt-1 border-t border-black pt-1">
+          <div><span className="mc-lbl">Item :</span> <strong className="mc-val">{d.itemName || '—'}</strong></div>
+          <div><span className="mc-lbl">HSN ACS :</span> <span className="mc-val">{d.hsnCd || ''}</span></div>
+          <div><span className="mc-lbl">Weaver :</span> <strong className="mc-val">{d.weaver || '—'}</strong></div>
         </div>
       </div>
 
-      <div className="jwp-band">
-        <Field label="GST :" value={d.millGstin} />
-        <Field label="State Code :" value={d.millStateCode} />
-      </div>
-      <div className="jwp-band">
-        <Field label="Item :" value={d.itemName} />
-        <Field label="HSN ACS :" value={d.hsnCd} />
-        <Field label="Weaver :" value={d.weaver} />
-      </div>
-
-      <table className="jwp-grid">
+      {/* ── 3. Table Grid (A, B, C, D) ── */}
+      <table className="jwp-grid mc-grid">
         <thead>
           <tr>
-            <th className="w-a">A</th><th>Meter</th>
-            <th className="w-a">B</th><th>Meter</th>
-            <th className="w-a">C</th><th>Meter</th>
-            <th className="w-a">D</th><th>Meter</th>
+            <th className="w-a">A</th>
+            <th>Meter</th>
+            <th className="w-a">B</th>
+            <th>Meter</th>
+            <th className="w-a">C</th>
+            <th>Meter</th>
+            <th className="w-a">D</th>
+            <th>Meter</th>
           </tr>
         </thead>
         <tbody>
@@ -107,7 +143,7 @@ const MillIssueSheet = ({ d, firm }) => {
                 const t = blocks[b][r];
                 return (
                   <React.Fragment key={b}>
-                    <td className="jwp-c">{t ? txt(t.label ?? b * ROWS + r + 1) : (b === 0 ? r + 1 : '')}</td>
+                    <td className="jwp-c">{t ? txt(t.label) : ''}</td>
                     <td className="jwp-r">{t ? qty(t.meters) : ''}</td>
                   </React.Fragment>
                 );
@@ -125,24 +161,27 @@ const MillIssueSheet = ({ d, firm }) => {
         </tbody>
       </table>
 
-      <div className="jwp-band jwp-foot">
-        <div className="jwp-col">
-          <Field label="Total Taka :" value={d.totalTaka} />
-          <Field label="Total Mts. :" value={qty(d.totalMts)} />
-          <Field label="Remark" value={d.remark} />
+      {/* ── 4. Footer & Signatures ── */}
+      <div className="mc-foot-box">
+        <div className="mc-foot-col">
+          <div><span className="mc-lbl">Total Taka :</span> <strong className="mc-val">{d.totalTaka || '0'}</strong></div>
+          <div><span className="mc-lbl">Total Mts. :</span> <strong className="mc-val">{qty(d.totalMts)}</strong></div>
+          <div><span className="mc-lbl">Remark :</span> <span className="mc-val">{d.remark || ''}</span></div>
         </div>
-        <div className="jwp-col">
-          <Field label="Taxable Amt :" value={money(d.taxableAmt)} />
-          <Field label="Rate :" value={money(d.rate)} />
+
+        <div className="mc-foot-col">
+          <div><span className="mc-lbl">Taxable Amt :</span> <strong className="mc-val">{money(d.taxableAmt)}</strong></div>
+          <div><span className="mc-lbl">Rate :</span> <strong className="mc-val">{money(d.rate)}</strong></div>
         </div>
-        <div className="jwp-col jwp-right">
-          <div className="jwp-for">For : {firm.name}</div>
+
+        <div className="mc-foot-col text-right">
+          <div className="mc-for">For : {firm.name}</div>
         </div>
       </div>
 
-      <div className="jwp-sign">
-        <span>Recieved By : ____________________</span>
-        <span>Authorised Signatory</span>
+      <div className="mc-sign-box">
+        <div>Recieved By : _______________________</div>
+        <div className="font-bold">Authorised Signatory</div>
       </div>
     </div>
   );
@@ -405,6 +444,22 @@ const PRINT_CSS = `
 .jwp-paper { background: #fff; width: 210mm; min-height: 148mm; padding: 8mm; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
 
 .jwp-sheet { font-family: Arial, Helvetica, sans-serif; color: #000; font-size: 11px; border: 1px solid #000; padding: 6px 8px; }
+.mc-sheet { font-family: Arial, Helvetica, sans-serif; color: #000; font-size: 11px; border: 1px solid #000; padding: 8px 10px; background: #fff; }
+.mc-firm-block { text-align: center; margin-bottom: 4px; }
+.mc-firm-title { font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; }
+.mc-firm-sub { font-size: 10px; line-height: 1.35; }
+.mc-title-bar { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 3px 6px; margin: 4px 0 6px; position: relative; }
+.mc-gstin-tag { font-size: 10.5px; font-weight: 700; background: #e2e8f0; padding: 1px 6px; border: 1px solid #cbd5e1; display: inline-block; }
+.mc-title-text { font-size: 13px; font-weight: 800; text-transform: uppercase; text-align: center; flex: 1; margin-right: 120px; }
+.mc-meta-box { border: 1px solid #000; padding: 6px 8px; margin-bottom: 6px; font-size: 11px; }
+.mc-lbl { font-weight: 700; }
+.mc-val { font-family: inherit; }
+.mc-grid th, .mc-grid td { border: 1px solid #000; padding: 3px 6px; font-size: 11px; }
+.mc-foot-box { display: flex; justify-content: space-between; align-items: flex-start; padding-top: 6px; font-size: 11px; border-top: 1px solid #000; margin-top: 4px; }
+.mc-foot-col { display: flex; flex-direction: column; gap: 3px; }
+.mc-for { font-weight: 700; font-size: 11.5px; }
+.mc-sign-box { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 30px; font-size: 11px; }
+
 .jwp-invoke { text-align: center; font-size: 10px; font-weight: 700; margin-bottom: 2px; }
 .jwp-head { text-align: center; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 4px; }
 .jwp-firm { font-size: 19px; font-weight: 700; letter-spacing: .02em; }

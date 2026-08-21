@@ -23,7 +23,11 @@ exports.createReturn = async (req, res) => {
 
   try {
     const companyId = req.companyId;
-    const { returnType, invoiceNo, originalInvoiceNo, partyId, date, items, taxableAmount: clientTaxable, gstAmount: clientGstAmount, netAmount: clientNetAmount, gstType, gstRate } = req.body;
+    const {
+      returnType, invoiceNo, originalInvoiceNo, originalSaleId, originalPurchaseId, partyId, brokerId,
+      date, items, taxableAmount: clientTaxable, gstAmount: clientGstAmount, netAmount: clientNetAmount,
+      gstType, gstRate, transport, city, lrNo, lrDate, freight, weight, remarks, tcs, roundOff
+    } = req.body;
 
     if (!returnType || !partyId || !items || items.length === 0 || !clientTaxable || !clientNetAmount) {
       await session.abortTransaction();
@@ -59,44 +63,22 @@ exports.createReturn = async (req, res) => {
       partyStateCode: req.body.partyStateCode || '',
     });
 
-    // Audit: Log if client values differed from computed values
-    const clientCgst = Number(req.body.cgst || 0);
-    const clientSgst = Number(req.body.sgst || 0);
-    const clientIgst = Number(req.body.igst || 0);
-    const taxOverride = {
-      clientTaxable: Number(clientTaxable),
-      serverTaxable: computedTotals.taxableAmount,
-      clientGstAmount: Number(clientGstAmount || 0),
-      serverGstAmount: computedTotals.gstAmount,
-      clientCgst,
-      serverCgst: computedTotals.cgst,
-      clientSgst,
-      serverSgst: computedTotals.sgst,
-      clientIgst,
-      serverIgst: computedTotals.igst,
-      clientNetAmount: Number(clientNetAmount),
-      serverNetAmount: computedTotals.netAmount,
-    };
-
-    // Log if any GST value was corrected server-side
-    const taxCorrectionNeeded = (
-      Math.abs(taxOverride.clientTaxable - taxOverride.serverTaxable) > 0.01 ||
-      Math.abs(taxOverride.clientGstAmount - taxOverride.serverGstAmount) > 0.01 ||
-      Math.abs(taxOverride.clientCgst - taxOverride.serverCgst) > 0.01 ||
-      Math.abs(taxOverride.clientSgst - taxOverride.serverSgst) > 0.01 ||
-      Math.abs(taxOverride.clientIgst - taxOverride.serverIgst) > 0.01
-    );
-
-    if (taxCorrectionNeeded) {
-      console.warn(
-        `[SECURITY] Return GST hardened on ${returnType} return ${finalInvoiceNo}: ` +
-        `Taxable ${taxOverride.clientTaxable} → ${taxOverride.serverTaxable}, ` +
-        `GST ${taxOverride.clientGstAmount} → ${taxOverride.serverGstAmount}, ` +
-        `CGST ${taxOverride.clientCgst} → ${taxOverride.serverCgst}, ` +
-        `SGST ${taxOverride.clientSgst} → ${taxOverride.serverSgst}, ` +
-        `IGST ${taxOverride.clientIgst} → ${taxOverride.serverIgst}`
-      );
-    }
+    // Merge computed item totals with extended textile properties (fold, cut, dis1Per, etc.)
+    const enrichedItems = (computedTotals.items || []).map((cItem, idx) => {
+      const origItem = items[idx] || {};
+      return {
+        ...cItem,
+        unit: origItem.unit || 'MTRS',
+        fold: Number(origItem.fold || 0),
+        cut: Number(origItem.cut || 0),
+        dis1Per: Number(origItem.dis1Per || 0),
+        dis1Amt: Number(origItem.dis1Amt || 0),
+        addAmt: Number(origItem.addAmt || 0),
+        gstPer: Number(origItem.gstPer || origItem.gstRate || 0),
+        gstAmt: Number(origItem.gstAmt || 0),
+        desc: origItem.desc || ''
+      };
+    });
 
     // Use server-computed totals, not client values
     const returnInvoice = await ReturnInvoice.create([{
@@ -104,9 +86,19 @@ exports.createReturn = async (req, res) => {
       returnType,
       invoiceNo: finalInvoiceNo,
       originalInvoiceNo,
+      originalSaleId: originalSaleId || null,
+      originalPurchaseId: originalPurchaseId || null,
       partyId,
+      brokerId: brokerId || null,
       date: date || new Date(),
-      items: computedTotals.items,
+      transport: transport || '',
+      city: city || '',
+      lrNo: lrNo || '',
+      lrDate: lrDate ? new Date(lrDate) : null,
+      freight: Number(freight || 0),
+      weight: Number(weight || 0),
+      remarks: remarks || '',
+      items: enrichedItems,
       taxableAmount: computedTotals.taxableAmount,
       gstAmount: computedTotals.gstAmount,
       netAmount: computedTotals.netAmount,
@@ -115,6 +107,8 @@ exports.createReturn = async (req, res) => {
       sgst: computedTotals.sgst,
       igst: computedTotals.igst,
       cess: computedTotals.cess,
+      tcs: Number(tcs || 0),
+      roundOff: Number(roundOff || 0),
       gstRate: computedTotals.gstRate,
     }], { session });
 
@@ -302,10 +296,50 @@ exports.getReturns = async (req, res) => {
     if (returnType) filter.returnType = returnType;
 
     const list = await ReturnInvoice.find(filter)
-      .populate('partyId', 'name gstin')
-      .populate('items.itemId', 'name hsnCode')
+      .populate('partyId', 'name gstin state city')
+      .populate('brokerId', 'name')
+      .populate('items.itemId', 'name hsnCode gstRate unit')
+      .populate('items.lotId', 'lotId remainingMtrs remainingPcs')
       .sort({ date: -1 });
     res.status(200).json({ success: true, data: list });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Fetch original sales or purchase bills for a party to auto-populate items in Return modal
+ */
+exports.getOriginalBills = async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const { partyId, type } = req.query;
+    if (!partyId || !type) {
+      return res.status(400).json({ success: false, message: 'partyId and type are required' });
+    }
+
+    if (type === 'Sales') {
+      const Sales = require('../models/Sales');
+      const salesList = await Sales.find({ companyId, customerId: partyId, status: { $ne: 'cancelled' } })
+        .select('invoiceNo date customerId brokerId transport station lrNo lrDate freight weight remarks items taxableAmount gstAmount netAmount gstType gstRate cgst sgst igst')
+        .populate('customerId', 'name gstin state city')
+        .populate('brokerId', 'name')
+        .populate('items.itemId', 'name hsnCode gstRate unit')
+        .populate('items.lotId', 'lotId remainingMtrs remainingPcs')
+        .sort({ date: -1 })
+        .limit(100);
+      return res.status(200).json({ success: true, data: salesList });
+    } else {
+      const Purchase = require('../models/Purchase');
+      const purchaseList = await Purchase.find({ companyId, supplierId: partyId, status: { $ne: 'cancelled' } })
+        .select('invoiceNo supplierInvoiceNo date supplierId brokerId transport lrNo challanNo items taxableAmount gstAmount netAmount gstType gstRate cgst sgst igst')
+        .populate('supplierId', 'name gstin state city')
+        .populate('brokerId', 'name')
+        .populate('items.itemId', 'name hsnCode gstRate unit')
+        .sort({ date: -1 })
+        .limit(100);
+      return res.status(200).json({ success: true, data: purchaseList });
+    }
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

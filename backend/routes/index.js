@@ -32,6 +32,18 @@ const subscriptionMiddleware = require('../middlewares/subscription.middleware')
 const companyIsolationMiddleware = require('../middlewares/companyIsolation.middleware');
 const { authLimiter } = require('../middlewares/rateLimit.middleware');
 
+// Public health check route
+router.get(['/health', '/health/live', '/health/ready'], (req, res) => {
+  res.json({
+    success: true,
+    message: 'ok',
+    data: {
+      mongo: require('mongoose').connection.readyState === 1 ? 'up' : 'down',
+      env: process.env.NODE_ENV || 'development',
+    },
+  });
+});
+
 // Public auth (rate-limited)
 router.use('/auth', authLimiter, authRoutes);
 

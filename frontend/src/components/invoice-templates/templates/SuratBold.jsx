@@ -202,6 +202,7 @@ export default function SuratBold({ data }) {
                 let displayMts = isMeter ? (Number(line.mts) || 0) : 0;
                 let displayNetMts = 0;
                 if (isMeter) {
+                  let grossMts = displayMts;
                   if (Array.isArray(line.pcsDetails) && line.pcsDetails.length > 0) {
                     const sum = line.pcsDetails.reduce((s, r) => {
                       const rowPcs = Number(r.pcs ?? r.qty) || 0;
@@ -209,15 +210,13 @@ export default function SuratBold({ data }) {
                       if (rowPcs > 0 && qtyBndl > 0) return s + rowPcs * qtyBndl;
                       return s + (Number(r.netQty ?? r.kgs) || 0);
                     }, 0);
-                    if (sum > 0) displayNetMts = sum;
+                    if (sum > 0) grossMts = sum;
                   }
-                  if (!displayNetMts) {
-                    const fold = Number(line.fold || 0);
-                    if (displayMts > 0 && fold > 0 && fold < 100) {
-                      displayNetMts = Number(((displayMts * fold) / 100).toFixed(2));
-                    } else {
-                      displayNetMts = displayMts;
-                    }
+                  const fold = Number(line.fold || 0);
+                  if (grossMts > 0 && fold > 0 && fold < 100) {
+                    displayNetMts = Number(((grossMts * fold) / 100).toFixed(2));
+                  } else {
+                    displayNetMts = grossMts;
                   }
                 }
                 return (

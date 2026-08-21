@@ -57,6 +57,7 @@ export const ordersApi = {
 
 export const returnsApi = {
   list: (params) => unwrap(get('/returns', params)).then((d) => asArray(d, ['returns'])),
+  originalBills: (params) => unwrap(get('/returns/bills', params)).then((d) => asArray(d)),
   create: (body) => unwrap(post('/returns', body)),
 };
 

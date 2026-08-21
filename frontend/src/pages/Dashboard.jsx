@@ -7,7 +7,8 @@ import {
    faScrewdriverWrench, faClipboardCheck, faChartPie,
    faChevronDown, faSync, faSearch, faBell,
    faTriangleExclamation, faHandshake, faUserTie,
-   faRightFromBracket, faBook, faCircleQuestion, faGear
+   faRightFromBracket, faBook, faCircleQuestion, faGear,
+   faRightLeft
 } from '@fortawesome/free-solid-svg-icons';
 import useStore from '../store/useStore';
 import useConfigStore from '../store/useConfigStore';
@@ -744,6 +745,8 @@ const Dashboard = () => {
    const ALL_CORE_MODULES = [
       { id: 1, label: 'Sales Billing', icon: faFileInvoiceDollar, key: 'sales' },
       { id: 2, label: 'Purchase', icon: faCartFlatbed, key: 'purchase' },
+      { id: 17, label: 'Sales Return', icon: faRightLeft, key: 'salesReturn' },
+      { id: 18, label: 'Purchase Return', icon: faRightLeft, key: 'purchaseReturn' },
       { id: 3, label: 'Bank Receipt', icon: faMoneyCheckDollar, key: 'receipt' },
       { id: 4, label: 'Bank Payment', icon: faHandHoldingDollar, key: 'payment' },
       { id: 5, label: 'Mill Issue', icon: faTruckArrowRight, key: 'millIssue' },
@@ -777,7 +780,12 @@ const Dashboard = () => {
                <button
                   key={mod.id}
                   type="button"
-                  onClick={() => { setActiveMenuKey(mod.key); toggleModal(mod.key, true); }}
+                  onClick={() => {
+                     setActiveMenuKey(mod.key);
+                     if (mod.key === 'salesReturn') openReturn('Sales');
+                     else if (mod.key === 'purchaseReturn') openReturn('Purchase');
+                     else toggleModal(mod.key, true);
+                  }}
                   className={`mx-1.5 flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer ${
                      activeMenuKey === mod.key
                         ? 'bg-[var(--accent)] text-white shadow-sm'

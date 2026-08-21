@@ -1628,12 +1628,26 @@ const useStore = create((set, get) => ({
     }
   },
 
+  fetchOriginalBills: async (partyId, type) => {
+    try {
+      const data = await returnsApi.originalBills({ partyId, type });
+      return data || [];
+    } catch (err) {
+      console.error('Fetch original bills failed:', err);
+      return [];
+    }
+  },
+
   addReturn: async (data) => {
     try {
       const _rc = await returnsApi.create(data);
       const res = { data: { data: _rc } };
       const newReturn = res.data.data;
       set(state => ({ returns: [newReturn, ...state.returns] }));
+      get().fetchSales();
+      get().fetchPurchases();
+      get().fetchInventory();
+      get().fetchVouchers();
       return newReturn;
     } catch (err) {
       console.error('Add return failed:', err);

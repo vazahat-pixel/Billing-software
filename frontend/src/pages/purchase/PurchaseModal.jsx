@@ -32,7 +32,7 @@ const DEFAULT_UNITS = ['PCS', 'KGS', 'NETQTY', 'QTY'];
 // lines — matching the reference software, where a piece-billed item (e.g. a garment) gets
 // the same Fold-based Less/Add treatment as a Qty-billed one. NetQty uses its own, separate
 // fold-DEDUCTION formula below and is not part of this set.
-const FOLD_LESS_ADD_UNITS = ['QTY', 'PCS'];
+const isFoldLessUnit = (unit) => String(unit || '').toUpperCase() !== 'NETQTY';
 
 const blankLine = () => ({
   id: Date.now(),
@@ -61,6 +61,7 @@ const blankLine = () => ({
 const PurchaseModal = ({
   isOpen,
   onClose,
+  initialData = null,
   selectedBook = null,
   readOnly = false,
   onOpenSales,
@@ -205,10 +206,10 @@ const PurchaseModal = ({
     const qty = lineQty({ ...row, pcs, mts });
     const unit = String(row.unit || 'MTRS').toUpperCase();
     const isNetQty = unit === 'NETQTY';
-    const isQty = FOLD_LESS_ADD_UNITS.includes(unit);
+    const isQty = isFoldLessUnit(unit);
 
     // Step 1: Gross amount from qty × rate
-    const grossAmt = qty > 0 && rate > 0 ? Number((qty * rate).toFixed(2)) : Number(row.amount || 0);
+    const grossAmt = rate > 0 ? Number((qty * rate).toFixed(2)) : Number(row.amount || 0);
 
     // Step 2 (NETQTY only): Apply fold % reduction BEFORE discounts.
     let foldDeductionAmt = 0;
@@ -333,7 +334,11 @@ const PurchaseModal = ({
       setSaveNextActions(null);
       setPrintInvoiceId(null);
       setBillAttachment(null);
-      if (readOnly) {
+      if (initialData) {
+        loadPurchaseData(initialData);
+        setSelectedPurchaseId(initialData._id || initialData.id || '');
+        setMode('View');
+      } else if (readOnly) {
         setMode('View');
       } else {
         setSelectedPurchaseId('');
@@ -470,7 +475,7 @@ const PurchaseModal = ({
       linesGst = money(linesGst + money(item.gstAmt));
 
       const unit = String(item.unit || 'MTRS').toUpperCase();
-      const isQty = FOLD_LESS_ADD_UNITS.includes(unit);
+      const isQty = isFoldLessUnit(unit);
       let rowBase = money(item.amount);
       if (isQty) {
         rowBase = money(rowBase - money(item.foldLessAmt) + money(item.foldAddAmt));
@@ -563,7 +568,7 @@ const PurchaseModal = ({
     
     gridItems.forEach(item => {
       const u = String(item.unit || '').toUpperCase();
-      if (FOLD_LESS_ADD_UNITS.includes(u)) {
+      if (isFoldLessUnit(u)) {
         totalFoldLess += Number(item.foldLessAmt || 0);
         totalFoldAdd += Number(item.foldAddAmt || 0);
       }
@@ -1237,7 +1242,7 @@ const PurchaseModal = ({
                         </td>
                         <td className="col-num">
                           <input type="number" className="classic-erp-input w-full text-center border-0" value={row.fold || ''} onChange={e => patchLine(idx, { fold: Number(e.target.value) })} disabled={locked} />
-                          {FOLD_LESS_ADD_UNITS.includes(String(row.unit || '').toUpperCase()) && (row.foldLessAmt || 0) > 0 && (
+                          {isFoldLessUnit(row.unit) && (row.foldLessAmt || 0) > 0 && (
                             <span
                               className="block text-center font-mono leading-none"
                               style={{ fontSize: 9, color: '#c2410c', paddingTop: 1 }}
@@ -1246,7 +1251,7 @@ const PurchaseModal = ({
                               less {(row.foldLessAmt || 0).toFixed(2)}
                             </span>
                           )}
-                          {FOLD_LESS_ADD_UNITS.includes(String(row.unit || '').toUpperCase()) && (row.foldAddAmt || 0) > 0 && (
+                          {isFoldLessUnit(row.unit) && (row.foldAddAmt || 0) > 0 && (
                             <span
                               className="block text-center font-mono leading-none"
                               style={{ fontSize: 9, color: '#16a34a', paddingTop: 1 }}

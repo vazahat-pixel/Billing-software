@@ -34,9 +34,8 @@ const lineQty = (row) => {
   if (['PCS', 'PC', 'NOS', 'NO'].includes(unit)) {
     return Number(row?.pcs || 0);
   }
-  // NETQTY and QTY: use full mts as qty
-  if (unit === 'NETQTY' || unit === 'QTY') {
-    return Number(row?.mts || 0);
+  if (['KGS', 'KG'].includes(unit)) {
+    return Number(row?.mts || row?.kgs || row?.netQty || 0);
   }
   return Number(row?.mts || 0);
 };
@@ -148,7 +147,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     const isQtyOrPcs = unit === 'QTY' || unit === 'PCS' || unit === 'PC' || unit === 'MTRS' || unit === 'MTS';
 
     // Step 1: Gross amount from qty × rate
-    const grossAmt = qty > 0 && rate > 0 ? Number((qty * rate).toFixed(2)) : Number(row.amount || 0);
+    const grossAmt = rate > 0 ? Number((qty * rate).toFixed(2)) : Number(row.amount || 0);
 
     // Step 2 (NETQTY only): Apply fold % reduction BEFORE discounts.
     let foldDeductionAmt = 0;
@@ -1244,7 +1243,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                       <input type="number" className="classic-erp-input w-full text-center border-0" value={row.fold || ''} onChange={e => {
                         patchLine(idx, { fold: Number(e.target.value) });
                       }} disabled={locked} />
-                      {['QTY', 'PCS'].includes(String(row.unit || '').toUpperCase()) && (row.foldLessAmt || 0) > 0 && (
+                      {String(row.unit || '').toUpperCase() !== 'NETQTY' && (row.foldLessAmt || 0) > 0 && (
                         <span
                           className="block text-center font-mono leading-none"
                           style={{ fontSize: 9, color: '#c2410c', paddingTop: 1 }}
@@ -1253,7 +1252,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                           less {(row.foldLessAmt || 0).toFixed(2)}
                         </span>
                       )}
-                      {['QTY', 'PCS'].includes(String(row.unit || '').toUpperCase()) && (row.foldAddAmt || 0) > 0 && (
+                      {String(row.unit || '').toUpperCase() !== 'NETQTY' && (row.foldAddAmt || 0) > 0 && (
                         <span
                           className="block text-center font-mono leading-none"
                           style={{ fontSize: 9, color: '#16a34a', paddingTop: 1 }}

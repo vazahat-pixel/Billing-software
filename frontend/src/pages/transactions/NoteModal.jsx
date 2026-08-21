@@ -130,12 +130,14 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
       .finally(() => setBootLoading(false));
     setNoteSide(initialSide);
     setNoteType(initialType);
-    resetNew();
+    if (!initialNoteId) {
+      resetNew();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, initialType, initialSide]);
+  }, [isOpen, initialType, initialSide, initialNoteId]);
 
   useEffect(() => {
-    if (!isOpen || !initialNoteId || bootLoading) return;
+    if (!isOpen || !initialNoteId) return;
     if (initialNoteLoadedRef.current === initialNoteId) return;
     // Try local store first (fast path)
     const target = (notes || []).find((n) => String(n._id || n.id) === String(initialNoteId));
@@ -158,7 +160,7 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
       })
       .catch(() => { /* silently ignore */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, initialNoteId, bootLoading, notes]);
+  }, [isOpen, initialNoteId, notes]);
 
   const partyOptions = useMemo(() => {
     const want = isSales ? 'Customer' : 'Supplier';
@@ -383,7 +385,7 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
 
   return (
     <>
-      <ErpWindowedModal isOpen={isOpen} onClose={onClose} title={title} windowId={`note-${noteSide}-${noteType}`} defaultMode="normal" bare>
+      <ErpWindowedModal isOpen={isOpen} onClose={onClose} title={title} windowId={`note-${noteSide}-${noteType}`} defaultMode="maximized" bare>
         {({ WindowControls }) => (
           <div className="classic-erp-window note-window flex flex-col h-full min-h-0 !max-h-none">
             <ErpBusyOverlay show={bootLoading} message="Loading masters…" />

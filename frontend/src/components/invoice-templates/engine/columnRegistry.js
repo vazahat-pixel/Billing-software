@@ -110,6 +110,7 @@ export const COLUMN_DEFS = {
       const isMeter = ['MTRS', 'MTS', 'QTY', 'NETQTY'].includes(u);
       if (!isMeter) return 0;
       // If pcsDetails exist, sum netQty from breakdown
+      let grossMts = Number(line.mts) || 0;
       if (Array.isArray(line.pcsDetails) && line.pcsDetails.length > 0) {
         const sum = line.pcsDetails.reduce((s, r) => {
           const rowPcs = Number(r.pcs ?? r.qty) || 0;
@@ -117,9 +118,9 @@ export const COLUMN_DEFS = {
           if (rowPcs > 0 && qtyBndl > 0) return s + rowPcs * qtyBndl;
           return s + (Number(r.netQty ?? r.kgs) || 0);
         }, 0);
-        if (sum > 0) return Number(sum.toFixed(3));
+        if (sum > 0) grossMts = Number(sum.toFixed(3));
       }
-      const rawMts = Number(line.mts) || 0;
+      const rawMts = grossMts;
       const fold = Number(line.fold || 0);
       if (rawMts > 0 && fold > 0 && fold < 100) {
         return Number(((rawMts * fold) / 100).toFixed(3));
