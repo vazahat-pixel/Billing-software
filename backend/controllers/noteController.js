@@ -115,9 +115,9 @@ async function computeNoteTotals(companyId, body, party) {
   const netAmount = round2(beforeRound + roundOff);
 
   const tdsPercent = Number(body.tdsPercent || 0);
-  const tdsAmount = tdsPercent > 0
-    ? round2((tax.taxableAmount * tdsPercent) / 100)
-    : round2(body.tdsAmount || 0);
+  const tdsAmount = body.tdsAmount != null && body.tdsAmount !== '' && !isNaN(Number(body.tdsAmount))
+    ? round2(body.tdsAmount)
+    : (tdsPercent > 0 ? round2((tax.taxableAmount * tdsPercent) / 100) : 0);
   const finalAmount = round2(netAmount - tdsAmount);
 
   if (tdsAmount > netAmount + 0.01) {

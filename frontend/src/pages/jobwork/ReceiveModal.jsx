@@ -132,6 +132,19 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
       };
    }, [isOpen, fetchJobs, fetchParties, fetchInventory, fetchItems]);
 
+   // Auto-sync GST from Item Master whenever a challan/item is loaded in the grid
+   useEffect(() => {
+      const activeLine = lines.find((l) => l.jobId || l.itemName);
+      if (activeLine && Number(sgstPercent) === 0 && Number(cgstPercent) === 0 && Number(igstPercent) === 0) {
+         const name = (activeLine.itemName || '').trim().toLowerCase();
+         const match = (items || []).find((it) => (it.name || it.itemName || '').trim().toLowerCase() === name);
+         const rate = match?.gstRate != null && Number(match.gstRate) > 0 ? Number(match.gstRate) : 5;
+         setSgstPercent((rate / 2).toString());
+         setCgstPercent((rate / 2).toString());
+         setIgstPercent('0');
+      }
+   }, [lines, items, sgstPercent, cgstPercent, igstPercent]);
+
    // Handle escape key globally to close lookup dialog
    useEffect(() => {
       const handleGlobalKeyDown = (e) => {
@@ -314,12 +327,24 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
          return next;
       });
 
-      // Header GSTIN / HSN come from the job worker on the first pick, default GST% is 0 (no tax)
-      setGstin(job.workerId?.gstin || '');
-      setHsnCd(job.hsnCd || '5407');
-      const gstPct = job.gstPercent != null && job.gstPercent !== '' ? Number(job.gstPercent) : 0;
-      setSgstPercent(gstPct > 0 ? (gstPct / 2).toString() : '0');
-      setCgstPercent(gstPct > 0 ? (gstPct / 2).toString() : '0');
+      // Header GSTIN / HSN come from the job worker on the first pick
+      const workerGstin = job.workerId?.gstin || (parties || []).find((p) => String(p._id || p.id) === String(selectedJobPartyId))?.gstin || '';
+      setGstin(workerGstin);
+      // Auto-set GST: Priority 1) Job GST% -> 2) Item Master GST% -> 3) Standard Process Charge 5% (SGST 2.5% + CGST 2.5%)
+      const lotItemId = job.lotId?.itemId?._id || job.lotId?.itemId || job.itemId;
+      const itemName = job.lotId?.itemId?.name || job.lotId?.itemName || job.itemName || '';
+      const masterItem = (items || []).find((it) => 
+         (lotItemId && String(it._id || it.id) === String(lotItemId)) ||
+         (itemName && (it.name || it.itemName || '').trim().toLowerCase() === itemName.trim().toLowerCase())
+      );
+      const itemGstRate = masterItem?.gstRate ?? job.lotId?.itemId?.gstRate;
+
+      const rawGst = job.gstPercent != null && job.gstPercent !== '' && Number(job.gstPercent) > 0
+         ? Number(job.gstPercent) 
+         : (itemGstRate != null && itemGstRate !== '' && Number(itemGstRate) > 0 ? Number(itemGstRate) : 5);
+
+      setSgstPercent(rawGst > 0 ? (rawGst / 2).toString() : '2.5');
+      setCgstPercent(rawGst > 0 ? (rawGst / 2).toString() : '2.5');
       setIgstPercent('0');
 
       const focusFieldId = options.focusField || `grid-finish-mts-${idx}`;
@@ -1103,13 +1128,18 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                  <span className="w-16 text-slate-800 font-semibold text-right">SGST %:</span>
                                  <input
                                     type="number"
-                                    className="classic-erp-input w-12 text-center bg-white"
+                                    step="0.01"
+                                    className="classic-erp-input w-12 text-center bg-white font-bold"
                                     value={sgstPercent}
-                                    onChange={(e) => setSgstPercent(e.target.value)}
+                                    onChange={(e) => {
+                                       const v = e.target.value;
+                                       setSgstPercent(v);
+                                       if (Number(igstPercent) === 0) setCgstPercent(v);
+                                    }}
                                  />
                                  <input
                                     type="number"
-                                    className="classic-erp-input flex-1 text-right bg-white"
+                                    className="classic-erp-input flex-1 text-right bg-white font-mono font-bold"
                                     value={computedSgstAmt}
                                     disabled
                                  />
@@ -1118,13 +1148,18 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                  <span className="w-16 text-slate-800 font-semibold text-right">CGST %:</span>
                                  <input
                                     type="number"
-                                    className="classic-erp-input w-12 text-center bg-white"
+                                    step="0.01"
+                                    className="classic-erp-input w-12 text-center bg-white font-bold"
                                     value={cgstPercent}
-                                    onChange={(e) => setCgstPercent(e.target.value)}
+                                    onChange={(e) => {
+                                       const v = e.target.value;
+                                       setCgstPercent(v);
+                                       if (Number(igstPercent) === 0) setSgstPercent(v);
+                                    }}
                                  />
                                  <input
                                     type="number"
-                                    className="classic-erp-input flex-1 text-right bg-white"
+                                    className="classic-erp-input flex-1 text-right bg-white font-mono font-bold"
                                     value={computedCgstAmt}
                                     disabled
                                  />
@@ -1133,13 +1168,21 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                  <span className="w-16 text-slate-800 font-semibold text-right">IGST %:</span>
                                  <input
                                     type="number"
-                                    className="classic-erp-input w-12 text-center bg-white"
+                                    step="0.01"
+                                    className="classic-erp-input w-12 text-center bg-white font-bold"
                                     value={igstPercent}
-                                    onChange={(e) => setIgstPercent(e.target.value)}
+                                    onChange={(e) => {
+                                       const v = e.target.value;
+                                       setIgstPercent(v);
+                                       if (Number(v) > 0) {
+                                          setSgstPercent('0');
+                                          setCgstPercent('0');
+                                       }
+                                    }}
                                  />
                                  <input
                                     type="number"
-                                    className="classic-erp-input flex-1 text-right bg-white"
+                                    className="classic-erp-input flex-1 text-right bg-white font-mono font-bold"
                                     value={computedIgstAmt}
                                     disabled
                                  />

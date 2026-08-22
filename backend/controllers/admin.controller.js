@@ -235,7 +235,8 @@ exports.generateLicense = async (req, res) => {
             expiresAt,
             checksum,
             planTier: planTier || 'pro',
-            maxDevices: maxDevices || 5,
+            // One licence, one computer unless the admin sells extra seats.
+            maxDevices: maxDevices || 1,
         });
 
         await Company.findByIdAndUpdate(companyId, { licenseKey: key });
@@ -258,6 +259,110 @@ exports.renewLicense = async (req, res) => {
         res.status(200).json(license);
     } catch (err) {
         res.status(500).json({ message: err.message });
+    }
+};
+
+/**
+ * GET /admin/lifecycle?days=30
+ * Every company's commercial state in one list, soonest expiry first — so a
+ * renewal is chased before the customer is locked out, not after they call.
+ */
+exports.getLifecycle = async (req, res) => {
+    try {
+        const entitlementService = require('../services/entitlementService');
+        const usageService = require('../services/usageService');
+        const withinDays = Number(req.query.days) || 30;
+
+        const companies = await Company.find().populate('planId', 'name').lean();
+
+        const rows = await Promise.all(
+            companies.map(async (c) => {
+                const ent = await entitlementService.resolve(c._id, { fresh: true });
+                const usage = await usageService.summary(c._id).catch(() => null);
+                const blocked = Object.entries(ent.modules)
+                    .filter(([, v]) => v === false)
+                    .map(([k]) => k);
+
+                return {
+                    companyId: c._id,
+                    name: c.name,
+                    plan: c.planId?.name || null,
+                    status: ent.status,
+                    daysLeft: ent.daysLeft,
+                    isUsable: ent.isUsable,
+                    isReadOnly: ent.isReadOnly,
+                    expiresAt: ent.license?.expiresAt || null,
+                    maxDevices: ent.license?.maxDevices ?? null,
+                    activeDevices: ent.license?.activeDevices ?? 0,
+                    blockedModules: blocked,
+                    invoicesUsed: usage?.invoices?.used ?? null,
+                    invoicesLimit: usage?.invoices?.limit ?? null,
+                    needsAttention:
+                        !ent.isUsable ||
+                        ent.status === 'grace' ||
+                        (ent.daysLeft !== null && ent.daysLeft <= withinDays),
+                };
+            })
+        );
+
+        // Soonest expiry first; companies with no deadline sink to the bottom.
+        rows.sort((a, b) => (a.daysLeft ?? 1e9) - (b.daysLeft ?? 1e9));
+
+        res.status(200).json({
+            withinDays,
+            total: rows.length,
+            needsAttention: rows.filter((r) => r.needsAttention).length,
+            companies: rows,
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// DEVICES — licence device slots (one licence, one computer)
+
+/** GET /admin/company/:companyId/devices */
+exports.getCompanyDevices = async (req, res) => {
+    try {
+        const deviceBindingService = require('../services/deviceBindingService');
+        const data = await deviceBindingService.listDevices(req.params.companyId);
+        res.status(200).json(data);
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ message: err.message });
+    }
+};
+
+/**
+ * DELETE /admin/company/:companyId/devices/:deviceId
+ * The recovery path when a customer's PC dies, is reinstalled or replaced.
+ * Frees the slot and revokes any session still open on that machine.
+ */
+exports.releaseCompanyDevice = async (req, res) => {
+    try {
+        const deviceBindingService = require('../services/deviceBindingService');
+        const data = await deviceBindingService.releaseDevice(
+            req.params.companyId,
+            req.params.deviceId,
+            { userId: req.user?._id, reason: req.body?.reason || 'admin_release' }
+        );
+        res.status(200).json(data);
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ message: err.message });
+    }
+};
+
+/** PUT /admin/company/:companyId/devices/max */
+exports.setCompanyMaxDevices = async (req, res) => {
+    try {
+        const deviceBindingService = require('../services/deviceBindingService');
+        const data = await deviceBindingService.setMaxDevices(
+            req.params.companyId,
+            req.body?.maxDevices,
+            { userId: req.user?._id }
+        );
+        res.status(200).json(data);
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ message: err.message });
     }
 };
 
