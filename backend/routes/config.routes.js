@@ -4,6 +4,7 @@ const configController = require('../controllers/config.controller');
 
 router.get('/active', configController.getActiveConfig);
 router.get('/version', configController.getConfigVersion);
+router.get('/entitlements', configController.getEntitlements);
 
 router.get('/bills', configController.listBillConfigs);
 router.get('/bills/:billType', configController.getBillConfig);

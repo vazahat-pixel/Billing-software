@@ -63,6 +63,20 @@ export function parseApiError(err, fallback = 'Something went wrong. Please try 
     FORBIDDEN: 'You do not have permission for this action.',
     SUBSCRIPTION_EXPIRED: 'Your subscription has expired. Please renew to continue.',
     COMPANY_LOCKED: 'This company account is locked. Contact your administrator.',
+    // Commercial gates: the server's own wording says which module or quota is
+    // involved, so prefer it and only fall back to a generic line.
+    FEATURE_LOCKED: sanitizeMessage(
+      rawMsg,
+      'This feature is not included in your plan. Contact your administrator to upgrade.'
+    ),
+    SUBSCRIPTION_INACTIVE: sanitizeMessage(
+      rawMsg,
+      'Your subscription has expired. Renew to continue saving entries.'
+    ),
+    LICENSE_INVALID: sanitizeMessage(
+      rawMsg,
+      'This licence is not valid on this computer. Contact your administrator.'
+    ),
     VALIDATION_ERROR: sanitizeMessage(rawMsg || fieldError, 'Please check the highlighted fields.'),
     DUPLICATE: 'This record already exists. Please use different details or click New.',
     CONFLICT: sanitizeMessage(rawMsg, 'This record already exists. Please use different details or click New.'),
@@ -74,12 +88,19 @@ export function parseApiError(err, fallback = 'Something went wrong. Please try 
     INTERNAL: 'Something went wrong. Please try again.',
   };
 
+  // Codes whose server message is more specific than any generic line — it
+  // names the actual module, quota or computer involved.
+  const PREFER_SERVER_MESSAGE = new Set([
+    'CONFLICT',
+    'DUPLICATE',
+    'VALIDATION_ERROR',
+    'FEATURE_LOCKED',
+    'SUBSCRIPTION_INACTIVE',
+    'LICENSE_INVALID',
+  ]);
+
   if (code && byCode[code]) {
-    if (
-      (code === 'CONFLICT' || code === 'DUPLICATE' || code === 'VALIDATION_ERROR') &&
-      rawMsg &&
-      !looksTechnical(rawMsg)
-    ) {
+    if (PREFER_SERVER_MESSAGE.has(code) && rawMsg && !looksTechnical(rawMsg)) {
       return rawMsg;
     }
     return byCode[code];

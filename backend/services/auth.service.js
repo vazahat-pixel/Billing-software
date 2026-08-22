@@ -188,6 +188,33 @@ exports.login = async (email, password, req = null) => {
     user.lastLoginIp = req?.ip || '';
     await user.save();
 
+    // Licence device binding — one licence, one computer. Runs BEFORE the
+    // session is created so a refused machine never gets a usable token.
+    let deviceBinding = null;
+    if (user.role !== 'super_admin' && user.companyId) {
+        const deviceBindingService = require('./deviceBindingService');
+        const identity = {
+            deviceId: req?.body?.deviceId || req?.headers?.['x-device-id'] || '',
+            fingerprint: req?.body?.deviceFingerprint || req?.headers?.['x-device-fingerprint'] || '',
+            traits: req?.body?.deviceTraits || null,
+            deviceName: req?.body?.deviceName || 'Unknown device',
+            isDesktop: !!req?.body?.isDesktop,
+        };
+        try {
+            deviceBinding = await deviceBindingService.bindDevice(user.companyId, identity, {
+                userId: user._id,
+                req,
+            });
+        } catch (bindErr) {
+            await sessionService.recordLogin(user, 'login_failed', req || {}, {
+                success: false,
+                reason: 'device_refused',
+                meta: { deviceId: identity.deviceId },
+            });
+            throw bindErr;
+        }
+    }
+
     const sessionBundle = await sessionService.createSession(user, req || {});
     const suspicious = await sessionService.detectSuspicious(user, req || {});
     await sessionService.recordLogin(user, 'login_success', req || {}, {

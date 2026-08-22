@@ -47,8 +47,12 @@ const SYSTEM_LEDGERS = [
   { name: 'Sales Return A/c', group: 'Income', subGroup: 'Direct Income', accountType: 'System', nature: 'Dr', groupCode: 'INC-DI' },
   { name: 'Purchase Return A/c', group: 'Expenses', subGroup: 'Direct Expenses', accountType: 'System', nature: 'Cr', groupCode: 'EXP-DE' },
   { name: 'Round Off', group: 'Expenses', subGroup: 'Indirect Expenses', accountType: 'System', nature: 'Dr', groupCode: 'EXP-IE' },
-  { name: 'Suspense A/c', group: 'Assets', subGroup: 'Current Assets', accountType: 'System', nature: 'Dr', groupCode: 'AST-CA' },
   { name: 'TDS Payable', group: 'Liabilities', subGroup: 'Current Liabilities', accountType: 'Tax', nature: 'Cr', groupCode: 'LIA-CL-TAX' },
+  { name: 'TDS Receivable', group: 'Assets', subGroup: 'Current Assets', accountType: 'Tax', nature: 'Dr', groupCode: 'AST-CA-TAX' },
+  { name: 'TDS ACCOUNT', group: 'Liabilities', subGroup: 'Current Liabilities', accountType: 'Tax', nature: 'Cr', groupCode: 'LIA-CL-TAX' },
+  { name: 'TDS ON JOBWORK', group: 'Liabilities', subGroup: 'Current Liabilities', accountType: 'Tax', nature: 'Cr', groupCode: 'LIA-CL-TAX' },
+  { name: 'TDS ON PROCESS', group: 'Liabilities', subGroup: 'Current Liabilities', accountType: 'Tax', nature: 'Cr', groupCode: 'LIA-CL-TAX' },
+  { name: 'DISCOUNT ACCOUNT', group: 'Expenses', subGroup: 'Indirect Expenses', accountType: 'System', nature: 'Dr', groupCode: 'EXP-IE' },
   { name: 'Bank Charges', group: 'Expenses', subGroup: 'Indirect Expenses', accountType: 'System', nature: 'Dr', groupCode: 'EXP-IE' },
   { name: 'Depreciation A/c', group: 'Expenses', subGroup: 'Indirect Expenses', accountType: 'System', nature: 'Dr', groupCode: 'EXP-IE' },
 ];

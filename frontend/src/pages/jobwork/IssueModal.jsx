@@ -422,7 +422,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     const itemName = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
     const puRate =
       lot.rate ?? lot.purchaseRate ?? lot.avgRate ?? lot.itemId?.purchaseRate ?? '';
-    
+
     // Look up supplier name (weaver) from purchases associated with this lot
     const purchaseById = new Map((purchases || []).map((p) => [String(p._id || p.id), p]));
     const pid = String(lot.purchaseId?._id || lot.purchaseId || '');

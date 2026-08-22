@@ -24,8 +24,12 @@ const licenseSchema = new mongoose.Schema({
         deviceId: { type: String, required: true },
         deviceName: { type: String, default: '' },
         fingerprint: { type: String, default: '' },
+        // Per-trait hashes — lets a partial hardware change (new NIC, rename)
+        // be told apart from a genuinely different machine.
+        traits: { type: mongoose.Schema.Types.Mixed, default: undefined },
         activatedAt: { type: Date, default: Date.now },
         lastSeenAt: { type: Date, default: Date.now },
+        releasedAt: { type: Date, default: null },
         active: { type: Boolean, default: true },
     }],
     lastValidatedAt: { type: Date, default: null },

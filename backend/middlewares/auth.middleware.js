@@ -56,21 +56,42 @@ const authMiddleware = async (req, res, next) => {
     req.companyId = user.companyId;
     req.branchId = req.headers['x-branch-id'] || null;
 
-    // Super admin without company: prefer X-Company-Id (set later by companyIsolation),
-    // otherwise fall back to oldest company (logged — avoid silent cross-tenant ops).
+    // Super admin without a company of their own selects a tenant with
+    // X-Company-Id. Reads may fall back to the oldest company for convenience;
+    // writes must not — an unheadered mutation would silently land in whichever
+    // tenant happens to be oldest, which is how one customer's data ends up in
+    // another customer's books.
     if (!req.companyId && user.role === 'super_admin') {
       const headerCompany = req.headers['x-company-id'];
       if (headerCompany) {
         req.companyId = headerCompany;
         req.superAdminTenant = true;
       } else {
+        const isRead = ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+        const isAdminSurface = (req.path || '').startsWith('/admin');
+
+        if (!isRead && !isAdminSurface) {
+          logger.warn('Super-admin write without X-Company-Id refused', {
+            method: req.method,
+            path: req.originalUrl,
+            requestId: req.requestId,
+          });
+          return next(
+            AppError.badRequest(
+              'Select a company first: this request needs an X-Company-Id header.'
+            )
+          );
+        }
+
         const Company = require('../models/Company');
         const fallback = await Company.findOne().sort({ createdAt: 1 });
         if (fallback) {
           req.companyId = fallback._id;
           req.superAdminTenant = true;
-          logger.warn('Super-admin using fallback oldest company — send X-Company-Id header', {
+          req.superAdminFallback = true;
+          logger.warn('Super-admin read using fallback oldest company — send X-Company-Id header', {
             companyId: fallback._id.toString(),
+            path: req.originalUrl,
             requestId: req.requestId,
           });
         }

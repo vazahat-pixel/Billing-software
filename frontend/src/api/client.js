@@ -2,6 +2,7 @@ import axios from 'axios';
 import { isOffline, markServerReachable, markServerUnreachable } from '../utils/networkStatus';
 import { isNetworkError } from '../utils/offlineHelpers';
 import { parseApiError } from '../utils/errors';
+import { getCachedDeviceIdentity } from '../utils/deviceIdentity';
 
 let activeRequests = 0;
 let activeMutatingRequests = 0;
@@ -86,6 +87,15 @@ client.interceptors.request.use((config) => {
       typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()
         : `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  // Licence device binding — read from cache only, so this stays synchronous.
+  const deviceIdentity = getCachedDeviceIdentity();
+  if (deviceIdentity?.deviceId) {
+    config.headers['X-Device-Id'] = deviceIdentity.deviceId;
+    if (deviceIdentity.deviceFingerprint) {
+      config.headers['X-Device-Fingerprint'] = deviceIdentity.deviceFingerprint;
+    }
   }
 
   const isAuthRequest = (config.url || '').includes('/auth/');
