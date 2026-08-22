@@ -974,13 +974,7 @@ const PurchaseModal = ({
       cut: Number(item?.cut || gridItems[idx].cut || 0),
       rate: item?.purRate || item?.purchaseRate || 0,
       unit: String(item?.unit || 'MTRS').toUpperCase(),
-      // GST% is deliberately NOT auto-filled from the item master on a purchase bill.
-      // A supplier bill carries whatever tax the SUPPLIER charged, which is a property of
-      // that bill — not of our item master — and it is commonly nil (unregistered,
-      // composition, exempt/nil-rated). Auto-applying the item's rate silently added tax
-      // to every purchase with no way to decline it. The operator types the rate when the
-      // bill actually has one, matching the reference ERP.
-      // (To restore auto-fill, set: gstPer: Number(item?.gstRate || 0))
+      gstPer: Number(item?.gstRate || 0),
     }, 'itemId');
   };
 

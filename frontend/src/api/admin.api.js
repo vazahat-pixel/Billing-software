@@ -16,6 +16,17 @@ export const adminApi = {
   generateLicense: (body) => unwrap(post('/admin/license/generate', body)),
   renewLicense: (companyId, body) => unwrap(put(`/admin/license/${companyId}/renew`, body)),
   usage: () => unwrap(get('/admin/usage')).then((d) => asArray(d, ['usage'])),
+
+  // Commercial lifecycle — who is expiring, in grace, or locked out.
+  lifecycle: (days) => unwrap(get('/admin/lifecycle', days ? { days } : undefined)),
+
+  // Licence device slots. Releasing a slot is the recovery path when a
+  // customer's computer dies, is reinstalled or replaced.
+  devices: (companyId) => unwrap(get(`/admin/company/${companyId}/devices`)),
+  releaseDevice: (companyId, deviceId) =>
+    unwrap(del(`/admin/company/${companyId}/devices/${deviceId}`)),
+  setMaxDevices: (companyId, maxDevices) =>
+    unwrap(put(`/admin/company/${companyId}/devices/max`, { maxDevices })),
   audit: (params) => unwrap(get('/admin/audit', params)).then((d) => asArray(d, ['logs', 'audit'])),
   moduleConfig: (id) => unwrap(get(`/admin/company/${id}/module-config`)),
   saveModuleConfig: (id, body) => unwrap(put(`/admin/company/${id}/module-config`, body)),

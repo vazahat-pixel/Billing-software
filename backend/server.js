@@ -102,6 +102,12 @@ connectDB()
       logger.warn('automation listeners failed to register', { error: err.message });
     }
     try {
+      // Entitlement cache must drop as soon as a plan/licence/module write lands.
+      require('./services/entitlementCacheHooks').install();
+    } catch (err) {
+      logger.warn('entitlement cache hooks failed to install', { error: err.message });
+    }
+    try {
       require('./services/cacheService').init();
       require('./services/jobQueueService').startWorker({
         intervalMs: Number(process.env.JOB_POLL_MS || 5000),

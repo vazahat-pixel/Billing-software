@@ -43,7 +43,7 @@ const BLANK_F = {
   amountMode: 'Exclusive',
   gstRate: 0,
   gstType: 'CGST+SGST',
-  tdsLedgerId: '', tdsPercent: 0, tdsRemark: '',
+  tdsLedgerId: '', tdsPercent: 0, tdsAmount: '', _tdsAmountManual: false, tdsRemark: '',
   narration: '',
 };
 
@@ -75,7 +75,10 @@ function computeCalc(f) {
   const roundOff = round2(Math.round(before) - before);
   const netAmount = round2(before + roundOff);
   const tdsPercent = Number(f.tdsPercent) || 0;
-  const tdsAmount = round2((taxable * tdsPercent) / 100);
+  const autoTds = round2((taxable * tdsPercent) / 100);
+  const tdsAmount = f._tdsAmountManual && f.tdsAmount !== '' && f.tdsAmount != null
+    ? round2(f.tdsAmount)
+    : autoTds;
   const finalAmount = round2(netAmount - tdsAmount);
   return { taxable, cgst, sgst, igst, totalGst, rcmAmount, roundOff, netAmount, tdsAmount, finalAmount, halfRate: rate / 2 };
 }
@@ -108,7 +111,21 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
 
   const setField = (key) => (e) => {
     const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setF((p) => ({ ...p, [key]: val }));
+    setF((p) => {
+      const next = { ...p, [key]: val };
+      if (key === 'amount' || key === 'amountMode' || key === 'gstRate' || key === 'tdsPercent') {
+        const calcNow = computeCalc(next);
+        const pct = Number(next.tdsPercent) || 0;
+        if (!p.tdsRemark || p.tdsRemark.startsWith('TDS @')) {
+          next.tdsRemark = pct > 0 && calcNow.taxable > 0 ? `TDS @ ${pct}% ON RS. ${calcNow.taxable.toFixed(2)}` : (pct === 0 ? '' : p.tdsRemark);
+        }
+        if (key === 'tdsPercent') {
+          next._tdsAmountManual = false;
+          next.tdsAmount = '';
+        }
+      }
+      return next;
+    });
   };
 
   const resetNew = () => {
@@ -208,6 +225,10 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
         const total = round2(d.netAmount || d.totalAmount || 0);
         const paid = round2(d.paidAmount || 0);
         const billDt = d.date ? new Date(d.date).toISOString().split('T')[0] : '';
+        // Resolve GST rate from the invoice — try invoice-level gstRate first, then
+        // fall back to the first line item's gstPer (per-line rate on purchase/sale).
+        const invoiceGstRate = Number(d.gstRate || 0)
+          || (d.items || []).reduce((r, it) => r || Number(it.gstPer || it.gstRate || 0), 0);
         return {
           _id: d._id,
           invoiceNo: d.invoiceNo || d.billNo || '',
@@ -217,6 +238,8 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
           osAmt: round2(Math.max(0, total - paid)),
           osDy: billDt ? Math.max(0, Math.floor((Date.now() - new Date(billDt).getTime()) / 86400000)) : 0,
           billType: d.invoiceType || (isSales ? 'SL' : 'PU'),
+          gstRate: invoiceGstRate,
+          gstType: d.gstType || (d.igst > 0 ? 'IGST' : 'CGST+SGST'),
         };
       });
   }, [f.partyId, isSales, sales, purchases]);
@@ -230,6 +253,9 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
       againstInvoiceNo: inv.invoiceNo,
       billNo: p.billNo || inv.invoiceNo,
       billDate: p.billDate || inv.billDt,
+      // Auto-fill GST rate & type from the linked invoice when not already set
+      gstRate: Number(p.gstRate) > 0 ? p.gstRate : (inv.gstRate || p.gstRate),
+      gstType: inv.gstType || p.gstType,
     }));
   };
 
@@ -355,6 +381,7 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
       accountHeadLedgerId: f.accountHeadLedgerId || undefined,
       tdsLedgerId: f.tdsLedgerId || undefined,
       tdsPercent: Number(f.tdsPercent) || 0,
+      tdsAmount: calc.tdsAmount,
       tdsRemark: f.tdsRemark || '',
       narration: f.narration || '',
       status: 'Posted',
@@ -565,11 +592,20 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
                   </div>
                   <div className="classic-erp-field classic-erp-field--xs">
                     <L>TDS %</L>
-                    <input type="number" className="classic-erp-input text-right" value={f.tdsPercent} onChange={setField('tdsPercent')} disabled={locked} />
+                    <input type="number" step="0.01" className="classic-erp-input text-right font-bold" value={f.tdsPercent} onChange={setField('tdsPercent')} disabled={locked} />
                   </div>
                   <div className="classic-erp-field classic-erp-field--xs">
                     <L>TDS AMOUNT</L>
-                    <input type="text" className="classic-erp-input text-right font-mono" value={money(calc.tdsAmount)} readOnly />
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="classic-erp-input text-right font-mono font-bold bg-[#fff9c4] text-amber-950 border border-amber-400"
+                      value={f._tdsAmountManual ? f.tdsAmount : (calc.tdsAmount || '')}
+                      onChange={(e) => setF((p) => ({ ...p, tdsAmount: e.target.value, _tdsAmountManual: true }))}
+                      disabled={locked}
+                      placeholder="0.00"
+                      title="Auto-calculated from TDS %, or click to type manual override"
+                    />
                   </div>
                 </div>
 

@@ -292,4 +292,55 @@ exports.savePermissionMatrix = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/config/entitlements — what this company may use, and how much of
+ * its quota is spent. One call so the UI never has to stitch plan, licence,
+ * lifecycle and usage together itself (and never disagrees with the backend).
+ */
+exports.getEntitlements = async (req, res) => {
+  try {
+    const companyId = req.companyId || req.user?.companyId;
+    if (!companyId) {
+      return res.status(400).json({ success: false, message: 'Company context required' });
+    }
+
+    const entitlementService = require('../services/entitlementService');
+    const usageService = require('../services/usageService');
+
+    const [ent, usage] = await Promise.all([
+      entitlementService.resolve(companyId),
+      usageService.summary(companyId).catch(() => null),
+    ]);
+
+    res.set('Cache-Control', 'private, max-age=15');
+    res.status(200).json({
+      success: true,
+      data: {
+        modules: ent.modules,
+        entitledModules: ent.entitledModules,
+        enabledModules: ent.enabledModules,
+        subMenus: ent.subMenus,
+        fields: ent.fields,
+        status: ent.status,
+        daysLeft: ent.daysLeft,
+        statusReason: ent.statusReason,
+        isUsable: ent.isUsable,
+        isReadOnly: ent.isReadOnly,
+        plan: ent.plan,
+        limits: ent.limits,
+        license: ent.license
+          ? {
+              expiresAt: ent.license.expiresAt,
+              maxDevices: ent.license.maxDevices,
+              activeDevices: ent.license.activeDevices,
+            }
+          : null,
+        usage,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.requireCompanyAdmin = requireCompanyAdmin;

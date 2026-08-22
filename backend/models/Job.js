@@ -93,6 +93,8 @@ const JobSchema = new mongoose.Schema({
   purchaseRate: { type: Number, default: 0, min: 0 },
   jobRate: { type: Number, default: 0, min: 0 },
   finish: { type: String, default: '' },
+  gstPer: { type: Number, default: 0, min: 0 },
+  gstType: { type: String, default: 'CGST+SGST' },
   remark: { type: String, default: '' },
   receivedPcs: {
     type: Number,
