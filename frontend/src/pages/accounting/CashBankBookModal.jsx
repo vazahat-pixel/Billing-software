@@ -408,7 +408,11 @@ const CashBankBookModal = ({
 
   useEffect(() => {
     if (!isOpen || !initialVoucherId) return;
-    const target = (vouchers || []).find((v) => String(v._id || v.id) === String(initialVoucherId));
+    const target = (vouchers || []).find(
+      (v) => String(v._id || v.id) === String(initialVoucherId) ||
+             String(v.voucherNo || '').trim() === String(initialVoucherId).trim() ||
+             String(v.billNo || '').trim() === String(initialVoucherId).trim()
+    );
     if (target) {
       if (target.voucherType) setVoucherType(target.voucherType);
       loadVoucher(target);

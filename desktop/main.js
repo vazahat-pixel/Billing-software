@@ -142,6 +142,18 @@ ipcMain.handle('desktop:notify', (_e, { title, body }) => {
 ipcMain.handle('desktop:version', () => app.getVersion());
 ipcMain.handle('desktop:platform', () => process.platform);
 
+// Licence device binding — one licence, one computer.
+ipcMain.handle('desktop:machine-id', () => {
+  try {
+    const { getMachineIdentity } = require('./machineId');
+    return getMachineIdentity(app.getPath('userData'));
+  } catch (err) {
+    // Never block login on an identity failure; the backend decides what to do
+    // with a missing deviceId.
+    return { error: err.message, deviceId: null, fingerprint: null };
+  }
+});
+
 app.whenReady().then(() => {
   buildMenu();
   createWindow();

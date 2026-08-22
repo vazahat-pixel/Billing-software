@@ -147,7 +147,7 @@ const MODULE_SUBMENU_MAP = {
 
 const Dashboard = () => {
    const navigate = useNavigate();
-   const { user, logout, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items, plan, fetchDashboardSummary, dashboardSummary, dashboardLoading } = useStore();
+   const { user, logout, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items, plan, fetchDashboardSummary, dashboardSummary, dashboardLoading, vouchers, notes } = useStore();
    const companySettings = useConfigStore((s) => s.companySettings);
    const companyMeta = useConfigStore((s) => s.company);
 
@@ -268,6 +268,10 @@ const Dashboard = () => {
       return true;
    };
    const [millIssueInitialData, setMillIssueInitialData] = useState(null);
+   const [purchaseInitialData, setPurchaseInitialData] = useState(null);
+   const [salesInitialData, setSalesInitialData] = useState(null);
+   const [voucherInitialId, setVoucherInitialId] = useState(null);
+   const [noteInitialId, setNoteInitialId] = useState(null);
    const [productionEngineTab, setProductionEngineTab] = useState('Board');
    const [modals, setModals] = useState({
       sales: false,
@@ -770,6 +774,11 @@ const Dashboard = () => {
       return filtered.length > 0 ? filtered : ALL_CORE_MODULES;
    }, [moduleConfig, bundle, user?.role]);
 
+   const openModalDirect = (key) => {
+      yieldOtherWindows(key);
+      setModals(prev => ({ ...prev, [key]: true }));
+   };
+
    return (
       <div className="erp-shell fixed inset-0 flex overflow-hidden">
 
@@ -1052,10 +1061,23 @@ const Dashboard = () => {
          </main>
 
          {/* Modals */}
-         <SalesModal isOpen={modals.sales} onClose={() => toggleModal('sales', false)} selectedBook={selectedBooks.sales?.name} readOnly={!permissions.canSave} />
+         <SalesModal
+            isOpen={modals.sales}
+            onClose={() => {
+               setSalesInitialData(null);
+               toggleModal('sales', false);
+            }}
+            initialData={salesInitialData}
+            selectedBook={selectedBooks.sales?.name}
+            readOnly={!permissions.canSave}
+         />
          <PurchaseModal 
             isOpen={modals.purchase} 
-            onClose={() => toggleModal('purchase', false)} 
+            onClose={() => {
+               setPurchaseInitialData(null);
+               toggleModal('purchase', false);
+            }}
+            initialData={purchaseInitialData}
             selectedBook={selectedBooks.purchase?.name} 
             readOnly={!permissions.canSave} 
             onOpenSales={() => { yieldOtherWindows('sales'); toggleModal('sales', true); }}
@@ -1069,49 +1091,55 @@ const Dashboard = () => {
 
          <CashBankBookModal
             isOpen={modals.cashBook}
-            onClose={() => toggleModal('cashBook', false)}
+            onClose={() => { setVoucherInitialId(null); toggleModal('cashBook', false); }}
             bookKind="cash"
             initialType="Receipt"
+            initialVoucherId={voucherInitialId}
             selectedBook={selectedBooks.cashBook}
             readOnly={!permissions.canSave}
          />
          <CashBankBookModal
             isOpen={modals.bankBook}
-            onClose={() => toggleModal('bankBook', false)}
+            onClose={() => { setVoucherInitialId(null); toggleModal('bankBook', false); }}
             bookKind="bank"
             initialType="Receipt"
+            initialVoucherId={voucherInitialId}
             selectedBook={selectedBooks.bankBook}
             readOnly={!permissions.canSave}
          />
          <CashBankBookModal
             isOpen={modals.receipt}
-            onClose={() => toggleModal('receipt', false)}
+            onClose={() => { setVoucherInitialId(null); toggleModal('receipt', false); }}
             bookKind="bank"
             initialType="Receipt"
+            initialVoucherId={voucherInitialId}
             selectedBook={selectedBooks.receipt}
             readOnly={!permissions.canSave}
          />
          <CashBankBookModal
             isOpen={modals.payment}
-            onClose={() => toggleModal('payment', false)}
+            onClose={() => { setVoucherInitialId(null); toggleModal('payment', false); }}
             bookKind="bank"
             initialType="Payment"
+            initialVoucherId={voucherInitialId}
             selectedBook={selectedBooks.payment}
             readOnly={!permissions.canSave}
          />
          <CashBankBookModal
             isOpen={modals.cashPayment}
-            onClose={() => toggleModal('cashPayment', false)}
+            onClose={() => { setVoucherInitialId(null); toggleModal('cashPayment', false); }}
             bookKind="cash"
             initialType="Payment"
+            initialVoucherId={voucherInitialId}
             selectedBook={selectedBooks.cashPayment}
             readOnly={!permissions.canSave}
          />
          <CashBankBookModal
             isOpen={modals.cashReceipt}
-            onClose={() => toggleModal('cashReceipt', false)}
+            onClose={() => { setVoucherInitialId(null); toggleModal('cashReceipt', false); }}
             bookKind="cash"
             initialType="Receipt"
+            initialVoucherId={voucherInitialId}
             selectedBook={selectedBooks.cashReceipt}
             readOnly={!permissions.canSave}
          />
@@ -1131,13 +1159,57 @@ const Dashboard = () => {
          <LedgerModal
             isOpen={modals.ledger}
             onClose={() => toggleModal('ledger', false)}
-            onOpenJournal={(data) => { toggleModal('journal', true); }}
-            onOpenPayment={(data) => { toggleModal('cashPayment', true); }}
-            onOpenReceipt={(data) => { toggleModal('cashReceipt', true); }}
-            onOpenSales={(data) => { toggleModal('sales', true); }}
-            onOpenPurchase={(data) => { toggleModal('purchase', true); }}
-            onOpenNote={(data) => { toggleModal('note', true); }}
-            onOpenOutstanding={() => toggleModal('outstanding', true)}
+            onOpenJournal={(data) => {
+               openModalDirect('journal');
+            }}
+            onOpenPayment={(data) => {
+               const docNo = data?.voucherNo || data?.docNo || data?.row?.billVoucherNo || '';
+               const refId = data?.row?.refId || data?.row?._id;
+               const found = (vouchers || []).find(v => (refId && String(v._id || v.id) === String(refId)) || (docNo && (v.voucherNo === docNo || v.billNo === docNo)));
+               const vId = found?._id || refId || docNo || null;
+               setVoucherInitialId(vId);
+               const isCash = String(data?.row?.particulars || '').toLowerCase().includes('cash') || docNo.startsWith('CPV') || (found && found.bookKind === 'cash');
+               if (isCash) {
+                  openModalDirect('cashPayment');
+               } else {
+                  openModalDirect('payment');
+               }
+            }}
+            onOpenReceipt={(data) => {
+               const docNo = data?.voucherNo || data?.docNo || data?.row?.billVoucherNo || '';
+               const refId = data?.row?.refId || data?.row?._id;
+               const found = (vouchers || []).find(v => (refId && String(v._id || v.id) === String(refId)) || (docNo && (v.voucherNo === docNo || v.billNo === docNo)));
+               const vId = found?._id || refId || docNo || null;
+               setVoucherInitialId(vId);
+               const isCash = String(data?.row?.particulars || '').toLowerCase().includes('cash') || docNo.startsWith('CRV') || (found && found.bookKind === 'cash');
+               if (isCash) {
+                  openModalDirect('cashReceipt');
+               } else {
+                  openModalDirect('receipt');
+               }
+            }}
+            onOpenSales={(data) => {
+               const docNo = data?.invoiceNo || data?.docNo || data?.voucherNo || data?.row?.billVoucherNo || '';
+               const refId = data?.row?.refId || data?.row?._id;
+               const found = (sales || []).find(s => (refId && String(s._id || s.id) === String(refId)) || (docNo && (s.invoiceNo === docNo || s.billNo === docNo)));
+               setSalesInitialData(found || { invoiceNo: docNo, _id: refId });
+               openModalDirect('sales');
+            }}
+            onOpenPurchase={(data) => {
+               const docNo = data?.invoiceNo || data?.docNo || data?.voucherNo || data?.row?.billVoucherNo || '';
+               const refId = data?.row?.refId || data?.row?._id;
+               const found = (purchases || []).find(p => (refId && String(p._id || p.id) === String(refId)) || (docNo && (p.invoiceNo === docNo || p.billNo === docNo)));
+               setPurchaseInitialData(found || { invoiceNo: docNo, _id: refId });
+               openModalDirect('purchase');
+            }}
+            onOpenNote={(data) => {
+               const docNo = data?.docNo || data?.voucherNo || data?.row?.billVoucherNo || '';
+               const refId = data?.row?.refId || data?.row?._id;
+               const found = (notes || []).find(n => (refId && String(n._id || n.id) === String(refId)) || (docNo && (n.noteNo === docNo || n.voucherNo === docNo)));
+               setNoteInitialId(found?._id || refId || docNo || null);
+               openModalDirect('note');
+            }}
+            onOpenOutstanding={() => openModalDirect('outstanding')}
          />
          <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters} />
          <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} readOnly={permissions.readOnlyMasters} />
@@ -1347,7 +1419,11 @@ const Dashboard = () => {
          />
          <NoteModal
             isOpen={modals.note}
-            onClose={() => setModals(prev => ({ ...prev, note: false }))}
+            onClose={() => {
+               setNoteInitialId(null);
+               setModals(prev => ({ ...prev, note: false }));
+            }}
+            initialNoteId={noteInitialId}
             initialType={modals.noteType}
             initialSide={modals.noteSide || 'Sales'}
             readOnly={!permissions.canSave}

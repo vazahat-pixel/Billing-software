@@ -11,6 +11,7 @@ export const booksApi = {
 export const configApi = {
   active: (config) => unwrap(get('/config/active', undefined, config)),
   version: (config) => unwrap(get('/config/version', undefined, config)),
+  entitlements: (config) => unwrap(get('/config/entitlements', undefined, config)),
   listBills: () => unwrap(get('/config/bills')).then((d) => asArray(d)),
   billConfig: (billType) => unwrap(get(`/config/bills/${billType}`)),
   saveBillConfig: (billType, body) => unwrap(put(`/config/bills/${billType}`, body)),

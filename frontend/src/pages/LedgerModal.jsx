@@ -519,25 +519,35 @@ const LedgerModal = ({
       return;
     }
     const refType = String(row.refType || row.voucherType || '').toLowerCase();
-    const docNo = row.billVoucherNo || row.voucherNo || row.entryNo || '';
+    const docNo = String(row.billVoucherNo || row.voucherNo || row.entryNo || '').trim();
+    const desc = String(row.particulars || row.narration || row.contraAccount || '').toLowerCase();
+    const docUp = docNo.toUpperCase();
 
-    if (refType.includes('payment')) {
-      if (onOpenPayment) onOpenPayment({ partyId, ledgerId: resolveLedgerId(), voucherNo: docNo, row });
+    // Check by refType, docNo prefix, or description
+    const isPurchase = refType.includes('purchase') || docUp.startsWith('PUR') || docUp.startsWith('PU-') || desc.includes('purchase a/c');
+    const isSales = refType.includes('sale') || docUp.startsWith('SL') || docUp.startsWith('SAL') || docUp.startsWith('INV') || desc.includes('sales a/c');
+    const isPayment = refType.includes('payment') || docUp.startsWith('PV') || docUp.startsWith('CPV') || docUp.startsWith('BPV') || docUp.startsWith('PAY');
+    const isReceipt = refType.includes('receipt') || docUp.startsWith('RV') || docUp.startsWith('CRV') || docUp.startsWith('BRV') || docUp.startsWith('REC');
+    const isNote = refType.includes('note') || docUp.startsWith('DN') || docUp.startsWith('CN') || docUp.startsWith('DR') || docUp.startsWith('CR');
+    const isJournal = refType.includes('journal') || docUp.startsWith('JV');
+
+    if (isPayment) {
+      if (onOpenPayment) onOpenPayment({ partyId, ledgerId: resolveLedgerId(), voucherNo: docNo, docNo, row });
       else toast.info(`Payment Voucher #${docNo}`);
-    } else if (refType.includes('receipt')) {
-      if (onOpenReceipt) onOpenReceipt({ partyId, ledgerId: resolveLedgerId(), voucherNo: docNo, row });
+    } else if (isReceipt) {
+      if (onOpenReceipt) onOpenReceipt({ partyId, ledgerId: resolveLedgerId(), voucherNo: docNo, docNo, row });
       else toast.info(`Receipt Voucher #${docNo}`);
-    } else if (refType.includes('sale')) {
-      if (onOpenSales) onOpenSales({ partyId, ledgerId: resolveLedgerId(), invoiceNo: docNo, row });
-      else toast.info(`Sales Invoice #${docNo}`);
-    } else if (refType.includes('purchase')) {
-      if (onOpenPurchase) onOpenPurchase({ partyId, ledgerId: resolveLedgerId(), invoiceNo: docNo, row });
+    } else if (isPurchase) {
+      if (onOpenPurchase) onOpenPurchase({ partyId, ledgerId: resolveLedgerId(), invoiceNo: docNo, docNo, row });
       else toast.info(`Purchase Bill #${docNo}`);
-    } else if (refType.includes('note')) {
-      if (onOpenNote) onOpenNote({ partyId, ledgerId: resolveLedgerId(), docNo, row });
+    } else if (isSales) {
+      if (onOpenSales) onOpenSales({ partyId, ledgerId: resolveLedgerId(), invoiceNo: docNo, docNo, row });
+      else toast.info(`Sales Invoice #${docNo}`);
+    } else if (isNote) {
+      if (onOpenNote) onOpenNote({ partyId, ledgerId: resolveLedgerId(), docNo, voucherNo: docNo, row });
       else toast.info(`Note #${docNo}`);
-    } else if (refType.includes('journal')) {
-      if (onOpenJournal) onOpenJournal({ partyId, ledgerId: resolveLedgerId(), entryNo: docNo, row });
+    } else if (isJournal) {
+      if (onOpenJournal) onOpenJournal({ partyId, ledgerId: resolveLedgerId(), entryNo: docNo, docNo, row });
       else setJvRow(row);
     } else {
       setJvRow(row);
@@ -1009,6 +1019,18 @@ const LedgerModal = ({
             </div>
 
             <div className="classic-erp-form-footer print:hidden">
+              <button
+                type="button"
+                className="classic-erp-btn btn-blue font-bold"
+                onClick={() => {
+                  const r = filteredRows[activeRow];
+                  if (r) handleRowOpen(r);
+                  else toast.warning('Please select a ledger line first');
+                }}
+                title="Open the invoice/voucher form for the selected row (Enter or double-click)"
+              >
+                Open Form (Enter)
+              </button>
               <button type="button" className="classic-erp-btn" onClick={() => setView('entry')}>Back</button>
               <button type="button" className="classic-erp-btn" onClick={handlePrint} disabled={!statement}>Print</button>
               <button type="button" className="classic-erp-btn" onClick={onClose}>Exit</button>

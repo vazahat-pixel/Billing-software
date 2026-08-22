@@ -4,6 +4,7 @@ import { Search, Bell, User, ChevronDown, Calendar, Building, LogOut, Settings }
 import { twMerge } from 'tailwind-merge';
 import useStore from '../../store/useStore';
 import OfflineIndicator from '../OfflineIndicator';
+import PlanStatusBadge from './PlanStatusBadge';
 
 const Topbar = () => {
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
@@ -45,6 +46,9 @@ const Topbar = () => {
              className="bg-transparent border-none outline-none text-[10px] font-black uppercase tracking-widest text-black placeholder:text-slate-300 w-full"
            />
         </div>
+
+        {/* Plan / licence status — only speaks up when it matters */}
+        <PlanStatusBadge />
 
         {/* Company Badge */}
         <div className="hidden md:flex items-center gap-3 px-5 py-2.5 bg-black text-white rounded-2xl shadow-xl shadow-black/10">

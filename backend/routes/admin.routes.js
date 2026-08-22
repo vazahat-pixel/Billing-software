@@ -9,6 +9,8 @@ router.use(roleMiddleware(['super_admin']));
 
 // DASHBOARD
 router.get('/stats', adminController.getAdminStats);
+// Commercial lifecycle — who is expiring, in grace, or locked out.
+router.get('/lifecycle', adminController.getLifecycle);
 
 // COMPANIES
 router.get('/companies', adminController.getAllCompanies);
@@ -30,6 +32,12 @@ router.put('/subscription/:companyId', adminController.updateSubscription);
 // LICENSE
 router.post('/license/generate', adminController.generateLicense);
 router.put('/license/:companyId/renew', adminController.renewLicense);
+
+// DEVICES — licence device slots; releasing a slot is the recovery path
+// for a dead, reinstalled or replaced customer PC.
+router.get('/company/:companyId/devices', adminController.getCompanyDevices);
+router.delete('/company/:companyId/devices/:deviceId', adminController.releaseCompanyDevice);
+router.put('/company/:companyId/devices/max', adminController.setCompanyMaxDevices);
 
 // USAGE
 router.get('/usage', adminController.getUsage);

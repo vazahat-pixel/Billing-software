@@ -56,8 +56,26 @@ class SessionService {
     const days = this.refreshDays(cfg);
     const expiresAt = new Date(Date.now() + days * 24 * 3600 * 1000);
 
-    // Single active session policy
-    if (cfg.session?.singleActiveSession) {
+    // Single active session policy.
+    // A single-device licence implies a single session: allowing two live
+    // sessions on a one-computer licence would defeat the binding, so the
+    // licence cap forces the policy on regardless of the stored security
+    // config (which defaults to false for historical companies).
+    let singleSession = !!cfg.session?.singleActiveSession;
+    if (!singleSession && user.companyId) {
+      try {
+        const License = require('../models/License');
+        const licence = await License.findOne({ companyId: user.companyId, isActive: true })
+          .select('maxDevices')
+          .sort({ createdAt: -1 })
+          .lean();
+        if (licence && (licence.maxDevices ?? 1) === 1) singleSession = true;
+      } catch {
+        /* fall back to the configured policy */
+      }
+    }
+
+    if (singleSession) {
       await UserSession.updateMany(
         { userId: user._id, status: 'active' },
         { status: 'forced', revokedAt: new Date(), revokeReason: 'single_session_policy' }

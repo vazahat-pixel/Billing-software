@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldCheck, Copy, CheckCircle2, XCircle, X, Key, RefreshCw, Plus, Fingerprint } from 'lucide-react';
+import { ShieldCheck, Copy, CheckCircle2, XCircle, X, Key, RefreshCw, Plus, Fingerprint, Monitor } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
 import { notifyWarning, notifyError } from '../../utils/notify';
+import DevicePanel from './DevicePanel';
 
 const Licenses = () => {
     const { companies, fetchCompanies, generateLicense, renewLicense } = useAdminStore();
@@ -10,6 +11,7 @@ const Licenses = () => {
     const [renewingCompany, setRenewingCompany] = useState(null);
     const [expiryDate, setExpiryDate] = useState('');
     const [copiedKey, setCopiedKey] = useState(null);
+    const [deviceCompany, setDeviceCompany] = useState(null);
 
     useEffect(() => { fetchCompanies(); }, [fetchCompanies]);
 
@@ -118,9 +120,14 @@ const Licenses = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <button onClick={() => { setRenewingCompany(company); setExpiryDate(''); }} className="license-action-btn">
-                                            <RefreshCw size={12} /> Renew
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => { setRenewingCompany(company); setExpiryDate(''); }} className="license-action-btn">
+                                                <RefreshCw size={12} /> Renew
+                                            </button>
+                                            <button onClick={() => setDeviceCompany(company)} className="license-action-btn" title="Which computers use this licence — release a slot when a PC is replaced">
+                                                <Monitor size={12} /> Devices
+                                            </button>
+                                        </div>
                                     </td>
                                 </motion.tr>
                             ))}
@@ -234,6 +241,10 @@ const Licenses = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {deviceCompany && (
+                <DevicePanel company={deviceCompany} onClose={() => setDeviceCompany(null)} />
+            )}
         </div>
     );
 };
