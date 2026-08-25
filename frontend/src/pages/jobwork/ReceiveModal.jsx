@@ -115,6 +115,11 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
    // Totals Block
    const [rcmGst, setRcmGst] = useState('0.00');
 
+   // Find/Search state
+   const [showFindDialog, setShowFindDialog] = useState(false);
+   const [findSearchText, setFindSearchText] = useState('');
+   const [foundRecords, setFoundRecords] = useState([]);
+
    useEffect(() => {
       if (!isOpen) {
          setBootLoading(false);
@@ -587,6 +592,46 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
          gpAmount: computedGrossAmt,
       };
    }, [linesWithAmt, parties, selectedJobPartyId, billGpNo, serialNo, remark, receiveDate, gridTotals, computedGrossAmt]);
+
+   const handleFind = () => {
+      setShowFindDialog(true);
+      setFindSearchText('');
+      setFoundRecords([]);
+   };
+
+   const handleNew = () => {
+      setLines([blankLine()]);
+      setSelectedJobPartyId('');
+      setGstin('');
+      setBillGpNo('');
+      setReceiveDate(today());
+      setRemark('');
+      notifySuccess('Cleared for new Mill Receive entry');
+   };
+
+   const handleLoadRecord = (record) => {
+      // Load the selected record into the form
+      setSelectedJobPartyId(record.partyId || '');
+      setGstin(record.gstin || '');
+      setBillGpNo(record.billGpNo || '');
+      setReceiveDate(record.receiveDate || today());
+      setRemark(record.remark || '');
+      if (record.lines && Array.isArray(record.lines)) {
+         setLines(record.lines);
+      }
+      setShowFindDialog(false);
+      notifySuccess('Record loaded successfully');
+   };
+
+   const handleSearchFind = () => {
+      if (!findSearchText.trim()) {
+         notifyWarning('Enter Bill No or Party name to search');
+         return;
+      }
+      // Placeholder: In real implementation, this would fetch from backend
+      // For now, we'll show a message
+      notifyWarning('Search feature coming soon - Please use bill number');
+   };
 
    const handlePrint = () => {
       if (!printData.lines.length) {
@@ -1248,8 +1293,8 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
 
                            {/* Row 1: Primary Toolbar */}
                            <div className="flex justify-start gap-1.5 flex-wrap items-center">
-                              <button type="button" className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">New</button>
-                              <button type="button" className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Edit</button>
+                              <button type="button" onClick={handleNew} className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">New</button>
+                              <button type="button" onClick={() => {}} className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Edit</button>
                               <button
                                  type="submit"
                                  onClick={handleSubmit}
@@ -1259,9 +1304,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                                  <SaveButtonLabel saving={saving} idle="Save" busy="Saving…" />
                               </button>
                               <button type="button" onClick={onClose} className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Cancel</button>
-                              <button type="button" className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Find</button>
-                              <button type="button" className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Sp.Find</button>
-                              <button type="button" className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1] text-red-800">Delete</button>
+                              <button type="button" onClick={handleFind} className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Find</button>
+                              <button type="button" onClick={handleFind} className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Sp.Find</button>
+                              <button type="button" onClick={() => notifyWarning('Select a record to delete')} className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1] text-red-800">Delete</button>
                               <button type="button" onClick={onClose} className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Exit</button>
                            </div>
 
@@ -1414,6 +1459,68 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null }) => {
                            </button>
                         </div>
 
+                     </div>
+                  </div>,
+                  document.body
+               )}
+
+               {/* Find Dialog */}
+               {showFindDialog && createPortal(
+                  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+                     <div className="bg-white border-2 border-gray-400 rounded-lg shadow-2xl w-96 max-h-[70vh] flex flex-col">
+                        <div className="bg-gray-200 border-b-2 border-gray-400 p-3 font-bold">Find Mill Receive Record</div>
+
+                        <div className="p-4 space-y-3">
+                           <div>
+                              <label className="text-xs font-bold">Search by Bill No or Party:</label>
+                              <input
+                                 type="text"
+                                 value={findSearchText}
+                                 onChange={(e) => setFindSearchText(e.target.value)}
+                                 onKeyDown={(e) => e.key === 'Enter' && handleSearchFind()}
+                                 placeholder="Enter Bill No or Party name"
+                                 className="w-full border-2 border-gray-400 px-2 py-1 mt-1 text-sm"
+                                 autoFocus
+                              />
+                           </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto border-t border-gray-300">
+                           {foundRecords.length > 0 ? (
+                              <div className="divide-y">
+                                 {foundRecords.map((rec, idx) => (
+                                    <div
+                                       key={idx}
+                                       onClick={() => handleLoadRecord(rec)}
+                                       className="p-3 cursor-pointer hover:bg-blue-100 border-b border-gray-300"
+                                    >
+                                       <div className="font-bold text-sm">{rec.billGpNo}</div>
+                                       <div className="text-xs text-gray-600">{rec.partyName || 'Unknown Party'}</div>
+                                       <div className="text-xs text-gray-500">{rec.receiveDate}</div>
+                                    </div>
+                                 ))}
+                              </div>
+                           ) : (
+                              <div className="p-4 text-center text-gray-500 text-sm">
+                                 {findSearchText ? 'No records found. Try a different search.' : 'Enter search criteria and click Find'}
+                              </div>
+                           )}
+                        </div>
+
+                        <div className="border-t border-gray-300 p-3 flex gap-2 justify-end">
+                           <button
+                              onClick={handleSearchFind}
+                              className="px-4 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded"
+                           >
+                              Find
+                           </button>
+                           <button
+                              onClick={() => setShowFindDialog(false)}
+                              className="px-4 py-1 bg-gray-400 hover:bg-gray-500 text-white font-bold text-sm rounded"
+                           >
+                              Close
+                           </button>
+                        </div>
                      </div>
                   </div>,
                   document.body

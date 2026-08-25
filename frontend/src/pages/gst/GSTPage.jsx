@@ -4,6 +4,7 @@ import { downloadJson, getMonthDateRange, buildGstr1Filename } from '../../utils
 import { downloadCsv } from '../../utils/reportExport';
 import { FileText, Download, TrendingUp, TrendingDown, Landmark, PieChart, ArrowRight } from 'lucide-react';
 import { notifyError } from '../../utils/notify';
+import GSTReportsTab from './GSTReportsTab';
 
 const GSTPage = () => {
   const { sales, purchases, fetchGstr1 } = useStore();
@@ -173,6 +174,12 @@ const GSTPage = () => {
                </tbody>
             </table>
          </div>
+      </div>
+
+      {/* GST Reports Section */}
+      <div className="mt-12">
+        <h2 className="text-2xl font-black text-black uppercase tracking-widest mb-6">GST Report Generator</h2>
+        <GSTReportsTab />
       </div>
     </div>
   );
