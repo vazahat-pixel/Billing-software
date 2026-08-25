@@ -1,337 +1,172 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import useStore from '../../store/useStore';
 import { ModalLoader } from '../../components/ui/loaders';
-import { Download, RefreshCw, AlertCircle } from 'lucide-react';
 import { downloadCsv } from '../../utils/reportExport';
 
-const REPORT_TYPES = [
-  { value: 'B2B', label: 'B2B' },
-  { value: 'B2CL', label: 'B2CL' },
-  { value: 'B2CS', label: 'B2CS' },
-  { value: 'CDNR', label: 'CDNR' },
-  { value: 'CDNU', label: 'CDNU' },
-  { value: 'HSN', label: 'HSN' },
-  { value: 'HSN_B2C', label: 'HSN B2C' },
-  { value: 'DOCS', label: 'DOCS' },
-  { value: 'EXP', label: 'EXP.' },
-  { value: 'EXEMP', label: 'EXEMP' },
-];
-
-const GSTR_TYPES = [
-  { value: 'GSTR1', label: 'GSTR-1 (Sales)' },
-  { value: 'GSTR2', label: 'GSTR-2 (Purchases)' },
-  { value: 'GSTR3B', label: 'GSTR-3B (Consolidated)' },
-];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const REPORT_TABS = ['B2B', 'B2CL', 'B2CS', 'CDNR', 'CDNU', 'HSN', 'HSN B2C', 'DOCS', 'EXP.', 'EXEMP'];
 
 const GSTReportsTab = () => {
-  const { sales, purchases, currentCompany } = useStore();
-
-  // State
-  const [month, setMonth] = useState('08');
-  const [year, setYear] = useState('2026');
-  const [fromDate, setFromDate] = useState('01/08/2026');
-  const [toDate, setToDate] = useState('31/08/2026');
+  const { sales, purchases } = useStore();
+  const [month, setMonth] = useState('Oct');
+  const [fromDate, setFromDate] = useState('01/04/2026');
+  const [toDate, setToDate] = useState('25/08/2026');
   const [activeTab, setActiveTab] = useState('B2B');
-  const [gstType, setGstType] = useState('GSTR1');
   const [gstSlabWise, setGstSlabWise] = useState(true);
-  const [hsnDescriptionWise, setHsnDescriptionWise] = useState(false);
+  const [hsnDescWise, setHsnDescWise] = useState(false);
+  const [reportType, setReportType] = useState('GSTR-1');
   const [isLoading, setIsLoading] = useState(false);
   const [rows, setRows] = useState([]);
-  const [error, setError] = useState('');
   const tableRef = useRef(null);
 
-  // Parse dates from DD/MM/YYYY format
-  const parseDateFromUI = (dateStr) => {
-    const [d, m, y] = dateStr.split('/');
-    return new Date(y, m - 1, d);
-  };
-
-  const formatDateToUI = (date) => {
-    const d = String(date.getDate()).padStart(2, '0');
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const y = date.getFullYear();
-    return `${d}/${m}/${y}`;
-  };
-
-  // Generate report data based on tab and type
-  const generateReportData = () => {
-    setIsLoading(true);
-    setError('');
-
-    try {
-      setTimeout(() => {
-        const start = parseDateFromUI(fromDate);
-        const end = parseDateFromUI(toDate);
-
-        let reportData = [];
-
-        if (gstType === 'GSTR1') {
-          // Sales data
-          reportData = sales
-            .filter(s => {
-              const sDate = new Date(s.date);
-              return sDate >= start && sDate <= end;
-            })
-            .map((s, idx) => ({
-              _key: idx,
-              GSTIN_NO: s.customerId?.gstin || '',
-              PARTY: s.customerId?.name || '',
-              NCBILL_NO: s.invoiceNo || '',
-              BILL_DATE: s.date ? new Date(s.date).toISOString().split('T')[0] : '',
-              NET_TOT: Number(s.netAmount || 0).toFixed(2),
-              STATE_NAME: s.customerId?.state || '',
-              RVRS_YN: 'N',
-              A_TAX_RATE: `${s.gstType === 'IGST' ? Number(s.igst) : (Number(s.cgst) + Number(s.sgst))}%`,
-              INV_TYPE: s.type || 'REG',
-              TAXABLE: Number(s.taxableAmount || 0).toFixed(2),
-              CGST: Number(s.cgst || 0).toFixed(2),
-              SGST: Number(s.sgst || 0).toFixed(2),
-              IGST: Number(s.igst || 0).toFixed(2),
-            }));
-        } else if (gstType === 'GSTR2') {
-          // Purchase data
-          reportData = purchases
-            .filter(p => {
-              const pDate = new Date(p.date);
-              return pDate >= start && pDate <= end;
-            })
-            .map((p, idx) => ({
-              _key: idx,
-              GSTIN_NO: p.supplierId?.gstin || '',
-              PARTY: p.supplierId?.name || '',
-              NCBILL_NO: p.supplierInvoiceNo || p.invoiceNo || '',
-              BILL_DATE: p.date ? new Date(p.date).toISOString().split('T')[0] : '',
-              NET_TOT: Number(p.netAmount || 0).toFixed(2),
-              STATE_NAME: p.supplierId?.state || '',
-              RVRS_YN: p.reverseCharge === 'Yes' ? 'Y' : 'N',
-              A_TAX_RATE: `${p.gstType === 'IGST' ? Number(p.igst) : (Number(p.cgst) + Number(p.sgst))}%`,
-              INV_TYPE: p.type || 'REG',
-              TAXABLE: Number(p.taxableAmount || 0).toFixed(2),
-              CGST: Number(p.cgst || 0).toFixed(2),
-              SGST: Number(p.sgst || 0).toFixed(2),
-              IGST: Number(p.igst || 0).toFixed(2),
-            }));
-        }
-
-        // Filter by tab (report type)
-        if (activeTab === 'B2B') {
-          reportData = reportData.filter(r => r.INV_TYPE === 'REG');
-        } else if (activeTab === 'B2CS') {
-          reportData = reportData.filter(r => r.INV_TYPE === 'B2CS');
-        }
-
-        // Sort by slab if enabled
-        if (gstSlabWise) {
-          reportData.sort((a, b) => {
-            const rateA = parseFloat(a.A_TAX_RATE);
-            const rateB = parseFloat(b.A_TAX_RATE);
-            return rateA - rateB;
-          });
-        }
-
-        setRows(reportData);
-      }, 500);
-    } catch (err) {
-      setError(`Error generating report: ${err.message}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleLoadData = () => {
-    generateReportData();
+    setIsLoading(true);
+    setTimeout(() => {
+      // Simulate data loading
+      const mockData = sales.slice(0, 5).map((s, idx) => ({
+        GSTIN_NO: s.customerId?.gstin || 'N/A',
+        PARTY: s.customerId?.name || 'N/A',
+        NCBILL_NO: s.invoiceNo || 'N/A',
+        BILL_DATE: s.date?.split('T')[0] || 'N/A',
+        NET_TOT: (s.netAmount || 0).toFixed(2),
+        STATE_NAME: s.customerId?.state || 'N/A',
+        RVRS_YN: 'N',
+        A_TAX_RATE: s.igst ? '18%' : '9%',
+        INV_TYPE: 'REG',
+      }));
+      setRows(mockData);
+      setIsLoading(false);
+    }, 300);
   };
 
-  const handleDownloadExcel = () => {
+  const handleGenerateExcel = () => {
     if (rows.length === 0) {
-      setError('No data to export. Please load data first.');
+      alert('Please load data first');
       return;
     }
-
-    setIsLoading(true);
-    try {
-      const headers = ['GSTIN_NO', 'PARTY', 'NCBILL_NO', 'BILL_DATE', 'NET_TOT', 'STATE_NAME', 'RVRS_YN', 'A_TAX_RATE', 'INV_TYPE', 'TAXABLE', 'CGST', 'SGST', 'IGST'];
-      const csvRows = rows.map(r => [
-        r.GSTIN_NO,
-        r.PARTY,
-        r.NCBILL_NO,
-        r.BILL_DATE,
-        r.NET_TOT,
-        r.STATE_NAME,
-        r.RVRS_YN,
-        r.A_TAX_RATE,
-        r.INV_TYPE,
-        r.TAXABLE,
-        r.CGST,
-        r.SGST,
-        r.IGST,
-      ]);
-
-      downloadCsv(`GSTR_${gstType}_${fromDate.replace(/\//g, '')}_to_${toDate.replace(/\//g, '')}.csv`, headers, csvRows);
-    } finally {
-      setIsLoading(false);
-    }
+    const headers = Object.keys(rows[0] || {});
+    const csvRows = rows.map(r => headers.map(h => r[h]));
+    downloadCsv(`GSTR1_${fromDate}_to_${toDate}.csv`, headers, csvRows);
   };
 
   return (
-    <div className="bg-[#e8eef7] p-4 rounded-lg relative">
-      {isLoading && <ModalLoader message="Generating GST Report…" />}
+    <div style={{ backgroundColor: '#d0dced', padding: '8px', fontFamily: 'Arial, sans-serif' }}>
+      {isLoading && <ModalLoader message="Loading..." />}
 
-      {/* Top Controls */}
-      <div className="bg-white border-2 border-gray-400 p-4 mb-4">
-        {/* Row 1: Month and Date Range */}
-        <div className="flex gap-4 items-center mb-4">
+      {/* Top Row Controls */}
+      <div style={{ backgroundColor: '#d0dced', marginBottom: '8px', padding: '8px' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', marginBottom: '8px' }}>
+          {/* Month Dropdown */}
           <div>
-            <label className="text-xs font-bold text-gray-700">Aug</label>
-            <select
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="border border-gray-400 px-2 py-1 text-sm font-bold"
-            >
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i} value={String(i + 1).padStart(2, '0')}>
-                  {new Date(2026, i, 1).toLocaleString('default', { month: 'short' })}
-                </option>
-              ))}
+            <label style={{ fontSize: '11px', fontWeight: 'bold', display: 'block', marginBottom: '2px' }}>Oct</label>
+            <select value={month} onChange={(e) => setMonth(e.target.value)}
+              style={{ border: '1px solid #666', padding: '4px 8px', fontWeight: 'bold', backgroundColor: 'white' }}>
+              {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
 
-          <div className="flex gap-2 items-end">
+          {/* From/To Dates */}
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end' }}>
             <div>
-              <label className="text-xs font-bold text-gray-700">From</label>
-              <input
-                type="text"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                placeholder="DD/MM/YYYY"
-                className="border-2 border-gray-400 px-3 py-1 font-bold text-sm w-32 text-center"
-              />
+              <label style={{ fontSize: '11px', fontWeight: 'bold', display: 'block' }}>From</label>
+              <input type="text" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+                style={{ border: '2px solid #666', padding: '4px', fontWeight: 'bold', width: '100px', textAlign: 'center', backgroundColor: '#fffacd' }} />
             </div>
+            <div style={{ fontWeight: 'bold' }}>To</div>
             <div>
-              <label className="text-xs font-bold text-gray-700">To</label>
-              <input
-                type="text"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                placeholder="DD/MM/YYYY"
-                className="border-2 border-gray-400 px-3 py-1 font-bold text-sm w-32 text-center"
-              />
+              <input type="text" value={toDate} onChange={(e) => setToDate(e.target.value)}
+                style={{ border: '2px solid #666', padding: '4px', fontWeight: 'bold', width: '100px', textAlign: 'center', backgroundColor: '#fffacd' }} />
             </div>
           </div>
 
-          <div className="flex gap-3 ml-auto">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={gstSlabWise}
-                onChange={(e) => setGstSlabWise(e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span className="font-bold">Gst Slab Wise</span>
+          {/* Checkboxes */}
+          <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto' }}>
+            <label style={{ fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <input type="checkbox" checked={gstSlabWise} onChange={(e) => setGstSlabWise(e.target.checked)}
+                style={{ backgroundColor: '#fffacd' }} /> Gst Slab Wise
             </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={hsnDescriptionWise}
-                onChange={(e) => setHsnDescriptionWise(e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span className="font-bold">HsnDescriptionWise</span>
+            <label style={{ fontSize: '11px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <input type="checkbox" checked={hsnDescWise} onChange={(e) => setHsnDescWise(e.target.checked)} /> HsnDescriptionWise
             </label>
           </div>
 
-          <div className="flex gap-2 items-end ml-auto">
+          {/* Report Type & LoadData */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
             <div>
-              <label className="text-xs font-bold text-gray-700">Report Type</label>
-              <select
-                value={gstType}
-                onChange={(e) => setGstType(e.target.value)}
-                className="border-2 border-gray-400 px-3 py-1 font-bold text-sm"
-              >
-                {GSTR_TYPES.map(t => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
+              <label style={{ fontSize: '11px', fontWeight: 'bold', display: 'block' }}>Report Type</label>
+              <select value={reportType} onChange={(e) => setReportType(e.target.value)}
+                style={{ border: '2px solid #666', padding: '4px', fontWeight: 'bold', backgroundColor: 'white' }}>
+                <option>GSTR-1</option>
+                <option>GSTR-2</option>
+                <option>GSTR-3B</option>
               </select>
             </div>
-            <button
-              onClick={handleLoadData}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-1 rounded text-sm"
-            >
+            <button onClick={handleLoadData}
+              style={{ backgroundColor: '#0066ff', color: 'white', border: 'none', padding: '6px 12px', fontWeight: 'bold', cursor: 'pointer', fontSize: '11px' }}>
               LoadData
             </button>
+            <div style={{ backgroundColor: '#0066ff', color: 'white', fontWeight: 'bold', padding: '6px 12px', fontSize: '11px' }}>
+              E-COMM
+            </div>
           </div>
         </div>
 
-        {/* Report Type Tabs */}
-        <div className="flex gap-1 border-b-2 border-gray-400">
-          {REPORT_TYPES.map(type => (
-            <button
-              key={type.value}
-              onClick={() => setActiveTab(type.value)}
-              className={`px-3 py-2 font-bold text-sm ${
-                activeTab === type.value
-                  ? 'bg-blue-600 text-white border-b-2 border-blue-800'
-                  : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-              }`}
-            >
-              {type.label}
+        {/* Tab Buttons */}
+        <div style={{ display: 'flex', gap: '0px', borderBottom: '2px solid #666' }}>
+          {REPORT_TABS.map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '6px 12px',
+                fontWeight: 'bold',
+                fontSize: '11px',
+                border: '1px solid #666',
+                borderBottom: activeTab === tab ? '3px solid #0066ff' : '1px solid #666',
+                backgroundColor: activeTab === tab ? '#0066ff' : '#c0c0c0',
+                color: activeTab === tab ? 'white' : 'black',
+                cursor: 'pointer',
+              }}>
+              {tab}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-100 border-2 border-red-500 p-3 mb-4 flex gap-2 items-center">
-          <AlertCircle size={16} className="text-red-600" />
-          <span className="font-bold text-red-800">{error}</span>
-        </div>
-      )}
-
-      {/* Table Section */}
-      <div className="bg-white border-2 border-gray-400 overflow-hidden">
-        <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-          <table className="w-full text-sm font-mono border-collapse" ref={tableRef}>
-            <thead className="sticky top-0 bg-gray-100 border-b-2 border-gray-400">
+      {/* Table */}
+      <div style={{ backgroundColor: 'white', border: '2px solid #666', marginBottom: '8px', overflow: 'hidden' }}>
+        <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px', fontFamily: 'monospace' }}>
+            <thead style={{ backgroundColor: '#e0e0e0', position: 'sticky', top: 0 }}>
               <tr>
-                <th className="border border-gray-300 px-2 py-1 text-left font-bold text-xs">GSTIN_NO</th>
-                <th className="border border-gray-300 px-2 py-1 text-left font-bold text-xs">PARTY</th>
-                <th className="border border-gray-300 px-2 py-1 text-left font-bold text-xs">NCBILL_NO</th>
-                <th className="border border-gray-300 px-2 py-1 text-left font-bold text-xs">BILL_DATE</th>
-                <th className="border border-gray-300 px-2 py-1 text-right font-bold text-xs">NET_TOT</th>
-                <th className="border border-gray-300 px-2 py-1 text-left font-bold text-xs">STATE_NAME</th>
-                <th className="border border-gray-300 px-2 py-1 text-center font-bold text-xs">RVRS_YN</th>
-                <th className="border border-gray-300 px-2 py-1 text-right font-bold text-xs">A_TAX_RATE</th>
-                <th className="border border-gray-300 px-2 py-1 text-left font-bold text-xs">INV_TYPE</th>
-                <th className="border border-gray-300 px-2 py-1 text-right font-bold text-xs">TAXABLE</th>
-                <th className="border border-gray-300 px-2 py-1 text-right font-bold text-xs">CGST</th>
-                <th className="border border-gray-300 px-2 py-1 text-right font-bold text-xs">SGST</th>
-                <th className="border border-gray-300 px-2 py-1 text-right font-bold text-xs">IGST</th>
+                <th style={{ border: '1px solid #999', padding: '4px', textAlign: 'left', fontWeight: 'bold' }}>GSTIN_NO</th>
+                <th style={{ border: '1px solid #999', padding: '4px', textAlign: 'left', fontWeight: 'bold' }}>PARTY</th>
+                <th style={{ border: '1px solid #999', padding: '4px', textAlign: 'left', fontWeight: 'bold' }}>NCBILL_NO</th>
+                <th style={{ border: '1px solid #999', padding: '4px', textAlign: 'left', fontWeight: 'bold' }}>BILL_DATE</th>
+                <th style={{ border: '1px solid #999', padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>NET_TOT</th>
+                <th style={{ border: '1px solid #999', padding: '4px', textAlign: 'left', fontWeight: 'bold' }}>STATE_NAME</th>
+                <th style={{ border: '1px solid #999', padding: '4px', textAlign: 'center', fontWeight: 'bold' }}>RVRS_YN</th>
+                <th style={{ border: '1px solid #999', padding: '4px', textAlign: 'right', fontWeight: 'bold' }}>A_TAX_RATE</th>
+                <th style={{ border: '1px solid #999', padding: '4px', textAlign: 'left', fontWeight: 'bold' }}>INV_TYPE</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan="13" className="border border-gray-300 px-2 py-20 text-center text-gray-500 font-bold">
-                    {isLoading ? 'Loading...' : 'No data loaded. Click LoadData to generate report.'}
+                  <td colSpan="9" style={{ border: '1px solid #999', padding: '100px 4px', textAlign: 'center', color: '#999' }}>
+                    No data loaded
                   </td>
                 </tr>
               ) : (
                 rows.map((row, idx) => (
-                  <tr key={row._key} className="hover:bg-blue-50 border-b border-gray-300">
-                    <td className="border border-gray-300 px-2 py-1 text-xs">{row.GSTIN_NO}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-xs">{row.PARTY}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-xs">{row.NCBILL_NO}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-xs">{row.BILL_DATE}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-right text-xs">{row.NET_TOT}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-xs">{row.STATE_NAME}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-center text-xs">{row.RVRS_YN}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-right text-xs">{row.A_TAX_RATE}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-xs">{row.INV_TYPE}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-right text-xs">{row.TAXABLE}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-right text-xs">{row.CGST}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-right text-xs">{row.SGST}</td>
-                    <td className="border border-gray-300 px-2 py-1 text-right text-xs">{row.IGST}</td>
+                  <tr key={idx}>
+                    <td style={{ border: '1px solid #999', padding: '2px 4px' }}>{row.GSTIN_NO}</td>
+                    <td style={{ border: '1px solid #999', padding: '2px 4px' }}>{row.PARTY}</td>
+                    <td style={{ border: '1px solid #999', padding: '2px 4px' }}>{row.NCBILL_NO}</td>
+                    <td style={{ border: '1px solid #999', padding: '2px 4px' }}>{row.BILL_DATE}</td>
+                    <td style={{ border: '1px solid #999', padding: '2px 4px', textAlign: 'right' }}>{row.NET_TOT}</td>
+                    <td style={{ border: '1px solid #999', padding: '2px 4px' }}>{row.STATE_NAME}</td>
+                    <td style={{ border: '1px solid #999', padding: '2px 4px', textAlign: 'center' }}>{row.RVRS_YN}</td>
+                    <td style={{ border: '1px solid #999', padding: '2px 4px', textAlign: 'right' }}>{row.A_TAX_RATE}</td>
+                    <td style={{ border: '1px solid #999', padding: '2px 4px' }}>{row.INV_TYPE}</td>
                   </tr>
                 ))
               )}
@@ -340,30 +175,31 @@ const GSTReportsTab = () => {
         </div>
       </div>
 
-      {/* Bottom Buttons */}
-      <div className="flex gap-3 mt-4 justify-end">
-        <button
-          onClick={handleDownloadExcel}
-          disabled={rows.length === 0}
-          className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold px-6 py-2 rounded flex items-center gap-2"
-        >
-          <Download size={16} />
-          Generate Excel
-        </button>
-        <button
-          onClick={handleLoadData}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded flex items-center gap-2"
-        >
-          <RefreshCw size={16} />
-          Refresh
-        </button>
+      {/* #lbl indicator */}
+      <div style={{ backgroundColor: '#ccff00', padding: '4px 8px', marginBottom: '8px', fontWeight: 'bold', width: 'fit-content', fontSize: '12px' }}>
+        #lbl
       </div>
 
-      {/* Status Bar */}
-      <div className="mt-2 text-xs text-gray-600 font-bold">
-        {rows.length > 0 && (
-          <span>Total Records: {rows.length} | Sum Amount: ₹{rows.reduce((sum, r) => sum + parseFloat(r.NET_TOT || 0), 0).toFixed(2)}</span>
-        )}
+      {/* Bottom Buttons */}
+      <div style={{ display: 'flex', gap: '12px' }}>
+        <button style={{ padding: '6px 16px', fontWeight: 'bold', border: '1px solid #666', backgroundColor: '#e0e0e0', cursor: 'pointer', fontSize: '11px' }}>
+          Email Send
+        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <input type="radio" name="format" value="regular" defaultChecked style={{ cursor: 'pointer' }} />
+          <label style={{ fontSize: '11px', fontWeight: 'bold' }}>Regular</label>
+          <input type="radio" name="format" value="epplus" style={{ cursor: 'pointer', marginLeft: '12px' }} />
+          <label style={{ fontSize: '11px', fontWeight: 'bold' }}>EPPlus</label>
+        </div>
+        <button style={{ padding: '6px 16px', fontWeight: 'bold', border: '1px solid #666', backgroundColor: '#e0e0e0', cursor: 'pointer', fontSize: '11px', marginLeft: 'auto' }}>
+          Kill Excel Process
+        </button>
+        <button onClick={handleGenerateExcel} style={{ padding: '6px 16px', fontWeight: 'bold', border: '1px solid #666', backgroundColor: '#e0e0e0', cursor: 'pointer', fontSize: '11px' }}>
+          Generate Excel
+        </button>
+        <button style={{ padding: '6px 16px', fontWeight: 'bold', border: '1px solid #666', backgroundColor: '#e0e0e0', cursor: 'pointer', fontSize: '11px' }}>
+          Exit
+        </button>
       </div>
     </div>
   );
