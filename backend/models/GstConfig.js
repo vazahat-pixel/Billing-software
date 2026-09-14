@@ -61,6 +61,7 @@ const GstConfigSchema = new mongoose.Schema({
       default: 'Taxable',
     },
   }],
+  defaultPlaceOfSupply: { type: String, default: '' },
   lockedUntilPeriod: { type: String, default: '' }, // YYYY-MM
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });

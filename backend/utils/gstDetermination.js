@@ -33,32 +33,47 @@ function validateGstin(gstin) {
 
 function stateCodeFromGstin(gstin) {
   const g = normalizeGstin(gstin);
-  if (g.length >= 2) return g.substring(0, 2);
+  if (g.length >= 2) return normalizeStateCode(g.substring(0, 2));
   return '';
 }
 
 function stateNameFromCode(code) {
-  return STATE_CODES[code] || '';
+  return STATE_CODES[normalizeStateCode(code)] || STATE_CODES[code] || '';
+}
+
+/** Supply natures that are never derived from geography. */
+const SPECIAL_GST_TYPES = new Set(['Exempt', 'NilRated', 'ZeroRated', 'Export', 'NonGST']);
+
+/** Normalize "24", 24, "3" → "24" / "03"; ignore non-numeric state names. */
+function normalizeStateCode(raw) {
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  return digits.slice(-2).padStart(2, '0');
 }
 
 /**
- * Determine CGST+SGST vs IGST from supplier/company vs party GSTIN/state.
+ * Determine CGST+SGST vs IGST from company vs party GSTIN/state.
+ * When both state codes are known, geography wins over a manual IGST/CGST force
+ * (wrong IN/OUT selection must not corrupt filings). Special types (Exempt/Export/…)
+ * are always honoured. Manual IGST/CGST force applies only when geography is unknown.
  */
 function determineGstType({ companyGstin, companyStateCode, partyGstin, partyStateCode, forceType }) {
-  if (forceType === 'IGST' || forceType === 'CGST+SGST') return forceType;
+  if (SPECIAL_GST_TYPES.has(forceType)) return forceType;
 
-  const companyCode = companyStateCode || stateCodeFromGstin(companyGstin);
-  const partyCode = stateCodeFromGstin(partyGstin) || partyStateCode || '';
+  const companyCode = normalizeStateCode(companyStateCode) || stateCodeFromGstin(companyGstin);
+  const partyCode = stateCodeFromGstin(partyGstin) || normalizeStateCode(partyStateCode);
 
-  if (!companyCode || !partyCode) {
-    // Default intra-state when unknown — caller may override
-    return 'CGST+SGST';
+  if (companyCode && partyCode) {
+    return companyCode === partyCode ? 'CGST+SGST' : 'IGST';
   }
-  return companyCode === partyCode ? 'CGST+SGST' : 'IGST';
+
+  if (forceType === 'IGST' || forceType === 'CGST+SGST') return forceType;
+  // Default intra-state when unknown
+  return 'CGST+SGST';
 }
 
 function placeOfSupply({ partyGstin, partyStateCode, companyStateCode }) {
-  const code = stateCodeFromGstin(partyGstin) || partyStateCode || companyStateCode || '';
+  const code = stateCodeFromGstin(partyGstin) || normalizeStateCode(partyStateCode) || normalizeStateCode(companyStateCode) || '';
   return {
     stateCode: code,
     stateName: stateNameFromCode(code),
@@ -111,26 +126,30 @@ function periodKey(date = new Date()) {
 }
 
 function periodBounds(period) {
-  // period: YYYY-MM
-  const [y, m] = period.split('-').map(Number);
+  // period: YYYY-MM (defaults to current period if omitted)
+  const p = String(period || periodKey());
+  const [y, m] = p.split('-').map(Number);
   const startDate = new Date(y, m - 1, 1);
   const endDate = new Date(y, m, 0, 23, 59, 59, 999);
   return { startDate, endDate, financialYear: m >= 4 ? `${y}-${String(y + 1).slice(2)}` : `${y - 1}-${String(y).slice(2)}` };
 }
 
 function filingPeriodFp(period) {
-  // GST portal fp: MMYYYY
-  const [y, m] = period.split('-');
+  // GST portal fp: MMYYYY (defaults to current period if omitted)
+  const p = String(period || periodKey());
+  const [y, m] = p.split('-');
   return `${m}${y}`;
 }
 
 module.exports = {
   STATE_CODES,
   GSTIN_REGEX,
+  SPECIAL_GST_TYPES,
   normalizeGstin,
   validateGstin,
   stateCodeFromGstin,
   stateNameFromCode,
+  normalizeStateCode,
   determineGstType,
   placeOfSupply,
   computeTaxComponents,

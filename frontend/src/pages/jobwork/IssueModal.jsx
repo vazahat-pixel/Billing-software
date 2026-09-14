@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { ERPCombobox } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
@@ -105,12 +105,91 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   const [lotSort, setLotSort] = useState('asc');
   const [accountModal, setAccountModal] = useState({ open: false, initialData: null });
   const [findOpen, setFindOpen] = useState(false);
+  const [findSearch, setFindSearch] = useState('');
+  const [findActiveIdx, setFindActiveIdx] = useState(0);
+  const findInputRef = useRef(null);
   const [printOpen, setPrintOpen] = useState(false);
   const [fromPurchase, setFromPurchase] = useState(null);
   const [puBillLookupOpen, setPuBillLookupOpen] = useState(false);
 
   const locked = mode === 'View';
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
+  // Sorted list of challans for Find
+  const bookJobs = useMemo(() => {
+    const list = [...(jobWorkEntries || [])];
+    return list.sort((a, b) => {
+      const numA = parseInt(String(a.challanNo || a.jobCardNo || '').replace(/\D/g, ''), 10);
+      const numB = parseInt(String(b.challanNo || b.jobCardNo || '').replace(/\D/g, ''), 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return new Date(a.issueDate || a.createdAt || 0) - new Date(b.issueDate || b.createdAt || 0);
+    });
+  }, [jobWorkEntries]);
+
+  const filteredChallans = useMemo(() => {
+    const q = findSearch.trim().toLowerCase();
+    if (!q) return bookJobs;
+    return bookJobs.filter((j) => {
+      const chNo = String(j.challanNo || j.jobCardNo || '').toLowerCase();
+      const numOnly = chNo.replace(/\D/g, '');
+      const mill = String(j.workerId?.name || '').toLowerCase();
+      const item = String(j.lotId?.itemName || '').toLowerCase();
+      return chNo.includes(q) || numOnly.includes(q) || mill.includes(q) || item.includes(q);
+    });
+  }, [bookJobs, findSearch]);
+
+  const handleOpenFindModal = () => {
+    setFindSearch('');
+    const currentIdx = bookJobs.findIndex((j) => String(j._id || j.id) === String(selectedJobId));
+    setFindActiveIdx(currentIdx >= 0 ? currentIdx : Math.max(0, bookJobs.length - 1));
+    setFindOpen(true);
+    setTimeout(() => {
+      findInputRef.current?.focus();
+      try { findInputRef.current?.select(); } catch {}
+    }, 50);
+  };
+
+  const handleFindKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setFindOpen(false);
+      return;
+    }
+
+    if (e.key === '+' || e.key === '=') {
+      e.preventDefault();
+      setFindActiveIdx((prev) => Math.min(prev + 1, filteredChallans.length - 1));
+      return;
+    }
+
+    if (e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      setFindActiveIdx((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+
+    if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+      e.preventDefault();
+      setFindActiveIdx((prev) => Math.min(prev + 1, filteredChallans.length - 1));
+      return;
+    }
+
+    if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault();
+      setFindActiveIdx((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const job = filteredChallans[findActiveIdx];
+      if (job) {
+        loadJob(job._id || job.id, 'Edit');
+        setFindOpen(false);
+        toast.success(`Challan #${job.challanNo || job.jobCardNo} loaded in Edit mode`);
+      }
+    }
+  };
 
   const mills = useMemo(
     () =>
@@ -334,7 +413,13 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         const partyList = results[0] || [];
         const purchaseList = results[2] || [];
         const lots = results[3] || [];
-        if (initialData) applyPurchasePrefill(initialData, lots, purchaseList, partyList);
+        if (initialData) {
+          applyPurchasePrefill(initialData, lots, purchaseList, partyList);
+          setTimeout(() => {
+            const millInput = document.querySelector('input[placeholder*="Search Mill"]');
+            millInput?.focus();
+          }, 150);
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -482,16 +567,15 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       return;
     }
     setMode('View');
-    if (selectedJobId) loadJob(selectedJobId);
+    if (selectedJobId) loadJob(selectedJobId, 'View');
   };
 
-  const loadJob = (id) => {
+  const loadJob = (id, targetMode = 'Edit') => {
     setSelectedJobId(id);
     if (!id) return;
     const job = jobWorkEntries.find((j) => String(j._id || j.id) === String(id));
     if (!job) return;
-    setMode('View');
-    setFindOpen(true);
+    setMode(targetMode);
     const remarks = String(job.remark || job.remarks || '');
     const [r1, ...rest] = remarks.split(/\n/);
     setForm({
@@ -513,6 +597,36 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       book: selectedBook || 'PROCESS ISSUE BOOK',
     });
   };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const onKeyDown = (e) => {
+      if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'f')) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleOpenFindModal();
+        return;
+      }
+
+      if (e.altKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        handleNew();
+        return;
+      }
+
+      if ((e.altKey && e.key.toLowerCase() === 'e') || e.key === 'F2') {
+        if (selectedJobId && mode === 'View') {
+          e.preventDefault();
+          setMode('Edit');
+          toast.info('Switched to Edit mode');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [isOpen, selectedJobId, mode, findOpen, bookJobs]);
 
   const handleJobCard = () => {
     if (locked) return;
@@ -819,6 +933,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                         value={form.millId}
                         onChange={handleMillChange}
                         disabled={locked}
+                        data-autofocus={Boolean(fromPurchase || initialData) ? 'true' : undefined}
                         options={millOptions}
                         placeholder="Search Mill / Job Worker…"
                         recentKey="mill-issue-mill"
@@ -839,17 +954,27 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                     </div>
                   </div>
 
-                  <div className="classic-erp-field classic-erp-field--lg">
-                    <span className="classic-erp-label">Weaver</span>
+                  <div
+                    className="classic-erp-field classic-erp-field--lg"
+                    {...(fromPurchase && form.weaver ? { 'data-enter-skip': 'true' } : {})}
+                  >
+                    <span className="classic-erp-label">
+                      Weaver
+                      {fromPurchase && form.weaver ? (
+                        <span className="ml-1 text-[10px] text-emerald-700 font-semibold">(From Purchase)</span>
+                      ) : null}
+                    </span>
                     <div className="classic-erp-control">
                       <ERPCombobox
                         value={form.weaver}
                         onChange={handleWeaverChange}
                         disabled={locked}
+                        readOnly={Boolean(fromPurchase && form.weaver)}
+                        data-enter-skip={Boolean(fromPurchase && form.weaver) ? 'true' : undefined}
                         options={weaverOptions}
                         placeholder="Search Weaver…"
                         recentKey="mill-issue-weaver"
-                        allowClear
+                        allowClear={!fromPurchase}
                       />
                     </div>
                   </div>
@@ -1077,16 +1202,14 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                 </button>
                 <button
                   type="button"
-                  className="classic-erp-btn"
-                  onClick={() => {
-                    setFindOpen(true);
-                    setMode('View');
-                  }}
+                  className="classic-erp-btn font-bold bg-amber-100 border-amber-400 text-amber-900"
+                  onClick={handleOpenFindModal}
                   disabled={saving}
+                  title="Quick Find Challan (F3 / Alt+F)"
                 >
-                  Find
+                  Find (F3)
                 </button>
-                <button type="button" className="classic-erp-btn" onClick={handleDelete} disabled={saving}>
+                <button type="button" className="classic-erp-btn btn-red" onClick={handleDelete} disabled={saving}>
                   Delete
                 </button>
                 <button type="button" className="classic-erp-btn" onClick={onClose} disabled={saving}>
@@ -1109,10 +1232,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                 <button
                   type="button"
                   className="classic-erp-btn"
-                  onClick={() => {
-                    setFindOpen(true);
-                    setMode('View');
-                  }}
+                  onClick={handleOpenFindModal}
                 >
                   Sp.Find
                 </button>
@@ -1124,6 +1244,132 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
           </div>
         )}
       </ErpWindowedModal>
+
+      {/* Quick Issue / Challan Number Find Modal with + / - and Enter -> Edit */}
+      {findOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
+          onClick={() => setFindOpen(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl border-2 border-slate-700 w-full max-w-md overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxHeight: '82vh' }}
+          >
+            {/* Header */}
+            <div className="bg-[#1a3353] text-white px-4 py-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="bg-amber-400 text-slate-900 font-black px-1.5 py-0.5 rounded text-[11px]">FIND CHALLAN</span>
+                <h3 className="font-bold text-xs uppercase tracking-wider">Quick Issue Selector</h3>
+              </div>
+              <span className="text-[10px] text-slate-300">
+                <kbd className="bg-slate-700 px-1 py-0.5 rounded font-mono font-bold">+</kbd> / <kbd className="bg-slate-700 px-1 py-0.5 rounded font-mono font-bold">-</kbd> change · <kbd className="bg-slate-700 px-1 py-0.5 rounded font-mono font-bold">Enter</kbd> Edit
+              </span>
+            </div>
+
+            {/* Search / Quick Number Input */}
+            <div className="p-3 bg-slate-100 border-b border-slate-300 flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-700 shrink-0">Challan No:</span>
+              <input
+                ref={findInputRef}
+                type="text"
+                autoFocus
+                value={findSearch}
+                onChange={(e) => {
+                  setFindSearch(e.target.value);
+                  setFindActiveIdx(0);
+                }}
+                onKeyDown={handleFindKeyDown}
+                placeholder="Type number (1, 2, 3...) or press + / - to change..."
+                className="flex-1 px-3 py-1.5 border-2 border-blue-600 rounded text-sm font-bold bg-[#fffde6] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-400 font-mono shadow-inner"
+              />
+              <span className="text-[11px] font-bold text-slate-600 shrink-0">{filteredChallans.length} Records</span>
+            </div>
+
+            {/* Challan Numbers List */}
+            <div className="overflow-y-auto p-2 flex-1 space-y-1 max-h-72 bg-slate-50">
+              {filteredChallans.length === 0 ? (
+                <div className="text-center py-10 text-xs text-slate-500 font-medium">
+                  No challans found matching &quot;{findSearch}&quot;
+                </div>
+              ) : (
+                filteredChallans.map((j, idx) => {
+                  const isSelected = idx === findActiveIdx;
+                  const cleanNo = String(j.challanNo || j.jobCardNo || idx + 1);
+                  return (
+                    <div
+                      key={j._id || j.id || idx}
+                      onClick={() => {
+                        loadJob(j._id || j.id, 'Edit');
+                        setFindOpen(false);
+                        toast.success(`Challan #${cleanNo} loaded in Edit mode`);
+                      }}
+                      className={`px-3 py-2 rounded flex items-center justify-between cursor-pointer text-xs transition-all ${
+                        isSelected
+                          ? 'bg-blue-600 text-white font-bold shadow-md ring-2 ring-blue-300'
+                          : 'hover:bg-slate-200 text-slate-800 bg-white border border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`text-sm font-black font-mono px-2 py-0.5 rounded ${isSelected ? 'bg-amber-400 text-slate-900 shadow-sm' : 'bg-slate-200 text-slate-900'}`}>
+                          #{cleanNo}
+                        </span>
+                        <div>
+                          <div className={`font-bold ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                            {j.workerId?.name || 'Mill / Job Worker'}
+                          </div>
+                          <div className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
+                            {j.issueDate ? new Date(j.issueDate).toLocaleDateString('en-IN') : '—'} · {j.lotId?.itemName || 'Item'} · {Number(j.issueQty || 0).toFixed(2)} mts
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right font-mono font-bold">
+                        <div>{Number(j.issuePcs || 0)} pcs</div>
+                        {isSelected && (
+                          <span className="text-[9px] bg-white/25 px-1.5 py-0.5 rounded text-white font-semibold uppercase tracking-wider">
+                            ↵ Enter → Edit
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer Navigation Bar */}
+            <div className="bg-slate-200 px-3 py-2 border-t border-slate-300 flex items-center justify-between text-[11px] text-slate-700">
+              <span className="flex items-center gap-1 font-medium">
+                <kbd className="bg-white border px-1 rounded font-bold font-mono">+</kbd> Next · <kbd className="bg-white border px-1 rounded font-bold font-mono">-</kbd> Prev · <kbd className="bg-white border px-1 rounded font-bold font-mono">↑↓</kbd> Select
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFindOpen(false)}
+                  className="px-3 py-1 bg-white border border-slate-400 rounded text-xs hover:bg-slate-100 font-semibold"
+                >
+                  Cancel (Esc)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const job = filteredChallans[findActiveIdx];
+                    if (job) {
+                      loadJob(job._id || job.id, 'Edit');
+                      setFindOpen(false);
+                      toast.success(`Challan #${job.challanNo || job.jobCardNo} loaded in Edit mode`);
+                    }
+                  }}
+                  disabled={!filteredChallans.length}
+                  className="px-3 py-1 bg-blue-600 text-white font-bold rounded text-xs hover:bg-blue-700 shadow-sm"
+                >
+                  Open in Edit (Enter)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <AccountMasterModal
         isOpen={accountModal.open}

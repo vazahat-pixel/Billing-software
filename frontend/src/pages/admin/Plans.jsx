@@ -195,7 +195,7 @@ const PlanBuilderModal = ({ plan, onClose, onSave }) => {
                             <div>
                                 <label className="dark-input__label">Plan Name</label>
                                 <select className="dark-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}>
-                                    {['Basic', 'Standard', 'Pro', 'Enterprise', 'Custom'].map(n => (
+                                    {['Basic', 'Standard', 'Pro', 'Custom'].map(n => (
                                         <option key={n} value={n}>{n}</option>
                                     ))}
                                 </select>

@@ -44,10 +44,32 @@ describe('gstDetermination — place of supply & type', () => {
     );
   });
 
-  it('forceType overrides', () => {
+  it('forceType IGST/CGST ignored when both state codes known', () => {
     assert.equal(
       determineGstType({ companyStateCode: '24', partyStateCode: '24', forceType: 'IGST' }),
+      'CGST+SGST'
+    );
+    assert.equal(
+      determineGstType({ companyStateCode: '24', partyStateCode: '27', forceType: 'CGST+SGST' }),
       'IGST'
+    );
+  });
+
+  it('forceType IGST used when geography unknown', () => {
+    assert.equal(
+      determineGstType({ forceType: 'IGST' }),
+      'IGST'
+    );
+  });
+
+  it('special types (Exempt/Export) always honoured', () => {
+    assert.equal(
+      determineGstType({ companyStateCode: '24', partyStateCode: '27', forceType: 'Exempt' }),
+      'Exempt'
+    );
+    assert.equal(
+      determineGstType({ companyStateCode: '24', partyStateCode: '24', forceType: 'Export' }),
+      'Export'
     );
   });
 

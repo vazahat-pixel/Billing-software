@@ -15,6 +15,8 @@ const DEMO_ADMIN = {
 const AdminLogin = () => {
     const [email, setEmail] = useState(() => (isDev ? DEMO_ADMIN.email : ''));
     const [password, setPassword] = useState(() => (isDev ? DEMO_ADMIN.password : ''));
+    const [totpCode, setTotpCode] = useState('');
+    const [needs2fa, setNeeds2fa] = useState(false);
     const [showPass, setShowPass] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -54,12 +56,18 @@ const AdminLogin = () => {
             const { token, user } = await loginWithOfflineSupport({
                 email,
                 password,
+                totpCode: totpCode || undefined,
                 adminOnly: true
             });
             await setAuth({ token, user });
             navigate('/admin/dashboard');
         } catch (err) {
-            setError(err.message || 'Login failed');
+            if (err.requires2fa) {
+                setNeeds2fa(true);
+                setError('Enter the 6-digit code from your authenticator app');
+            } else {
+                setError(err.message || 'Login failed');
+            }
         } finally {
             setLoading(false);
         }
@@ -139,6 +147,24 @@ const AdminLogin = () => {
                             </button>
                         </div>
                     </div>
+
+                    {(needs2fa || totpCode) && (
+                        <div>
+                            <label className="admin-login-label">Authenticator code</label>
+                            <div className="admin-login-input-wrap">
+                                <Shield size={15} style={{ color: 'var(--admin-text-subtle)' }} />
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="one-time-code"
+                                    value={totpCode}
+                                    onChange={(e) => setTotpCode(e.target.value)}
+                                    className="admin-login-input"
+                                    placeholder="6-digit code"
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     <button disabled={loading} type="submit" className="admin-login-btn">
                         {loading ? (

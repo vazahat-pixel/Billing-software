@@ -32,9 +32,10 @@ export function buildPuBillRows({ inventoryLots = [], purchases = [], items = []
       const supplierName = p.supplierId?.name || p.supplierName || p.partyName || p.weaver || '';
 
       if (filterWeaver && weaverKey) {
-        const supLower = supplierName.toLowerCase();
-        const match = supLower.includes(weaverKey) || weaverKey.includes(supLower);
-        if (!match) return;
+        const supLower = supplierName.trim().toLowerCase();
+        if (!supLower || (supLower !== weaverKey && !supLower.includes(weaverKey) && !weaverKey.includes(supLower))) {
+          return;
+        }
       }
 
       const billNo = p.invoiceNo || p.supplierInvoiceNo || p.billNo || '';
@@ -95,15 +96,16 @@ export function buildPuBillRows({ inventoryLots = [], purchases = [], items = []
     });
   };
 
-  // First try with weaver filter if weaverKey present
+  // If weaverKey is specified, strictly filter by weaver only
   if (weaverKey) {
     processPurchaseList(purchases, true);
-  }
-  // If no rows matched weaver or weaver is empty, include all purchase bills
-  if (rows.length === 0) {
-    sral = 0;
+  } else {
+    // If no weaver specified, include all purchase bills
     processPurchaseList(purchases, false);
   }
+
+  // Index purchases by ID for accurate lot supplier resolution
+  const purchaseById = new Map((purchases || []).map((p) => [String(p._id || p.id), p]));
 
   // Also include standalone inventoryLots not already represented by purchase rows
   const processedLotIds = new Set(rows.map((r) => String(r.lotId)).filter(Boolean));
@@ -111,11 +113,24 @@ export function buildPuBillRows({ inventoryLots = [], purchases = [], items = []
     const lotIdStr = String(lot._id || lot.id || '');
     if (lotIdStr && processedLotIds.has(lotIdStr)) return;
 
-    const supplierName = lot.weaver || lot.supplierName || lot.partyName || lot.supplierId?.name || '';
+    const pid = String(lot.purchaseId?._id || lot.purchaseId || '');
+    const purchase = pid ? purchaseById.get(pid) : null;
+    const supplierName =
+      lot.weaver ||
+      purchase?.supplierId?.name ||
+      purchase?.supplierName ||
+      purchase?.partyName ||
+      lot.supplierName ||
+      lot.partyName ||
+      lot.supplierId?.name ||
+      '';
+
     if (weaverKey) {
-      const supLower = supplierName.toLowerCase();
-      const match = supLower.includes(weaverKey) || weaverKey.includes(supLower);
-      if (!match) return;
+      const supLower = supplierName.trim().toLowerCase();
+      // If lot has no supplier info, or doesn't match selected weaver, exclude it!
+      if (!supLower || (supLower !== weaverKey && !supLower.includes(weaverKey) && !weaverKey.includes(supLower))) {
+        return;
+      }
     }
 
     const billNo = lot.invoiceNo || lot.purchaseInvoiceNo || lot.supplierInvoiceNo || lot.lotId || '';

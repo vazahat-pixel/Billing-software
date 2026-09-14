@@ -29,6 +29,7 @@ const subscriptionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 subscriptionSchema.index({ companyId: 1, status: 1 });
-subscriptionSchema.index({ companyId: 1 }, { unique: false });
+// One commercial subscription document per company (latest wins via updates).
+subscriptionSchema.index({ companyId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Subscription', subscriptionSchema);

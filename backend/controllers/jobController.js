@@ -20,6 +20,17 @@ exports.receiveFromJob = async (req, res) => {
   }
 };
 
+exports.updateJobReceive = async (req, res) => {
+  try {
+    req.body.companyId = req.companyId;
+    if (req.params.id) req.body.jobId = req.params.id;
+    const result = await jobService.updateJobReceive(req.body);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
 exports.updateProcess = async (req, res) => {
   try {
     const { jobId, status } = req.body;

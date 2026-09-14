@@ -20,6 +20,8 @@ import {
  * the very same payload object this screen renders).
  */
 
+import GSTReportsTab from './GSTReportsTab';
+
 const money = (v) => `₹${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const num = (v) => Number(v || 0);
 const dt = (d) => (d ? new Date(d).toLocaleDateString('en-IN') : '');
@@ -28,6 +30,7 @@ const firstOfMonth = () => { const d = new Date(); return new Date(d.getFullYear
 const lastOfMonth = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10); };
 
 const TABS = [
+  { id: 'offline_tool', label: 'GSTR-1 Excel Utility (V3.2.2)', icon: faFileExcel },
   { id: 'summary', label: 'GST Summary', icon: faChartPie },
   { id: 'gstr1', label: 'GSTR-1 (Sales)', icon: faFileInvoiceDollar },
   { id: 'gstr2', label: 'GSTR-2 (Purchase)', icon: faCartFlatbed },
@@ -290,6 +293,13 @@ export default function GstReportsHub({ isOpen, onClose }) {
           <p className="mt-2 text-[13px] font-semibold text-rose-800">Could not load GST reports</p>
           <p className="text-[11px] text-rose-600 mt-1">{error}</p>
           <button type="button" onClick={load} className="erp-btn erp-btn-secondary h-8 px-4 text-[11px] mt-4">Retry</button>
+        </div>
+      );
+    }
+    if (tab === 'offline_tool') {
+      return (
+        <div className="pt-2">
+          <GSTReportsTab />
         </div>
       );
     }

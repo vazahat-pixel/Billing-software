@@ -2,13 +2,13 @@ const InventoryLot = require('../models/InventoryLot');
 const StockMovement = require('../models/StockMovement');
 const AppError = require('./AppError');
 
-/** Physical remaining minus active reservations */
+/** Physical remaining minus active reservations (clamped to 0) */
 function availableMtrs(lot) {
-  return Number(lot.remainingMtrs || 0) - Number(lot.reservedMtrs || 0);
+  return Math.max(0, Number(lot.remainingMtrs || 0) - Number(lot.reservedMtrs || 0));
 }
 
 function availablePcs(lot) {
-  return Number(lot.remainingPcs || 0) - Number(lot.reservedPcs || 0);
+  return Math.max(0, Number(lot.remainingPcs || 0) - Number(lot.reservedPcs || 0));
 }
 
 function assertLotIssuable(lot) {

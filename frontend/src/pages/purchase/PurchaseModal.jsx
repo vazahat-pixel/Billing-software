@@ -18,7 +18,7 @@ import ErpWindowControls from '../../components/erp/ErpWindowControls';
 import useErpWindow from '../../hooks/useErpWindow';
 import { erpConfirm } from '../../utils/confirm';
 import { resolveParty, buildWhatsAppMessage, openWhatsAppShare } from '../../utils/invoiceHelpers';
-import { getFocusableElements } from '../../utils/formEnterNavigation';
+import { getFocusableElements, handleFormEnterKeyDown, handleFormArrowKeyDown } from '../../utils/formEnterNavigation';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import useConfigStore from '../../store/useConfigStore';
 import { resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
@@ -64,6 +64,7 @@ const PurchaseModal = ({
   initialData = null,
   selectedBook = null,
   readOnly = false,
+  onChangeBook = null,
   onOpenSales,
   onOpenJobIssue,
   onOpenMillIssue
@@ -85,16 +86,19 @@ const PurchaseModal = ({
   const suppBillRef = useRef(null);
   const lastEnterRef = useRef({ time: 0, idx: -1 });
 
-  const [pcsBreakdown, setPcsBreakdown] = useState({ open: false, lineIdx: -1, calcType: 'Mts' });
-
+  const [showFindModal, setShowFindModal] = useState(false);
+  const [findSearch, setFindSearch] = useState('');
+  const [findActiveIdx, setFindActiveIdx] = useState(0);
+  const findInputRef = useRef(null);
   const [warehouses, setWarehouses] = useState([]);
+  const [pcsBreakdown, setPcsBreakdown] = useState({ open: false, lineIdx: -1, calcType: 'Mts' });
   const [billAttachment, setBillAttachment] = useState(null);
 
   const [header, setHeader] = useState({
     party: '',
     add: '',
     broker: '',
-    book: 'PURCHASE BOOK',
+    book: selectedBook || 'PURCHASE BOOK',
     gstin: '',
     city: '',
     vNo: 'AUTO',
@@ -107,6 +111,96 @@ const PurchaseModal = ({
     reverseCharge: 'No',
     warehouseId: ''
   });
+
+  // Sorted list of bills in this book / company for Find
+  const bookPurchases = useMemo(() => {
+    const list = (purchases || []).filter(p => {
+      if (header.book && p.bookId) {
+        return String(p.bookId).toLowerCase() === String(header.book).toLowerCase();
+      }
+      return true;
+    });
+    return [...list].sort((a, b) => {
+      const numA = parseInt(String(a.vNo || a.invoiceNo || '').replace(/\D/g, ''), 10);
+      const numB = parseInt(String(b.vNo || b.invoiceNo || '').replace(/\D/g, ''), 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return new Date(a.date || 0) - new Date(b.date || 0);
+    });
+  }, [purchases, header.book]);
+
+  const filteredPurchases = useMemo(() => {
+    const q = findSearch.trim().toLowerCase();
+    if (!q) return bookPurchases;
+    return bookPurchases.filter(p => {
+      const vNo = String(p.vNo || p.invoiceNo || '').toLowerCase();
+      const numOnly = vNo.replace(/\D/g, '');
+      const party = String(p.supplierId?.name || '').toLowerCase();
+      return vNo.includes(q) || numOnly.includes(q) || party.includes(q);
+    });
+  }, [bookPurchases, findSearch]);
+
+  const handleOpenFindModal = () => {
+    setFindSearch('');
+    const currentIdx = bookPurchases.findIndex(p => (p._id || p.id) === selectedPurchaseId);
+    setFindActiveIdx(currentIdx >= 0 ? currentIdx : Math.max(0, bookPurchases.length - 1));
+    setShowFindModal(true);
+    setTimeout(() => {
+      findInputRef.current?.focus();
+      try { findInputRef.current?.select(); } catch {}
+    }, 50);
+  };
+
+  const handleFindKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setShowFindModal(false);
+      return;
+    }
+
+    if (e.key === '+' || e.key === '=') {
+      e.preventDefault();
+      setFindActiveIdx(prev => Math.min(prev + 1, filteredPurchases.length - 1));
+      return;
+    }
+
+    if (e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      setFindActiveIdx(prev => Math.max(prev - 1, 0));
+      return;
+    }
+
+    if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+      e.preventDefault();
+      setFindActiveIdx(prev => Math.min(prev + 1, filteredPurchases.length - 1));
+      return;
+    }
+
+    if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault();
+      setFindActiveIdx(prev => Math.max(prev - 1, 0));
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const bill = filteredPurchases[findActiveIdx];
+      if (bill) {
+        loadPurchaseData(bill);
+        setMode('Edit');
+        setShowFindModal(false);
+        toast.success(`Purchase #${bill.vNo || bill.invoiceNo} loaded in Edit mode`);
+        setTimeout(() => {
+          if (modalContainerRef.current) {
+            const focusables = getFocusableElements(modalContainerRef.current);
+            if (focusables.length > 0) {
+              focusables[0].focus();
+              try { focusables[0].select(); } catch {}
+            }
+          }
+        }, 100);
+      }
+    }
+  };
 
   const win = useErpWindow(isOpen, {
     id: 'purchase',
@@ -366,6 +460,45 @@ const PurchaseModal = ({
     };
   }, [isOpen, readOnly, selectedBook, fetchParties, fetchItems, fetchPurchases]);
 
+  useEffect(() => {
+    if (isOpen && selectedBook) {
+      setHeader((h) => ({ ...h, book: selectedBook }));
+    }
+  }, [isOpen, selectedBook]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const onKeyDown = (e) => {
+      // F3 or Alt+F: Open Find Bill dialog
+      if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'f')) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleOpenFindModal();
+        return;
+      }
+
+      // Alt+N: New Bill
+      if (e.altKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        handleNew();
+        return;
+      }
+
+      // Alt+E or F2: Edit Bill
+      if ((e.altKey && e.key.toLowerCase() === 'e') || e.key === 'F2') {
+        if (selectedPurchaseId && mode === 'View') {
+          e.preventDefault();
+          setMode('Edit');
+          toast.info('Switched to Edit mode');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [isOpen, selectedPurchaseId, mode, showFindModal, bookPurchases]);
+
   const loadPurchaseData = (pur) => {
     const purId = pur._id || pur.id || '';
     if (purId) setSelectedPurchaseId(purId);
@@ -523,7 +656,7 @@ const PurchaseModal = ({
         ? money(linesGst * (taxable / linesGstBase))
         : linesGst;
     const cgst = isOutOfState ? 0 : money(gstAmt / 2);
-    const sgst = isOutOfState ? 0 : money(gstAmt / 2);
+    const sgst = isOutOfState ? 0 : money(gstAmt - cgst);
     const igst = isOutOfState ? gstAmt : 0;
 
     const rcmVal = money(footer.rcmCharge);
@@ -965,6 +1098,18 @@ const PurchaseModal = ({
     });
   };
 
+  // When vendor + company states are known, registered IN/OUT follows GSTIN (matches backend).
+  // Unregistered invoice types stay freely selectable.
+  const registeredSupplyAuto = useMemo(() => {
+    const p = parties.find((x) => (x._id || x.id) === header.party);
+    return resolveInvoiceSupplyType({
+      partyGstin: p?.gstin || header.gstin,
+      partyStateCode: p?.stateCode || p?.state,
+      companyGstin: companySettings?.gstin || companySettings?.GSTIN,
+      companyStateCode: companySettings?.stateCode || companySettings?.state,
+    });
+  }, [header.party, header.gstin, parties, companySettings]);
+
   const onPurchaseItemSelect = (val, idx) => {
     if (!val) return;
     const item = items.find((i) => (i._id || i.id) === val);
@@ -1036,7 +1181,19 @@ const PurchaseModal = ({
             <ErpBusyOverlay show={bootLoading} message="Loading purchase bill…" />
             <ErpBusyOverlay show={!bootLoading && saving} message="Saving purchase…" />
             <div className="classic-erp-header shrink-0">
-              <span className="erp-window-title truncate">Purchase Invoice [ {header.book} ]</span>
+              <span className="erp-window-title truncate flex items-center gap-1.5">
+                Purchase Invoice [ {header.book} ]
+                {onChangeBook && (
+                  <button
+                    type="button"
+                    onClick={onChangeBook}
+                    className="text-[9px] font-bold text-amber-200 hover:text-white bg-blue-900/60 hover:bg-blue-800 px-1.5 py-0.5 rounded border border-blue-400/40 transition-colors ml-1 cursor-pointer"
+                    title="Click to switch book"
+                  >
+                    Change Book ▾
+                  </button>
+                )}
+              </span>
               <ErpWindowControls
                 isMaximized={win.isMaximized}
                 onMinimize={win.minimize}
@@ -1169,7 +1326,19 @@ const PurchaseModal = ({
                     </div>
                     <div className="classic-erp-field">
                       <span className="classic-erp-label">Type *:</span>
-                      <select className="classic-erp-select" value={header.type} onChange={e => setHeader({ ...header, type: e.target.value })} disabled={locked}>
+                      <select
+                        className="classic-erp-select"
+                        value={header.type}
+                        onChange={(e) => {
+                          let next = e.target.value;
+                          if (!next.includes('UNREGISTERED') && registeredSupplyAuto) {
+                            next = registeredSupplyAuto;
+                          }
+                          setHeader({ ...header, type: next });
+                        }}
+                        disabled={locked}
+                        title={registeredSupplyAuto ? 'Registered IN/OUT auto from party vs company GSTIN/state' : undefined}
+                      >
                         <option value="INVOICE IN STATE">INVOICE IN STATE</option>
                         <option value="INVOICE OUT OF STATE">INVOICE OUT OF STATE</option>
                         {/* Unregistered supplier — no GST is charged on the bill. The
@@ -1185,7 +1354,10 @@ const PurchaseModal = ({
               </div>
 
               <div className="classic-erp-table-container erp-grid-panel erp-sales-grid min-h-0">
-                <table className="classic-erp-table">
+                <table
+                  className="classic-erp-table"
+                  onKeyDown={(e) => { handleFormEnterKeyDown(e); handleFormArrowKeyDown(e); }}
+                >
                   <thead>
                     <tr>
                       <th className="col-sr text-center">Sr</th>
@@ -1262,22 +1434,15 @@ const PurchaseModal = ({
                           <div className="flex items-center w-full relative">
                             <input
                               type="number"
+                              data-enter-action="true"
                               className="classic-erp-input w-full text-center border-0 font-bold"
                               value={row.pcs > 0 ? row.pcs : ''}
                               onChange={e => patchLine(idx, { pcs: Number(e.target.value) || 0, _mtsManual: false }, 'pcs')}
                               onKeyDown={(e) => {
-                                if (e.key === '#') {
+                                if (e.key === '#' || e.key === 'Enter') {
                                   e.preventDefault();
+                                  e.stopPropagation();
                                   openPcsBreakdown(idx);
-                                } else if (e.key === 'Enter') {
-                                  const now = Date.now();
-                                  if (lastEnterRef.current.idx === idx && now - lastEnterRef.current.time < 500) {
-                                    e.preventDefault();
-                                    lastEnterRef.current = { time: 0, idx: -1 };
-                                    openPcsBreakdown(idx);
-                                  } else {
-                                    lastEnterRef.current = { time: now, idx };
-                                  }
                                 }
                               }}
                               onDoubleClick={() => !locked && openPcsBreakdown(idx)}
@@ -1285,13 +1450,22 @@ const PurchaseModal = ({
                               min="0"
                               step="1"
                               placeholder="0"
-                              title="Double Enter or Double Click on Pcs to open breakdown (or press #)"
+                              title="Press Enter or # to open Pcs/Kgs breakdown"
                             />
                             {!locked && (
                               <button
                                 type="button"
+                                tabIndex={0}
+                                data-enter-action="true"
                                 onClick={() => openPcsBreakdown(idx)}
-                                title="Open detailed Kgs/Pcs breakdown"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openPcsBreakdown(idx);
+                                  }
+                                }}
+                                title="Open detailed Kgs/Pcs breakdown (keyboard: Tab here, then Enter)"
                                 className="px-1 text-[10px] text-blue-600 hover:text-blue-800 font-bold shrink-0 border-l border-slate-200"
                               >
                                 #
@@ -1475,15 +1649,15 @@ const PurchaseModal = ({
           {/* Action bar — outside scroll/window so New/Save never clip */}
           <div className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1.5 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]">
             <span className="text-[10px] text-[var(--text-muted)] mr-auto hidden sm:inline">
-              Enter → next · Esc close
+              Enter → next · Shift+Enter / Left → back · F3 Find · Ctrl+Enter save · Esc close
             </span>
-            <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving}>New</button>
+            <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving} title="New Bill (Alt+N)">New</button>
             <button className="classic-erp-btn btn-blue" type="button" data-enter-save onClick={handleSave} disabled={locked || saving || bootLoading}>
               <SaveButtonLabel saving={saving} />
             </button>
             <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked || saving}>Cancel</button>
-            <button className="classic-erp-btn" type="button" onClick={() => setMode('View')} disabled={readOnly || mode === 'View' || saving}>Find</button>
-            <button className="classic-erp-btn" type="button" onClick={() => setMode('Edit')} disabled={readOnly || mode !== 'View' || !selectedPurchaseId || saving}>Edit</button>
+            <button className="classic-erp-btn font-bold bg-amber-100 border-amber-400 text-amber-900" type="button" onClick={handleOpenFindModal} disabled={saving} title="Quick Find Bill No (F3 / Alt+F)">Find (F3)</button>
+            <button className="classic-erp-btn" type="button" onClick={() => setMode('Edit')} disabled={readOnly || mode !== 'View' || !selectedPurchaseId || saving} title="Edit Bill (F2 / Alt+E)">Edit</button>
             <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || saving || !selectedPurchaseId}>Delete</button>
             <button className="classic-erp-btn btn-blue" type="button" onClick={() => selectedPurchaseId && setPrintInvoiceId(selectedPurchaseId)} disabled={!selectedPurchaseId}>PDF / Print</button>
             <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
@@ -1519,6 +1693,134 @@ const PurchaseModal = ({
           onSuccess={handleItemSuccess}
         />
       </Modal>
+
+      {/* Quick Purchase Bill Number Find Modal with + / - and Enter -> Edit */}
+      {showFindModal && (
+        <div
+          className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
+          onClick={() => setShowFindModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl border-2 border-slate-700 w-full max-w-md overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxHeight: '82vh' }}
+          >
+            {/* Header */}
+            <div className="bg-[#1a3353] text-white px-4 py-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="bg-amber-400 text-slate-900 font-black px-1.5 py-0.5 rounded text-[11px]">FIND BILL</span>
+                <h3 className="font-bold text-xs uppercase tracking-wider">Quick Purchase Selector</h3>
+              </div>
+              <span className="text-[10px] text-slate-300">
+                <kbd className="bg-slate-700 px-1 py-0.5 rounded font-mono font-bold">+</kbd> / <kbd className="bg-slate-700 px-1 py-0.5 rounded font-mono font-bold">-</kbd> change · <kbd className="bg-slate-700 px-1 py-0.5 rounded font-mono font-bold">Enter</kbd> Edit
+              </span>
+            </div>
+
+            {/* Search / Quick Number Input */}
+            <div className="p-3 bg-slate-100 border-b border-slate-300 flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-700 shrink-0">Bill No:</span>
+              <input
+                ref={findInputRef}
+                type="text"
+                autoFocus
+                value={findSearch}
+                onChange={(e) => {
+                  setFindSearch(e.target.value);
+                  setFindActiveIdx(0);
+                }}
+                onKeyDown={handleFindKeyDown}
+                placeholder="Type number (1, 2, 3...) or press + / - to change..."
+                className="flex-1 px-3 py-1.5 border-2 border-blue-600 rounded text-sm font-bold bg-[#fffde6] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-400 font-mono shadow-inner"
+              />
+              <span className="text-[11px] font-bold text-slate-600 shrink-0">{filteredPurchases.length} Bills</span>
+            </div>
+
+            {/* Bill Numbers List */}
+            <div className="overflow-y-auto p-2 flex-1 space-y-1 max-h-72 bg-slate-50">
+              {filteredPurchases.length === 0 ? (
+                <div className="text-center py-10 text-xs text-slate-500 font-medium">
+                  No purchase bills found matching &quot;{findSearch}&quot;
+                </div>
+              ) : (
+                filteredPurchases.map((b, idx) => {
+                  const isSelected = idx === findActiveIdx;
+                  const cleanNo = String(b.vNo || b.invoiceNo || idx + 1);
+                  return (
+                    <div
+                      key={b._id || b.id || idx}
+                      onClick={() => {
+                        loadPurchaseData(b);
+                        setMode('Edit');
+                        setShowFindModal(false);
+                        toast.success(`Purchase #${cleanNo} loaded in Edit mode`);
+                      }}
+                      className={`px-3 py-2 rounded flex items-center justify-between cursor-pointer text-xs transition-all ${
+                        isSelected
+                          ? 'bg-blue-600 text-white font-bold shadow-md ring-2 ring-blue-300'
+                          : 'hover:bg-slate-200 text-slate-800 bg-white border border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`text-sm font-black font-mono px-2 py-0.5 rounded ${isSelected ? 'bg-amber-400 text-slate-900 shadow-sm' : 'bg-slate-200 text-slate-900'}`}>
+                          #{cleanNo}
+                        </span>
+                        <div>
+                          <div className={`font-bold ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                            {b.supplierId?.name || 'Supplier'}
+                          </div>
+                          <div className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
+                            {b.date ? new Date(b.date).toLocaleDateString('en-IN') : '—'} · {b.items?.length || 0} items
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right font-mono font-bold">
+                        <div>₹{Number(b.netAmount || b.taxableAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                        {isSelected && (
+                          <span className="text-[9px] bg-white/25 px-1.5 py-0.5 rounded text-white font-semibold uppercase tracking-wider">
+                            ↵ Enter → Edit
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer Navigation Bar */}
+            <div className="bg-slate-200 px-3 py-2 border-t border-slate-300 flex items-center justify-between text-[11px] text-slate-700">
+              <span className="flex items-center gap-1 font-medium">
+                <kbd className="bg-white border px-1 rounded font-bold font-mono">+</kbd> Next · <kbd className="bg-white border px-1 rounded font-bold font-mono">-</kbd> Prev · <kbd className="bg-white border px-1 rounded font-bold font-mono">↑↓</kbd> Select
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFindModal(false)}
+                  className="px-3 py-1 bg-white border border-slate-400 rounded text-xs hover:bg-slate-100 font-semibold"
+                >
+                  Cancel (Esc)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const bill = filteredPurchases[findActiveIdx];
+                    if (bill) {
+                      loadPurchaseData(bill);
+                      setMode('Edit');
+                      setShowFindModal(false);
+                      toast.success(`Purchase #${bill.vNo || bill.invoiceNo} loaded in Edit mode`);
+                    }
+                  }}
+                  disabled={!filteredPurchases.length}
+                  className="px-3 py-1 bg-blue-600 text-white font-bold rounded text-xs hover:bg-blue-700 shadow-sm"
+                >
+                  Open in Edit (Enter)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {typeof document !== 'undefined' && saveNextActions && createPortal(
         <BillSaveNextActions

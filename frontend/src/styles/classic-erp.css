@@ -1351,7 +1351,7 @@
 
 /* ============================================================
    Note Modal (Debit/Credit Note) — compact section + grid layout.
-   NoteModal.jsx renders note-section-card/note-grid-*/note-field/
+   NoteModal.jsx renders note-section-card / note-grid-[N] / note-field /
    note-label directly, but none of them were ever defined here —
    every field fell back to a plain full-width stacked block with
    no column layout, which is why the form rendered loose and

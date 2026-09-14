@@ -58,21 +58,26 @@ export default function JobLotLookupModal({ isOpen, onClose, jobs = [], partyNam
   const onKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      e.stopPropagation();
       setIdx((i) => Math.min(i + 1, Math.max(0, rows.length - 1)));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      e.stopPropagation();
       setIdx((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter' && rows[idx]) {
       e.preventDefault();
+      e.stopPropagation();
       pick(rows[idx]);
     } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
       onClose?.();
     }
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-[880px] w-full">
-      <div className="flex flex-col bg-white overflow-hidden" onKeyDown={onKeyDown}>
+      <div className="flex flex-col bg-white overflow-hidden" data-enter-nav="off" onKeyDown={onKeyDown}>
         <div className="bg-[#374151] text-white px-3 py-1.5 text-[12px] font-bold flex justify-between items-center">
           <span>Lot No Entry — Pending Mill Issue {partyName ? `for ${partyName}` : ''}</span>
           <span className="text-[10px] font-normal opacity-80">{rows.length} pending</span>
@@ -82,6 +87,7 @@ export default function JobLotLookupModal({ isOpen, onClose, jobs = [], partyNam
           <input
             autoFocus
             type="text"
+            data-enter-nav="off"
             className="w-full h-7 px-2 text-[12px] border border-slate-300 rounded-sm outline-none focus:border-blue-500"
             placeholder="Filter Lot No, Challan No, Mill, Item…"
             value={search}

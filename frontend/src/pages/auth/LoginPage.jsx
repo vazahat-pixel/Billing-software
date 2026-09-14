@@ -12,7 +12,7 @@ const DEMO_USERS = [
     {
         label: 'QA Admin (Dev)',
         email: 'qa.dev.admin@textileerp.dev',
-        password: 'QaTenant@123',
+        password: 'Admin@123',
     },
     {
         label: 'Owner (Acme Textile)',

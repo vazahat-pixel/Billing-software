@@ -17,7 +17,7 @@ const { assertProductionEnv, envReport } = require('./utils/startupChecks');
 assertProductionEnv();
 
 const app = express();
-const startedAt = Date.now();
+const startedAt = Date.now(); // reload trigger
 
 // Optional compression (Stage 7.8)
 let compression;
@@ -119,6 +119,20 @@ connectDB()
         const companyId = job.payload?.companyId || job.companyId;
         return backupService.create(companyId, { type: 'scheduled', userId: null });
       });
+
+      // SaaS dunning sweep (remind + suspend) — no payment gateway
+      const dunningMs = Number(process.env.DUNNING_INTERVAL_MS ?? 21600000);
+      if (dunningMs > 0) {
+        const dunningService = require('./services/dunningService');
+        const run = () => {
+          dunningService.runDunningSweep().catch((e) =>
+            logger.warn('dunning.interval.failed', { error: e.message })
+          );
+        };
+        setTimeout(run, 60_000).unref?.();
+        setInterval(run, dunningMs).unref?.();
+        logger.info('dunning.interval.started', { intervalMs: dunningMs });
+      }
     } catch (err) {
       logger.warn('cache/queue init skipped', { error: err.message });
     }
@@ -233,4 +247,5 @@ if (!process.env.VERCEL && require.main === module) {
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
+// Force nodemon reload: 2026-09-09T15:36:00
 module.exports = app;

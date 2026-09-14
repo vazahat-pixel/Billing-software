@@ -119,9 +119,21 @@ class JobQueueService {
       'report.build',
       'export.build',
       'backup.run',
+      'subscription.dunning',
     ]) {
       if (!handlers.has(t)) this.registerHandler(t, noopOk);
     }
+
+    this.registerHandler('subscription.dunning', async () => {
+      const dunningService = require('./dunningService');
+      return dunningService.runDunningSweep();
+    });
+
+    this.registerHandler('email.send', async (job) => {
+      const emailService = require('./emailService');
+      const p = job.payload || {};
+      return emailService.sendMail(p);
+    });
   }
 
   async retryDead(id, companyId) {

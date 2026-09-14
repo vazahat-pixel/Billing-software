@@ -8,7 +8,13 @@ files:
   - main.js
   - preload.js
   - updater.js
+  - machineId.js
+  - config.example.json
+  - renderer/**/*
   - assets/**/*
+extraResources:
+  - from: config.example.json
+    to: config.example.json
 win:
   target:
     - target: nsis
@@ -23,7 +29,6 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: Textile ERP
   deleteAppDataOnUninstall: false
-  differentialPackage: true
 publish:
   - provider: generic
     url: https://updates.example.com/textile-erp/

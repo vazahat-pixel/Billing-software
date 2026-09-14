@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('textileDesktop', {
   notify: (title, body) => ipcRenderer.invoke('desktop:notify', { title, body }),
   version: () => ipcRenderer.invoke('desktop:version'),
   platform: () => ipcRenderer.invoke('desktop:platform'),
-  // Hardware-derived identity for licence device binding (read-only).
+  /** Sync — used by axios baseURL at module load */
+  getApiBaseUrlSync: () => ipcRenderer.sendSync('desktop:api-url-sync'),
+  getApiBaseUrl: () => ipcRenderer.invoke('desktop:api-url'),
   machineId: () => ipcRenderer.invoke('desktop:machine-id'),
 });

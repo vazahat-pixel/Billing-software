@@ -265,6 +265,17 @@
   border-spacing: 0 !important;
 }
 
+/* Sales/Purchase Return has fewer columns than Sales Invoice */
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .classic-erp-table.erp-return-grid-table {
+  min-width: 1120px !important;
+}
+
+/* Purchase Return: Lot column needs combobox width */
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .classic-erp-table.erp-return-grid-table .col-desc {
+  width: 120px;
+  min-width: 120px;
+}
+
 .classic-erp-window.erp-sales-bill-compact .classic-erp-table th,
 .classic-erp-window.erp-sales-bill-compact .classic-erp-table td {
   padding: 3px 6px !important;

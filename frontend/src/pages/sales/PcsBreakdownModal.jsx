@@ -124,8 +124,15 @@ export default function PcsBreakdownModal({
 
   // Tab-order: Pcs → Qty/Bndl → Remark → next row Pcs
   const handleKeyDown = (e, idx, field) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      handleOk();
+      return;
+    }
     if (e.key !== 'Enter') return;
     e.preventDefault();
+    e.stopPropagation();
     const order = ['pcs', 'qtyBndl', 'remark'];
     const i = order.indexOf(field);
     if (i < order.length - 1) {
@@ -142,10 +149,24 @@ export default function PcsBreakdownModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-[500px] w-[500px]">
-      <div className="classic-erp-window flex flex-col overflow-hidden bg-slate-100 border border-slate-400">
+      <div
+        className="classic-erp-window flex flex-col overflow-hidden bg-slate-100 border border-slate-400"
+        data-enter-nav="off"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleOk();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose?.();
+          }
+        }}
+      >
         <div className="classic-erp-header shrink-0 py-1.5 px-2 bg-slate-200 border-b border-slate-300">
           <span className="erp-window-title text-[12px] font-bold text-slate-800">
-            Pcs / Qty Breakdown
+            Pcs / Qty Breakdown (Press Ctrl+Enter or OK to Save)
           </span>
         </div>
 
@@ -312,8 +333,17 @@ export default function PcsBreakdownModal({
               )}
               <button
                 type="button"
+                data-enter-action="true"
+                tabIndex={0}
                 className="classic-erp-btn primary text-[11px] h-6 px-3"
                 onClick={handleOk}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleOk();
+                  }
+                }}
                 disabled={locked}
               >
                 OK

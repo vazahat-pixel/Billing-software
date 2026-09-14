@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -12,6 +12,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import useStore from '../store/useStore';
 import useConfigStore from '../store/useConfigStore';
+import useEntitlements from '../hooks/useEntitlements';
 import PanelSwitcher from '../components/PanelSwitcher';
 import OfflineIndicator from '../components/OfflineIndicator';
 import FailedSyncModal from '../components/FailedSyncModal';
@@ -54,6 +55,7 @@ import LedgerModal from './LedgerModal';
 import AccountMasterModal from './masters/AccountMasterModal';
 import ItemMasterModal from './masters/ItemMasterModal';
 import BookMasterModal from './masters/BookMasterModal';
+import JobWorkerMaster from './masters/JobWorkerMaster';
 import InventoryPage from './inventory/InventoryPage';
 
 // GST Compliance Modals
@@ -67,10 +69,14 @@ import {
 } from './gst/GstModals';
 import GstReportsHub from './gst/GstReportsHub';
 import CADashboardModal from './gst/CADashboardModal';
+import GstinReportsPage from './gst/GstinReportsPage';
+import Gstr2ReportModal from './gst/Gstr2ReportModal';
+import Gstr9ReportModal from './gst/Gstr9ReportModal';
+import EWayBillHub from './gst/EWayBillHub';
 import VisitLogModal from './crm/VisitLogModal';
 import PartyModal from './masters/PartyModal';
-import JobWorkerMaster from './masters/JobWorkerMaster';
 import BookSelectionModal from '../components/BookSelectionModal';
+import { getDefaultBooksForModule } from '../utils/defaultBooks';
 
 // New Database Modals
 import GenericMasterModal from './masters/GenericMasterModal';
@@ -114,6 +120,10 @@ const MODULE_PARENT_MAP = {
   gst2bMatching: 'gst',
   gstCompliance: 'gst',
   caDashboard: 'gst',
+  gstinReports: 'gst',
+  gstr2: 'gst',
+  gstr9: 'gst',
+  ewayBill: 'gst',
   visit: 'sales',
   outstanding: 'reports',
   inventoryPage: 'inventory'
@@ -137,6 +147,10 @@ const MODULE_SUBMENU_MAP = {
   gst2bMatching: 'GSTR-2B Matching',
   gstCompliance: 'GST Compliance',
   caDashboard: 'CA Desk',
+  gstinReports: 'GSTIN Reports',
+  gstr2: 'GSTR-2 Purchase',
+  gstr9: 'GSTR-9 Annual Return',
+  ewayBill: 'E-Way Bill Hub',
   visit: 'Visit Log',
   outstanding: 'Outstanding Report',
   inventoryPage: 'Stock Ledger',
@@ -147,7 +161,7 @@ const MODULE_SUBMENU_MAP = {
 
 const Dashboard = () => {
    const navigate = useNavigate();
-   const { user, logout, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items, plan, fetchDashboardSummary, dashboardSummary, dashboardLoading, vouchers, notes } = useStore();
+   const { user, logout, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items, plan, fetchDashboardSummary, dashboardSummary, dashboardLoading, vouchers, notes, books: storeBooks, ledgers, fetchBooks } = useStore();
    const companySettings = useConfigStore((s) => s.companySettings);
    const companyMeta = useConfigStore((s) => s.company);
 
@@ -168,6 +182,7 @@ const Dashboard = () => {
       return gaps;
    }, [companySettings, companyMeta]);
    const { bundle, moduleConfig: liveModuleConfig, lastSynced } = useConfig();
+   const { hasModule } = useEntitlements();
    const openCommandPalette = useUiStore((s) => s.openCommandPalette);
    const openNotificationCenter = useUiStore((s) => s.openNotificationCenter);
    const notificationUnread = useUiStore((s) => s.notificationUnread);
@@ -181,10 +196,12 @@ const Dashboard = () => {
       navigate('/login');
    };
 
-   /** Show menu unless admin explicitly disabled (opt-out). Plan does not hide menus. */
+   /** Menu visible only when Plan sells it AND Module Control leaves it on. */
    const isParentModuleEnabled = (parentKey) => {
       if (!parentKey) return true;
       if (user?.role === 'super_admin') return true;
+      // Entitlements = plan.features.modules ∩ company moduleConfig (backend truth)
+      if (!hasModule(parentKey)) return false;
       if (moduleConfig?.modules?.[parentKey] === false) return false;
       if (bundle?.modules?.[parentKey] === false) return false;
       return true;
@@ -315,6 +332,11 @@ const Dashboard = () => {
       contraVoucher: false,
       tdsEntry: false,
       gstComplianceReports: false,
+      gstinReports: false,
+      gstinReportsSection: 'sales',
+      gstr2: false,
+      gstr9: false,
+      ewayBill: false,
       systemUtilities: false,
       zTrial: false,
       issueMultiple: false,
@@ -414,8 +436,9 @@ const Dashboard = () => {
    useEffect(() => {
       if (user?.companyId || user?.role === 'super_admin') {
          fetchDashboardSummary();
+         if (typeof fetchBooks === 'function') fetchBooks();
       }
-   }, [user?.companyId, user?.role, fetchDashboardSummary]);
+   }, [user?.companyId, user?.role, fetchDashboardSummary, fetchBooks]);
 
    useEffect(() => {
       if (!user?.companyId || user?.role === 'super_admin') return;
@@ -445,8 +468,69 @@ const Dashboard = () => {
       cashReceipt: 'receipt',
    };
 
+   const getAvailableBooksForModule = useCallback((key) => {
+      const bookMod = BOOK_MODULE_ALIAS[key] || key;
+      let list = (storeBooks || []).filter((b) => b.module === bookMod);
+      if (!list.length) {
+         list = getDefaultBooksForModule(bookMod);
+      }
+
+      // For cash/bank books, also include bank & cash ledgers if not already present as books
+      const isCashOrBank = ['receipt', 'payment', 'cashBook', 'bankBook', 'cashPayment', 'cashReceipt'].includes(bookMod);
+      if (isCashOrBank && Array.isArray(ledgers) && ledgers.length > 0) {
+         const existingNames = new Set(list.map((b) => (b.name || '').trim().toLowerCase()));
+         const bankLedgerBooks = ledgers
+            .filter((l) => ['Bank', 'Cash'].includes(l.accountType) && l.isActive !== false)
+            .filter((l) => !existingNames.has((l.name || '').trim().toLowerCase()))
+            .map((l, i) => ({
+               _id: `ledger_book_${l._id || l.id}`,
+               name: l.name,
+               code: l.code || String(100 + i + 1),
+               module: bookMod,
+               ledgerId: l._id || l.id,
+               accountType: l.accountType,
+            }));
+         list = [...list, ...bankLedgerBooks];
+      }
+
+      if (['cashBook', 'cashPayment', 'cashReceipt'].includes(key)) {
+         const filtered = list.filter((b) => {
+            const n = (b.name || '').toLowerCase();
+            return n.includes('cash') || b.accountType === 'Cash';
+         });
+         if (filtered.length > 0) list = filtered;
+      } else if (['bankBook'].includes(key)) {
+         const filtered = list.filter((b) => {
+            const n = (b.name || '').toLowerCase();
+            return n.includes('bank') || b.accountType === 'Bank';
+         });
+         if (filtered.length > 0) list = filtered;
+      }
+
+      return list;
+   }, [storeBooks, ledgers]);
+
    const toggleModal = (key, val) => {
       if (val === true && CORE_MODULES_WITH_BOOKS.includes(key)) {
+         const available = getAvailableBooksForModule(key);
+
+         // 1. Single Book: If only 1 book exists for this module, auto-select and open form directly!
+         if (available.length <= 1) {
+            const singleBook = available[0] || { name: key.toUpperCase(), code: '101', module: key };
+            setSelectedBooks(prev => ({ ...prev, [key]: singleBook }));
+            yieldOtherWindows(key);
+            setModals(prev => ({ ...prev, [key]: true }));
+            return;
+         }
+
+         // 2. Previously Selected Book: If user already selected a book in this session, reuse it directly!
+         if (selectedBooks[key]) {
+            yieldOtherWindows(key);
+            setModals(prev => ({ ...prev, [key]: true }));
+            return;
+         }
+
+         // 3. Multiple books (> 1) and none selected yet: ask user to pick
          setBookSelection({
             isOpen: true,
             module: key,
@@ -467,6 +551,14 @@ const Dashboard = () => {
          yieldOtherWindows(key);
       }
       setModals(prev => ({ ...prev, [key]: val }));
+   };
+
+   const promptChangeBook = (key) => {
+      setBookSelection({
+         isOpen: true,
+         module: key,
+         bookModule: BOOK_MODULE_ALIAS[key] || key,
+      });
    };
 
    const openPlaceholder = (name) => {
@@ -537,6 +629,14 @@ const Dashboard = () => {
          ...prev,
          reportsHub: true,
          reportsTab: tab
+      }));
+   };
+
+   const openGstinReports = (section = 'sales') => {
+      setModals(prev => ({
+         ...prev,
+         gstinReports: true,
+         gstinReportsSection: section
       }));
    };
 
@@ -661,6 +761,26 @@ const Dashboard = () => {
          { label: 'Cutting Entry', action: () => setModals(prev => ({ ...prev, cuttingEntry: true })) },
          { label: 'Beam Entry', action: () => setModals(prev => ({ ...prev, beamEntry: true })) },
          { label: 'Stock Ledger', key: 'inventoryPage' },
+      ],
+      'GST / Tax': [
+         { label: 'GSTIN Sales Report', action: () => openGstinReports('sales') },
+         { label: 'GSTIN Purchase Report', action: () => openGstinReports('purchase') },
+         { label: 'GSTIN Process Report', action: () => openGstinReports('process') },
+         { label: 'GSTIN JobWork Report', action: () => openGstinReports('jobwork') },
+         { label: 'GSTIN Journal Report', action: () => openGstinReports('journal') },
+         { label: 'GSTIN Expense Report', action: () => openGstinReports('expense') },
+         { label: 'GSTR-1 Outward Return', key: 'gstr1' },
+         { label: 'GSTR-1 Error Checking', key: 'gstr1Errorchek' },
+         { label: 'GSTR-2 Purchase Report', action: () => setModals(prev => ({ ...prev, gstr2: true })) },
+         { label: 'GSTR-2B Matching / Reconcile', key: 'gst2bMatching' },
+         { label: 'GSTR-3B Monthly Return', key: 'gst3bMonthly' },
+         { label: 'GSTR-3B Detailed Breakdown', key: 'gst3bDetail' },
+         { label: 'GSTR-9 Annual Return', action: () => setModals(prev => ({ ...prev, gstr9: true })) },
+         { label: 'ITC-04 Job Work Return', action: () => openGstinReports('itc04') },
+         { label: 'GST Reconciliation Dashboard', action: () => openGstinReports('reconciliation') },
+         { label: 'E-Way Bill Hub', action: () => setModals(prev => ({ ...prev, ewayBill: true })) },
+         { label: 'CA Audit Desk', key: 'caDashboard' },
+         { label: 'GST Reports Hub', action: () => toggleModal('gstReports', true) },
       ],
       Reports: [
          { label: 'All Reports Hub', action: () => openReportsHub('summary') },
@@ -1070,6 +1190,7 @@ const Dashboard = () => {
             initialData={salesInitialData}
             selectedBook={selectedBooks.sales?.name}
             readOnly={!permissions.canSave}
+            onChangeBook={() => promptChangeBook('sales')}
          />
          <PurchaseModal 
             isOpen={modals.purchase} 
@@ -1080,6 +1201,7 @@ const Dashboard = () => {
             initialData={purchaseInitialData}
             selectedBook={selectedBooks.purchase?.name} 
             readOnly={!permissions.canSave} 
+            onChangeBook={() => promptChangeBook('purchase')}
             onOpenSales={() => { yieldOtherWindows('sales'); toggleModal('sales', true); }}
             onOpenJobIssue={() => { yieldOtherWindows('jobIssue'); toggleModal('jobIssue', true); }}
             onOpenMillIssue={(data) => {
@@ -1152,9 +1274,25 @@ const Dashboard = () => {
             selectedBook={selectedBooks.millIssue?.name}
             initialData={millIssueInitialData}
          />
-         <ReceiveModal isOpen={modals.millRec} onClose={() => toggleModal('millRec', false)} selectedBook={selectedBooks.millRec?.name} />
+         <ReceiveModal
+            isOpen={modals.millRec}
+            onClose={() => toggleModal('millRec', false)}
+            selectedBook={selectedBooks.millRec?.name}
+            onOpenPayment={(partyId) => {
+               setVoucherInitialId(null);
+               openModalDirect('payment');
+            }}
+         />
          <UpdateModal isOpen={modals.jobIssue} onClose={() => toggleModal('jobIssue', false)} selectedBook={selectedBooks.jobIssue?.name} />
-         <JobReceiptModal isOpen={modals.jobRec} onClose={() => toggleModal('jobRec', false)} selectedBook={selectedBooks.jobRec?.name} />
+         <JobReceiptModal
+            isOpen={modals.jobRec}
+            onClose={() => toggleModal('jobRec', false)}
+            selectedBook={selectedBooks.jobRec?.name}
+            onOpenPayment={(partyId) => {
+               setVoucherInitialId(null);
+               openModalDirect('payment');
+            }}
+         />
          <ProcessUpdateModal isOpen={modals.updateJob} onClose={() => toggleModal('updateJob', false)} />
          <LedgerModal
             isOpen={modals.ledger}
@@ -1282,6 +1420,23 @@ const Dashboard = () => {
          <Gst3bDetailModal isOpen={modals.gst3bDetail} onClose={() => toggleModal('gst3bDetail', false)} />
          <Gstr1ErrorChekModal isOpen={modals.gstr1Errorchek} onClose={() => toggleModal('gstr1Errorchek', false)} />
          <GstComplianceModal isOpen={modals.gstCompliance} onClose={() => toggleModal('gstCompliance', false)} />
+         <GstinReportsPage
+            isOpen={modals.gstinReports}
+            onClose={() => setModals(prev => ({ ...prev, gstinReports: false }))}
+            initialSection={modals.gstinReportsSection || 'sales'}
+         />
+         <Gstr2ReportModal
+            isOpen={modals.gstr2}
+            onClose={() => setModals(prev => ({ ...prev, gstr2: false }))}
+         />
+         <Gstr9ReportModal
+            isOpen={modals.gstr9}
+            onClose={() => setModals(prev => ({ ...prev, gstr9: false }))}
+         />
+         <EWayBillHub
+            isOpen={modals.ewayBill}
+            onClose={() => setModals(prev => ({ ...prev, ewayBill: false }))}
+         />
          <CADashboardModal
             isOpen={modals.caDashboard}
             onClose={() => toggleModal('caDashboard', false)}
@@ -1413,6 +1568,7 @@ const Dashboard = () => {
             initialType={modals.orderType} 
          />
          <ReturnModal 
+            key={`return-${modals.returnType || 'Sales'}`}
             isOpen={modals.returnInv} 
             onClose={() => setModals(prev => ({ ...prev, returnInv: false }))} 
             initialType={modals.returnType} 

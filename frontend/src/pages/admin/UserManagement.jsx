@@ -12,9 +12,9 @@ import { erpConfirm } from '../../utils/confirm';
 
 const ROLES = [
     { value: 'owner', label: 'Owner', color: '#f59e0b', desc: 'Full access, can add users' },
-    { value: 'manager', label: 'Manager', color: '#8b5cf6', desc: 'Can access all modules' },
-    { value: 'accountant', label: 'Accountant', color: '#3b82f6', desc: 'Accounting & reports only' },
-    { value: 'salesman', label: 'Salesman', color: '#10b981', desc: 'Sales module only' },
+    { value: 'admin', label: 'Admin', color: '#8b5cf6', desc: 'Full access except company master' },
+    { value: 'accountant', label: 'Accountant', color: '#3b82f6', desc: 'Accounting, GST & reports' },
+    { value: 'sales', label: 'Sales', color: '#10b981', desc: 'Sales billing & parties' },
     { value: 'viewer', label: 'Viewer', color: '#64748b', desc: 'Read-only access' },
 ];
 

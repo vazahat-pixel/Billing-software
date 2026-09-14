@@ -48,8 +48,17 @@ export const resetApiLoadingState = () => {
 };
 
 const getBaseUrl = () => {
+  // Electron desktop — runtime config (userData/config.json) wins
+  try {
+    if (typeof window !== 'undefined' && window.textileDesktop?.getApiBaseUrlSync) {
+      const desktopUrl = window.textileDesktop.getApiBaseUrlSync();
+      if (desktopUrl) return String(desktopUrl).replace(/\/$/, '');
+    }
+  } catch {
+    /* ignore */
+  }
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+    return String(import.meta.env.VITE_API_URL).replace(/\/$/, '');
   }
   return '/api';
 };

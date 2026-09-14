@@ -216,8 +216,11 @@ export const updateSyncQueuePayload = async (localId, payload) => {
 export const clearOfflineDB = async () => {
   try {
     const db = await getDB();
-    const tx = db.transaction(DATA_STORES, 'readwrite');
-    for (const store of DATA_STORES) {
+    // CRITICAL: Never wipe syncQueue on logout! Pending offline transactions
+    // must be preserved until successfully synced to MongoDB cloud.
+    const storesToClear = DATA_STORES.filter((s) => s !== 'syncQueue');
+    const tx = db.transaction(storesToClear, 'readwrite');
+    for (const store of storesToClear) {
       await tx.objectStore(store).clear();
     }
     await tx.done;

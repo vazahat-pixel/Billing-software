@@ -2,30 +2,46 @@
   "name": "textile-erp-desktop",
   "version": "1.0.0",
   "private": true,
-  "description": "Textile ERP Desktop Shell (Electron)",
+  "description": "Textile ERP Desktop — Electron shell for end users",
   "main": "main.js",
   "author": "Textile ERP",
   "scripts": {
     "start": "electron .",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder",
-    "dist:win": "electron-builder --win"
+    "build:ui": "node scripts/build-ui.cjs",
+    "pack": "npm run build:ui && electron-builder --dir",
+    "dist": "npm run build:ui && electron-builder",
+    "dist:win": "npm run build:ui && electron-builder --win nsis"
   },
   "build": {
     "appId": "com.textileerp.desktop",
     "productName": "Textile ERP",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "assets"
     },
     "files": [
       "main.js",
       "preload.js",
       "updater.js",
+      "machineId.js",
+      "config.example.json",
+      "renderer/**/*",
       "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "config.example.json",
+        "to": "config.example.json"
+      }
     ],
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "artifactName": "TextileERP-Setup-${version}.${ext}"
     },
@@ -44,7 +60,7 @@
     ]
   },
   "devDependencies": {
-    "electron": "^33.0.0",
+    "electron": "^33.2.1",
     "electron-builder": "^25.0.0"
   },
   "optionalDependencies": {

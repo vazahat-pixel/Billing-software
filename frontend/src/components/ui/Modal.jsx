@@ -45,6 +45,14 @@ const Modal = ({
     const t = setTimeout(() => {
       const root = contentRef.current;
       if (!root) return;
+      if (root.contains(document.activeElement) && document.activeElement !== root) {
+        return;
+      }
+      const preferred = root.querySelector('[data-autofocus], [autofocus]');
+      if (preferred) {
+        preferred.focus();
+        return;
+      }
       const first = root.querySelector(
         'input:not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]), [data-erp-combobox-input]'
       );

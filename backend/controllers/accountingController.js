@@ -616,6 +616,7 @@ async function createCashBankVoucher(req, res, voucherType) {
     }).lean();
     res.status(201).json({ success: true, data: voucher, discountNotes });
   } catch (error) {
+    console.error('[createCashBankVoucher ERROR]', error.message, { body: req.body });
     if (!committed) await session.abortTransaction();
     res.status(400).json({ success: false, message: error.message });
   } finally {

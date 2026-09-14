@@ -120,8 +120,8 @@ exports.register = async (name, email, password, companyName) => {
     const CompanySettings = require('../models/CompanySettings');
     const configService = require('./configService');
 
-    // Seed full dynamic config bundle (Phase 1)
-    const { moduleConfig, settings } = await configService.seedCompanyDefaults(company._id, user._id);
+    // Seed full dynamic config bundle (Phase 1) — clip modules to Basic plan
+    const { moduleConfig, settings } = await configService.seedCompanyDefaults(company._id, user._id, null, { planId: plan._id });
     if (companyName) {
       await CompanySettings.findOneAndUpdate(
         { companyId: company._id },
@@ -153,7 +153,7 @@ exports.login = async (email, password, req = null) => {
     const securityConfigService = require('./securityConfigService');
     const sessionService = require('./sessionService');
 
-    const user = await User.findOne({ email }).select('+password +failedLoginAttempts +lockUntil');
+    const user = await User.findOne({ email }).select('+password +failedLoginAttempts +lockUntil +totpSecret +totpEnabled');
     if (!user) {
         if (req) await sessionService.recordLogin(null, 'login_failed', req, { success: false, reason: 'unknown_user', meta: { email } });
         throw new Error('Invalid credentials');
@@ -180,6 +180,21 @@ exports.login = async (email, password, req = null) => {
     }
 
     if (!user.isActive) throw new Error('Account deactivated. Please contact support.');
+
+    // Super-admin TOTP
+    if (user.role === 'super_admin' && user.totpEnabled) {
+        const totp = require('../utils/totp');
+        const code = req?.body?.totpCode;
+        if (!code) {
+            const err = new Error('Two-factor code required');
+            err.code = 'TOTP_REQUIRED';
+            err.requires2fa = true;
+            throw err;
+        }
+        if (!totp.verifyTotp(user.totpSecret, code)) {
+            throw new Error('Invalid two-factor code');
+        }
+    }
 
     // Clear lockout on success
     user.failedLoginAttempts = 0;
@@ -293,6 +308,8 @@ exports.login = async (email, password, req = null) => {
             role: user.role,
             companyRole: user.companyRole || 'owner',
             companyId: resolvedCompanyId,
+            mustChangePassword: !!user.mustChangePassword,
+            totpEnabled: !!user.totpEnabled,
             plan: planFeatures,
             company: companyInfo,
             moduleConfig: moduleConfig,
@@ -320,11 +337,21 @@ exports.forgotPassword = async (email) => {
     user.passwordResetExpires = resetExpires;
     await user.save({ validateBeforeSave: false });
 
-    // TODO: Send email with resetToken (raw, unhashed)
-    // Example: await emailService.sendPasswordReset(email, resetToken);
-    console.log(`[DEV] Password reset token for ${email}: ${resetToken}`);
+    try {
+        const emailService = require('./emailService');
+        await emailService.sendPasswordReset({
+            to: user.email,
+            name: user.name,
+            resetToken,
+        });
+    } catch (mailErr) {
+        console.error('[forgotPassword] email failed:', mailErr.message);
+    }
 
-    return { message: 'If an account exists, a reset link has been sent.', devToken: process.env.NODE_ENV === 'development' ? resetToken : undefined };
+    return {
+        message: 'If an account exists, a reset link has been sent.',
+        devToken: process.env.NODE_ENV === 'development' ? resetToken : undefined,
+    };
 };
 
 /**

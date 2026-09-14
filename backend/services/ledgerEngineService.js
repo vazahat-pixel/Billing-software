@@ -143,6 +143,15 @@ class LedgerEngineService {
       load(['DebitNote', 'CreditNote'], 'DebitCreditNote',
         (d) => ({ docNo: d.vNo || d.noteNo, remarks: d.vNo || d.noteNo || d.reason || d.narration || '', accBill: 'B', scCode: 'SCC' }),
         'vNo noteNo noteType reason narration'),
+      // Job Work / Mill Charges / Receive / Issue: docNo = billGpNo / challanNo / jobCardNo
+      load(['JobWorkCharges', 'JobReceive', 'JobIssue'], 'Job',
+        (d) => ({
+          docNo: d.billGpNo || d.challanNo || d.jobCardNo || '',
+          remarks: d.billGpNo ? `GP No.:${d.billGpNo}` : (d.challanNo || d.jobCardNo || d.remark || d.remarks || ''),
+          accBill: 'B',
+          scCode: 'SCC',
+        }),
+        'billGpNo challanNo jobCardNo remark remarks processType'),
     ]);
 
     return map;
@@ -183,22 +192,46 @@ class LedgerEngineService {
     }
     if (!ledger) throw new Error('Ledger not found');
 
+    const relatedIds = [ledger._id];
+    if (ledger.linkedPartyId) {
+      if (mongoose.Types.ObjectId.isValid(ledger.linkedPartyId)) {
+        relatedIds.push(new mongoose.Types.ObjectId(ledger.linkedPartyId));
+      }
+      const otherLedgers = await LedgerMaster.find({
+        companyId,
+        linkedPartyId: ledger.linkedPartyId,
+      }).select('_id').lean();
+      otherLedgers.forEach((ol) => {
+        if (!relatedIds.some((rid) => rid.toString() === ol._id.toString())) {
+          relatedIds.push(ol._id);
+        }
+      });
+    }
+
     let openingSigned = this.signedOpening(ledger);
 
     if (from) {
       const priorTo = new Date(new Date(from).getTime() - 1);
       const prior = await this.aggregateByLedger(companyId, {
         to: priorTo,
-        ledgerIds: [ledger._id],
+        ledgerIds: relatedIds,
       });
-      const row = prior[ledger._id.toString()] || { totalDr: 0, totalCr: 0 };
-      openingSigned += (row.totalDr - row.totalCr);
+      let priorDr = 0;
+      let priorCr = 0;
+      relatedIds.forEach((rid) => {
+        const row = prior[rid.toString()];
+        if (row) {
+          priorDr += row.totalDr || 0;
+          priorCr += row.totalCr || 0;
+        }
+      });
+      openingSigned += (priorDr - priorCr);
     }
 
     const entryFilter = {
       companyId,
       ...LIVE_ENTRY_FILTER,
-      'lines.ledgerId': ledger._id,
+      'lines.ledgerId': { $in: relatedIds },
     };
     if (from || to) {
       entryFilter.entryDate = {};
@@ -215,14 +248,14 @@ class LedgerEngineService {
       const src = sourceMap[String(entry.refId)] || {};
 
       for (const line of entry.lines) {
-        if (line.ledgerId.toString() !== ledger._id.toString()) continue;
+        if (!relatedIds.some((rid) => rid.toString() === (line.ledgerId || '').toString())) continue;
 
         // Find all opposite (contra) lines in this journal entry that are on the opposite side (Dr vs Cr)
         const oppositeLines = entry.lines.filter(
-          (l) => l.ledgerId && l.ledgerId.toString() !== ledger._id.toString() && l.type !== line.type
+          (l) => l.ledgerId && !relatedIds.some((rid) => rid.toString() === l.ledgerId.toString()) && l.type !== line.type
         );
         const allOtherLines = entry.lines.filter(
-          (l) => l.ledgerId && l.ledgerId.toString() !== ledger._id.toString()
+          (l) => l.ledgerId && !relatedIds.some((rid) => rid.toString() === l.ledgerId.toString())
         );
         const effectiveOppositeLines = oppositeLines.length > 0 ? oppositeLines : allOtherLines;
 

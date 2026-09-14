@@ -2,6 +2,7 @@ const ALL_SECTIONS = [
   'Master',
   'Transaction',
   'Inventory',
+  'GST / Tax',
   'Reports',
   'Others Reports',
   'Ledger',
@@ -26,12 +27,17 @@ export const getPermissions = (companyRole = 'owner', systemRole = 'user') => {
     };
   }
 
-  const role = companyRole || 'owner';
+  // Admin panel historically used salesman/manager — map to ERP permission keys.
+  const ROLE_ALIASES = {
+    salesman: 'sales',
+    manager: 'admin',
+  };
+  const role = ROLE_ALIASES[companyRole] || companyRole || 'owner';
 
   const sectionAccess = {
     owner: ALL_SECTIONS,
     admin: ALL_SECTIONS.filter(s => s !== 'Company'),
-    accountant: ['Master', 'Transaction', 'Inventory', 'Records', 'Reports', 'Others Reports', 'Ledger'],
+    accountant: ['Master', 'Transaction', 'Inventory', 'GST / Tax', 'Records', 'Reports', 'Others Reports', 'Ledger'],
     sales: ['Transaction', 'Inventory', 'Records', 'Reports', 'Others Reports'],
     viewer: ['Records', 'Reports', 'Others Reports', 'Ledger']
   };

@@ -321,7 +321,6 @@ const LedgerModal = ({
       );
       if (opt) {
         setAccountText(acName(opt));
-        setAccHead(acGroup(opt));
       } else if (initialAccountText) {
         setAccountText(initialAccountText);
       }
@@ -346,7 +345,7 @@ const LedgerModal = ({
     if (isOpen && view === 'entry') {
       const t = setTimeout(() => {
         accountRef.current?.focus();
-      }, 50);
+      }, 60);
       return () => clearTimeout(t);
     }
   }, [isOpen, view]);
@@ -354,7 +353,7 @@ const LedgerModal = ({
   const pickAccount = (o, shouldRun = false) => {
     setLedgerId(o.value);
     setAccountText(acName(o));
-    setAccHead(acGroup(o));
+    // Keep accHead on '-- ALL ACCOUNT HEADS --' so all account heads remain selected
     setListOpen(null);
     if (shouldRun) {
       runLedgerForId(o.value);
@@ -364,12 +363,25 @@ const LedgerModal = ({
   };
 
   const pickHead = (head) => {
-    setAccHead(head);
+    setAccHead(head || '');
     setListOpen(null);
-    accountRef.current?.focus();
-    setListOpen('account');
-    setListIdx(0);
+    setTimeout(() => {
+      accountRef.current?.focus();
+      setListOpen('account');
+      setListIdx(0);
+    }, 30);
   };
+
+  useEffect(() => {
+    if (!listOpen) return undefined;
+    const handleDocClick = (e) => {
+      if (!e.target.closest('.ledger-field-wrap')) {
+        setListOpen(null);
+      }
+    };
+    document.addEventListener('mousedown', handleDocClick);
+    return () => document.removeEventListener('mousedown', handleDocClick);
+  }, [listOpen]);
 
   const resolveAccountFromText = () => {
     if (ledgerId) return ledgerId;
@@ -409,18 +421,47 @@ const LedgerModal = ({
     runLedger(range);
   };
 
-  const handleListKey = (e, list, onPick) => {
+  const handleHeadKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      if (!listOpen) {
+      if (listOpen !== 'head') {
+        setListOpen('head');
+        setListIdx(0);
+        return;
+      }
+      setListIdx((i) => Math.min(i + 1, Math.max(0, filteredHeads.length - 1)));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (listOpen !== 'head') {
+        setListOpen('head');
+        setListIdx(0);
+        return;
+      }
+      setListIdx((i) => Math.max(i - 1, -1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (listOpen === 'head' && listIdx >= 0 && filteredHeads[listIdx]) {
+        pickHead(filteredHeads[listIdx]);
+      } else {
+        pickHead('');
+      }
+    } else if (e.key === 'Escape') {
+      setListOpen(null);
+    }
+  };
+
+  const handleAccountKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (listOpen !== 'account') {
         setListOpen('account');
         setListIdx(0);
         return;
       }
-      setListIdx((i) => Math.min(i + 1, Math.max(0, list.length - 1)));
+      setListIdx((i) => Math.min(i + 1, Math.max(0, filteredAccounts.length - 1)));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      if (!listOpen) {
+      if (listOpen !== 'account') {
         setListOpen('account');
         setListIdx(0);
         return;
@@ -428,8 +469,8 @@ const LedgerModal = ({
       setListIdx((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (listOpen && list[listIdx]) {
-        onPick(list[listIdx], true);
+      if (listOpen === 'account' && filteredAccounts[listIdx]) {
+        pickAccount(filteredAccounts[listIdx], true);
       } else {
         runLedger();
       }
@@ -661,9 +702,9 @@ const LedgerModal = ({
               className="classic-erp-input"
               value={accHead}
               onChange={(e) => { setAccHead(e.target.value); setListOpen('head'); setListIdx(0); }}
-              onFocus={() => { setListOpen('head'); setListIdx(0); }}
-              onKeyDown={(e) => handleListKey(e, filteredHeads.map((h) => ({ value: h, label: h })), (item) => pickHead(item.value))}
-              placeholder="Type to filter head…"
+              onClick={() => { setListOpen((prev) => (prev === 'head' ? null : 'head')); setListIdx(-1); }}
+              onKeyDown={handleHeadKeyDown}
+              placeholder="-- ALL ACCOUNT HEADS --"
             />
             {listOpen === 'head' && (
               <HeadListPanel
@@ -683,6 +724,7 @@ const LedgerModal = ({
           <div className="ledger-field-wrap">
             <input
               ref={accountRef}
+              data-autofocus
               className="classic-erp-input"
               value={accountText}
               onChange={(e) => {
@@ -692,7 +734,7 @@ const LedgerModal = ({
                 setListIdx(0);
               }}
               onFocus={() => { setListOpen('account'); setListIdx(0); }}
-              onKeyDown={(e) => handleListKey(e, filteredAccounts, pickAccount)}
+              onKeyDown={handleAccountKeyDown}
               placeholder="Type account name…"
             />
             {listOpen === 'account' && (

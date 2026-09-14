@@ -46,12 +46,14 @@ require('dotenv').config();
       console.log(`Role: ${user.companyRole}`);
       console.log(`Company: ${user.companyId}`);
 
-      // Reset password just to be sure
-      const password = 'QaTenant@123';
-      const hash = await bcrypt.hash(password, 10);
-      user.password = hash;
+      // Reset password to user requested password (plain text so pre-save hashes it once)
+      const password = 'Admin@123';
+      user.password = password;
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+      user.isActive = true;
       await user.save();
-      console.log(`✅ Password reset to: ${password}`);
+      console.log(`✅ Password properly reset to: ${password}`);
     }
 
     await mongoose.connection.close();

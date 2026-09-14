@@ -19,6 +19,14 @@ export const adminApi = {
 
   // Commercial lifecycle — who is expiring, in grace, or locked out.
   lifecycle: (days) => unwrap(get('/admin/lifecycle', days ? { days } : undefined)),
+  runDunning: () => unwrap(post('/admin/dunning/run')),
+  exportCompany: (id) => unwrap(get(`/admin/company/${id}/export`)),
+  deleteCompany: (id, body) => unwrap(post(`/admin/company/${id}/purge`, body)),
+  changeCompanyPlan: (id, body) => unwrap(put(`/admin/company/${id}/plan`, body)),
+  impersonateCompany: (id, body) => unwrap(post(`/admin/company/${id}/impersonate`, body || {})),
+  setup2fa: () => unwrap(post('/admin/security/2fa/setup')),
+  enable2fa: (body) => unwrap(post('/admin/security/2fa/enable', body)),
+  disable2fa: (body) => unwrap(post('/admin/security/2fa/disable', body)),
 
   // Licence device slots. Releasing a slot is the recovery path when a
   // customer's computer dies, is reinstalled or replaced.
