@@ -7,6 +7,9 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDesktop = process.env.VITE_DESKTOP === '1';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const isDesktop = process.env.VITE_DESKTOP === '1';
+
 export default defineConfig({
   plugins: [
     react(),
