@@ -50,6 +50,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.3.4",
     "multer": "^2.2.0",
+    "nodemailer": "^10.0.9",
     "pdf-parse": "^2.4.5",
     "sharp": "^0.35.3",
     "tesseract.js": "^7.0.0"

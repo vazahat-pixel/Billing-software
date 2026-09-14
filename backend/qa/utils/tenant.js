@@ -85,7 +85,7 @@ async function getOrCreateQaTenant(profileName) {
   const Subscription = require('../../models/Subscription');
   await Subscription.updateOne({ companyId: company._id }, { planId: proPlan._id });
 
-  await configService.seedCompanyDefaults(company._id, result.user._id);
+  await configService.seedCompanyDefaults(company._id, result.user._id, null, { planId: proPlan._id });
 
   return {
     companyId: company._id,

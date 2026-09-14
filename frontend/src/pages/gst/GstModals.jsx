@@ -21,7 +21,8 @@ import {
    Sparkles,
    Calendar,
    ShieldCheck,
-   ShieldAlert
+   ShieldAlert,
+   X
 } from 'lucide-react';
 
 // ==========================================
@@ -205,44 +206,86 @@ export const Gst3bMonthlyModal = ({ isOpen, onClose }) => {
 // 2. GSTR-1 OUTWARD SUPPLIES RETURN MODAL
 // ==========================================
 export const Gstr1Modal = ({ isOpen, onClose }) => {
-   const { fetchGstr1 } = useStore();
+   const { fetchGstr1, company } = useStore();
    const [activeTab, setActiveTab] = useState('b2b');
    const [exporting, setExporting] = useState(false);
    const [loading, setLoading] = useState(false);
-   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+   const [periodMode, setPeriodMode] = useState('thisMonth'); // thisMonth, lastMonth, q2, ytd, custom
+   const [searchQuery, setSearchQuery] = useState('');
+   const [rateFilter, setRateFilter] = useState('ALL');
+
+   // Compute dates based on period presets
+   const defaultDates = useMemo(() => {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth(); // 0-based
+      const pad = (n) => String(n).padStart(2, '0');
+      const lastDay = (year, month) => new Date(year, month + 1, 0).getDate();
+
+      return {
+         thisMonth: {
+            from: `${y}-${pad(m + 1)}-01`,
+            to: `${y}-${pad(m + 1)}-${pad(lastDay(y, m))}`,
+            label: `This Month (${now.toLocaleString('en-IN', { month: 'short' })} ${y})`
+         },
+         lastMonth: {
+            from: `${m === 0 ? y - 1 : y}-${pad(m === 0 ? 12 : m)}-01`,
+            to: `${m === 0 ? y - 1 : y}-${pad(m === 0 ? 12 : m)}-${pad(lastDay(m === 0 ? y - 1 : y, m === 0 ? 11 : m - 1))}`,
+            label: `Last Month (${new Date(y, m - 1, 1).toLocaleString('en-IN', { month: 'short' })} ${m === 0 ? y - 1 : y})`
+         },
+         q2: {
+            from: `${y}-07-01`,
+            to: `${y}-09-30`,
+            label: `Q2 (Jul - Sep ${y})`
+         },
+         ytd: {
+            from: `${m >= 3 ? y : y - 1}-04-01`,
+            to: `${m >= 3 ? y + 1 : y}-03-31`,
+            label: `FY ${m >= 3 ? y : y - 1}-${String((m >= 3 ? y + 1 : y)).slice(-2)} (Full Year)`
+         }
+      };
+   }, []);
+
+   const [startDate, setStartDate] = useState(defaultDates.thisMonth.from);
+   const [endDate, setEndDate] = useState(defaultDates.thisMonth.to);
    const [gstr1Data, setGstr1Data] = useState(null);
 
-   const { startDate, endDate } = useMemo(
-      () => getMonthDateRange(new Date(`${selectedMonth}-01T12:00:00`)),
-      [selectedMonth]
-   );
+   const loadData = async (from = startDate, to = endDate) => {
+      setLoading(true);
+      try {
+         const data = await fetchGstr1(from, to);
+         setGstr1Data(data || null);
+      } catch (err) {
+         notifyError(err, 'Failed to load GSTR-1');
+         setGstr1Data(null);
+      } finally {
+         setLoading(false);
+      }
+   };
 
    useEffect(() => {
-      if (!isOpen) return;
-      setLoading(true);
-      fetchGstr1(startDate, endDate)
-         .then((data) => setGstr1Data(data || null))
-         .catch((err) => {
-            notifyError(err, 'Failed to load GSTR-1');
-            setGstr1Data(null);
-         })
-         .finally(() => setLoading(false));
-   }, [isOpen, startDate, endDate, fetchGstr1]);
+      if (isOpen) {
+         loadData(startDate, endDate);
+      }
+   }, [isOpen, startDate, endDate]);
 
+   const handlePeriodPreset = (preset) => {
+      setPeriodMode(preset);
+      if (defaultDates[preset]) {
+         setStartDate(defaultDates[preset].from);
+         setEndDate(defaultDates[preset].to);
+      }
+   };
+
+   // Government JSON Download
    const handleDownloadJson = async () => {
       setExporting(true);
       try {
          const data = gstr1Data || (await fetchGstr1(startDate, endDate));
-         // Portal-shaped payload only (gstin, fp, b2b, b2cl, b2cs, hsn, …)
-         const {
-            invoices: _inv,
-            period: _period,
-            totals: _totals,
-            ...payload
-         } = data || {};
+         const { invoices: _inv, period: _period, totals: _totals, ...payload } = data || {};
          const clean = data?.payload || payload;
          downloadJson(clean, buildGstr1Filename(startDate, endDate));
-         toast.success(`GSTR-1 JSON exported for ${selectedMonth}`);
+         toast.success(`GSTR-1 JSON downloaded (${startDate} to ${endDate})`);
       } catch (err) {
          notifyError(err, 'GSTR-1 export failed');
       } finally {
@@ -250,209 +293,556 @@ export const Gstr1Modal = ({ isOpen, onClose }) => {
       }
    };
 
+   // Government Excel Workbook (.xlsx) Download
    const handleDownloadExcel = async () => {
       setExporting(true);
       try {
+         const { exportGstr1Excel } = await import('../../utils/gstExport');
          const data = gstr1Data || (await fetchGstr1(startDate, endDate));
-         const b2bRows = (data?.b2b || []).flatMap((b) =>
-            (b.inv || []).map((i) => ({
-               ctin: b.ctin,
-               invNo: i.inum,
-               invDate: i.idt,
-               val: i.val,
-               pos: i.pos,
-               rchrg: i.rchrg,
-               taxable: (i.itms || []).reduce((s, x) => s + (x.itm_det?.txval || 0), 0),
-               cgst: (i.itms || []).reduce((s, x) => s + (x.itm_det?.camt || 0), 0),
-               sgst: (i.itms || []).reduce((s, x) => s + (x.itm_det?.samt || 0), 0),
-               igst: (i.itms || []).reduce((s, x) => s + (x.itm_det?.iamt || 0), 0),
-            }))
-         );
-         exportTableToExcel(
-            `GSTR1_Sales_Report_${selectedMonth}.csv`,
-            [
-               { key: 'ctin', label: 'GSTIN' },
-               { key: 'invNo', label: 'Invoice No' },
-               { key: 'invDate', label: 'Date' },
-               { key: 'val', label: 'Total Value' },
-               { key: 'pos', label: 'POS' },
-               { key: 'rchrg', label: 'Reverse Charge' },
-               { key: 'taxable', label: 'Taxable Amount' },
-               { key: 'cgst', label: 'CGST' },
-               { key: 'sgst', label: 'SGST' },
-               { key: 'igst', label: 'IGST' },
-            ],
-            b2bRows
-         );
-         toast.success(`GSTR-1 Excel exported for ${selectedMonth}`);
+         const fileName = `GSTR1_V3_2_2_${startDate}_to_${endDate}.xlsx`;
+         exportGstr1Excel(data, fileName);
+         toast.success(`GSTR-1 Government Utility Excel downloaded!`);
       } catch (err) {
-         notifyError(err, 'GSTR-1 Excel export failed');
+         notifyError(err, 'Excel export failed');
       } finally {
          setExporting(false);
       }
    };
 
-   const invoiceData = useMemo(() => {
-      const payload = gstr1Data?.payload || gstr1Data || {};
-      const b2b = [];
-      for (const party of payload.b2b || []) {
-         for (const inv of party.inv || []) {
-            const det = inv.itms?.[0]?.itm_det || {};
-            b2b.push({
-               invoiceNo: inv.inum,
-               date: inv.idt,
-               partyName: party.ctin,
-               gstin: party.ctin,
-               taxable: det.txval || 0,
-               total: inv.val || 0,
-            });
-         }
+   // Download Active Tab CSV
+   const handleDownloadCsv = () => {
+      const activeRows = tableData[activeTab] || [];
+      if (!activeRows.length) {
+         return toast.warning('No records to export in this section');
       }
-      const b2cLarge = (payload.b2cl || []).map((inv) => {
-         const det = inv.itms?.[0]?.itm_det || {};
+      const exportCols = activeColumns.map(c => ({ key: c.key, label: c.label }));
+      exportTableToExcel(`GSTR1_${activeTab.toUpperCase()}_${startDate}_to_${endDate}.csv`, exportCols, activeRows);
+      toast.success(`${activeTab.toUpperCase()} exported to CSV`);
+   };
+
+   // Extract & Normalize Data from GSTR-1 API response
+   const tableData = useMemo(() => {
+      const payload = gstr1Data?.payload || gstr1Data || {};
+
+      // 1. B2B Rows
+      let b2bRows = payload.b2bRows || [];
+      if (!b2bRows.length && Array.isArray(payload.b2b)) {
+         b2bRows = payload.b2b.flatMap((party) =>
+            (party.inv || []).map((inv) => {
+               const det = inv.itms?.[0]?.itm_det || {};
+               return {
+                  gstin: party.ctin || '',
+                  partyName: party.cname || inv.party_name || 'Registered Recipient',
+                  invoiceNo: inv.inum || '',
+                  date: inv.idt || '',
+                  netAmount: inv.val || 0,
+                  stateName: inv.pos_name || inv.pos || '',
+                  reverseCharge: inv.rchrg || 'N',
+                  invType: inv.inv_typ || 'Regular',
+                  taxRate: `${det.rt || 5}%`,
+                  taxableAmount: det.txval || 0,
+                  cgst: det.camt || 0,
+                  sgst: det.samt || 0,
+                  igst: det.iamt || 0,
+                  cess: det.csamt || 0,
+               };
+            })
+         );
+      }
+
+      // 2. B2CL Rows
+      const b2clRows = payload.b2clRows || [];
+
+      // 3. B2CS Rows
+      const b2csRows = (payload.b2cs || []).map((r, i) => {
+         const txval = Number(r.txval || 0);
+         const camt = Number(r.camt || 0);
+         const samt = Number(r.samt || 0);
+         const iamt = Number(r.iamt || 0);
+         const csamt = Number(r.csamt || 0);
+         const totTax = camt + samt + iamt + csamt;
          return {
-            invoiceNo: inv.inum,
-            date: inv.idt,
-            partyName: 'B2C Large',
-            gstin: inv.pos || 'N/A',
-            taxable: det.txval || 0,
-            total: inv.val || 0,
+            id: i,
+            typ: r.typ || 'OE',
+            pos: r.pos_name || r.pos || 'Local',
+            taxRate: `${parseFloat(r.rt || 0).toFixed(2)}%`,
+            rawRate: parseFloat(r.rt || 0),
+            taxableAmount: txval,
+            cgst: camt,
+            sgst: samt,
+            igst: iamt,
+            cess: csamt,
+            totalTax: totTax,
+            grossTotal: txval + totTax,
          };
       });
-      const b2cSmall = (payload.b2cs || []).map((row) => ({
-         invoiceNo: `${row.sply_ty || 'OE'} @ ${row.rt || 0}%`,
-         date: 'Aggregate',
-         partyName: `POS ${row.pos || '—'}`,
-         gstin: row.sply_ty || 'B2CS',
-         taxable: row.txval || 0,
-         total: (row.txval || 0) + (row.iamt || 0) + (row.camt || 0) + (row.samt || 0),
+
+      // 4. CDNR Rows
+      const cdnrRows = payload.cdnrRows || [];
+
+      // 5. CDNUR Rows
+      const cdnuRows = payload.cdnuRows || [];
+
+      // 6. EXP Rows
+      const expRows = payload.expRows || [];
+
+      // 7. EXEMP Rows
+      const exempRows = (payload.exempRows || []).map((e) => ({
+         ...e,
+         total: Number(e.nilRated || 0) + Number(e.exempted || 0) + Number(e.nonGst || 0)
       }));
-      const hsn = (payload.hsn?.data || []).map((h) => ({
-         hsn: h.hsn_sc,
-         invoiceNo: h.hsn_sc,
-         date: h.desc || 'HSN',
-         partyName: h.desc || 'HSN',
-         gstin: `Qty ${h.qty || 0}`,
-         taxable: h.txval || 0,
-         total: (h.txval || 0) + (h.iamt || 0) + (h.camt || 0) + (h.samt || 0),
-         gst: (h.iamt || 0) + (h.camt || 0) + (h.samt || 0),
-      }));
-      const totals = gstr1Data?.totals || {};
+
+      // 8. HSN Rows
+      const hsnRows = payload.hsnRows || payload.hsn?.data || [];
+
+      // 9. DOCS Rows
+      const docsRows = payload.docsRows || [];
+
       return {
-         b2b,
-         b2cLarge,
-         b2cSmall,
-         hsn,
-         totalTaxable: totals.taxable || 0,
-         totalGst: (totals.cgst || 0) + (totals.sgst || 0) + (totals.igst || 0),
-         invoiceCount: totals.invoiceCount || b2b.length + b2cLarge.length,
+         b2b: b2bRows,
+         b2cl: b2clRows,
+         b2cs: b2csRows,
+         cdnr: cdnrRows,
+         cdnu: cdnuRows,
+         exp: expRows,
+         exemp: exempRows,
+         hsn: hsnRows,
+         docs: docsRows,
       };
    }, [gstr1Data]);
 
+   // Executive Summary KPI calculations
+   const kpis = useMemo(() => {
+      const totals = gstr1Data?.totals || {};
+      const b2bList = tableData.b2b || [];
+      const b2csList = tableData.b2cs || [];
+
+      let taxable = Number(totals.taxable || 0);
+      let cgst = Number(totals.cgst || 0);
+      let sgst = Number(totals.sgst || 0);
+      let igst = Number(totals.igst || 0);
+      let cess = Number(totals.cess || 0);
+      let invCount = Number(totals.invoiceCount || (b2bList.length + (tableData.b2cl?.length || 0)));
+
+      // Fallback sum from tables if totals object is 0
+      if (!taxable && (b2bList.length || b2csList.length)) {
+         b2bList.forEach(r => {
+            taxable += Number(r.taxableAmount || 0);
+            cgst += Number(r.cgst || 0);
+            sgst += Number(r.sgst || 0);
+            igst += Number(r.igst || 0);
+            cess += Number(r.cess || 0);
+         });
+         b2csList.forEach(r => {
+            taxable += Number(r.taxableAmount || 0);
+            cgst += Number(r.cgst || 0);
+            sgst += Number(r.sgst || 0);
+            igst += Number(r.igst || 0);
+            cess += Number(r.cess || 0);
+         });
+      }
+
+      const totalTax = cgst + sgst + igst + cess;
+      const grossTotal = taxable + totalTax;
+
+      return {
+         invoiceCount: invCount,
+         taxable,
+         cgst,
+         sgst,
+         igst,
+         cess,
+         totalTax,
+         grossTotal,
+      };
+   }, [gstr1Data, tableData]);
+
+   // Filter rows based on search query & rate filter
+   const filteredRows = useMemo(() => {
+      const rows = tableData[activeTab] || [];
+      const q = searchQuery.trim().toLowerCase();
+
+      return rows.filter((r) => {
+         // Rate filter
+         if (rateFilter !== 'ALL') {
+            const rowRate = parseFloat(r.taxRate || r.rt || r.rate || 0);
+            if (parseFloat(rateFilter) !== rowRate) return false;
+         }
+         // Search filter
+         if (!q) return true;
+         const str = [
+            r.invoiceNo,
+            r.partyName,
+            r.gstin,
+            r.stateName,
+            r.pos,
+            r.noteNo,
+            r.hsn_sc,
+            r.desc,
+            r.docType,
+            r.exportType
+         ].filter(Boolean).join(' ').toLowerCase();
+         return str.includes(q);
+      });
+   }, [tableData, activeTab, searchQuery, rateFilter]);
+
+   // Compute column-level totals for the active table
+   const tableTotals = useMemo(() => {
+      let taxable = 0;
+      let cgst = 0;
+      let sgst = 0;
+      let igst = 0;
+      let total = 0;
+
+      filteredRows.forEach((r) => {
+         taxable += Number(r.taxableAmount || r.txval || 0);
+         cgst += Number(r.cgst || r.camt || 0);
+         sgst += Number(r.sgst || r.samt || 0);
+         igst += Number(r.igst || r.iamt || 0);
+         total += Number(r.netAmount || r.grossTotal || r.val || r.total || 0);
+      });
+
+      return { taxable, cgst, sgst, igst, total };
+   }, [filteredRows]);
+
+   // Tab definitions with official schedule names
+   const tabs = [
+      { id: 'b2b', label: 'B2B Invoices', sub: '4A, 4B, 4C, 6B, 6C', count: tableData.b2b?.length || 0 },
+      { id: 'b2cl', label: 'B2C (Large)', sub: 'Table 5A, 5B', count: tableData.b2cl?.length || 0 },
+      { id: 'b2cs', label: 'B2C (Small)', sub: 'Table 7 Details', count: tableData.b2cs?.length || 0 },
+      { id: 'cdnr', label: 'Credit / Debit (Reg)', sub: 'Table 9B CDNR', count: tableData.cdnr?.length || 0 },
+      { id: 'cdnu', label: 'Credit / Debit (Unreg)', sub: 'Table 9B CDNUR', count: tableData.cdnu?.length || 0 },
+      { id: 'exp', label: 'Exports (EXP)', sub: 'Table 6A', count: tableData.exp?.length || 0 },
+      { id: 'exemp', label: 'Nil / Exempt', sub: 'Table 8A, 8B, 8C, 8D', count: tableData.exemp?.length || 0 },
+      { id: 'hsn', label: 'HSN Summary', sub: 'Table 12 HSN', count: tableData.hsn?.length || 0 },
+      { id: 'docs', label: 'Docs Issued', sub: 'Table 13 DOCS', count: tableData.docs?.length || 0 },
+   ];
+
+   // Columns configuration per active schedule
+   const activeColumns = useMemo(() => {
+      switch (activeTab) {
+         case 'b2b':
+            return [
+               { key: 'invoiceNo', label: 'Invoice No', align: 'left', font: 'font-mono font-bold text-blue-700' },
+               { key: 'date', label: 'Date', align: 'left' },
+               { key: 'partyName', label: 'Receiver Name', align: 'left', font: 'font-semibold text-slate-800' },
+               { key: 'gstin', label: 'Recipient GSTIN', align: 'left', font: 'font-mono text-slate-600' },
+               { key: 'stateName', label: 'POS State', align: 'left' },
+               { key: 'invType', label: 'Type', align: 'center', badge: true },
+               { key: 'reverseCharge', label: 'RCM', align: 'center' },
+               { key: 'taxRate', label: 'Rate', align: 'right' },
+               { key: 'taxableAmount', label: 'Taxable (₹)', align: 'right', format: 'currency' },
+               { key: 'cgst', label: 'CGST (₹)', align: 'right', format: 'currency' },
+               { key: 'sgst', label: 'SGST (₹)', align: 'right', format: 'currency' },
+               { key: 'igst', label: 'IGST (₹)', align: 'right', format: 'currency' },
+               { key: 'netAmount', label: 'Invoice Total (₹)', align: 'right', format: 'currency', font: 'font-bold text-slate-900' },
+            ];
+         case 'b2cl':
+            return [
+               { key: 'invoiceNo', label: 'Invoice No', align: 'left', font: 'font-mono font-bold' },
+               { key: 'date', label: 'Date', align: 'left' },
+               { key: 'stateName', label: 'Place of Supply', align: 'left' },
+               { key: 'taxRate', label: 'Rate', align: 'right' },
+               { key: 'taxableAmount', label: 'Taxable (₹)', align: 'right', format: 'currency' },
+               { key: 'igst', label: 'IGST (₹)', align: 'right', format: 'currency' },
+               { key: 'cess', label: 'Cess (₹)', align: 'right', format: 'currency' },
+               { key: 'netAmount', label: 'Invoice Value (₹)', align: 'right', format: 'currency', font: 'font-bold' },
+            ];
+         case 'b2cs':
+            return [
+               { key: 'typ', label: 'Type', align: 'left', font: 'font-semibold' },
+               { key: 'pos', label: 'Place of Supply (POS)', align: 'left' },
+               { key: 'taxRate', label: 'Rate', align: 'right' },
+               { key: 'taxableAmount', label: 'Taxable Value (₹)', align: 'right', format: 'currency' },
+               { key: 'cgst', label: 'CGST (₹)', align: 'right', format: 'currency' },
+               { key: 'sgst', label: 'SGST (₹)', align: 'right', format: 'currency' },
+               { key: 'igst', label: 'IGST (₹)', align: 'right', format: 'currency' },
+               { key: 'totalTax', label: 'Total Tax (₹)', align: 'right', format: 'currency', font: 'text-amber-700 font-semibold' },
+               { key: 'grossTotal', label: 'Gross Value (₹)', align: 'right', format: 'currency', font: 'font-bold text-slate-900' },
+            ];
+         case 'cdnr':
+            return [
+               { key: 'noteNo', label: 'Note No', align: 'left', font: 'font-mono font-bold text-purple-700' },
+               { key: 'noteDate', label: 'Date', align: 'left' },
+               { key: 'noteType', label: 'Note Type', align: 'center', badge: true },
+               { key: 'partyName', label: 'Receiver Name', align: 'left' },
+               { key: 'gstin', label: 'GSTIN', align: 'left', font: 'font-mono' },
+               { key: 'pos', label: 'POS', align: 'left' },
+               { key: 'taxRate', label: 'Rate', align: 'right' },
+               { key: 'taxableAmount', label: 'Taxable (₹)', align: 'right', format: 'currency' },
+               { key: 'cgst', label: 'CGST (₹)', align: 'right', format: 'currency' },
+               { key: 'sgst', label: 'SGST (₹)', align: 'right', format: 'currency' },
+               { key: 'igst', label: 'IGST (₹)', align: 'right', format: 'currency' },
+               { key: 'reason', label: 'Reason', align: 'left' },
+               { key: 'netAmount', label: 'Note Value (₹)', align: 'right', format: 'currency', font: 'font-bold' },
+            ];
+         case 'cdnu':
+            return [
+               { key: 'type', label: 'Supply Type', align: 'left' },
+               { key: 'noteNo', label: 'Note No', align: 'left', font: 'font-mono font-bold' },
+               { key: 'noteDate', label: 'Date', align: 'left' },
+               { key: 'noteType', label: 'Type', align: 'center', badge: true },
+               { key: 'pos', label: 'POS', align: 'left' },
+               { key: 'taxRate', label: 'Rate', align: 'right' },
+               { key: 'taxableAmount', label: 'Taxable (₹)', align: 'right', format: 'currency' },
+               { key: 'cgst', label: 'CGST (₹)', align: 'right', format: 'currency' },
+               { key: 'sgst', label: 'SGST (₹)', align: 'right', format: 'currency' },
+               { key: 'igst', label: 'IGST (₹)', align: 'right', format: 'currency' },
+               { key: 'netAmount', label: 'Value (₹)', align: 'right', format: 'currency', font: 'font-bold' },
+            ];
+         case 'exp':
+            return [
+               { key: 'exportType', label: 'Export Type', align: 'center', badge: true },
+               { key: 'invoiceNo', label: 'Invoice No', align: 'left', font: 'font-mono font-bold' },
+               { key: 'date', label: 'Date', align: 'left' },
+               { key: 'portCode', label: 'Port Code', align: 'left' },
+               { key: 'shippingBillNo', label: 'Shipping Bill No', align: 'left' },
+               { key: 'taxRate', label: 'Rate', align: 'right' },
+               { key: 'taxableAmount', label: 'Taxable (₹)', align: 'right', format: 'currency' },
+               { key: 'igst', label: 'IGST (₹)', align: 'right', format: 'currency' },
+               { key: 'invoiceValue', label: 'Invoice Value (₹)', align: 'right', format: 'currency', font: 'font-bold' },
+            ];
+         case 'exemp':
+            return [
+               { key: 'description', label: 'Description', align: 'left', font: 'font-semibold' },
+               { key: 'nilRated', label: 'Nil Rated (₹)', align: 'right', format: 'currency' },
+               { key: 'exempted', label: 'Exempted (₹)', align: 'right', format: 'currency' },
+               { key: 'nonGst', label: 'Non-GST (₹)', align: 'right', format: 'currency' },
+               { key: 'total', label: 'Total Value (₹)', align: 'right', format: 'currency', font: 'font-bold' },
+            ];
+         case 'hsn':
+            return [
+               { key: 'hsn_sc', label: 'HSN Code', align: 'left', font: 'font-mono font-bold text-blue-700' },
+               { key: 'desc', label: 'Description', align: 'left', font: 'text-slate-800' },
+               { key: 'uqc', label: 'UQC', align: 'center' },
+               { key: 'qty', label: 'Total Quantity', align: 'right', format: 'number' },
+               { key: 'txval', label: 'Taxable Value (₹)', align: 'right', format: 'currency' },
+               { key: 'camt', label: 'CGST (₹)', align: 'right', format: 'currency' },
+               { key: 'samt', label: 'SGST (₹)', align: 'right', format: 'currency' },
+               { key: 'iamt', label: 'IGST (₹)', align: 'right', format: 'currency' },
+               { key: 'val', label: 'Total Value (₹)', align: 'right', format: 'currency', font: 'font-bold text-slate-900' },
+            ];
+         case 'docs':
+            return [
+               { key: 'docType', label: 'Nature of Document', align: 'left', font: 'font-semibold' },
+               { key: 'from', label: 'From Sr. No.', align: 'left', font: 'font-mono' },
+               { key: 'to', label: 'To Sr. No.', align: 'left', font: 'font-mono' },
+               { key: 'totnum', label: 'Total Issued', align: 'right', font: 'font-bold' },
+               { key: 'cancel', label: 'Cancelled', align: 'right', font: 'text-rose-600 font-bold' },
+               { key: 'net_issue', label: 'Net Number', align: 'right', font: 'text-emerald-700 font-bold' },
+            ];
+         default:
+            return [];
+      }
+   }, [activeTab]);
+
+   const fmtVal = (row, col) => {
+      const v = row[col.key];
+      if (col.format === 'currency') {
+         return `₹ ${(Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      }
+      if (col.format === 'number') {
+         return (Number(v) || 0).toLocaleString('en-IN');
+      }
+      return v != null && v !== '' ? String(v) : '—';
+   };
+
    return (
-      <Modal isOpen={isOpen} onClose={onClose} title="GSTR-1 Outward Supplies" className="max-w-[95vw] h-[92vh] bg-white rounded-[2.5rem] p-0 border-none shadow-2xl">
-         <div className="flex flex-col h-full p-10 space-y-8">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-               <div>
-                  <h2 className="text-4xl font-black text-black tracking-tight italic">GSTR-1 Registry<span className="text-slate-300">.</span></h2>
-                  <p className="text-slate-400 text-[11px] font-bold uppercase tracking-[0.2em] mt-2">
-                     {selectedMonth} · Taxable ₹{(invoiceData.totalTaxable || 0).toLocaleString('en-IN')} · GST ₹{(invoiceData.totalGst || 0).toLocaleString('en-IN')} · {invoiceData.invoiceCount || 0} inv
-                  </p>
-               </div>
-               <div className="flex gap-3 items-center">
-                  <div className="flex items-center gap-3 px-5 py-3 bg-white border border-slate-100 rounded-xl">
-                     <Calendar className="text-slate-300" size={16} />
-                     <input
-                        type="month"
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(e.target.value)}
-                        className="text-[11px] font-bold uppercase tracking-widest bg-transparent outline-none text-black"
-                     />
+      <Modal
+         isOpen={isOpen}
+         onClose={onClose}
+         bare={true}
+         className="max-w-[96vw] w-[96vw] max-h-[88vh] bg-slate-50 rounded-2xl p-0 border border-slate-300 shadow-2xl overflow-hidden flex flex-col"
+      >
+         <div className="flex flex-col bg-slate-50 overflow-hidden text-slate-800">
+            {/* Header Ribbon */}
+            <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between flex-wrap gap-2 shadow-sm shrink-0">
+               <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-xs shadow-sm shadow-blue-200">
+                     G1
                   </div>
-                  <button
-                     type="button"
-                     onClick={handleDownloadExcel}
-                     disabled={exporting || loading}
-                     className="px-6 py-3 bg-emerald-700 text-white rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center gap-2 hover:bg-emerald-800 transition-all disabled:opacity-50"
-                  >
-                     <Download size={14} /> Export Excel (.csv)
+                  <div>
+                     <div className="flex items-center gap-1.5">
+                        <h2 className="text-sm font-black text-slate-900 tracking-tight">GSTR-1 Outward Supplies Return</h2>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Rule 59(1)</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Live</span>
+                     </div>
+                     <p className="text-[10px] text-slate-500 mt-0.5">
+                        <span className="font-semibold text-slate-700">{company?.name || 'Company Outward Register'}</span> · GSTIN: <strong className="font-mono text-blue-700">{company?.gstin || gstr1Data?.gstin || '24AAACC1206D1ZH'}</strong>
+                     </p>
+                  </div>
+               </div>
+               <div className="flex items-center gap-1.5">
+                  <button type="button" onClick={() => loadData(startDate, endDate)} disabled={loading} className="px-2.5 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded text-[11px] font-bold flex items-center gap-1 transition-all">
+                     <RefreshCw size={11} className={loading ? 'animate-spin text-blue-600' : ''} /> Refresh
                   </button>
-                  <button
-                     type="button"
-                     onClick={handleDownloadJson}
-                     disabled={exporting || loading}
-                     className="px-6 py-3 bg-slate-800 text-white rounded-xl text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center gap-2 hover:bg-slate-900 transition-all disabled:opacity-50"
-                  >
-                     <Download size={14} /> {exporting ? 'Exporting...' : 'JSON (Govt)'}
+                  <button type="button" onClick={handleDownloadExcel} disabled={exporting || loading} className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded text-[11px] font-bold flex items-center gap-1 transition-all disabled:opacity-50">
+                     <FileSpreadsheet size={11} /> Excel (.xlsx)
+                  </button>
+                  <button type="button" onClick={handleDownloadJson} disabled={exporting || loading} className="px-2.5 py-1.5 bg-slate-800 hover:bg-black text-white rounded text-[11px] font-bold flex items-center gap-1 transition-all disabled:opacity-50">
+                     <Download size={11} /> {exporting ? '...' : 'JSON'}
+                  </button>
+                  <button type="button" onClick={handleDownloadCsv} disabled={loading} className="px-2.5 py-1.5 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-800 rounded text-[11px] font-bold flex items-center gap-1 transition-all">
+                     <FileText size={11} /> CSV
+                  </button>
+                  <button type="button" onClick={onClose} className="p-1.5 ml-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer" title="Close (Esc)">
+                     <X size={15} />
                   </button>
                </div>
             </div>
 
-            <div className="flex gap-4 p-1 bg-slate-100 rounded-xl self-start">
-               {[
-                  { id: 'b2b', label: `B2B (${invoiceData.b2b?.length || 0})` },
-                  { id: 'b2cLarge', label: `B2C Large (${invoiceData.b2cLarge?.length || 0})` },
-                  { id: 'b2cSmall', label: `B2C Small (${invoiceData.b2cSmall?.length || 0})` },
-                  { id: 'hsn', label: `HSN (${invoiceData.hsn?.length || 0})` }
-               ].map(tab => (
-                  <button
-                     key={tab.id}
-                     type="button"
-                     onClick={() => setActiveTab(tab.id)}
-                     className={`px-8 py-2 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all ${activeTab === tab.id ? 'bg-white text-black shadow-sm' : 'text-slate-400 hover:text-black'
-                        }`}
-                  >
-                     {tab.label}
-                  </button>
-               ))}
+            {/* Period + Date Controls */}
+            <div className="bg-slate-100 border-b border-slate-200 px-4 py-1.5 flex items-center justify-between flex-wrap gap-2 shrink-0">
+               <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase mr-1">Period:</span>
+                  {[
+                     { key: 'thisMonth', label: defaultDates.thisMonth.label },
+                     { key: 'lastMonth', label: defaultDates.lastMonth.label },
+                     { key: 'q2', label: defaultDates.q2.label },
+                     { key: 'ytd', label: 'Full FY' },
+                     { key: 'custom', label: 'Custom' },
+                  ].map((p) => (
+                     <button key={p.key} type="button" onClick={() => handlePeriodPreset(p.key)} className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all ${periodMode === p.key ? 'bg-blue-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-200'}`}>
+                        {p.label}
+                     </button>
+                  ))}
+               </div>
+               <div className="flex items-center gap-2 text-[11px]">
+                  <div className="flex items-center gap-1 bg-white border border-slate-300 rounded px-2 py-0.5">
+                     <span className="text-slate-400 font-semibold">From:</span>
+                     <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPeriodMode('custom'); }} className="font-mono font-bold text-slate-800 bg-transparent outline-none text-[11px]" />
+                  </div>
+                  <div className="flex items-center gap-1 bg-white border border-slate-300 rounded px-2 py-0.5">
+                     <span className="text-slate-400 font-semibold">To:</span>
+                     <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPeriodMode('custom'); }} className="font-mono font-bold text-slate-800 bg-transparent outline-none text-[11px]" />
+                  </div>
+               </div>
             </div>
 
-            <div className="flex-1 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+            {/* Compact KPI Bar */}
+            <div className="bg-white border-b border-slate-200 px-4 py-1.5 shrink-0">
+               <div className="flex items-center gap-1.5 overflow-x-auto">
+                  {[
+                     { label: 'Invoices', value: kpis.invoiceCount, isMoney: false, color: 'text-slate-900', bg: 'bg-slate-50 border-slate-200' },
+                     { label: 'Taxable', value: kpis.taxable, isMoney: true, color: 'text-blue-800', bg: 'bg-blue-50 border-blue-100' },
+                     { label: 'CGST', value: kpis.cgst, isMoney: true, color: 'text-emerald-800', bg: 'bg-emerald-50 border-emerald-100' },
+                     { label: 'SGST', value: kpis.sgst, isMoney: true, color: 'text-emerald-800', bg: 'bg-emerald-50 border-emerald-100' },
+                     { label: 'IGST', value: kpis.igst, isMoney: true, color: 'text-purple-800', bg: 'bg-purple-50 border-purple-100' },
+                     { label: 'Total Tax', value: kpis.totalTax, isMoney: true, color: 'text-amber-800', bg: 'bg-amber-50 border-amber-100' },
+                     { label: 'Gross Total', value: kpis.grossTotal, isMoney: true, color: 'text-white', bg: 'bg-slate-900 border-slate-900' },
+                  ].map((kpi) => (
+                     <div key={kpi.label} className={`flex items-center gap-1.5 px-2.5 py-1 rounded border ${kpi.bg} shrink-0`}>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide whitespace-nowrap">{kpi.label}:</span>
+                        <span className={`text-[11px] font-black ${kpi.color} font-mono whitespace-nowrap`}>
+                           {kpi.isMoney ? `₹ ${(Number(kpi.value) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : kpi.value}
+                        </span>
+                     </div>
+                  ))}
+               </div>
+            </div>
+
+            {/* Schedule Tabs Bar */}
+            <div className="bg-slate-100 border-b border-slate-300 px-3 pt-1 flex items-center gap-0.5 overflow-x-auto custom-scrollbar shrink-0">
+               {tabs.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                     <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={`px-2.5 py-1 rounded-t text-[11px] font-bold transition-all whitespace-nowrap flex items-center gap-1 border-t border-x ${isActive ? 'bg-white text-blue-700 border-slate-300 shadow-sm' : 'bg-slate-100 border-transparent text-slate-500 hover:bg-slate-200 hover:text-slate-800'}`}>
+                        {tab.label}
+                        <span className={`px-1 rounded text-[9px] font-extrabold ${isActive ? 'bg-blue-100 text-blue-700' : tab.count > 0 ? 'bg-slate-300 text-slate-700' : 'bg-slate-200 text-slate-400'}`}>{tab.count}</span>
+                     </button>
+                  );
+               })}
+            </div>
+
+            {/* Filter & Search Toolbar */}
+            <div className="bg-white px-4 py-1 border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
+               <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded px-2 py-1 flex-1 max-w-xs">
+                  <span className="text-slate-400 text-[10px]">🔍</span>
+                  <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={`Search ${activeTab.toUpperCase()}…`} className="bg-transparent text-[11px] text-slate-800 placeholder-slate-400 outline-none w-full" />
+                  {searchQuery && <button type="button" onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600 text-[10px] font-bold">✕</button>}
+               </div>
+               <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-500 font-semibold">Rate:</span>
+                  <select value={rateFilter} onChange={(e) => setRateFilter(e.target.value)} className="bg-white border border-slate-300 rounded px-1.5 py-0.5 text-[11px] font-bold text-slate-700 outline-none">
+                     <option value="ALL">All</option>
+                     <option value="0">0%</option>
+                     <option value="5">5%</option>
+                     <option value="12">12%</option>
+                     <option value="18">18%</option>
+                     <option value="28">28%</option>
+                  </select>
+                  <span className="text-[11px] text-slate-500 border-l border-slate-200 pl-2">
+                     <strong className="text-slate-800">{filteredRows.length}</strong> rec
+                  </span>
+               </div>
+            </div>
+
+            {/* Main Data Table */}
+            <div className="bg-white overflow-auto custom-scrollbar flex flex-col max-h-[58vh]">
                {loading ? (
-                  <div className="p-8"><SkeletonTable rows={10} cols={5} /></div>
+                  <div className="p-4">
+                     <SkeletonTable rows={6} cols={activeColumns.length} />
+                  </div>
+               ) : filteredRows.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                     <div className="text-3xl mb-2">📋</div>
+                     <h3 className="text-sm font-bold text-slate-700 mb-1">No {activeTab.toUpperCase()} records for this period</h3>
+                     <p className="text-xs text-slate-400 max-w-xs mb-3">No supplies between {startDate} and {endDate}.</p>
+                     <div className="flex gap-2">
+                        <button type="button" onClick={() => handlePeriodPreset('lastMonth')} className="px-3 py-1.5 bg-white border border-slate-300 rounded text-xs font-bold text-slate-700 hover:bg-slate-50">Last Month</button>
+                        <button type="button" onClick={() => handlePeriodPreset('ytd')} className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-700">Full FY (YTD)</button>
+                     </div>
+                  </div>
                ) : (
-               <div className="overflow-auto flex-1 custom-scrollbar">
-                  <table className="w-full text-left">
-                     <thead>
-                        <tr className="border-b border-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                           <th className="px-8 py-5">Reference & Date</th>
-                           <th className="px-8 py-5">Counterparty</th>
-                           <th className="px-8 py-5">GSTIN / POS</th>
-                           <th className="px-8 py-5 text-right">Taxable Value</th>
-                           <th className="px-8 py-5 text-right">Gross Total</th>
+                  <table className="w-full text-left text-xs border-collapse">
+                     <thead className="sticky top-0 bg-slate-100 border-b border-slate-300 text-slate-600 font-bold uppercase z-10">
+                        <tr>
+                           <th className="px-2 py-1 w-7 text-center text-[10px]">#</th>
+                           {activeColumns.map((col) => (
+                              <th key={col.key} className={`px-2 py-1 text-[10px] whitespace-nowrap ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}>
+                                 {col.label}
+                              </th>
+                           ))}
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-slate-50">
-                        {(invoiceData[activeTab] || []).length === 0 && (
-                           <tr>
-                              <td colSpan={5} className="px-8 py-16 text-center text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                                 No rows for {selectedMonth} in this section
-                              </td>
-                           </tr>
-                        )}
-                        {invoiceData[activeTab]?.map((inv, index) => (
-                           <tr key={index} className="hover:bg-slate-50/50 transition-all group border-l-4 border-transparent hover:border-black">
-                              <td className="px-8 py-5">
-                                 <p className="text-[11px] font-black text-black uppercase tracking-widest">{inv.invoiceNo || inv.hsn}</p>
-                                 <p className="text-[9px] font-bold text-slate-400 uppercase mt-1">{inv.date || 'Aggregate'}</p>
-                              </td>
-                              <td className="px-8 py-5 text-[10px] font-bold text-slate-500 uppercase">{inv.partyName || (activeTab === 'hsn' ? 'HSN Classification' : 'Unregistered')}</td>
-                              <td className="px-8 py-5 text-[10px] font-bold text-black tracking-widest">{inv.gstin}</td>
-                              <td className="px-8 py-5 text-right font-bold text-slate-400 text-[11px]">₹ {(inv.taxable || 0).toLocaleString('en-IN')}</td>
-                              <td className="px-8 py-5 text-right font-black text-black text-[12px]">₹ {(inv.total || inv.gst || 0).toLocaleString('en-IN')}</td>
+                     <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {filteredRows.map((row, idx) => (
+                           <tr key={row.id || row.invoiceNo || idx} className="hover:bg-blue-50/30 transition-colors">
+                              <td className="px-2 py-0.5 text-center text-[10px] text-slate-400 font-mono">{idx + 1}</td>
+                              {activeColumns.map((col) => {
+                                 const val = fmtVal(row, col);
+                                 return (
+                                    <td key={col.key} className={`px-2 py-0.5 whitespace-nowrap text-[11px] ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'} ${col.font || ''}`}>
+                                       {col.badge ? <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-200">{val}</span> : val}
+                                    </td>
+                                 );
+                              })}
                            </tr>
                         ))}
                      </tbody>
+                     {filteredRows.length > 0 && (
+                        <tfoot className="sticky bottom-0 bg-slate-200 border-t-2 border-slate-400 font-bold text-slate-900 z-10">
+                           <tr>
+                              <td className="px-2 py-1 text-center text-[10px] font-black">∑</td>
+                              {activeColumns.map((col, cIdx) => {
+                                 if (col.key === 'taxableAmount' || col.key === 'txval') return <td key={col.key} className="px-2 py-1 text-right font-mono text-[11px] font-black text-blue-900">₹ {tableTotals.taxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>;
+                                 if (col.key === 'cgst' || col.key === 'camt') return <td key={col.key} className="px-2 py-1 text-right font-mono text-[11px] font-black text-emerald-900">₹ {tableTotals.cgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>;
+                                 if (col.key === 'sgst' || col.key === 'samt') return <td key={col.key} className="px-2 py-1 text-right font-mono text-[11px] font-black text-emerald-900">₹ {tableTotals.sgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>;
+                                 if (col.key === 'igst' || col.key === 'iamt') return <td key={col.key} className="px-2 py-1 text-right font-mono text-[11px] font-black text-purple-900">₹ {tableTotals.igst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>;
+                                 if (col.key === 'netAmount' || col.key === 'grossTotal' || col.key === 'val' || col.key === 'invoiceValue') return <td key={col.key} className="px-2 py-1 text-right font-mono text-[11px] font-black text-slate-900">₹ {tableTotals.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>;
+                                 if (cIdx === 0) return <td key={col.key} className="px-2 py-1 text-[11px] font-bold text-slate-600">{filteredRows.length} row(s)</td>;
+                                 return <td key={col.key} className="px-2 py-1" />;
+                              })}
+                           </tr>
+                        </tfoot>
+                     )}
                   </table>
-               </div>
                )}
             </div>
          </div>
       </Modal>
    );
 };
-
-
 
 // ==========================================
 // 3. GSTR-2B MATCHING & RECONCILIATION MODAL

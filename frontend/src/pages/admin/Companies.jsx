@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, Lock, Unlock, ShieldCheck, Edit3, Plus, X, Search, Filter, Users, ArrowUpRight, Globe } from 'lucide-react';
+import { Building2, Lock, Unlock, ShieldCheck, Edit3, Plus, X, Search, Filter, Users, ArrowUpRight, Globe, Download, Trash2, UserRoundSearch } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
+import { adminApi } from '../../api';
 import { AdminPageHeader, AdminButton, AdminBadge } from '../../components/admin/AdminUI';
-import { notifyWarning, notifyError } from '../../utils/notify';
+import { notifyWarning, notifyError, notifySuccess } from '../../utils/notify';
+import { erpConfirm } from '../../utils/confirm';
 
 /* ── Dark Glass Modal ── */
 const DarkModal = ({ isOpen, onClose, title, subtitle, children }) => (
@@ -93,9 +95,69 @@ const Companies = () => {
     const handleUpdate = async (e) => {
         e.preventDefault();
         try {
+            const prevPlan = editingCompany?.planId?._id || editingCompany?.planId;
             await updateCompany(editingCompany._id, editForm);
+            if (editForm.planId && String(editForm.planId) !== String(prevPlan)) {
+                await adminApi.changeCompanyPlan(editingCompany._id, {
+                    planId: editForm.planId,
+                    reconcileModules: true,
+                });
+            }
             setEditingCompany(null);
+            notifySuccess('Company updated');
+            fetchCompanies();
         } catch (err) { notifyError(err, 'Failed to update'); }
+    };
+
+    const handleExport = async (company) => {
+        try {
+            const data = await adminApi.exportCompany(company._id);
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${company.name || 'company'}-export.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            notifySuccess('Export downloaded');
+        } catch (err) {
+            notifyError(err, 'Export failed');
+        }
+    };
+
+    const handlePurge = async (company) => {
+        const ok = await erpConfirm({
+            title: 'Hard delete company',
+            message: `Permanently delete "${company.name}" and all tenant data? This cannot be undone.`,
+            confirmLabel: 'Continue',
+            danger: true,
+        });
+        if (!ok) return;
+        const confirmName = window.prompt(`Type company name exactly to confirm delete:\n${company.name}`);
+        if (confirmName == null) return;
+        try {
+            await adminApi.deleteCompany(company._id, { confirmName });
+            notifySuccess('Company deleted');
+            fetchCompanies();
+        } catch (err) {
+            notifyError(err, 'Delete failed');
+        }
+    };
+
+    const handleImpersonate = async (company) => {
+        try {
+            const data = await adminApi.impersonateCompany(company._id, { reason: 'support' });
+            const token = data?.token;
+            if (!token) throw new Error('No token returned');
+            // Open ERP with support token in a new tab via query (consumed once by login bootstrap if supported)
+            window.open(`${window.location.origin}/?supportToken=${encodeURIComponent(token)}`, '_blank');
+            notifySuccess('Support session token issued (30 min). Paste is auto-opened in new tab.');
+            try {
+                await navigator.clipboard.writeText(token);
+            } catch { /* ignore */ }
+        } catch (err) {
+            notifyError(err, 'Impersonate failed');
+        }
     };
 
     const handleLicenseGenerate = async (e) => {
@@ -201,6 +263,15 @@ const Companies = () => {
                                             )}
                                             <button onClick={() => setLicenseCompany(company)} className="icon-btn icon-btn--info" title="Issue License">
                                                 <ShieldCheck size={14} />
+                                            </button>
+                                            <button onClick={() => handleExport(company)} className="icon-btn icon-btn--info" title="Export data">
+                                                <Download size={14} />
+                                            </button>
+                                            <button onClick={() => handleImpersonate(company)} className="icon-btn" title="Impersonate owner (support)">
+                                                <UserRoundSearch size={14} />
+                                            </button>
+                                            <button onClick={() => handlePurge(company)} className="icon-btn icon-btn--danger" title="Hard delete">
+                                                <Trash2 size={14} />
                                             </button>
                                             <button onClick={() => startEdit(company)} className="icon-btn icon-btn--warn" title="Edit">
                                                 <Edit3 size={14} />

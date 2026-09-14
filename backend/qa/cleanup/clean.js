@@ -5,6 +5,11 @@ const License = require('../../models/License');
 const { truncateTenant } = require('./truncate');
 
 async function cleanQaTenant(companyId) {
+  const comp = await Company.findById(companyId);
+  if (comp && comp.isQaTenant !== true && process.env.ALLOW_TENANT_TRUNCATE !== 'true') {
+    console.warn(`⚠️ [SAFETY SHIELD] Refusing to clean protected company: ${comp.name}`);
+    return { companyId: String(companyId), cleaned: false, reason: 'Company is protected against deletion' };
+  }
   await truncateTenant(companyId);
   await User.deleteMany({ companyId });
   await Subscription.deleteMany({ companyId });

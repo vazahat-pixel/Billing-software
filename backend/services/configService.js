@@ -68,14 +68,35 @@ const bumpMeta = (doc, actorId) => {
 };
 
 /** Seed all dynamic config documents for a new company. */
-exports.seedCompanyDefaults = async (companyId, actorId = null, req = null) => {
+exports.seedCompanyDefaults = async (companyId, actorId = null, req = null, options = {}) => {
   const companyObjectId = companyId;
+
+  // Start from full defaults, then clip to what the Plan actually sells.
+  // masters + utilities always stay on (product shell — not plan-gated).
+  let modules = { ...defaults.DEFAULT_MODULES };
+  if (options.planId) {
+    try {
+      const Plan = require('../models/Plan');
+      const plan = await Plan.findById(options.planId).lean();
+      const planMods = plan?.features?.modules;
+      if (planMods && typeof planMods === 'object') {
+        for (const key of Object.keys(modules)) {
+          if (key === 'masters' || key === 'utilities') continue;
+          if (Object.prototype.hasOwnProperty.call(planMods, key)) {
+            modules[key] = planMods[key] === true;
+          }
+        }
+      }
+    } catch (planErr) {
+      console.error('seedCompanyDefaults: could not apply plan modules', planErr.message);
+    }
+  }
 
   const moduleConfig = await CompanyModuleConfig.findOneAndUpdate(
     { companyId: companyObjectId },
     {
       companyId: companyObjectId,
-      modules: defaults.DEFAULT_MODULES,
+      modules,
       subMenus: defaults.DEFAULT_SUB_MENUS,
       fields: defaults.DEFAULT_MODULE_FIELDS,
       version: 1,

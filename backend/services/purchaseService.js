@@ -18,15 +18,34 @@ class PurchaseService {
         ...safeData
       } = purchaseData || {};
       purchaseData = safeData;
+
+      // Normalize supplierId if client passed object { _id, name }
+      if (purchaseData.supplierId && typeof purchaseData.supplierId === 'object' && !(purchaseData.supplierId instanceof mongoose.Types.ObjectId)) {
+        if (purchaseData.supplierId._id) purchaseData.supplierId = purchaseData.supplierId._id;
+        else if (purchaseData.supplierId.id && typeof purchaseData.supplierId.id === 'string') purchaseData.supplierId = purchaseData.supplierId.id;
+      }
+      if (!purchaseData.supplierId && purchaseData.partyId) {
+        if (typeof purchaseData.partyId === 'object' && !(purchaseData.partyId instanceof mongoose.Types.ObjectId)) {
+          purchaseData.supplierId = purchaseData.partyId._id || purchaseData.partyId.id || purchaseData.partyId;
+        } else {
+          purchaseData.supplierId = purchaseData.partyId;
+        }
+      }
+
       if (Array.isArray(purchaseData.items)) {
         purchaseData.items = purchaseData.items.map((it) => {
           const { _id, id, lotId, ...rest } = it || {};
+          let itemId = rest.itemId;
+          if (itemId && typeof itemId === 'object' && !(itemId instanceof mongoose.Types.ObjectId)) {
+            if (itemId._id) itemId = itemId._id;
+            else if (itemId.id && typeof itemId.id === 'string') itemId = itemId.id;
+          }
           // Keep server ObjectId lotId only; drop local lot stubs
           const keepLot =
             lotId && mongoose.Types.ObjectId.isValid(lotId) && String(lotId).length === 24
               ? { lotId }
               : {};
-          return { ...rest, ...keepLot };
+          return { ...rest, itemId, ...keepLot };
         });
       }
 
@@ -108,7 +127,6 @@ class PurchaseService {
         }
       }
 
-      // Generate Lot IDs for each item before saving
       const purchase = new Purchase(purchaseData);
       for (let i = 0; i < purchase.items.length; i += 1) {
         const item = purchase.items[i];
@@ -121,14 +139,16 @@ class PurchaseService {
       // 2. Create Inventory Lots and Stock Movements inside transaction
       // Stock increases in selected warehouse (or company default godown if none).
       for (const item of purchase.items) {
+        const mtrs = Number(item.mts || item.meters || item.qty || item.quantity || 0);
+        const pcs = Number(item.pcs || 0);
         const lot = new InventoryLot({
           lotId: item.lotId,
           itemId: item.itemId,
           purchaseId: purchase._id,
-          totalPcs: item.pcs || 0,
-          remainingPcs: item.pcs || 0,
-          totalMtrs: item.mts || 0,
-          remainingMtrs: item.mts || 0,
+          totalPcs: pcs,
+          remainingPcs: pcs,
+          totalMtrs: mtrs,
+          remainingMtrs: mtrs,
           rate: item.rate || 0,
           warehouseId: purchase.warehouseId || null,
           status: 'Available',
@@ -140,9 +160,9 @@ class PurchaseService {
         const movement = new StockMovement({
           lotId: lot._id,
           type: 'PURCHASE',
-          qtyPcs: item.pcs || 0,
-          qtyMtrs: item.mts || 0,
-          balanceMtrs: item.mts || 0,
+          qtyPcs: pcs,
+          qtyMtrs: mtrs,
+          balanceMtrs: mtrs,
           referenceId: purchase._id,
           idempotencyKey: `PURCHASE:${purchase._id}:${item.lotId}`,
           remarks: `Purchase Bill: ${purchase.invoiceNo}`,

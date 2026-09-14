@@ -39,7 +39,12 @@ const userSchema = new mongoose.Schema({
     lastLoginIp: { type: String, default: '' },
     // Password reset fields
     passwordResetToken: { type: String, select: false },
-    passwordResetExpires: { type: Date, select: false }
+    passwordResetExpires: { type: Date, select: false },
+    // SaaS invite / first-login
+    mustChangePassword: { type: Boolean, default: false },
+    // Super-admin TOTP 2FA
+    totpEnabled: { type: Boolean, default: false },
+    totpSecret: { type: String, select: false, default: '' },
 }, { timestamps: true });
 
 userSchema.pre('save', async function(next) {

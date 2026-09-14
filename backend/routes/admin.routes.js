@@ -89,4 +89,16 @@ router.put('/user/:userId/role', adminController.updateUserRole);
 router.put('/user/:userId/toggle-active', adminController.toggleUserActive);
 router.delete('/user/:userId', adminController.deleteCompanyUser);
 
+// Tenant lifecycle
+router.get('/company/:id/export', adminController.exportCompany);
+router.post('/company/:id/purge', adminController.deleteCompanyHard);
+router.put('/company/:id/plan', adminController.changeCompanyPlan);
+router.post('/company/:id/impersonate', adminController.impersonateCompany);
+router.post('/dunning/run', adminController.runDunning);
+
+// Super-admin 2FA
+router.post('/security/2fa/setup', adminController.setupAdmin2fa);
+router.post('/security/2fa/enable', adminController.enableAdmin2fa);
+router.post('/security/2fa/disable', adminController.disableAdmin2fa);
+
 module.exports = router;

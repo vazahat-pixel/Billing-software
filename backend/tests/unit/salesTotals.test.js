@@ -50,6 +50,22 @@ describe('salesTotals', () => {
     assert.equal(r.cgst, 0);
   });
 
+  it('ignores wrong IGST force when party is same-state', () => {
+    const r = recalcSalesTotals(
+      [{ mts: 100, rate: 10 }],
+      {
+        gstRate: 5,
+        gstType: 'IGST',
+        companyGstin: '24AAAAA0000A1Z5',
+        partyGstin: '24BBBBB0000B1Z5',
+      }
+    );
+    assert.equal(r.gstType, 'CGST+SGST');
+    assert.equal(r.cgst, 25);
+    assert.equal(r.sgst, 25);
+    assert.equal(r.igst, 0);
+  });
+
   it('auto-determines IGST from state codes when gstType not forced', () => {
     // salesTotals only auto-resolves when gstType is outside the force list
     const { determineGstType } = require('../../utils/gstDetermination');

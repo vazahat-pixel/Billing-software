@@ -1,0 +1,4 @@
+desktop/renderer/
+desktop/dist/
+desktop/node_modules/
+config.json

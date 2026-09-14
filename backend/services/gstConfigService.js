@@ -86,7 +86,7 @@ class GstConfigService {
       'legalName', 'tradeName', 'stateCode', 'stateName', 'registrationType',
       'filingFrequency', 'isExporter', 'lutNumber', 'lutValidFrom', 'lutValidTo',
       'reverseChargeEnabled', 'eInvoiceEnabled', 'eWayEnabled',
-      'eInvoiceThreshold', 'eWayThreshold', 'taxTemplates', 'lockedUntilPeriod',
+      'eInvoiceThreshold', 'eWayThreshold', 'taxTemplates', 'lockedUntilPeriod', 'defaultPlaceOfSupply',
     ];
     for (const f of fields) {
       if (payload[f] !== undefined) cfg[f] = payload[f];

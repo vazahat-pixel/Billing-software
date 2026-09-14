@@ -30,6 +30,8 @@ export default function ERPCombobox({
   allowClear = false,
   openOnEnter = false,
   'data-enter-nav': enterNav,
+  'data-enter-skip': enterSkip,
+  'data-autofocus': autoFocusProp,
 }) {
   const inputId = useId();
   const rootRef = useRef(null);
@@ -226,7 +228,9 @@ export default function ERPCombobox({
     row?.scrollIntoView({ block: 'nearest' });
   }, [activeIdx, open]);
 
-  const displayValue = open ? query : (selected?.label || '');
+  const displayValue = open
+    ? query
+    : (selected?.label || (typeof value === 'string' && value ? value : ''));
 
   const dropdown = open && !disabled && !readOnly ? createPortal(
     <div
@@ -300,7 +304,7 @@ export default function ERPCombobox({
     <div
       ref={rootRef}
       className={`erp-combobox ${error ? 'erp-combobox--error' : ''} ${disabled ? 'erp-combobox--disabled' : ''} ${className}`}
-      data-enter-skip={open ? 'true' : undefined}
+      data-enter-skip={open ? 'true' : (enterSkip || undefined)}
     >
       <div className="erp-combobox-control">
         <input
@@ -315,6 +319,7 @@ export default function ERPCombobox({
           autoComplete="off"
           data-erp-combobox-input="true"
           data-enter-nav={enterNav}
+          data-autofocus={autoFocusProp}
           aria-expanded={open}
           aria-autocomplete="list"
           onFocus={() => {

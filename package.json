@@ -6,6 +6,7 @@
     "build": "cd frontend && npm install && npm run build && cd ..",
     "install": "cd backend && npm install && cd ..",
     "desktop:start": "cd desktop && npm start",
+    "desktop:ui": "cd desktop && npm run build:ui",
     "desktop:dist": "cd desktop && npm run dist:win"
   }
 }

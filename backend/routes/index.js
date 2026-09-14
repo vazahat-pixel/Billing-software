@@ -102,6 +102,7 @@ router.use('/returns', requireModule('accounting'), returnRoutes);
 router.use('/tds', requireModule('accounting'), tdsRoutes);
 
 router.use('/gst', requireModule('gst'), gstRoutes);
+router.use('/gstin-reports', requireModule('gst'), require('./gstinReport.routes'));
 
 router.use('/reports', requireModule('reports'), reportRoutes);
 

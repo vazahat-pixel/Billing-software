@@ -38,4 +38,7 @@ const licenseSchema = new mongoose.Schema({
     antiTamperHash: { type: String, default: '' },
 }, { timestamps: true });
 
+licenseSchema.index({ companyId: 1, isActive: 1 });
+licenseSchema.index({ companyId: 1 });
+
 module.exports = mongoose.model('License', licenseSchema);

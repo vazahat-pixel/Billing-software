@@ -130,7 +130,12 @@ const useStore = create((set, get) => ({
   setAuth: async (data) => {
     const user = normalizeUser(data.user);
     const platformRole = user.role === 'super_admin' ? 'super_admin' : 'user';
-    await prepareCompanyCache(user.companyId);
+    try {
+      await prepareCompanyCache(user.companyId);
+    } catch (cacheErr) {
+      console.warn('[setAuth] prepareCompanyCache skipped:', cacheErr?.message || cacheErr);
+      try { setActiveCompanyId(user.companyId); } catch { /* ignore */ }
+    }
     // Explicitly set companyId BEFORE any cache hydration
     if (user.companyId) setActiveCompanyId(user.companyId);
     localStorage.setItem('token', data.token);
@@ -1056,6 +1061,18 @@ const useStore = create((set, get) => ({
   receiveFromMill: async (receiveData) => {
     try {
       const _jr = await jobsApi.receive(receiveData);
+      const res = { data: { data: _jr } };
+      await get().fetchJobs();
+      await get().fetchInventory();
+      return res.data.data;
+    } catch (err) {
+      throw err;
+    }
+  },
+
+  updateJobReceive: async (receiveData) => {
+    try {
+      const _jr = await jobsApi.updateReceive(receiveData);
       const res = { data: { data: _jr } };
       await get().fetchJobs();
       await get().fetchInventory();

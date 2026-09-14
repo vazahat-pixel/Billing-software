@@ -3,6 +3,8 @@ const Purchase = require('../models/Purchase');
 const ReturnInvoice = require('../models/ReturnInvoice');
 const DebitCreditNote = require('../models/DebitCreditNote');
 const Company = require('../models/Company');
+const Party = require('../models/Party');
+const Item = require('../models/Item');
 
 class GstService {
   async getGstr1(companyId, startDate, endDate) {
@@ -26,7 +28,7 @@ class GstService {
         invoices.push({
           invoiceNo: inv.inum,
           date: inv.idt,
-          partyName: '',
+          partyName: party.cname || inv.party_name || '',
           gstin: party.ctin,
           taxable: det.txval,
           cgst: det.camt,
@@ -89,7 +91,7 @@ class GstService {
       }
     }
 
-    const [gstr1, gstr2, company, returns, notes] = await Promise.all([
+    const [gstr1, gstr2, company, returns, notes, gstr3bBuilt] = await Promise.all([
       this.getGstr1(companyId, startDate, endDate),
       this.getGstr2(companyId, startDate, endDate),
       Company.findById(companyId).lean(),
@@ -100,19 +102,24 @@ class GstService {
       DebitCreditNote.find({
         companyId,
         ...(Object.keys(dateFilter).length ? { date: dateFilter } : {})
-      }).populate('partyLedgerId', 'name').lean()
+      }).populate('partyLedgerId', 'name').lean(),
+      (async () => {
+        const { periodKey } = require('../utils/gstDetermination');
+        const gstReturnService = require('./gstReturnService');
+        const period = startDate ? periodKey(new Date(startDate)) : periodKey();
+        return gstReturnService.buildGstr3b(companyId, period);
+      })(),
     ]);
 
-    // Outward totals come from gstr1.totals, which buildGstr1 computes across EVERY
-    // section (B2B + B2CL + B2CS). The flattened `invoices` array below carries B2B rows
-    // only — summing that instead reported ₹0 outward for a business selling purely to
-    // unregistered customers, which understated the liability and made GSTR-3B show a
-    // net ITC credit instead of tax payable.
+    // Prefer authoritative GSTR-3B builder (taxable vs zero-rated vs nil/exempt split,
+    // net of sales CN/returns) over gross GSTR-1 section totals.
+    const g3 = gstr3bBuilt?.payload?.sup_details?.osup_det || {};
+    const g3Net = gstr3bBuilt?.payload?.netPayable || {};
     const g1Totals = gstr1.totals || {};
-    const outwardTaxable = Number(g1Totals.taxable || 0);
-    const outwardCgst = Number(g1Totals.cgst || 0);
-    const outwardSgst = Number(g1Totals.sgst || 0);
-    const outwardIgst = Number(g1Totals.igst || 0);
+    const outwardTaxable = Number(g3.txval ?? g1Totals.netTaxable ?? g1Totals.taxable ?? 0);
+    const outwardCgst = Number(g3.camt ?? g1Totals.netCgst ?? g1Totals.cgst ?? 0);
+    const outwardSgst = Number(g3.samt ?? g1Totals.netSgst ?? g1Totals.sgst ?? 0);
+    const outwardIgst = Number(g3.iamt ?? g1Totals.netIgst ?? g1Totals.igst ?? 0);
 
     let inwardTaxable = 0;
     let itcCgst = 0;
@@ -125,9 +132,9 @@ class GstService {
       itcIgst += p.igst || 0;
     });
 
-    const netCgst = outwardCgst - itcCgst;
-    const netSgst = outwardSgst - itcSgst;
-    const netIgst = outwardIgst - itcIgst;
+    const netCgst = g3Net.cgst != null ? Number(g3Net.cgst) : outwardCgst - itcCgst;
+    const netSgst = g3Net.sgst != null ? Number(g3Net.sgst) : outwardSgst - itcSgst;
+    const netIgst = g3Net.igst != null ? Number(g3Net.igst) : outwardIgst - itcIgst;
 
     const warnings = [];
     (gstr1.invoices || []).forEach((inv) => {

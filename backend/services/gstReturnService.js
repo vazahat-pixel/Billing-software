@@ -3,6 +3,9 @@ const Purchase = require('../models/Purchase');
 const ReturnInvoice = require('../models/ReturnInvoice');
 const DebitCreditNote = require('../models/DebitCreditNote');
 const GstReturnSnapshot = require('../models/GstReturnSnapshot');
+const Party = require('../models/Party');
+const Item = require('../models/Item');
+const Company = require('../models/Company');
 const gstConfigService = require('./gstConfigService');
 const {
   placeOfSupply, filingPeriodFp, periodBounds, stateCodeFromGstin,
@@ -131,48 +134,101 @@ class GstReturnService {
     const notes = await this._notesInPeriod(companyId, startDate, endDate, 'Sales');
 
     const b2b = [];
+    const b2bRows = [];
     const b2cl = [];
+    const b2clRows = [];
     const b2csMap = {};
     const cdnrByCtin = {};
+    const cdnrRows = [];
+    const cdnuRows = [];
     const hsnMap = {};
-    const companyPos = cfg.stateCode || stateCodeFromGstin(cfg.gstin);
+    const hsnB2cMap = {};
+    const expRows = [];
+    const exempMap = {
+      interReg: { desc: 'Inter-State supplies to registered persons', nil: 0, exempt: 0, nonGst: 0 },
+      intraReg: { desc: 'Intra-State supplies to registered persons', nil: 0, exempt: 0, nonGst: 0 },
+      interUnreg: { desc: 'Inter-State supplies to unregistered persons', nil: 0, exempt: 0, nonGst: 0 },
+      intraUnreg: { desc: 'Intra-State supplies to unregistered persons', nil: 0, exempt: 0, nonGst: 0 },
+    };
 
-    const pushCdnr = (ctin, note) => {
+    const companyPos = cfg.stateCode || stateCodeFromGstin(cfg.gstin) || '24';
+    const { stateNameFromCode } = require('../utils/gstDetermination');
+
+    const pushCdnr = (ctin, cname, note) => {
       const key = (ctin || '').toUpperCase() || '_UNREG';
-      if (!cdnrByCtin[key]) cdnrByCtin[key] = { ctin: key === '_UNREG' ? '' : key, nt: [] };
+      if (!cdnrByCtin[key]) cdnrByCtin[key] = { ctin: key === '_UNREG' ? '' : key, cname: cname || '', nt: [] };
       cdnrByCtin[key].nt.push(note);
     };
 
     for (const s of sales) {
       const gstin = (s.customerId?.gstin || '').toUpperCase();
+      const partyName = s.customerId?.name || s.partyName || 'Cash Sale';
       const isRegistered = gstin.length === 15;
       const taxable = round2(s.taxableAmount);
       const cgst = round2(s.cgst);
       const sgst = round2(s.sgst);
       const igst = round2(s.igst);
-      const invVal = round2(s.netAmount);
-      const pos = placeOfSupply({
+      const cess = round2(s.cess || 0);
+      const invVal = round2(s.netAmount || taxable + cgst + sgst + igst + cess);
+      const posCode = placeOfSupply({
         partyGstin: gstin,
         partyStateCode: s.customerId?.stateCode,
         companyStateCode: companyPos,
       }).stateCode || companyPos;
+      const stateName = stateNameFromCode(posCode) || s.customerId?.state || '';
+      const posFullName = `${posCode}${stateName ? `-${stateName}` : ''}`;
+      const isInterState = igst > 0 || (posCode && posCode !== companyPos);
+      const taxRate = s.gstRate || (taxable ? round2(((cgst + sgst + igst) / taxable) * 100) : 0);
+      const invDate = s.date ? new Date(s.date).toISOString().slice(0, 10) : '';
+
+      // Check for Export supply
+      if (s.gstType === 'Export' || s.gstType === 'ZeroRated' || posCode === '97') {
+        const expType = igst > 0 ? 'WPAY' : 'WOPAY';
+        expRows.push({
+          exportType: expType,
+          invoiceNo: s.invoiceNo,
+          date: invDate,
+          invoiceValue: invVal,
+          portCode: s.portCode || '',
+          shippingBillNo: s.shippingBillNo || '',
+          shippingBillDate: s.shippingBillDate ? new Date(s.shippingBillDate).toISOString().slice(0, 10) : '',
+          taxRate,
+          taxableAmount: taxable,
+          igst,
+          cess,
+        });
+        continue;
+      }
+
+      // Exempt / Nil / Non-GST → Table 8 only (never also B2B/B2CL/B2CS)
+      if (s.gstType === 'Exempt' || s.gstType === 'NilRated' || s.gstType === 'NonGST' || (taxable > 0 && taxRate === 0 && cgst === 0 && sgst === 0 && igst === 0)) {
+        const bucket = isInterState
+          ? (isRegistered ? 'interReg' : 'interUnreg')
+          : (isRegistered ? 'intraReg' : 'intraUnreg');
+        if (s.gstType === 'NonGST') exempMap[bucket].nonGst = round2(exempMap[bucket].nonGst + taxable);
+        else if (s.gstType === 'Exempt') exempMap[bucket].exempt = round2(exempMap[bucket].exempt + taxable);
+        else exempMap[bucket].nil = round2(exempMap[bucket].nil + taxable);
+        continue;
+      }
 
       const inv = {
         inum: s.invoiceNo,
-        idt: s.date ? new Date(s.date).toISOString().slice(0, 10) : '',
+        idt: invDate,
         val: invVal,
-        pos,
+        pos: posCode,
+        pos_name: posFullName,
+        party_name: partyName,
         rchrg: s.reverseCharge ? 'Y' : 'N',
-        inv_typ: s.gstType === 'Export' || s.gstType === 'ZeroRated' ? 'SEWP' : 'R',
+        inv_typ: 'R',
         itms: [{
           num: 1,
           itm_det: {
             txval: taxable,
-            rt: s.gstRate || (taxable ? round2(((cgst + sgst + igst) / taxable) * 100) : 0),
+            rt: taxRate,
             iamt: igst,
             camt: cgst,
             samt: sgst,
-            csamt: round2(s.cess || 0),
+            csamt: cess,
           },
         }],
       };
@@ -180,66 +236,115 @@ class GstReturnService {
       if (isRegistered) {
         let party = b2b.find((x) => x.ctin === gstin);
         if (!party) {
-          party = { ctin: gstin, inv: [] };
+          party = { ctin: gstin, cname: partyName, inv: [] };
           b2b.push(party);
         }
         party.inv.push(inv);
-      } else if (taxable > 250000 && igst > 0) {
-        // B2CL — invoice value must be net (same as inv.val)
+
+        b2bRows.push({
+          gstin,
+          partyName,
+          invoiceNo: s.invoiceNo,
+          date: invDate,
+          netAmount: invVal,
+          stateName: posFullName,
+          reverseCharge: s.reverseCharge ? 'Y' : 'N',
+          taxRate: `${taxRate.toFixed(2)}%`,
+          invType: 'Regular',
+          taxableAmount: taxable,
+          cgst,
+          sgst,
+          igst,
+          cess,
+        });
+      } else if (invVal > 250000 && isInterState) {
+        // B2CL — large interstate unregistered
         b2cl.push({ ...inv, val: invVal });
+        b2clRows.push({
+          invoiceNo: s.invoiceNo,
+          date: invDate,
+          netAmount: invVal,
+          stateName: posFullName,
+          taxRate: taxRate.toFixed(2),
+          taxableAmount: taxable,
+          cess,
+          ecomm: s.ecommGstin || '',
+          igst,
+        });
       } else {
-        const rate = inv.itms[0].itm_det.rt;
-        const key = `${pos}|${rate}`;
+        // B2CS — small unregistered
+        const rate = Number(taxRate || 0);
+        const rateStr = rate.toFixed(2);
+        const key = `${posFullName}|${rateStr}`;
         if (!b2csMap[key]) {
           b2csMap[key] = {
-            sply_ty: igst > 0 ? 'INTER' : 'INTRA',
-            pos,
+            sply_ty: isInterState ? 'INTER' : 'INTRA',
+            pos: posCode,
+            pos_name: posFullName,
             typ: 'OE',
-            rt: rate,
+            app_rate: '',
+            rt: rateStr,
             txval: 0,
             iamt: 0,
             camt: 0,
             samt: 0,
             csamt: 0,
+            ecomm: '',
           };
         }
         b2csMap[key].txval = round2(b2csMap[key].txval + taxable);
         b2csMap[key].iamt = round2(b2csMap[key].iamt + igst);
         b2csMap[key].camt = round2(b2csMap[key].camt + cgst);
         b2csMap[key].samt = round2(b2csMap[key].samt + sgst);
+        b2csMap[key].csamt = round2(b2csMap[key].csamt + cess);
       }
 
+      // HSN Breakdown
       for (const line of s.items || []) {
-        const hsn = line.itemId?.hsnCode || line.hsnCode || '';
-        if (!hsn) continue;
-        if (!hsnMap[hsn]) {
-          hsnMap[hsn] = {
-            num: Object.keys(hsnMap).length + 1,
-            hsn_sc: hsn,
-            desc: line.itemId?.name || '',
-            uqc: 'MTR',
-            qty: 0,
-            rt: line.itemId?.gstRate || s.gstRate || 0,
-            txval: 0,
-            iamt: 0,
-            camt: 0,
-            samt: 0,
-            csamt: 0,
-          };
-        }
-        const lineTaxable = round2(line.amount || (line.mts || 0) * (line.rate || 0));
-        const rt = (hsnMap[hsn].rt || 0) / 100;
-        hsnMap[hsn].qty = round2(hsnMap[hsn].qty + (line.mts || line.qty || 0));
-        hsnMap[hsn].txval = round2(hsnMap[hsn].txval + lineTaxable);
-        if (igst > 0) hsnMap[hsn].iamt = round2(hsnMap[hsn].iamt + lineTaxable * rt);
-        else {
-          hsnMap[hsn].camt = round2(hsnMap[hsn].camt + (lineTaxable * rt) / 2);
-          hsnMap[hsn].samt = round2(hsnMap[hsn].samt + (lineTaxable * rt) / 2);
+        const hsn = line.itemId?.hsnCode || line.hsnCode || '9999';
+        const desc = line.itemId?.name || line.description || 'Goods/Services';
+        const uqc = line.itemId?.unit || line.unit || 'PCS';
+        const lineTaxable = round2(line.amount || line.taxableAmount || (line.mts || line.qty || 0) * (line.rate || 0));
+        const lineRate = line.itemId?.gstRate ?? line.gstRate ?? taxRate;
+        const rt = Number(lineRate || 0) / 100;
+        const lineQty = round2(line.mts || line.qty || 1);
+
+        const accumulateHsn = (targetMap) => {
+          if (!targetMap[hsn]) {
+            targetMap[hsn] = {
+              num: Object.keys(targetMap).length + 1,
+              hsn_sc: hsn,
+              desc,
+              uqc,
+              qty: 0,
+              val: 0,
+              rt: Number(lineRate || 0).toFixed(2),
+              txval: 0,
+              iamt: 0,
+              camt: 0,
+              samt: 0,
+              csamt: 0,
+            };
+          }
+          targetMap[hsn].qty = round2(targetMap[hsn].qty + lineQty);
+          targetMap[hsn].txval = round2(targetMap[hsn].txval + lineTaxable);
+          targetMap[hsn].val = round2(targetMap[hsn].val + lineTaxable * (1 + rt));
+          if (isInterState) {
+            targetMap[hsn].iamt = round2(targetMap[hsn].iamt + lineTaxable * rt);
+          } else {
+            targetMap[hsn].camt = round2(targetMap[hsn].camt + (lineTaxable * rt) / 2);
+            targetMap[hsn].samt = round2(targetMap[hsn].samt + (lineTaxable * rt) / 2);
+          }
+        };
+
+        accumulateHsn(hsnMap);
+        if (!isRegistered) {
+          accumulateHsn(hsnB2cMap);
         }
       }
     }
 
-    // Credit / Debit notes → CDNR (grouped by party CTIN when GSTIN available)
+    // Credit / Debit notes → CDNR / CDNU
     for (const n of notes) {
       if (!n.taxableAmount && !n.amount) continue;
       const ctin = (
@@ -248,59 +353,187 @@ class GstReturnService {
         || n.ctin
         || ''
       ).toUpperCase();
-      pushCdnr(ctin, {
-        ntty: n.noteType === 'Credit' ? 'C' : 'D',
-        nt_num: n.noteNo,
-        nt_dt: n.date ? new Date(n.date).toISOString().slice(0, 10) : '',
-        val: round2(n.netAmount || n.amount),
-        txval: round2(n.taxableAmount || n.amount),
-        iamt: round2(n.igst || 0),
-        camt: round2(n.cgst || 0),
-        samt: round2(n.sgst || 0),
-        rsn: n.reason || '',
-      });
+      const partyName = n.partyLedgerId?.name || n.partyName || '';
+      const noteDate = n.date ? new Date(n.date).toISOString().slice(0, 10) : '';
+      const posCode = n.stateCode || companyPos;
+      const stateName = stateNameFromCode(posCode) || '';
+      const posFullName = `${posCode}${stateName ? `-${stateName}` : ''}`;
+      const noteVal = round2(n.netAmount || n.amount);
+      const noteTaxable = round2(n.taxableAmount || n.amount);
+      const noteType = n.noteType === 'Credit' ? 'C' : 'D';
+      const taxRate = n.gstRate ?? (noteTaxable ? round2((((n.cgst || 0) + (n.sgst || 0) + (n.igst || 0)) / noteTaxable) * 100) : 0);
+
+      if (ctin && ctin.length === 15) {
+        pushCdnr(ctin, partyName, {
+          ntty: noteType,
+          nt_num: n.noteNo,
+          nt_dt: noteDate,
+          val: noteVal,
+          txval: noteTaxable,
+          iamt: round2(n.igst || 0),
+          camt: round2(n.cgst || 0),
+          samt: round2(n.sgst || 0),
+          csamt: round2(n.cess || 0),
+          rsn: n.reason || 'Correction in Invoice',
+          p_gst: 'N',
+          pos: posCode,
+          pos_name: posFullName,
+          rt: taxRate.toFixed(2),
+        });
+
+        cdnrRows.push({
+          gstin: ctin,
+          partyName,
+          noteNo: n.noteNo,
+          noteDate,
+          noteType,
+          pos: posFullName,
+          netAmount: noteVal,
+          taxRate: `${taxRate.toFixed(2)}%`,
+          taxableAmount: noteTaxable,
+          cgst: round2(n.cgst || 0),
+          sgst: round2(n.sgst || 0),
+          igst: round2(n.igst || 0),
+          cess: round2(n.cess || 0),
+          reason: n.reason || 'Correction',
+        });
+      } else {
+        cdnuRows.push({
+          type: noteVal > 250000 ? 'B2CL' : 'B2CS',
+          noteNo: n.noteNo,
+          noteDate,
+          noteType,
+          pos: posFullName,
+          taxRate: taxRate.toFixed(2),
+          taxableAmount: noteTaxable,
+          netAmount: noteVal,
+          cgst: round2(n.cgst || 0),
+          sgst: round2(n.sgst || 0),
+          igst: round2(n.igst || 0),
+          reason: n.reason || 'Correction',
+        });
+      }
     }
 
     for (const r of returns) {
       if (r.returnType !== 'Sales') continue;
       const ctin = (r.partyId?.gstin || r.partyGstin || '').toUpperCase();
-      pushCdnr(ctin, {
-        ntty: 'C',
-        nt_num: r.invoiceNo || r.returnNo,
-        nt_dt: r.date ? new Date(r.date).toISOString().slice(0, 10) : '',
-        val: round2(r.netAmount),
-        txval: round2(r.taxableAmount),
-        iamt: round2(r.igst || 0),
-        camt: round2(r.cgst || (r.gstAmount || 0) / 2),
-        samt: round2(r.sgst || (r.gstAmount || 0) / 2),
-        rsn: 'Sales Return',
-      });
+      const partyName = r.partyId?.name || r.partyName || '';
+      const retDate = r.date ? new Date(r.date).toISOString().slice(0, 10) : '';
+      const posCode = r.stateCode || companyPos;
+      const stateName = stateNameFromCode(posCode) || '';
+      const posFullName = `${posCode}${stateName ? `-${stateName}` : ''}`;
+      const retVal = round2(r.netAmount);
+      const retTaxable = round2(r.taxableAmount);
+      const taxRate = retTaxable ? round2((((r.cgst || 0) + (r.sgst || 0) + (r.igst || 0)) / retTaxable) * 100) : 0;
+
+      if (ctin && ctin.length === 15) {
+        pushCdnr(ctin, partyName, {
+          ntty: 'C',
+          nt_num: r.invoiceNo || r.returnNo,
+          nt_dt: retDate,
+          val: retVal,
+          txval: retTaxable,
+          iamt: round2(r.igst || 0),
+          camt: round2(r.cgst || (r.gstAmount || 0) / 2),
+          samt: round2(r.sgst || (r.gstAmount || 0) / 2),
+          csamt: 0,
+          rsn: 'Sales Return',
+          p_gst: 'N',
+          pos: posCode,
+          pos_name: posFullName,
+          rt: taxRate.toFixed(2),
+        });
+
+        cdnrRows.push({
+          gstin: ctin,
+          partyName,
+          noteNo: r.invoiceNo || r.returnNo,
+          noteDate: retDate,
+          noteType: 'C',
+          pos: posFullName,
+          netAmount: retVal,
+          taxRate: `${taxRate.toFixed(2)}%`,
+          taxableAmount: retTaxable,
+          cgst: round2(r.cgst || (r.gstAmount || 0) / 2),
+          sgst: round2(r.sgst || (r.gstAmount || 0) / 2),
+          igst: round2(r.igst || 0),
+          cess: 0,
+          reason: 'Sales Return',
+        });
+      } else {
+        cdnuRows.push({
+          type: retVal > 250000 ? 'B2CL' : 'B2CS',
+          noteNo: r.invoiceNo || r.returnNo,
+          noteDate: retDate,
+          noteType: 'C',
+          pos: posFullName,
+          taxRate: taxRate.toFixed(2),
+          taxableAmount: retTaxable,
+          netAmount: retVal,
+          cgst: round2(r.cgst || (r.gstAmount || 0) / 2),
+          sgst: round2(r.sgst || (r.gstAmount || 0) / 2),
+          igst: round2(r.igst || 0),
+          reason: 'Sales Return',
+        });
+      }
     }
 
     // CDNR carries notes issued to REGISTERED recipients (grouped by their CTIN).
-    // Notes to unregistered recipients are a separate GSTR-1 section, CDNUR, and are
-    // reported flat with a supply type rather than under a counter-party GSTIN.
     const cdnr = Object.values(cdnrByCtin).filter((g) => g.ctin && g.nt.length);
-    const cdnur = Object.values(cdnrByCtin)
-      .filter((g) => !g.ctin && g.nt.length)
-      .flatMap((g) => g.nt.map((n) => ({
-        typ: n.igst > 0 || n.iamt > 0 ? 'B2CL' : 'B2CS',
-        ntty: n.ntty,
-        nt_num: n.nt_num,
-        nt_dt: n.nt_dt,
-        val: n.val,
-        txval: n.txval,
-        iamt: n.iamt,
-        camt: n.camt,
-        samt: n.samt,
-        rsn: n.rsn,
-      })));
+    const cdnur = cdnuRows.map((n) => ({
+      typ: n.type,
+      ntty: n.noteType,
+      nt_num: n.noteNo,
+      nt_dt: n.noteDate,
+      val: n.netAmount,
+      txval: n.taxableAmount,
+      iamt: n.igst || 0,
+      camt: n.cgst || 0,
+      samt: n.sgst || 0,
+      rsn: n.reason,
+    }));
+
     const cancelCount = cancelledSales.length;
     const totnum = sales.length + cancelCount;
     const allDocNos = [
       ...sales.map((s) => s.invoiceNo).filter(Boolean),
       ...cancelledSales.map((s) => s.invoiceNo).filter(Boolean),
+    ].sort();
+
+    const docsRows = [
+      {
+        docType: 'Invoices for outward supply',
+        from: allDocNos[0] || sales[0]?.invoiceNo || 'N/A',
+        to: allDocNos[allDocNos.length - 1] || sales[sales.length - 1]?.invoiceNo || 'N/A',
+        totnum,
+        cancel: cancelCount,
+        net_issue: totnum - cancelCount,
+      },
+      {
+        docType: 'Credit Notes',
+        from: notes.filter(n => n.noteType === 'Credit')[0]?.noteNo || returns[0]?.invoiceNo || 'N/A',
+        to: notes.filter(n => n.noteType === 'Credit').slice(-1)[0]?.noteNo || returns.slice(-1)[0]?.invoiceNo || 'N/A',
+        totnum: notes.filter(n => n.noteType === 'Credit').length + returns.length,
+        cancel: 0,
+        net_issue: notes.filter(n => n.noteType === 'Credit').length + returns.length,
+      },
+      {
+        docType: 'Debit Notes',
+        from: notes.filter(n => n.noteType === 'Debit')[0]?.noteNo || 'N/A',
+        to: notes.filter(n => n.noteType === 'Debit').slice(-1)[0]?.noteNo || 'N/A',
+        totnum: notes.filter(n => n.noteType === 'Debit').length,
+        cancel: 0,
+        net_issue: notes.filter(n => n.noteType === 'Debit').length,
+      }
     ];
+
+    const exempRows = Object.values(exempMap).map(e => ({
+      description: e.desc,
+      nilRated: e.nil,
+      exempted: e.exempt,
+      nonGst: e.nonGst,
+    }));
 
     const payload = {
       gstin: cfg.gstin,
@@ -308,31 +541,75 @@ class GstReturnService {
       version: 'GST3.2.2',
       hash: '',
       b2b,
+      b2bRows,
       b2cl,
+      b2clRows,
       b2cs: Object.values(b2csMap),
       cdnr,
+      cdnrRows,
       cdnur,
+      cdnuRows,
       hsn: { data: Object.values(hsnMap) },
+      hsnRows: Object.values(hsnMap),
+      hsnB2cRows: Object.values(hsnB2cMap),
       doc_issue: {
         doc_det: [{
           doc_num: 1,
           docs: [{
             num: 1,
-            from: allDocNos[0] || sales[0]?.invoiceNo || '',
-            to: allDocNos[allDocNos.length - 1] || sales[sales.length - 1]?.invoiceNo || '',
+            from: docsRows[0].from,
+            to: docsRows[0].to,
             totnum,
             cancel: cancelCount,
             net_issue: totnum - cancelCount,
           }],
         }],
       },
+      docsRows,
+      expRows,
+      exempRows,
     };
+
+    let netTaxable = sales.reduce((s, x) => s + (x.taxableAmount || 0), 0);
+    let netCgst = sales.reduce((s, x) => s + (x.cgst || 0), 0);
+    let netSgst = sales.reduce((s, x) => s + (x.sgst || 0), 0);
+    let netIgst = sales.reduce((s, x) => s + (x.igst || 0), 0);
+    let netCess = sales.reduce((s, x) => s + (x.cess || 0), 0);
+
+    for (const n of notes) {
+      const t = n.taxableAmount || n.amount || 0;
+      const c = n.cgst || 0;
+      const s = n.sgst || 0;
+      const i = n.igst || 0;
+      const cs = n.cess || 0;
+      if (n.noteType === 'Credit') {
+        netTaxable -= t; netCgst -= c; netSgst -= s; netIgst -= i; netCess -= cs;
+      } else if (n.noteType === 'Debit') {
+        netTaxable += t; netCgst += c; netSgst += s; netIgst += i; netCess += cs;
+      }
+    }
+
+    for (const r of returns) {
+      if (r.returnType === 'Sales') {
+        netTaxable -= r.taxableAmount || 0;
+        netCgst -= r.cgst || 0;
+        netSgst -= r.sgst || 0;
+        netIgst -= r.igst || 0;
+        netCess -= r.cess || 0;
+      }
+    }
 
     const totals = {
       taxable: round2(sales.reduce((s, x) => s + (x.taxableAmount || 0), 0)),
+      netTaxable: round2(netTaxable),
       cgst: round2(sales.reduce((s, x) => s + (x.cgst || 0), 0)),
+      netCgst: round2(netCgst),
       sgst: round2(sales.reduce((s, x) => s + (x.sgst || 0), 0)),
+      netSgst: round2(netSgst),
       igst: round2(sales.reduce((s, x) => s + (x.igst || 0), 0)),
+      netIgst: round2(netIgst),
+      cess: round2(sales.reduce((s, x) => s + (x.cess || 0), 0)),
+      totalTax: round2(sales.reduce((s, x) => s + (x.cgst || 0) + (x.sgst || 0) + (x.igst || 0) + (x.cess || 0), 0)),
       invoiceCount: sales.length,
     };
 
@@ -347,13 +624,76 @@ class GstReturnService {
     const { startDate, endDate } = periodBounds(period);
     const sales = await this._salesInPeriod(companyId, startDate, endDate);
     const purchases = await this._purchasesInPeriod(companyId, startDate, endDate);
+    const notes = await this._notesInPeriod(companyId, startDate, endDate, 'Sales');
+    const returns = await this._returnsInPeriod(companyId, startDate, endDate);
+
+    // Table 3.1 split: taxable / zero-rated / nil-exempt must not be lumped together
+    let outwardTaxable = 0;
+    let outwardCgst = 0;
+    let outwardSgst = 0;
+    let outwardIgst = 0;
+    let outwardCess = 0;
+    let zeroTaxable = 0;
+    let zeroIgst = 0;
+    let zeroCess = 0;
+    let nilExemptTaxable = 0;
+
+    const isNilExempt = (x) => {
+      const type = String(x.gstType || '');
+      if (type === 'Exempt' || type === 'NilRated' || type === 'NonGST') return true;
+      const taxable = Number(x.taxableAmount || 0);
+      const tax = Number(x.cgst || 0) + Number(x.sgst || 0) + Number(x.igst || 0) + Number(x.gstAmount || 0);
+      return taxable > 0 && tax === 0 && type !== 'Export' && type !== 'ZeroRated';
+    };
+
+    for (const x of sales) {
+      const type = String(x.gstType || '');
+      const tx = Number(x.taxableAmount || 0);
+      if (type === 'Export' || type === 'ZeroRated') {
+        zeroTaxable += tx;
+        zeroIgst += Number(x.igst || 0);
+        zeroCess += Number(x.cess || 0);
+      } else if (isNilExempt(x)) {
+        nilExemptTaxable += tx;
+      } else {
+        outwardTaxable += tx;
+        outwardCgst += Number(x.cgst || 0);
+        outwardSgst += Number(x.sgst || 0);
+        outwardIgst += Number(x.igst || 0);
+        outwardCess += Number(x.cess || 0);
+      }
+    }
+
+    // CN/DN and sales returns adjust taxable outward (3.1(a)); rare export/nil notes stay out of scope
+    for (const n of notes) {
+      const t = n.taxableAmount || n.amount || 0;
+      const c = n.cgst || 0;
+      const s = n.sgst || 0;
+      const i = n.igst || 0;
+      const cs = n.cess || 0;
+      if (n.noteType === 'Credit') {
+        outwardTaxable -= t; outwardCgst -= c; outwardSgst -= s; outwardIgst -= i; outwardCess -= cs;
+      } else if (n.noteType === 'Debit') {
+        outwardTaxable += t; outwardCgst += c; outwardSgst += s; outwardIgst += i; outwardCess += cs;
+      }
+    }
+
+    for (const r of returns) {
+      if (r.returnType === 'Sales') {
+        outwardTaxable -= r.taxableAmount || 0;
+        outwardCgst -= r.cgst || 0;
+        outwardSgst -= r.sgst || 0;
+        outwardIgst -= r.igst || 0;
+        outwardCess -= r.cess || 0;
+      }
+    }
 
     const outward = {
-      taxable: round2(sales.reduce((s, x) => s + (x.taxableAmount || 0), 0)),
-      cgst: round2(sales.reduce((s, x) => s + (x.cgst || 0), 0)),
-      sgst: round2(sales.reduce((s, x) => s + (x.sgst || 0), 0)),
-      igst: round2(sales.reduce((s, x) => s + (x.igst || 0), 0)),
-      cess: round2(sales.reduce((s, x) => s + (x.cess || 0), 0)),
+      taxable: round2(outwardTaxable),
+      cgst: round2(outwardCgst),
+      sgst: round2(outwardSgst),
+      igst: round2(outwardIgst),
+      cess: round2(outwardCess),
     };
 
     const inward = {
@@ -419,8 +759,12 @@ class GstReturnService {
           samt: outward.sgst,
           csamt: outward.cess,
         },
-        osup_zero: { txval: 0, iamt: 0, csamt: 0 },
-        osup_nil_exmp: { txval: 0 },
+        osup_zero: {
+          txval: round2(zeroTaxable),
+          iamt: round2(zeroIgst),
+          csamt: round2(zeroCess),
+        },
+        osup_nil_exmp: { txval: round2(nilExemptTaxable) },
         isup_rev: {
           txval: round2(rcm.reduce((s, x) => s + (x.taxableAmount || 0), 0)),
           iamt: rcmTax.igst,
@@ -460,6 +804,8 @@ class GstReturnService {
         sgst: netPayable.sgst,
         igst: netPayable.igst,
         invoiceCount: sales.length,
+        zeroRated: round2(zeroTaxable),
+        nilExempt: round2(nilExemptTaxable),
       },
       period,
     };

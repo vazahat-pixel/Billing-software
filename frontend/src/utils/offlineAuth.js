@@ -8,13 +8,27 @@ import { normalizeUser } from './normalizers';
 
 const HASH_SALT = 'billing-offline-auth-v1';
 
+/** Prefer WebCrypto; fall back for Electron / non-secure contexts. */
 const hashPassword = async (email, password) => {
   const payload = `${email.toLowerCase()}::${password}::${HASH_SALT}`;
-  const data = new TextEncoder().encode(payload);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  try {
+    if (globalThis.crypto?.subtle?.digest) {
+      const data = new TextEncoder().encode(payload);
+      const digest = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+    }
+  } catch (err) {
+    console.warn('[offlineAuth] WebCrypto hash failed, using fallback:', err?.message || err);
+  }
+  // Simple stable fallback (offline-only credential store, not a server secret)
+  let h = 2166136261;
+  for (let i = 0; i < payload.length; i += 1) {
+    h ^= payload.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return `fb-${(h >>> 0).toString(16).padStart(8, '0')}-${payload.length}`;
 };
 
 export const saveOfflineCredential = async (email, password, { token, user }) => {

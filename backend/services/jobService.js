@@ -589,6 +589,162 @@ class JobService {
     }
   }
 
+  async updateJobReceive(receiveData) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const { jobId, companyId, billGpNo, receivedQty, receivedPcs, charges, gstAmount, receiveDate, isFinal, workerId, billType } = receiveData;
+      const job = await Job.findOne({ _id: jobId, companyId }).session(session);
+      if (!job) throw AppError.notFound('Job record not found');
+      if (job.status !== 'Received' && job.status !== 'Partial') {
+        throw AppError.badRequest('Only received or partial jobs can be updated. Current status: ' + job.status);
+      }
+
+      const newQty = Number(receivedQty != null ? receivedQty : job.receivedQty);
+      const newPcs = Number(receivedPcs != null ? receivedPcs : (job.receivedPcs || 0));
+      const newCharges = charges != null ? Number(charges) : Number(job.processCharges || 0);
+      const newGst = gstAmount != null ? Number(gstAmount) : Number(job.processGstAmount || 0);
+      const newDate = receiveDate ? new Date(receiveDate) : (job.receiveDate || new Date());
+      const oldQty = Number(job.receivedQty || 0);
+      const oldPcs = Number(job.receivedPcs || 0);
+
+      // Validate Bill/GP No uniqueness across different workers if changed
+      if (billGpNo) {
+        const existingReceipt = await Job.findOne({
+          billGpNo: String(billGpNo).trim(),
+          companyId,
+          _id: { $ne: job._id },
+          status: { $in: ['Received', 'Partial'] },
+          workerId: { $ne: workerId || job.workerId },
+        }).session(session);
+        if (existingReceipt) {
+          throw AppError.badRequest(`Bill/GP No. "${billGpNo}" is already used for a different Job Party.`);
+        }
+      }
+
+      // Check finished lot
+      let finishedLot = null;
+      if (job.finishedLotId) {
+        finishedLot = await InventoryLot.findById(job.finishedLotId).session(session);
+      }
+
+      const qtyDelta = Number((newQty - oldQty).toFixed(4));
+      const pcsDelta = newPcs - oldPcs;
+
+      if (finishedLot && qtyDelta !== 0) {
+        // If reducing quantity, ensure remainingMtrs doesn't go below 0
+        if (Number(finishedLot.remainingMtrs) + qtyDelta < -0.0001) {
+          throw AppError.badRequest(`Cannot reduce received quantity by ${-qtyDelta} Mts because ${Number(finishedLot.totalMtrs) - Number(finishedLot.remainingMtrs)} Mts have already been sold or used from this lot.`);
+        }
+        finishedLot.totalMtrs = Math.max(0, Number((Number(finishedLot.totalMtrs || 0) + qtyDelta).toFixed(4)));
+        finishedLot.remainingMtrs = Math.max(0, Number((Number(finishedLot.remainingMtrs || 0) + qtyDelta).toFixed(4)));
+        finishedLot.totalPcs = Math.max(0, Number((finishedLot.totalPcs || 0) + pcsDelta));
+        finishedLot.remainingPcs = Math.max(0, Number((finishedLot.remainingPcs || 0) + pcsDelta));
+        if (finishedLot.remainingMtrs > 0 && finishedLot.status === 'Closed') {
+          finishedLot.status = 'Available';
+        }
+        await finishedLot.save({ session });
+      }
+
+      // Reverse previous accounting entries for this receive
+      const AccountingEntry = require('../models/AccountingEntry');
+      const journalEngineService = require('./journalEngineService');
+      const entriesToReverse = await AccountingEntry.find({
+        companyId,
+        refId: job._id,
+        $or: [
+          { refType: 'JobReceive' },
+          { refType: 'JobWorkCharges' },
+          { refType: 'Journal' }
+        ],
+        isReversed: { $ne: true }
+      }).session(session);
+
+      for (const entry of entriesToReverse) {
+        await journalEngineService.reverseJournal(companyId, entry._id, { session });
+      }
+
+      // Recompute wastage
+      const finalFlag = isFinal !== false;
+      const tolerancePct = job.toleranceWastagePct ?? 3;
+      let wastage = 0;
+      let abnormalWastage = 0;
+      if (finalFlag) {
+        ({ wastage, abnormalWastage } = computeWastageSplit(job.issueQty, newQty, tolerancePct));
+      }
+
+      // Update job record
+      job.receivedQty = newQty;
+      job.receivedPcs = newPcs;
+      job.wastage = wastage;
+      job.processCharges = newCharges;
+      job.processGstAmount = newGst;
+      if (billGpNo != null) job.billGpNo = String(billGpNo).trim();
+      if (workerId) job.workerId = workerId;
+      if (billType) job.billType = billType;
+      job.receiveDate = newDate;
+      job.status = finalFlag ? 'Received' : 'Partial';
+      await job.save({ session });
+
+      // Post new accounting entries
+      const accountingService = require('./accountingService');
+      const originalLot = await InventoryLot.findById(job.lotId).session(session);
+      let greyCostPerMtr = Number(originalLot?.rate || 0) || 100;
+
+      if (finalFlag) {
+        await accountingService.onJobReceiveStockPost(
+          job,
+          { greyCostPerMtr, receivedQty: newQty },
+          session
+        );
+        if (abnormalWastage > 0 && greyCostPerMtr > 0) {
+          await accountingService.onAbnormalWastagePost(
+            companyId,
+            abnormalWastage,
+            greyCostPerMtr,
+            job._id,
+            session
+          );
+        }
+      }
+
+      if (newCharges > 0 || newGst > 0) {
+        await accountingService.onJobWorkChargesPost(
+          {
+            companyId,
+            millId: job.workerId,
+            charges: newCharges,
+            gstAmount: newGst,
+            date: job.receiveDate || new Date(),
+            _id: job._id,
+          },
+          session
+        );
+      }
+
+      await session.commitTransaction();
+
+      try {
+        const eventBus = require('../events/eventBus');
+        eventBus.emitSafe('job.receive-updated', {
+          companyId: String(companyId),
+          jobId: job._id?.toString?.(),
+          jobCardNo: job.jobCardNo,
+        });
+      } catch {
+        /* optional */
+      }
+
+      return job;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
   async reverseJobReceive(jobId, companyId) {
     const session = await mongoose.startSession();
     session.startTransaction();

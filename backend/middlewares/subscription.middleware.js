@@ -65,12 +65,17 @@ const subscriptionMiddleware = async (req, res, next) => {
       return next();
     }
 
-    if (!subscription || subscription.status !== 'active' || new Date() > subscription.endDate) {
+    if (!subscription || !['active', 'trial'].includes(subscription.status) || new Date() > subscription.endDate) {
       return next(AppError.paymentRequired('Subscription expired or inactive'));
     }
 
     if (!license || new Date() > license.expiresAt) {
       return next(AppError.forbidden('License key invalid or expired', ErrorCodes.LICENSE_INVALID));
+    }
+
+    // Soft checksum check when present (legacy trial keys may use older scheme)
+    if (license.checksum && company.licenseKey && license.licenseKey !== company.licenseKey) {
+      logger.warn('license.key.mismatch', { companyId: String(company._id) });
     }
 
     req.planId = company.planId;

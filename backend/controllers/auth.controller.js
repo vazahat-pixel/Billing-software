@@ -2,6 +2,16 @@ const authService = require('../services/auth.service');
 
 exports.register = async (req, res) => {
     try {
+        const envFlag = String(process.env.ALLOW_PUBLIC_REGISTER || '').toLowerCase();
+        const allow =
+            envFlag === 'true' ||
+            (envFlag !== 'false' && process.env.NODE_ENV === 'test');
+        if (!allow) {
+            return res.status(403).json({
+                message: 'Public signup is disabled. Ask your platform administrator to create your company.',
+                code: 'PUBLIC_REGISTER_DISABLED',
+            });
+        }
         const { name, email, password, companyName } = req.body;
         if (!name || !email || !password || !companyName) {
             return res.status(400).json({ message: 'Name, email, password and company name are required' });
@@ -15,13 +25,16 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, totpCode } = req.body;
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required' });
         }
-        const result = await authService.login(email, password, req);
+        const result = await authService.login(email, password, { ...req, body: { ...req.body, totpCode } });
         res.status(200).json(result);
     } catch (err) {
+        if (err.requires2fa || err.code === 'TOTP_REQUIRED') {
+            return res.status(401).json({ message: err.message, requires2fa: true, code: 'TOTP_REQUIRED' });
+        }
         res.status(401).json({ message: err.message });
     }
 };

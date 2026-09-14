@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard, Building2, CreditCard, ShieldCheck,
     BarChart3, Activity, LogOut, ChevronRight, Bell, Search,
-    Shield, TrendingUp, Settings2, UserCog, Layers, Database
+    Shield, TrendingUp, Settings2, UserCog, Layers, Database, Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useStore from '../store/useStore';
@@ -26,6 +26,7 @@ const AdminLayout = () => {
             items: [
                 { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard, desc: 'KPIs & Analytics' },
                 { name: 'Companies', path: '/admin/companies', icon: Building2, desc: 'Client Management' },
+                { name: 'Lifecycle', path: '/admin/lifecycle', icon: Clock, desc: 'Expiry & Dunning' },
             ]
         },
         {

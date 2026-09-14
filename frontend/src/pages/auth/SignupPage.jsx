@@ -64,7 +64,13 @@ const SignupPage = () => {
                             <LayoutDashboard size={32} />
                         </div>
                         <h1 className="text-2xl font-bold text-white tracking-tight">Create Account</h1>
-                        <p className="text-slate-400 mt-1">Start your textile ERP journey today</p>
+                        <p className="text-slate-400 mt-1">Self-signup is disabled on SaaS installs — ask your admin</p>
+                    </div>
+
+                    <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs">
+                        Public registration is off by default (<code>ALLOW_PUBLIC_REGISTER</code>).
+                        Your platform admin should create the company from <strong>/admin</strong>.
+                        You can still try the form; the API will reject if signup stays disabled.
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">

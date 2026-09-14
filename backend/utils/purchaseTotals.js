@@ -113,10 +113,12 @@ function recalcPurchaseTotals(items = [], {
   // TCS — manually entered (rate/amount), collected on top by the seller, so it adds to payable.
   const tcsAmt = Number(extras.tcsAmt || 0);
 
+  const isRcm = Boolean(reverseCharge === true || extras.reverseCharge === 'Yes' || extras.reverseCharge === true || (Number(extras.rcmCharge) > 0));
+
   // RCM: tax is payable by recipient — net to supplier excludes GST (or includes depending on policy)
   // Standard: invoice net to supplier = taxable (+ non-RCM GST). Under RCM, GST paid separately.
   let netAmount;
-  if (reverseCharge || extras.reverseCharge) {
+  if (isRcm) {
     netAmount = Number((taxable - tdsAmount + roundOff + tcsAmt).toFixed(2));
   } else {
     netAmount = Number((taxable + tax.gstAmount + tax.cess - tdsAmount + roundOff + tcsAmt).toFixed(2));
@@ -134,7 +136,7 @@ function recalcPurchaseTotals(items = [], {
     gstAmount: Number((tax.gstAmount + tax.cess).toFixed(2)),
     tdsAmount,
     tcsAmt,
-    reverseCharge: !!(reverseCharge || extras.reverseCharge),
+    reverseCharge: isRcm,
     netAmount,
   };
 }

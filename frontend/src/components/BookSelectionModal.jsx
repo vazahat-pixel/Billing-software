@@ -53,8 +53,15 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook, bookFil
     return list;
   }, [moduleName, storeBooks, ledgers, bookFilter]);
 
+  // Single Book Auto-Bypass: If only 1 book exists, auto-select it immediately without asking
   useEffect(() => {
-    if (!isOpen || books.length === 0) return undefined;
+    if (isOpen && !loading && books.length === 1) {
+      onSelectBook(books[0]);
+    }
+  }, [isOpen, loading, books, onSelectBook]);
+
+  useEffect(() => {
+    if (!isOpen || books.length <= 1) return undefined;
 
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowDown') {
@@ -75,7 +82,7 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook, bookFil
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, books, selectedIdx, onSelectBook, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || (!loading && books.length === 1)) return null;
 
   const handleContinue = () => {
     if (books[selectedIdx]) onSelectBook(books[selectedIdx]);

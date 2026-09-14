@@ -1,0 +1,430 @@
+{
+  "timestamp": "2026-09-08T10:28:37.381Z",
+  "total": 42,
+  "passed": 42,
+  "failed": 0,
+  "p0": 0,
+  "p1": 0,
+  "scorecard": [
+    {
+      "id": "API-001",
+      "layer": "Layer 2 (API)",
+      "name": "POST /api/auth/login Status Code 200",
+      "status": "PASS",
+      "expected": 200,
+      "actual": 200,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-002",
+      "layer": "Layer 2 (API)",
+      "name": "JWT Bearer Token Returned",
+      "status": "PASS",
+      "expected": "Valid JWT string",
+      "actual": "eyJhbGciOiJIUzI...",
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-003",
+      "layer": "Layer 2 (API)",
+      "name": "User Authenticated as CI Textile Co",
+      "status": "PASS",
+      "expected": "Non-empty companyId",
+      "actual": "6a8d486cd53acd60963d0d0a",
+      "detail": "User: QA Admin",
+      "severity": "P0"
+    },
+    {
+      "id": "API-004",
+      "layer": "Layer 2 (API)",
+      "name": "GET /api/gstin-reports/sales/detail Status 200",
+      "status": "PASS",
+      "expected": 200,
+      "actual": 200,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-005",
+      "layer": "Layer 2 (API)",
+      "name": "Sales Detail Contract: rows and totals Present",
+      "status": "PASS",
+      "expected": "{ rows: [], totals: {} }",
+      "actual": "object",
+      "detail": "",
+      "severity": "P1"
+    },
+    {
+      "id": "API-006",
+      "layer": "Layer 2 (API)",
+      "name": "QA B2B Local Sale Returned by API",
+      "status": "PASS",
+      "expected": "QA-GST-SALE-B2B-001",
+      "actual": "QA-GST-SALE-B2B-001",
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-007",
+      "layer": "Layer 2 (API)",
+      "name": "QA B2B Taxable Amount = 50,000",
+      "status": "PASS",
+      "expected": 50000,
+      "actual": 50000,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-008",
+      "layer": "Layer 2 (API)",
+      "name": "QA B2B CGST = 1,250",
+      "status": "PASS",
+      "expected": 1250,
+      "actual": 1250,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-009",
+      "layer": "Layer 2 (API)",
+      "name": "QA B2B SGST = 1,250",
+      "status": "PASS",
+      "expected": 1250,
+      "actual": 1250,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-010",
+      "layer": "Layer 2 (API)",
+      "name": "QA Interstate Sale Returned by API",
+      "status": "PASS",
+      "expected": "QA-GST-SALE-INTER-001",
+      "actual": "QA-GST-SALE-INTER-001",
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-011",
+      "layer": "Layer 2 (API)",
+      "name": "QA Interstate IGST = 3,000",
+      "status": "PASS",
+      "expected": 3000,
+      "actual": 3000,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-012",
+      "layer": "Layer 2 (API)",
+      "name": "QA Interstate CGST = 0",
+      "status": "PASS",
+      "expected": 0,
+      "actual": 0,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-013",
+      "layer": "Layer 2 (API)",
+      "name": "QA B2C Sale Returned by API",
+      "status": "PASS",
+      "expected": "QA-GST-SALE-B2C-001",
+      "actual": "QA-GST-SALE-B2C-001",
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-014",
+      "layer": "Layer 2 (API)",
+      "name": "GET Sales Summary (Group By Party) Status 200",
+      "status": "PASS",
+      "expected": 200,
+      "actual": 200,
+      "detail": "",
+      "severity": "P1"
+    },
+    {
+      "id": "API-015",
+      "layer": "Layer 2 (API)",
+      "name": "Sales Summary Returns Groups Array",
+      "status": "PASS",
+      "expected": ">0 party groups",
+      "actual": 3,
+      "detail": "",
+      "severity": "P1"
+    },
+    {
+      "id": "API-016",
+      "layer": "Layer 2 (API)",
+      "name": "GET Sales Summary (Group By GST Rate) Status 200",
+      "status": "PASS",
+      "expected": 200,
+      "actual": 200,
+      "detail": "",
+      "severity": "P1"
+    },
+    {
+      "id": "API-017",
+      "layer": "Layer 2 (API)",
+      "name": "5% GST Rate Group Found in Summary",
+      "status": "PASS",
+      "expected": "Group 5%",
+      "actual": "5%",
+      "detail": "",
+      "severity": "P1"
+    },
+    {
+      "id": "API-018",
+      "layer": "Layer 2 (API)",
+      "name": "GET /api/gstin-reports/purchase/detail Status 200",
+      "status": "PASS",
+      "expected": 200,
+      "actual": 200,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-019",
+      "layer": "Layer 2 (API)",
+      "name": "QA Purchase Bill Returned by API",
+      "status": "PASS",
+      "expected": "QA-GST-PUR-001",
+      "actual": "QA-GST-PUR-001",
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-020",
+      "layer": "Layer 2 (API)",
+      "name": "QA Purchase Taxable = 1,00,000",
+      "status": "PASS",
+      "expected": 100000,
+      "actual": 100000,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-021",
+      "layer": "Layer 2 (API)",
+      "name": "QA Purchase CGST = 2,500",
+      "status": "PASS",
+      "expected": 2500,
+      "actual": 2500,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-022",
+      "layer": "Layer 2 (API)",
+      "name": "QA Purchase SGST = 2,500",
+      "status": "PASS",
+      "expected": 2500,
+      "actual": 2500,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-023",
+      "layer": "Layer 2 (API)",
+      "name": "QA Purchase Net Amount = 1,05,000",
+      "status": "PASS",
+      "expected": 105000,
+      "actual": 105000,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-024",
+      "layer": "Layer 2 (API)",
+      "name": "GET /api/stage4/returns/gstr1 Status 200",
+      "status": "PASS",
+      "expected": 200,
+      "actual": 200,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-025",
+      "layer": "Layer 2 (API)",
+      "name": "GSTR-1 JSON Payload Valid Structure",
+      "status": "PASS",
+      "expected": "{ gstin, fp, b2b: [] }",
+      "actual": "gstin: 24AABCC1234D1Z5, fp: 092026",
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-026",
+      "layer": "Layer 2 (API)",
+      "name": "GSTR-1 B2B Invoices Include QA Sale",
+      "status": "PASS",
+      "expected": "QA-GST-SALE-B2B-001",
+      "actual": "QA-GST-SALE-B2B-001",
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-027",
+      "layer": "Layer 2 (API)",
+      "name": "GSTR-1 CDNR Section Populated (Sales Credit Note)",
+      "status": "PASS",
+      "expected": ">0 CDNR groups",
+      "actual": 1,
+      "detail": "",
+      "severity": "P1"
+    },
+    {
+      "id": "API-028",
+      "layer": "Layer 2 (API)",
+      "name": "GET /api/stage4/returns/gstr3b Status 200",
+      "status": "PASS",
+      "expected": 200,
+      "actual": 200,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-029",
+      "layer": "Layer 2 (API)",
+      "name": "GSTR-3B Table 3.1 Outward Taxable Calculated",
+      "status": "PASS",
+      "expected": ">0 taxable",
+      "actual": 182000,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-030",
+      "layer": "Layer 2 (API)",
+      "name": "GSTR-3B Table 3.1 Outward CGST Correct",
+      "status": "PASS",
+      "expected": 3050,
+      "actual": 3050,
+      "detail": "3175 gross - 125 CN = 3050",
+      "severity": "P0"
+    },
+    {
+      "id": "API-031",
+      "layer": "Layer 2 (API)",
+      "name": "GSTR-3B Table 3.1 Outward SGST Correct",
+      "status": "PASS",
+      "expected": 3050,
+      "actual": 3050,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-032",
+      "layer": "Layer 2 (API)",
+      "name": "GSTR-3B Table 4 Eligible ITC Present",
+      "status": "PASS",
+      "expected": ">0 ITC entries",
+      "actual": 1,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-033",
+      "layer": "Layer 2 (API)",
+      "name": "GET /api/gstin-reports/gstr1-errors Status 200",
+      "status": "PASS",
+      "expected": 200,
+      "actual": 200,
+      "detail": "",
+      "severity": "P1"
+    },
+    {
+      "id": "API-034",
+      "layer": "Layer 2 (API)",
+      "name": "GSTR-1 Error Audit Returns errors Array",
+      "status": "PASS",
+      "expected": "Array of error items",
+      "actual": "object",
+      "detail": "4 notices",
+      "severity": "P1"
+    },
+    {
+      "id": "API-035",
+      "layer": "Layer 2 (API)",
+      "name": "GET /api/gstin-reports/cross-reconciliation Status 200",
+      "status": "PASS",
+      "expected": 200,
+      "actual": 200,
+      "detail": "",
+      "severity": "P0"
+    },
+    {
+      "id": "API-036",
+      "layer": "Layer 2 (API)",
+      "name": "Cross-Reconciliation Returned Checks Array",
+      "status": "PASS",
+      "expected": ">0 reconciliation checks",
+      "actual": 6,
+      "detail": "",
+      "severity": "P1"
+    },
+    {
+      "id": "API-037",
+      "layer": "Layer 2 (API)",
+      "name": "Cross-Report ZERO Mismatches Across Return Modules",
+      "status": "PASS",
+      "expected": "0 mismatches",
+      "actual": "0 mismatches",
+      "detail": "Sales ↔ GSTR-1 ↔ GSTR-3B all reconcile perfectly",
+      "severity": "P0"
+    },
+    {
+      "id": "API-038",
+      "layer": "Layer 10 (Excel)",
+      "name": "Excel Binary Workbook Generated Successfully",
+      "status": "PASS",
+      "expected": ">500 bytes binary .xlsx buffer",
+      "actual": "18319 bytes",
+      "detail": "",
+      "severity": "P1"
+    },
+    {
+      "id": "API-039",
+      "layer": "Layer 10 (Excel)",
+      "name": "Exported Excel Contains Correct Row Count",
+      "status": "PASS",
+      "expected": 5,
+      "actual": 5,
+      "detail": "Expected 5 rows in sheet",
+      "severity": "P1"
+    },
+    {
+      "id": "API-040",
+      "layer": "Layer 10 (Excel)",
+      "name": "Exported Excel Contains All Statutory GST Headers",
+      "status": "PASS",
+      "expected": "Invoice No, Party Name, GSTIN, Taxable (₹), CGST (₹), SGST (₹), Net Amount (₹)",
+      "actual": "ALL PRESENT",
+      "detail": "",
+      "severity": "P1"
+    },
+    {
+      "id": "API-041",
+      "layer": "Layer 10 (Excel)",
+      "name": "Excel Sheet Taxable Sum Matches API Response (No Blank Data)",
+      "status": "PASS",
+      "expected": 187000,
+      "actual": 187000,
+      "detail": "API: ₹187000, Excel: ₹187000",
+      "severity": "P0"
+    },
+    {
+      "id": "API-042",
+      "layer": "Layer 10 (Excel)",
+      "name": "Excel Sheet CGST Sum Matches API Response",
+      "status": "PASS",
+      "expected": 3175,
+      "actual": 3175,
+      "detail": "API: ₹3175, Excel: ₹3175",
+      "severity": "P0"
+    }
+  ]
+}

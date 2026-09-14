@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AuthBootstrap from './components/auth/AuthBootstrap';
 import FallbackRedirect from './components/auth/FallbackRedirect';
@@ -25,6 +25,7 @@ const AdminModuleControl = lazy(() => import('./pages/admin/ModuleControl'));
 const AdminUserManagement = lazy(() => import('./pages/admin/UserManagement'));
 const AdminCompanyConfig = lazy(() => import('./pages/admin/CompanyConfig'));
 const AdminDynamicConfig = lazy(() => import('./pages/admin/DynamicConfig'));
+const AdminLifecycle = lazy(() => import('./pages/admin/Lifecycle'));
 const PanelPortal = lazy(() => import('./pages/PanelPortal'));
 
 function RouteFallback() {
@@ -34,6 +35,13 @@ function RouteFallback() {
     </div>
   );
 }
+
+/** Electron loadFile needs HashRouter; web keeps BrowserRouter. */
+const isDesktopShell =
+  import.meta.env.VITE_DESKTOP === '1' ||
+  (typeof window !== 'undefined' && window.textileDesktop?.isDesktop);
+
+const Router = isDesktopShell ? HashRouter : BrowserRouter;
 
 function App() {
   return (
@@ -71,6 +79,7 @@ function App() {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="companies" element={<AdminCompanies />} />
+          <Route path="lifecycle" element={<AdminLifecycle />} />
           <Route path="plans" element={<AdminPlans />} />
           <Route path="subscriptions" element={<AdminSubscriptions />} />
           <Route path="licenses" element={<AdminLicenses />} />

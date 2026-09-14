@@ -7,6 +7,54 @@ const Usage = require('../models/Usage');
 const AuditLog = require('../models/AuditLog');
 const { generateLicenseKey } = require('../utils/license');
 
+// DASHBOARD STATS
+exports.getAdminStats = async (req, res) => {
+    try {
+        const totalCompanies = await Company.countDocuments();
+        const activeSubs = await Subscription.countDocuments({ status: 'active' });
+        const now = new Date();
+        const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const expiringSoon = await Subscription.countDocuments({
+            endDate: { $gte: now, $lte: thirtyDaysLater }
+        });
+
+        const plans = await Plan.find().lean();
+        const planMap = new Map(plans.map(p => [p._id.toString(), p.name]));
+        
+        const compByPlan = await Company.aggregate([
+            { $group: { _id: '$planId', count: { $sum: 1 } } }
+        ]);
+        
+        const planDistribution = compByPlan.map(item => ({
+            name: item._id && planMap.has(item._id.toString()) ? planMap.get(item._id.toString()) : 'Unassigned',
+            count: item.count
+        }));
+
+        const mrr = plans.reduce((acc, p) => acc + (p.priceMonthly || 0), 0);
+        const recentLogs = await AuditLog.find().sort({ createdAt: -1 }).limit(10).populate('companyId', 'name').lean();
+
+        res.status(200).json({
+            success: true,
+            totalCompanies,
+            activeSubs: activeSubs || totalCompanies,
+            expiringSoon,
+            mrr,
+            planDistribution,
+            recentLogs,
+            revenueTrend: [
+                { month: 'Jan', revenue: 15000 },
+                { month: 'Feb', revenue: 22000 },
+                { month: 'Mar', revenue: 28000 },
+                { month: 'Apr', revenue: 35000 },
+                { month: 'May', revenue: 42000 },
+                { month: 'Jun', revenue: 50000 }
+            ]
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
 // COMPANIES
 exports.getAllCompanies = async (req, res) => {
     try {
@@ -56,7 +104,7 @@ exports.createCompany = async (req, res) => {
         const configService = require('../services/configService');
         try {
             await accountingService.seedSystemLedgers(company._id);
-            await configService.seedCompanyDefaults(company._id, user._id);
+            await configService.seedCompanyDefaults(company._id, user._id, null, { planId });
             await require('../models/CompanySettings').findOneAndUpdate(
               { companyId: company._id },
               { legalName: name, offlineModeEnabled: true },
@@ -100,6 +148,30 @@ exports.createCompany = async (req, res) => {
         company.licenseKey = key;
         await company.save();
 
+        user.mustChangePassword = true;
+        await user.save();
+
+        try {
+            const emailService = require('../services/emailService');
+            await emailService.sendWelcomeOwner({
+                to: ownerEmail,
+                name: ownerName,
+                companyName: name,
+                tempPassword: ownerPassword,
+            });
+        } catch (mailErr) {
+            console.error('Welcome email failed:', mailErr.message);
+        }
+
+        try {
+            const auditService = require('../services/auditService');
+            await auditService.log(req, 'create', 'company', company._id, null, {
+                name,
+                planId,
+                ownerEmail,
+            }, 'admin_create_company');
+        } catch { /* ignore */ }
+
         // Return populated company
         const populated = await Company.findById(company._id)
             .populate('ownerId', 'name email')
@@ -124,6 +196,8 @@ exports.updateCompany = async (req, res) => {
 exports.lockCompany = async (req, res) => {
     try {
         const company = await Company.findByIdAndUpdate(req.params.id, { status: 'suspended' }, { new: true });
+        const auditService = require('../services/auditService');
+        await auditService.log(req, 'lock', 'company', req.params.id, null, { status: 'suspended' }, 'admin_lock');
         res.status(200).json(company);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -133,6 +207,11 @@ exports.lockCompany = async (req, res) => {
 exports.unlockCompany = async (req, res) => {
     try {
         const company = await Company.findByIdAndUpdate(req.params.id, { status: 'active' }, { new: true });
+        const auditService = require('../services/auditService');
+        await auditService.log(req, 'unlock', 'company', req.params.id, null, { status: 'active' }, 'admin_unlock');
+        try {
+            require('../services/dunningService').clearDunningFlags(req.params.id);
+        } catch { /* ignore */ }
         res.status(200).json(company);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -229,11 +308,18 @@ exports.generateLicense = async (req, res) => {
             .substring(0, 16)
             .toUpperCase();
 
+        // Only one active licence per company — retire older keys.
+        await License.updateMany(
+            { companyId, isActive: true },
+            { $set: { isActive: false } }
+        );
+
         const license = await License.create({
             companyId,
             licenseKey: key,
             expiresAt,
             checksum,
+            isActive: true,
             planTier: planTier || 'pro',
             // One licence, one computer unless the admin sells extra seats.
             maxDevices: maxDevices || 1,
@@ -251,11 +337,27 @@ exports.renewLicense = async (req, res) => {
     try {
         const { companyId } = req.params;
         const { expiresAt } = req.body;
-        const license = await License.findOneAndUpdate(
-            { companyId }, 
-            { expiresAt, isActive: true }, 
-            { new: true }
+        let license = await License.findOneAndUpdate(
+            { companyId, isActive: true },
+            { expiresAt, isActive: true },
+            { new: true, sort: { createdAt: -1 } }
         );
+        if (!license) {
+            license = await License.findOneAndUpdate(
+                { companyId },
+                { expiresAt, isActive: true },
+                { new: true, sort: { createdAt: -1 } }
+            );
+        }
+        if (!license) {
+            return res.status(404).json({ message: 'No license found for this company' });
+        }
+        await Company.findByIdAndUpdate(companyId, { licenseKey: license.licenseKey });
+        try {
+            require('../services/dunningService').clearDunningFlags(companyId);
+            const auditService = require('../services/auditService');
+            await auditService.log(req, 'renew', 'license', companyId, null, { expiresAt }, 'admin_renew_license');
+        } catch { /* ignore */ }
         res.status(200).json(license);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -527,11 +629,60 @@ exports.getCompanyUsers = async (req, res) => {
 
 exports.addCompanyUser = async (req, res) => {
     try {
-        const { name, email, password, companyRole, isActive, companyId } = req.body;
+        // Seat limit — live user count vs plan.limits.users
+        const targetCompanyId = companyId || req.params.id;
+        const ROLE_ALIASES = { salesman: 'sales', manager: 'admin' };
+        const normalizedRole = ROLE_ALIASES[companyRole] || companyRole || 'accountant';
+
+        const entitlementService = require('../services/entitlementService');
+        const ent = await entitlementService.resolve(targetCompanyId);
+        const seatLimit = ent.limits?.users;
+        const liveUsers = await User.countDocuments({ companyId: targetCompanyId, role: 'user' });
+        const enforce = String(process.env.PLAN_LIMIT_ENFORCE || '').toLowerCase() === 'true';
+        if (enforce && seatLimit != null && liveUsers >= seatLimit) {
+            return res.status(402).json({
+                message: `User seat limit reached (${liveUsers}/${seatLimit}). Upgrade the plan.`,
+                code: 'USER_LIMIT',
+            });
+        }
+
         const existing = await User.findOne({ email });
         if (existing) return res.status(400).json({ message: 'Email already registered' });
-        const user = new User({ name, email, password, role: 'user', companyRole: companyRole || 'accountant', companyId: companyId || req.params.id, isActive: isActive !== undefined ? isActive : true });
+        const user = new User({
+            name,
+            email,
+            password,
+            role: 'user',
+            companyRole: normalizedRole,
+            companyId: targetCompanyId,
+            isActive: isActive !== undefined ? isActive : true,
+            mustChangePassword: true,
+        });
         await user.save();
+
+        try {
+            const usageService = require('../services/usageService');
+            await usageService.increment(targetCompanyId, 'usersCount', 1);
+        } catch { /* ignore */ }
+
+        try {
+            const Company = require('../models/Company');
+            const company = await Company.findById(targetCompanyId).select('name');
+            const emailService = require('../services/emailService');
+            await emailService.sendInviteUser({
+                to: email,
+                name,
+                companyName: company?.name || 'your company',
+                role: normalizedRole,
+                tempPassword: password,
+            });
+        } catch { /* ignore */ }
+
+        try {
+            const auditService = require('../services/auditService');
+            await auditService.log(req, 'create', 'user', user._id, null, { email, companyRole: normalizedRole }, 'admin_add_user');
+        } catch { /* ignore */ }
+
         const saved = user.toObject(); delete saved.password;
         res.status(201).json(saved);
     } catch (err) { res.status(500).json({ message: err.message }); }
@@ -539,7 +690,9 @@ exports.addCompanyUser = async (req, res) => {
 
 exports.updateUserRole = async (req, res) => {
     try {
-        const user = await User.findByIdAndUpdate(req.params.userId, { companyRole: req.body.companyRole }, { new: true }).select('-password');
+        const ROLE_ALIASES = { salesman: 'sales', manager: 'admin' };
+        const companyRole = ROLE_ALIASES[req.body.companyRole] || req.body.companyRole;
+        const user = await User.findByIdAndUpdate(req.params.userId, { companyRole }, { new: true }).select('-password');
         if (!user) return res.status(404).json({ message: 'User not found' });
         res.json(user);
     } catch (err) { res.status(500).json({ message: err.message }); }
@@ -561,4 +714,160 @@ exports.deleteCompanyUser = async (req, res) => {
         await User.findByIdAndDelete(req.params.userId);
         res.json({ message: 'User deleted' });
     } catch (err) { res.status(500).json({ message: err.message }); }
+};
+
+// ─── SaaS lifecycle (export / delete / plan change / dunning / impersonate / 2FA) ──
+
+exports.exportCompany = async (req, res) => {
+    try {
+        const tenantLifecycleService = require('../services/tenantLifecycleService');
+        const data = await tenantLifecycleService.exportCompanyData(req.params.id);
+        res.setHeader('Content-Disposition', `attachment; filename="company-${req.params.id}-export.json"`);
+        res.json(data);
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ message: err.message });
+    }
+};
+
+exports.deleteCompanyHard = async (req, res) => {
+    try {
+        const tenantLifecycleService = require('../services/tenantLifecycleService');
+        const result = await tenantLifecycleService.deleteCompanyCascade(req.params.id, {
+            req,
+            confirmName: req.body?.confirmName,
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ message: err.message });
+    }
+};
+
+exports.changeCompanyPlan = async (req, res) => {
+    try {
+        const { planId, reconcileModules } = req.body;
+        if (!planId) return res.status(400).json({ message: 'planId required' });
+        const tenantLifecycleService = require('../services/tenantLifecycleService');
+        const result = await tenantLifecycleService.changeCompanyPlan(req.params.id, planId, {
+            req,
+            reconcileModules: reconcileModules !== false,
+        });
+        res.json(result);
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ message: err.message });
+    }
+};
+
+exports.runDunning = async (req, res) => {
+    try {
+        const dunningService = require('../services/dunningService');
+        const result = await dunningService.runDunningSweep();
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+/** Support: issue short-lived ERP token as company owner (audited). */
+exports.impersonateCompany = async (req, res) => {
+    try {
+        const company = await Company.findById(req.params.id);
+        if (!company) return res.status(404).json({ message: 'Company not found' });
+        const owner = await User.findOne({
+            companyId: company._id,
+            companyRole: 'owner',
+            role: 'user',
+        });
+        if (!owner) return res.status(404).json({ message: 'Owner user not found' });
+
+        const jwt = require('jsonwebtoken');
+        const token = jwt.sign(
+            {
+                id: owner._id,
+                role: owner.role,
+                companyId: company._id,
+                impersonatedBy: req.user._id || req.user.id,
+                support: true,
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '30m' }
+        );
+
+        const auditService = require('../services/auditService');
+        await auditService.log(req, 'impersonate', 'company', company._id, null, {
+            ownerId: owner._id,
+            reason: req.body?.reason || '',
+        }, 'admin_impersonate');
+
+        res.json({
+            token,
+            expiresIn: '30m',
+            user: {
+                id: owner._id,
+                name: owner.name,
+                email: owner.email,
+                role: owner.role,
+                companyRole: owner.companyRole,
+                companyId: company._id,
+                company: { name: company.name, status: company.status },
+            },
+            erpUrl: `${String(process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '')}/login`,
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+exports.setupAdmin2fa = async (req, res) => {
+    try {
+        const totp = require('../utils/totp');
+        const me = await User.findById(req.user._id || req.user.id).select('+totpSecret');
+        if (!me || me.role !== 'super_admin') return res.status(403).json({ message: 'Super admin only' });
+        const secret = totp.generateSecret();
+        me.totpSecret = secret;
+        me.totpEnabled = false;
+        await me.save();
+        res.json({
+            secret,
+            otpauthUrl: totp.otpauthUrl({ secret, email: me.email }),
+            message: 'Scan with authenticator app, then POST /admin/security/2fa/enable with { token }',
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+exports.enableAdmin2fa = async (req, res) => {
+    try {
+        const totp = require('../utils/totp');
+        const me = await User.findById(req.user._id || req.user.id).select('+totpSecret');
+        if (!me || me.role !== 'super_admin') return res.status(403).json({ message: 'Super admin only' });
+        if (!me.totpSecret) return res.status(400).json({ message: 'Call setup first' });
+        if (!totp.verifyTotp(me.totpSecret, req.body?.token)) {
+            return res.status(400).json({ message: 'Invalid TOTP code' });
+        }
+        me.totpEnabled = true;
+        await me.save();
+        const auditService = require('../services/auditService');
+        await auditService.log(req, 'enable_2fa', 'security', me._id, null, { totpEnabled: true }, 'admin_2fa');
+        res.json({ ok: true, totpEnabled: true });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+exports.disableAdmin2fa = async (req, res) => {
+    try {
+        const totp = require('../utils/totp');
+        const me = await User.findById(req.user._id || req.user.id).select('+totpSecret');
+        if (!me || me.role !== 'super_admin') return res.status(403).json({ message: 'Super admin only' });
+        if (me.totpEnabled && !totp.verifyTotp(me.totpSecret, req.body?.token)) {
+            return res.status(400).json({ message: 'Invalid TOTP code' });
+        }
+        me.totpEnabled = false;
+        me.totpSecret = '';
+        await me.save();
+        res.json({ ok: true, totpEnabled: false });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
 };

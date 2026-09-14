@@ -112,27 +112,27 @@ export const calcJobReceipt = (lines, footer, header) => {
 
   const taxRate = Number(footer.taxRate) || 0;
   const inState = header.type === 'INVOICE IN STATE';
-  const gstTotal = (taxable * taxRate) / 100;
+  const gstTotal = Number(((taxable * taxRate) / 100).toFixed(2));
 
   let cgst = 0;
   let sgst = 0;
   let igst = 0;
   if (inState) {
-    cgst = gstTotal / 2;
-    sgst = gstTotal / 2;
+    cgst = Number((gstTotal / 2).toFixed(2));
+    sgst = Number((gstTotal - cgst).toFixed(2)); // ensures cgst+sgst = gstTotal exactly
   } else {
     igst = gstTotal;
   }
-  const totalGst = cgst + sgst + igst;
+  const totalGst = Number((cgst + sgst + igst).toFixed(2));
 
   const tdsOn = Number(footer.tdsOnAmount) || taxable;
   const tdsPct = Number(footer.tdsPercent) || 0;
-  const tdsAmt = (tdsOn * tdsPct) / 100;
+  const tdsAmt = Number(((tdsOn * tdsPct) / 100).toFixed(2));
 
   const rcm = header.reverseCharge === 'Yes' ? Number(footer.rcmCharge) || 0 : 0;
-  const net = taxable + totalGst + rcm - tdsAmt;
+  const net = Number((taxable + totalGst + rcm).toFixed(2));
   const roundOff = Number(footer.roundOff) || 0;
-  const final = net + roundOff;
+  const final = Number((net + roundOff - tdsAmt).toFixed(2));
 
   return {
     gross,

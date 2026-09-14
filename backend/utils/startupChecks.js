@@ -17,6 +17,9 @@ function assertProductionEnv() {
     if (!process.env.JWT_SECRET) {
       logger.warn('JWT_SECRET missing — required before serving authenticated traffic');
     }
+    if (String(process.env.ALLOW_PUBLIC_REGISTER || '').toLowerCase() === 'true') {
+      logger.warn('ALLOW_PUBLIC_REGISTER=true — anyone can create a free company');
+    }
     return { ok: true, env: nodeEnv, warnings: [] };
   }
 
@@ -39,6 +42,20 @@ function assertProductionEnv() {
   if (!process.env.BACKUP_ENCRYPTION_KEY) {
     warnings.push('BACKUP_ENCRYPTION_KEY recommended (falls back to JWT_SECRET)');
   }
+  if (String(process.env.ALLOW_SUBSCRIPTION_BYPASS || '').toLowerCase() === 'true') {
+    errors.push('ALLOW_SUBSCRIPTION_BYPASS must not be true in production');
+  }
+  if (String(process.env.ALLOW_PUBLIC_REGISTER || '').toLowerCase() === 'true') {
+    warnings.push('ALLOW_PUBLIC_REGISTER=true — prefer admin-provisioned tenants only');
+  }
+  for (const flag of ['MODULE_GATE_ENFORCE', 'DEVICE_BINDING_ENFORCE', 'PLAN_LIMIT_ENFORCE']) {
+    if (String(process.env[flag] || '').toLowerCase() !== 'true') {
+      warnings.push(`${flag} is not true — commercial gates are soft/shadow in production`);
+    }
+  }
+  if (!process.env.SMTP_HOST) {
+    warnings.push('SMTP_HOST unset — invite/reset/dunning emails go to console only');
+  }
 
   if (errors.length) {
     throw new Error(`FATAL: ${errors.join('; ')}`);
@@ -56,6 +73,12 @@ function envReport() {
     hasFrontendUrl: !!process.env.FRONTEND_URL,
     hasRedis: !!process.env.REDIS_URL,
     hasBackupKey: !!process.env.BACKUP_ENCRYPTION_KEY,
+    hasSmtp: !!process.env.SMTP_HOST,
+    allowPublicRegister: String(process.env.ALLOW_PUBLIC_REGISTER || 'false'),
+    moduleGateEnforce: String(process.env.MODULE_GATE_ENFORCE || 'false'),
+    planLimitEnforce: String(process.env.PLAN_LIMIT_ENFORCE || 'false'),
+    deviceBindingEnforce: String(process.env.DEVICE_BINDING_ENFORCE || 'false'),
+    allowSubscriptionBypass: String(process.env.ALLOW_SUBSCRIPTION_BYPASS || 'false'),
     port: process.env.PORT || 5000,
     rateLimitMax: process.env.RATE_LIMIT_MAX || 1000,
   };
