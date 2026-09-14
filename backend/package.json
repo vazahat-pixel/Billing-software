@@ -33,6 +33,7 @@
     "test:isolation": "node --test tests/isolation/*.test.js",
     "test:api": "node --test tests/api/*.test.js",
     "test:ci": "node --test tests/unit/*.test.js tests/certification/*.test.js tests/integration/*.test.js tests/security/*.test.js tests/isolation/*.test.js tests/api/*.test.js",
+    "smoke:golive": "node scripts/goLiveSmoke.js",
     "certify": "node scripts/certify/runCertification.js",
     "certify:gates": "node scripts/certify/runQualityGates.js",
     "perf:k6:smoke": "k6 run performance/k6/load-smoke.js",
@@ -52,6 +53,7 @@
     "multer": "^2.2.0",
     "nodemailer": "^10.0.9",
     "pdf-parse": "^2.4.5",
+    "razorpay": "^2.9.8",
     "sharp": "^0.35.3",
     "tesseract.js": "^7.0.0"
   },

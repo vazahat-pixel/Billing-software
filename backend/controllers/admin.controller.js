@@ -87,11 +87,12 @@ exports.createCompany = async (req, res) => {
         });
         await user.save();
 
-        // 3. Create Company
+        // 3. Create Company — new admin-provisioned tenants are SaaS-enforced
         const company = new Company({
             name,
             ownerId: user._id,
-            planId
+            planId,
+            commercialPolicy: 'saas_enforced',
         });
         await company.save();
 
@@ -114,14 +115,16 @@ exports.createCompany = async (req, res) => {
             console.error('Failed to seed company defaults during admin company creation:', seedErr);
         }
 
-        // 6. Create default active Subscription
+        // 6. Create trial Subscription (plan.trialDays, default 14)
+        const planDoc = planId ? await Plan.findById(planId).lean() : null;
+        const trialDays = Number(planDoc?.trialDays ?? 14) || 14;
         const trialStart = new Date();
         const trialEnd = new Date();
-        trialEnd.setDate(trialEnd.getDate() + 30);
+        trialEnd.setDate(trialEnd.getDate() + trialDays);
         await Subscription.create({
             companyId: company._id,
             planId,
-            status: 'active',
+            status: 'trial',
             startDate: trialStart,
             endDate: trialEnd,
             billingCycle: 'monthly',
@@ -629,16 +632,30 @@ exports.getCompanyUsers = async (req, res) => {
 
 exports.addCompanyUser = async (req, res) => {
     try {
+        const {
+            email,
+            name,
+            password,
+            companyRole,
+            isActive,
+            companyId: bodyCompanyId,
+        } = req.body || {};
+
+        if (!email || !name || !password) {
+            return res.status(400).json({ message: 'name, email and password are required' });
+        }
+
         // Seat limit — live user count vs plan.limits.users
-        const targetCompanyId = companyId || req.params.id;
+        const targetCompanyId = bodyCompanyId || req.params.id;
         const ROLE_ALIASES = { salesman: 'sales', manager: 'admin' };
         const normalizedRole = ROLE_ALIASES[companyRole] || companyRole || 'accountant';
 
         const entitlementService = require('../services/entitlementService');
+        const { shouldHardEnforce } = require('../utils/commercialPolicy');
         const ent = await entitlementService.resolve(targetCompanyId);
         const seatLimit = ent.limits?.users;
         const liveUsers = await User.countDocuments({ companyId: targetCompanyId, role: 'user' });
-        const enforce = String(process.env.PLAN_LIMIT_ENFORCE || '').toLowerCase() === 'true';
+        const enforce = await shouldHardEnforce(targetCompanyId, 'PLAN_LIMIT_ENFORCE');
         if (enforce && seatLimit != null && liveUsers >= seatLimit) {
             return res.status(402).json({
                 message: `User seat limit reached (${liveUsers}/${seatLimit}). Upgrade the plan.`,

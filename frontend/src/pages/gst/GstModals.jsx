@@ -1189,85 +1189,28 @@ export const Gstr1ErrorChekModal = ({ isOpen, onClose }) => {
 // ==========================================
 export const GstComplianceModal = ({ isOpen, onClose }) => {
    return (
-      <Modal isOpen={isOpen} onClose={onClose} title="Executive Compliance Scorecard" className="max-w-5xl h-[85vh] bg-white rounded-[2.5rem] p-0 border-none shadow-2xl overflow-hidden">
-         <div className="flex flex-col h-full">
-            <div className="px-10 pt-6">
-               <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-[11px] font-bold uppercase tracking-widest px-4 py-3">
-                  Demo / stub screen — scores below are not calculated from your books. Use CA Desk + GSTR-1 / GSTR-3B for real data.
-               </div>
+      <Modal isOpen={isOpen} onClose={onClose} title="GST Compliance" className="max-w-2xl h-auto bg-white rounded-[2rem] p-0 border-none shadow-2xl overflow-hidden">
+         <div className="flex flex-col">
+            <div className="p-8 bg-slate-950 text-white">
+               <h2 className="text-2xl font-black tracking-tight uppercase">Use live GST reports<span className="text-slate-500">.</span></h2>
+               <p className="text-slate-400 text-xs mt-2 leading-relaxed">
+                  This screen no longer shows demo scores. File and review from your books via
+                  GSTR-1, GSTR-3B, CA Desk, and GSTIN reports — then have your CA upload to the portal.
+               </p>
             </div>
-            <div className="p-10 bg-black text-white flex justify-between items-center">
-               <div>
-                  <h2 className="text-3xl font-black tracking-tighter uppercase">GST Health Score<span className="text-slate-500">.</span></h2>
-                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.3em] mt-2">Placeholder UI — not live compliance</p>
+            <div className="p-8 space-y-4 text-sm text-slate-700">
+               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 text-xs font-semibold">
+                  Fake “98% health / ₹14.2K gap / all months filed” metrics have been removed so they cannot be mistaken for live compliance.
                </div>
-               <div className="text-right">
-                  <h3 className="text-5xl font-black tracking-tighter text-slate-500">N/A</h3>
-                  <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Not computed</p>
-               </div>
+               <ul className="list-disc pl-5 space-y-2 text-xs text-slate-600">
+                  <li>GSTR-1 / GSTR-3B exports are books-derived helpers — verify with your CA before portal filing.</li>
+                  <li>GSTR-2B portal matching is not auto-connected to GSTN in this build.</li>
+                  <li>E-invoice / e-way bill filing may be partial depending on your plan and setup.</li>
+               </ul>
             </div>
-
-            <div className="flex-1 p-10 overflow-y-auto space-y-12 no-scrollbar">
-               {/* Critical Metrics */}
-               <div className="grid grid-cols-3 gap-8">
-                  <div className="p-8 rounded-3xl border border-slate-100 bg-slate-50/50">
-                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">ITC Matching Gap</span>
-                     <div className="flex items-end gap-3">
-                        <h4 className="text-4xl font-black text-black tracking-tighter">₹ 14.2K</h4>
-                        <span className="text-[10px] font-bold text-amber-600 mb-2 uppercase tracking-widest flex items-center gap-1">
-                           <AlertTriangle size={10} /> 2.1% Unmatched
-                        </span>
-                     </div>
-                  </div>
-                  <div className="p-8 rounded-3xl border border-slate-100 bg-slate-50/50">
-                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Liability Coverage</span>
-                     <div className="flex items-end gap-3">
-                        <h4 className="text-4xl font-black text-black tracking-tighter">100%</h4>
-                        <span className="text-[10px] font-bold text-black mb-2 uppercase tracking-widest flex items-center gap-1">
-                           <ShieldCheck size={10} /> Fully Reconciled
-                        </span>
-                     </div>
-                  </div>
-                  <div className="p-8 rounded-3xl border border-slate-100 bg-slate-50/50">
-                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-4">Portal Sync Age</span>
-                     <div className="flex items-end gap-3">
-                        <h4 className="text-4xl font-black text-black tracking-tighter">2h</h4>
-                        <span className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest flex items-center gap-1">
-                           <RefreshCw size={10} /> Real-time
-                        </span>
-                     </div>
-                  </div>
-               </div>
-
-               {/* Filing Checklist */}
-               <div className="space-y-6">
-                  <h5 className="text-[11px] font-black uppercase tracking-[0.4em] text-black border-b border-slate-100 pb-4">Compliance Checklist - FY 2026-27</h5>
-                  <div className="grid grid-cols-2 gap-4">
-                     {['APRIL', 'MAY', 'JUNE', 'JULY'].map(month => (
-                        <div key={month} className="p-6 rounded-2xl bg-white border border-slate-100 flex items-center justify-between group hover:border-black transition-all">
-                           <div className="flex items-center gap-6">
-                              <span className="text-[11px] font-black text-slate-300 group-hover:text-black transition-all w-16">{month}</span>
-                              <div className="flex gap-4">
-                                 <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-black"></div>
-                                    <span className="text-[9px] font-bold uppercase tracking-widest text-black">GSTR-1</span>
-                                 </div>
-                                 <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-black"></div>
-                                    <span className="text-[9px] font-bold uppercase tracking-widest text-black">GSTR-3B</span>
-                                 </div>
-                              </div>
-                           </div>
-                           <CheckCircle2 size={16} className="text-black" />
-                        </div>
-                     ))}
-                  </div>
-               </div>
-            </div>
-
-            <div className="p-8 bg-slate-50 flex justify-end">
-               <button onClick={onClose} className="px-14 py-4 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all rounded-xl shadow-xl">
-                  Dismiss Report
+            <div className="p-6 bg-slate-50 flex justify-end">
+               <button onClick={onClose} className="px-10 py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all rounded-xl">
+                  Close
                </button>
             </div>
          </div>

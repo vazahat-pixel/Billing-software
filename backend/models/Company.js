@@ -37,7 +37,18 @@ const companySchema = new mongoose.Schema({
     },
     /** Developer QA engine tenant markers — never set on production customer companies */
     isQaTenant: { type: Boolean, default: false, index: true },
-    qaProfile: { type: String, default: null, trim: true }
+    qaProfile: { type: String, default: null, trim: true },
+    /**
+     * SaaS commercial policy (does not change ERP transaction math):
+     *  legacy_open   — grandfathered tenants; hard gates never block
+     *  saas_enforced — new SaaS tenants; MODULE_GATE / PLAN_LIMIT may hard-block
+     */
+    commercialPolicy: {
+        type: String,
+        enum: ['legacy_open', 'saas_enforced'],
+        default: 'legacy_open',
+        index: true,
+    },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Company', companySchema);

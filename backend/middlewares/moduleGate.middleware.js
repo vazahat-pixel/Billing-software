@@ -13,6 +13,7 @@ const entitlementService = require('../services/entitlementService');
 const AppError = require('../utils/AppError');
 const ErrorCodes = require('../constants/errorCodes');
 const logger = require('../utils/logger');
+const { shouldHardEnforce } = require('../utils/commercialPolicy');
 
 const isEnforcing = () => String(process.env.MODULE_GATE_ENFORCE || '').toLowerCase() === 'true';
 
@@ -76,6 +77,14 @@ const requireModule = (moduleKey) => {
         // Shadow mode — record and let the request through.
         logger.warn('module.gate.shadow (would block)', detail);
         res.set('X-Module-Gate', `shadow:${moduleKey}`);
+        return next();
+      }
+
+      // Existing (legacy_open) tenants never hard-block — protects live business flow.
+      const hard = await shouldHardEnforce(companyId, 'MODULE_GATE_ENFORCE');
+      if (!hard) {
+        logger.warn('module.gate.legacy_open (would block)', detail);
+        res.set('X-Module-Gate', `legacy:${moduleKey}`);
         return next();
       }
 

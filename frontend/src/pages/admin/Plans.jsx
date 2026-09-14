@@ -194,11 +194,22 @@ const PlanBuilderModal = ({ plan, onClose, onSave }) => {
                         <div className="space-y-5">
                             <div>
                                 <label className="dark-input__label">Plan Name</label>
-                                <select className="dark-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}>
-                                    {['Basic', 'Standard', 'Pro', 'Custom'].map(n => (
-                                        <option key={n} value={n}>{n}</option>
-                                    ))}
-                                </select>
+                                <input
+                                    className="dark-input"
+                                    value={form.name}
+                                    onChange={e => setForm({ ...form, name: e.target.value })}
+                                    placeholder="e.g. Enterprise Plus"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="dark-input__label">Description</label>
+                                <input
+                                    className="dark-input"
+                                    value={form.description || ''}
+                                    onChange={e => setForm({ ...form, description: e.target.value })}
+                                    placeholder="Short marketing blurb"
+                                />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
@@ -208,6 +219,19 @@ const PlanBuilderModal = ({ plan, onClose, onSave }) => {
                                 <div>
                                     <label className="dark-input__label">Yearly Price (₹)</label>
                                     <input type="number" className="dark-input" value={form.priceYearly} onChange={e => setForm({ ...form, priceYearly: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="dark-input__label">Trial days</label>
+                                    <input type="number" className="dark-input" value={form.trialDays ?? 14} onChange={e => setForm({ ...form, trialDays: Number(e.target.value) })} />
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/[0.04] rounded-xl mt-5">
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-300">Public on signup</p>
+                                        <p className="text-[10px] text-slate-600">Show in /signup catalog</p>
+                                    </div>
+                                    <Toggle checked={form.isPublic !== false} onChange={() => setForm({ ...form, isPublic: form.isPublic === false })} />
                                 </div>
                             </div>
 
@@ -342,7 +366,11 @@ const Plans = () => {
     useEffect(() => { fetchPlans(); }, [fetchPlans]);
 
     const initialPlan = {
-        name: 'Basic',
+        name: 'New Plan',
+        description: '',
+        trialDays: 14,
+        isPublic: true,
+        sortOrder: 100,
         priceMonthly: 0,
         priceYearly: 0,
         features: {

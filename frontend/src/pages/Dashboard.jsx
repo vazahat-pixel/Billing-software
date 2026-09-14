@@ -989,6 +989,14 @@ const Dashboard = () => {
                   <div className="flex items-center gap-2 shrink-0">
                      <OfflineIndicator onOpenSync={() => setSyncModalOpen(true)} />
                      <PanelSwitcher variant="light" />
+                     <button
+                        type="button"
+                        onClick={() => navigate('/subscription')}
+                        className="h-7 px-2 text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border)] rounded-md bg-white hover:bg-[var(--bg-subtle)]"
+                        title="Subscription & billing"
+                     >
+                        Plan
+                     </button>
                      <button type="button" onClick={() => refreshAllData()} className="h-7 px-2 text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border)] rounded-md bg-white hover:bg-[var(--bg-subtle)]">
                         <FontAwesomeIcon icon={faSync} className={`text-[9px] mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />Sync
                      </button>

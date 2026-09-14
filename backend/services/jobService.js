@@ -244,7 +244,19 @@ class JobService {
       // or every subsequent tranche would re-post everything already booked by earlier
       // ones. Falls back to this tranche's share at the agreed per-unit job rate.
       const charges = parseFloat(receiveData.charges) || Number(((job.jobRate || 0) * trancheQty).toFixed(2)) || 0;
-      const gstAmount = parseFloat(receiveData.gstAmount) || 0;
+      // Prefer server-side GST from rate (item / payload). Fall back to client amount
+      // only when no rate is available — never invent a different tax engine for jobs.
+      let gstRate = Number(receiveData.gstRate ?? receiveData.gstPercent ?? 0);
+      if (!(gstRate > 0) && outputItemId) {
+        try {
+          const Item = require('../models/Item');
+          const it = await Item.findById(outputItemId).select('gstRate').session(session).lean();
+          gstRate = Number(it?.gstRate || 0);
+        } catch { /* keep 0 */ }
+      }
+      const gstAmount = gstRate > 0
+        ? Number(((charges * gstRate) / 100).toFixed(2))
+        : (parseFloat(receiveData.gstAmount) || 0);
       const greyMaterialCost = greyCostPerMtr * trancheQty;
       const trancheFinishedRate =
         trancheQty > 0

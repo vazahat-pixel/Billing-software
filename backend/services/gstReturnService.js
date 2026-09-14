@@ -151,13 +151,95 @@ class GstReturnService {
       intraUnreg: { desc: 'Intra-State supplies to unregistered persons', nil: 0, exempt: 0, nonGst: 0 },
     };
 
-    const companyPos = cfg.stateCode || stateCodeFromGstin(cfg.gstin) || '24';
+    const companyPos = cfg.stateCode || stateCodeFromGstin(cfg.gstin) || '';
     const { stateNameFromCode } = require('../utils/gstDetermination');
 
     const pushCdnr = (ctin, cname, note) => {
       const key = (ctin || '').toUpperCase() || '_UNREG';
       if (!cdnrByCtin[key]) cdnrByCtin[key] = { ctin: key === '_UNREG' ? '' : key, cname: cname || '', nt: [] };
       cdnrByCtin[key].nt.push(note);
+    };
+
+    /**
+     * Portal expects rate-wise itms. Split invoice tax by taxable share per rate so
+     * sum(itms) always equals the SAVED invoice tax (books stay authoritative).
+     */
+    const buildRateWiseItms = (saleDoc, header) => {
+      const buckets = {};
+      for (const line of saleDoc.items || []) {
+        const lineTaxable = round2(
+          line.taxableAmount
+            ?? line.amount
+            ?? ((line.mts || line.qty || 0) * (line.rate || 0))
+        );
+        if (!(lineTaxable > 0)) continue;
+        const lineRate = Number(
+          line.gstRate ?? line.itemId?.gstRate ?? header.taxRate ?? 0
+        );
+        const key = Number(lineRate || 0).toFixed(2);
+        if (!buckets[key]) buckets[key] = { rt: Number(key), txval: 0 };
+        buckets[key].txval = round2(buckets[key].txval + lineTaxable);
+      }
+      const entries = Object.values(buckets);
+      if (!entries.length) {
+        return [{
+          num: 1,
+          itm_det: {
+            txval: header.taxable,
+            rt: header.taxRate,
+            iamt: header.igst,
+            camt: header.cgst,
+            samt: header.sgst,
+            csamt: header.cess,
+          },
+        }];
+      }
+      if (entries.length === 1) {
+        return [{
+          num: 1,
+          itm_det: {
+            txval: header.taxable,
+            rt: entries[0].rt,
+            iamt: header.igst,
+            camt: header.cgst,
+            samt: header.sgst,
+            csamt: header.cess,
+          },
+        }];
+      }
+
+      const baseTaxable = entries.reduce((s, e) => s + e.txval, 0) || header.taxable || 1;
+      let used = { iamt: 0, camt: 0, samt: 0, csamt: 0, txval: 0 };
+      const itms = entries.map((e, idx) => {
+        const isLast = idx === entries.length - 1;
+        const share = e.txval / baseTaxable;
+        const det = isLast
+          ? {
+              txval: round2(header.taxable - used.txval),
+              rt: e.rt,
+              iamt: round2(header.igst - used.iamt),
+              camt: round2(header.cgst - used.camt),
+              samt: round2(header.sgst - used.samt),
+              csamt: round2(header.cess - used.csamt),
+            }
+          : {
+              txval: round2(e.txval),
+              rt: e.rt,
+              iamt: round2(header.igst * share),
+              camt: round2(header.cgst * share),
+              samt: round2(header.sgst * share),
+              csamt: round2(header.cess * share),
+            };
+        used = {
+          txval: round2(used.txval + det.txval),
+          iamt: round2(used.iamt + det.iamt),
+          camt: round2(used.camt + det.camt),
+          samt: round2(used.samt + det.samt),
+          csamt: round2(used.csamt + det.csamt),
+        };
+        return { num: idx + 1, itm_det: det };
+      });
+      return itms;
     };
 
     for (const s of sales) {
@@ -220,17 +302,9 @@ class GstReturnService {
         party_name: partyName,
         rchrg: s.reverseCharge ? 'Y' : 'N',
         inv_typ: 'R',
-        itms: [{
-          num: 1,
-          itm_det: {
-            txval: taxable,
-            rt: taxRate,
-            iamt: igst,
-            camt: cgst,
-            samt: sgst,
-            csamt: cess,
-          },
-        }],
+        itms: buildRateWiseItms(s, {
+          taxable, taxRate, cgst, sgst, igst, cess,
+        }),
       };
 
       if (isRegistered) {
@@ -611,6 +685,14 @@ class GstReturnService {
       cess: round2(sales.reduce((s, x) => s + (x.cess || 0), 0)),
       totalTax: round2(sales.reduce((s, x) => s + (x.cgst || 0) + (x.sgst || 0) + (x.igst || 0) + (x.cess || 0), 0)),
       invoiceCount: sales.length,
+      // Taxable outward supply only (excludes Export / ZeroRated / Exempt / Nil / NonGST)
+      taxableSupply: round2(sales.reduce((s, x) => {
+        const type = String(x.gstType || '');
+        if (type === 'Export' || type === 'ZeroRated' || type === 'Exempt' || type === 'NilRated' || type === 'NonGST') return s;
+        const tax = Number(x.cgst || 0) + Number(x.sgst || 0) + Number(x.igst || 0);
+        if (Number(x.taxableAmount || 0) > 0 && tax === 0 && !type) return s;
+        return s + Number(x.taxableAmount || 0);
+      }, 0)),
     };
 
     return { payload, totals, period };

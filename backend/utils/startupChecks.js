@@ -6,7 +6,20 @@ const WEAK_SECRETS = new Set([
   'change_me',
   'secret',
   'jwt_secret',
+  'replace-with-at-least-32-char-random-secret',
+  'replace_with_40_char_random_secret_minimum_32',
 ]);
+
+function isWeakJwtSecret(secret) {
+  const s = String(secret || '');
+  if (!s) return true;
+  if (WEAK_SECRETS.has(s.toLowerCase())) return true;
+  if (/^replace.?with/i.test(s)) return true;
+  if (/change.?me/i.test(s)) return true;
+  if (/your.?jwt/i.test(s)) return true;
+  if (/^(.)\1{31,}$/.test(s)) return true;
+  return false;
+}
 
 /**
  * Stage 7.1 / 7.9 — Environment variable validation.
@@ -30,8 +43,8 @@ function assertProductionEnv() {
   if (!secret || secret.length < 32) {
     errors.push('JWT_SECRET must be at least 32 characters in production');
   }
-  if (WEAK_SECRETS.has(secret.toLowerCase())) {
-    errors.push('JWT_SECRET is a known placeholder');
+  if (isWeakJwtSecret(secret)) {
+    errors.push('JWT_SECRET is a known placeholder or weak value — generate a random secret');
   }
   if (!process.env.MONGO_URI) {
     errors.push('MONGO_URI is required in production');
@@ -84,4 +97,4 @@ function envReport() {
   };
 }
 
-module.exports = { assertProductionEnv, envReport };
+module.exports = { assertProductionEnv, envReport, isWeakJwtSecret };

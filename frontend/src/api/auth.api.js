@@ -15,6 +15,7 @@ export const authApi = {
   },
   register: (payload) => unwrap(post('/auth/register', payload)),
   me: () => unwrap(get('/auth/me', undefined, { skipAuthRedirect: true, forceNetwork: true, silent: true })),
+  changePassword: (payload) => unwrap(post('/auth/change-password', payload)),
   forgotPassword: (payload) => unwrap(post('/auth/forgot-password', payload)),
   resetPassword: (payload) => unwrap(post('/auth/reset-password', payload)),
 };

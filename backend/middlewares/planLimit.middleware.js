@@ -12,6 +12,7 @@ const usageService = require('../services/usageService');
 const AppError = require('../utils/AppError');
 const ErrorCodes = require('../constants/errorCodes');
 const logger = require('../utils/logger');
+const { shouldHardEnforce } = require('../utils/commercialPolicy');
 
 const isEnforcing = () =>
   String(process.env.PLAN_LIMIT_ENFORCE || '').toLowerCase() === 'true';
@@ -46,13 +47,19 @@ const enforceInvoiceLimit = async (req, res, next) => {
         logger.warn('plan.limit.shadow (would block)', detail);
         res.set('X-Plan-Limit', 'shadow:invoices');
       } else {
-        logger.warn('plan.limit.blocked', detail);
-        return next(
-          new AppError(
-            `You have used all ${check.limit} invoices included in your plan this month. Upgrade your plan to continue.`,
-            { statusCode: 402, errorCode: ErrorCodes.FEATURE_LOCKED }
-          )
-        );
+        const hard = await shouldHardEnforce(companyId, 'PLAN_LIMIT_ENFORCE');
+        if (!hard) {
+          logger.warn('plan.limit.legacy_open (would block)', detail);
+          res.set('X-Plan-Limit', 'legacy:invoices');
+        } else {
+          logger.warn('plan.limit.blocked', detail);
+          return next(
+            new AppError(
+              `You have used all ${check.limit} invoices included in your plan this month. Upgrade your plan to continue.`,
+              { statusCode: 402, errorCode: ErrorCodes.FEATURE_LOCKED }
+            )
+          );
+        }
       }
     }
 

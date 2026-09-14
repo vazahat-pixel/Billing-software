@@ -148,7 +148,9 @@ const GSTReportsTab = () => {
       const igst = Number(s.igst || 0);
       const cess = Number(s.cess || 0);
       const net = Number(s.netAmount || taxable + cgst + sgst + igst + cess);
-      const state = s.customerId?.stateCode ? `${s.customerId.stateCode}-${s.customerId.state || 'State'}` : (s.customerId?.state || '24-Gujarat');
+      const state = s.customerId?.stateCode
+        ? `${s.customerId.stateCode}-${s.customerId.state || 'State'}`
+        : (s.customerId?.state || '—');
       const rate = Number(s.gstRate || (taxable ? (((cgst + sgst + igst) / taxable) * 100).toFixed(2) : 18));
       const invDate = s.date?.split('T')[0] || '';
 

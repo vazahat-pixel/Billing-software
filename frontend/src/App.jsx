@@ -27,6 +27,8 @@ const AdminCompanyConfig = lazy(() => import('./pages/admin/CompanyConfig'));
 const AdminDynamicConfig = lazy(() => import('./pages/admin/DynamicConfig'));
 const AdminLifecycle = lazy(() => import('./pages/admin/Lifecycle'));
 const PanelPortal = lazy(() => import('./pages/PanelPortal'));
+const SubscriptionBillingPage = lazy(() => import('./pages/billing/SubscriptionBillingPage'));
+const MustChangePasswordGate = lazy(() => import('./components/auth/MustChangePasswordGate'));
 
 function RouteFallback() {
   return (
@@ -62,7 +64,21 @@ function App() {
           <ProtectedRoute allowedRoles={['user', 'super_admin']}>
             <AuthBootstrap>
               <ConfigProvider>
-                <Dashboard />
+                <MustChangePasswordGate>
+                  <Dashboard />
+                </MustChangePasswordGate>
+              </ConfigProvider>
+            </AuthBootstrap>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/subscription" element={
+          <ProtectedRoute allowedRoles={['user', 'super_admin']}>
+            <AuthBootstrap>
+              <ConfigProvider>
+                <MustChangePasswordGate>
+                  <SubscriptionBillingPage />
+                </MustChangePasswordGate>
               </ConfigProvider>
             </AuthBootstrap>
           </ProtectedRoute>

@@ -48,6 +48,10 @@ router.get(['/health', '/health/live', '/health/ready'], (req, res) => {
 // Public auth (rate-limited)
 router.use('/auth', authLimiter, authRoutes);
 
+// Public SaaS catalog (plans for signup / pricing page)
+const { publicRouter: billingPublicRoutes, tenantRouter: billingTenantRoutes } = require('./billing.routes');
+router.use('/billing/public', billingPublicRoutes);
+
 // Authenticated tenant surface
 router.use(authMiddleware);
 router.use(subscriptionMiddleware);
@@ -71,6 +75,7 @@ router.use('/stage8', require('./stage8Commercial.routes'));
 router.use('/admin', adminRoutes);
 router.use('/users', userRoutes);
 router.use('/config', configRoutes);
+router.use('/billing', billingTenantRoutes);
 
 // --- Masters: the shell of the product, shipped with every plan -------------
 router.use('/masters', requireModule('masters'), mastersRoutes);

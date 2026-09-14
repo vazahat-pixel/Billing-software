@@ -96,6 +96,11 @@ router.put('/company/:id/plan', adminController.changeCompanyPlan);
 router.post('/company/:id/impersonate', adminController.impersonateCompany);
 router.post('/dunning/run', adminController.runDunning);
 
+// SaaS payment orders
+const billingController = require('../controllers/billing.controller');
+router.get('/billing/orders', billingController.adminListOrders);
+router.post('/billing/orders/:orderId/mark-paid', billingController.adminMarkPaid);
+
 // Super-admin 2FA
 router.post('/security/2fa/setup', adminController.setupAdmin2fa);
 router.post('/security/2fa/enable', adminController.enableAdmin2fa);

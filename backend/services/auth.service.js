@@ -24,7 +24,7 @@ const generateToken = (user) => {
     );
 };
 
-exports.register = async (name, email, password, companyName) => {
+exports.register = async (name, email, password, companyName, options = {}) => {
     const securityConfigService = require('./securityConfigService');
     const check = securityConfigService.validatePassword(password);
     if (!check.ok) throw new Error(`Password policy: ${check.gaps.join(', ')}`);
@@ -33,13 +33,27 @@ exports.register = async (name, email, password, companyName) => {
     const existingUser = await User.findOne({ email });
     if (existingUser) throw new Error('Email already registered');
 
-    // 2. Get Default Plan (Basic) or create it
-    let plan = await Plan.findOne({ name: 'Basic' });
+    // 2. Resolve plan — prefer caller planId, else public Basic/first active public plan
+    let plan = null;
+    if (options.planId) {
+        plan = await Plan.findOne({ _id: options.planId, isActive: true });
+        if (!plan) throw new Error('Selected plan is not available');
+    }
+    if (!plan) {
+        plan = await Plan.findOne({ name: 'Basic', isActive: true });
+    }
+    if (!plan) {
+        plan = await Plan.findOne({ isActive: true, isPublic: true }).sort({ sortOrder: 1, priceMonthly: 1 });
+    }
     if (!plan) {
         plan = await Plan.create({
             name: 'Basic',
+            slug: 'basic',
+            description: 'Starter plan',
             priceMonthly: 29,
             priceYearly: 290,
+            trialDays: 14,
+            isPublic: true,
             features: {
                 offlineMode: true,
                 modules: {
@@ -61,11 +75,12 @@ exports.register = async (name, email, password, companyName) => {
     const user = new User({ name, email, password, role: 'user', companyRole: 'owner' });
     await user.save();
 
-    // 4. Create Company
+    // 4. Create Company — self-serve SaaS tenant
     const company = new Company({
         name: companyName,
         ownerId: user._id,
-        planId: plan._id
+        planId: plan._id,
+        commercialPolicy: 'saas_enforced',
     });
     await company.save();
 
@@ -81,15 +96,16 @@ exports.register = async (name, email, password, companyName) => {
     user.companyId = company._id;
     await user.save();
 
-    // 7. AUTO-CREATE trial Subscription — fixes critical bug where new users were blocked in production
+    // 7. Trial subscription from plan.trialDays
+    const trialDays = Number(plan.trialDays ?? 14) || 14;
     const trialStart = new Date();
     const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 30); // 30-day trial
+    trialEnd.setDate(trialEnd.getDate() + trialDays);
 
     await Subscription.create({
         companyId: company._id,
         planId: plan._id,
-        status: 'active',
+        status: 'trial',
         startDate: trialStart,
         endDate: trialEnd,
         billingCycle: 'monthly',

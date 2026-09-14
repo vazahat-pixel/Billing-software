@@ -187,8 +187,9 @@ const BillAutoFill = ({ parties = [], items = [], disabled = false, onApply, onM
         type: 'Supplier',
         group: 'SUNDRY CREDITORS',
         gstin: sug.gstin || '',
-        state: 'Gujarat',
-        stateCode: '24',
+        // State derived from GSTIN on the server when possible — do not hardcode Gujarat.
+        state: sug.state || '',
+        stateCode: sug.stateCode || (sug.gstin ? String(sug.gstin).slice(0, 2) : ''),
       });
       await onMastersChanged?.();
       const id = created?._id || created?.id;

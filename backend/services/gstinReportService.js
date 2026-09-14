@@ -206,7 +206,7 @@ class GstinReportService {
       .lean();
 
     const cfg = await gstConfigService.getOrCreate(companyId);
-    const companyStateCode = cfg.stateCode || '24';
+    const companyStateCode = cfg.stateCode || stateCodeFromGstin(cfg.gstin) || '';
 
     const rows = sales.map((s) => {
       const partyGstin = (s.customerId?.gstin || '').toUpperCase();
@@ -279,7 +279,7 @@ class GstinReportService {
       .lean();
 
     const cfg = await gstConfigService.getOrCreate(companyId);
-    const companyStateCode = cfg.stateCode || '24';
+    const companyStateCode = cfg.stateCode || stateCodeFromGstin(cfg.gstin) || '';
 
     const rows = purchases.map((p) => {
       const partyGstin = (p.supplierId?.gstin || '').toUpperCase();
@@ -337,7 +337,7 @@ class GstinReportService {
       .lean();
 
     const cfg = await gstConfigService.getOrCreate(companyId);
-    const companyStateCode = cfg.stateCode || '24';
+    const companyStateCode = cfg.stateCode || stateCodeFromGstin(cfg.gstin) || '';
 
     const rows = returns.map((r) => {
       const partyGstin = (r.partyId?.gstin || '').toUpperCase();
@@ -397,7 +397,7 @@ class GstinReportService {
       .lean();
 
     const cfg = await gstConfigService.getOrCreate(companyId);
-    const companyStateCode = cfg.stateCode || '24';
+    const companyStateCode = cfg.stateCode || stateCodeFromGstin(cfg.gstin) || '';
 
     const rows = jobs.map((j) => {
       const workerGstin = (j.workerId?.gstin || '').toUpperCase();
@@ -466,7 +466,7 @@ class GstinReportService {
       .lean();
 
     const cfg = await gstConfigService.getOrCreate(companyId);
-    const companyStateCode = cfg.stateCode || '24';
+    const companyStateCode = cfg.stateCode || stateCodeFromGstin(cfg.gstin) || '';
 
     const rows = jobs.map((j) => {
       const workerGstin = (j.workerId?.gstin || '').toUpperCase();
@@ -642,7 +642,7 @@ class GstinReportService {
       .lean();
 
     const cfg = await gstConfigService.getOrCreate(companyId);
-    const companyStateCode = cfg.stateCode || '24';
+    const companyStateCode = cfg.stateCode || stateCodeFromGstin(cfg.gstin) || '';
 
     const rows = purchases.map((p) => {
       const partyGstin = (p.supplierId?.gstin || '').toUpperCase();
@@ -691,7 +691,7 @@ class GstinReportService {
       .lean();
 
     const cfg = await gstConfigService.getOrCreate(companyId);
-    const companyStateCode = cfg.stateCode || '24';
+    const companyStateCode = cfg.stateCode || stateCodeFromGstin(cfg.gstin) || '';
     const invoiceNos = new Set();
 
     for (const s of sales) {

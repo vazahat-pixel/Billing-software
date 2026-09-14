@@ -46,7 +46,7 @@ class PartyService {
       email: partyData.email || '',
       address: partyData.address || '',
       city: partyData.city || partyData.station || '',
-      state: partyData.state || 'Gujarat',
+      state: partyData.state || '',
       creditLimit: Number(partyData.creditLimit || 0),
       openingBalance: Number(partyData.openingBalance || 0),
       openingBalanceType: partyData.openingBalanceType || 'Dr',
@@ -62,8 +62,15 @@ class PartyService {
       updateInAllFirm: partyData.updateInAllFirm || 'Y',
       updateInAllYear: partyData.updateInAllYear || 'N',
       aadharNo: partyData.aadharNo || '',
-      stateCode: partyData.stateCode || '24',
-      stateName: partyData.stateName || 'Gujarat',
+      stateCode: (() => {
+        const { stateCodeFromGstin } = require('../utils/gstDetermination');
+        return partyData.stateCode || stateCodeFromGstin(partyData.gstin) || '';
+      })(),
+      stateName: (() => {
+        const { stateCodeFromGstin, stateNameFromCode } = require('../utils/gstDetermination');
+        const code = partyData.stateCode || stateCodeFromGstin(partyData.gstin) || '';
+        return partyData.stateName || (code ? `${code}-${stateNameFromCode(code)}` : '') || '';
+      })(),
       gstType: partyData.gstType || 'INVOICE (IN STATE)',
       udyamAadhar: partyData.udyamAadhar || '',
       msmeType: partyData.msmeType || 'None',

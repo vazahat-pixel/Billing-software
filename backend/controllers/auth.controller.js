@@ -12,11 +12,14 @@ exports.register = async (req, res) => {
                 code: 'PUBLIC_REGISTER_DISABLED',
             });
         }
-        const { name, email, password, companyName } = req.body;
+        const { name, email, password, companyName, planId, billingCycle } = req.body;
         if (!name || !email || !password || !companyName) {
             return res.status(400).json({ message: 'Name, email, password and company name are required' });
         }
-        const result = await authService.register(name, email, password, companyName);
+        const result = await authService.register(name, email, password, companyName, {
+            planId: planId || null,
+            billingCycle: billingCycle || 'monthly',
+        });
         res.status(201).json(result);
     } catch (err) {
         res.status(400).json({ message: err.message });
@@ -89,6 +92,7 @@ exports.getMe = async (req, res) => {
                 role: user.role,
                 companyRole: user.companyRole || 'owner',
                 companyId: resolvedCompanyId || req.companyId,
+                mustChangePassword: !!user.mustChangePassword,
                 plan: planFeatures,
                 company: companyInfo,
                 moduleConfig: moduleConfig,
@@ -153,6 +157,38 @@ exports.logoutAll = async (req, res) => {
         const result = await sessionService.revokeAll(req.user._id, null, 'logout_all');
         await sessionService.recordLogin(req.user, 'logout_all', req, { success: true });
         res.status(200).json(result);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+};
+
+/** Invited users must set a new password before using the ERP. */
+exports.changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body || {};
+        if (!newPassword) {
+            return res.status(400).json({ message: 'New password is required' });
+        }
+        const User = require('../models/User');
+        const securityConfigService = require('../services/securityConfigService');
+        const user = await User.findById(req.user._id || req.user.id).select('+password');
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        if (!user.mustChangePassword) {
+            if (!currentPassword || !(await user.comparePassword(currentPassword))) {
+                return res.status(400).json({ message: 'Current password is incorrect' });
+            }
+        }
+
+        const check = securityConfigService.validatePassword(newPassword);
+        if (!check.ok) {
+            return res.status(400).json({ message: `Password policy: ${check.gaps.join(', ')}` });
+        }
+
+        user.password = newPassword;
+        user.mustChangePassword = false;
+        await user.save();
+        res.status(200).json({ message: 'Password updated', mustChangePassword: false });
     } catch (err) {
         res.status(400).json({ message: err.message });
     }

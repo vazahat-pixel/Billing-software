@@ -5,6 +5,7 @@ export { default as client, onApiLoadingChange } from './client';
 export * from './http';
 
 export { authApi } from './auth.api';
+export { billingApi } from './billing.api';
 export { partiesApi } from './party.api';
 export { itemsApi } from './item.api';
 export { purchasesApi } from './purchase.api';
