@@ -11,7 +11,12 @@ exports.createItem = asyncHandler(async (req, res) => {
 
 exports.getItems = asyncHandler(async (req, res) => {
   if (!req.companyId) throw AppError.forbidden('No company context');
-  const items = await itemService.getItems(req.companyId);
+  const { favorites, page, limit } = req.query;
+  const items = await itemService.getItems(req.companyId, {
+    favorites: favorites === 'true' || favorites === true,
+    page: page || undefined,
+    limit: limit || undefined,
+  });
   return ok(res, items);
 });
 

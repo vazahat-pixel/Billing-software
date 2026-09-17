@@ -22,6 +22,7 @@ import {
   normalizeInventoryLot
 } from './normalizers';
 import { isOffline } from './networkStatus';
+import { useLocalApiAsSourceOfTruth } from './desktopMode';
 
 const ENDPOINTS = {
   sales: '/sales',
@@ -127,6 +128,7 @@ const syncItem = async (item, onSynced) => {
 let syncing = false;
 
 export const processSyncQueue = async (onSynced, onError, onComplete) => {
+  if (useLocalApiAsSourceOfTruth()) return { synced: 0, failed: 0 };
   if (syncing || isOffline()) return { synced: 0, failed: 0 };
   syncing = true;
 
@@ -168,6 +170,9 @@ export const processSyncQueue = async (onSynced, onError, onComplete) => {
 };
 
 export const saveOffline = async (entityType, payload, action = 'create') => {
+  if (useLocalApiAsSourceOfTruth()) {
+    throw new Error('Desktop local mode: use live API (IndexedDB queue disabled)');
+  }
   const companyId = getActiveCompanyId();
   const localId = payload.id || payload._id || generateLocalId();
   const record = await putOfflineRecord(entityType, {
@@ -242,6 +247,9 @@ export const retryAllFailed = async (onSynced, onError, onComplete) => {
 };
 
 export const initSyncListener = (onSynced, onError, onComplete) => {
+  if (useLocalApiAsSourceOfTruth()) {
+    return () => {};
+  }
   const run = () => processSyncQueue(onSynced, onError, onComplete);
 
   window.addEventListener('online', run);

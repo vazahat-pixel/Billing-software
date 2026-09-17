@@ -13,6 +13,22 @@ const logger = require('./utils/logger');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
+// Desktop-local: override .env SaaS locks after dotenv loads
+if (String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true') {
+  // Never allow public register on desktop — activation pack only
+  process.env.ALLOW_PUBLIC_REGISTER = 'false';
+  process.env.DUNNING_INTERVAL_MS = process.env.DUNNING_INTERVAL_MS || '0';
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+    process.env.JWT_SECRET =
+      process.env.JWT_SECRET || 'desktop-local-jwt-secret-minimum-32-characters!!';
+  }
+  // Pack HMAC: prefer dedicated secret; fall back to JWT_SECRET (must match admin issuer for signed packs)
+  if (!process.env.PROVISIONING_PACK_SECRET) {
+    process.env.PROVISIONING_PACK_SECRET = process.env.JWT_SECRET;
+  }
+  if (!process.env.NODE_ENV) process.env.NODE_ENV = 'production';
+}
+
 const { assertProductionEnv, envReport } = require('./utils/startupChecks');
 assertProductionEnv();
 
@@ -94,50 +110,78 @@ try {
 
 const { connectDB, dbCheckMiddleware, disconnectDB } = require('./config/db');
 
-connectDB()
-  .then(() => {
-    try {
-      require('./events/registerAutomation').registerAutomationListeners();
-    } catch (err) {
-      logger.warn('automation listeners failed to register', { error: err.message });
-    }
-    try {
-      // Entitlement cache must drop as soon as a plan/licence/module write lands.
-      require('./services/entitlementCacheHooks').install();
-    } catch (err) {
-      logger.warn('entitlement cache hooks failed to install', { error: err.message });
-    }
-    try {
-      require('./services/cacheService').init();
-      require('./services/jobQueueService').startWorker({
-        intervalMs: Number(process.env.JOB_POLL_MS || 5000),
-      });
-      // Wire backup job handler
-      const jobQueue = require('./services/jobQueueService');
-      const backupService = require('./services/backupService');
-      jobQueue.registerHandler('backup.run', async (job) => {
-        const companyId = job.payload?.companyId || job.companyId;
-        return backupService.create(companyId, { type: 'scheduled', userId: null });
-      });
+let bootPromise = null;
+let listenersReady = false;
 
-      // SaaS dunning sweep (remind + suspend) — no payment gateway
-      const dunningMs = Number(process.env.DUNNING_INTERVAL_MS ?? 21600000);
-      if (dunningMs > 0) {
-        const dunningService = require('./services/dunningService');
-        const run = () => {
-          dunningService.runDunningSweep().catch((e) =>
-            logger.warn('dunning.interval.failed', { error: e.message })
-          );
-        };
-        setTimeout(run, 60_000).unref?.();
-        setInterval(run, dunningMs).unref?.();
-        logger.info('dunning.interval.started', { intervalMs: dunningMs });
-      }
+async function runPostConnectHooks() {
+  if (listenersReady) return;
+  listenersReady = true;
+  if (String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true') {
+    try {
+      const mongoose = require('mongoose');
+      const { ensureDesktopIndexes } = require('./utils/desktopIndexes');
+      await ensureDesktopIndexes(mongoose);
     } catch (err) {
-      logger.warn('cache/queue init skipped', { error: err.message });
+      logger.warn('desktop indexes skipped', { error: err.message });
     }
-  })
-  .catch((err) => logger.error('MongoDB initial connection error', { error: err.message }));
+  }
+  try {
+    require('./events/registerAutomation').registerAutomationListeners();
+  } catch (err) {
+    logger.warn('automation listeners failed to register', { error: err.message });
+  }
+  try {
+    require('./services/entitlementCacheHooks').install();
+  } catch (err) {
+    logger.warn('entitlement cache hooks failed to install', { error: err.message });
+  }
+  try {
+    require('./services/cacheService').init();
+    require('./services/jobQueueService').startWorker({
+      intervalMs: Number(process.env.JOB_POLL_MS || 5000),
+    });
+    const jobQueue = require('./services/jobQueueService');
+    const backupService = require('./services/backupService');
+    jobQueue.registerHandler('backup.run', async (job) => {
+      const companyId = job.payload?.companyId || job.companyId;
+      return backupService.create(companyId, { type: 'scheduled', userId: null });
+    });
+
+    const dunningMs = Number(process.env.DUNNING_INTERVAL_MS ?? 21600000);
+    const isDesktop = String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+    if (!isDesktop && dunningMs > 0) {
+      const dunningService = require('./services/dunningService');
+      const run = () => {
+        dunningService.runDunningSweep().catch((e) =>
+          logger.warn('dunning.interval.failed', { error: e.message })
+        );
+      };
+      setTimeout(run, 60_000).unref?.();
+      setInterval(run, dunningMs).unref?.();
+      logger.info('dunning.interval.started', { intervalMs: dunningMs });
+    }
+  } catch (err) {
+    logger.warn('cache/queue init skipped', { error: err.message });
+  }
+}
+
+function ensureDbBoot() {
+  if (!bootPromise) {
+    bootPromise = connectDB()
+      .then(() => runPostConnectHooks())
+      .catch((err) => {
+        bootPromise = null;
+        logger.error('MongoDB initial connection error', { error: err.message });
+        throw err;
+      });
+  }
+  return bootPromise;
+}
+
+// Auto-connect when loaded as HTTP server or tests (not when only exporting app for attach)
+if (!process.env.VERCEL && process.env.DESKTOP_SKIP_AUTO_CONNECT !== 'true') {
+  ensureDbBoot().catch((err) => logger.error('MongoDB initial connection error', { error: err.message }));
+}
 
 // Slow query logging (Stage 7.3)
 if (process.env.MONGO_DEBUG === 'true') {
@@ -209,7 +253,7 @@ app.use(errorHandler);
 
 let server = null;
 
-function gracefulShutdown(signal) {
+function gracefulShutdown(signal, { exitProcess = true } = {}) {
   logger.info(`graceful.shutdown.${signal}`);
   try {
     require('./services/jobQueueService').stopWorker();
@@ -218,7 +262,7 @@ function gracefulShutdown(signal) {
   }
   const force = setTimeout(() => {
     logger.error('graceful.shutdown.timeout');
-    process.exit(1);
+    if (exitProcess) process.exit(1);
   }, 15000);
   force.unref?.();
 
@@ -226,26 +270,79 @@ function gracefulShutdown(signal) {
     ? new Promise((resolve) => server.close(() => resolve()))
     : Promise.resolve();
 
-  closeHttp
+  return closeHttp
     .then(() => disconnectDB())
     .then(() => {
       logger.info('graceful.shutdown.complete');
-      process.exit(0);
+      server = null;
+      if (exitProcess) process.exit(0);
     })
     .catch((err) => {
       logger.error('graceful.shutdown.error', { error: err.message });
-      process.exit(1);
+      if (exitProcess) process.exit(1);
+      throw err;
     });
+}
+
+/**
+ * Programmatic start for Electron desktop-local / tests.
+ * @param {{ port?: number, mongoUri?: string }} opts
+ */
+async function startServer(opts = {}) {
+  if (opts.mongoUri) process.env.MONGO_URI = opts.mongoUri;
+  const port = Number(opts.port || process.env.PORT || 5000);
+  process.env.PORT = String(port);
+
+  await ensureDbBoot();
+
+  if (server) {
+    return {
+      app,
+      server,
+      port,
+      async stop() {
+        await gracefulShutdown('stop', { exitProcess: false });
+      },
+    };
+  }
+
+  await new Promise((resolve, reject) => {
+    server = app.listen(port, '127.0.0.1', (err) => {
+      if (err) return reject(err);
+      logger.info(`Server listening on http://127.0.0.1:${port}`);
+      resolve();
+    });
+  });
+
+  return {
+    app,
+    server,
+    port,
+    async stop() {
+      await gracefulShutdown('stop', { exitProcess: false });
+    },
+  };
 }
 
 if (!process.env.VERCEL && require.main === module) {
   const PORT = process.env.PORT || 5000;
-  server = app.listen(PORT, () => {
-    logger.info(`Server listening on http://localhost:${PORT}`);
-  });
+  ensureDbBoot()
+    .then(() => {
+      server = app.listen(PORT, () => {
+        logger.info(`Server listening on http://localhost:${PORT}`);
+      });
+    })
+    .catch((err) => {
+      logger.error('Failed to start server', { error: err.message });
+      process.exit(1);
+    });
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 // Force nodemon reload: 2026-09-09T15:36:00
 module.exports = app;
+module.exports.app = app;
+module.exports.startServer = startServer;
+module.exports.stopServer = () => gracefulShutdown('stop', { exitProcess: false });
+module.exports.ensureDbBoot = ensureDbBoot;

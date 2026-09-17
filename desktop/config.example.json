@@ -1,4 +1,7 @@
 {
-  "apiBaseUrl": "http://localhost:5050/api",
-  "note": "Copy to %APPDATA%/Textile ERP/config.json (or set after install). Point apiBaseUrl at your live MERN backend."
+  "mode": "local",
+  "apiBaseUrl": "http://127.0.0.1:5050/api",
+  "apiPort": 5050,
+  "mongoPort": 27028,
+  "note": "Standalone offline desktop. mode=local embeds Mongo+API. mode=remote uses apiBaseUrl only."
 }

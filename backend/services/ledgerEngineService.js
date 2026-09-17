@@ -4,6 +4,17 @@ const LedgerMaster = require('../models/LedgerMaster');
 
 const round2 = (n) => Number(Number(n || 0).toFixed(2));
 
+/** JSM Zoom Ledger labels for settlement-discount / cash-bank contra legs. */
+function displayContraName(name) {
+  const raw = String(name || '').trim();
+  if (!raw) return 'CONTRA A/C';
+  const key = raw.toLowerCase();
+  if (key === 'discount allowed' || key === 'discount received' || key === 'discount account') {
+    return 'DISCOUNT ACCOUNT';
+  }
+  return raw.toUpperCase();
+}
+
 /**
  * The set of journal entries that count as live money.
  *
@@ -285,8 +296,8 @@ class LedgerEngineService {
               contraShortCode: src.scCode || 'SCC',
               voucherType: entry.voucherType,
               narration: opp.narration || line.narration || entry.narration || '',
-              particulars: opp.ledgerName || 'CONTRA A/C',
-              contraAccount: opp.ledgerName || '',
+              particulars: displayContraName(opp.ledgerName || 'CONTRA A/C'),
+              contraAccount: displayContraName(opp.ledgerName || ''),
               debit: line.type === 'Dr' ? portion : 0,
               credit: line.type === 'Cr' ? portion : 0,
               runningBalance: round2(Math.abs(current)),
@@ -308,21 +319,28 @@ class LedgerEngineService {
           if (line.type === 'Dr') current += line.amount;
           else current -= line.amount;
 
-          // Description (particulars): match reference software naming exactly
-          const vt = entry.voucherType || entry.refType || '';
+          // Description (particulars): match reference software naming exactly.
+          // Prefer refType for auto-posted books (SalesAuto/PurchaseAuto) so Zoom Ledger
+          // shows SALES BOOK / PURCHASE BOOK instead of the internal Sales A/c ledger name.
+          const vt = entry.voucherType || '';
+          const rt = entry.refType || '';
           let particulars;
-          if (vt === 'SalesInvoice' || vt === 'Sales') {
+          if (['SalesInvoice', 'Sales', 'SalesAuto'].includes(vt) || rt === 'SalesInvoice') {
             particulars = 'SALES BOOK';
-          } else if (vt === 'PurchaseBill' || vt === 'Purchase') {
+          } else if (['PurchaseBill', 'Purchase', 'PurchaseAuto'].includes(vt) || rt === 'PurchaseBill') {
             particulars = 'PURCHASE BOOK';
-          } else if (vt === 'JobWorkCharges' || vt === 'JobWork') {
+          } else if (['JobWorkCharges', 'JobWork', 'JobWorkAuto'].includes(vt) || rt === 'JobWorkCharges') {
             particulars = 'JOB WORK CHARGES';
           } else {
             // For Journal/Payment/Receipt with single contra — use the actual contra ledger name
             const mainContra = effectiveOppositeLines[0];
-            particulars = mainContra?.ledgerName
-              ? mainContra.ledgerName.toUpperCase()
-              : (effectiveOppositeLines.map((l) => l.ledgerName).filter(Boolean).join(', ').toUpperCase() || vt.toUpperCase() || 'CONTRA A/C');
+            particulars = displayContraName(
+              mainContra?.ledgerName
+                || effectiveOppositeLines.map((l) => l.ledgerName).filter(Boolean).join(', ')
+                || vt
+                || rt
+                || 'CONTRA A/C'
+            );
           }
 
           statement.push({

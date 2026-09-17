@@ -37,6 +37,7 @@ import EnterpriseTestingDashboard from './commercial/EnterpriseTestingDashboard'
 import OnboardingWizard from './commercial/OnboardingWizard';
 import useUiStore from '../store/useUiStore';
 import { stage8Api } from '../api/stage8.api';
+import { showDevTools, DEV_ONLY_MENU_LABELS } from '../utils/showDevTools';
 import CashBankBookModal from './accounting/CashBankBookModal';
 import IssueModal from './jobwork/IssueModal';
 import ReceiveModal from './jobwork/ReceiveModal';
@@ -93,6 +94,7 @@ import OpeningBalanceModal from './masters/OpeningBalanceModal';
 import OpeningStockModal from './masters/OpeningStockModal';
 import DataRecordsHub from './records/DataRecordsHub';
 import ReportsHub from './reports/ReportsHub';
+import { buildReportsMenuItems } from '../utils/reportTree';
 import { getPermissions } from '../utils/permissions';
 import { useConfig } from '../context/ConfigContext';
 import { isFlagEnabled } from '../utils/configHelpers';
@@ -228,6 +230,8 @@ const Dashboard = () => {
 
    const isMenuItemAllowed = (item) => {
       if (user?.role === 'super_admin') return true;
+      // Nested report folders stay visible; leaf gating happens inside runner / plan modules
+      if (Array.isArray(item?.children) && item.children.length > 0) return true;
 
       const label = item.label;
       const key = item.key;
@@ -368,7 +372,8 @@ const Dashboard = () => {
       recordsHub: false,
       recordsTab: 'accounts',
       reportsHub: false,
-      reportsTab: 'summary'
+      reportsTab: 'summary',
+      reportsLeafId: null,
    });
 
    const [placeholderName, setPlaceholderName] = useState('');
@@ -381,6 +386,7 @@ const Dashboard = () => {
    const [selectedBooks, setSelectedBooks] = useState({});
    const [activeMenuKey, setActiveMenuKey] = useState(null);
    const [openMenuSection, setOpenMenuSection] = useState(null);
+   const [openFlyoutPath, setOpenFlyoutPath] = useState(null);
    const [isRefreshing, setIsRefreshing] = useState(false);
    const menuBarRef = useRef(null);
 
@@ -409,6 +415,7 @@ const Dashboard = () => {
       const onDocMouseDown = (e) => {
          if (menuBarRef.current && !menuBarRef.current.contains(e.target)) {
             setOpenMenuSection(null);
+            setOpenFlyoutPath(null);
          }
       };
       document.addEventListener('mousedown', onDocMouseDown);
@@ -624,12 +631,17 @@ const Dashboard = () => {
       }));
    };
 
-   const openReportsHub = (tab = 'summary') => {
+   const openReportsHub = (tab = 'summary', leafId = null) => {
       setModals(prev => ({
          ...prev,
          reportsHub: true,
-         reportsTab: tab
+         reportsTab: tab,
+         reportsLeafId: leafId,
       }));
+   };
+
+   const openReportLeaf = (leafId) => {
+      openReportsHub('summary', leafId);
    };
 
    const openGstinReports = (section = 'sales') => {
@@ -783,15 +795,17 @@ const Dashboard = () => {
          { label: 'GST Reports Hub', action: () => toggleModal('gstReports', true) },
       ],
       Reports: [
-         { label: 'All Reports Hub', action: () => openReportsHub('summary') },
-         { label: 'Sales Reports', action: () => openReportsHub('sales') },
-         { label: 'Purchase Reports', action: () => openReportsHub('purchase') },
-         { label: 'Job Work Reports', action: () => openReportsHub('jobwork') },
-         { label: 'Stock Reports', action: () => openReportsHub('stock') },
-         { label: 'Outstanding', key: 'outstanding' },
+         ...buildReportsMenuItems({
+            openLeaf: openReportLeaf,
+            openHub: openReportsHub,
+            openExternal: (ext) => {
+               if (ext === 'gstReports') toggleModal('gstReports', true);
+               else if (ext === 'gstr1') toggleModal('gstr1', true);
+               else toggleModal(ext, true);
+            },
+         }),
          { label: 'Outstanding Report (Sales)', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
          { label: 'Outstanding Report (Purchase)', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
-         { label: 'GSTR-1', key: 'gstr1' },
          { label: 'CA Desk', key: 'caDashboard' },
          { label: 'Z Trial (Trial Balance)', action: () => setModals(prev => ({ ...prev, zTrial: true })) },
       ],
@@ -820,7 +834,16 @@ const Dashboard = () => {
          { label: 'Refresh All Data', action: () => refreshAllData().then(() => toast.success('All data refreshed.')) },
       ],
       Utilities: [
-         { label: 'Backup', action: () => setModals(prev => ({ ...prev, infrastructure: true })) },
+         {
+            label: 'Backup',
+            action: () => {
+               if (showDevTools()) {
+                  setModals(prev => ({ ...prev, infrastructure: true }));
+               } else {
+                  toast.info('Backup is managed by your admin or the desktop installer — not from this screen.');
+               }
+            },
+         },
          { label: 'Closing / UnClosing Year', action: () => setModals(prev => ({ ...prev, systemUtilities: true })) },
          { label: 'New A/c. Year ( Manual )', action: () => setModals(prev => ({ ...prev, systemUtilities: true })) },
          { label: 'MisMatch Data Scanner', action: () => setModals(prev => ({ ...prev, systemUtilities: true })) },
@@ -857,6 +880,9 @@ const Dashboard = () => {
             let allowedItems = items.filter(isMenuItemAllowed);
             if (section === 'Admin') {
                allowedItems = allowedItems.filter(i => i.label !== 'User Rights' || permissions.canManageUsers);
+            }
+            if (!showDevTools()) {
+               allowedItems = allowedItems.filter((i) => !DEV_ONLY_MENU_LABELS.has(i.label));
             }
             if (allowedItems.length > 0) {
                filtered[section] = allowedItems;
@@ -948,7 +974,7 @@ const Dashboard = () => {
                </button>
                <button
                   type="button"
-                  onClick={() => toast.info('Ctrl+K or Ctrl+Space opens Command Center. Bell opens Notifications. Enterprise button opens Stage 6 platform.')}
+                  onClick={() => toast.info('Ctrl+K opens search. Use menu for billing, GST, and reports. Bell shows notifications.')}
                   className="w-full flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
                >
                   <FontAwesomeIcon icon={faCircleQuestion} className="text-[11px] w-3.5 shrink-0" />
@@ -969,7 +995,7 @@ const Dashboard = () => {
                         <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate leading-tight">
                            {user?.companyName || user?.company?.name || 'Company'}
                         </p>
-                        <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide">Enterprise</p>
+                        <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide">Textile ERP</p>
                      </div>
                   </div>
 
@@ -1042,7 +1068,10 @@ const Dashboard = () => {
                      <div key={section} className="relative shrink-0">
                         <button
                            type="button"
-                           onClick={() => setOpenMenuSection(isOpen ? null : section)}
+                           onClick={() => {
+                              setOpenMenuSection(isOpen ? null : section);
+                              setOpenFlyoutPath(null);
+                           }}
                            className={`erp-menu-trigger ${isOpen ? 'erp-menu-trigger--open' : ''}`}
                         >
                            {section}
@@ -1050,29 +1079,70 @@ const Dashboard = () => {
                         {isOpen && (
                            <div className="erp-menu-dropdown">
                                  {visibleMenuData[section].map((item, idx) => {
-                                    const label = typeof item === 'object' ? item.label : item;
-                                    const { badge, text } = parseMenuLabel(label);
-                                    const needsSeparator = text === 'Closing / UnClosing Year' || text === 'Voucher Relndex';
-                                    return (
-                                       <React.Fragment key={idx}>
-                                          {needsSeparator && <div className="erp-menu-separator" />}
-                                          <button
-                                             type="button"
-                                             onClick={() => {
-                                                setOpenMenuSection(null);
-                                                handleMenuItemClick(item);
-                                             }}
-                                             className="erp-menu-item"
-                                          >
-                                             {badge && (
-                                                <span className="text-[9px] text-white bg-[var(--accent)] px-1 rounded font-mono shrink-0">
-                                                   {badge}
-                                                </span>
-                                             )}
-                                             <span className="truncate">{text}</span>
-                                          </button>
-                                       </React.Fragment>
-                                    );
+                                    const renderMenuNode = (node, keyPrefix) => {
+                                       const label = typeof node === 'object' ? node.label : node;
+                                       const { badge, text } = parseMenuLabel(label);
+                                       const kids = Array.isArray(node.children) ? node.children : null;
+                                       const needsSeparator = text === 'Closing / UnClosing Year' || text === 'Voucher Relndex';
+                                       const flyoutOpen = openFlyoutPath === keyPrefix
+                                          || (typeof openFlyoutPath === 'string' && openFlyoutPath.startsWith(`${keyPrefix}-`));
+
+                                       if (kids?.length) {
+                                          return (
+                                             <React.Fragment key={keyPrefix}>
+                                                {needsSeparator && <div className="erp-menu-separator" />}
+                                                <div className="erp-menu-item-row">
+                                                   <button
+                                                      type="button"
+                                                      className={`erp-menu-item erp-menu-item--parent ${openFlyoutPath === keyPrefix ? 'erp-menu-trigger--open' : ''}`}
+                                                      onClick={(e) => {
+                                                         e.stopPropagation();
+                                                         setOpenFlyoutPath((prev) => (prev === keyPrefix ? null : keyPrefix));
+                                                      }}
+                                                   >
+                                                      {badge && (
+                                                         <span className="text-[9px] text-white bg-[var(--accent)] px-1 rounded font-mono shrink-0">
+                                                            {badge}
+                                                         </span>
+                                                      )}
+                                                      <span className="truncate">{text}</span>
+                                                      <span className="erp-menu-chevron">{flyoutOpen ? '▾' : '▸'}</span>
+                                                   </button>
+                                                   {flyoutOpen && (
+                                                      <div className="erp-menu-flyout erp-menu-flyout--open">
+                                                         {kids.map((child, cIdx) => renderMenuNode(child, `${keyPrefix}-${cIdx}`))}
+                                                      </div>
+                                                   )}
+                                                </div>
+                                             </React.Fragment>
+                                          );
+                                       }
+
+                                       return (
+                                          <React.Fragment key={keyPrefix}>
+                                             {needsSeparator && <div className="erp-menu-separator" />}
+                                             <button
+                                                type="button"
+                                                onClick={() => {
+                                                   setOpenMenuSection(null);
+                                                   setOpenFlyoutPath(null);
+                                                   handleMenuItemClick(node);
+                                                }}
+                                                className="erp-menu-item"
+                                             >
+                                                {badge && (
+                                                   <span className="text-[9px] text-white bg-[var(--accent)] px-1 rounded font-mono shrink-0">
+                                                      {badge}
+                                                   </span>
+                                                )}
+                                                <span className="truncate">{text}</span>
+                                                {node.soon && <span className="erp-menu-soon">Soon</span>}
+                                             </button>
+                                          </React.Fragment>
+                                       );
+                                    };
+
+                                    return renderMenuNode(item, String(idx));
                                  })}
                            </div>
                         )}
@@ -1482,7 +1552,9 @@ const Dashboard = () => {
          >
             <div className="erp-modal-body text-center py-4">
                <FontAwesomeIcon icon={faTriangleExclamation} className="text-2xl text-[var(--amber)] mb-3" />
-               <p className="text-body text-[var(--text-secondary)]">This module is not available yet.</p>
+               <p className="text-body text-[var(--text-secondary)]">
+                  This menu item is not wired in your plan or is still being built. Use Sales, Purchase, GST reports, or ask your admin to enable the module.
+               </p>
             </div>
          </Modal>
 
@@ -1611,7 +1683,7 @@ const Dashboard = () => {
             initialBillType={modals.settingsBillType}
             onAction={(action) => {
                if (action === 'books') toggleModal('bookMaster', true);
-               else if (action === 'automation') setModals(prev => ({ ...prev, automationEngine: true }));
+               else if (action === 'automation' && showDevTools()) setModals(prev => ({ ...prev, automationEngine: true }));
                else if (action === 'openingBalance') setModals(prev => ({ ...prev, openingBalance: true }));
                else if (action === 'openingStock') setModals(prev => ({ ...prev, openingStock: true }));
             }}
@@ -1624,8 +1696,15 @@ const Dashboard = () => {
          />
          <ReportsHub
             isOpen={modals.reportsHub}
-            onClose={() => setModals(prev => ({ ...prev, reportsHub: false }))}
+            onClose={() => setModals(prev => ({ ...prev, reportsHub: false, reportsLeafId: null }))}
             initialTab={modals.reportsTab}
+            initialLeafId={modals.reportsLeafId}
+            onOpenExternal={(ext) => {
+               setModals(prev => ({ ...prev, reportsHub: false, reportsLeafId: null }));
+               if (ext === 'gstReports') toggleModal('gstReports', true);
+               else if (ext === 'gstr1') toggleModal('gstr1', true);
+               else toggleModal(ext, true);
+            }}
          />
 
          <FailedSyncModal isOpen={syncModalOpen} onClose={() => setSyncModalOpen(false)} />

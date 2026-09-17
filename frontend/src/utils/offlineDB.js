@@ -92,6 +92,12 @@ const withCompany = (entity, companyId) => ({
 
 export const cacheEntities = async (storeName, entities, companyId = getActiveCompanyId()) => {
   if (!companyId || !entities?.length) return;
+  try {
+    const { useLocalApiAsSourceOfTruth } = await import('./desktopMode');
+    if (useLocalApiAsSourceOfTruth()) return;
+  } catch {
+    /* continue */
+  }
   const db = await getDB();
   const cid = String(companyId);
 

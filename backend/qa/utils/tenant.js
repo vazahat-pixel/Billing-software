@@ -57,7 +57,7 @@ async function getOrCreateQaTenant(profileName) {
 
   await ensureProPlan();
   const email = `qa.${profileName}@textileerp.dev`;
-  const password = process.env.QA_DEFAULT_PASSWORD || 'QaTenant@123';
+  const password = process.env.QA_DEFAULT_PASSWORD || 'Admin@123';
   const companyName = `QA ${profileName.toUpperCase()} Tenant`;
 
   const existingUser = await User.findOne({ email });

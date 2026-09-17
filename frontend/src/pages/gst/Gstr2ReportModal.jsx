@@ -110,213 +110,126 @@ export default function Gstr2ReportModal({ isOpen, onClose }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="GSTR-2 Inward Supplies (Purchase Register)" className="max-w-7xl h-[92vh] bg-white rounded-[2.5rem] p-0 border-none shadow-2xl">
-      <div className="flex flex-col h-full p-8 space-y-6 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                <ShoppingCart size={20} />
+    <Modal isOpen={isOpen} onClose={onClose} title="GSTR-2 Inward Supplies" className="max-w-7xl w-full h-[min(92vh,900px)] p-0 rounded-2xl">
+      <div className="flex flex-col h-full min-h-0 bg-[var(--bg-base)]">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-card)]">
+          <p className="text-[11px] text-[var(--text-muted)]">Purchase register · ITC verification</p>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={handlePrint} disabled={loading || !filteredRows.length} className="erp-btn erp-btn-secondary h-8 px-3 text-[11px] gap-1">
+              <Printer size={12} /> Print
+            </button>
+            <button type="button" onClick={handleExportExcel} disabled={loading || !filteredRows.length} className="erp-btn erp-btn-secondary h-8 px-3 text-[11px] gap-1">
+              <FileSpreadsheet size={12} /> Excel
+            </button>
+            <button type="button" onClick={fetchGstr2} disabled={loading} className="erp-btn erp-btn-primary h-8 px-3 text-[11px] gap-1">
+              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+            <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              From date
+              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-8 px-2 rounded border border-[var(--border)] bg-[var(--bg-base)] text-[12px] font-medium text-[var(--text-primary)]" />
+            </label>
+            <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              To date
+              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-8 px-2 rounded border border-[var(--border)] bg-[var(--bg-base)] text-[12px] font-medium text-[var(--text-primary)]" />
+            </label>
+            <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              Search
+              <div className="relative">
+                <Search size={12} className="absolute left-2 top-2.5 text-[var(--text-muted)]" />
+                <input type="text" placeholder="Supplier, GSTIN, invoice" value={partySearch} onChange={(e) => setPartySearch(e.target.value)} className="w-full h-8 pl-7 pr-2 rounded border border-[var(--border)] bg-[var(--bg-base)] text-[12px] font-medium text-[var(--text-primary)]" />
               </div>
-              <div>
-                <h2 className="text-2xl font-black text-slate-900 tracking-tight">GSTR-2 Purchase Register</h2>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Inward Supplies • ITC Verification • Supplier Breakdown</p>
+            </label>
+            <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              Type
+              <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="h-8 px-2 rounded border border-[var(--border)] bg-[var(--bg-base)] text-[12px] font-medium text-[var(--text-primary)]">
+                <option value="ALL">All inward</option>
+                <option value="B2B">B2B registered</option>
+                <option value="B2BUR">B2BUR unregistered</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+            {[
+              { label: 'Bills', val: filteredRows.length },
+              { label: 'Taxable', val: money(totals.taxable) },
+              { label: 'CGST', val: money(totals.cgst) },
+              { label: 'SGST', val: money(totals.sgst) },
+              { label: 'IGST', val: money(totals.igst) },
+              { label: 'Net', val: money(totals.netAmount) },
+            ].map((s) => (
+              <div key={s.label} className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-3">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{s.label}</p>
+                <p className="text-[13px] font-bold tabular-nums text-[var(--text-primary)] mt-1">{s.val}</p>
               </div>
-            </div>
+            ))}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handlePrint}
-              disabled={loading || !filteredRows.length}
-              className="px-4 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
-            >
-              <Printer size={14} /> Print
-            </button>
-            <button
-              onClick={handleExportExcel}
-              disabled={loading || !filteredRows.length}
-              className="px-4 py-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
-            >
-              <FileSpreadsheet size={14} /> Excel Export
-            </button>
-            <button
-              onClick={fetchGstr2}
-              disabled={loading}
-              className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2"
-            >
-              {loading ? <RefreshCw className="animate-spin" size={14} /> : <RefreshCw size={14} />}
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {/* Filters Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">From Date</label>
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-indigo-500"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">To Date</label>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-indigo-500"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Search Supplier / GSTIN</label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Type name, GSTIN, invoice..."
-                value={partySearch}
-                onChange={(e) => setPartySearch(e.target.value)}
-                className="w-full px-3 py-2 pl-8 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-indigo-500"
-              />
-              <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
-            </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Registration Type</label>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-indigo-500"
-            >
-              <option value="ALL">All Inward Supplies</option>
-              <option value="B2B">B2B (Registered Suppliers)</option>
-              <option value="B2BUR">B2BUR (Unregistered Suppliers)</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Stats Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Bills</p>
-            <p className="text-lg font-black text-slate-900 mt-0.5">{filteredRows.length}</p>
-          </div>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Taxable</p>
-            <p className="text-lg font-black text-slate-900 mt-0.5 tabular-nums">{money(totals.taxable)}</p>
-          </div>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">CGST (ITC)</p>
-            <p className="text-lg font-black text-slate-900 mt-0.5 tabular-nums">{money(totals.cgst)}</p>
-          </div>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">SGST (ITC)</p>
-            <p className="text-lg font-black text-slate-900 mt-0.5 tabular-nums">{money(totals.sgst)}</p>
-          </div>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">IGST (ITC)</p>
-            <p className="text-lg font-black text-slate-900 mt-0.5 tabular-nums">{money(totals.igst)}</p>
-          </div>
-          <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">Total Net Amount</p>
-            <p className="text-lg font-black text-indigo-700 mt-0.5 tabular-nums">{money(totals.netAmount)}</p>
-          </div>
-        </div>
-
-        {/* Data Table */}
-        <div className="flex-1 border border-slate-200 rounded-2xl overflow-hidden flex flex-col bg-white">
-          <div className="overflow-x-auto flex-1 overflow-y-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px] tracking-wider sticky top-0 z-10 border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-3">#</th>
-                  <th className="px-4 py-3">Invoice No</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Supplier Name</th>
-                  <th className="px-4 py-3">GSTIN</th>
-                  <th className="px-4 py-3 text-right">Taxable (₹)</th>
-                  <th className="px-4 py-3 text-right">CGST (₹)</th>
-                  <th className="px-4 py-3 text-right">SGST (₹)</th>
-                  <th className="px-4 py-3 text-right">IGST (₹)</th>
-                  <th className="px-4 py-3 text-right">Total Tax (₹)</th>
-                  <th className="px-4 py-3 text-right">Total Amount (₹)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
+          <div className="border border-[var(--border)] rounded-lg overflow-hidden bg-[var(--bg-card)]">
+            <div className="overflow-x-auto max-h-[min(48vh,480px)] overflow-y-auto">
+              <table className="w-full text-left text-[11px]">
+                <thead className="sticky top-0 z-10 bg-[var(--bg-base)] text-[var(--text-muted)] uppercase text-[9px] tracking-wider">
                   <tr>
-                    <td colSpan={11} className="py-20 text-center text-slate-400">
-                      <div className="flex flex-col items-center justify-center gap-3">
-                        <RefreshCw className="animate-spin text-indigo-600" size={24} />
-                        <span className="font-semibold text-xs">Loading GSTR-2 inward transactions...</span>
-                      </div>
-                    </td>
+                    <th className="px-3 py-2">#</th>
+                    <th className="px-3 py-2">Invoice</th>
+                    <th className="px-3 py-2">Date</th>
+                    <th className="px-3 py-2">Supplier</th>
+                    <th className="px-3 py-2">GSTIN</th>
+                    <th className="px-3 py-2 text-right">Taxable</th>
+                    <th className="px-3 py-2 text-right">CGST</th>
+                    <th className="px-3 py-2 text-right">SGST</th>
+                    <th className="px-3 py-2 text-right">IGST</th>
+                    <th className="px-3 py-2 text-right">Tax</th>
+                    <th className="px-3 py-2 text-right">Amount</th>
                   </tr>
-                ) : !filteredRows.length ? (
-                  <tr>
-                    <td colSpan={11} className="py-20 text-center text-slate-400">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <ShoppingCart size={32} className="text-slate-300" />
-                        <span className="font-semibold text-xs">No purchase transactions found for this period.</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRows.map((r, i) => (
-                    <tr key={i} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-4 py-2.5 text-slate-400 font-mono text-[11px]">{i + 1}</td>
-                      <td className="px-4 py-2.5 font-bold text-slate-900">{r.invoiceNo || '—'}</td>
-                      <td className="px-4 py-2.5 text-slate-600">{dt(r.date)}</td>
-                      <td className="px-4 py-2.5 font-semibold text-slate-800">{r.partyName || '—'}</td>
-                      <td className="px-4 py-2.5 font-mono text-[11px] text-slate-600">
-                        {r.gstin ? (
-                          <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-700 font-medium">{r.gstin}</span>
-                        ) : (
-                          <span className="text-slate-400 italic">Unregistered</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-right font-medium text-slate-900 tabular-nums">{money(r.taxable)}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{money(r.cgst)}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{money(r.sgst)}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-600 tabular-nums">{money(r.igst)}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-indigo-600 tabular-nums">{money(r.gstAmount)}</td>
-                      <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">{money(r.netAmount)}</td>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)]">
+                  {loading ? (
+                    <tr><td colSpan={11} className="py-12 text-center text-[var(--text-muted)]">Loading…</td></tr>
+                  ) : !filteredRows.length ? (
+                    <tr><td colSpan={11} className="py-12 text-center text-[var(--text-muted)]">No purchases for this period.</td></tr>
+                  ) : filteredRows.map((r, i) => (
+                    <tr key={i} className="hover:bg-[var(--bg-base)]">
+                      <td className="px-3 py-2 text-[var(--text-muted)]">{i + 1}</td>
+                      <td className="px-3 py-2 font-semibold">{r.invoiceNo || '—'}</td>
+                      <td className="px-3 py-2">{dt(r.date)}</td>
+                      <td className="px-3 py-2">{r.partyName || '—'}</td>
+                      <td className="px-3 py-2 font-mono text-[10px]">{r.gstin || 'Unregistered'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{money(r.taxable)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{money(r.cgst)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{money(r.sgst)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{money(r.igst)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-medium">{money(r.gstAmount)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold">{money(r.netAmount)}</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Table Totals Row */}
-          {!loading && filteredRows.length > 0 && (
-            <div className="bg-slate-100 border-t border-slate-200 px-4 py-3 flex items-center justify-between text-xs font-bold text-slate-800">
-              <span>Total ({filteredRows.length} purchases)</span>
-              <div className="flex items-center gap-6 tabular-nums">
-                <span>Taxable: {money(totals.taxable)}</span>
-                <span>CGST: {money(totals.cgst)}</span>
-                <span>SGST: {money(totals.sgst)}</span>
-                <span>IGST: {money(totals.igst)}</span>
-                <span className="text-indigo-700">Net: {money(totals.netAmount)}</span>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
+            {!loading && filteredRows.length > 0 && (
+              <div className="border-t border-[var(--border)] px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold bg-[var(--bg-base)] text-[var(--text-primary)]">
+                <span>Total ({filteredRows.length})</span>
+                <div className="flex flex-wrap gap-4 tabular-nums text-[var(--text-muted)]">
+                  <span>Taxable {money(totals.taxable)}</span>
+                  <span>CGST {money(totals.cgst)}</span>
+                  <span>SGST {money(totals.sgst)}</span>
+                  <span>IGST {money(totals.igst)}</span>
+                  <span className="text-[var(--text-primary)]">Net {money(totals.netAmount)}</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {printCfg && (
         <div style={{ display: 'none' }}>
-          <ListPrint
-            ref={printRef}
-            title={printCfg.title}
-            columns={printCfg.columns}
-            rows={printCfg.rows}
-          />
+          <ListPrint ref={printRef} title={printCfg.title} columns={printCfg.columns} rows={printCfg.rows} />
         </div>
       )}
     </Modal>

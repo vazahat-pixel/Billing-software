@@ -42,18 +42,31 @@ const seedAdmin = async () => {
 
         const adminEmail = process.env.ADMIN_EMAIL || 'admin@textileerp.com';
         const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@123';
+        const forceReset = String(process.env.ADMIN_RESET || '').toLowerCase() === '1'
+          || String(process.env.ADMIN_RESET || '').toLowerCase() === 'true';
 
-        const existingAdmin = await User.findOne({ email: adminEmail });
-        if (existingAdmin) {
-            console.log('ℹ️ Super Admin already exists');
-        } else {
+        let existingAdmin = await User.findOne({ email: adminEmail }).select('+password');
+        if (!existingAdmin) {
             await User.create({
                 name: 'Super Admin',
                 email: adminEmail,
                 password: adminPassword,
-                role: 'super_admin'
+                role: 'super_admin',
+                isActive: true,
             });
             console.log('✅ Super Admin created successfully');
+        } else if (forceReset) {
+            existingAdmin.role = 'super_admin';
+            existingAdmin.isActive = true;
+            existingAdmin.failedLoginAttempts = 0;
+            existingAdmin.lockUntil = null;
+            existingAdmin.totpEnabled = false;
+            existingAdmin.totpSecret = '';
+            existingAdmin.password = adminPassword;
+            await existingAdmin.save();
+            console.log('✅ Super Admin password reset (ADMIN_RESET=1)');
+        } else {
+            console.log('ℹ️ Super Admin already exists');
         }
 
         // Create default normal tenant user if they don't exist

@@ -24,6 +24,13 @@ const mapToObject = (mapVal) => {
 const computeBundleHash = (payload) =>
   crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex').substring(0, 16);
 
+/** Active + not soft-deleted — treat missing deletedAt as live (legacy docs). */
+const liveCompanySettingsFilter = (companyId) => ({
+  companyId,
+  isActive: true,
+  $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+});
+
 const logConfigChange = async ({
   companyId, configType, configKey, configId, version, action, actorId, before, after, req
 }) => {
@@ -110,7 +117,19 @@ exports.seedCompanyDefaults = async (companyId, actorId = null, req = null, opti
 
   const settings = await CompanySettings.findOneAndUpdate(
     { companyId: companyObjectId },
-    { companyId: companyObjectId, version: 1, publishedAt: new Date(), isActive: true },
+    {
+      $set: {
+        companyId: companyObjectId,
+        version: 1,
+        publishedAt: new Date(),
+        isActive: true,
+      },
+      $setOnInsert: {
+        legalName: '',
+        shortName: '',
+        gstin: '',
+      },
+    },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
@@ -208,7 +227,7 @@ exports.getActiveConfigBundle = async (companyId) => {
     permissions
   ] = await Promise.all([
     CompanyModuleConfig.findOne({ companyId, isActive: true, deletedAt: null }).lean(),
-    CompanySettings.findOne({ companyId, isActive: true, deletedAt: null }).lean(),
+    CompanySettings.findOne(liveCompanySettingsFilter(companyId)).lean(),
     FormConfig.find({ companyId, isActive: true, deletedAt: null }).lean(),
     ColumnConfig.find({ companyId, isActive: true, deletedAt: null }).lean(),
     BillConfig.find({ companyId, isActive: true, deletedAt: null }).lean(),
@@ -317,11 +336,11 @@ exports.saveModuleConfig = async (companyId, body, actorId, req) => {
 };
 
 exports.getCompanySettings = async (companyId) => {
-  let settings = await CompanySettings.findOne({ companyId, isActive: true, deletedAt: null }).lean();
+  let settings = await CompanySettings.findOne(liveCompanySettingsFilter(companyId)).lean();
   if (!settings) {
     settings = await CompanySettings.findOneAndUpdate(
       { companyId },
-      { companyId, version: 1, publishedAt: new Date(), isActive: true },
+      { companyId, version: 1, publishedAt: new Date(), isActive: true, deletedAt: null },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).lean();
   }
@@ -340,7 +359,8 @@ exports.saveCompanySettings = async (companyId, body, actorId, req) => {
     showLogo, printWatermark, primaryColor, logoUrl, offlineModeEnabled,
     bankName, accountName, accountNo, ifsc, bankBranch, upiId, invoiceTerms,
     invoiceTemplateId, autoFestiveTheme, showFestivalGreeting,
-    customField1Label, customField2Label, customField3Label
+    customField1Label, customField2Label, customField3Label,
+    uiThemeId,
   } = body || {};
 
   const patch = {
@@ -352,7 +372,8 @@ exports.saveCompanySettings = async (companyId, body, actorId, req) => {
     showLogo, printWatermark, primaryColor, logoUrl, offlineModeEnabled,
     bankName, accountName, accountNo, ifsc, bankBranch, upiId, invoiceTerms,
     invoiceTemplateId, autoFestiveTheme, showFestivalGreeting,
-    customField1Label, customField2Label, customField3Label
+    customField1Label, customField2Label, customField3Label,
+    uiThemeId,
   };
   Object.keys(patch).forEach((k) => {
     if (patch[k] === undefined) delete patch[k];

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { assertDestructiveQaAllowed } = require('../../utils/mongoSafety');
 
 const COLLECTIONS_BY_COMPANY = [
   'stockmovements',
@@ -36,6 +37,7 @@ const COLLECTIONS_BY_COMPANY = [
 ];
 
 async function truncateTenant(companyId) {
+  assertDestructiveQaAllowed('truncateTenant');
   const oid = typeof companyId === 'string' ? new mongoose.Types.ObjectId(companyId) : companyId;
   const db = mongoose.connection.db;
 

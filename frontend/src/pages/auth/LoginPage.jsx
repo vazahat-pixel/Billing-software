@@ -6,6 +6,7 @@ import { loginWithOfflineSupport } from '../../utils/loginService';
 import { listOfflineProfiles } from '../../utils/offlineAuth';
 import { isOffline } from '../../utils/offlineHelpers';
 import { subscribeNetworkStatus } from '../../utils/networkStatus';
+import { isDesktopShell } from '../../utils/desktopMode';
 
 /** Seeded by backend/seed.js — shown only in Vite dev for quick local login */
 const DEMO_USERS = [
@@ -33,6 +34,27 @@ const LoginPage = () => {
     
     const navigate = useNavigate();
     const setAuth = useStore(state => state.setAuth);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const local =
+                    typeof window.textileDesktop?.isLocalSync === 'function'
+                        ? window.textileDesktop.isLocalSync()
+                        : window.textileDesktop?.isLocal;
+                if (local === false) return;
+
+                if (window.textileDesktop?.needsSetup) {
+                    const needs = await window.textileDesktop.needsSetup();
+                    if (!cancelled && needs) navigate('/activate', { replace: true });
+                }
+            } catch {
+                /* ignore */
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [navigate]);
 
     useEffect(() => {
         const unsub = subscribeNetworkStatus(({ isOffline: offline, browserOnline }) => {
@@ -103,7 +125,11 @@ const LoginPage = () => {
                                 </button>
                             ))}
                             <p className="text-[9px] text-emerald-700/80 mt-2">
-                                Prefills fields — click Sign In. If login fails, run <code className="font-mono">npm run seed:users</code> in <code className="font-mono">backend/</code> (QA Admin is a test fixture and can be wiped by QA test runs).
+        Prefills fields — click Sign In. Full demo data:{' '}
+                                <code className="font-mono">npm run seed:demo</code> in{' '}
+                                <code className="font-mono">backend/</code>. If login fails only, run{' '}
+                                <code className="font-mono">npm run restore:logins</code>. Never run{' '}
+                                <code className="font-mono">clean</code>/<code className="font-mono">reset</code> on live Atlas.
                             </p>
                         </div>
                     )}
@@ -205,15 +231,23 @@ const LoginPage = () => {
                     </form>
 
                     <div className="mt-8 pt-8 border-t border-white/5 text-center">
-                        {!offlineMode && (
+                        {!offlineMode && !isDesktopShell() && (
                             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                                 Don't have a business account? 
                                 <Link to="/signup" className="text-black font-black hover:underline ml-1.5">Create Account</Link>
                             </p>
                         )}
+                        {isDesktopShell() && (
+                            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                                Need to activate this PC?
+                                <Link to="/activate" className="text-black font-black hover:underline ml-1.5">Activate</Link>
+                            </p>
+                        )}
+                        {!isDesktopShell() && (
                         <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-3">
                             <Link to="/portal" className="text-slate-500 hover:text-black transition-colors">← Back to Panel Selection</Link>
                         </p>
+                        )}
                     </div>
                 </div>
                 

@@ -989,7 +989,7 @@
   font-weight: 700 !important;
   white-space: nowrap !important;
   line-height: 1.1 !important;
-  color: #334155 !important;
+  color: var(--text-secondary) !important;
   margin-right: 2px !important;
   flex-shrink: 0 !important;
 }
@@ -1006,15 +1006,17 @@
 .classic-erp-window.erp-job-issue-window input.classic-erp-input,
 .classic-erp-window.erp-job-issue-window select.classic-erp-select,
 .classic-erp-window.erp-job-issue-window .classic-erp-control input {
-  height: 21px !important;
-  min-height: 21px !important;
-  max-height: 21px !important;
-  font-size: 10px !important;
-  padding: 0 4px !important;
-  line-height: 19px !important;
-  border-radius: 2px !important;
-  border: 1px solid #cbd5e1 !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: none !important;
+  font-size: 12px !important;
+  padding: 0 8px !important;
+  line-height: 1.25 !important;
+  border-radius: var(--radius-input, 6px) !important;
+  border: 1px solid var(--border, #cbd5e1) !important;
   box-sizing: border-box !important;
+  color: var(--text-primary) !important;
+  background: var(--bg-card) !important;
 }
 
 /* Prevent numeric input spin buttons from causing text truncation */

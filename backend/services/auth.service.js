@@ -75,7 +75,7 @@ exports.register = async (name, email, password, companyName, options = {}) => {
     const user = new User({ name, email, password, role: 'user', companyRole: 'owner' });
     await user.save();
 
-    // 4. Create Company — self-serve SaaS tenant
+    // 4. Create Company — self-serve SaaS tenant (web only; desktop uses provisioning packs)
     const company = new Company({
         name: companyName,
         ownerId: user._id,

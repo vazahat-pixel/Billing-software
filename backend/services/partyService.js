@@ -144,11 +144,21 @@ class PartyService {
     return ledger;
   }
 
-  async getParties(companyId, { type, favorites } = {}) {
+  async getParties(companyId, { type, favorites, page, limit } = {}) {
     const filter = { companyId };
     if (type) filter.type = type;
     if (favorites) filter.isFavorite = true;
-    return await Party.find(filter).sort({ name: 1 });
+    const q = Party.find(filter).sort({ name: 1 });
+    const lim = limit != null ? Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500) : null;
+    if (lim != null) {
+      const p = Math.max(parseInt(page, 10) || 1, 1);
+      const [items, total] = await Promise.all([
+        q.skip((p - 1) * lim).limit(lim).lean(),
+        Party.countDocuments(filter),
+      ]);
+      return { items, total, page: p, limit: lim };
+    }
+    return await q;
   }
 
   async searchParties(query, companyId) {

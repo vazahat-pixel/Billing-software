@@ -13,9 +13,20 @@ exports.getInventory = async (req, res) => {
 
 exports.getLotsByItem = async (req, res) => {
   try {
-    const { itemId } = req.query;
+    const { itemId, page, limit } = req.query;
     const companyId = req.companyId || req.query.companyId;
-    const lots = await InventoryLot.find({ itemId, companyId });
+    const filter = { companyId };
+    if (itemId) filter.itemId = itemId;
+    const lim = limit != null ? Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500) : null;
+    if (lim != null) {
+      const p = Math.max(parseInt(page, 10) || 1, 1);
+      const [items, total] = await Promise.all([
+        InventoryLot.find(filter).sort({ createdAt: -1 }).skip((p - 1) * lim).limit(lim).lean(),
+        InventoryLot.countDocuments(filter),
+      ]);
+      return res.status(200).json({ success: true, data: { items, total, page: p, limit: lim } });
+    }
+    const lots = await InventoryLot.find(filter).sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: lots });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

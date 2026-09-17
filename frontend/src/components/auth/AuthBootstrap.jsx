@@ -2,12 +2,12 @@ import React, { useEffect, useRef } from 'react';
 import useStore from '../../store/useStore';
 import { initSyncListener } from '../../utils/syncQueue';
 import { subscribeNetworkStatus } from '../../utils/networkStatus';
+import { useLocalApiAsSourceOfTruth } from '../../utils/desktopMode';
 
 const AuthBootstrap = ({ children }) => {
   const { sessionReady, bootstrapMasters, token } = useStore();
   const mastersBootedRef = useRef(false);
-
-  // restoreSession runs once in AppProviders — do not call again here (double refresh)
+  const desktopLocal = useLocalApiAsSourceOfTruth();
 
   useEffect(() => {
     if (!sessionReady || !token) {
@@ -20,7 +20,7 @@ const AuthBootstrap = ({ children }) => {
   }, [sessionReady, token, bootstrapMasters]);
 
   useEffect(() => {
-    if (!token) return undefined;
+    if (!token || desktopLocal) return undefined;
 
     const onSynced = (entityType, synced, localId, action) => {
       const store = useStore.getState();
@@ -30,7 +30,7 @@ const AuthBootstrap = ({ children }) => {
         parties: 'parties',
         items: 'items',
         payments: 'payments',
-        receipts: 'receipts'
+        receipts: 'receipts',
       };
       const key = keyMap[entityType];
       if (!key || !store[key]) return;
@@ -43,7 +43,7 @@ const AuthBootstrap = ({ children }) => {
       if (entityType === 'payments' || entityType === 'receipts') {
         const vouchers = [
           ...(entityType === 'payments' ? [synced, ...store.payments] : store.payments),
-          ...(entityType === 'receipts' ? [synced, ...store.receipts] : store.receipts)
+          ...(entityType === 'receipts' ? [synced, ...store.receipts] : store.receipts),
         ].filter((v, i, arr) => arr.findIndex((x) => (x.id || x._id) === (v.id || v._id)) === i);
         useStore.setState({ vouchers });
       }
@@ -56,15 +56,16 @@ const AuthBootstrap = ({ children }) => {
     };
 
     return initSyncListener(onSynced, null, onComplete);
-  }, [token]);
+  }, [token, desktopLocal]);
 
   useEffect(() => {
+    if (desktopLocal) return undefined;
     return subscribeNetworkStatus(({ isOffline }) => {
       if (isOffline && useStore.getState().token) {
         useStore.getState().hydrateFromCache();
       }
     });
-  }, []);
+  }, [desktopLocal]);
 
   if (!sessionReady) {
     return (

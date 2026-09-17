@@ -1,92 +1,91 @@
-# Textile ERP — Desktop (Electron)
+# Textile ERP — Standalone Offline Desktop
 
-End-user Windows app for the MERN Textile ERP.  
-UI runs inside Electron; **API stays on your server** (localhost or cloud).
+**1 PC = 1 company.** Electron embeds a local MongoDB + Express API so the full ERP runs without internet.
 
 ## Architecture
 
 ```
-┌─────────────────────┐         HTTPS / LAN          ┌──────────────────┐
-│  Electron (Windows) │  ─────────────────────────►  │  Node API        │
-│  React UI bundled   │     /api/...                 │  + MongoDB       │
-└─────────────────────┘                              └──────────────────┘
+┌──────────────────────────────────────────┐
+│ Electron (Windows)                       │
+│  React UI  →  http://127.0.0.1:PORT/api  │
+│  portable mongod  +  Node Express API    │
+│  Data: %APPDATA%/Textile ERP/data/mongo  │
+└──────────────────────────────────────────┘
 ```
 
-Admin SaaS panel can stay **web-only**; users get the desktop installer.
+IndexedDB is **not** the system of record in desktop-local mode (cache disabled for large lists).
 
-## Prerequisites
+## Prerequisites (dev)
 
 - Node 20+
-- Backend running (`cd backend && npm run dev`) — default `http://localhost:5000`
-- MongoDB available to the backend
+- MongoDB available as `mongod` on PATH **or** run `node desktop/scripts/fetch-mongodb.cjs` once
+- Backend deps: `cd backend && npm install`
 
-## 1) Development (hot reload UI)
+## Development
 
-Terminal A — API:
 ```bash
-cd backend
-npm run dev
+# Terminal A — optional if you rely on embedded stack from Electron
+cd backend && npm run dev
+
+# Terminal B — Vite UI
+cd frontend && npm run dev
+
+# Terminal C — Electron (boots local mongod+API when mode=local)
+cd desktop && npm install && npm start
 ```
 
-Terminal B — Vite UI:
-```bash
-cd frontend
-npm run dev
-```
+First launch opens **Activate** (`/activate`): import the Super-Admin provisioning pack, set owner password, then login. Public signup/`/setup` company self-creation is disabled on desktop.
 
-Terminal C — Electron shell:
-```bash
-cd desktop
-npm install
-npm start
-```
+**Pack signing:** desktop and Web Super Admin must share the same `PROVISIONING_PACK_SECRET` (or `JWT_SECRET`). Generate packs from Admin → Companies → provisioning pack download.
 
-Electron opens `http://localhost:5173` and uses API from `desktop/config.json` / userData  
-(default `http://localhost:5050/api`).
-
-## 2) Production Windows installer (for users)
+## Production Windows installer
 
 ```bash
-# From repo root — build UI into desktop/renderer, then NSIS setup
+# 1) Fetch MongoDB Community binaries (SSPL) into desktop/vendor/mongodb
+node desktop/scripts/fetch-mongodb.cjs
+
+# 2) Ensure backend node_modules exist (copied into resources)
+cd backend && npm install --omit=dev && cd ..
+
+# 3) Build UI + NSIS
 cd desktop
 npm install
 npm run dist:win
 ```
 
-Optional: bake a default API URL into the UI build:
-```bash
-set ERP_API_URL=https://your-api.example.com/api
-npm run dist:win
-```
+Installer output: `desktop/dist/TextileERP-Setup-*.exe`
 
-Installer output:
-`desktop/dist/TextileERP-Setup-1.0.0.exe`
+### Extra resources packaged
 
-## 3) After install — point app at your API
+- `vendor/mongodb/**` — portable `mongod`
+- `backend/**` — Express API (with node_modules)
+- Renderer UI under `renderer/`
 
-On the user PC open:
+## Backup / restore
 
-`%APPDATA%\Textile ERP\config.json`
+In the app: **File → Backup data…** / **Restore data…**  
+Zips `%APPDATA%/Textile ERP` (mongo data + config + jwt secret).
+
+## Remote API mode (optional)
+
+Edit `%APPDATA%/Textile ERP/config.json`:
 
 ```json
 {
+  "mode": "remote",
   "apiBaseUrl": "https://your-api.example.com/api"
 }
 ```
 
-Restart the app.  
-Menu **File → API Settings…** shows the path.
+Restart the app. Standalone offline requires `"mode": "local"`.
 
-## Features
+## Smoke test
 
-- System tray (close hides to tray)
-- Native menu + shortcuts
-- Licence device binding (`window.textileDesktop.machineId`)
-- Desktop notifications bridge
-- Auto-update stub (`electron-updater` when publish URL is set)
+```bash
+cd desktop
+node scripts/smoke-local-boot.js
+```
 
-## Notes
+## Licence note
 
-- Public web signup can stay disabled; create companies from **Admin**.
-- Do **not** set `ALLOW_SUBSCRIPTION_BYPASS=true` on customer servers.
-- Offline mode still uses the existing IndexedDB / sync queue in the frontend.
+Bundled MongoDB Community is under the **Server Side Public License (SSPL)**. See `vendor/mongodb/LICENSE-NOTICE.txt` after fetch.

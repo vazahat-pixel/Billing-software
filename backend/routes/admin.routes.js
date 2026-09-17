@@ -91,6 +91,7 @@ router.delete('/user/:userId', adminController.deleteCompanyUser);
 
 // Tenant lifecycle
 router.get('/company/:id/export', adminController.exportCompany);
+router.post('/company/:id/provisioning-pack', require('../controllers/provisioning.controller').generateProvisioningPack);
 router.post('/company/:id/purge', adminController.deleteCompanyHard);
 router.put('/company/:id/plan', adminController.changeCompanyPlan);
 router.post('/company/:id/impersonate', adminController.impersonateCompany);

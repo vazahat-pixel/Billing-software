@@ -2,6 +2,13 @@ const authService = require('../services/auth.service');
 
 exports.register = async (req, res) => {
     try {
+        // Desktop offline clients must activate a Super-Admin provisioning pack — never self-create a company.
+        if (String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true') {
+            return res.status(403).json({
+                message: 'Desktop registration is disabled. Import a provisioning pack from your Super Admin.',
+                code: 'DESKTOP_ACTIVATION_REQUIRED',
+            });
+        }
         const envFlag = String(process.env.ALLOW_PUBLIC_REGISTER || '').toLowerCase();
         const allow =
             envFlag === 'true' ||

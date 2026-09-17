@@ -15,7 +15,7 @@ const QA_USERS = [
 async function seedUsers(ctx) {
   const companyId = await resolveCompanyId(ctx);
   const profile = ctx.profile.name;
-  const password = process.env.QA_DEFAULT_PASSWORD || 'QaTenant@123';
+  const password = process.env.QA_DEFAULT_PASSWORD || 'Admin@123';
   const hash = await bcrypt.hash(password, 10);
   const users = [];
 

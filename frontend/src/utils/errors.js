@@ -97,6 +97,7 @@ export function parseApiError(err, fallback = 'Something went wrong. Please try 
     'FEATURE_LOCKED',
     'SUBSCRIPTION_INACTIVE',
     'LICENSE_INVALID',
+    'FORBIDDEN',
   ]);
 
   if (code && byCode[code]) {

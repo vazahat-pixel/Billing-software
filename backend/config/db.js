@@ -63,6 +63,13 @@ async function attemptConnection(uri) {
     await mongoose.connect(uri, MONGO_OPTIONS);
     isConnecting = false;
     retryCount = 0;
+    try {
+      const { warnIfSharedLiveDatabase } = require('../utils/mongoSafety');
+      const warn = warnIfSharedLiveDatabase();
+      if (warn) logger.warn(warn);
+    } catch {
+      /* ignore */
+    }
     return mongoose.connection;
   } catch (err) {
     isConnecting = false;

@@ -2,15 +2,18 @@
   "name": "textile-erp-desktop",
   "version": "1.0.0",
   "private": true,
-  "description": "Textile ERP Desktop — Electron shell for end users",
+  "description": "Textile ERP Desktop — standalone offline (1 PC = 1 company)",
   "main": "main.js",
   "author": "Textile ERP",
   "scripts": {
     "start": "electron .",
+    "fetch:mongo": "node scripts/fetch-mongodb.cjs",
+    "prepare:backend": "node scripts/prepare-backend.cjs",
     "build:ui": "node scripts/build-ui.cjs",
-    "pack": "npm run build:ui && electron-builder --dir",
-    "dist": "npm run build:ui && electron-builder",
-    "dist:win": "npm run build:ui && electron-builder --win nsis"
+    "smoke:local": "node scripts/smoke-local-boot.js",
+    "pack": "npm run prepare:backend && npm run build:ui && electron-builder --dir",
+    "dist": "npm run prepare:backend && npm run build:ui && electron-builder",
+    "dist:win": "npm run prepare:backend && npm run build:ui && electron-builder --win nsis"
   },
   "build": {
     "appId": "com.textileerp.desktop",
@@ -25,6 +28,7 @@
       "updater.js",
       "machineId.js",
       "config.example.json",
+      "localRuntime/**/*",
       "renderer/**/*",
       "assets/**/*"
     ],
@@ -32,15 +36,26 @@
       {
         "from": "config.example.json",
         "to": "config.example.json"
+      },
+      {
+        "from": "vendor/mongodb",
+        "to": "vendor/mongodb",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/backend",
+        "to": "backend",
+        "filter": ["**/*"]
       }
+    ],
+    "asarUnpack": [
+      "localRuntime/**/*"
     ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ],
       "artifactName": "TextileERP-Setup-${version}.${ext}"
@@ -50,7 +65,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Textile ERP"
+      "shortcutName": "Textile ERP",
+      "deleteAppDataOnUninstall": false
     },
     "publish": [
       {

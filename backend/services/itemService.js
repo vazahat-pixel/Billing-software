@@ -117,10 +117,20 @@ class ItemService {
     return await new Item(normalized).save();
   }
 
-  async getItems(companyId, { favorites } = {}) {
+  async getItems(companyId, { favorites, page, limit } = {}) {
     const filter = { companyId };
     if (favorites) filter.isFavorite = true;
-    return await Item.find(filter).sort({ name: 1 });
+    const q = Item.find(filter).sort({ name: 1 });
+    const lim = limit != null ? Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500) : null;
+    if (lim != null) {
+      const p = Math.max(parseInt(page, 10) || 1, 1);
+      const [items, total] = await Promise.all([
+        q.skip((p - 1) * lim).limit(lim).lean(),
+        Item.countDocuments(filter),
+      ]);
+      return { items, total, page: p, limit: lim };
+    }
+    return await q;
   }
 
   async searchItems(query, companyId) {

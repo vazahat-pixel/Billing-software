@@ -6,15 +6,21 @@ const { rand, randFloat, randomDateInFY, pick } = require('../utils/faker');
 const logger = require('../utils/logger');
 
 async function loadMasters(companyId) {
-  const [suppliers, items, warehouseId] = await Promise.all([
+  const [suppliers, items, warehouseId, gstCfg] = await Promise.all([
     Party.find({ companyId, type: { $in: ['Supplier', 'Both'] } }).limit(20).lean(),
     Item.find({ companyId, category: { $in: ['Grey', 'Yarn'] } }).limit(30).lean(),
     require('../../models/Warehouse').findOne({ companyId, isDefault: true }).select('_id').lean(),
+    require('../../services/gstConfigService').getOrCreate(companyId).catch(() => null),
   ]);
   if (!suppliers.length || !items.length) {
     throw new Error('Seed masters first ? suppliers and items required');
   }
-  return { suppliers, items, warehouseId: warehouseId?._id };
+  return {
+    suppliers,
+    items,
+    warehouseId: warehouseId?._id,
+    companyStateCode: gstCfg?.stateCode || String(gstCfg?.gstin || '').slice(0, 2) || '24',
+  };
 }
 
 function buildPurchasePayload(companyId, masters, index) {
@@ -30,10 +36,15 @@ function buildPurchasePayload(companyId, masters, index) {
       pcs: rand(1, 20),
       rate,
       amount: Number((mts * rate).toFixed(2)),
+      gstRate: item.gstRate ?? 5,
     });
   }
   const supplier = pick(masters.suppliers);
-  const sameState = Math.random() > 0.3;
+  const companyState = String(masters.companyStateCode || '24');
+  const supplierCode =
+    String(supplier.stateCode || '').padStart(2, '0') ||
+    String(supplier.gstin || '').slice(0, 2);
+  const sameState = !supplierCode || supplierCode === companyState;
   return {
     companyId,
     supplierId: supplier._id,

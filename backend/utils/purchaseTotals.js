@@ -2,23 +2,17 @@ const { computeTaxComponents, determineGstType } = require('./gstDetermination')
 
 /**
  * Server-side purchase totals — Sprint 4.2 parity with salesTotals.
- * Never trust client GST totals, but mirror PurchaseModal's computeLine() for line
- * amounts so saved/printed figures match what the user actually entered.
+ * Never trust client GST totals. GST is computed **per line**, then rolled up,
+ * so mixed rates / footer discounts stay consistent for dummy + live bills.
  */
 const PCS_UNITS = ['PCS', 'PC', 'NOS', 'NO'];
 
-/** Qty that drives Amount = Rate × Qty, matching PurchaseModal.jsx's lineQty(). */
 function lineQty(line) {
   const unit = String(line.unit || 'MTRS').toUpperCase();
   if (PCS_UNITS.includes(unit)) return Number(line.pcs || 0);
   return Number(line.mts || line.qty || line.quantity || 0);
 }
 
-/**
- * Gross (pre-discount) line amount. Trusts the client-computed value when present —
- * it already carries fold adjustments (NETQTY/QTY) that can't be re-derived from
- * qty × rate alone — and only falls back to qty × rate for legacy/incomplete payloads.
- */
 function lineAmount(line) {
   const provided = Number(line.amount);
   if (Number.isFinite(provided) && provided !== 0) return Math.max(0, Number(provided.toFixed(2)));
@@ -27,7 +21,6 @@ function lineAmount(line) {
   return Math.max(0, Number((qty * rate).toFixed(2)));
 }
 
-/** Post-discount, post-addAmt taxable contribution of one (already-amounted) line. */
 function lineTaxable(line) {
   const amount = Number(line.amount || 0);
   const dis1Amt = Number(line.dis1Amt || 0);
@@ -36,6 +29,37 @@ function lineTaxable(line) {
   const discount = dis1Amt || dis2Amt ? dis1Amt + dis2Amt : legacyDiscount;
   const addAmt = Number(line.addAmt || 0);
   return Math.max(0, Number((amount - discount + addAmt).toFixed(2)));
+}
+
+function resolveLineRate(it, fallbackGstRate, isUnregistered) {
+  if (isUnregistered) return 0;
+  const candidates = [it.gstPer, it.gstRate];
+  if (it.itemId && typeof it.itemId === 'object') candidates.push(it.itemId.gstRate);
+  candidates.push(fallbackGstRate);
+
+  // Prefer first positive rate. Explicit 0 is ignored unless every source is 0
+  // (dummy/bad rows often store gstPer:0 while the bill header still carries tax).
+  for (const raw of candidates) {
+    if (raw === undefined || raw === null || raw === '') continue;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 5; // textile default slab when nothing usable is stated
+}
+
+function signedAdjust(amount, sign) {
+  return sign === '+' ? Number(amount || 0) : -Number(amount || 0);
+}
+
+function footerTaxableDelta(extras = {}) {
+  let delta = 0;
+  delta += signedAdjust(extras.discountAmt, extras.discountSign);
+  delta += signedAdjust(extras.lessAmt, extras.lessSign);
+  delta += signedAdjust(extras.addAmt, extras.addSign);
+  delta += signedAdjust(extras.octroi, extras.octroiSign);
+  delta -= Number(extras.rdAmt || 0);
+  delta += Number(extras.freight || 0);
+  return Number(delta.toFixed(2));
 }
 
 function recalcPurchaseTotals(items = [], {
@@ -48,56 +72,7 @@ function recalcPurchaseTotals(items = [], {
   partyStateCode,
   reverseCharge = false,
 } = {}) {
-  const mapped = items.map((it) => {
-    const amount = lineAmount(it);
-    return { ...it, amount };
-  });
-
-  // Signed footer adjustments — sign '+' adds to taxable, anything else (default '-') subtracts.
-  // Must mirror the frontend's adjust() in PurchaseModal.jsx exactly, or the saved bill won't
-  // match what the user saw on screen before hitting Save.
-  const signedAdjust = (amount, sign) => (sign === '+' ? Number(amount || 0) : -Number(amount || 0));
-
-  let taxable = mapped.reduce((s, it) => s + lineTaxable(it), 0);
-  taxable += signedAdjust(extras.discountAmt, extras.discountSign);
-  taxable += signedAdjust(extras.lessAmt, extras.lessSign);
-  taxable += signedAdjust(extras.addAmt, extras.addSign);
-  taxable += signedAdjust(extras.octroi, extras.octroiSign);
-  taxable -= Number(extras.rdAmt || 0);
-  taxable += Number(extras.freight || 0);
-  taxable = Math.max(0, Number(taxable.toFixed(2)));
-
-  // Unregistered-dealer purchase — no GST is charged on the bill (rate forced to 0).
   const isUnregistered = /UNREGISTERED/i.test(extras.invoiceType || '');
-
-  // Per-line GST rate, honouring what the operator actually typed.
-  //
-  // Two bugs lived here:
-  //   1. Only `gstRate` was read, but PurchaseModal sends the rate as `gstPer` — so every
-  //      per-line rate the user entered was silently ignored and the invoice-level
-  //      fallback (default 5) was applied instead.
-  //   2. `it.gstRate || …` treats an explicit 0 as "missing" and falls through to that
-  //      same 5% fallback, making a genuinely zero-GST purchase impossible to record.
-  // A stated 0 is a real answer ("this bill carries no GST"), not an absent one.
-  const lineRate = (it) => {
-    const raw = [it.gstPer, it.gstRate, it.itemId?.gstRate]
-      .find((v) => v !== undefined && v !== null && v !== '');
-    return raw === undefined ? null : Number(raw) || 0;
-  };
-
-  const statedRates = mapped.map(lineRate).filter((r) => r !== null);
-  const positiveRates = statedRates.filter((r) => r > 0);
-
-  const effectiveRate = isUnregistered
-    ? 0
-    : positiveRates.length
-      // Mixed/positive rates: average them, as before.
-      ? Number((positiveRates.reduce((a, b) => a + b, 0) / positiveRates.length).toFixed(2))
-      : statedRates.length
-        // Every line explicitly said 0 → the bill genuinely carries no GST.
-        ? 0
-        // Nothing stated at all (legacy/partial payload) → invoice-level fallback.
-        : Number(gstRate);
 
   const resolvedType = determineGstType({
     companyGstin,
@@ -107,33 +82,95 @@ function recalcPurchaseTotals(items = [], {
     forceType: extras.forceGstType || (gstType === 'IGST' || gstType === 'CGST+SGST' ? gstType : null),
   });
 
-  const tax = computeTaxComponents(taxable, effectiveRate, resolvedType, extras.cessRate || 0);
+  let linesTaxable = 0;
+  let cgst = 0;
+  let sgst = 0;
+  let igst = 0;
+  let cess = 0;
+  let rateWeight = 0;
+  let rateSum = 0;
+
+  const mapped = items.map((it) => {
+    const amount = lineAmount(it);
+    const taxable = lineTaxable({ ...it, amount });
+    const rate = resolveLineRate(it, gstRate, isUnregistered);
+    const tax = computeTaxComponents(taxable, rate, resolvedType, Number(it.cessRate || extras.cessRate || 0));
+
+    linesTaxable += taxable;
+    cgst += tax.cgst;
+    sgst += tax.sgst;
+    igst += tax.igst;
+    cess += tax.cess;
+    if (taxable > 0) {
+      rateWeight += taxable;
+      rateSum += rate * taxable;
+    }
+
+    return {
+      ...it,
+      amount,
+      taxableAmount: tax.taxableAmount,
+      gstRate: rate,
+      gstPer: rate,
+      cgst: tax.cgst,
+      sgst: tax.sgst,
+      igst: tax.igst,
+      gstAmt: tax.gstAmount,
+      cess: tax.cess,
+    };
+  });
+
+  const footerDelta = footerTaxableDelta(extras);
+  let taxable = Math.max(0, Number((linesTaxable + footerDelta).toFixed(2)));
+
+  const effectiveRate = rateWeight > 0
+    ? Number((rateSum / rateWeight).toFixed(2))
+    : (isUnregistered ? 0 : Number(gstRate) || 0);
+
+  // Footer add/less must move GST with taxable (same bill rate).
+  if (Math.abs(footerDelta) >= 0.005) {
+    const footerTax = computeTaxComponents(Math.abs(footerDelta), effectiveRate, resolvedType, extras.cessRate || 0);
+    const sign = footerDelta >= 0 ? 1 : -1;
+    cgst = Number((cgst + sign * footerTax.cgst).toFixed(2));
+    sgst = Number((sgst + sign * footerTax.sgst).toFixed(2));
+    igst = Number((igst + sign * footerTax.igst).toFixed(2));
+    cess = Number((cess + sign * footerTax.cess).toFixed(2));
+  }
+
+  // Clamp tiny negatives from rounding after large less-adjustments
+  cgst = Math.max(0, Number(cgst.toFixed(2)));
+  sgst = Math.max(0, Number(sgst.toFixed(2)));
+  igst = Math.max(0, Number(igst.toFixed(2)));
+  cess = Math.max(0, Number(cess.toFixed(2)));
+
+  const gstAmount = Number((cgst + sgst + igst + cess).toFixed(2));
   const tdsAmount = Number(extras.tdsAmount || 0);
   const roundOff = Number(extras.roundOff || 0);
-  // TCS — manually entered (rate/amount), collected on top by the seller, so it adds to payable.
   const tcsAmt = Number(extras.tcsAmt || 0);
+  const isRcm = Boolean(
+    reverseCharge === true
+    || extras.reverseCharge === 'Yes'
+    || extras.reverseCharge === true
+    || (Number(extras.rcmCharge) > 0)
+  );
 
-  const isRcm = Boolean(reverseCharge === true || extras.reverseCharge === 'Yes' || extras.reverseCharge === true || (Number(extras.rcmCharge) > 0));
-
-  // RCM: tax is payable by recipient — net to supplier excludes GST (or includes depending on policy)
-  // Standard: invoice net to supplier = taxable (+ non-RCM GST). Under RCM, GST paid separately.
   let netAmount;
   if (isRcm) {
     netAmount = Number((taxable - tdsAmount + roundOff + tcsAmt).toFixed(2));
   } else {
-    netAmount = Number((taxable + tax.gstAmount + tax.cess - tdsAmount + roundOff + tcsAmt).toFixed(2));
+    netAmount = Number((taxable + gstAmount - tdsAmount + roundOff + tcsAmt).toFixed(2));
   }
 
   return {
     items: mapped,
-    taxableAmount: tax.taxableAmount,
-    gstType: tax.gstType,
+    taxableAmount: taxable,
+    gstType: resolvedType || gstType,
     gstRate: effectiveRate,
-    cgst: tax.cgst,
-    sgst: tax.sgst,
-    igst: tax.igst,
-    cess: tax.cess,
-    gstAmount: Number((tax.gstAmount + tax.cess).toFixed(2)),
+    cgst,
+    sgst,
+    igst,
+    cess,
+    gstAmount,
     tdsAmount,
     tcsAmt,
     reverseCharge: isRcm,

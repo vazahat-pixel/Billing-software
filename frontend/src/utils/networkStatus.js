@@ -1,4 +1,5 @@
 /** Real network state — WiFi off, API down, or sticky false-offline recovery */
+import { useLocalApiAsSourceOfTruth } from './desktopMode';
 
 let browserOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 let serverReachable = true;
@@ -9,15 +10,24 @@ let probing = false;
 
 const PROBE_MS = 4000;
 
-export const getNetworkStatus = () => ({
-  browserOnline,
-  serverReachable,
-  isOffline: !browserOnline || !serverReachable,
-});
+export const getNetworkStatus = () => {
+  // Standalone desktop: local API is the SoR — never divert to IndexedDB write path
+  if (useLocalApiAsSourceOfTruth()) {
+    return { browserOnline: true, serverReachable: true, isOffline: false };
+  }
+  return {
+    browserOnline,
+    serverReachable,
+    isOffline: !browserOnline || !serverReachable,
+  };
+};
 
 export const isOffline = () => getNetworkStatus().isOffline;
 
-export const isBrowserOffline = () => !browserOnline;
+export const isBrowserOffline = () => {
+  if (useLocalApiAsSourceOfTruth()) return false;
+  return !browserOnline;
+};
 
 export const subscribeNetworkStatus = (fn) => {
   listeners.add(fn);
@@ -32,6 +42,11 @@ const notify = () => {
 };
 
 export const markServerUnreachable = () => {
+  if (useLocalApiAsSourceOfTruth()) {
+    // Local stack blips — keep probing but do not flip the app into IDB-SoR mode
+    scheduleProbe();
+    return;
+  }
   if (!serverReachable) {
     scheduleProbe();
     return;
@@ -41,7 +56,7 @@ export const markServerUnreachable = () => {
 };
 
 export const markServerReachable = () => {
-  if (!browserOnline) return;
+  if (!browserOnline && !useLocalApiAsSourceOfTruth()) return;
   if (!serverReachable) {
     serverReachable = true;
     notify();
@@ -52,6 +67,17 @@ export const markServerReachable = () => {
 
 export const getApiOrigin = () => {
   if (typeof window === 'undefined') return '';
+  try {
+    const desktopUrl =
+      window.textileDesktop?.getApiBaseUrlSync?.() ||
+      import.meta.env?.VITE_API_URL;
+    if (desktopUrl) {
+      const u = new URL(desktopUrl, 'http://127.0.0.1');
+      return u.origin;
+    }
+  } catch {
+    /* fall through */
+  }
   if (import.meta.env?.VITE_API_URL) {
     try {
       const u = new URL(import.meta.env.VITE_API_URL, window.location.origin);

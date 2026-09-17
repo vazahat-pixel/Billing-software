@@ -381,9 +381,8 @@ async function postVoucherAccounting(companyId, voucher, ctx, session) {
     });
   }
   if (totalDiscount > 0.004) {
-    const discLedger = await accountingService.getSystemLedger(
-      companyId, isReceipt ? 'Discount Allowed' : 'Discount Received', session
-    );
+    // JSM Zoom Ledger shows "DISCOUNT ACCOUNT" on the party statement for settlement discount.
+    const discLedger = await accountingService.getSystemLedger(companyId, 'DISCOUNT ACCOUNT', session);
     lines.push({
       ledgerId: discLedger._id, ledgerName: discLedger.name, type: sideType, amount: totalDiscount,
       narration: isReceipt

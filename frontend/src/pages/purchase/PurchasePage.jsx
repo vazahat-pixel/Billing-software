@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import useStore from '../../store/useStore';
 import { Plus, Search, Filter, FileText, Calendar, User, MoreVertical, Printer, ArrowRight, History, TrendingUp, Package } from 'lucide-react';
 import PurchaseModal from './PurchaseModal';
@@ -16,6 +16,28 @@ const PurchasePage = () => {
   }, [fetchPurchases, fetchParties]);
 
   const tabs = ['ALL', 'STAGED', 'COMPLETED', 'PENDING'];
+
+  const monthStart = useMemo(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  }, []);
+
+  const monthlyPurchaseTotal = useMemo(
+    () => purchases.reduce((sum, p) => {
+      const d = new Date(p.date || p.createdAt || 0);
+      if (Number.isNaN(d.getTime()) || d < monthStart) return sum;
+      return sum + Number(p.netAmount || p.totals?.total || 0);
+    }, 0),
+    [purchases, monthStart]
+  );
+
+  const pendingCount = useMemo(
+    () => purchases.filter((p) => {
+      const st = String(p.status || p.paymentStatus || '').toLowerCase();
+      return st.includes('pending') || st.includes('draft') || st.includes('staged');
+    }).length,
+    [purchases]
+  );
 
   return (
     <div className="p-8 space-y-8 bg-[#FDFCF9] min-h-screen">
@@ -48,7 +70,7 @@ const PurchasePage = () => {
                <span className="text-[10px] font-bold text-cyan-500 uppercase tracking-widest">Inbound</span>
             </div>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Total Procurement</p>
-            <h3 className="text-3xl font-black text-black mt-1">₹ 24,18,000</h3>
+            <h3 className="text-3xl font-black text-black mt-1">₹ {monthlyPurchaseTotal.toLocaleString('en-IN')}</h3>
          </div>
 
          <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden group">
@@ -70,7 +92,7 @@ const PurchasePage = () => {
                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Review</span>
             </div>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Awaiting Verification</p>
-            <h3 className="text-3xl font-black text-black mt-1">5 Items</h3>
+            <h3 className="text-3xl font-black text-black mt-1">{pendingCount}</h3>
          </div>
       </div>
 

@@ -893,6 +893,60 @@ class GstReturnService {
     };
   }
 
+  _sumGstr1B2bTax(g1) {
+    let taxable = 0;
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+    for (const b of g1.b2b || []) {
+      for (const inv of b.inv || []) {
+        for (const it of inv.itms || []) {
+          const d = it.itm_det || {};
+          taxable += Number(d.txval || 0);
+          cgst += Number(d.camt || 0);
+          sgst += Number(d.samt || 0);
+          igst += Number(d.iamt || 0);
+        }
+      }
+    }
+    return {
+      taxable: round2(taxable),
+      cgst: round2(cgst),
+      sgst: round2(sgst),
+      igst: round2(igst),
+    };
+  }
+
+  _sumGstr1B2cTax(g1) {
+    let taxable = 0;
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+    const rows = [...(g1.b2cs || []), ...(g1.b2clRows || []), ...(g1.b2cl || [])];
+    for (const row of rows) {
+      taxable += Number(row.txval || row.val || 0);
+      cgst += Number(row.camt || row.cgst || 0);
+      sgst += Number(row.samt || row.sgst || 0);
+      igst += Number(row.iamt || row.igst || 0);
+    }
+    return {
+      taxable: round2(taxable),
+      cgst: round2(cgst),
+      sgst: round2(sgst),
+      igst: round2(igst),
+    };
+  }
+
+  _sumGstr1ExportTax(g1) {
+    let taxable = 0;
+    let igst = 0;
+    for (const row of g1.expRows || []) {
+      taxable += Number(row.txval || row.val || 0);
+      igst += Number(row.iamt || row.igst || 0);
+    }
+    return { taxable: round2(taxable), cgst: 0, sgst: 0, igst: round2(igst) };
+  }
+
   /** GSTR-9 annual roll-up (ready structure) */
   async buildGstr9(companyId, financialYear) {
     // FY Apr–Mar: 2025-26 → periods 2025-04 … 2026-03
@@ -907,6 +961,9 @@ class GstReturnService {
     let cgst = 0;
     let sgst = 0;
     let igst = 0;
+    const table4a = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
+    const table4b = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
+    const table4c = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
     for (const period of months) {
       const g1 = await this.buildGstr1(companyId, period);
       monthly.push({ period, totals: g1.totals });
@@ -914,18 +971,42 @@ class GstReturnService {
       cgst += g1.totals.cgst;
       sgst += g1.totals.sgst;
       igst += g1.totals.igst;
+
+      const b2b = this._sumGstr1B2bTax(g1);
+      const b2c = this._sumGstr1B2cTax(g1);
+      const exp = this._sumGstr1ExportTax(g1);
+      table4a.taxable += b2b.taxable;
+      table4a.cgst += b2b.cgst;
+      table4a.sgst += b2b.sgst;
+      table4a.igst += b2b.igst;
+      table4b.taxable += b2c.taxable;
+      table4b.cgst += b2c.cgst;
+      table4b.sgst += b2c.sgst;
+      table4b.igst += b2c.igst;
+      table4c.taxable += exp.taxable;
+      table4c.igst += exp.igst;
     }
 
     const cfg = await this._companyCtx(companyId);
+    const table4 = { taxable: round2(taxable), cgst: round2(cgst), sgst: round2(sgst), igst: round2(igst) };
+    const roundBlock = (b) => ({
+      taxable: round2(b.taxable),
+      cgst: round2(b.cgst),
+      sgst: round2(b.sgst),
+      igst: round2(b.igst),
+    });
     return {
       payload: {
         gstin: cfg.gstin,
         financialYear,
-        table4: { taxable: round2(taxable), cgst: round2(cgst), sgst: round2(sgst), igst: round2(igst) },
+        table4,
+        table4a: roundBlock(table4a),
+        table4b: roundBlock(table4b),
+        table4c: roundBlock(table4c),
         monthly,
         gstr9cReady: true,
       },
-      totals: { taxable: round2(taxable), cgst: round2(cgst), sgst: round2(sgst), igst: round2(igst) },
+      totals: table4,
       period: financialYear,
     };
   }

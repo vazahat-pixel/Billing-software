@@ -23,15 +23,19 @@ async function loadSalesMasters(companyId) {
 }
 
 function buildDirectInvoice(companyId, masters) {
-  const lot = pick(masters.lots.filter((l) => l.remainingMtrs > 20) || masters.lots);
-  const sellMts = Math.min(randFloat(10, 80, 2), (lot.remainingMtrs || 0) - 1);
+  const available = masters.lots.filter((l) => (l.remainingMtrs || 0) > 20);
+  const lot = pick(available.length ? available : masters.lots);
+  const sellMts = Math.min(randFloat(10, 80, 2), Math.max(1, (lot.remainingMtrs || 20) - 1));
   const item = masters.items.find((i) => String(i._id) === String(lot.itemId)) || pick(masters.items);
   const rate = item.salesRate || randFloat(80, 200, 2);
+  const customer = pick(masters.customers);
+  // Mix CGST+SGST (intra Gujarat) and IGST (out-of-state) for GST report coverage
+  const interstate = Boolean(customer.state && customer.state !== 'Gujarat') || Math.random() < 0.35;
   return {
     companyId,
-    customerId: pick(masters.customers)._id,
+    customerId: customer._id,
     date: randomDateInFY(),
-    gstType: 'CGST+SGST',
+    gstType: interstate ? 'IGST' : 'CGST+SGST',
     items: [
       {
         itemId: item._id,

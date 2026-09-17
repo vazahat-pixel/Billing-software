@@ -1,14 +1,14 @@
 /**
- * Textile ERP — Electron main process (user desktop shell)
- * Loads the packaged React UI and talks to the remote/local MERN API.
+ * Textile ERP — Electron main process
+ * Standalone offline: boots local mongod + Express, then loads the React UI.
  */
 const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, Notification, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { pathToFileURL } = require('url');
 
 let mainWindow = null;
 let tray = null;
+let localStack = null;
 const isDev = !app.isPackaged;
 
 function readJsonSafe(file) {
@@ -20,8 +20,13 @@ function readJsonSafe(file) {
   return null;
 }
 
-/** Runtime API base — userData overrides packaged default. */
+function writeJsonSafe(file, obj) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(obj, null, 2), 'utf8');
+}
+
 function resolveApiBaseUrl() {
+  if (localStack?.apiBaseUrl) return localStack.apiBaseUrl;
   if (process.env.ERP_API_URL) return process.env.ERP_API_URL.replace(/\/$/, '');
 
   const candidates = [
@@ -33,8 +38,7 @@ function resolveApiBaseUrl() {
     const cfg = readJsonSafe(file);
     if (cfg?.apiBaseUrl) return String(cfg.apiBaseUrl).replace(/\/$/, '');
   }
-  // Dev default: Vite proxy path won't work in Electron — hit backend directly
-  return process.env.VITE_API_URL || 'http://localhost:5050/api';
+  return process.env.VITE_API_URL || 'http://127.0.0.1:5050/api';
 }
 
 function resolveStartUrl() {
@@ -42,7 +46,6 @@ function resolveStartUrl() {
 
   const rendererIndex = path.join(__dirname, 'renderer', 'index.html');
 
-  // Dev hot-reload: Vite. Set ERP_USE_RENDERER=1 to test the packaged UI without NSIS.
   if (isDev && process.env.ERP_USE_RENDERER !== '1') {
     return { type: 'url', value: process.env.VITE_DEV_URL || 'http://localhost:5173' };
   }
@@ -72,7 +75,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false, // machineId + sync IPC need non-sandbox preload
+      sandbox: false,
       spellcheck: true,
     },
   });
@@ -103,6 +106,45 @@ function createWindow() {
   });
 }
 
+async function runBackupDialog() {
+  const { zipUserData } = require('./localRuntime/backup');
+  const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+    title: 'Backup Textile ERP data',
+    defaultPath: `textile-erp-backup-${new Date().toISOString().slice(0, 10)}.zip`,
+    filters: [{ name: 'Zip', extensions: ['zip'] }],
+  });
+  if (canceled || !filePath) return;
+  await zipUserData(app.getPath('userData'), filePath);
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Backup complete',
+    message: `Saved to:\n${filePath}`,
+  });
+}
+
+async function runRestoreDialog() {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Restore Textile ERP data',
+    filters: [{ name: 'Zip', extensions: ['zip'] }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || !result.filePaths[0]) return;
+  const confirm = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    title: 'Restore backup?',
+    message: 'This replaces local data. The app will quit after restore — reopen to continue.',
+    buttons: ['Cancel', 'Restore'],
+    defaultId: 0,
+    cancelId: 0,
+  });
+  if (confirm.response !== 1) return;
+
+  const { restoreUserDataZip } = require('./localRuntime/backup');
+  await restoreUserDataZip(result.filePaths[0], app.getPath('userData'));
+  app.isQuiting = true;
+  app.quit();
+}
+
 function buildMenu() {
   const template = [
     {
@@ -112,22 +154,34 @@ function buildMenu() {
         { label: 'Force Reload', role: 'forceReload' },
         { type: 'separator' },
         {
-          label: 'API Settings…',
+          label: 'Backup data…',
+          click: () => runBackupDialog().catch((e) => dialog.showErrorBox('Backup failed', e.message)),
+        },
+        {
+          label: 'Restore data…',
+          click: () => runRestoreDialog().catch((e) => dialog.showErrorBox('Restore failed', e.message)),
+        },
+        { type: 'separator' },
+        {
+          label: 'Local / API Settings…',
           click: () => {
             const cfgPath = path.join(app.getPath('userData'), 'config.json');
             const current = resolveApiBaseUrl();
-            dialog.showMessageBox(mainWindow, {
-              type: 'info',
-              title: 'API Settings',
-              message: 'Server API URL',
-              detail:
-                `Current: ${current}\n\n` +
-                `Edit this file and restart the app:\n${cfgPath}\n\n` +
-                `Example:\n{\n  "apiBaseUrl": "https://your-api.example.com/api"\n}`,
-              buttons: ['Open config folder', 'OK'],
-            }).then((r) => {
-              if (r.response === 0) shell.openPath(app.getPath('userData'));
-            });
+            const mode = localStack?.mode || readJsonSafe(cfgPath)?.mode || 'local';
+            dialog
+              .showMessageBox(mainWindow, {
+                type: 'info',
+                title: 'Desktop settings',
+                message: mode === 'local' ? 'Standalone offline mode' : 'Remote API mode',
+                detail:
+                  `Mode: ${mode}\nAPI: ${current}\n\nConfig file:\n${cfgPath}\n\n` +
+                  `Local mode embeds MongoDB + API on this PC (1 company).\n` +
+                  `To use a remote server, set "mode": "remote" and apiBaseUrl, then restart.`,
+                buttons: ['Open data folder', 'OK'],
+              })
+              .then((r) => {
+                if (r.response === 0) shell.openPath(app.getPath('userData'));
+              });
           },
         },
         { type: 'separator' },
@@ -171,14 +225,20 @@ function buildMenu() {
     {
       label: 'Help',
       submenu: [
+        { label: `Version ${app.getVersion()}`, enabled: false },
         {
-          label: 'Open in Browser (web)',
+          label: 'About offline desktop',
           click: () => {
-            const api = resolveApiBaseUrl().replace(/\/api\/?$/, '');
-            shell.openExternal(api || 'http://localhost:5173');
+            dialog.showMessageBox(mainWindow, {
+              type: 'info',
+              title: 'Textile ERP Desktop',
+              message: 'Standalone offline ERP (1 PC = 1 company)',
+              detail:
+                'All data stays on this computer. No internet required after install.\n' +
+                'Use File → Backup regularly.',
+            });
           },
         },
-        { label: `Version ${app.getVersion()}`, enabled: false },
       ],
     },
   ];
@@ -222,6 +282,37 @@ ipcMain.handle('desktop:api-url', () => resolveApiBaseUrl());
 ipcMain.on('desktop:api-url-sync', (event) => {
   event.returnValue = resolveApiBaseUrl();
 });
+ipcMain.handle('desktop:is-local', () => (localStack?.mode || 'local') === 'local');
+ipcMain.on('desktop:is-local-sync', (event) => {
+  event.returnValue = (localStack?.mode || 'local') === 'local';
+});
+ipcMain.handle('desktop:needs-setup', async () => {
+  // Remote API (existing SaaS / shared Mongo) — no provisioning pack required
+  const mode = localStack?.mode || readJsonSafe(path.join(app.getPath('userData'), 'config.json'))?.mode || 'local';
+  if (String(mode).toLowerCase() === 'remote') return false;
+
+  // Prefer local API activation status (Mongo) over legacy setup.done file
+  try {
+    const base = resolveApiBaseUrl();
+    if (base) {
+      const res = await fetch(`${String(base).replace(/\/$/, '')}/desktop/activation-status`);
+      if (res.ok) {
+        const json = await res.json();
+        const activated = !!(json?.data?.activated ?? json?.activated);
+        if (activated) return false;
+        return true;
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+  const flag = path.join(app.getPath('userData'), 'setup.done');
+  return !fs.existsSync(flag);
+});
+ipcMain.handle('desktop:mark-setup-done', () => {
+  fs.writeFileSync(path.join(app.getPath('userData'), 'setup.done'), new Date().toISOString(), 'utf8');
+  return true;
+});
 
 ipcMain.handle('desktop:machine-id', () => {
   try {
@@ -232,27 +323,58 @@ ipcMain.handle('desktop:machine-id', () => {
   }
 });
 
-app.whenReady().then(() => {
-  // Seed default config for first run
-  const userCfg = path.join(app.getPath('userData'), 'config.json');
-  if (!fs.existsSync(userCfg)) {
-    try {
-      fs.mkdirSync(app.getPath('userData'), { recursive: true });
-      fs.writeFileSync(
-        userCfg,
-        JSON.stringify(
-          {
-            apiBaseUrl: resolveApiBaseUrl(),
-            note: 'Change apiBaseUrl to your MERN backend /api URL, then restart the app.',
-          },
-          null,
-          2
-        ),
-        'utf8'
-      );
-    } catch {
-      /* ignore */
-    }
+ipcMain.handle('desktop:backup', async () => {
+  await runBackupDialog();
+  return true;
+});
+
+app.whenReady().then(async () => {
+  const userData = app.getPath('userData');
+  fs.mkdirSync(userData, { recursive: true });
+
+  const splash = new BrowserWindow({
+    width: 420,
+    height: 180,
+    frame: false,
+    resizable: false,
+    show: true,
+    alwaysOnTop: true,
+    backgroundColor: '#0f172a',
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+  splash.loadURL(
+    'data:text/html,' +
+      encodeURIComponent(
+        `<html><body style="margin:0;font-family:Segoe UI,sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh">
+        <div style="text-align:center"><div style="font-size:18px;font-weight:600">Textile ERP</div>
+        <div style="margin-top:12px;opacity:.7;font-size:13px">Starting local database…</div></div></body></html>`
+      )
+  );
+
+  try {
+    const { bootLocalStack } = require('./localRuntime');
+    localStack = await bootLocalStack({
+      userData,
+      desktopRoot: __dirname,
+      resourcesPath: process.resourcesPath,
+      isPackaged: app.isPackaged,
+    });
+  } catch (err) {
+    console.error('[desktop] local stack failed', err);
+    splash.destroy();
+    dialog.showErrorBox(
+      'Textile ERP failed to start',
+      `${err.message}\n\nInstall MongoDB locally or run desktop/scripts/fetch-mongodb.cjs, then retry.\nData folder: ${userData}`
+    );
+    app.isQuiting = true;
+    app.quit();
+    return;
+  }
+
+  try {
+    splash.destroy();
+  } catch {
+    /* ignore */
   }
 
   buildMenu();
@@ -269,17 +391,26 @@ app.whenReady().then(() => {
   });
 });
 
+app.on('before-quit', async (e) => {
+  if (app._stackStopped) return;
+  e.preventDefault();
+  app._stackStopped = true;
+  app.isQuiting = true;
+  try {
+    const { shutdownLocalStack } = require('./localRuntime');
+    await shutdownLocalStack();
+  } catch (err) {
+    console.error('[desktop] shutdown error', err);
+  }
+  app.exit(0);
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    /* keep tray alive on Windows */
+    /* tray keeps process alive */
   }
 });
 
 process.on('uncaughtException', (err) => {
   console.error('[desktop] crash', err);
-  if (!app.isQuiting) {
-    app.relaunch();
-    app.isQuiting = true;
-    app.exit(1);
-  }
 });

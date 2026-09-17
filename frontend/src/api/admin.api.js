@@ -21,6 +21,7 @@ export const adminApi = {
   lifecycle: (days) => unwrap(get('/admin/lifecycle', days ? { days } : undefined)),
   runDunning: () => unwrap(post('/admin/dunning/run')),
   exportCompany: (id) => unwrap(get(`/admin/company/${id}/export`)),
+  generateProvisioningPack: (id) => unwrap(post(`/admin/company/${id}/provisioning-pack`)),
   deleteCompany: (id, body) => unwrap(post(`/admin/company/${id}/purge`, body)),
   changeCompanyPlan: (id, body) => unwrap(put(`/admin/company/${id}/plan`, body)),
   impersonateCompany: (id, body) => unwrap(post(`/admin/company/${id}/impersonate`, body || {})),

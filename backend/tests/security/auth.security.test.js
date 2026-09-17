@@ -1,30 +1,24 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const path = require('path');
-const dotenv = require('dotenv');
+const { bootIsolatedApp } = require('../helpers/isolatedApp');
+const { authHeader, unwrapBody } = require('../helpers/setup');
 
-dotenv.config({ path: path.join(__dirname, '../../.env') });
-
-process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'ci-test-jwt-secret-minimum-32-characters-long';
-if (!process.env.MONGO_URI) {
-  process.env.MONGO_URI = 'mongodb://127.0.0.1:27017/billing_test_security';
-}
-
-const mongoose = require('mongoose');
-const request = require('supertest');
-const { waitForMongo, authHeader, unwrapBody } = require('../helpers/setup');
-const app = require('../../server');
-
+/**
+ * Security certification — MUST use in-memory Mongo (never Atlas via .env).
+ */
 describe('Security certification — auth & injection guards', () => {
+  let app;
+  let request;
+  let mongoose;
+  let shutdown;
   let token;
 
   before(async () => {
-    await waitForMongo();
+    ({ app, request, mongoose, shutdown } = await bootIsolatedApp());
   });
 
   after(async () => {
-    await mongoose.connection.close();
+    if (shutdown) await shutdown();
   });
 
   it('rejects protected routes without JWT', async () => {
@@ -68,7 +62,6 @@ describe('Security certification — auth & injection guards', () => {
       .post('/api/parties')
       .set(authHeader(token))
       .send({ name: payload, type: 'Customer' });
-    // Either created or validated — response must be JSON, not executed HTML
     assert.ok(res.headers['content-type']?.includes('json'));
     const body = JSON.stringify(res.body);
     assert.ok(!body.includes('<html'));
@@ -83,7 +76,6 @@ describe('Security certification — auth & injection guards', () => {
     assert.ok([200, 201].includes(res.status));
     const data = unwrapBody(res);
     assert.ok(data._id || data.id);
-    // Spoofed companyId must not win — created under JWT company
     if (data.companyId) {
       assert.notEqual(String(data.companyId), fakeId);
     }

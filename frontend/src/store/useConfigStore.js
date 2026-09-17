@@ -1,6 +1,15 @@
 import { create } from 'zustand';
 import { getPermissions } from '../utils/permissions';
 
+/** True when settings carry enough identity to drive setup checks / invoices. */
+function hasCompanyIdentity(settings) {
+  if (!settings || typeof settings !== 'object') return false;
+  if (settings._id) return true;
+  const legal = String(settings.legalName || settings.shortName || '').trim();
+  const gstin = String(settings.gstin || '').replace(/\s/g, '');
+  return Boolean(legal || gstin.length >= 15);
+}
+
 /**
  * Single source of truth for session configuration after login.
  * Populated from auth payload + ConfigProvider bundle sync.
@@ -37,19 +46,36 @@ const useConfigStore = create((set, get) => ({
       });
       return;
     }
-    const settings = user.companySettings || user.settings || null;
-    const company = user.company || {
+    // Config sync stores settings under activeConfig; login payload often omits them.
+    // Never wipe a richer in-memory copy when re-hydrate runs after every Sync.
+    const incoming =
+      user.companySettings || user.settings || user.activeConfig?.companySettings || null;
+    const existing = get().companySettings;
+    const settings = hasCompanyIdentity(incoming)
+      ? incoming
+      : hasCompanyIdentity(existing)
+        ? existing
+        : incoming || existing || null;
+
+    const baseCompany = user.company || {
       _id: user.companyId,
       name: settings?.legalName || settings?.shortName || user.companyName || 'My Company',
+      meta: {},
+    };
+    const company = {
+      ...baseCompany,
+      name: settings?.legalName || settings?.shortName || baseCompany.name || user.companyName || 'My Company',
       meta: {
-        gstin: settings?.gstin,
-        pan: settings?.pan,
-        state: settings?.state,
-        address: settings?.address,
-        phone: settings?.phone,
-        email: settings?.email,
-        city: settings?.city,
-        pincode: settings?.pincode,
+        ...(baseCompany.meta || {}),
+        gstin: settings?.gstin ?? baseCompany.meta?.gstin,
+        pan: settings?.pan ?? baseCompany.meta?.pan,
+        state: settings?.state ?? baseCompany.meta?.state,
+        stateCode: settings?.stateCode ?? baseCompany.meta?.stateCode,
+        address: settings?.address ?? baseCompany.meta?.address,
+        phone: settings?.phone ?? baseCompany.meta?.phone,
+        email: settings?.email ?? baseCompany.meta?.email,
+        city: settings?.city ?? baseCompany.meta?.city,
+        pincode: settings?.pincode ?? baseCompany.meta?.pincode,
       },
     };
     set({
@@ -57,7 +83,7 @@ const useConfigStore = create((set, get) => ({
       plan: plan || user.plan || null,
       company,
       companySettings: settings,
-      financialYear: settings?.financialYear || user.financialYear || null,
+      financialYear: settings?.financialYear || user.financialYear || get().financialYear || null,
       permissions: getPermissions(user.companyRole, user.role),
       modules: user.moduleConfig?.modules || get().modules,
       subMenus: user.moduleConfig?.subMenus || get().subMenus,
@@ -76,6 +102,13 @@ const useConfigStore = create((set, get) => ({
     } else if (rawFlags && typeof rawFlags === 'object') {
       featureFlags = { ...rawFlags };
     }
+    const fromBundle = bundle.companySettings;
+    const prev = get().companySettings;
+    // Empty `{}` from backend `companySettings || {}` must not wipe filled store.
+    const companySettings = hasCompanyIdentity(fromBundle)
+      ? fromBundle
+      : prev || (fromBundle && Object.keys(fromBundle).length ? fromBundle : prev);
+
     set({
       modules: bundle.modules || bundle.moduleConfig?.modules || get().modules,
       subMenus: bundle.subMenus || bundle.moduleConfig?.subMenus || get().subMenus,
@@ -84,7 +117,7 @@ const useConfigStore = create((set, get) => ({
       configHash: bundle.configHash || null,
       bundleVersion: bundle.bundleVersion || null,
       lastSyncedAt: new Date().toISOString(),
-      companySettings: bundle.companySettings || get().companySettings,
+      companySettings,
     });
   },
 

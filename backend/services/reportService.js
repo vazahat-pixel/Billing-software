@@ -8,6 +8,9 @@ const Job = require('../models/Job');
 const PaymentVoucher = require('../models/PaymentVoucher');
 const ReturnInvoice = require('../models/ReturnInvoice');
 const Book = require('../models/Book');
+const Order = require('../models/Order');
+const DeliveryChallan = require('../models/DeliveryChallan');
+const DebitCreditNote = require('../models/DebitCreditNote');
 
 const round2 = (n) => Number(Number(n || 0).toFixed(2));
 
@@ -657,6 +660,332 @@ class ReportService {
     };
   }
 
+  /** Item-wise roll-up from sales invoice lines */
+  async getSalesItemWise(companyId, startDate, endDate) {
+    const sales = await Sales.find({
+      companyId,
+      status: { $ne: 'cancelled' },
+      ...buildDateQuery(startDate, endDate),
+    })
+      .populate('customerId', 'name')
+      .populate('items.itemId', 'itemName name hsnCode group unit')
+      .lean();
+
+    const map = {};
+    for (const s of sales) {
+      for (const line of s.items || []) {
+        const itemName = (
+          line.itemId?.itemName ||
+          line.itemId?.name ||
+          line.desc ||
+          'UNKNOWN'
+        ).toUpperCase();
+        if (!map[itemName]) {
+          map[itemName] = {
+            itemName,
+            hsnCode: line.itemId?.hsnCode || '',
+            group: line.itemId?.group || '',
+            unit: line.unit || line.itemId?.unit || 'MTRS',
+            bills: 0,
+            pcs: 0,
+            mts: 0,
+            amount: 0,
+            parties: new Set(),
+          };
+        }
+        const row = map[itemName];
+        row.bills += 1;
+        row.pcs += Number(line.pcs) || 0;
+        row.mts += Number(line.mts) || 0;
+        row.amount += Number(line.amount) || 0;
+        if (s.customerId?.name) row.parties.add(s.customerId.name);
+      }
+    }
+    return Object.values(map)
+      .map((r) => ({
+        ...r,
+        partyCount: r.parties.size,
+        parties: undefined,
+        amount: round2(r.amount),
+        mts: round2(r.mts),
+      }))
+      .sort((a, b) => a.itemName.localeCompare(b.itemName));
+  }
+
+  async getPurchaseItemWise(companyId, startDate, endDate) {
+    const purchases = await Purchase.find({
+      companyId,
+      status: { $ne: 'cancelled' },
+      ...buildDateQuery(startDate, endDate),
+    })
+      .populate('supplierId', 'name')
+      .populate('items.itemId', 'itemName name hsnCode group unit')
+      .lean();
+
+    const map = {};
+    for (const p of purchases) {
+      for (const line of p.items || []) {
+        const itemName = (
+          line.itemId?.itemName ||
+          line.itemId?.name ||
+          line.desc ||
+          'UNKNOWN'
+        ).toUpperCase();
+        if (!map[itemName]) {
+          map[itemName] = {
+            itemName,
+            hsnCode: line.itemId?.hsnCode || '',
+            group: line.itemId?.group || '',
+            unit: line.unit || line.itemId?.unit || 'MTRS',
+            bills: 0,
+            pcs: 0,
+            mts: 0,
+            amount: 0,
+            parties: new Set(),
+          };
+        }
+        const row = map[itemName];
+        row.bills += 1;
+        row.pcs += Number(line.pcs) || 0;
+        row.mts += Number(line.mts) || 0;
+        row.amount += Number(line.amount) || 0;
+        if (p.supplierId?.name) row.parties.add(p.supplierId.name);
+      }
+    }
+    return Object.values(map)
+      .map((r) => ({
+        ...r,
+        partyCount: r.parties.size,
+        parties: undefined,
+        amount: round2(r.amount),
+        mts: round2(r.mts),
+      }))
+      .sort((a, b) => a.itemName.localeCompare(b.itemName));
+  }
+
+  /** Haste / Transport register from sales bills */
+  async getSalesHasteTransport(companyId, startDate, endDate) {
+    const sales = await Sales.find({
+      companyId,
+      status: { $ne: 'cancelled' },
+      ...buildDateQuery(startDate, endDate),
+    })
+      .populate('customerId', 'name station')
+      .sort({ date: -1 })
+      .lean();
+
+    return sales.map((s) => ({
+      _id: s._id,
+      invoiceNo: s.invoiceNo,
+      date: s.date,
+      partyName: s.customerId?.name || '—',
+      haste: s.haste || '',
+      transport: s.transport || '',
+      station: s.station || s.customerId?.station || '',
+      lrNo: s.lrNo || '',
+      lrDate: s.lrDate || null,
+      baleNo: s.baleNo || '',
+      freight: s.freight || 0,
+      weight: s.weight || 0,
+      netAmount: s.netAmount || 0,
+    }));
+  }
+
+  async getOrderRegister(companyId, orderType, startDate, endDate) {
+    const orders = await Order.find({
+      companyId,
+      orderType,
+      ...buildDateQuery(startDate, endDate),
+    })
+      .populate('partyId', 'name gstin station')
+      .populate('items.itemId', 'itemName name')
+      .sort({ date: -1 })
+      .lean();
+
+    return orders.map((o) => {
+      const qty = (o.items || []).reduce((a, i) => a + (Number(i.mts) || 0), 0);
+      const amount = (o.items || []).reduce((a, i) => a + (Number(i.amount) || 0), 0);
+      return {
+        _id: o._id,
+        orderNo: o.orderNo,
+        date: o.date,
+        expectedDate: o.expectedDate,
+        partyName: o.partyId?.name || '—',
+        gstin: o.partyId?.gstin || '',
+        city: o.partyId?.station || '',
+        transport: o.transport || '',
+        status: o.status || o.packingStatus || 'Open',
+        itemCount: (o.items || []).length,
+        qty: round2(qty),
+        amount: round2(amount),
+        remarks: o.remarks || '',
+      };
+    });
+  }
+
+  async getDeliveryChallanRegister(companyId, startDate, endDate) {
+    const rows = await DeliveryChallan.find({
+      companyId,
+      status: { $ne: 'Cancelled' },
+      ...buildDateQuery(startDate, endDate),
+    })
+      .populate('customerId', 'name station')
+      .sort({ date: -1 })
+      .lean();
+
+    return rows.map((c) => ({
+      _id: c._id,
+      challanNo: c.challanNo,
+      date: c.date,
+      partyName: c.customerId?.name || '—',
+      station: c.station || c.customerId?.station || '',
+      transport: c.transport || '',
+      lrNo: c.lrNo || '',
+      eway: c.eway || '',
+      status: c.status,
+      invoiceNo: c.invoiceNo || '',
+      itemCount: (c.items || []).length,
+      qty: round2((c.items || []).reduce((a, i) => a + (Number(i.mts) || 0), 0)),
+      amount: round2((c.items || []).reduce((a, i) => a + (Number(i.amount) || 0), 0)),
+    }));
+  }
+
+  async getReturnRegister(companyId, returnType, startDate, endDate) {
+    const list = await ReturnInvoice.find({
+      companyId,
+      returnType,
+      ...buildDateQuery(startDate, endDate),
+    })
+      .populate('partyId', 'name gstin station')
+      .populate('items.itemId', 'itemName name')
+      .sort({ date: -1 })
+      .lean();
+
+    return list.map((r) => ({
+      _id: r._id,
+      invoiceNo: r.invoiceNo,
+      originalInvoiceNo: r.originalInvoiceNo || '',
+      date: r.date,
+      partyName: r.partyId?.name || '—',
+      gstin: r.partyId?.gstin || '',
+      city: r.city || r.partyId?.station || '',
+      transport: r.transport || '',
+      taxable: r.taxableAmount || 0,
+      gstAmount: r.gstAmount || 0,
+      netAmount: r.netAmount || 0,
+      itemCount: (r.items || []).length,
+      remarks: r.remarks || '',
+    }));
+  }
+
+  /** Process = mill / job cards (send vs receipt views) */
+  async getProcessReport(companyId, startDate, endDate, mode = 'all') {
+    const jobs = await this.getJobWorkReport(companyId, startDate, endDate);
+    if (mode === 'send') {
+      return jobs.filter((j) => {
+        const st = String(j.status || '').toLowerCase();
+        return st === 'issued' || st === 'in-process' || st === 'in process' || !j.receiveDate;
+      });
+    }
+    if (mode === 'receipt') {
+      return jobs.filter((j) => {
+        const st = String(j.status || '').toLowerCase();
+        return st === 'received' || st === 'completed' || !!j.receiveDate;
+      });
+    }
+    return jobs;
+  }
+
+  async getTdsRegister(companyId, startDate, endDate) {
+    const dateQ = buildDateQuery(startDate, endDate);
+    const [purchases, notes] = await Promise.all([
+      Purchase.find({ companyId, status: { $ne: 'cancelled' }, tdsAmount: { $gt: 0 }, ...dateQ })
+        .populate('supplierId', 'name gstin')
+        .lean(),
+      DebitCreditNote.find({ companyId, tdsAmount: { $gt: 0 }, ...dateQ })
+        .populate('partyId', 'name gstin')
+        .lean()
+        .catch(() => []),
+    ]);
+
+    const rows = [];
+    purchases.forEach((p) => {
+      rows.push({
+        date: p.date,
+        docType: 'Purchase',
+        docNo: p.invoiceNo || p.billNo,
+        partyName: p.supplierId?.name || '—',
+        gstin: p.supplierId?.gstin || '',
+        taxable: p.taxableAmount || 0,
+        tdsAmount: p.tdsAmount || 0,
+        netAmount: p.netAmount || 0,
+      });
+    });
+    (notes || []).forEach((n) => {
+      rows.push({
+        date: n.date,
+        docType: n.noteType || 'Note',
+        docNo: n.noteNo || n.invoiceNo || '',
+        partyName: n.partyId?.name || '—',
+        gstin: n.partyId?.gstin || '',
+        taxable: n.taxableAmount || n.netAmount || 0,
+        tdsAmount: n.tdsAmount || 0,
+        netAmount: n.finalAmount || n.netAmount || 0,
+      });
+    });
+    return rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+  }
+
+  async getTcsRegister(companyId, startDate, endDate) {
+    const sales = await Sales.find({
+      companyId,
+      status: { $ne: 'cancelled' },
+      tcsAmount: { $gt: 0 },
+      ...buildDateQuery(startDate, endDate),
+    })
+      .populate('customerId', 'name gstin')
+      .lean();
+
+    return sales
+      .map((s) => ({
+        date: s.date,
+        docType: 'Sales',
+        docNo: s.invoiceNo,
+        partyName: s.customerId?.name || '—',
+        gstin: s.customerId?.gstin || '',
+        taxable: s.taxableAmount || 0,
+        tcsAmount: s.tcsAmount || 0,
+        netAmount: s.netAmount || 0,
+      }))
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+  }
+
+  /** Lightweight balance-sheet style snapshot from stock + outstanding */
+  async getBalanceSheet(companyId, asOnDate) {
+    const [stock, receivable, payable] = await Promise.all([
+      this.getStockReport(companyId),
+      this.getOutstanding(companyId, 'receivable', asOnDate),
+      this.getOutstanding(companyId, 'payable', asOnDate),
+    ]);
+    const stockValue = stock.reduce((a, l) => a + (l.value || 0), 0);
+    const recv = receivable.reduce((a, r) => a + (r.totalOutstanding || 0), 0);
+    const pay = payable.reduce((a, r) => a + (r.totalOutstanding || 0), 0);
+    const assets = round2(stockValue + recv);
+    const liabilities = round2(pay);
+    return {
+      asOn: asOnDate,
+      rows: [
+        { side: 'Asset', particular: 'Closing Stock', amount: round2(stockValue) },
+        { side: 'Asset', particular: 'Sundry Debtors (Receivable)', amount: round2(recv) },
+        { side: 'Asset', particular: 'Total Assets', amount: assets, isTotal: true },
+        { side: 'Liability', particular: 'Sundry Creditors (Payable)', amount: round2(pay) },
+        { side: 'Liability', particular: 'Capital / Balancing Figure', amount: round2(assets - liabilities) },
+        { side: 'Liability', particular: 'Total Liabilities', amount: assets, isTotal: true },
+      ],
+      totals: { assets, liabilities, stockValue, receivable: recv, payable: pay },
+    };
+  }
+
   async getReportBundle(companyId, startDate, endDate) {
     const [
       salesRegister,
@@ -668,7 +997,20 @@ class ReportService {
       outstandingPayable,
       profitLoss,
       dailyTransactions,
-      masterSummary
+      masterSummary,
+      salesItemWise,
+      purchaseItemWise,
+      salesHaste,
+      salesOrders,
+      purchaseOrders,
+      salesChallans,
+      salesReturns,
+      purchaseReturns,
+      processSend,
+      processReceipt,
+      tdsRegister,
+      tcsRegister,
+      balanceSheet,
     ] = await Promise.all([
       this.getSalesRegister(companyId, startDate, endDate),
       this.getPurchaseRegister(companyId, startDate, endDate),
@@ -679,7 +1021,20 @@ class ReportService {
       this.getOutstanding(companyId, 'payable', endDate),
       this.getProfitLoss(companyId, startDate, endDate),
       this.getDailyTransactions(companyId, startDate, endDate),
-      this.getMasterSummary(companyId)
+      this.getMasterSummary(companyId),
+      this.getSalesItemWise(companyId, startDate, endDate),
+      this.getPurchaseItemWise(companyId, startDate, endDate),
+      this.getSalesHasteTransport(companyId, startDate, endDate),
+      this.getOrderRegister(companyId, 'Sales', startDate, endDate),
+      this.getOrderRegister(companyId, 'Purchase', startDate, endDate),
+      this.getDeliveryChallanRegister(companyId, startDate, endDate),
+      this.getReturnRegister(companyId, 'Sales', startDate, endDate),
+      this.getReturnRegister(companyId, 'Purchase', startDate, endDate),
+      this.getProcessReport(companyId, startDate, endDate, 'send'),
+      this.getProcessReport(companyId, startDate, endDate, 'receipt'),
+      this.getTdsRegister(companyId, startDate, endDate),
+      this.getTcsRegister(companyId, startDate, endDate),
+      this.getBalanceSheet(companyId, endDate),
     ]);
 
     const summary = {
@@ -698,7 +1053,9 @@ class ReportService {
       receivable: outstandingReceivable.reduce((a, r) => a + r.totalOutstanding, 0),
       payable: outstandingPayable.reduce((a, r) => a + r.totalOutstanding, 0),
       accountCount: masterSummary.accounts.length,
-      itemCount: masterSummary.items.length
+      itemCount: masterSummary.items.length,
+      salesReturnCount: salesReturns.length,
+      purchaseReturnCount: purchaseReturns.length,
     };
 
     Object.keys(summary).forEach((k) => {
@@ -718,7 +1075,20 @@ class ReportService {
       outstandingPayable,
       profitLoss,
       dailyTransactions,
-      masterSummary
+      masterSummary,
+      salesItemWise,
+      purchaseItemWise,
+      salesHaste,
+      salesOrders,
+      purchaseOrders,
+      salesChallans,
+      salesReturns,
+      purchaseReturns,
+      processSend,
+      processReceipt,
+      tdsRegister,
+      tcsRegister,
+      balanceSheet,
     };
   }
 }

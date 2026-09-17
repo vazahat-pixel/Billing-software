@@ -11,7 +11,13 @@ exports.createParty = asyncHandler(async (req, res) => {
 
 exports.getParties = asyncHandler(async (req, res) => {
   if (!req.companyId) throw AppError.forbidden('No company context');
-  const parties = await partyService.getParties(req.companyId);
+  const { type, favorites, page, limit } = req.query;
+  const parties = await partyService.getParties(req.companyId, {
+    type,
+    favorites: favorites === 'true' || favorites === true,
+    page: page || undefined,
+    limit: limit || undefined,
+  });
   return ok(res, parties);
 });
 

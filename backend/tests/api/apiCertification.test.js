@@ -1,27 +1,20 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const path = require('path');
-const dotenv = require('dotenv');
-
-dotenv.config({ path: path.join(__dirname, '../../.env') });
-
-process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'ci-test-jwt-secret-minimum-32-characters-long';
-if (!process.env.MONGO_URI) {
-  process.env.MONGO_URI = 'mongodb://127.0.0.1:27017/billing_test_api_cert';
-}
-
-const mongoose = require('mongoose');
-const request = require('supertest');
-const { waitForMongo, authHeader } = require('../helpers/setup');
-const app = require('../../server');
+const { bootIsolatedApp } = require('../helpers/isolatedApp');
+const { authHeader } = require('../helpers/setup');
 const routes = require('../api/routeManifest');
 
+/**
+ * API certification — in-memory Mongo only (never Atlas via .env).
+ */
 describe('API certification — authenticated GET coverage', () => {
+  let app;
+  let request;
+  let shutdown;
   let token;
 
   before(async () => {
-    await waitForMongo();
+    ({ app, request, shutdown } = await bootIsolatedApp());
     const email = `api-cert-${Date.now()}@example.com`;
     const res = await request(app)
       .post('/api/auth/register')
@@ -36,7 +29,7 @@ describe('API certification — authenticated GET coverage', () => {
   });
 
   after(async () => {
-    await mongoose.connection.close();
+    if (shutdown) await shutdown();
   });
 
   it('manifest has ≥ 35 routes and required groups', () => {

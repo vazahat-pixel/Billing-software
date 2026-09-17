@@ -26,6 +26,8 @@ function isWeakJwtSecret(secret) {
  */
 function assertProductionEnv() {
   const nodeEnv = process.env.NODE_ENV || 'development';
+  const isDesktopLocal = String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+
   if (nodeEnv !== 'production') {
     if (!process.env.JWT_SECRET) {
       logger.warn('JWT_SECRET missing — required before serving authenticated traffic');
@@ -43,13 +45,13 @@ function assertProductionEnv() {
   if (!secret || secret.length < 32) {
     errors.push('JWT_SECRET must be at least 32 characters in production');
   }
-  if (isWeakJwtSecret(secret)) {
+  if (isWeakJwtSecret(secret) && !isDesktopLocal) {
     errors.push('JWT_SECRET is a known placeholder or weak value — generate a random secret');
   }
   if (!process.env.MONGO_URI) {
     errors.push('MONGO_URI is required in production');
   }
-  if (!process.env.FRONTEND_URL) {
+  if (!process.env.FRONTEND_URL && !isDesktopLocal) {
     warnings.push('FRONTEND_URL recommended for CORS lockdown');
   }
   if (!process.env.BACKUP_ENCRYPTION_KEY) {
@@ -58,12 +60,16 @@ function assertProductionEnv() {
   if (String(process.env.ALLOW_SUBSCRIPTION_BYPASS || '').toLowerCase() === 'true') {
     errors.push('ALLOW_SUBSCRIPTION_BYPASS must not be true in production');
   }
-  if (String(process.env.ALLOW_PUBLIC_REGISTER || '').toLowerCase() === 'true') {
+  if (String(process.env.ALLOW_PUBLIC_REGISTER || '').toLowerCase() === 'true' && !isDesktopLocal) {
     warnings.push('ALLOW_PUBLIC_REGISTER=true — prefer admin-provisioned tenants only');
   }
-  for (const flag of ['MODULE_GATE_ENFORCE', 'DEVICE_BINDING_ENFORCE', 'PLAN_LIMIT_ENFORCE']) {
-    if (String(process.env[flag] || '').toLowerCase() !== 'true') {
-      warnings.push(`${flag} is not true — commercial gates are soft/shadow in production`);
+  if (isDesktopLocal) {
+    warnings.push('DESKTOP_LOCAL=true — standalone offline desktop mode');
+  } else {
+    for (const flag of ['MODULE_GATE_ENFORCE', 'DEVICE_BINDING_ENFORCE', 'PLAN_LIMIT_ENFORCE']) {
+      if (String(process.env[flag] || '').toLowerCase() !== 'true') {
+        warnings.push(`${flag} is not true — commercial gates are soft/shadow in production`);
+      }
     }
   }
   if (!process.env.SMTP_HOST) {
@@ -73,7 +79,7 @@ function assertProductionEnv() {
   if (errors.length) {
     throw new Error(`FATAL: ${errors.join('; ')}`);
   }
-  logger.info('Production environment checks passed', { warnings });
+  logger.info('Production environment checks passed', { warnings, desktopLocal: isDesktopLocal });
   return { ok: true, env: nodeEnv, warnings };
 }
 

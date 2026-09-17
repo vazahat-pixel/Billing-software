@@ -50,6 +50,16 @@ class FinancialClosingService {
     fy.lockedUntilDate = new Date(lockedUntilDate);
     fy.updatedBy = userId;
     await fy.save();
+
+    // Keep legacy Company.settings.lockedUntilDate in sync so vouchers that
+    // still read company settings (and sales/purchase via assertAccountingPeriodOpen)
+    // honor the same lock.
+    const Company = require('../models/Company');
+    await Company.updateOne(
+      { _id: companyId },
+      { $set: { 'settings.lockedUntilDate': new Date(lockedUntilDate) } }
+    );
+
     return fy;
   }
 

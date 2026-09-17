@@ -1,4 +1,15 @@
 const PROFILES = {
+  demo: {
+    purchases: 28,
+    itemsPerLineAvg: 4,
+    itemsPerLineMax: 6,
+    salesInvoices: 22,
+    jobCards: 10,
+    paymentsReceipts: 24,
+    concurrency: 2,
+    benchmarkConcurrent: 5,
+    benchmarkDurationSec: 10,
+  },
   smoke: {
     purchases: 5,
     itemsPerLineAvg: 3,
@@ -70,6 +81,10 @@ function envInt(key, fallback) {
 function resolveProfile(name = 'dev') {
   const key = String(name || 'dev').toLowerCase();
   const base = PROFILES[key] || PROFILES.dev;
+  const salesMix =
+    key === 'demo'
+      ? { salesDirectPct: 0.85, salesPipelinePct: 0.1, salesReturnPct: 0.05 }
+      : { salesDirectPct: 0.6, salesPipelinePct: 0.35, salesReturnPct: 0.05 };
   return {
     name: PROFILES[key] ? key : 'dev',
     purchases: envInt('QA_PURCHASES', base.purchases),
@@ -83,9 +98,7 @@ function resolveProfile(name = 'dev') {
     benchmarkDurationSec: envInt('QA_BENCHMARK_DURATION', base.benchmarkDurationSec),
     jobWorkLotPct: 0.4,
     settlementPct: 0.7,
-    salesDirectPct: 0.6,
-    salesPipelinePct: 0.35,
-    salesReturnPct: 0.05,
+    ...salesMix,
   };
 }
 

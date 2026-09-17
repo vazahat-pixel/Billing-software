@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import useStore from '../../store/useStore';
 import { Plus, Search, Filter, ShoppingBag, CreditCard, User, MoreVertical, Printer, ArrowRight, History, TrendingUp } from 'lucide-react';
 import SalesModal from './SalesModal';
@@ -16,6 +16,29 @@ const SalesPage = () => {
    }, [fetchSales, fetchParties]);
 
    const tabs = ['ALL', 'PAID', 'UNPAID', 'DUE'];
+
+   const monthStart = useMemo(() => {
+      const d = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), 1);
+   }, []);
+
+   const monthlySalesTotal = useMemo(
+      () => sales.reduce((sum, s) => {
+         const d = new Date(s.date || s.createdAt || 0);
+         if (Number.isNaN(d.getTime()) || d < monthStart) return sum;
+         return sum + Number(s.netAmount || s.totals?.total || 0);
+      }, 0),
+      [sales, monthStart]
+   );
+
+   const overdueTotal = useMemo(
+      () => sales.reduce((sum, s) => {
+         const due = Number(s.balanceDue ?? s.outstanding ?? 0);
+         if (due <= 0) return sum;
+         return sum + due;
+      }, 0),
+      [sales]
+   );
 
    return (
       <div className="p-8 space-y-8 bg-[#FDFCF9] min-h-screen">
@@ -48,7 +71,7 @@ const SalesPage = () => {
                   <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">Growth</span>
                </div>
                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Monthly Sales</p>
-               <h3 className="text-3xl font-black text-black mt-1">₹ 12,84,500</h3>
+               <h3 className="text-3xl font-black text-black mt-1">₹ {monthlySalesTotal.toLocaleString('en-IN')}</h3>
             </div>
 
             <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden group">
@@ -70,7 +93,7 @@ const SalesPage = () => {
                   <span className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Alert</span>
                </div>
                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Overdue</p>
-               <h3 className="text-3xl font-black text-black mt-1">₹ 2,14,000</h3>
+               <h3 className="text-3xl font-black text-black mt-1">₹ {overdueTotal.toLocaleString('en-IN')}</h3>
             </div>
          </div>
 

@@ -199,8 +199,8 @@ describe('Settlement-discount auto Notes — SALES (Receipt -> Credit Note)', ()
     const { dr, cr, entry } = await drCr(voucher.accountingEntryId);
     assert.ok(Math.abs(dr - cr) < 0.01, `receipt journal unbalanced Dr=${dr} Cr=${cr}`);
     assert.ok(Math.abs(dr - 10000) < 0.01, `Dr should total 10000, got ${dr}`);
-    const discountLines = entry.lines.filter(l => l.ledgerName === 'Discount Allowed');
-    assert.equal(discountLines.length, 1, 'exactly one Discount Allowed posting');
+    const discountLines = entry.lines.filter(l => l.ledgerName === 'DISCOUNT ACCOUNT');
+    assert.equal(discountLines.length, 1, 'exactly one DISCOUNT ACCOUNT posting');
     assert.equal(Number(discountLines[0].amount), 500);
 
     // No independent AccountingEntry was created for the note itself.
@@ -294,7 +294,7 @@ describe('Settlement-discount auto Notes — SALES (Receipt -> Credit Note)', ()
 
     const { dr, cr, entry } = await drCr(editedVoucher.accountingEntryId);
     assert.ok(Math.abs(dr - cr) < 0.01, `edited receipt journal unbalanced Dr=${dr} Cr=${cr}`);
-    const discountLines = entry.lines.filter(l => l.ledgerName === 'Discount Allowed');
+    const discountLines = entry.lines.filter(l => l.ledgerName === 'DISCOUNT ACCOUNT');
     assert.equal(discountLines.length, 1);
     assert.equal(Number(discountLines[0].amount), 300, 'only ONE discount posting of 300 — no leftover 500');
   });
@@ -332,7 +332,7 @@ describe('Settlement-discount auto Notes — SALES (Receipt -> Credit Note)', ()
     const editRes = await request(app).put(`/api/notes/${note._id}`).set(auth(tok)).send({ amount: 999 });
     assert.equal(editRes.status, 400);
     assert.match(editRes.body.message, /automatically generated/i);
-    assert.match(editRes.body.message, /Receipt #/);
+    assert.match(editRes.body.message, /Receipt\s*#|source voucher|PaymentVoucher/i);
 
     const revRes = await request(app).post(`/api/notes/${note._id}/reverse`).set(auth(tok)).send({});
     assert.equal(revRes.status, 400);
@@ -381,7 +381,7 @@ describe('Settlement-discount auto Notes — PURCHASE (Payment -> Debit Note)', 
     const { dr, cr, entry } = await drCr(voucher.accountingEntryId);
     assert.ok(Math.abs(dr - cr) < 0.01, `payment journal unbalanced Dr=${dr} Cr=${cr}`);
     assert.ok(Math.abs(dr - 10000) < 0.01);
-    const discountLines = entry.lines.filter(l => l.ledgerName === 'Discount Received');
+    const discountLines = entry.lines.filter(l => l.ledgerName === 'DISCOUNT ACCOUNT');
     assert.equal(discountLines.length, 1);
     assert.equal(Number(discountLines[0].amount), 500);
 
@@ -487,8 +487,8 @@ describe('Settlement-discount auto Notes — multiple bills in one voucher', () 
 
     const { dr, cr, entry } = await drCr(voucher.accountingEntryId);
     assert.ok(Math.abs(dr - cr) < 0.01);
-    const discountLines = entry.lines.filter(l => l.ledgerName === 'Discount Allowed');
-    assert.equal(discountLines.length, 1, 'both discounts sum into ONE Discount Allowed leg on the voucher journal');
+    const discountLines = entry.lines.filter(l => l.ledgerName === 'DISCOUNT ACCOUNT');
+    assert.equal(discountLines.length, 1, 'both discounts sum into ONE DISCOUNT ACCOUNT leg on the voucher journal');
     assert.equal(Number(discountLines[0].amount), 700, '200 + 500 combined');
   });
 });

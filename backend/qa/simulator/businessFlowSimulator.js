@@ -3,6 +3,7 @@ const { simulatePurchases } = require('./purchaseSimulator');
 const { simulateJobWork } = require('./jobWorkSimulator');
 const { simulateSales } = require('./salesSimulator');
 const { simulatePayments } = require('./paymentSimulator');
+const { simulateNotesAndReturns } = require('./notesAndReturnsSimulator');
 const inventoryEngineService = require('../../services/inventoryEngineService');
 const InventoryLot = require('../../models/InventoryLot');
 const logger = require('../utils/logger');
@@ -11,7 +12,7 @@ async function ensureSeeded(ctx) {
   const Item = require('../../models/Item');
   const count = await Item.countDocuments({ companyId: ctx.companyId });
   if (count === 0) {
-    logger.info('Masters missing — running seed:all');
+    logger.info('Masters missing ï¿½ running seed:all');
     await seedAll(ctx);
   }
 }
@@ -78,6 +79,7 @@ async function simulateBusinessFlow(ctx) {
   await runStep('purchases', () => simulatePurchases(ctx));
   await runStep('jobWork', () => simulateJobWork(ctx));
   await runStep('sales', () => simulateSales(ctx));
+  await runStep('notesAndReturns', () => simulateNotesAndReturns(ctx));
   await runStep('payments', () => simulatePayments(ctx));
   await runStep('adjustments', () => sampleAdjustments(ctx));
 

@@ -1,23 +1,16 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const path = require('path');
-const dotenv = require('dotenv');
+const { bootIsolatedApp } = require('../helpers/isolatedApp');
+const { authHeader, unwrapBody } = require('../helpers/setup');
 
-dotenv.config({ path: path.join(__dirname, '../../.env') });
-
-process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'ci-test-jwt-secret-minimum-32-characters-long';
-if (!process.env.MONGO_URI) {
-  process.env.MONGO_URI = 'mongodb://127.0.0.1:27017/billing_test_flow';
-}
-
-const mongoose = require('mongoose');
-const request = require('supertest');
-
-const { waitForMongo, authHeader, unwrapBody } = require('../helpers/setup');
-const app = require('../../server');
-
+/**
+ * ERP core billing flow — in-memory Mongo only.
+ * Never dropDatabase against Atlas.
+ */
 describe('ERP core billing flow', () => {
+  let app;
+  let request;
+  let shutdown;
   let token;
   let supplierId;
   let customerId;
@@ -27,12 +20,11 @@ describe('ERP core billing flow', () => {
   let saleId;
 
   before(async () => {
-    await waitForMongo();
-    await mongoose.connection.db.dropDatabase();
+    ({ app, request, shutdown } = await bootIsolatedApp());
   });
 
   after(async () => {
-    await mongoose.connection.close();
+    if (shutdown) await shutdown();
   });
 
   it('health check', async () => {
@@ -102,7 +94,6 @@ describe('ERP core billing flow', () => {
       .get(`/api/inventory/stock/${itemId}`)
       .set(authHeader(token));
     assert.equal(stock.status, 200);
-    const stockData = unwrapBody(stock);
     assert.ok(Number(unwrapBody(stock).totalMtrs || 0) >= 99);
 
     const lots = await request(app)

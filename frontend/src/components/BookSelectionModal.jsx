@@ -103,7 +103,7 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook, bookFil
           initial={{ scale: 0.98, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.98, opacity: 0 }}
-          className="relative w-full max-w-md bg-[#ece9d8] overflow-hidden border-2 border-[#0055ea] shadow-2xl font-sans"
+          className="relative w-full max-w-md bg-[#ece9d8] overflow-hidden shadow-2xl font-sans outline-none"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Classic WinForms Header */}

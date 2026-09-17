@@ -1,4 +1,7 @@
 desktop/renderer/
 desktop/dist/
 desktop/node_modules/
+desktop/resources/backend/
+desktop/vendor/mongodb/bin/
+desktop/vendor/mongodb/*.zip
 config.json

@@ -12,6 +12,9 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const SignupPage = lazy(() => import('./pages/auth/SignupPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
+const DesktopSetupPage = lazy(() => import('./pages/auth/DesktopSetupPage'));
+const DesktopActivatePage = lazy(() => import('./pages/auth/DesktopActivatePage'));
 const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 const AdminCompanies = lazy(() => import('./pages/admin/Companies'));
@@ -55,8 +58,11 @@ function App() {
         <Route path="/portal" element={<PanelPortal />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/offline-login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/signup" element={isDesktopShell ? <Navigate to="/activate" replace /> : <SignupPage />} />
+        <Route path="/setup" element={<DesktopSetupPage />} />
+        <Route path="/activate" element={<DesktopActivatePage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         
         {/* Only the Legacy Dashboard is kept */}

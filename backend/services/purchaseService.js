@@ -74,14 +74,14 @@ class PurchaseService {
       }).session(session);
       let companyGstin = '';
       let companyStateCode = '';
-      try {
+      {
+        const { assertAccountingPeriodOpen } = require('../utils/assertAccountingPeriodOpen');
+        await assertAccountingPeriodOpen(purchaseData.companyId, purchaseData.date || new Date());
         const gstConfigService = require('./gstConfigService');
         const cfg = await gstConfigService.getOrCreate(purchaseData.companyId);
         companyGstin = cfg.gstin;
         companyStateCode = cfg.stateCode;
         await gstConfigService.assertPeriodOpen(purchaseData.companyId, purchaseData.date || new Date());
-      } catch (err) {
-        if (err.message && err.message.includes('GST period')) throw err;
       }
       let gstRate = purchaseData.gstRate || purchaseData.gstPer;
       if (gstRate == null && purchaseData.items?.[0]?.itemId) {
@@ -327,14 +327,14 @@ class PurchaseService {
       const supplier = await Party.findOne({ _id: clean.supplierId, companyId }).session(session);
       let companyGstin = '';
       let companyStateCode = '';
-      try {
+      {
+        const { assertAccountingPeriodOpen } = require('../utils/assertAccountingPeriodOpen');
+        await assertAccountingPeriodOpen(companyId, clean.date || purchase.date || new Date());
         const gstConfigService = require('./gstConfigService');
         const cfg = await gstConfigService.getOrCreate(companyId);
         companyGstin = cfg.gstin;
         companyStateCode = cfg.stateCode;
         await gstConfigService.assertPeriodOpen(companyId, clean.date || purchase.date || new Date());
-      } catch (err) {
-        if (err.message && err.message.includes('GST period')) throw err;
       }
       let gstRate = clean.gstRate || clean.gstPer;
       if (gstRate == null && clean.items?.[0]?.itemId) {

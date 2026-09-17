@@ -48,6 +48,9 @@ router.get(['/health', '/health/live', '/health/ready'], (req, res) => {
 // Public auth (rate-limited)
 router.use('/auth', authLimiter, authRoutes);
 
+// Desktop-local activation (no JWT) — only meaningful when DESKTOP_LOCAL=true
+router.use('/desktop', authLimiter, require('./desktop.routes'));
+
 // Public SaaS catalog (plans for signup / pricing page)
 const { publicRouter: billingPublicRoutes, tenantRouter: billingTenantRoutes } = require('./billing.routes');
 router.use('/billing/public', billingPublicRoutes);

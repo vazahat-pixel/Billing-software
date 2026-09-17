@@ -1,36 +1,27 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const path = require('path');
-const dotenv = require('dotenv');
-
-dotenv.config({ path: path.join(__dirname, '../../.env') });
-
-process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'ci-test-jwt-secret-minimum-32-characters-long';
-if (!process.env.MONGO_URI) {
-  process.env.MONGO_URI = 'mongodb://127.0.0.1:27017/billing_test_isolation';
-}
-
-const mongoose = require('mongoose');
-const request = require('supertest');
-const { waitForMongo, authHeader, unwrapBody } = require('../helpers/setup');
-const app = require('../../server');
+const { bootIsolatedApp } = require('../helpers/isolatedApp');
+const { authHeader, unwrapBody } = require('../helpers/setup');
 
 /**
  * Multi-tenant isolation — Company A must never read Company B data.
+ * Uses in-memory Mongo only (never Atlas via .env).
  */
 describe('Multi-company isolation', () => {
+  let app;
+  let request;
+  let shutdown;
   let tokenA;
   let tokenB;
   let partyAId;
   let companyAId;
 
   before(async () => {
-    await waitForMongo();
+    ({ app, request, shutdown } = await bootIsolatedApp());
   });
 
   after(async () => {
-    await mongoose.connection.close();
+    if (shutdown) await shutdown();
   });
 
   it('creates company A owner', async () => {

@@ -104,8 +104,8 @@ const authMiddleware = async (req, res, next) => {
       if (company) {
         req.planId = company.planId;
         req.companyStatus = company.status;
-        if (company.status === 'suspended') {
-          return next(AppError.forbidden('Your company account is suspended. Please contact support.'));
+        if (company.status === 'suspended' || company.status === 'expired' || company.isActive === false) {
+          return next(AppError.forbidden('Your company account is locked or inactive. Please contact support.'));
         }
       }
     }

@@ -305,11 +305,8 @@ async function runLive() {
   const base = LIVE_URL.replace(/\/$/, '');
   console.log(`\n=== GO-LIVE SMOKE (live API ${base}) ===\n`);
 
-  const email = process.env.SMOKE_EMAIL;
-  const password = process.env.SMOKE_PASSWORD;
-  if (!email || !password) {
-    throw new Error('SMOKE_LIVE_URL set — also set SMOKE_EMAIL and SMOKE_PASSWORD');
-  }
+  let email = process.env.SMOKE_EMAIL;
+  let password = process.env.SMOKE_PASSWORD;
 
   const req = async (method, urlPath, body, token) => {
     const res = await fetch(`${base}${urlPath}`, {
@@ -324,6 +321,25 @@ async function runLive() {
     return { status: res.status, data };
   };
 
+  if ((!email || !password) && String(process.env.SMOKE_LIVE_REGISTER || '').toLowerCase() === 'true') {
+    email = `desktop-smoke-${Date.now()}@local.test`;
+    password = 'DesktopSmoke123!';
+    const reg = await req('POST', '/auth/register', {
+      name: 'Desktop Smoke',
+      email,
+      password,
+      companyName: `Desktop Smoke Co ${Date.now()}`,
+    });
+    if (![200, 201].includes(reg.status)) {
+      throw new Error(`live register failed: ${JSON.stringify(reg.data)}`);
+    }
+    pass('live register', email);
+  }
+
+  if (!email || !password) {
+    throw new Error('SMOKE_LIVE_URL set — also set SMOKE_EMAIL and SMOKE_PASSWORD (or SMOKE_LIVE_REGISTER=true)');
+  }
+
   const login = await req('POST', '/auth/login', { email, password });
   const tok = login.data.token || login.data.data?.token;
   if (!tok) {
@@ -336,6 +352,48 @@ async function runLive() {
   const companyId = me.companyId;
   pass('live company', String(companyId || ''));
 
+  // Masters → purchase → sale → GSTR (same as isolated path, against live API)
+  const stamp = Date.now();
+  const partyC = await req('POST', '/parties', { name: `Cust ${stamp}`, type: 'Customer', gstin: '24AAAAA0000A1Z5', stateCode: '24' }, tok);
+  const partyS = await req('POST', '/parties', { name: `Supp ${stamp}`, type: 'Supplier', gstin: '24BBBBB0000B1Z5', stateCode: '24' }, tok);
+  const item = await req('POST', '/items', { name: `Item ${stamp}`, category: 'Grey', gstRate: 5, unit: 'MTRS' }, tok);
+  const customerId = (partyC.data.data || partyC.data)._id;
+  const supplierId = (partyS.data.data || partyS.data)._id;
+  const itemId = (item.data.data || item.data)._id;
+  if (!customerId || !supplierId || !itemId) {
+    fail('live masters', JSON.stringify({ partyC: partyC.data, partyS: partyS.data, item: item.data }));
+    return;
+  }
+  pass('live masters');
+
+  const date = new Date().toISOString();
+  const pur = await req('POST', '/purchases', {
+    supplierId, invoiceNo: 'AUTO', date, gstType: 'CGST+SGST',
+    items: [{ itemId, mts: 100, pcs: 0, rate: 100, amount: 10000 }],
+    taxableAmount: 10000, netAmount: 10500,
+  }, tok);
+  if (pur.status !== 201) {
+    fail('live purchase', JSON.stringify(pur.data));
+    return;
+  }
+  pass('live purchase');
+
+  const lots = await req('GET', `/inventory/lots?itemId=${itemId}`, null, tok);
+  const lotList = lots.data.data?.items || lots.data.data || lots.data;
+  const lotOid = Array.isArray(lotList) ? lotList[0]?._id : null;
+
+  const sale = await req('POST', '/sales', {
+    customerId, invoiceNo: 'AUTO', date, gstType: 'CGST+SGST',
+    items: [{ itemId, lotId: lotOid, mts: 100, pcs: 0, rate: 100, amount: 10000 }],
+    taxableAmount: 10000, netAmount: 10500,
+  }, tok);
+  if (sale.status !== 201) {
+    fail('live sale', JSON.stringify(sale.data));
+    return;
+  }
+  const saleDoc = sale.data.data || sale.data;
+  pass('live sale', `taxable=${saleDoc.taxableAmount} cgst=${saleDoc.cgst}`);
+
   const now = new Date();
   const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
   const to = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
@@ -346,11 +404,12 @@ async function runLive() {
     fail('live GSTR-1', JSON.stringify(g1res.data));
     return;
   }
+  assertEq('live GSTR-1 taxable = sale', g1.totals?.taxable, saleDoc.taxableAmount);
   pass('live GSTR-1', `taxable=${g1.totals?.taxable} invoices=${g1.totals?.invoiceCount}`);
 
   const g2res = await req('GET', `/gst/gstr2?startDate=${from}&endDate=${to}`, null, tok);
   if (g2res.status !== 200) fail('live GSTR-2', JSON.stringify(g2res.data));
-  else pass('live GSTR-2', `rows=${(Array.isArray(g2res.data.data) ? g2res.data.data : g2res.data).length || 0}`);
+  else pass('live GSTR-2');
 }
 
 async function main() {

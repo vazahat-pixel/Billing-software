@@ -19,6 +19,25 @@ const subscriptionMiddleware = async (req, res, next) => {
     return next();
   }
 
+  // Standalone offline desktop — single PC, local licence; skip cloud SaaS gates
+  if (String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true') {
+    if (req.user?.companyId) {
+      try {
+        const company = await Company.findById(req.user.companyId);
+        if (company) {
+          req.planId = company.planId;
+          if (company.commercialPolicy !== 'legacy_open') {
+            company.commercialPolicy = 'legacy_open';
+            await company.save();
+          }
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    return next();
+  }
+
   // Development bypass. Requires BOTH a dev NODE_ENV and an explicit opt-in, so
   // an unset NODE_ENV on a packaged desktop build cannot silently disable every
   // commercial gate. Set ALLOW_SUBSCRIPTION_BYPASS=true locally to use it.
@@ -46,7 +65,7 @@ const subscriptionMiddleware = async (req, res, next) => {
     }
 
     const company = await Company.findById(req.user.companyId);
-    if (!company || !company.isActive || company.status === 'suspended') {
+    if (!company || !company.isActive || company.status === 'suspended' || company.status === 'expired') {
       return next(AppError.forbidden('Account locked or inactive. Please contact support.'));
     }
 

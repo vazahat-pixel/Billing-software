@@ -35,7 +35,9 @@ exports.createReturn = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Type, party, items, and amounts are required' });
     }
 
-    // Check GST period is not locked/filed
+    // Check GST + accounting periods are not locked/filed
+    const { assertAccountingPeriodOpen } = require('../utils/assertAccountingPeriodOpen');
+    await assertAccountingPeriodOpen(companyId, date || new Date());
     const gstConfigService = require('../services/gstConfigService');
     await gstConfigService.assertPeriodOpen(companyId, date || new Date());
 
@@ -47,11 +49,11 @@ exports.createReturn = async (req, res) => {
     // =====================================================================
     let companyGstin = '';
     let companyStateCode = '';
-    try {
+    {
       const cfg = await gstConfigService.getOrCreate(companyId);
       companyGstin = cfg.gstin;
       companyStateCode = cfg.stateCode;
-    } catch (_) { /* optional */ }
+    }
 
     const computedTotals = recalcReturnTotals(items || [], {
       gstType: gstType || 'CGST+SGST',

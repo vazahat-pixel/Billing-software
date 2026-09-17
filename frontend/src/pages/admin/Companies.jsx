@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, Lock, Unlock, ShieldCheck, Edit3, Plus, X, Search, Filter, Users, ArrowUpRight, Globe, Download, Trash2, UserRoundSearch } from 'lucide-react';
+import { Building2, Lock, Unlock, ShieldCheck, Edit3, Plus, X, Search, Filter, Users, ArrowUpRight, Globe, Download, Trash2, UserRoundSearch, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
 import { adminApi } from '../../api';
@@ -122,6 +122,26 @@ const Companies = () => {
             notifySuccess('Export downloaded');
         } catch (err) {
             notifyError(err, 'Export failed');
+        }
+    };
+
+    const handleProvisioningPack = async (company) => {
+        try {
+            const data = await adminApi.generateProvisioningPack(company._id);
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${(company.name || 'company').replace(/\s+/g, '-')}-provisioning-pack.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            notifySuccess('Provisioning pack downloaded — send securely to the desktop customer');
+        } catch (err) {
+            const msg =
+                err?.response?.data?.message ||
+                err?.message ||
+                'Provisioning pack failed';
+            notifyError(msg, 'Need active license + owner user on this company first');
         }
     };
 
@@ -263,6 +283,9 @@ const Companies = () => {
                                             )}
                                             <button onClick={() => setLicenseCompany(company)} className="icon-btn icon-btn--info" title="Issue License">
                                                 <ShieldCheck size={14} />
+                                            </button>
+                                            <button onClick={() => handleProvisioningPack(company)} className="icon-btn icon-btn--success" title="Download desktop provisioning pack">
+                                                <Package size={14} />
                                             </button>
                                             <button onClick={() => handleExport(company)} className="icon-btn icon-btn--info" title="Export data">
                                                 <Download size={14} />

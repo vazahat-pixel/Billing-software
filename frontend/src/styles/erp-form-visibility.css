@@ -1,0 +1,413 @@
+/**
+ * Form visibility & layout safety — loaded LAST so it can gently override
+ * ultra-dense rules that clip text / hide controls on some themes.
+ * Does not redesign screens; only ensures readable height, padding, contrast.
+ */
+
+/* ── Base form controls: enough room for glyphs ── */
+.classic-erp-window {
+  --erp-input-h: 30px;
+  --erp-label-w: 80px;
+}
+
+.classic-erp-input,
+.classic-erp-select,
+.classic-erp-textarea,
+.erp-input,
+.erp-select,
+.erp-combobox-input {
+  min-height: 28px !important;
+  line-height: 1.25 !important;
+  box-sizing: border-box !important;
+  color: var(--text-primary) !important;
+  background-color: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.classic-erp-input,
+.classic-erp-select,
+.erp-input,
+.erp-select,
+.erp-combobox-input {
+  height: auto !important;
+  min-height: 28px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  font-size: 12px !important;
+}
+
+.classic-erp-textarea,
+textarea.classic-erp-input {
+  min-height: 56px !important;
+  height: auto !important;
+  padding: 8px 10px !important;
+  line-height: 1.4 !important;
+  overflow-y: auto !important;
+  resize: vertical;
+}
+
+.classic-erp-input::placeholder,
+.erp-input::placeholder,
+.erp-combobox-input::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 1;
+}
+
+.classic-erp-input:disabled,
+.classic-erp-select:disabled,
+.classic-erp-input[readonly],
+.erp-input:disabled,
+.erp-select:disabled {
+  background-color: var(--bg-subtle) !important;
+  color: var(--text-secondary) !important;
+  opacity: 1;
+}
+
+.classic-erp-label,
+.erp-label,
+.note-label {
+  color: var(--text-secondary) !important;
+  line-height: 1.3 !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+}
+
+/* Fixed-width labels: wrap instead of clipping long names */
+.classic-erp-label--fixed,
+.classic-erp-label--fixed-sm {
+  white-space: normal !important;
+  line-height: 1.25 !important;
+  align-items: flex-start !important;
+  padding-top: 6px;
+}
+
+.classic-erp-field-row,
+.classic-erp-field {
+  align-items: center;
+  min-height: 28px;
+  gap: 6px;
+  min-width: 0;
+}
+
+.classic-erp-field-row > .classic-erp-input,
+.classic-erp-field-row > .classic-erp-select,
+.classic-erp-field-row > .classic-erp-control,
+.classic-erp-field-row > .erp-combobox {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Body: never permanently clip the form — allow scroll */
+.classic-erp-body {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  padding: 12px 14px 16px !important;
+}
+
+.classic-erp-frame {
+  padding: 10px 12px !important;
+  margin-bottom: 8px !important;
+}
+
+.classic-erp-header {
+  min-height: 34px !important;
+  padding: 8px 14px !important;
+  font-size: 12.5px !important;
+  line-height: 1.3 !important;
+  white-space: normal !important;
+}
+
+.classic-erp-header > * {
+  min-width: 0;
+}
+
+/* Table cells: keep readable; allow horizontal scroll instead of clipping */
+.classic-erp-table th,
+.classic-erp-table td {
+  overflow: visible !important;
+  vertical-align: middle !important;
+  line-height: 1.3 !important;
+}
+
+.classic-erp-table-container {
+  overflow: auto !important;
+}
+
+.classic-erp-table .classic-erp-input,
+.classic-erp-table .classic-erp-select,
+.classic-erp-table .erp-combobox-input {
+  min-height: 26px !important;
+  font-size: 11.5px !important;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+}
+
+/* Combobox chevron aligned to taller inputs */
+.erp-combobox-chevron {
+  height: 100% !important;
+  min-height: 26px;
+  width: 28px;
+}
+
+.erp-combobox-input {
+  padding-right: 30px !important;
+}
+
+.erp-combobox-dropdown {
+  z-index: 80;
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+
+.erp-combobox-option {
+  color: var(--text-primary);
+  line-height: 1.35;
+  white-space: normal;
+  overflow: visible;
+}
+
+/* Date inputs — room for calendar glyph */
+.classic-erp-input[type='date'],
+.erp-input[type='date'] {
+  min-width: 132px !important;
+  padding-left: 8px !important;
+  padding-right: 6px !important;
+  font-size: 12px !important;
+}
+
+/* Select: room for caret */
+.classic-erp-select,
+.erp-select {
+  padding-right: 28px !important;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2371717a' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px;
+}
+
+/* Compact bill forms — readable floor (overrides 21–26px density) */
+.classic-erp-window.erp-sales-bill-compact {
+  --erp-input-h: 28px;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-body {
+  overflow-y: auto !important;
+  padding: 10px 12px 14px !important;
+  gap: 8px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-input,
+.classic-erp-window.erp-sales-bill-compact .classic-erp-select,
+.classic-erp-window.erp-sales-bill-compact .erp-combobox-input {
+  min-height: 28px !important;
+  height: 28px !important;
+  max-height: none !important;
+  font-size: 12px !important;
+  padding: 0 8px !important;
+  line-height: 1.25 !important;
+  overflow: visible !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-label {
+  font-size: 11px !important;
+  min-width: 72px !important;
+  line-height: 1.3 !important;
+  white-space: normal !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-table th,
+.classic-erp-window.erp-sales-bill-compact .classic-erp-table td {
+  height: auto !important;
+  min-height: 30px !important;
+  padding: 4px 6px !important;
+  font-size: 12px !important;
+  overflow: visible !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .classic-erp-input,
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .classic-erp-select,
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .erp-combobox-input {
+  min-height: 26px !important;
+  height: 26px !important;
+  font-size: 11.5px !important;
+  padding: 0 6px !important;
+  overflow: visible !important;
+}
+
+/* Job / mill windows — stop ultra-21px clipping + theme-hardcoded colors */
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-body,
+.classic-erp-window.erp-job-issue-window .erp-job-issue-body,
+.classic-erp-window.erp-mill-issue-window .erp-job-issue-body,
+.classic-erp-window.erp-mill-receive-window .erp-mill-receive-body {
+  overflow-y: auto !important;
+  padding: 8px 10px !important;
+  gap: 6px !important;
+}
+
+.classic-erp-window.erp-job-receipt-window .classic-erp-label,
+.classic-erp-window.erp-job-issue-window .classic-erp-label,
+.classic-erp-window.erp-mill-issue-window .classic-erp-label,
+.classic-erp-window.erp-mill-receive-window .classic-erp-label {
+  color: var(--text-secondary) !important;
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  white-space: normal !important;
+}
+
+.classic-erp-window.erp-job-receipt-window input.classic-erp-input,
+.classic-erp-window.erp-job-receipt-window select.classic-erp-select,
+.classic-erp-window.erp-job-receipt-window .classic-erp-control input,
+.classic-erp-window.erp-job-issue-window input.classic-erp-input,
+.classic-erp-window.erp-job-issue-window select.classic-erp-select,
+.classic-erp-window.erp-job-issue-window .classic-erp-control input,
+.classic-erp-window.erp-mill-issue-window input.classic-erp-input,
+.classic-erp-window.erp-mill-issue-window select.classic-erp-select,
+.classic-erp-window.erp-mill-receive-window input.classic-erp-input,
+.classic-erp-window.erp-mill-receive-window select.classic-erp-select {
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: none !important;
+  font-size: 12px !important;
+  padding: 0 8px !important;
+  line-height: 1.25 !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-input) !important;
+  color: var(--text-primary) !important;
+  background: var(--bg-card) !important;
+}
+
+/* Note / cash-bank grids */
+.note-field .classic-erp-input,
+.note-field .classic-erp-select,
+.note-field .erp-combobox-input {
+  min-height: 28px !important;
+}
+
+.cash-bank-bill-grid td .classic-erp-input {
+  min-height: 26px !important;
+  height: 26px !important;
+  font-size: 12px !important;
+  overflow: visible !important;
+}
+
+.cash-bank-bill-grid thead th {
+  overflow: visible !important;
+  white-space: normal !important;
+  line-height: 1.25 !important;
+}
+
+/* Modal helpers */
+.erp-modal-body {
+  overflow-y: auto;
+  padding: 16px 20px !important;
+}
+
+.erp-field {
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.erp-btn {
+  min-height: 32px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+/* Theme-safe shell bits that used hard white backgrounds */
+.erp-menu-bar {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+}
+
+.erp-menu-dropdown {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary);
+}
+
+.erp-menu-item {
+  color: var(--text-primary);
+}
+
+.erp-rail {
+  background: var(--bg-sidebar) !important;
+  border-color: var(--border-subtle) !important;
+}
+
+/* Address / badge strips: show full text */
+.classic-erp-window .erp-job-receipt-address-box {
+  min-height: 28px !important;
+  height: auto !important;
+  max-height: none !important;
+  padding: 4px 8px !important;
+  font-size: 11.5px !important;
+  line-height: 1.35 !important;
+  color: var(--text-primary) !important;
+  background: var(--bg-subtle) !important;
+  border: 1px solid var(--border) !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+}
+
+.classic-erp-window .erp-job-issue-taxbox-row > span,
+.classic-erp-window .erp-job-issue-sumrow > span {
+  color: var(--text-secondary) !important;
+}
+
+.classic-erp-window .erp-job-issue-taxbox-row input,
+.classic-erp-window .erp-job-issue-sumrow input {
+  min-height: 26px !important;
+  height: 26px !important;
+  font-size: 12px !important;
+  color: var(--text-primary) !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.classic-erp-window .erp-job-issue-sumrow input {
+  background: var(--bg-subtle) !important;
+}
+
+/* Slightly stronger muted placeholders when theme muted is very light */
+.classic-erp-input::placeholder,
+.erp-input::placeholder {
+  color: var(--text-secondary) !important;
+  opacity: 0.65;
+}
+
+/* Number inputs: no spin buttons eating width */
+.classic-erp-window input[type='number'] {
+  -moz-appearance: textfield !important;
+}
+.classic-erp-window input[type='number']::-webkit-inner-spin-button,
+.classic-erp-window input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+/* Small screens: stack dense grids so fields don’t crush */
+@media (max-width: 1100px) {
+  .erp-bill-doc-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+  }
+  .note-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .note-grid-2,
+  .note-grid-3,
+  .note-grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+  .classic-erp-label--fixed {
+    width: 100px !important;
+  }
+}

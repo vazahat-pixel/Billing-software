@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import useStore from '../store/useStore';
 import useConfigStore from '../store/useConfigStore';
 import { toast } from '../store/useToastStore';
@@ -107,10 +108,61 @@ const rowAuditMark = (r) => {
   return '—';
 };
 
+/** Position a portal dropdown under an input without being clipped by modal overflow. */
+function useDropdownRect(anchorRef, open) {
+  const [rect, setRect] = useState(null);
+
+  useLayoutEffect(() => {
+    if (!open || !anchorRef?.current) {
+      setRect(null);
+      return undefined;
+    }
+    const update = () => {
+      const el = anchorRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const maxH = Math.min(280, Math.max(140, window.innerHeight - r.bottom - 12));
+      const width = Math.max(r.width, 320);
+      let left = r.left;
+      if (left + width > window.innerWidth - 8) {
+        left = Math.max(8, window.innerWidth - width - 8);
+      }
+      setRect({
+        top: r.bottom + 2,
+        left,
+        width,
+        maxHeight: maxH,
+      });
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open, anchorRef]);
+
+  return rect;
+}
+
 /** Head list dropdown */
-function HeadListPanel({ heads, highlightIdx, onSelect }) {
-  return (
-    <div className="ledger-head-list">
+function HeadListPanel({ heads, highlightIdx, onSelect, anchorRef }) {
+  const rect = useDropdownRect(anchorRef, true);
+  if (!rect) return null;
+
+  return createPortal(
+    <div
+      className="ledger-head-list ledger-portal-dropdown"
+      style={{
+        position: 'fixed',
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        maxHeight: rect.maxHeight,
+        zIndex: 10050,
+      }}
+    >
       <div
         className={`ledger-head-item ${highlightIdx === -1 ? 'is-active' : ''}`}
         onMouseDown={(e) => { e.preventDefault(); onSelect(''); }}
@@ -126,14 +178,28 @@ function HeadListPanel({ heads, highlightIdx, onSelect }) {
           <span>{h}</span>
         </div>
       ))}
-    </div>
+    </div>,
+    document.body
   );
 }
 
-/** Inline account list — opens on focus/type */
-function AccountListPanel({ rows, highlightIdx, onSelect, emptyText = 'No accounts found' }) {
-  return (
-    <div className="ledger-ac-list">
+/** Account list — portal so modal overflow cannot clip it */
+function AccountListPanel({ rows, highlightIdx, onSelect, emptyText = 'No accounts found', anchorRef }) {
+  const rect = useDropdownRect(anchorRef, true);
+  if (!rect) return null;
+
+  return createPortal(
+    <div
+      className="ledger-ac-list ledger-portal-dropdown"
+      style={{
+        position: 'fixed',
+        top: rect.top,
+        left: rect.left,
+        width: Math.max(rect.width, 420),
+        maxHeight: rect.maxHeight,
+        zIndex: 10050,
+      }}
+    >
       <table className="ledger-ac-list-table">
         <thead>
           <tr>
@@ -158,7 +224,8 @@ function AccountListPanel({ rows, highlightIdx, onSelect, emptyText = 'No accoun
           ))}
         </tbody>
       </table>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -375,7 +442,10 @@ const LedgerModal = ({
   useEffect(() => {
     if (!listOpen) return undefined;
     const handleDocClick = (e) => {
-      if (!e.target.closest('.ledger-field-wrap')) {
+      if (
+        !e.target.closest('.ledger-field-wrap')
+        && !e.target.closest('.ledger-portal-dropdown')
+      ) {
         setListOpen(null);
       }
     };
@@ -711,6 +781,7 @@ const LedgerModal = ({
                 heads={filteredHeads}
                 highlightIdx={listIdx}
                 onSelect={(h) => pickHead(h)}
+                anchorRef={accHeadRef}
               />
             )}
           </div>
@@ -742,6 +813,7 @@ const LedgerModal = ({
                 rows={filteredAccounts}
                 highlightIdx={listIdx}
                 onSelect={pickAccount}
+                anchorRef={accountRef}
               />
             )}
           </div>
@@ -1229,6 +1301,15 @@ const ledgerStyles = `
   }
   .ledger-ac-list-table tr:hover .ac-group-tag, .ledger-ac-list-table tr.is-active .ac-group-tag {
     background: #1d4ed8; color: #ffffff;
+  }
+  .ledger-portal-dropdown.ledger-head-list,
+  .ledger-portal-dropdown.ledger-ac-list {
+    position: fixed !important;
+    right: auto;
+    overflow-y: auto;
+    border: 2px solid #2b60db;
+    background: #fff;
+    box-shadow: 0 12px 32px rgba(0,0,0,.28);
   }
   .ledger-ac-list {
     position: absolute; left: 0; right: 0; top: 100%; z-index: 50;

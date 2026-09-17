@@ -114,7 +114,7 @@ export default function EWayBillHub({ isOpen, onClose }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="E-Way Bill Hub & Transit Management" className="max-w-7xl h-[92vh] bg-white rounded-[2.5rem] p-0 border-none shadow-2xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="E-Way Bill Hub" className="max-w-7xl w-full h-[min(92vh,900px)] p-0 rounded-2xl">
       <div className="flex flex-col h-full p-8 space-y-6 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">

@@ -56,6 +56,8 @@ const CompanySettingsSchema = new mongoose.Schema({
     invoiceTemplateId: { type: String, default: 'textile-pro' },
     autoFestiveTheme: { type: Boolean, default: false },
     showFestivalGreeting: { type: Boolean, default: false },
+    /** UI theme id from frontend/theme/themes.js — per-company preference */
+    uiThemeId: { type: String, default: 'classic' },
     // Custom Fields
     customField1Label: { type: String, default: '' },
     customField2Label: { type: String, default: '' },

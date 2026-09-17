@@ -10,11 +10,22 @@ files:
   - updater.js
   - machineId.js
   - config.example.json
+  - localRuntime/**/*
   - renderer/**/*
   - assets/**/*
 extraResources:
   - from: config.example.json
     to: config.example.json
+  - from: vendor/mongodb
+    to: vendor/mongodb
+    filter:
+      - '**/*'
+  - from: resources/backend
+    to: backend
+    filter:
+      - '**/*'
+asarUnpack:
+  - localRuntime/**/*
 win:
   target:
     - target: nsis

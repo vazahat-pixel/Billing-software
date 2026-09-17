@@ -31,6 +31,9 @@ async function run() {
     await mongoose.connect(MONGO_URI);
     console.log('✅ Connected to MongoDB');
 
+    const { assertDestructiveQaAllowed } = require('./utils/mongoSafety');
+    assertDestructiveQaAllowed('testBusinessFlow cleanup');
+
     // Drop old indexes if non-sparse or non-compound unique constraints are active on DB
     const dropIndexSafely = async (coll, name) => {
       try {

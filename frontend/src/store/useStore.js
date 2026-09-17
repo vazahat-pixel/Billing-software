@@ -326,6 +326,12 @@ const useStore = create((set, get) => ({
 
   hydrateFromCache: async () => {
     try {
+      const { useLocalApiAsSourceOfTruth } = await import('../utils/desktopMode');
+      if (useLocalApiAsSourceOfTruth()) return;
+    } catch {
+      /* continue */
+    }
+    try {
       const [
         parties, items, sales, purchases, books, inventory, payments, receipts,
         jobs, orders, returns, notes, visits, ledgers, subMasters

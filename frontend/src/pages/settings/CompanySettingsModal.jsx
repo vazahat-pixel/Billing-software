@@ -102,6 +102,7 @@ const emptySettings = () => ({
   bankName: '', accountName: '', accountNo: '', ifsc: '', bankBranch: '', upiId: '',
   invoiceTerms: '', invoiceTemplateId: 'textile-pro',
   autoFestiveTheme: false, showFestivalGreeting: false,
+  uiThemeId: 'classic',
   customField1Label: '', customField2Label: '', customField3Label: '',
 });
 
@@ -1066,8 +1067,8 @@ const CompanySettingsModal = ({ isOpen, onClose, initialTab = 'appearance', init
   const renderContent = () => {
     if (activeTab === 'appearance') {
       return (
-        <div className="space-y-4 max-w-md">
-          <PanelHeader title="Theme" subtitle="Saved in this browser." />
+        <div className="space-y-4 max-w-lg">
+          <PanelHeader title="Theme" subtitle="Apply saves for this company. Default is Classic ERP." />
           <ThemePicker />
         </div>
       );

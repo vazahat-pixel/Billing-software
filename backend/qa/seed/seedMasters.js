@@ -108,8 +108,8 @@ async function seedParties(companyId) {
   for (const block of PARTY_TYPES) {
     for (let i = 1; i <= block.count; i += 1) {
       const state = pick(STATES);
-      const name = partyName(block.type, seq);
-      const gstin = gstinForState(state.name, seq);
+      const name = partyName(block.type, i);
+      const gstin = ['Employee'].includes(block.type) ? '' : gstinForState(state.name, seq + 10);
       const doc = await Party.findOneAndUpdate(
         { companyId, name },
         {
@@ -117,10 +117,13 @@ async function seedParties(companyId) {
           gstin,
           state: state.name,
           stateCode: state.code,
-          city: 'Surat',
-          address: 'QA Address Line',
-          mobile: `98${String(seq).padStart(8, '0')}`,
+          city: state.city || 'Surat',
+          address: `${100 + seq}, Textile Market, Ring Road`,
+          pincode: state.code === '24' ? '395002' : '400001',
+          mobile: `98${String(70000000 + seq).slice(-8)}`,
+          email: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '.')}@demo.textile`,
           creditLimit: block.type === 'Customer' ? 500000 : 0,
+          creditDays: block.type === 'Customer' ? 30 : 0,
         },
         { upsert: true, new: true }
       );
@@ -161,9 +164,35 @@ async function seedVoucherSeries(companyId, fyCode) {
 }
 
 async function seedCompanyMeta(companyId) {
+  const companyGstin = gstinForState('Gujarat', 77);
   await CompanySettings.findOneAndUpdate(
     { companyId },
-    { $setOnInsert: { legalName: 'QA Textile Mills Pvt Ltd', gstRegistered: true } },
+    {
+      $set: {
+        legalName: 'Surat Demo Textile Mills Pvt Ltd',
+        shortName: 'SDTM',
+        gstRegistered: true,
+        gstin: companyGstin,
+        pan: companyGstin.slice(2, 12),
+        state: 'Gujarat',
+        stateCode: '24',
+        city: 'Surat',
+        address: 'Ring Road, Textile Market, Surat',
+        pincode: '395002',
+        phone: '9825012345',
+        email: 'accounts@suratdemo.textile',
+        bankName: 'HDFC Bank',
+        bankBranch: 'Ring Road Surat',
+        accountNo: '50200012345678',
+        ifsc: 'HDFC0001234',
+        invoicePrefix: 'INV',
+        purchasePrefix: 'PUR',
+        offlineModeEnabled: true,
+        businessType: 'Textile',
+        currency: 'INR (₹)',
+        financialYear: `${new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1}-${String((new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1) + 1).slice(-2)}`,
+      },
+    },
     { upsert: true }
   );
   await gstConfigService.getOrCreate(companyId);
@@ -171,13 +200,15 @@ async function seedCompanyMeta(companyId) {
     { companyId },
     {
       $set: {
-        gstin: '24AAAAA0000A1Z5',
+        gstin: companyGstin,
         stateCode: '24',
         registrationType: 'Regular',
+        legalName: 'Surat Demo Textile Mills Pvt Ltd',
         isActive: true,
       },
     }
   );
+  return companyGstin;
 }
 
 async function seedMasters(ctx) {
