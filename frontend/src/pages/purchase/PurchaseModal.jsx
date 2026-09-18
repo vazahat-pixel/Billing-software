@@ -5,7 +5,7 @@ import useStore from '../../store/useStore';
 import { useConfig } from '../../context/ConfigContext';
 import { resolvePurchaseFieldVisibility } from '../../utils/configHelpers';
 import { toast } from '../../store/useToastStore';
-import { notifyError } from '../../utils/notify';
+import { notifyError, notifySuccess } from '../../utils/notify';
 import { Trash2, Plus } from 'lucide-react';
 import AccountMasterModal from '../masters/AccountMasterModal';
 import ItemMasterModal from '../masters/ItemMasterModal';
@@ -15,9 +15,10 @@ import PurchasePrint from './PurchasePrint';
 import { warehousesApi } from '../../api';
 import { ERPCombobox } from '../../components/erp';
 import ErpWindowControls from '../../components/erp/ErpWindowControls';
+import ErpKeyboardHintBar, { FORM_KEYBOARD_HINTS } from '../../components/erp/ErpKeyboardHintBar';
 import useErpWindow from '../../hooks/useErpWindow';
 import { erpConfirm } from '../../utils/confirm';
-import { resolveParty, buildWhatsAppMessage, openWhatsAppShare } from '../../utils/invoiceHelpers';
+import { resolveParty, buildWhatsAppMessage, openWhatsAppShare, shareInvoiceWhatsApp } from '../../utils/invoiceHelpers';
 import { getFocusableElements, handleFormEnterKeyDown, handleFormArrowKeyDown } from '../../utils/formEnterNavigation';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import useConfigStore from '../../store/useConfigStore';
@@ -410,19 +411,7 @@ const PurchaseModal = ({
       return;
     }
 
-    let cancelled = false;
-    setBootLoading(true);
-    Promise.all([
-      fetchParties(),
-      fetchItems(),
-      fetchPurchases(),
-      warehousesApi.list().then((list) => setWarehouses(Array.isArray(list) ? list : [])).catch(() => setWarehouses([])),
-    ])
-      .catch(() => { })
-      .finally(() => {
-        if (!cancelled) setBootLoading(false);
-      });
-
+    // Open the form immediately; only block if masters are missing from store.
     if (!openedOnceRef.current) {
       openedOnceRef.current = true;
       setSaveNextActions(null);
@@ -440,6 +429,32 @@ const PurchaseModal = ({
       }
     }
 
+    let cancelled = false;
+    const state = useStore.getState();
+    const needParties = !(state.parties && state.parties.length);
+    const needItems = !(state.items && state.items.length);
+    const blocking = [];
+    if (needParties) blocking.push(fetchParties());
+    if (needItems) blocking.push(fetchItems());
+
+    if (blocking.length) {
+      setBootLoading(true);
+      Promise.all(blocking)
+        .catch(() => { })
+        .finally(() => {
+          if (!cancelled) setBootLoading(false);
+        });
+    } else {
+      setBootLoading(false);
+    }
+    // Warehouses are optional for the shell — never block bill open on this call
+    warehousesApi.list().then((list) => setWarehouses(Array.isArray(list) ? list : [])).catch(() => setWarehouses([]));
+
+    // Warm purchase find-list in background — do not block the form shell.
+    if (!(state.purchases && state.purchases.length)) {
+      fetchPurchases().catch(() => {});
+    }
+
     const t = setTimeout(() => {
       if (suppBillRef.current && !locked) {
         suppBillRef.current.focus();
@@ -453,7 +468,7 @@ const PurchaseModal = ({
           }
         }
       }
-    }, 150);
+    }, 80);
     return () => {
       cancelled = true;
       clearTimeout(t);
@@ -1647,10 +1662,8 @@ const PurchaseModal = ({
           </div>
 
           {/* Action bar — outside scroll/window so New/Save never clip */}
-          <div className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1.5 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]">
-            <span className="text-[10px] text-[var(--text-muted)] mr-auto hidden sm:inline">
-              Enter → next · Shift+Enter / Left → back · F3 Find · Ctrl+Enter save · Esc close
-            </span>
+          <div className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]">
+            <ErpKeyboardHintBar items={FORM_KEYBOARD_HINTS} dense className="mr-auto min-w-0 flex-1 max-w-full sm:max-w-[55%]" />
             <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving} title="New Bill (Alt+N)">New</button>
             <button className="classic-erp-btn btn-blue" type="button" data-enter-save onClick={handleSave} disabled={locked || saving || bootLoading}>
               <SaveButtonLabel saving={saving} />
@@ -1835,11 +1848,17 @@ const PurchaseModal = ({
           onPrint={() => {
             if (saveNextActions.id) setPrintInvoiceId(saveNextActions.id);
           }}
-          onWhatsApp={() => {
+          onWhatsApp={async () => {
             const inv = saveNextActions.invoice || purchases.find((p) => p._id === saveNextActions.id || p.id === saveNextActions.id);
             if (!inv) return;
             const party = resolveParty(inv.supplierId, parties);
-            openWhatsAppShare(buildWhatsAppMessage({ type: 'purchase', invoice: inv, party }), party?.phone || party?.mobile);
+            try {
+              const res = await shareInvoiceWhatsApp({ type: 'purchase', invoice: inv, party });
+              if (res.mode === 'api') notifySuccess(res.message || 'WhatsApp sent');
+              else notifySuccess('WhatsApp opened — confirm send on your device');
+            } catch (err) {
+              openWhatsAppShare(buildWhatsAppMessage({ type: 'purchase', invoice: inv, party }), party?.phone || party?.mobile);
+            }
           }}
           onNew={() => {
             setSaveNextActions(null);

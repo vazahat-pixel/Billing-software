@@ -3,6 +3,7 @@ import {
   resolveCompanyProfile,
   buildWhatsAppMessage,
   openWhatsAppShare,
+  shareInvoiceWhatsApp,
   resolveParty,
 } from '../utils/invoiceHelpers';
 import {
@@ -16,6 +17,7 @@ import { WarningsBanner } from './invoice-templates/shared/FieldWarning';
 import useInvoiceTemplateStore from '../store/useInvoiceTemplateStore';
 import useConfigStore from '../store/useConfigStore';
 import { ButtonLoader } from './ui/loaders';
+import { toast } from '../store/useToastStore';
 
 /**
  * Invoice preview / print / PDF shell — compact ERP layout with left sidebar.
@@ -293,9 +295,20 @@ const InvoicePDFViewer = ({
     }
   };
 
-  const handleWhatsApp = () => {
-    const msg = buildWhatsAppMessage({ type, invoice, party, company: firm });
-    openWhatsAppShare(msg, party?.phone || party?.mobile || '');
+  const handleWhatsApp = async () => {
+    try {
+      const res = await shareInvoiceWhatsApp({
+        type,
+        invoice,
+        party,
+        company: firm,
+      });
+      if (res.mode === 'api') toast.success(res.message || 'WhatsApp sent');
+      else toast.success('WhatsApp opened — confirm send on your device');
+    } catch {
+      const msg = buildWhatsAppMessage({ type, invoice, party, company: firm });
+      openWhatsAppShare(msg, party?.phone || party?.mobile || '');
+    }
   };
 
   const paperWidth =

@@ -207,3 +207,66 @@ export const openWhatsAppShare = (message, phone = '') => {
     : `https://wa.me/?text=${text}`;
   window.open(url, '_blank', 'noopener,noreferrer');
 };
+
+/**
+ * Prefer Meta Cloud API send via Communication Hub; fall back to wa.me if
+ * credentials missing, send failed, or offline.
+ *
+ * @returns {Promise<{ mode: 'api'|'client', status?: string, message?: string }>}
+ */
+export async function shareInvoiceWhatsApp({
+  type = 'sale',
+  invoice,
+  party,
+  company,
+  action,
+  message,
+} = {}) {
+  const phone = party?.whatsapp || party?.phone || party?.mobile || '';
+  const text =
+    message ||
+    buildWhatsAppMessage({ type, invoice, party, company });
+
+  const refId = invoice?._id || invoice?.id || null;
+  const partyId = party?._id || party?.id || invoice?.customerId?._id || invoice?.customerId || invoice?.supplierId?._id || invoice?.supplierId || null;
+  const resolvedAction =
+    action ||
+    (type === 'purchase' || type === 'Purchase' ? 'send_purchase_order' : 'send_invoice');
+
+  try {
+    const { stage6Api } = await import('../api/stage6.api');
+    const res = await stage6Api.commSend({
+      channel: 'whatsapp',
+      action: resolvedAction,
+      partyId: partyId || undefined,
+      recipient: phone || undefined,
+      referenceType: type === 'purchase' || type === 'Purchase' ? 'Purchase' : 'Sales',
+      referenceId: refId || undefined,
+      message: text,
+      bodyParams: [
+        invoice?.invoiceNo || invoice?.billNo || '—',
+        String(invoice?.netAmount ?? invoice?.totalAmount ?? ''),
+        party?.name || '',
+      ],
+    });
+
+    if (res?.status === 'sent') {
+      return { mode: 'api', status: 'sent', message: res.message || 'WhatsApp sent', to: res.to };
+    }
+
+    // API not configured or failed — open client WhatsApp so user is never blocked
+    openWhatsAppShare(res?.text || text, res?.to || phone);
+    return {
+      mode: 'client',
+      status: res?.status || 'stub',
+      message: res?.message || 'Opened WhatsApp on this device',
+    };
+  } catch (err) {
+    openWhatsAppShare(text, phone);
+    return {
+      mode: 'client',
+      status: 'fallback',
+      message: err?.message || 'Opened WhatsApp on this device',
+    };
+  }
+}

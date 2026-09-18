@@ -1,7 +1,7 @@
 /* Enterprise motion — fast, subtle, desktop-grade */
 
 .erp-motion-fade-in {
-  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .erp-motion-scale-in {
@@ -12,8 +12,30 @@
   animation: erpSlideDown 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+.erp-motion-content {
+  animation: erpContentIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.erp-motion-stagger > * {
+  opacity: 0;
+  animation: erpContentIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.erp-motion-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.erp-motion-stagger > *:nth-child(2) { animation-delay: 30ms; }
+.erp-motion-stagger > *:nth-child(3) { animation-delay: 60ms; }
+.erp-motion-stagger > *:nth-child(4) { animation-delay: 90ms; }
+.erp-motion-stagger > *:nth-child(5) { animation-delay: 120ms; }
+.erp-motion-stagger > *:nth-child(6) { animation-delay: 150ms; }
+.erp-motion-stagger > *:nth-child(n+7) { animation-delay: 170ms; }
+
 @keyframes erpSlideDown {
   from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes erpContentIn {
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -24,6 +46,31 @@
 @keyframes erpToastIn {
   from { opacity: 0; transform: translateX(12px) scale(0.98); }
   to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+/* Soft busy overlay fade (used by ErpBusyOverlay) */
+.erp-busy-overlay {
+  animation: fadeIn 0.18s ease-out forwards;
+}
+
+.erp-top-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  overflow: hidden;
+  z-index: 40;
+  pointer-events: none;
+  background: transparent;
+}
+
+.erp-top-progress__bar {
+  height: 100%;
+  width: 35%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-info, #0d9488));
+  animation: erp-loader-slide 1.05s ease-in-out infinite;
 }
 
 .erp-focus-ring:focus-visible {
@@ -61,4 +108,18 @@
 
 [data-theme='high-contrast'] .erp-btn-primary {
   border: 2px solid var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erp-motion-fade-in,
+  .erp-motion-scale-in,
+  .erp-motion-slide-down,
+  .erp-motion-content,
+  .erp-motion-stagger > *,
+  .erp-busy-overlay,
+  .erp-toast-enter {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }

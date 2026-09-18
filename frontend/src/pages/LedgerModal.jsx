@@ -5,7 +5,7 @@ import useConfigStore from '../store/useConfigStore';
 import { toast } from '../store/useToastStore';
 import Modal from '../components/ui/Modal';
 import ErpWindowedModal from '../components/erp/ErpWindowedModal';
-import { fmtDate, fmtMoney } from '../utils/invoiceHelpers';
+import { fmtDate, fmtMoney, shareInvoiceWhatsApp, openWhatsAppShare } from '../utils/invoiceHelpers';
 import { downloadCsv } from '../utils/reportExport';
 import { SkeletonTable, InlineLoader, ButtonLoader, ErpBusyOverlay } from '../components/ui/loaders';
 
@@ -897,7 +897,35 @@ const LedgerModal = ({
               </button>
               <button type="button" className="classic-erp-btn" onClick={handleExcel} disabled={!statement}>Excel</button>
               <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('Mail')}>Mail</button>
-              <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('WhatsApp')}>Whatsapp</button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                disabled={!statement || !partyInfo}
+                onClick={async () => {
+                  const phone = partyInfo?.whatsapp || partyInfo?.phone || partyInfo?.mobile || '';
+                  if (!phone) {
+                    toast.warning('Party phone / WhatsApp number missing');
+                    return;
+                  }
+                  const bal = `${money(closingBal)}${closingType ? ` ${closingType}` : ''}`;
+                  const msg = `*Ledger Statement*\nAccount: ${ledgerName}\nPeriod: ${from} to ${to}\nClosing: ${bal}`;
+                  try {
+                    const res = await shareInvoiceWhatsApp({
+                      type: 'statement',
+                      action: 'send_statement',
+                      party: partyInfo,
+                      invoice: { invoiceNo: ledgerName, netAmount: closingBal },
+                      message: msg,
+                    });
+                    if (res.mode === 'api') toast.success(res.message || 'WhatsApp sent');
+                    else toast.success('WhatsApp opened — confirm send on your device');
+                  } catch {
+                    openWhatsAppShare(msg, phone);
+                  }
+                }}
+              >
+                Whatsapp
+              </button>
               <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('ALL Reports')}>ALL Reports</button>
               <button
                 type="button"

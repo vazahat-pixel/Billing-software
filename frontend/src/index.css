@@ -79,22 +79,49 @@
     transition: background-color 0.2s ease, color 0.2s ease;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
   }
 
-  /* Ultra-smooth interactions with GPU acceleration */
-  button, a, input, select, .erp-card, .transition-all {
-    transition-property: all;
+  /* Narrow transitions only — permanent will-change / transition:all on every
+     control was forcing huge GPU layer trees and making the ERP feel laggy. */
+  button, a, .erp-btn, .erp-menu-trigger, .erp-card {
+    transition-property: background-color, border-color, color, box-shadow, opacity, transform;
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-    transition-duration: 200ms;
-    will-change: transform, box-shadow, border-color, background-color;
+    transition-duration: 160ms;
+  }
+
+  input, select, textarea {
+    transition-property: border-color, box-shadow, background-color;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    transition-duration: 140ms;
   }
   
   button:active, .erp-btn:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
   }
 
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Smooth scrolling for main panels / modal bodies */
+  .erp-scroll-smooth,
+  .erp-shell main,
+  .classic-erp-window-body,
+  .classic-erp-body {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 /* Animations */
@@ -123,9 +150,15 @@
 .animate-slide-in-right { animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .animate-scale-in { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.15); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 0.3); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.14);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 0.28); background-clip: padding-box; }
 
 /* Ultra-Compact Typography */
 .text-display { font-size: 18px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.02em; }
@@ -317,6 +350,101 @@
   color: #334155;
   padding: 0 0.2rem;
   user-select: none;
+}
+
+/* Bottom keyboard shortcut strip — small text, always readable */
+.erp-kbd-hint-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 22px;
+  padding: 2px 8px;
+  background: linear-gradient(180deg, #e8e6de 0%, #d4d0c8 100%);
+  border-top: 1px solid #9ca3af;
+  color: #1e293b;
+  font-size: 10px;
+  line-height: 1.2;
+  flex-shrink: 0;
+  z-index: 40;
+}
+
+.erp-kbd-hint-bar--dense {
+  min-height: 20px;
+  padding: 1px 6px;
+  background: transparent;
+  border-top: none;
+}
+
+.erp-kbd-hint-bar__title {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.erp-kbd-hint-bar__scroll {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.15rem;
+  overflow-x: auto;
+  min-width: 0;
+  scrollbar-width: none;
+}
+
+.erp-kbd-hint-bar__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.erp-kbd-hint-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  white-space: nowrap;
+}
+
+.erp-kbd {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid #94a3b8;
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: #fff;
+  color: #0f172a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.erp-kbd-hint-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.erp-kbd-hint-sep {
+  margin: 0 0.15rem 0 0.05rem;
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.erp-shell-with-kbd {
+  padding-bottom: 22px;
+}
+
+.erp-shell-kbd-fixed {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10040;
+}
+
+.erp-window-dock-tray {
+  bottom: 28px !important;
 }
 
 .erp-sidebar { 

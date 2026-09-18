@@ -69,13 +69,16 @@ const AuthBootstrap = ({ children }) => {
 
   if (!sessionReady) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white">
-        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Loading ERP...</p>
+      <div className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-[var(--bg-base)] erp-motion-fade-in">
+        <div className="h-9 w-9 rounded-full border-2 border-[var(--border)] border-t-[var(--color-primary)] animate-spin" />
+        <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[var(--text-muted)]">
+          Loading ERP…
+        </p>
       </div>
     );
   }
 
-  return children;
+  return <div className="erp-motion-fade-in min-h-full">{children}</div>;
 };
 
 export default AuthBootstrap;

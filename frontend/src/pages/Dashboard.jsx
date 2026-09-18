@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -20,66 +20,15 @@ import ErpWindowDockTray from '../components/erp/ErpWindowDockTray';
 import { yieldOtherWindows } from '../store/useWindowDockStore';
 import PwaInstallPrompt from '../components/PwaInstallPrompt';
 import Modal from '../components/ui/Modal';
-
-// Legacy Modals
-import SalesModal from './sales/SalesModal';
-import PurchaseModal from './purchase/PurchaseModal';
-import PurchaseEngineModal from './purchase/PurchaseEngineModal';
-import InventoryEngineModal from './inventory/InventoryEngineModal';
-import ProductionEngineModal from './jobwork/ProductionEngineModal';
-import SalesEngineModal from './sales/SalesEngineModal';
-import AutomationEngineModal from './admin/AutomationEngineModal';
-import Stage2OpsModal from './admin/Stage2OpsModal';
-import EnterprisePlatformModal from './enterprise/EnterprisePlatformModal';
-import InfrastructureModal from './infrastructure/InfrastructureModal';
-import CommercialReleaseModal from './commercial/CommercialReleaseModal';
-import EnterpriseTestingDashboard from './commercial/EnterpriseTestingDashboard';
-import OnboardingWizard from './commercial/OnboardingWizard';
 import useUiStore from '../store/useUiStore';
 import { stage8Api } from '../api/stage8.api';
 import { showDevTools, DEV_ONLY_MENU_LABELS } from '../utils/showDevTools';
-import CashBankBookModal from './accounting/CashBankBookModal';
-import IssueModal from './jobwork/IssueModal';
-import ReceiveModal from './jobwork/ReceiveModal';
-import UpdateModal from './jobwork/UpdateModal';
-import JobReceiptModal from './jobwork/JobReceiptModal';
-import ProcessUpdateModal from './jobwork/ProcessUpdateModal';
-import SalesOutstanding from './reports/SalesOutstanding';
-import OutstandingReportModal from './reports/OutstandingReportModal';
-import GstComplianceReportsModal from './reports/GstComplianceReportsModal';
-import SystemUtilitiesModal from './utilities/SystemUtilitiesModal';
-import TrialBalanceModal from './accounting/TrialBalanceModal';
-import LotNoEntryModal from './inventory/LotNoEntryModal';
-import IssueMultipleModal from './jobwork/IssueMultipleModal';
-import CuttingBeamEntryModal from './inventory/CuttingBeamEntryModal';
-import LedgerModal from './LedgerModal';
-import AccountMasterModal from './masters/AccountMasterModal';
-import ItemMasterModal from './masters/ItemMasterModal';
-import BookMasterModal from './masters/BookMasterModal';
-import JobWorkerMaster from './masters/JobWorkerMaster';
-import InventoryPage from './inventory/InventoryPage';
-
-// GST Compliance Modals
-import {
-   Gst3bMonthlyModal,
-   Gstr1Modal,
-   Gst2bMatchingModal,
-   Gst3bDetailModal,
-   Gstr1ErrorChekModal,
-   GstComplianceModal
-} from './gst/GstModals';
-import GstReportsHub from './gst/GstReportsHub';
-import CADashboardModal from './gst/CADashboardModal';
-import GstinReportsPage from './gst/GstinReportsPage';
-import Gstr2ReportModal from './gst/Gstr2ReportModal';
-import Gstr9ReportModal from './gst/Gstr9ReportModal';
-import EWayBillHub from './gst/EWayBillHub';
-import VisitLogModal from './crm/VisitLogModal';
-import PartyModal from './masters/PartyModal';
 import BookSelectionModal from '../components/BookSelectionModal';
+import ErpKeyboardHintBar from '../components/erp/ErpKeyboardHintBar';
 import { getDefaultBooksForModule } from '../utils/defaultBooks';
-
-// New Database Modals
+import CompanySettingsModal from './settings/CompanySettingsModal';
+import ReportsHub from './reports/ReportsHub';
+import DataRecordsHub from './records/DataRecordsHub';
 import GenericMasterModal from './masters/GenericMasterModal';
 import WarehouseMasterModal from './masters/WarehouseMasterModal';
 import MergeMasterModal from './masters/MergeMasterModal';
@@ -89,17 +38,65 @@ import NoteModal from './transactions/NoteModal';
 import ContraVoucherModal from './transactions/ContraVoucherModal';
 import TdsEntryModal from './transactions/TdsEntryModal';
 import JournalEntryModal from './transactions/JournalEntryModal';
-import CompanySettingsModal from './settings/CompanySettingsModal';
 import OpeningBalanceModal from './masters/OpeningBalanceModal';
 import OpeningStockModal from './masters/OpeningStockModal';
-import DataRecordsHub from './records/DataRecordsHub';
-import ReportsHub from './reports/ReportsHub';
-import { buildReportsMenuItems } from '../utils/reportTree';
 import { getPermissions } from '../utils/permissions';
 import { useConfig } from '../context/ConfigContext';
 import { isFlagEnabled } from '../utils/configHelpers';
 import { toast } from '../store/useToastStore';
-import { CardGridLoader, InlineLoader } from '../components/ui/loaders';
+import { CardGridLoader, InlineLoader, TopProgressBar } from '../components/ui/loaders';
+import { buildReportsMenuItems } from '../utils/reportTree';
+
+// Daily-path modals — eager so click → form is instant (no blank Suspense wait)
+import SalesModal from './sales/SalesModal';
+import PurchaseModal from './purchase/PurchaseModal';
+import CashBankBookModal from './accounting/CashBankBookModal';
+import LedgerModal from './LedgerModal';
+import IssueModal from './jobwork/IssueModal';
+import ReceiveModal from './jobwork/ReceiveModal';
+import UpdateModal from './jobwork/UpdateModal';
+import JobReceiptModal from './jobwork/JobReceiptModal';
+import ProcessUpdateModal from './jobwork/ProcessUpdateModal';
+import AccountMasterModal from './masters/AccountMasterModal';
+import ItemMasterModal from './masters/ItemMasterModal';
+import BookMasterModal from './masters/BookMasterModal';
+import PartyModal from './masters/PartyModal';
+import OutstandingReportModal from './reports/OutstandingReportModal';
+import SystemUtilitiesModal from './utilities/SystemUtilitiesModal';
+import TrialBalanceModal from './accounting/TrialBalanceModal';
+
+// Rare / heavy screens — lazy OK
+const PurchaseEngineModal = lazy(() => import('./purchase/PurchaseEngineModal'));
+const InventoryEngineModal = lazy(() => import('./inventory/InventoryEngineModal'));
+const ProductionEngineModal = lazy(() => import('./jobwork/ProductionEngineModal'));
+const SalesEngineModal = lazy(() => import('./sales/SalesEngineModal'));
+const AutomationEngineModal = lazy(() => import('./admin/AutomationEngineModal'));
+const Stage2OpsModal = lazy(() => import('./admin/Stage2OpsModal'));
+const EnterprisePlatformModal = lazy(() => import('./enterprise/EnterprisePlatformModal'));
+const InfrastructureModal = lazy(() => import('./infrastructure/InfrastructureModal'));
+const CommercialReleaseModal = lazy(() => import('./commercial/CommercialReleaseModal'));
+const EnterpriseTestingDashboard = lazy(() => import('./commercial/EnterpriseTestingDashboard'));
+const OnboardingWizard = lazy(() => import('./commercial/OnboardingWizard'));
+const SalesOutstanding = lazy(() => import('./reports/SalesOutstanding'));
+const GstComplianceReportsModal = lazy(() => import('./reports/GstComplianceReportsModal'));
+const LotNoEntryModal = lazy(() => import('./inventory/LotNoEntryModal'));
+const IssueMultipleModal = lazy(() => import('./jobwork/IssueMultipleModal'));
+const CuttingBeamEntryModal = lazy(() => import('./inventory/CuttingBeamEntryModal'));
+const JobWorkerMaster = lazy(() => import('./masters/JobWorkerMaster'));
+const InventoryPage = lazy(() => import('./inventory/InventoryPage'));
+const Gst3bMonthlyModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst3bMonthlyModal })));
+const Gstr1Modal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gstr1Modal })));
+const Gst2bMatchingModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst2bMatchingModal })));
+const Gst3bDetailModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst3bDetailModal })));
+const Gstr1ErrorChekModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gstr1ErrorChekModal })));
+const GstComplianceModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.GstComplianceModal })));
+const GstReportsHub = lazy(() => import('./gst/GstReportsHub'));
+const CADashboardModal = lazy(() => import('./gst/CADashboardModal'));
+const GstinReportsPage = lazy(() => import('./gst/GstinReportsPage'));
+const Gstr2ReportModal = lazy(() => import('./gst/Gstr2ReportModal'));
+const Gstr9ReportModal = lazy(() => import('./gst/Gstr9ReportModal'));
+const EWayBillHub = lazy(() => import('./gst/EWayBillHub'));
+const VisitLogModal = lazy(() => import('./crm/VisitLogModal'));
 
 const MODULE_PARENT_MAP = {
   sales: 'sales',
@@ -390,7 +387,10 @@ const Dashboard = () => {
    const [isRefreshing, setIsRefreshing] = useState(false);
    const menuBarRef = useRef(null);
 
-   const showDashboardSkeleton = dashboardLoading || isRefreshing;
+   // Soft refresh: keep existing KPIs visible; only full skeleton on first empty load.
+   const hasDashboardData = Boolean(dashboardSummary);
+   const showDashboardSkeleton = dashboardLoading && !hasDashboardData;
+   const showSoftSync = isRefreshing || (dashboardLoading && hasDashboardData);
 
    const openSettings = (tab = 'appearance', billType = 'sales') => {
       const resolved = tab === 'fields' ? (billType || 'sales') : tab;
@@ -926,7 +926,7 @@ const Dashboard = () => {
    };
 
    return (
-      <div className="erp-shell fixed inset-0 flex overflow-hidden">
+      <div className="erp-shell erp-shell-with-kbd fixed inset-0 flex overflow-hidden">
 
          {/* Core modules — compact rail */}
          <aside className="erp-rail flex flex-col py-2 gap-0.5 shrink-0 overflow-y-auto no-scrollbar">
@@ -974,7 +974,7 @@ const Dashboard = () => {
                </button>
                <button
                   type="button"
-                  onClick={() => toast.info('Ctrl+K opens search. Use menu for billing, GST, and reports. Bell shows notifications.')}
+                  onClick={() => toast.info('Bottom Keys bar: Ctrl+K Search · F3 Find · Ctrl+Enter Save · Esc Close. Bill forms also show shortcuts near New/Save.')}
                   className="w-full flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
                >
                   <FontAwesomeIcon icon={faCircleQuestion} className="text-[11px] w-3.5 shrink-0" />
@@ -1159,8 +1159,9 @@ const Dashboard = () => {
 
             </header>
 
-            <div className="flex-1 overflow-y-auto p-4">
-               <div className="max-w-6xl mx-auto flex flex-col gap-4">
+            <div className="flex-1 overflow-y-auto p-4 erp-scroll-smooth relative">
+               <TopProgressBar show={showSoftSync} />
+               <div className="max-w-6xl mx-auto flex flex-col gap-4 erp-motion-content">
                {setupGaps.length > 0 && (
                   <div className="flex flex-wrap items-center gap-3 px-3 py-2.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-950">
                      <FontAwesomeIcon icon={faTriangleExclamation} className="text-amber-600 text-[12px] shrink-0" />
@@ -1190,9 +1191,9 @@ const Dashboard = () => {
                      {lastSynced && (
                         <span className="text-[9px] font-medium text-emerald-600 self-center">Live</span>
                      )}
-                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={handleSync} disabled={showDashboardSkeleton}>
-                        <FontAwesomeIcon icon={faSync} className={`text-[9px] mr-1 ${showDashboardSkeleton ? 'animate-spin' : ''}`} />
-                        {showDashboardSkeleton ? 'Syncing…' : 'Sync'}
+                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={handleSync} disabled={showSoftSync || showDashboardSkeleton}>
+                        <FontAwesomeIcon icon={faSync} className={`text-[9px] mr-1 ${showSoftSync || showDashboardSkeleton ? 'animate-spin' : ''}`} />
+                        {showSoftSync || showDashboardSkeleton ? 'Syncing…' : 'Sync'}
                      </button>
                      {showRecordsHub && (
                         <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => openRecordsHub('accounts')}>Records</button>
@@ -1210,7 +1211,7 @@ const Dashboard = () => {
                {showDashboardSkeleton ? (
                   <CardGridLoader count={6} />
                ) : (
-               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 erp-motion-stagger">
                   {[
                      { label: 'Sales Today', value: dashboardSummary?.salesToday?.amount, sub: dashboardSummary?.salesToday?.count != null ? `${dashboardSummary.salesToday.count} bills` : null },
                      { label: 'Purchase Today', value: dashboardSummary?.purchaseToday?.amount, sub: dashboardSummary?.purchaseToday?.count != null ? `${dashboardSummary.purchaseToday.count} bills` : null },
@@ -1238,10 +1239,15 @@ const Dashboard = () => {
                         <InlineLoader message="Loading activity…" />
                      </div>
                   )}
+                  {showSoftSync && !showDashboardSkeleton && (
+                     <div className="absolute top-2 right-3 z-10">
+                        <InlineLoader message="Updating…" />
+                     </div>
+                  )}
                   <h3 className="text-[12px] font-semibold mb-3 text-[var(--text-primary)]">Recent Activity</h3>
                   <div className="flex flex-col gap-2">
                      {(recentActivity.length ? recentActivity : [{ text: 'No recent transactions', time: '—', type: 'empty' }]).map((act, i) => (
-                        <div key={i} className="flex gap-2 items-start">
+                        <div key={i} className="flex gap-2 items-start erp-motion-fade-in">
                            <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-[var(--accent)] shrink-0" />
                            <div>
                               <div className="text-[11px] text-[var(--text-primary)]">{act.text}</div>
@@ -1258,7 +1264,7 @@ const Dashboard = () => {
             </div>
          </main>
 
-         {/* Modals */}
+         {/* Modals — daily path is eager; rare screens stay in Suspense */}
          <SalesModal
             isOpen={modals.sales}
             onClose={() => {
@@ -1429,7 +1435,6 @@ const Dashboard = () => {
          />
          <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters} />
          <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} readOnly={permissions.readOnlyMasters} />
-         {modals.outstanding && <SalesOutstanding isOpen={modals.outstanding} onClose={() => toggleModal('outstanding', false)} />}
          {modals.outstandingSalesFull && (
             <OutstandingReportModal
                isOpen={modals.outstandingSalesFull}
@@ -1444,13 +1449,6 @@ const Dashboard = () => {
                type="payable"
             />
          )}
-
-         {modals.gstComplianceReports && (
-            <GstComplianceReportsModal
-               isOpen={modals.gstComplianceReports}
-               onClose={() => setModals(prev => ({ ...prev, gstComplianceReports: false }))}
-            />
-         )}
          {modals.systemUtilities && (
             <SystemUtilitiesModal
                isOpen={modals.systemUtilities}
@@ -1463,80 +1461,92 @@ const Dashboard = () => {
                onClose={() => setModals(prev => ({ ...prev, zTrial: false }))}
             />
          )}
-         {modals.lotNoEntry && (
-            <LotNoEntryModal
-               isOpen={modals.lotNoEntry}
-               onClose={() => setModals(prev => ({ ...prev, lotNoEntry: false }))}
-            />
-         )}
-         {modals.issueMultiple && (
-            <IssueMultipleModal
-               isOpen={modals.issueMultiple}
-               onClose={() => setModals(prev => ({ ...prev, issueMultiple: false }))}
-            />
-         )}
-         {modals.cuttingEntry && (
-            <CuttingBeamEntryModal
-               isOpen={modals.cuttingEntry}
-               onClose={() => setModals(prev => ({ ...prev, cuttingEntry: false }))}
-               mode="cutting"
-            />
-         )}
-         {modals.beamEntry && (
-            <CuttingBeamEntryModal
-               isOpen={modals.beamEntry}
-               onClose={() => setModals(prev => ({ ...prev, beamEntry: false }))}
-               mode="beam"
-            />
-         )}
-
-         {/* GST Compliance Modals */}
-         <Gst3bMonthlyModal isOpen={modals.gst3bMonthly} onClose={() => toggleModal('gst3bMonthly', false)} />
-         <Gstr1Modal isOpen={modals.gstr1} onClose={() => toggleModal('gstr1', false)} />
-         <GstReportsHub isOpen={modals.gstReports} onClose={() => toggleModal('gstReports', false)} />
-         <Gst2bMatchingModal isOpen={modals.gst2bMatching} onClose={() => toggleModal('gst2bMatching', false)} />
-         <Gst3bDetailModal isOpen={modals.gst3bDetail} onClose={() => toggleModal('gst3bDetail', false)} />
-         <Gstr1ErrorChekModal isOpen={modals.gstr1Errorchek} onClose={() => toggleModal('gstr1Errorchek', false)} />
-         <GstComplianceModal isOpen={modals.gstCompliance} onClose={() => toggleModal('gstCompliance', false)} />
-         <GstinReportsPage
-            isOpen={modals.gstinReports}
-            onClose={() => setModals(prev => ({ ...prev, gstinReports: false }))}
-            initialSection={modals.gstinReportsSection || 'sales'}
-         />
-         <Gstr2ReportModal
-            isOpen={modals.gstr2}
-            onClose={() => setModals(prev => ({ ...prev, gstr2: false }))}
-         />
-         <Gstr9ReportModal
-            isOpen={modals.gstr9}
-            onClose={() => setModals(prev => ({ ...prev, gstr9: false }))}
-         />
-         <EWayBillHub
-            isOpen={modals.ewayBill}
-            onClose={() => setModals(prev => ({ ...prev, ewayBill: false }))}
-         />
-         <CADashboardModal
-            isOpen={modals.caDashboard}
-            onClose={() => toggleModal('caDashboard', false)}
-            onOpenGstr1={() => { toggleModal('caDashboard', false); toggleModal('gstr1', true); }}
-            onOpenGstr2={() => { toggleModal('caDashboard', false); toggleModal('gst2bMatching', true); }}
-            onOpenGstr3b={() => { toggleModal('caDashboard', false); toggleModal('gst3bMonthly', true); }}
-         />
-         <VisitLogModal isOpen={modals.visit} onClose={() => toggleModal('visit', false)} />
          <PartyModal isOpen={modals.party} onClose={() => toggleModal('party', false)} />
          <BookMasterModal isOpen={modals.bookMaster} onClose={() => toggleModal('bookMaster', false)} readOnly={permissions.readOnlyMasters} />
-         <Modal isOpen={modals.inventoryPage} onClose={() => toggleModal('inventoryPage', false)} title="Inventory Stock Control" className="max-w-[90vw]">
-            <div className="bg-[var(--bg-card)] p-2 rounded-[2.5rem] overflow-hidden">
-               <InventoryPage />
-            </div>
-         </Modal>
 
-         {/* Job Worker Modal Wrap */}
-         <Modal isOpen={modals.jobWorker} onClose={() => toggleModal('jobWorker', false)} title="Processing Partner Registry" className="max-w-[90vw]">
-            <div className="bg-[var(--bg-card)] p-10 rounded-[2.5rem]">
-               <JobWorkerMaster />
-            </div>
-         </Modal>
+         {/* Lazy-only island — must NOT wrap Sales/Purchase or clicks go blank */}
+         <Suspense fallback={null}>
+            {modals.outstanding && <SalesOutstanding isOpen={modals.outstanding} onClose={() => toggleModal('outstanding', false)} />}
+            {modals.gstComplianceReports && (
+               <GstComplianceReportsModal
+                  isOpen={modals.gstComplianceReports}
+                  onClose={() => setModals(prev => ({ ...prev, gstComplianceReports: false }))}
+               />
+            )}
+            {modals.lotNoEntry && (
+               <LotNoEntryModal
+                  isOpen={modals.lotNoEntry}
+                  onClose={() => setModals(prev => ({ ...prev, lotNoEntry: false }))}
+               />
+            )}
+            {modals.issueMultiple && (
+               <IssueMultipleModal
+                  isOpen={modals.issueMultiple}
+                  onClose={() => setModals(prev => ({ ...prev, issueMultiple: false }))}
+               />
+            )}
+            {modals.cuttingEntry && (
+               <CuttingBeamEntryModal
+                  isOpen={modals.cuttingEntry}
+                  onClose={() => setModals(prev => ({ ...prev, cuttingEntry: false }))}
+                  mode="cutting"
+               />
+            )}
+            {modals.beamEntry && (
+               <CuttingBeamEntryModal
+                  isOpen={modals.beamEntry}
+                  onClose={() => setModals(prev => ({ ...prev, beamEntry: false }))}
+                  mode="beam"
+               />
+            )}
+            {modals.gst3bMonthly && <Gst3bMonthlyModal isOpen onClose={() => toggleModal('gst3bMonthly', false)} />}
+            {modals.gstr1 && <Gstr1Modal isOpen onClose={() => toggleModal('gstr1', false)} />}
+            {modals.gstReports && <GstReportsHub isOpen onClose={() => toggleModal('gstReports', false)} />}
+            {modals.gst2bMatching && <Gst2bMatchingModal isOpen onClose={() => toggleModal('gst2bMatching', false)} />}
+            {modals.gst3bDetail && <Gst3bDetailModal isOpen onClose={() => toggleModal('gst3bDetail', false)} />}
+            {modals.gstr1Errorchek && <Gstr1ErrorChekModal isOpen onClose={() => toggleModal('gstr1Errorchek', false)} />}
+            {modals.gstCompliance && <GstComplianceModal isOpen onClose={() => toggleModal('gstCompliance', false)} />}
+            {modals.gstinReports && (
+               <GstinReportsPage
+                  isOpen
+                  onClose={() => setModals(prev => ({ ...prev, gstinReports: false }))}
+                  initialSection={modals.gstinReportsSection || 'sales'}
+               />
+            )}
+            {modals.gstr2 && (
+               <Gstr2ReportModal isOpen onClose={() => setModals(prev => ({ ...prev, gstr2: false }))} />
+            )}
+            {modals.gstr9 && (
+               <Gstr9ReportModal isOpen onClose={() => setModals(prev => ({ ...prev, gstr9: false }))} />
+            )}
+            {modals.ewayBill && (
+               <EWayBillHub isOpen onClose={() => setModals(prev => ({ ...prev, ewayBill: false }))} />
+            )}
+            {modals.caDashboard && (
+               <CADashboardModal
+                  isOpen
+                  onClose={() => toggleModal('caDashboard', false)}
+                  onOpenGstr1={() => { toggleModal('caDashboard', false); toggleModal('gstr1', true); }}
+                  onOpenGstr2={() => { toggleModal('caDashboard', false); toggleModal('gst2bMatching', true); }}
+                  onOpenGstr3b={() => { toggleModal('caDashboard', false); toggleModal('gst3bMonthly', true); }}
+               />
+            )}
+            {modals.visit && <VisitLogModal isOpen onClose={() => toggleModal('visit', false)} />}
+            {modals.inventoryPage && (
+               <Modal isOpen={modals.inventoryPage} onClose={() => toggleModal('inventoryPage', false)} title="Inventory Stock Control" className="max-w-[90vw]">
+                  <div className="bg-[var(--bg-card)] p-2 rounded-[2.5rem] overflow-hidden">
+                     <InventoryPage />
+                  </div>
+               </Modal>
+            )}
+            {modals.jobWorker && (
+               <Modal isOpen={modals.jobWorker} onClose={() => toggleModal('jobWorker', false)} title="Processing Partner Registry" className="max-w-[90vw]">
+                  <div className="bg-[var(--bg-card)] p-10 rounded-[2.5rem]">
+                     <JobWorkerMaster />
+                  </div>
+               </Modal>
+            )}
+         </Suspense>
 
          {/* Module Placeholder Modal */}
          <Modal
@@ -1597,51 +1607,75 @@ const Dashboard = () => {
             isOpen={modals.mergeMaster}
             onClose={() => setModals(prev => ({ ...prev, mergeMaster: false }))}
          />
-         <PurchaseEngineModal
-            isOpen={modals.purchaseEngine}
-            onClose={() => setModals(prev => ({ ...prev, purchaseEngine: false }))}
-         />
-         <InventoryEngineModal
-            isOpen={modals.inventoryEngine}
-            onClose={() => setModals(prev => ({ ...prev, inventoryEngine: false }))}
-         />
-         <ProductionEngineModal
-            isOpen={modals.productionEngine}
-            onClose={() => setModals(prev => ({ ...prev, productionEngine: false }))}
-            initialTab={productionEngineTab}
-         />
-         <SalesEngineModal
-            isOpen={modals.salesEngine}
-            onClose={() => setModals(prev => ({ ...prev, salesEngine: false }))}
-         />
-         <AutomationEngineModal
-            isOpen={modals.automationEngine}
-            onClose={() => setModals(prev => ({ ...prev, automationEngine: false }))}
-         />
-         <Stage2OpsModal
-            isOpen={modals.stage2Ops}
-            onClose={() => setModals(prev => ({ ...prev, stage2Ops: false }))}
-         />
-         <EnterprisePlatformModal
-            isOpen={modals.enterprisePlatform}
-            onClose={() => setModals(prev => ({ ...prev, enterprisePlatform: false }))}
-         />
-         <InfrastructureModal
-            isOpen={modals.infrastructure}
-            onClose={() => setModals(prev => ({ ...prev, infrastructure: false }))}
-         />
-         <CommercialReleaseModal
-            isOpen={modals.commercialRelease}
-            onClose={() => setModals(prev => ({ ...prev, commercialRelease: false }))}
-         />
-         <EnterpriseTestingDashboard
-            isOpen={modals.enterpriseTesting}
-            onClose={() => setModals(prev => ({ ...prev, enterpriseTesting: false }))}
-         />
-         <OnboardingWizard
-            isOpen={modals.onboardingWizard}
-            onClose={() => setModals(prev => ({ ...prev, onboardingWizard: false }))}
-         />
+         <Suspense fallback={null}>
+            {modals.purchaseEngine && (
+               <PurchaseEngineModal
+                  isOpen
+                  onClose={() => setModals(prev => ({ ...prev, purchaseEngine: false }))}
+               />
+            )}
+            {modals.inventoryEngine && (
+               <InventoryEngineModal
+                  isOpen
+                  onClose={() => setModals(prev => ({ ...prev, inventoryEngine: false }))}
+               />
+            )}
+            {modals.productionEngine && (
+               <ProductionEngineModal
+                  isOpen
+                  onClose={() => setModals(prev => ({ ...prev, productionEngine: false }))}
+                  initialTab={productionEngineTab}
+               />
+            )}
+            {modals.salesEngine && (
+               <SalesEngineModal
+                  isOpen
+                  onClose={() => setModals(prev => ({ ...prev, salesEngine: false }))}
+               />
+            )}
+            {modals.automationEngine && (
+               <AutomationEngineModal
+                  isOpen
+                  onClose={() => setModals(prev => ({ ...prev, automationEngine: false }))}
+               />
+            )}
+            {modals.stage2Ops && (
+               <Stage2OpsModal
+                  isOpen
+                  onClose={() => setModals(prev => ({ ...prev, stage2Ops: false }))}
+               />
+            )}
+            {modals.enterprisePlatform && (
+               <EnterprisePlatformModal
+                  isOpen
+                  onClose={() => setModals(prev => ({ ...prev, enterprisePlatform: false }))}
+               />
+            )}
+            {modals.infrastructure && (
+               <InfrastructureModal
+                  isOpen
+                  onClose={() => setModals(prev => ({ ...prev, infrastructure: false }))}
+               />
+            )}
+            {modals.commercialRelease && (
+               <CommercialReleaseModal
+                  isOpen
+                  onClose={() => setModals(prev => ({ ...prev, commercialRelease: false }))}
+               />
+            )}
+            {modals.enterpriseTesting && (
+               <EnterpriseTestingDashboard
+                  isOpen
+                  onClose={() => setModals(prev => ({ ...prev, enterpriseTesting: false }))}
+               />
+            )}
+            {modals.onboardingWizard && (
+               <OnboardingWizard
+                  isOpen
+                  onClose={() => setModals(prev => ({ ...prev, onboardingWizard: false }))}
+               />
+            )}
+         </Suspense>
          <OrderModal 
             isOpen={modals.order} 
             onClose={() => setModals(prev => ({ ...prev, order: false }))} 
@@ -1710,6 +1744,7 @@ const Dashboard = () => {
          <FailedSyncModal isOpen={syncModalOpen} onClose={() => setSyncModalOpen(false)} />
          <ErpWindowDockTray />
          <PwaInstallPrompt />
+         <ErpKeyboardHintBar className="erp-shell-kbd-fixed" />
 
       </div>
    );

@@ -57,7 +57,7 @@ const Modal = ({
         'input:not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]), [data-erp-combobox-input]'
       );
       first?.focus();
-    }, 120);
+    }, 40);
     return () => clearTimeout(t);
   }, [isOpen, inertBackdrop]);
 
@@ -77,17 +77,17 @@ const Modal = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.1, ease: [0.16, 1, 0.3, 1] }}
               onClick={onClose}
-              className="fixed inset-0 bg-slate-900/30 backdrop-blur-[6px]"
+              className="fixed inset-0 bg-slate-900/28 backdrop-blur-[2px]"
             />
           )}
 
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            initial={{ opacity: 0, scale: 0.992, y: 4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 15 }}
-            transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+            exit={{ opacity: 0, scale: 0.992, y: 3 }}
+            transition={{ duration: 0.12, ease: [0.16, 1, 0.3, 1] }}
             style={style}
             className={twMerge(
               'relative flex flex-col w-full max-h-[calc(100dvh-12px)] overflow-hidden border border-slate-200/80 shadow-[0_20px_50px_rgba(15,23,42,0.12)]',
