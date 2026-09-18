@@ -316,8 +316,15 @@ const useStore = create((set, get) => ({
       await get().hydrateFromCache();
       return;
     }
+    // Paint from cache first so shell feels instant, then refresh masters only.
     try {
-      await get().refreshAllData();
+      await get().hydrateFromCache();
+    } catch {
+      /* ignore — online refresh still runs */
+    }
+    try {
+      // Masters first (blocking). Heavy transaction lists load in background.
+      await get().refreshAllData({ includeTransactions: false });
     } catch (err) {
       console.warn('[bootstrapMasters] refreshAllData failed, loading from cache:', err?.message);
       await get().hydrateFromCache();
@@ -381,31 +388,66 @@ const useStore = create((set, get) => ({
     }
   },
 
-  refreshAllData: async () => {
+  refreshAllData: async (opts = {}) => {
+    const includeTransactions = opts.includeTransactions !== false;
     const {
       fetchParties, fetchItems, fetchSales, fetchPurchases, fetchInventory,
       fetchJobs, fetchOrders, fetchReturns, fetchNotes, fetchVisits, fetchVouchers, fetchBooks,
       fetchLedgers
     } = get();
-    const results = await Promise.allSettled([
+
+    // Wave 1 — masters needed to open bills / menus quickly
+    const wave1 = await Promise.allSettled([
       fetchParties(),
       fetchItems(),
-      fetchSales(),
-      fetchPurchases(),
-      fetchInventory(),
-      fetchJobs(),
-      fetchOrders(),
-      fetchReturns(),
-      fetchNotes(),
-      fetchVisits(),
-      fetchVouchers(),
       fetchBooks(),
-      fetchLedgers()
+      fetchLedgers(),
     ]);
-    const failed = results.filter(r => r.status === 'rejected');
-    if (failed.length > 0) {
-      console.warn(`[Refresh] ${failed.length} data fetches failed:`, failed.map(f => f.reason?.message));
+
+    const runWave2 = async () => {
+      const wave2 = await Promise.allSettled([
+        fetchSales(),
+        fetchPurchases(),
+        fetchInventory(),
+        fetchJobs(),
+        fetchOrders(),
+        fetchReturns(),
+        fetchNotes(),
+        fetchVisits(),
+        fetchVouchers(),
+      ]);
+      const failed2 = wave2.filter((r) => r.status === 'rejected');
+      if (failed2.length > 0) {
+        console.warn(`[Refresh] ${failed2.length} transaction fetches failed:`, failed2.map((f) => f.reason?.message));
+      }
+      return wave2;
+    };
+
+    const failed1 = wave1.filter((r) => r.status === 'rejected');
+    if (failed1.length > 0) {
+      console.warn(`[Refresh] ${failed1.length} master fetches failed:`, failed1.map((f) => f.reason?.message));
     }
+
+    if (!includeTransactions) {
+      // Let UI paint masters, then warm transaction caches without blocking login.
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => {
+          setTimeout(() => { runWave2().catch(() => {}); }, 120);
+        });
+      } else {
+        setTimeout(() => { runWave2().catch(() => {}); }, 120);
+      }
+      return;
+    }
+
+    await new Promise((resolve) => {
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => setTimeout(resolve, 0));
+      } else {
+        setTimeout(resolve, 0);
+      }
+    });
+    await runWave2();
   },
 
   // --- MASTER ACTIONS ---
@@ -1457,10 +1499,19 @@ const useStore = create((set, get) => ({
   },
 
   fetchBooksByModule: async (moduleName) => {
+    const mergeModuleBooks = (list) => {
+      if (!Array.isArray(list) || !list.length) return list || [];
+      set((state) => {
+        const others = (state.books || []).filter((b) => b.module !== moduleName);
+        return { books: [...others, ...list] };
+      });
+      return list;
+    };
+
     const loadCached = async () => {
       const cached = await getCachedEntities('books');
       const filtered = cached.filter((b) => b.module === moduleName);
-      if (filtered.length > 0) return filtered;
+      if (filtered.length > 0) return mergeModuleBooks(filtered);
       return getDefaultBooksForModule(moduleName);
     };
 
@@ -1474,7 +1525,7 @@ const useStore = create((set, get) => ({
       const data = res.data.data || [];
       if (data.length > 0) {
         await cacheEntities('books', data.map((b) => ({ ...b, id: b._id || b.id })));
-        return data;
+        return mergeModuleBooks(data);
       }
       return loadCached();
     } catch (err) {

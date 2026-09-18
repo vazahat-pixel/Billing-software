@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import useStore from '../../store/useStore';
-import { ERPCombobox } from '../../components/erp';
+import { ERPCombobox, ErpKeyboardHintBar, FORM_KEYBOARD_HINTS } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import { notifySuccess, notifyWarning, notifyError } from '../../utils/notify';
 import { toast } from '../../store/useToastStore';
@@ -380,20 +380,7 @@ const CashBankBookModal = ({
       setBootLoading(false);
       return;
     }
-    let cancelled = false;
-    setBootLoading(true);
-    Promise.all([
-      fetchParties(),
-      fetchLedgers(),
-      fetchSales(),
-      fetchPurchases(),
-      fetchVouchers(),
-      fetchJobs(),
-    ])
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setBootLoading(false);
-      });
+
     setVoucherType(initialType);
     if (!openedRef.current) {
       openedRef.current = true;
@@ -401,10 +388,38 @@ const CashBankBookModal = ({
         resetNew();
       }
     }
+
+    let cancelled = false;
+    const state = useStore.getState();
+    const needParties = !(state.parties && state.parties.length);
+    const needLedgers = !(state.ledgers && state.ledgers.length);
+    const blocking = [];
+    if (needParties) blocking.push(fetchParties());
+    if (needLedgers) blocking.push(fetchLedgers());
+
+    if (blocking.length) {
+      setBootLoading(true);
+      Promise.all(blocking)
+        .catch(() => {})
+        .finally(() => {
+          if (!cancelled) setBootLoading(false);
+        });
+    } else {
+      setBootLoading(false);
+    }
+
+    // Outstanding / voucher pickers — warm in background
+    Promise.all([
+      state.sales?.length ? Promise.resolve() : fetchSales(),
+      state.purchases?.length ? Promise.resolve() : fetchPurchases(),
+      state.vouchers?.length ? Promise.resolve() : fetchVouchers(),
+      state.jobWorkEntries?.length ? Promise.resolve() : fetchJobs(),
+    ]).catch(() => {});
+
     return () => {
       cancelled = true;
     };
-  }, [isOpen, initialType, bookKind, initialVoucherId]);
+  }, [isOpen, initialType, bookKind, initialVoucherId, fetchParties, fetchLedgers, fetchSales, fetchPurchases, fetchVouchers, fetchJobs]);
 
   useEffect(() => {
     if (!isOpen || !initialVoucherId) return;
@@ -1412,6 +1427,15 @@ const CashBankBookModal = ({
         </div>
 
         <div className="classic-erp-form-footer flex-wrap">
+          <ErpKeyboardHintBar
+            items={[
+              ...FORM_KEYBOARD_HINTS,
+              { keys: 'F4', label: 'Bill' },
+              { keys: 'Space', label: 'O/S' },
+            ]}
+            dense
+            className="w-full basis-full mb-0.5"
+          />
           <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode === 'Add' || mode === 'Edit'}>New</button>
           <button className="classic-erp-btn" type="button" onClick={handleEdit} disabled={readOnly || mode !== 'View' || !selectedVoucherId}>Edit</button>
           <button

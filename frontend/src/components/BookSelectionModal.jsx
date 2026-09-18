@@ -7,19 +7,12 @@ import useStore from '../store/useStore';
  * Classic ERP Book Selection Modal — matches reference software layout:
  * Header: Book Selection
  * Table: Book | Book Cd
+ *
+ * Instant UX: show store/default books immediately; refresh in background.
  */
 const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook, bookFilter = null }) => {
   const { fetchBooksByModule, books: storeBooks, ledgers } = useStore();
   const [selectedIdx, setSelectedIdx] = useState(0);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (isOpen && moduleName) {
-      setLoading(true);
-      fetchBooksByModule(moduleName).finally(() => setLoading(false));
-      setSelectedIdx(0);
-    }
-  }, [isOpen, moduleName]);
 
   const books = useMemo(() => {
     if (!moduleName) return [];
@@ -28,7 +21,6 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook, bookFil
       list = getDefaultBooksForModule(moduleName);
     }
 
-    // For cash/bank books, also include bank & cash ledgers if not already present as books
     const isCashOrBank = ['receipt', 'payment', 'cashBook', 'bankBook', 'cashPayment', 'cashReceipt'].includes(moduleName);
     if (isCashOrBank && Array.isArray(ledgers) && ledgers.length > 0) {
       const existingNames = new Set(list.map((b) => (b.name || '').trim().toLowerCase()));
@@ -53,12 +45,23 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook, bookFil
     return list;
   }, [moduleName, storeBooks, ledgers, bookFilter]);
 
-  // Single Book Auto-Bypass: If only 1 book exists, auto-select it immediately without asking
+  // Open instantly with cached/default list; refresh quietly in background
   useEffect(() => {
-    if (isOpen && !loading && books.length === 1) {
+    if (!isOpen || !moduleName) return undefined;
+    setSelectedIdx(0);
+    let cancelled = false;
+    fetchBooksByModule(moduleName).catch(() => {}).finally(() => {
+      if (cancelled) return;
+    });
+    return () => { cancelled = true; };
+  }, [isOpen, moduleName, fetchBooksByModule]);
+
+  // Single book → skip picker immediately (don't wait on network)
+  useEffect(() => {
+    if (isOpen && books.length === 1) {
       onSelectBook(books[0]);
     }
-  }, [isOpen, loading, books, onSelectBook]);
+  }, [isOpen, books, onSelectBook]);
 
   useEffect(() => {
     if (!isOpen || books.length <= 1) return undefined;
@@ -82,7 +85,7 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook, bookFil
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, books, selectedIdx, onSelectBook, onClose]);
 
-  if (!isOpen || (!loading && books.length === 1)) return null;
+  if (!isOpen || books.length === 1) return null;
 
   const handleContinue = () => {
     if (books[selectedIdx]) onSelectBook(books[selectedIdx]);
@@ -95,18 +98,19 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook, bookFil
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.12 }}
           onClick={onClose}
-          className="absolute inset-0 bg-black/50"
+          className="absolute inset-0 bg-black/45"
         />
 
         <motion.div
-          initial={{ scale: 0.98, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.98, opacity: 0 }}
+          initial={{ scale: 0.99, opacity: 0, y: 4 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.99, opacity: 0 }}
+          transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
           className="relative w-full max-w-md bg-[#ece9d8] overflow-hidden shadow-2xl font-sans outline-none"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Classic WinForms Header */}
           <div className="bg-[#6b8299] px-3 py-1.5 flex items-center justify-between text-white border-b border-[#4a5f73]">
             <span className="text-[13px] font-bold text-[#ffff99] tracking-wide mx-auto">Book Selection</span>
             <button
@@ -120,9 +124,7 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook, bookFil
           </div>
 
           <div className="p-1 bg-white min-h-[160px] max-h-[300px] overflow-y-auto">
-            {loading ? (
-              <div className="py-8 text-center text-xs text-gray-500 font-semibold">Loading books…</div>
-            ) : books.length === 0 ? (
+            {books.length === 0 ? (
               <div className="py-8 text-center text-xs text-gray-500 font-semibold">No books found</div>
             ) : (
               <table className="w-full text-left border-collapse select-none text-xs">
@@ -185,4 +187,3 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook, bookFil
 };
 
 export default BookSelectionModal;
-

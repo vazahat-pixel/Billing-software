@@ -134,6 +134,24 @@ class JobQueueService {
       const p = job.payload || {};
       return emailService.sendMail(p);
     });
+
+    this.registerHandler('whatsapp.send', async (job) => {
+      const whatsappService = require('./whatsappService');
+      const p = job.payload || {};
+      if (p.templateName || p.template) {
+        return whatsappService.sendTemplate({
+          to: p.to || p.phone || p.recipient,
+          templateName: p.templateName || p.template,
+          languageCode: p.languageCode || p.lang,
+          components: p.components,
+        });
+      }
+      return whatsappService.sendInvoiceMessage({
+        to: p.to || p.phone || p.recipient,
+        text: p.text || p.body || p.message || '',
+        bodyParams: p.bodyParams || [],
+      });
+    });
   }
 
   async retryDead(id, companyId) {

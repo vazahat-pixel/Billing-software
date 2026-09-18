@@ -135,7 +135,7 @@ export function TableLoaderOverlay({ message = 'Loading data…' }) {
 export function ModalLoader({ message = 'Please wait…' }) {
   return (
     <div
-      className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-white/85 backdrop-blur-[1px]"
+      className="erp-busy-overlay absolute inset-0 z-30 flex flex-col items-center justify-center bg-[var(--bg-card)]/85 backdrop-blur-[2px]"
       aria-busy="true"
       aria-live="polite"
     >
@@ -148,7 +148,26 @@ export function ModalLoader({ message = 'Please wait…' }) {
 /** Classic ERP window overlay — parent must be `relative` (classic-erp-window is fine with position) */
 export function ErpBusyOverlay({ show, message = 'Loading…' }) {
   if (!show) return null;
-  return <ModalLoader message={message} />;
+  return (
+    <div
+      className="erp-busy-overlay absolute inset-0 z-30 flex flex-col items-center justify-center bg-[var(--bg-card)]/80 backdrop-blur-[2px]"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <Spinner size={26} />
+      <p className="mt-3 text-[12px] font-semibold text-[var(--text-secondary)] tracking-wide">{message}</p>
+    </div>
+  );
+}
+
+/** Thin indeterminate bar for soft refreshes (keeps content visible). */
+export function TopProgressBar({ show }) {
+  if (!show) return null;
+  return (
+    <div className="erp-top-progress" aria-hidden="true">
+      <div className="erp-top-progress__bar" />
+    </div>
+  );
 }
 
 /** Footer Save button content helper */
