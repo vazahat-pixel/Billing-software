@@ -283,16 +283,12 @@ exports.updateCompany = async (req, res) => {
                 delete patch.planId; // already applied via lifecycle
             } catch { /* optional — still apply other fields */ }
         }
-        let updated;
         if (Object.keys(patch).length) {
-            updated = await Company.findByIdAndUpdate(id, patch, { new: true })
-                .populate('ownerId', 'name email')
-                .populate('planId');
-        } else {
-            updated = await Company.findById(id)
-                .populate('ownerId', 'name email')
-                .populate('planId');
+            await Company.findByIdAndUpdate(id, patch, { new: true });
         }
+        const updated = await Company.findById(id)
+            .populate('ownerId', 'name email')
+            .populate('planId');
         if (!updated) return res.status(404).json({ message: 'Company not found' });
         res.status(200).json(updated);
     } catch (err) {
@@ -326,9 +322,45 @@ exports.unlockCompany = async (req, res) => {
 };
 
 // PLANS
+async function ensureDefaultPlans() {
+    const count = await Plan.countDocuments();
+    if (count > 0) return;
+    await Plan.create([
+        {
+            name: 'Basic',
+            slug: 'basic',
+            description: 'Starter plan',
+            priceMonthly: 999,
+            priceYearly: 9999,
+            isPublic: true,
+            sortOrder: 1,
+            features: {
+                offlineMode: true,
+                modules: { purchase: true, inventory: true, sales: true, jobWork: true, accounting: true, gst: true, reports: true },
+            },
+            limits: { users: 5, invoicesPerMonth: 500, storageMb: 1024 },
+        },
+        {
+            name: 'Pro',
+            slug: 'pro',
+            description: 'Full textile ERP',
+            priceMonthly: 2999,
+            priceYearly: 29999,
+            isPublic: true,
+            sortOrder: 2,
+            features: {
+                offlineMode: true,
+                modules: { purchase: true, inventory: true, sales: true, jobWork: true, accounting: true, gst: true, reports: true, offline: true },
+            },
+            limits: { users: 25, invoicesPerMonth: 5000, storageMb: 5120 },
+        },
+    ]);
+}
+
 exports.getAllPlans = async (req, res) => {
     try {
-        const plans = await Plan.find();
+        await ensureDefaultPlans();
+        const plans = await Plan.find({ isActive: { $ne: false } }).sort({ sortOrder: 1, priceMonthly: 1 });
         res.status(200).json(plans);
     } catch (err) {
         res.status(500).json({ message: err.message });

@@ -68,7 +68,7 @@ const authMiddleware = async (req, res, next) => {
         req.superAdminTenant = true;
       } else {
         const isRead = ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
-        const isAdminSurface = (req.path || '').startsWith('/admin');
+        const isAdminSurface = /\/admin(\/|$)/.test(req.originalUrl || req.path || '');
 
         if (!isRead && !isAdminSurface) {
           logger.warn('Super-admin write without X-Company-Id refused', {
@@ -104,7 +104,9 @@ const authMiddleware = async (req, res, next) => {
       if (company) {
         req.planId = company.planId;
         req.companyStatus = company.status;
-        if (company.status === 'suspended' || company.status === 'expired' || company.isActive === false) {
+        const onAdminSurface = /\/admin(\/|$)/.test(req.originalUrl || req.path || '');
+        const platformAdmin = user.role === 'super_admin' && (req.superAdminFallback || onAdminSurface);
+        if (!platformAdmin && (company.status === 'suspended' || company.status === 'expired' || company.isActive === false)) {
           return next(AppError.forbidden('Your company account is locked or inactive. Please contact support.'));
         }
       }

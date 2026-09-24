@@ -112,6 +112,19 @@ function install() {
         // Queries and promises both settle asynchronously — invalidate only
         // once the write has actually landed, and also on failure (the write
         // may have partially applied).
+        // Mongoose queries are thenable. Returning result.then() turns them
+        // into a Promise and breaks later chaining such as .populate().
+        if (result && typeof result.exec === 'function') {
+          const exec = result.exec.bind(result);
+          result.exec = function (...execArgs) {
+            return Promise.resolve(exec(...execArgs)).then(
+              (value) => { invalidateNow(); return value; },
+              (err) => { invalidateNow(); throw err; }
+            );
+          };
+          return result;
+        }
+
         if (result && typeof result.then === 'function') {
           return result.then(
             (value) => { invalidateNow(); return value; },
