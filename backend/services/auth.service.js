@@ -311,6 +311,65 @@ exports.login = async (email, password, req = null) => {
         }
     }
 
+    // Hybrid desktop: seed sync agent with a CENTRAL token (local JWT is not valid on central)
+    if (
+        String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+        resolvedCompanyId
+    ) {
+        try {
+            const syncAgentWorker = require('./syncAgentWorker');
+            const deviceId =
+                req?.body?.deviceId ||
+                req?.headers?.['x-device-id'] ||
+                deviceBinding?.device?.deviceId ||
+                '';
+            let agentToken = null;
+            let agentRefresh = null;
+            const centralBase = String(process.env.CENTRAL_API_BASE_URL || '').replace(/\/$/, '');
+            if (centralBase && req?.body?.password) {
+                try {
+                    const up = await fetch(`${centralBase}/auth/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId },
+                        body: JSON.stringify({
+                            email: user.email,
+                            password: req.body.password,
+                            deviceId,
+                            isDesktop: true,
+                            deviceName: req.body.deviceName || 'Desktop Hybrid',
+                        }),
+                    });
+                    const uj = await up.json().catch(() => ({}));
+                    const payload = uj?.data || uj;
+                    if (up.ok && payload?.token) {
+                        agentToken = payload.token;
+                        agentRefresh = payload.refreshToken || null;
+                    }
+                } catch (centralLoginErr) {
+                    console.warn('hybrid central login for sync agent:', centralLoginErr.message);
+                }
+            }
+            // Never overwrite a good central token with a local-only JWT when central is offline
+            const existing = await syncAgentWorker.getAgentContext();
+            await syncAgentWorker.seedAgentSession({
+                companyId: resolvedCompanyId,
+                token: agentToken || existing.token || token,
+                refreshToken: agentRefresh || existing.refreshToken || sessionBundle.refreshToken,
+                deviceId,
+            });
+            const offlineSession = require('./offlineSessionService');
+            await offlineSession.storeLocalSession({
+                companyId: resolvedCompanyId,
+                userId: user._id,
+                email: user.email,
+                password: req?.body?.password,
+                deviceId,
+            });
+        } catch (seedErr) {
+            console.warn('hybrid sync agent seed:', seedErr.message);
+        }
+    }
+
     return {
         token,
         refreshToken: sessionBundle.refreshToken,

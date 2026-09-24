@@ -1,7 +1,8 @@
 {
-  "mode": "local",
+  "mode": "hybrid",
   "apiBaseUrl": "http://127.0.0.1:5050/api",
+  "centralApiBaseUrl": "https://your-central-api.example.com/api",
   "apiPort": 5050,
   "mongoPort": 27028,
-  "note": "Standalone offline desktop. mode=local embeds Mongo+API. mode=remote uses apiBaseUrl only."
+  "note": "mode=local: standalone offline. mode=hybrid: local Express+Mongo execution + sync to centralApiBaseUrl. mode=remote: UI talks only to apiBaseUrl."
 }

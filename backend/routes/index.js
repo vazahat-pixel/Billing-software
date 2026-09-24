@@ -57,6 +57,11 @@ router.use('/billing/public', billingPublicRoutes);
 
 // Authenticated tenant surface
 router.use(authMiddleware);
+
+// Billing MUST stay reachable when subscription/license is expired — otherwise
+// tenants cannot checkout / renew and self-serve is a dead end.
+router.use('/billing', billingTenantRoutes);
+
 router.use(subscriptionMiddleware);
 router.use(companyIsolationMiddleware);
 
@@ -78,7 +83,9 @@ router.use('/stage8', require('./stage8Commercial.routes'));
 router.use('/admin', adminRoutes);
 router.use('/users', userRoutes);
 router.use('/config', configRoutes);
-router.use('/billing', billingTenantRoutes);
+
+// Hybrid cloud sync (additive — does not replace existing CRUD)
+router.use('/sync', require('./sync.routes'));
 
 // --- Masters: the shell of the product, shipped with every plan -------------
 router.use('/masters', requireModule('masters'), mastersRoutes);

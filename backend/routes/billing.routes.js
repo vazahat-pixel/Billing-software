@@ -5,7 +5,7 @@ const billingController = require('../controllers/billing.controller');
 const publicRouter = express.Router();
 publicRouter.get('/plans', billingController.listPublicPlans);
 
-/** Mounted at /api/billing — after auth + subscription */
+/** Mounted at /api/billing — after auth; subscription may be expired (renew path) */
 const tenantRouter = express.Router();
 tenantRouter.get('/me', billingController.getMyBilling);
 tenantRouter.post('/checkout', billingController.createCheckout);

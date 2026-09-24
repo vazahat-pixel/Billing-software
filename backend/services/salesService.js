@@ -15,6 +15,15 @@ class SalesService {
     try {
       const { companyId, items } = salesData;
       const skipStock = options.skipStock === true || salesData.stockFromChallan === true;
+      const operationId = String(
+        options.operationId || salesData.operationId || ''
+      ).trim() || null;
+
+      // Idempotent retry: return existing invoice for same operationId
+      if (operationId) {
+        const existingByOp = await Sales.findOne({ companyId, operationId }).session(session);
+        if (existingByOp) return existingByOp;
+      }
 
       // Strip offline local-* ids before Mongo create
       const {
@@ -22,9 +31,11 @@ class SalesService {
         id: _dropId2,
         localId: _dropLocal,
         accountingEntryId: _dropAcct,
+        operationId: _dropOp,
         ...clean
       } = salesData || {};
       salesData = clean;
+      if (operationId) salesData.operationId = operationId;
       const safeItems = Array.isArray(items)
         ? items.map((it) => {
             const { _id, id, ...rest } = it || {};
@@ -97,15 +108,26 @@ class SalesService {
       if (totals.cess != null) salesData.cess = totals.cess;
 
       const Counter = require('../models/Counter');
+      const isHybridDesktop =
+        String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+        String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+
       if (!salesData.invoiceNo || salesData.invoiceNo === 'AUTO') {
-        try {
-          const voucherSeriesService = require('./voucherSeriesService');
-          const allocated = await voucherSeriesService.allocateNext(companyId, 'sales', { session });
+        if (isHybridDesktop && !options.skipLeaseAllocation) {
+          // Hybrid offline: consume central-issued lease (no parallel numbering)
+          const numberLeaseService = require('./numberLeaseService');
+          const allocated = await numberLeaseService.consumeLocalLease(companyId, 'sales', { session });
           salesData.invoiceNo = allocated.number;
-        } catch {
-          const counterId = `INV-${companyId}`;
-          const seq = await Counter.nextSeq(counterId, session);
-          salesData.invoiceNo = `INV-${seq}`;
+        } else {
+          try {
+            const voucherSeriesService = require('./voucherSeriesService');
+            const allocated = await voucherSeriesService.allocateNext(companyId, 'sales', { session });
+            salesData.invoiceNo = allocated.number;
+          } catch {
+            const counterId = `INV-${companyId}`;
+            const seq = await Counter.nextSeq(counterId, session);
+            salesData.invoiceNo = `INV-${seq}`;
+          }
         }
       }
 
@@ -138,6 +160,9 @@ class SalesService {
             );
             item.lotId = lot._id;
           }
+          const stockKey = operationId
+            ? `SALE:${operationId}:${lot._id}`
+            : `SALE:${sales._id}:${lot._id}`;
           await applyLotMovement({
             session,
             lot,
@@ -146,7 +171,7 @@ class SalesService {
             deltaPcs: -(item.pcs || 0),
             type: 'SALE',
             referenceId: sales._id,
-            idempotencyKey: `SALE:${sales._id}:${lot._id}`,
+            idempotencyKey: stockKey,
             remarks: `Sales Inv: ${sales.invoiceNo}`,
           });
         }
@@ -177,10 +202,49 @@ class SalesService {
           netAmount: sales.netAmount,
           customerId: sales.customerId?.toString?.() || sales.customerId,
           stockFromChallan: skipStock,
+          operationId: operationId || undefined,
         });
       } catch {
         /* event bus optional */
       }
+
+      // Hybrid desktop: durable outbox for central sync (same business result already committed)
+      if (
+        isHybridDesktop &&
+        options.enqueueOutbox !== false &&
+        !options.fromSync
+      ) {
+        try {
+          const crypto = require('crypto');
+          const syncOutboxService = require('./syncOutboxService');
+          const opId = operationId || crypto.randomUUID();
+          if (!sales.operationId) {
+            sales.operationId = opId;
+            await sales.save({ session });
+          }
+          const payload = sales.toObject ? sales.toObject() : { ...sales };
+          delete payload.accountingEntryId;
+          await syncOutboxService.enqueue({
+            operationId: opId,
+            companyId,
+            userId: salesData.createdBy || null,
+            deviceId: options.deviceId || salesData.deviceId || '',
+            installationId: options.installationId || '',
+            entityType: 'sales',
+            entityId: sales._id,
+            operationType: 'create',
+            payload: {
+              ...payload,
+              invoiceNo: sales.invoiceNo,
+              operationId: opId,
+            },
+            session,
+          });
+        } catch (outboxErr) {
+          console.warn('Sync outbox enqueue after sales:', outboxErr.message);
+        }
+      }
+
       return sales;
     } catch (error) {
       throw error;

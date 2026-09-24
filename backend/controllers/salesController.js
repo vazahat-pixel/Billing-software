@@ -5,10 +5,21 @@ const { ok, created } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
 
 exports.createInvoice = asyncHandler(async (req, res) => {
-  const sales = await salesService.createInvoice({ ...req.body, companyId: req.companyId });
+  const operationId =
+    req.body?.operationId ||
+    req.headers['x-operation-id'] ||
+    req.headers['idempotency-key'] ||
+    undefined;
+  const deviceId = req.headers['x-device-id'] || req.body?.deviceId || '';
+  const sales = await salesService.createInvoice(
+    { ...req.body, companyId: req.companyId, operationId },
+    { operationId, deviceId }
+  );
   await auditService.log(req, 'CREATE_INVOICE', 'Sales', sales._id, null, {
     invoiceNo: sales.invoiceNo,
     amount: sales.netAmount,
+    operationId: sales.operationId || operationId || null,
+    source: String(process.env.DESKTOP_HYBRID || '') === 'true' ? 'desktop-hybrid' : 'online',
   });
   return created(res, sales, 'Sales invoice created');
 });

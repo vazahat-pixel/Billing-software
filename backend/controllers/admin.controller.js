@@ -7,6 +7,64 @@ const Usage = require('../models/Usage');
 const AuditLog = require('../models/AuditLog');
 const { generateLicenseKey } = require('../utils/license');
 
+/** Keep subscription + company status in sync when admin issues/renews a licence. */
+async function activateCommercialAccess(companyId, { expiresAt, planId } = {}) {
+    const endDate = expiresAt ? new Date(expiresAt) : (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 30);
+        return d;
+    })();
+
+    const company = await Company.findById(companyId);
+    if (!company) throw new Error('Company not found');
+
+    const resolvedPlanId = planId || company.planId;
+    const existing = await Subscription.findOne({ companyId });
+    await Subscription.findOneAndUpdate(
+        { companyId },
+        {
+            companyId,
+            planId: resolvedPlanId,
+            status: 'active',
+            startDate: existing?.startDate || new Date(),
+            endDate,
+            billingCycle: existing?.billingCycle || 'monthly',
+            autoRenew: existing?.autoRenew ?? false,
+            offlineModeEnabled: existing?.offlineModeEnabled ?? true,
+        },
+        { upsert: true, new: true }
+    );
+
+    const companyPatch = {
+        status: 'active',
+        isActive: true,
+        licenseKey: company.licenseKey,
+    };
+    if (resolvedPlanId) companyPatch.planId = resolvedPlanId;
+    await Company.findByIdAndUpdate(companyId, companyPatch);
+
+    try {
+        require('../services/dunningService').clearDunningFlags(companyId);
+    } catch { /* optional */ }
+
+    return { endDate, planId: resolvedPlanId };
+}
+
+const COMPANY_UPDATE_ALLOW = new Set([
+    'name',
+    'status',
+    'planId',
+    'isActive',
+    'commercialPolicy',
+    'gstin',
+    'address',
+    'phone',
+    'email',
+    'city',
+    'state',
+    'pincode',
+]);
+
 // DASHBOARD STATS
 exports.getAdminStats = async (req, res) => {
     try {
@@ -70,7 +128,19 @@ exports.getAllCompanies = async (req, res) => {
 exports.createCompany = async (req, res) => {
     try {
         const { name, ownerName, ownerEmail, ownerPassword, planId } = req.body;
-        
+
+        if (!name || !ownerName || !ownerEmail || !ownerPassword) {
+            return res.status(400).json({ message: 'Company name, owner name, email and password are required.' });
+        }
+
+        const securityConfigService = require('../services/securityConfigService');
+        const pwdCheck = securityConfigService.validatePassword(ownerPassword);
+        if (!pwdCheck.ok) {
+            return res.status(400).json({
+                message: `Weak owner password: ${pwdCheck.gaps.join(', ')}`,
+            });
+        }
+
         // 1. Validate ownerEmail
         const existingUser = await User.findOne({ email: ownerEmail });
         if (existingUser) {
@@ -88,13 +158,21 @@ exports.createCompany = async (req, res) => {
         await user.save();
 
         // 3. Create Company — new admin-provisioned tenants are SaaS-enforced
-        const company = new Company({
-            name,
-            ownerId: user._id,
-            planId,
-            commercialPolicy: 'saas_enforced',
-        });
-        await company.save();
+        let company;
+        try {
+            company = new Company({
+                name,
+                ownerId: user._id,
+                planId,
+                commercialPolicy: 'saas_enforced',
+                status: 'active',
+                isActive: true,
+            });
+            await company.save();
+        } catch (companyErr) {
+            await User.findByIdAndDelete(user._id).catch(() => {});
+            throw companyErr;
+        }
 
         // 4. Update User with companyId
         user.companyId = company._id;
@@ -136,9 +214,9 @@ exports.createCompany = async (req, res) => {
         const crypto = require('crypto');
         const key = generateLicenseKey(company._id);
         const licenseChecksum = crypto.createHash('sha256')
-            .update(`${company._id}-TRIAL`)
+            .update(`${company._id}:${key}:${process.env.JWT_SECRET || ''}`)
             .digest('hex')
-            .substring(0, 8)
+            .substring(0, 16)
             .toUpperCase();
         await License.create({
             companyId: company._id,
@@ -189,7 +267,33 @@ exports.createCompany = async (req, res) => {
 exports.updateCompany = async (req, res) => {
     try {
         const { id } = req.params;
-        const updated = await Company.findByIdAndUpdate(id, req.body, { new: true });
+        const patch = {};
+        for (const [key, value] of Object.entries(req.body || {})) {
+            if (COMPANY_UPDATE_ALLOW.has(key) && value !== undefined) {
+                patch[key] = value;
+            }
+        }
+        if (!Object.keys(patch).length) {
+            return res.status(400).json({ message: 'No valid company fields to update.' });
+        }
+        if (patch.planId) {
+            try {
+                const tenantLifecycleService = require('../services/tenantLifecycleService');
+                await tenantLifecycleService.changeCompanyPlan(id, patch.planId, { req, reconcileModules: true });
+                delete patch.planId; // already applied via lifecycle
+            } catch { /* optional — still apply other fields */ }
+        }
+        let updated;
+        if (Object.keys(patch).length) {
+            updated = await Company.findByIdAndUpdate(id, patch, { new: true })
+                .populate('ownerId', 'name email')
+                .populate('planId');
+        } else {
+            updated = await Company.findById(id)
+                .populate('ownerId', 'name email')
+                .populate('planId');
+        }
+        if (!updated) return res.status(404).json({ message: 'Company not found' });
         res.status(200).json(updated);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -302,7 +406,10 @@ exports.updateSubscription = async (req, res) => {
 exports.generateLicense = async (req, res) => {
     try {
         const crypto = require('crypto');
-        const { companyId, expiresAt, planTier, maxDevices } = req.body;
+        const { companyId, expiresAt, planTier, maxDevices, planId } = req.body;
+        if (!companyId || !expiresAt) {
+            return res.status(400).json({ message: 'companyId and expiresAt are required.' });
+        }
         const key = generateLicenseKey(companyId);
         const checksum = crypto
             .createHash('sha256')
@@ -329,6 +436,13 @@ exports.generateLicense = async (req, res) => {
         });
 
         await Company.findByIdAndUpdate(companyId, { licenseKey: key });
+        // UI promise: Issue License also activates/renews subscription access
+        await activateCommercialAccess(companyId, { expiresAt, planId });
+
+        try {
+            const auditService = require('../services/auditService');
+            await auditService.log(req, 'issue', 'license', companyId, null, { expiresAt, planId }, 'admin_issue_license');
+        } catch { /* ignore */ }
 
         res.status(201).json(license);
     } catch (err) {
@@ -339,7 +453,10 @@ exports.generateLicense = async (req, res) => {
 exports.renewLicense = async (req, res) => {
     try {
         const { companyId } = req.params;
-        const { expiresAt } = req.body;
+        const { expiresAt, planId } = req.body;
+        if (!expiresAt) {
+            return res.status(400).json({ message: 'expiresAt is required.' });
+        }
         let license = await License.findOneAndUpdate(
             { companyId, isActive: true },
             { expiresAt, isActive: true },
@@ -356,8 +473,8 @@ exports.renewLicense = async (req, res) => {
             return res.status(404).json({ message: 'No license found for this company' });
         }
         await Company.findByIdAndUpdate(companyId, { licenseKey: license.licenseKey });
+        await activateCommercialAccess(companyId, { expiresAt, planId });
         try {
-            require('../services/dunningService').clearDunningFlags(companyId);
             const auditService = require('../services/auditService');
             await auditService.log(req, 'renew', 'license', companyId, null, { expiresAt }, 'admin_renew_license');
         } catch { /* ignore */ }

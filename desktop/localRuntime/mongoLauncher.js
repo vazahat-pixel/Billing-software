@@ -109,11 +109,76 @@ function resolveMemoryServerModule(desktopRoot) {
 }
 
 /**
- * @param {{ dataDir: string, port?: number, resourcesPath?: string, desktopRoot?: string, logPath?: string }} opts
+ * Initiate single-node replica set so local Express can use real ACID transactions.
+ * Safe to call repeatedly (already-initiated sets are ignored).
+ */
+async function ensureReplicaSet(port, replSetName = 'rs0') {
+  let MongoClient;
+  try {
+    ({ MongoClient } = require('mongodb'));
+  } catch {
+    try {
+      ({ MongoClient } = require(path.join(__dirname, '..', '..', 'backend', 'node_modules', 'mongodb')));
+    } catch (err) {
+      console.warn('[localRuntime] mongodb driver missing; skipping rs.initiate:', err.message);
+      return false;
+    }
+  }
+  const uri = `mongodb://127.0.0.1:${port}/?directConnection=true`;
+  const client = new MongoClient(uri, { serverSelectionTimeoutMS: 15000 });
+  try {
+    await client.connect();
+    const admin = client.db().admin();
+    try {
+      const status = await admin.command({ replSetGetStatus: 1 });
+      if (status?.ok) return true;
+    } catch {
+      /* not initiated yet */
+    }
+    await admin.command({
+      replSetInitiate: {
+        _id: replSetName,
+        members: [{ _id: 0, host: `127.0.0.1:${port}` }],
+      },
+    });
+    // Wait until primary is elected
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      try {
+        const st = await admin.command({ replSetGetStatus: 1 });
+        const self = (st.members || []).find((m) => m.self) || (st.members || [])[0];
+        if (self && (self.stateStr === 'PRIMARY' || self.state === 1)) return true;
+      } catch {
+        /* retry */
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    console.warn('[localRuntime] replica set initiated but primary not confirmed in time');
+    return true;
+  } catch (err) {
+    console.warn('[localRuntime] ensureReplicaSet failed:', err.message);
+    return false;
+  } finally {
+    try {
+      await client.close();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
+ * @param {{ dataDir: string, port?: number, resourcesPath?: string, desktopRoot?: string, logPath?: string, replicaSet?: boolean|string }} opts
  */
 async function startMongo(opts) {
   const port = Number(opts.port || 27017);
   const dataDir = opts.dataDir;
+  const replSetName =
+    opts.replicaSet === false
+      ? null
+      : typeof opts.replicaSet === 'string'
+        ? opts.replicaSet
+        : 'rs0';
   fs.mkdirSync(dataDir, { recursive: true });
   if (opts.logPath) {
     fs.mkdirSync(path.dirname(opts.logPath), { recursive: true });
@@ -121,7 +186,16 @@ async function startMongo(opts) {
 
   if (await portInUse(port)) {
     startedByUs = false;
-    return { port, uri: `mongodb://127.0.0.1:${port}/textile_erp_desktop`, reused: true };
+    if (replSetName) {
+      await ensureReplicaSet(port, replSetName);
+    }
+    const qs = replSetName ? `?replicaSet=${replSetName}` : '';
+    return {
+      port,
+      uri: `mongodb://127.0.0.1:${port}/textile_erp_desktop${qs}`,
+      reused: true,
+      replicaSet: replSetName,
+    };
   }
 
   const bin = resolveMongodBinary(opts);
@@ -132,6 +206,9 @@ async function startMongo(opts) {
       '--bind_ip', '127.0.0.1',
       '--storageEngine', 'wiredTiger',
     ];
+    if (replSetName) {
+      args.push('--replSet', replSetName);
+    }
     if (opts.logPath) {
       args.push('--logpath', opts.logPath, '--logappend');
     }
@@ -163,11 +240,17 @@ async function startMongo(opts) {
       throw new Error(`${err.message}\nTried binary: ${bin}\n${stderr.slice(-800)}`);
     }
 
+    if (replSetName) {
+      await ensureReplicaSet(port, replSetName);
+    }
+
+    const qs = replSetName ? `?replicaSet=${replSetName}` : '';
     return {
       port,
-      uri: `mongodb://127.0.0.1:${port}/textile_erp_desktop`,
+      uri: `mongodb://127.0.0.1:${port}/textile_erp_desktop${qs}`,
       reused: false,
       binary: bin,
+      replicaSet: replSetName,
     };
   }
 
@@ -241,4 +324,4 @@ async function stopMongo() {
   });
 }
 
-module.exports = { startMongo, stopMongo, resolveMongodBinary };
+module.exports = { startMongo, stopMongo, resolveMongodBinary, ensureReplicaSet };

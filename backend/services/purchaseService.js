@@ -6,7 +6,7 @@ const StockMovement = require('../models/StockMovement');
 const AccountingEntry = require('../models/AccountingEntry');
 
 class PurchaseService {
-  async createPurchase(purchaseData) {
+  async createPurchase(purchaseData, options = {}) {
     return withTransaction(async (session) => {
     try {
       // Strip offline / client-only ids — Mongo ObjectId cannot be "local-…"
@@ -15,9 +15,23 @@ class PurchaseService {
         id: _dropId2,
         localId: _dropLocal,
         accountingEntryId: _dropAcct,
+        operationId: _rawOpId,
         ...safeData
       } = purchaseData || {};
       purchaseData = safeData;
+
+      const operationId = String(options.operationId || _rawOpId || '').trim() || null;
+      const isHybridDesktop =
+        String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+        String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+
+      // Idempotent retry: return existing purchase for same operationId (hybrid)
+      if (operationId) {
+        const existingByOp = await Purchase.findOne({ companyId: purchaseData.companyId, operationId }).session(session);
+        if (existingByOp) return existingByOp;
+      }
+
+      if (operationId) purchaseData.operationId = operationId;
 
       // Normalize supplierId if client passed object { _id, name }
       if (purchaseData.supplierId && typeof purchaseData.supplierId === 'object' && !(purchaseData.supplierId instanceof mongoose.Types.ObjectId)) {
@@ -196,6 +210,44 @@ class PurchaseService {
           supplierId: purchase.supplierId?.toString?.() || purchase.supplierId,
         });
       } catch { /* optional */ }
+
+      // Hybrid desktop: durable outbox for central sync (business result already committed)
+      if (
+        isHybridDesktop &&
+        options.enqueueOutbox !== false &&
+        !options.fromSync
+      ) {
+        try {
+          const crypto = require('crypto');
+          const syncOutboxService = require('./syncOutboxService');
+          const opId = operationId || crypto.randomUUID();
+          if (!purchase.operationId) {
+            purchase.operationId = opId;
+            await purchase.save({ session });
+          }
+          const payload = purchase.toObject ? purchase.toObject() : { ...purchase };
+          delete payload.accountingEntryId;
+          await syncOutboxService.enqueue({
+            operationId: opId,
+            companyId: purchase.companyId,
+            userId: purchaseData.createdBy || options.userId || null,
+            deviceId: options.deviceId || purchaseData.deviceId || '',
+            installationId: options.installationId || '',
+            entityType: 'purchase',
+            entityId: purchase._id,
+            operationType: 'create',
+            payload: {
+              ...payload,
+              invoiceNo: purchase.invoiceNo,
+              operationId: opId,
+            },
+            session,
+          });
+        } catch (outboxErr) {
+          console.warn('Sync outbox enqueue after purchase:', outboxErr.message);
+        }
+      }
+
       return purchase;
     } catch (error) {
       if (error && error.code === 11000) {

@@ -94,12 +94,17 @@ async function startApi(opts) {
   const mongoUri = opts.mongoUri;
   const backendRoot = resolveBackendRoot(opts);
 
+  const isHybrid = opts.hybrid === true || String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true';
   const env = {
     ...process.env,
     NODE_ENV: process.env.DESKTOP_NODE_ENV || 'production',
     PORT: String(port),
     MONGO_URI: mongoUri,
     DESKTOP_LOCAL: 'true',
+    DESKTOP_HYBRID: isHybrid ? 'true' : (process.env.DESKTOP_HYBRID || 'false'),
+    HYBRID_SYNC_ENABLED: isHybrid ? 'true' : (process.env.HYBRID_SYNC_ENABLED || 'false'),
+    CENTRAL_API_BASE_URL: opts.centralApiBaseUrl || process.env.CENTRAL_API_BASE_URL || '',
+    MONGO_REPLICA_SET: 'true',
     ALLOW_PUBLIC_REGISTER: 'false',
     ALLOW_SUBSCRIPTION_BYPASS: 'false',
     DUNNING_INTERVAL_MS: '0',
@@ -113,8 +118,11 @@ async function startApi(opts) {
       process.env.JWT_SECRET ||
       'desktop-local-jwt-secret-change-me-32chars!!',
     FRONTEND_URL: 'http://127.0.0.1',
-    // Soft commercial gates — desktop is single-PC licensed locally
-    MODULE_GATE_ENFORCE: process.env.MODULE_GATE_ENFORCE || 'false',
+    // Hybrid production: enforce module + device gates on local replica too
+    MODULE_GATE_ENFORCE:
+      process.env.MODULE_GATE_ENFORCE || (isHybrid ? 'true' : 'false'),
+    DEVICE_BINDING_ENFORCE:
+      process.env.DEVICE_BINDING_ENFORCE || (isHybrid ? 'true' : 'false'),
     PLAN_LIMIT_ENFORCE: process.env.PLAN_LIMIT_ENFORCE || 'false',
   };
 

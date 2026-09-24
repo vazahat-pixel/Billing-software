@@ -66,18 +66,25 @@ Installer output: `desktop/dist/TextileERP-Setup-*.exe`
 In the app: **File → Backup data…** / **Restore data…**  
 Zips `%APPDATA%/Textile ERP` (mongo data + config + jwt secret).
 
-## Remote API mode (optional)
+## Hybrid cloud-authoritative mode
 
-Edit `%APPDATA%/Textile ERP/config.json`:
+Set `%APPDATA%/Textile ERP/config.json`:
 
 ```json
 {
-  "mode": "remote",
-  "apiBaseUrl": "https://your-api.example.com/api"
+  "mode": "hybrid",
+  "centralApiBaseUrl": "https://your-central-api.example.com/api",
+  "apiPort": 5050,
+  "mongoPort": 27028
 }
 ```
 
-Restart the app. Standalone offline requires `"mode": "local"`.
+- Local Express + Mongo (single-node replica set) executes the **same** business services offline.
+- Durable `SyncOutbox` queues Sales creates; sync agent pushes to central `/api/sync/*` when online.
+- Invoice numbers come from central **leases** (`POST /api/sync/leases/invoice`) — never invent a parallel series.
+- Central remains source of truth; enable `HYBRID_SYNC_ENABLED=true` on the server for pilot.
+
+Standalone offline remains available with `"mode": "local"`.
 
 ## Smoke test
 

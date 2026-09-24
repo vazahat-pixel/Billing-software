@@ -175,8 +175,9 @@ function buildMenu() {
                 message: mode === 'local' ? 'Standalone offline mode' : 'Remote API mode',
                 detail:
                   `Mode: ${mode}\nAPI: ${current}\n\nConfig file:\n${cfgPath}\n\n` +
-                  `Local mode embeds MongoDB + API on this PC (1 company).\n` +
-                  `To use a remote server, set "mode": "remote" and apiBaseUrl, then restart.`,
+                  `local = standalone offline.\n` +
+                  `hybrid = local execution + sync to centralApiBaseUrl.\n` +
+                  `remote = UI talks only to an external API.`,
                 buttons: ['Open data folder', 'OK'],
               })
               .then((r) => {
@@ -282,10 +283,26 @@ ipcMain.handle('desktop:api-url', () => resolveApiBaseUrl());
 ipcMain.on('desktop:api-url-sync', (event) => {
   event.returnValue = resolveApiBaseUrl();
 });
-ipcMain.handle('desktop:is-local', () => (localStack?.mode || 'local') === 'local');
-ipcMain.on('desktop:is-local-sync', (event) => {
-  event.returnValue = (localStack?.mode || 'local') === 'local';
+ipcMain.handle('desktop:is-local', () => {
+  const mode = localStack?.mode || 'local';
+  return mode === 'local' || mode === 'hybrid';
 });
+ipcMain.on('desktop:is-local-sync', (event) => {
+  const mode = localStack?.mode || 'local';
+  event.returnValue = mode === 'local' || mode === 'hybrid';
+});
+ipcMain.handle('desktop:mode', () => localStack?.mode || 'local');
+ipcMain.on('desktop:mode-sync', (event) => {
+  event.returnValue = localStack?.mode || 'local';
+});
+ipcMain.handle('desktop:sync-status', () => {
+  try {
+    return require('./syncAgent').getStatus();
+  } catch {
+    return { connectivity: 'unknown', syncState: 'idle', pendingCount: 0 };
+  }
+});
+ipcMain.handle('desktop:central-url', () => localStack?.centralApiBaseUrl || null);
 ipcMain.handle('desktop:needs-setup', async () => {
   // Remote API (existing SaaS / shared Mongo) — no provisioning pack required
   const mode = localStack?.mode || readJsonSafe(path.join(app.getPath('userData'), 'config.json'))?.mode || 'local';
@@ -359,6 +376,15 @@ app.whenReady().then(async () => {
       resourcesPath: process.resourcesPath,
       isPackaged: app.isPackaged,
     });
+    try {
+      const syncAgent = require('./syncAgent');
+      syncAgent.setStatus({ mode: localStack.mode || 'local' });
+      if (localStack.mode === 'hybrid' && localStack.centralApiBaseUrl) {
+        syncAgent.startProbing({ centralApiBaseUrl: localStack.centralApiBaseUrl });
+      }
+    } catch (err) {
+      console.warn('[desktop] syncAgent init', err.message);
+    }
   } catch (err) {
     console.error('[desktop] local stack failed', err);
     splash.destroy();
@@ -401,6 +427,11 @@ app.on('before-quit', async (e) => {
     await shutdownLocalStack();
   } catch (err) {
     console.error('[desktop] shutdown error', err);
+  }
+  try {
+    require('./syncAgent').stopProbing();
+  } catch {
+    /* ignore */
   }
   app.exit(0);
 });

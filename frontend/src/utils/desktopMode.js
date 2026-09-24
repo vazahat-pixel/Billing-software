@@ -14,6 +14,16 @@ export function isDesktopShell() {
 export function isDesktopLocalMode() {
   if (!isDesktopShell()) return false;
   try {
+    const mode =
+      typeof window.textileDesktop?.getModeSync === 'function'
+        ? window.textileDesktop.getModeSync()
+        : window.textileDesktop?.mode;
+    if (mode === 'remote') return false;
+    if (mode === 'local' || mode === 'hybrid') return true;
+  } catch {
+    /* ignore */
+  }
+  try {
     if (typeof window.textileDesktop?.isLocalSync === 'function') {
       return window.textileDesktop.isLocalSync() !== false;
     }
@@ -23,8 +33,21 @@ export function isDesktopLocalMode() {
   } catch {
     /* ignore */
   }
-  // Packaged desktop defaults to local standalone
+  // Packaged desktop defaults to hybrid/local
   return import.meta.env.VITE_DESKTOP === '1';
+}
+
+export function isDesktopHybridMode() {
+  if (!isDesktopShell()) return false;
+  try {
+    const mode =
+      typeof window.textileDesktop?.getModeSync === 'function'
+        ? window.textileDesktop.getModeSync()
+        : window.textileDesktop?.mode;
+    return mode === 'hybrid';
+  } catch {
+    return false;
+  }
 }
 
 /** True when sync-queue / IDB should NOT be used as write path */

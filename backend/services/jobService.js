@@ -38,12 +38,27 @@ function computeWastageSplit(issueQty, receivedQty, tolerancePct) {
 }
 
 class JobService {
-  async issueToJob(issueData) {
+  async issueToJob(issueData, options = {}) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
       const { lotId, issueQty, issuePcs, companyId, chainTemplateId } = issueData;
+
+      const operationId = String(options.operationId || issueData.operationId || '').trim() || null;
+      const isHybridDesktop =
+        String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+        String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+
+      // Idempotent retry: return existing job for same operationId (hybrid)
+      if (operationId) {
+        const existingByOp = await Job.findOne({ companyId, operationId }).session(session);
+        if (existingByOp) {
+          await session.commitTransaction();
+          return existingByOp;
+        }
+      }
+      if (operationId) issueData.operationId = operationId;
 
       const Counter = require('../models/Counter');
       const counterId = `JC-${companyId}`;
@@ -119,11 +134,37 @@ class JobService {
         remarks: `Job Issued: ${job.jobCardNo}`,
       });
 
-      // Ledger: Stock → Job Work In Progress (mill issue track)
+      // Ledger: Stock -> Job Work In Progress (mill issue track)
       const accountingService = require('./accountingService');
       await accountingService.onJobIssuePost(job, lot, session);
 
       await session.commitTransaction();
+
+      // Hybrid desktop: durable outbox for central sync (after commit, non-blocking)
+      if (isHybridDesktop && options.enqueueOutbox !== false && !options.fromSync) {
+        try {
+          const crypto = require('crypto');
+          const syncOutboxService = require('./syncOutboxService');
+          const opId = operationId || crypto.randomUUID();
+          if (!job.operationId) {
+            await Job.updateOne({ _id: job._id }, { $set: { operationId: opId } });
+          }
+          const payload = job.toObject ? job.toObject() : { ...job };
+          await syncOutboxService.enqueue({
+            operationId: opId,
+            companyId,
+            userId: issueData.createdBy || options.userId || null,
+            deviceId: options.deviceId || issueData.deviceId || '',
+            entityType: 'job_issue',
+            entityId: job._id,
+            operationType: 'create',
+            payload: { ...payload, operationId: opId },
+          });
+        } catch (outboxErr) {
+          console.warn('Sync outbox enqueue after job issue:', outboxErr.message);
+        }
+      }
+
       return job;
     } catch (error) {
       await session.abortTransaction();
@@ -158,7 +199,7 @@ class JobService {
    * separate feature (advanceStep/performQc already model "one step at a time") — for
    * those, a receive still completes the current step in one shot, exactly as before.
    */
-  async receiveFromJob(receiveData) {
+  async receiveFromJob(receiveData, options = {}) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -166,6 +207,20 @@ class JobService {
       const { jobId, companyId, billGpNo } = receiveData;
       const trancheQty = Number(receiveData.receivedQty || 0);
       const tranchePcs = Number(receiveData.receivedPcs || 0);
+
+      const operationId = String(options.operationId || receiveData.operationId || '').trim() || null;
+      const isHybridDesktop =
+        String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+        String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+
+      // Idempotent retry: if a receive with this operationId already completed, return it
+      if (operationId) {
+        const existingByOp = await Job.findOne({ companyId, operationId: `RECV:${operationId}` }).session(session);
+        if (existingByOp) {
+          await session.commitTransaction();
+          return { job: existingByOp, duplicate: true };
+        }
+      }
 
       const job = await Job.findOne({ _id: jobId, companyId }).session(session);
       if (!job) throw AppError.notFound('Job record not found');
@@ -424,6 +479,40 @@ class JobService {
       } catch {
         /* optional */
       }
+
+      // Hybrid desktop: durable outbox for central sync (after commit, non-blocking)
+      if (isHybridDesktop && options.enqueueOutbox !== false && !options.fromSync) {
+        try {
+          const crypto = require('crypto');
+          const syncOutboxService = require('./syncOutboxService');
+          const opId = operationId || crypto.randomUUID();
+          // Use prefixed operationId to distinguish receive ops from issue ops on the same job
+          const receiveOpId = `RECV:${opId}`;
+          await Job.updateOne({ _id: job._id }, { $set: { operationId: receiveOpId } });
+          const payload = job.toObject ? job.toObject() : { ...job };
+          await syncOutboxService.enqueue({
+            operationId: receiveOpId,
+            companyId,
+            userId: receiveData.createdBy || options.userId || null,
+            deviceId: options.deviceId || receiveData.deviceId || '',
+            entityType: 'job_receive',
+            entityId: job._id,
+            operationType: 'create',
+            payload: {
+              ...payload,
+              receivedQty: trancheQty,
+              receivedPcs: tranchePcs,
+              charges,
+              gstAmount,
+              isFinal,
+              operationId: receiveOpId,
+            },
+          });
+        } catch (outboxErr) {
+          console.warn('Sync outbox enqueue after job receive:', outboxErr.message);
+        }
+      }
+
       return {
         job,
         newLot: finishedLot,

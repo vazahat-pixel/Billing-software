@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
 import { isOffline } from '../../utils/offlineHelpers';
+import { hasPendingSupportSession } from '../../utils/supportSession';
 
 /**
  * Platform role for routing: only `user` | `super_admin`.
@@ -37,6 +38,15 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     () => resolvePlatformRole(storeRole, storeUser),
     [storeRole, storeUser]
   );
+
+  // Admin "Open as support" lands on /?supportToken=… before token is hydrated
+  if (!token && hasPendingSupportSession()) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-white">
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Opening support session…</p>
+      </div>
+    );
+  }
 
   if (!token) {
     if (location.pathname.startsWith('/admin')) {

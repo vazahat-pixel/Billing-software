@@ -137,7 +137,18 @@ const JobSchema = new mongoose.Schema({
     ref: 'Company',
     required: true,
     index: true
-  }
+  },
+  /**
+   * Hybrid sync idempotency key — set by the desktop client before creating offline.
+   * Central side uses this to guarantee exactly-once processing via ProcessedOperation.
+   * Mirrors Sales.operationId and Purchase.operationId. Additive — null for pre-hybrid records.
+   */
+  operationId: {
+    type: String,
+    default: null,
+    index: true,
+    sparse: true,
+  },
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

@@ -295,6 +295,13 @@ async function startServer(opts = {}) {
 
   await ensureDbBoot();
 
+  try {
+    const { startSyncAgentWorker } = require('./services/syncAgentWorker');
+    startSyncAgentWorker();
+  } catch (err) {
+    logger.warn('sync agent worker not started', { error: err.message });
+  }
+
   if (server) {
     return {
       app,
@@ -331,6 +338,11 @@ if (!process.env.VERCEL && require.main === module) {
       server = app.listen(PORT, () => {
         logger.info(`Server listening on http://localhost:${PORT}`);
       });
+      try {
+        require('./services/syncAgentWorker').startSyncAgentWorker();
+      } catch (err) {
+        logger.warn('sync agent worker not started', { error: err.message });
+      }
     })
     .catch((err) => {
       logger.error('Failed to start server', { error: err.message });

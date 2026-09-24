@@ -2,6 +2,10 @@
 
 /**
  * Boot / shutdown the full local stack: mongod + Express API.
+ * Modes: local | hybrid | remote
+ * - local: standalone offline (local SoR)
+ * - hybrid: local Express+Mongo execution + sync to centralApiBaseUrl
+ * - remote: UI points at external API only (no embedded stack)
  */
 const fs = require('fs');
 const path = require('path');
@@ -46,9 +50,11 @@ async function bootLocalStack(ctx) {
   const userData = ctx.userData;
   const cfgPath = path.join(userData, 'config.json');
   const desktopCfg = ctx.desktopRoot ? readJson(path.join(ctx.desktopRoot, 'config.json')) : null;
-  const cfg = { ...(desktopCfg || {}), ...(readJson(cfgPath) || {}) };
+  const exampleCfg = ctx.desktopRoot ? readJson(path.join(ctx.desktopRoot, 'config.example.json')) : null;
+  const cfg = { ...(exampleCfg || {}), ...(desktopCfg || {}), ...(readJson(cfgPath) || {}) };
 
-  const mode = String(cfg.mode || process.env.ERP_DESKTOP_MODE || 'local').toLowerCase();
+  const mode = String(cfg.mode || process.env.ERP_DESKTOP_MODE || 'hybrid').toLowerCase();
+
   if (mode === 'remote' && cfg.apiBaseUrl && !process.env.ERP_FORCE_LOCAL) {
     writeJson(cfgPath, {
       ...cfg,
@@ -58,10 +64,12 @@ async function bootLocalStack(ctx) {
     return {
       mode: 'remote',
       apiBaseUrl: String(cfg.apiBaseUrl).replace(/\/$/, ''),
+      centralApiBaseUrl: cfg.centralApiBaseUrl || null,
       configPath: cfgPath,
     };
   }
 
+  const isHybrid = mode === 'hybrid';
   const dataRoot = path.join(userData, 'data');
   const mongoData = path.join(dataRoot, 'mongo');
   const mongoLog = path.join(userData, 'logs', 'mongod.log');
@@ -69,20 +77,25 @@ async function bootLocalStack(ctx) {
   fs.mkdirSync(path.join(userData, 'logs'), { recursive: true });
 
   const preferredApi = Number(cfg.apiPort || 5050);
-  // Prefer a fresh ephemeral port for smoke/dev to avoid colliding with a stale API.
   const apiPort = await findFreePort(
     process.env.DESKTOP_API_PORT ? Number(process.env.DESKTOP_API_PORT) : preferredApi
   );
   const mongoPort = await findFreePort(Number(cfg.mongoPort || 27028));
   const jwtSecret = ensureJwtSecret(userData);
 
+  // Hybrid + local: single-node replica set for ACID withTransaction
   const mongo = await startMongo({
     dataDir: mongoData,
     port: mongoPort,
     logPath: mongoLog,
     resourcesPath: ctx.resourcesPath,
     desktopRoot: ctx.desktopRoot,
+    replicaSet: 'rs0',
   });
+
+  const centralApiBaseUrl = cfg.centralApiBaseUrl
+    ? String(cfg.centralApiBaseUrl).replace(/\/$/, '')
+    : process.env.CENTRAL_API_BASE_URL || '';
 
   const api = await startApi({
     port: apiPort,
@@ -91,26 +104,32 @@ async function bootLocalStack(ctx) {
     desktopRoot: ctx.desktopRoot,
     resourcesPath: ctx.resourcesPath,
     jwtSecret,
+    hybrid: isHybrid,
+    centralApiBaseUrl,
   });
 
   const apiBaseUrl = `http://127.0.0.1:${apiPort}/api`;
   const nextCfg = {
     ...cfg,
-    mode: 'local',
+    mode: isHybrid ? 'hybrid' : 'local',
     apiBaseUrl,
     apiPort,
     mongoPort: mongo.port,
     mongoUri: mongo.uri,
-    note: 'Standalone offline desktop — local Mongo + API. Set mode to "remote" only to point at an external server.',
+    centralApiBaseUrl: centralApiBaseUrl || cfg.centralApiBaseUrl || '',
+    note: isHybrid
+      ? 'Hybrid: local Express+Mongo executes ERP; syncs to centralApiBaseUrl when online.'
+      : 'Standalone offline desktop — local Mongo + API.',
   };
   writeJson(cfgPath, nextCfg);
 
   return {
-    mode: 'local',
+    mode: nextCfg.mode,
     apiBaseUrl,
     apiPort,
     mongoPort: mongo.port,
     mongoUri: mongo.uri,
+    centralApiBaseUrl: nextCfg.centralApiBaseUrl || null,
     configPath: cfgPath,
     api,
     mongo,

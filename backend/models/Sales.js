@@ -152,7 +152,19 @@ const SalesSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'AccountingEntry',
     default: null
-  }
+  },
+  /** Client/desktop sync idempotency key — sparse unique per company */
+  operationId: {
+    type: String,
+    default: null,
+    trim: true,
+  },
+  /** Central Sales _id after successful hybrid sync (local _id may differ) */
+  syncServerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Sales',
+    default: null,
+  },
 }, {
   timestamps: true
 });
@@ -160,6 +172,10 @@ const SalesSchema = new mongoose.Schema({
 // Per-company unique invoice number — fixes cross-tenant collision bug
 SalesSchema.index({ invoiceNo: 1, companyId: 1 }, { unique: true });
 SalesSchema.index({ companyId: 1, date: -1, status: 1 });
+SalesSchema.index(
+  { companyId: 1, operationId: 1 },
+  { unique: true, partialFilterExpression: { operationId: { $type: 'string', $gt: '' } } }
+);
 
 SalesSchema.plugin(enterpriseIntegrityPlugin);
 

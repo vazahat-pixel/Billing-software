@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import ToastHost from '../components/ui/ToastHost';
 import ConfirmDialogHost from '../components/ui/ConfirmDialogHost';
 import CommandPalette from '../components/CommandPalette';
@@ -10,6 +10,7 @@ import useUiStore from '../store/useUiStore';
 import { useFormEnterNavigation } from '../hooks/useFormEnterNavigation';
 import { installBrowserDialogGuard } from '../utils/browserDialogGuard';
 import { stage6Api } from '../api/stage6.api';
+import { consumeSupportSession } from '../utils/supportSession';
 
 /**
  * App-level providers glue — keeps existing Router in App.jsx.
@@ -24,6 +25,7 @@ export function AppProviders({ children }) {
   const toggleCommandPalette = useUiStore((s) => s.toggleCommandPalette);
   const commandPaletteOpen = useUiStore((s) => s.commandPaletteOpen);
   const setNotificationUnread = useUiStore((s) => s.setNotificationUnread);
+  const [bootDone, setBootDone] = useState(false);
 
   useFormEnterNavigation(!commandPaletteOpen);
 
@@ -32,7 +34,16 @@ export function AppProviders({ children }) {
   }, []);
 
   useEffect(() => {
-    restoreSession();
+    let cancelled = false;
+    (async () => {
+      const setAuthFn = useStore.getState().setAuth;
+      const applied = await consumeSupportSession(setAuthFn);
+      if (!cancelled && !applied) {
+        await restoreSession();
+      }
+      if (!cancelled) setBootDone(true);
+    })();
+    return () => { cancelled = true; };
   }, [restoreSession]);
 
   useEffect(() => {
@@ -69,6 +80,16 @@ export function AppProviders({ children }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [toggleCommandPalette]);
+
+  if (!bootDone) {
+    return (
+      <ThemeProvider>
+        <div className="fixed inset-0 flex items-center justify-center bg-white">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Loading session...</p>
+        </div>
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider>

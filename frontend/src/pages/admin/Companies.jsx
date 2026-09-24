@@ -169,9 +169,23 @@ const Companies = () => {
             const data = await adminApi.impersonateCompany(company._id, { reason: 'support' });
             const token = data?.token;
             if (!token) throw new Error('No token returned');
-            // Open ERP with support token in a new tab via query (consumed once by login bootstrap if supported)
+            // localStorage shared across tabs — AuthBootstrap / AppProviders consume this
+            localStorage.setItem(
+                'pendingSupportSession',
+                JSON.stringify({
+                    token,
+                    user: {
+                        ...(data.user || {}),
+                        id: data.user?.id || data.user?._id,
+                        supportSession: true,
+                        mustChangePassword: false,
+                    },
+                    companyId: company._id,
+                    at: Date.now(),
+                })
+            );
             window.open(`${window.location.origin}/?supportToken=${encodeURIComponent(token)}`, '_blank');
-            notifySuccess('Support session token issued (30 min). Paste is auto-opened in new tab.');
+            notifySuccess('Support session opened in new tab (30 min).');
             try {
                 await navigator.clipboard.writeText(token);
             } catch { /* ignore */ }
@@ -355,7 +369,8 @@ const Companies = () => {
             <DarkModal isOpen={!!licenseCompany} onClose={() => setLicenseCompany(null)} title="Issue License Key" subtitle={licenseCompany?.name}>
                 <form onSubmit={handleLicenseGenerate} className="space-y-4">
                     <p className="text-xs text-slate-400 bg-white/[0.03] p-3 rounded-xl border border-white/[0.05]">
-                        Generate a product license key for <strong className="text-violet-400">{licenseCompany?.name}</strong>. This will activate or renew their subscription.
+                        Generate a product license for <strong className="text-violet-400">{licenseCompany?.name}</strong>.
+                        This activates the company and renews their subscription to the expiry date below.
                     </p>
                     <DarkInput label="Expiry Date" type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} required />
                     <button type="submit" className="dark-submit-btn w-full">

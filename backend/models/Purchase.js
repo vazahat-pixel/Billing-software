@@ -156,6 +156,17 @@ const PurchaseSchema = new mongoose.Schema({
     mimeType: { type: String, default: '' },
     extractedAt: { type: Date, default: null },
   },
+  /**
+   * Hybrid sync idempotency key — set by the desktop client before creating offline.
+   * Central side uses this to guarantee exactly-once processing via ProcessedOperation.
+   * Mirrors Sales.operationId. Additive — null for all pre-hybrid records.
+   */
+  operationId: {
+    type: String,
+    default: null,
+    index: true,
+    sparse: true,
+  },
 }, {
   timestamps: true
 });

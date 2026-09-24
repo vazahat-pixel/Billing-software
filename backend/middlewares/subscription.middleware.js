@@ -19,14 +19,17 @@ const subscriptionMiddleware = async (req, res, next) => {
     return next();
   }
 
-  // Standalone offline desktop — single PC, local licence; skip cloud SaaS gates
+  // Standalone offline desktop — single PC, local licence; skip cloud SaaS gates.
+  // Hybrid desktop keeps commercialPolicy intact so MODULE_GATE / PLAN_LIMIT can
+  // still hard-enforce saas_enforced tenants (do not rewrite to legacy_open).
   if (String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true') {
+    const isHybrid = String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true';
     if (req.user?.companyId) {
       try {
         const company = await Company.findById(req.user.companyId);
         if (company) {
           req.planId = company.planId;
-          if (company.commercialPolicy !== 'legacy_open') {
+          if (!isHybrid && company.commercialPolicy !== 'legacy_open') {
             company.commercialPolicy = 'legacy_open';
             await company.save();
           }
