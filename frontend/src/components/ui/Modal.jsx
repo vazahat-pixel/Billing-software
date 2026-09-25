@@ -17,6 +17,7 @@ const Modal = ({
   enableEscape = true,
   style,
   inertBackdrop = false,
+  overlayZ = 1200,
 }) => {
   const contentRef = useRef(null);
 
@@ -67,10 +68,13 @@ const Modal = ({
         <div
           className={twMerge(
             'fixed inset-0 z-[1200]',
-            inertBackdrop
-              ? 'pointer-events-none overflow-hidden'
-              : 'z-[1200] flex items-center justify-center p-1.5 sm:p-2 overflow-hidden'
+            String(className || '').includes('erp-bill-window--max')
+              ? 'overflow-hidden'
+              : inertBackdrop || style?.top != null
+                ? 'pointer-events-none overflow-hidden'
+                : 'z-[1200] flex items-center justify-center p-1.5 sm:p-2 overflow-hidden'
           )}
+          style={{ zIndex: overlayZ || 1200 }}
         >
           {!inertBackdrop && (
             <motion.div
@@ -79,7 +83,9 @@ const Modal = ({
               exit={{ opacity: 0 }}
               transition={{ duration: 0.1, ease: [0.16, 1, 0.3, 1] }}
               onClick={onClose}
-              className="fixed inset-0 bg-slate-900/28 backdrop-blur-[2px]"
+              className={style?.top != null
+                ? 'fixed left-0 right-0 bottom-0 top-[52px] bg-slate-900/15 pointer-events-auto'
+                : 'fixed inset-0 bg-slate-900/28 backdrop-blur-[2px]'}
             />
           )}
 
@@ -91,7 +97,7 @@ const Modal = ({
             style={style}
             className={twMerge(
               'relative flex flex-col w-full max-h-[calc(100dvh-12px)] overflow-hidden border border-slate-200/80 shadow-[0_20px_50px_rgba(15,23,42,0.12)]',
-              inertBackdrop ? 'pointer-events-auto z-[2000]' : 'z-[1500]',
+              inertBackdrop || style?.top != null ? 'pointer-events-auto z-[2000]' : 'z-[1500]',
               bare
                 ? 'max-w-5xl rounded-[var(--radius-card)] bg-[var(--bg-card)]'
                 : 'max-w-4xl rounded-2xl bg-[var(--bg-card)]',

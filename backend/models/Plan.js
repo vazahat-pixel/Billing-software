@@ -32,6 +32,8 @@ const planSchema = new mongoose.Schema({
   sortOrder: { type: Number, default: 100 },
   features: {
     offlineMode: { type: Boolean, default: false },
+    /** Phone layout for the owner is view-only. Desktop billing stays editable. */
+    mobileView: { type: Boolean, default: false },
     modules: {
       purchase: { type: Boolean, default: false },
       inventory: { type: Boolean, default: false },

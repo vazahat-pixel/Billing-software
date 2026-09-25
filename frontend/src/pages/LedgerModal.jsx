@@ -7,6 +7,7 @@ import Modal from '../components/ui/Modal';
 import ErpWindowedModal from '../components/erp/ErpWindowedModal';
 import { fmtDate, fmtMoney, shareInvoiceWhatsApp, openWhatsAppShare } from '../utils/invoiceHelpers';
 import { downloadCsv } from '../utils/reportExport';
+import { openLedgerScreenPdf } from '../utils/screenPdf';
 import { SkeletonTable, InlineLoader, ButtonLoader, ErpBusyOverlay } from '../components/ui/loaders';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -260,6 +261,7 @@ const LedgerModal = ({
     const st = s.companySettings || {};
     return [st.address, st.city, st.state, st.pincode].filter(Boolean).join(', ');
   });
+  const companyGstin = useConfigStore((s) => s.companySettings?.gstin || s.company?.gstin || '');
   const financialYear = useConfigStore((s) => s.financialYear || s.companySettings?.financialYear);
 
   const [view, setView] = useState('entry');
@@ -622,47 +624,55 @@ const LedgerModal = ({
     }
   };
 
-  /** Direct form opener — opens the edit form corresponding to any selected ledger row */
+  /** One click opens the source bill. Description wins over the voucher-number prefix
+   *  so DISCOUNT ACCOUNT opens the note even when the bill number starts with RV. */
   const handleRowOpen = (row) => {
     if (!row) return;
     if (row._material) {
       toast.info(`Material entry: ${row.particulars || 'Job Work'}`);
       return;
     }
-    const refType = String(row.refType || row.voucherType || '').toLowerCase();
+    const refType = String(row.refType || '').toLowerCase();
+    const vt = String(row.voucherType || '').toLowerCase();
     const docNo = String(row.billVoucherNo || row.voucherNo || row.entryNo || '').trim();
-    const desc = String(row.particulars || row.narration || row.contraAccount || '').toLowerCase();
+    const desc = String(row.particulars || row.contraAccount || '').toLowerCase();
     const docUp = docNo.toUpperCase();
+    const payload = { partyId, ledgerId: resolveLedgerId(), docNo, voucherNo: docNo, invoiceNo: docNo, row };
 
-    // Check by refType, docNo prefix, or description
-    const isPurchase = refType.includes('purchase') || docUp.startsWith('PUR') || docUp.startsWith('PU-') || desc.includes('purchase a/c');
-    const isSales = refType.includes('sale') || docUp.startsWith('SL') || docUp.startsWith('SAL') || docUp.startsWith('INV') || desc.includes('sales a/c');
-    const isPayment = refType.includes('payment') || docUp.startsWith('PV') || docUp.startsWith('CPV') || docUp.startsWith('BPV') || docUp.startsWith('PAY');
-    const isReceipt = refType.includes('receipt') || docUp.startsWith('RV') || docUp.startsWith('CRV') || docUp.startsWith('BRV') || docUp.startsWith('REC');
-    const isNote = refType.includes('note') || docUp.startsWith('DN') || docUp.startsWith('CN') || docUp.startsWith('DR') || docUp.startsWith('CR');
-    const isJournal = refType.includes('journal') || docUp.startsWith('JV');
+    const open = (fn, fallback) => {
+      if (fn) fn(payload);
+      else if (fallback) fallback();
+    };
 
-    if (isPayment) {
-      if (onOpenPayment) onOpenPayment({ partyId, ledgerId: resolveLedgerId(), voucherNo: docNo, docNo, row });
-      else toast.info(`Payment Voucher #${docNo}`);
-    } else if (isReceipt) {
-      if (onOpenReceipt) onOpenReceipt({ partyId, ledgerId: resolveLedgerId(), voucherNo: docNo, docNo, row });
-      else toast.info(`Receipt Voucher #${docNo}`);
-    } else if (isPurchase) {
-      if (onOpenPurchase) onOpenPurchase({ partyId, ledgerId: resolveLedgerId(), invoiceNo: docNo, docNo, row });
-      else toast.info(`Purchase Bill #${docNo}`);
-    } else if (isSales) {
-      if (onOpenSales) onOpenSales({ partyId, ledgerId: resolveLedgerId(), invoiceNo: docNo, docNo, row });
-      else toast.info(`Sales Invoice #${docNo}`);
-    } else if (isNote) {
-      if (onOpenNote) onOpenNote({ partyId, ledgerId: resolveLedgerId(), docNo, voucherNo: docNo, row });
-      else toast.info(`Note #${docNo}`);
-    } else if (isJournal) {
-      if (onOpenJournal) onOpenJournal({ partyId, ledgerId: resolveLedgerId(), entryNo: docNo, docNo, row });
-      else setJvRow(row);
-    } else {
-      setJvRow(row);
+    if (desc.includes('discount')) {
+      open(onOpenNote, () => toast.info(`Note #${docNo}`));
+      return;
     }
+    if (desc.includes('sales book') || desc.includes('sales a/c') || refType.includes('sale') || vt.includes('sale') || docUp.startsWith('INV') || docUp.startsWith('SL')) {
+      open(onOpenSales, () => toast.info(`Sales Invoice #${docNo}`));
+      return;
+    }
+    if (desc.includes('purchase') || refType.includes('purchase') || vt.includes('purchase') || docUp.startsWith('PUR') || docUp.startsWith('PU-')) {
+      open(onOpenPurchase, () => toast.info(`Purchase Bill #${docNo}`));
+      return;
+    }
+    if (refType.includes('note') || vt.includes('note') || docUp.startsWith('DN') || docUp.startsWith('CN')) {
+      open(onOpenNote, () => toast.info(`Note #${docNo}`));
+      return;
+    }
+    if (refType.includes('payment') || vt === 'payment' || docUp.startsWith('PV') || docUp.startsWith('CPV') || docUp.startsWith('BPV') || docUp.startsWith('PAY')) {
+      open(onOpenPayment, () => toast.info(`Payment Voucher #${docNo}`));
+      return;
+    }
+    if (refType.includes('receipt') || vt === 'receipt' || docUp.startsWith('RV') || docUp.startsWith('CRV') || docUp.startsWith('BRV') || docUp.startsWith('REC')) {
+      open(onOpenReceipt, () => toast.info(`Receipt Voucher #${docNo}`));
+      return;
+    }
+    if (refType.includes('journal') || vt.includes('journal') || docUp.startsWith('JV')) {
+      open(onOpenJournal, () => setJvRow(row));
+      return;
+    }
+    setJvRow(row);
   };
 
   useEffect(() => {
@@ -746,13 +756,65 @@ const LedgerModal = ({
     downloadCsv(`Ledger_${(ledgerName || 'account').replace(/\W+/g, '_')}_${from}_to_${to}.csv`, headers, body);
   };
 
+  const handleScreenPdf = () => {
+    if (!statement || filteredRows.length === 0) return toast.warning('Load ledger first');
+    const pdfRows = [[
+      fmtDateDMY(from),
+      'OB',
+      'OPENING BALANCE',
+      '',
+      openingType === 'Dr' ? money(openingBal) : '0.00',
+      openingType === 'Cr' ? money(openingBal) : '0.00',
+      `${money(openingBal)} ${String(openingType || '').toUpperCase()}`,
+    ]];
+    filteredRows.forEach((r) => {
+      const bal = Number(r.runningBalance ?? r.balance ?? 0);
+      const balType = String(r.balanceType || '').toUpperCase();
+      pdfRows.push([
+        fmtDateDMY(r.date || r.entryDate),
+        r.billVoucherNo || r.voucherNo || '',
+        rowDescriptionClean(r),
+        r.chequeNo || r.chqNo || '',
+        money(r.debit),
+        money(r.credit),
+        `${money(bal)}${balType ? ` ${balType}` : ''}`,
+      ]);
+    });
+    const safeName = String(ledgerName || 'account').replace(/[^\w]+/g, '_');
+    openLedgerScreenPdf({
+      companyName,
+      companyAddress,
+      gstin: companyGstin,
+      accountName: ledgerName,
+      accountGroup: partyInfo?.group || selectedMeta?.ledger?.group || selectedMeta?.ledger?.accountType || '',
+      fromLabel: fmtDateDMY(from),
+      toLabel: fmtDateDMY(to),
+      rows: pdfRows,
+      totalDebit: periodDebit,
+      totalCredit: periodCredit,
+      closingLabel: `${money(closingBal)} ${String(closingType || '').toUpperCase()}`,
+      filename: `Ledger_${safeName}.pdf`,
+    });
+  };
+
   const handlePrint = () => {
-    if (!statement) return toast.warning('Load ledger first');
-    document.body.classList.add('ledger-printing');
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => document.body.classList.remove('ledger-printing'), 400);
-    }, 50);
+    handleScreenPdf();
+  };
+
+  const handleMonth = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const iso = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const range = { from: iso(start), to: iso(end) };
+    setFrom(range.from);
+    setTo(range.to);
+    runLedger(range);
   };
 
   const isLoading = busy || loading;
@@ -880,7 +942,7 @@ const LedgerModal = ({
     : '';
 
   return (
-    <ErpWindowedModal isOpen={isOpen} onClose={onClose} title="Zoom Ledger" windowId="ledger" defaultMode="maximized" bare>
+    <ErpWindowedModal isOpen={isOpen} onClose={onClose} title="Zoom Ledger" windowId="ledger" defaultMode="normal" bare>
       {({ WindowControls }) => (
         <>
           <div className="classic-erp-window ledger-stmt-window h-full min-h-0 !max-h-none flex flex-col">
@@ -892,11 +954,27 @@ const LedgerModal = ({
 
             <div className="ledger-toolbar print:hidden">
               <button type="button" className="classic-erp-btn" onClick={handlePrint} disabled={!statement}>Print</button>
-              <button type="button" className="classic-erp-btn" onClick={runLedger} disabled={isLoading}>
+              <button type="button" className="classic-erp-btn" onClick={handleScreenPdf} disabled={!statement || isLoading}>
                 {isLoading ? <ButtonLoader label="Refreshing…" /> : 'Screen'}
               </button>
               <button type="button" className="classic-erp-btn" onClick={handleExcel} disabled={!statement}>Excel</button>
-              <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('Mail')}>Mail</button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                disabled={!statement}
+                onClick={() => {
+                  const email = partyInfo?.email || '';
+                  const bal = `${money(closingBal)}${closingType ? ` ${closingType}` : ''}`;
+                  const body = `Ledger: ${ledgerName}\nPeriod: ${fmtDateDMY(from)} to ${fmtDateDMY(to)}\nClosing: ${bal}`;
+                  if (!email) {
+                    toast.warning('Party email is not saved. Add it on the account, then Mail will open.');
+                    return;
+                  }
+                  window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(`Ledger — ${ledgerName}`)}&body=${encodeURIComponent(body)}`;
+                }}
+              >
+                Mail
+              </button>
               <button
                 type="button"
                 className="classic-erp-btn"
@@ -926,12 +1004,26 @@ const LedgerModal = ({
               >
                 Whatsapp
               </button>
-              <button type="button" className="classic-erp-btn" onClick={() => toast.unavailable('ALL Reports')}>ALL Reports</button>
               <button
                 type="button"
                 className="classic-erp-btn"
                 onClick={() => {
-                  if (onOpenOutstanding) onOpenOutstanding({ partyId, ledgerId: resolveLedgerId() });
+                  window.dispatchEvent(new CustomEvent('erp:open-modal', { detail: { modal: 'reportsHub' } }));
+                }}
+              >
+                ALL Reports
+              </button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                onClick={() => {
+                  if (!partyId) {
+                    toast.warning('Is ledger se koi party linked nahi — pehle party ledger kholo');
+                    return;
+                  }
+                  const kind = `${partyInfo?.group || ''} ${partyInfo?.type || ''} ${partyInfo?.accountType || ''} ${selectedMeta?.ledger?.group || ''} ${selectedMeta?.ledger?.accountType || ''}`.toLowerCase();
+                  const osType = /creditor|supplier|payable|sundry creditor/.test(kind) ? 'payable' : 'receivable';
+                  if (onOpenOutstanding) onOpenOutstanding({ partyId, partyName: partyInfo?.name || '', osType, ledgerId: resolveLedgerId() });
                   else toast.info('Outstanding — open from Reports > Outstanding');
                 }}
               >
@@ -1004,7 +1096,7 @@ const LedgerModal = ({
                   <span className="classic-erp-label">To</span>
                   <input type="date" className="classic-erp-input ledger-date-red" value={to} onChange={(e) => setTo(e.target.value)} />
                   <button type="button" className="classic-erp-btn ledger-green-btn" onClick={() => runLedger()} disabled={isLoading}>OK</button>
-                  <button type="button" className="classic-erp-btn ledger-green-btn" onClick={() => toast.unavailable('Month')}>Month</button>
+                  <button type="button" className="classic-erp-btn ledger-green-btn" onClick={handleMonth} disabled={isLoading}>Month</button>
                   <label className="ledger-stmt-check"><input type="checkbox" checked={onlyDr} onChange={(e) => setOnlyDr(e.target.checked)} />Only Dr</label>
                   <label className="ledger-stmt-check"><input type="checkbox" checked={onlyCr} onChange={(e) => setOnlyCr(e.target.checked)} />Only Cr</label>
                 </div>
@@ -1103,10 +1195,12 @@ const LedgerModal = ({
                         return (
                           <tr
                             key={`${rowKey}-${i}`}
-                            className={`${i === activeRow ? 'is-selected' : ''} ${rowTypeClass}`}
-                            onClick={() => setSelectedRow(i)}
-                            onDoubleClick={() => handleRowOpen(row)}
-                            title="Press Enter or double-click to open form for editing"
+                            className={`${i === activeRow ? 'is-selected' : ''} ${rowTypeClass} ledger-data-row`}
+                            onClick={() => {
+                              setSelectedRow(i);
+                              handleRowOpen(row);
+                            }}
+                            title="Click to open this bill"
                           >
                             <td className="text-center" onClick={(e) => e.stopPropagation()}>
                               <input
@@ -1155,7 +1249,7 @@ const LedgerModal = ({
                 <div className="ledger-grand-boxes">
                   <input type="text" className="classic-erp-input font-bold" readOnly title="Total Debit of listed rows" value={money(periodDebit)} />
                   <input type="text" className="classic-erp-input font-bold" readOnly title="Total Credit of listed rows" value={money(periodCredit)} />
-                  <input type="text" className="classic-erp-input font-extrabold text-red-700" readOnly title="Closing balance of the account" value={`${money(closingBal)} ${closingType.toUpperCase()}`} />
+                  <input type="text" className="classic-erp-input font-extrabold text-red-700 ledger-close-box" readOnly title="Closing balance of the account" value={`${money(closingBal)} ${String(closingType || '').toUpperCase()}`} />
                 </div>
               </div>
             </div>
@@ -1457,10 +1551,14 @@ const ledgerStyles = `
   .ledger-grand-totals { display: flex; align-items: center; gap: 6px; font-size: 9.5px; font-weight: 700; }
   .ledger-grand-labels { display: flex; flex-direction: column; text-align: right; line-height: 1.1; font-weight: 800; color: #1e3a1e; font-size: 9px; }
   .ledger-grand-boxes { display: flex; gap: 4px; }
+  .ledger-stmt-table tbody tr.ledger-data-row { cursor: pointer; }
   .ledger-grand-boxes input {
     width: 85px !important; min-width: 85px !important; max-width: 85px !important; text-align: right;
     font-family: ui-monospace, Consolas, monospace; font-weight: 700; background: #fff !important;
     height: 20px !important; font-size: 10px !important; padding: 0 4px !important; display: inline-block !important;
+  }
+  .ledger-grand-boxes input.ledger-close-box {
+    width: 118px !important; min-width: 118px !important; max-width: 118px !important;
   }
   @media print {
     body * { visibility: hidden !important; }

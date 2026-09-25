@@ -17,12 +17,14 @@ import ErpKeyboardHintBar, { FORM_KEYBOARD_HINTS } from '../../components/erp/Er
 import useErpWindow from '../../hooks/useErpWindow';
 import { erpConfirm } from '../../utils/confirm';
 import { resolveParty, buildWhatsAppMessage, openWhatsAppShare, shareInvoiceWhatsApp } from '../../utils/invoiceHelpers';
-import { getFocusableElements } from '../../utils/formEnterNavigation';
+import { getFocusableElements, focusPrevField } from '../../utils/formEnterNavigation';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import useConfigStore from '../../store/useConfigStore';
 import { calcSalesBillTotals } from '../../utils/salesBillCalc';
 import { resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
 import PcsBreakdownModal from './PcsBreakdownModal';
+import { peekBillNo } from '../../utils/nextBillNo';
+import LrEntryModal from './LrEntryModal';
 
 const today = () => new Date().toISOString().split('T')[0];
 const DEFAULT_UNITS = ['PCS', 'KGS', 'NETQTY', 'QTY'];
@@ -87,6 +89,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const [bootLoading, setBootLoading] = useState(false);
   const [saveNextActions, setSaveNextActions] = useState(null);
   const [printInvoiceId, setPrintInvoiceId] = useState(null);
+  const [lrModalOpen, setLrModalOpen] = useState(false);
   const openedOnceRef = useRef(false);
   const modalContainerRef = useRef(null);
   const lastEnterRef = useRef({ time: 0, idx: -1 });
@@ -104,7 +107,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     gstin: '',
     city: '',
     haste: '',
-    billNo: 'AUTO',
+    billNo: '',
     billDate: today(),
     challanNo: '',
     chDate: today(),
@@ -133,6 +136,11 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const filteredBills = useMemo(() => {
     const q = findSearch.trim().toLowerCase();
     if (!q) return bookSales;
+    const exact = bookSales.filter((s) => {
+      const numOnly = String(s.invoiceNo || '').replace(/\D/g, '');
+      return numOnly === q || String(Number(numOnly)) === String(Number(q));
+    });
+    if (exact.length) return exact;
     return bookSales.filter(s => {
       const invNo = String(s.invoiceNo || '').toLowerCase();
       const numOnly = invNo.replace(/\D/g, '');
@@ -205,9 +213,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       const bill = filteredBills[findActiveIdx];
       if (bill) {
         loadInvoiceData(bill);
-        setMode('Edit');
+        setMode('View');
         setShowFindModal(false);
-        toast.success(`Bill #${bill.invoiceNo} loaded in Edit mode`);
+        toast.success(`Bill #${bill.invoiceNo}`);
         setTimeout(() => {
           if (modalContainerRef.current) {
             const focusables = getFocusableElements(modalContainerRef.current);
@@ -462,20 +470,25 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     }
 
     // Open the form immediately; only block if masters are missing from store.
+    const incomingId = String(initialData?._id || initialData?.id || '');
     if (!openedOnceRef.current) {
-      openedOnceRef.current = true;
+      openedOnceRef.current = incomingId || 'open';
       setSaveNextActions(null);
       setPrintInvoiceId(null);
-      if (initialData) {
+      if (initialData && Array.isArray(initialData.items)) {
         loadInvoiceData(initialData);
-        setSelectedInvoiceId(initialData._id || initialData.id || '');
+        setSelectedInvoiceId(incomingId);
         setMode(readOnly ? 'View' : 'Edit');
       } else if (readOnly) {
         setMode('View');
-      } else {
-        setSelectedInvoiceId('');
-        handleNew();
+      } else if (!readOnly) {
+        setMode('View');
       }
+    } else if (incomingId && openedOnceRef.current !== incomingId && Array.isArray(initialData?.items)) {
+      openedOnceRef.current = incomingId;
+      loadInvoiceData(initialData);
+      setSelectedInvoiceId(incomingId);
+      setMode(readOnly ? 'View' : 'Edit');
     }
 
     let cancelled = false;
@@ -547,7 +560,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       gstType: inv.gstType || 'CGST+SGST'
     });
 
-    setGridItems(inv.items.map((item, idx) => recalcLine({
+    setGridItems((Array.isArray(inv.items) ? inv.items : []).map((item, idx) => recalcLine({
       id: idx + 1,
       itemId: item.itemId?._id || item.itemId || '',
       itemName: item.itemName || item.itemId?.itemName || item.itemId?.name || '',
@@ -771,7 +784,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     setGridItems(updatedGrid);
   };
 
-  const handleNew = () => {
+  const handleNew = async () => {
+    const billNo = await peekBillNo('sales');
     setSelectedInvoiceId('');
     setHeader({
       party: '',
@@ -781,7 +795,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       gstin: '',
       city: '',
       haste: '',
-      billNo: 'AUTO',
+      billNo,
       billDate: today(),
       challanNo: '',
       chDate: today(),
@@ -817,7 +831,54 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       roundOff: 0
     });
     setMode('Add');
+    setTimeout(() => {
+      const bill = modalContainerRef.current?.querySelector('.erp-sales-bill-meta input');
+      bill?.focus();
+      try { bill?.select(); } catch { /* ignore */ }
+    }, 40);
   };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    if (initialData || readOnly || mode === 'Add' || mode === 'Edit' || selectedInvoiceId) return undefined;
+    if (!bookSales.length) return undefined;
+    const last = bookSales[bookSales.length - 1];
+    loadInvoiceData(last);
+    setMode('View');
+    return undefined;
+  }, [isOpen, bookSales, initialData, readOnly, mode, selectedInvoiceId]);
+
+  const handleNewRef = useRef(handleNew);
+  handleNewRef.current = handleNew;
+
+  useEffect(() => {
+    if (!isOpen || showFindModal) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'F3') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleOpenFindModal();
+        return;
+      }
+      const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus';
+      const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal';
+      if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && mode === 'View' && !readOnly) {
+        e.preventDefault();
+        e.stopPropagation();
+        navigateToAdjacentBill(prevKey ? -1 : 1);
+        return;
+      }
+      if (mode !== 'View' || readOnly) return;
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+        if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette]')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        handleNewRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [isOpen, showFindModal, mode, readOnly, bookSales, selectedInvoiceId]);
 
   const handleSave = async (e) => {
     if (e) e.preventDefault();
@@ -1167,12 +1228,13 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       style={win.modalStyle}
       className={win.modalClassName}
       inertBackdrop={win.inertBackdrop}
+      overlayZ={win.z}
     >
       <div
         className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-card)] erp-bill-window-shell relative"
         onPointerDown={win.onShellPointerDown}
       >
-      <div className="classic-erp-window erp-density erp-sales-bill-compact flex flex-col flex-1 min-h-0 overflow-hidden !max-h-none !h-auto">
+      <div className="classic-erp-window erp-density erp-sales-bill-compact flex flex-col flex-1 min-h-0 overflow-hidden !max-h-none !h-auto" data-enter-skip={mode === 'View' ? 'true' : undefined}>
         <ErpBusyOverlay show={bootLoading} message="Loading sales bill…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving invoice…" />
         {/* Title Bar */}
@@ -1204,7 +1266,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         </div>
 
         {/* Form Body — scrolls inside; action bar stays fixed below */}
-        <div ref={modalContainerRef} className="classic-erp-body flex-1 min-h-0 overflow-y-auto overflow-x-hidden erp-bill-layout">
+        <div ref={modalContainerRef} className="classic-erp-body flex-1 min-h-0 overflow-hidden erp-bill-layout">
           
           {mode === 'View' && (
             <div className="classic-erp-frame flex gap-2 items-center shrink-0">
@@ -1354,7 +1416,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           </div>
 
           {/* Item Grid Table */}
-          <div className="classic-erp-table-container erp-grid-panel erp-sales-grid min-h-0">
+          <div className="classic-erp-table-container erp-grid-panel erp-sales-grid">
             <table className="classic-erp-table">
               <thead>
                 <tr>
@@ -1565,12 +1627,45 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                     <td className="col-pct">
                       <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.gstPer || ''} onChange={e => {
                         patchLine(idx, { gstPer: Number(e.target.value) });
-                      }} disabled={locked} />
+                      }} onFocus={(e) => e.target.scrollIntoView({ inline: 'nearest', block: 'nearest' })} disabled={locked} />
                     </td>
                     <td className="col-amt">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono font-bold text-blue-800" value={row.gstAmt || ''} onChange={e => {
-                        patchLine(idx, { gstAmt: Number(e.target.value) });
-                      }} disabled={locked} />
+                      <input
+                        type="number"
+                        step="0.01"
+                        data-enter-action="true"
+                        className="classic-erp-input w-full text-right border-0 font-mono font-bold text-blue-800"
+                        value={row.gstAmt || ''}
+                        onChange={e => {
+                          patchLine(idx, { gstAmt: Number(e.target.value) });
+                        }}
+                        onFocus={(e) => e.target.scrollIntoView({ inline: 'nearest', block: 'nearest' })}
+                        disabled={locked}
+                        title="Enter adds the next item line"
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey || locked) return;
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (e.shiftKey) {
+                            focusPrevField(e.currentTarget);
+                            return;
+                          }
+                          const focusRowItem = (rowIndex) => {
+                            const grid = modalContainerRef.current?.querySelector('.erp-sales-grid');
+                            const trs = grid?.querySelectorAll('tbody tr');
+                            const input = trs?.[rowIndex]?.querySelector('[data-erp-combobox-input], input');
+                            if (grid) grid.scrollLeft = 0;
+                            input?.focus();
+                            try { input?.select?.(); } catch { /* ignore */ }
+                          };
+                          if (idx !== gridItems.length - 1) {
+                            focusRowItem(idx + 1);
+                            return;
+                          }
+                          setGridItems((rows) => [...rows, blankLine()]);
+                          setTimeout(() => focusRowItem(idx + 1), 40);
+                        }}
+                      />
                     </td>
                     <td className="col-del text-center">
                       <button type="button" onClick={() => {
@@ -1586,15 +1681,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             </table>
           </div>
 
-          <div className="flex justify-between items-center bg-[var(--bg-subtle)] p-1.5 border border-[var(--border)] rounded-md">
-            <button
-              type="button"
-              onClick={() => setGridItems([...gridItems, blankLine()])}
-              className="classic-erp-btn"
-              disabled={locked}
-            >
-              <Plus size={12} strokeWidth={3} /> Add Line Item
-            </button>
+          <div className="erp-sales-totalbar">
+            <span className="text-[10px] font-semibold opacity-80">Enter on GST Amt adds next line</span>
             <div className="text-xs font-bold text-black font-mono flex gap-3 flex-wrap items-center">
               {currentItemInfo?.hsn && (
                 <span className="text-slate-600">HSN: <span className="text-blue-800">{currentItemInfo.hsn || currentItemInfo.hsnCode}</span></span>
@@ -1873,6 +1961,14 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           <button className="classic-erp-btn" type="button" onClick={() => setMode('Edit')} disabled={readOnly || mode !== 'View' || !selectedInvoiceId || saving} title="Edit Bill (F2 / Alt+E)">Edit</button>
           <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || saving || !selectedInvoiceId}>Delete</button>
           <button className="classic-erp-btn btn-blue" type="button" onClick={handlePrint} disabled={!selectedInvoiceId && !initialData}>PDF / Print</button>
+          <button
+            className="classic-erp-btn font-bold bg-[#1a3353] text-white border-[#1a3353] hover:bg-[#243f5c]"
+            type="button"
+            onClick={() => setLrModalOpen(true)}
+            title="Open LR Entry for all pending bills"
+          >
+            LR Entry
+          </button>
           <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
         </div>
       </div>
@@ -1955,9 +2051,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                     key={b._id || b.id || idx}
                     onClick={() => {
                       loadInvoiceData(b);
-                      setMode('Edit');
+                      setMode('View');
                       setShowFindModal(false);
-                      toast.success(`Bill #${b.invoiceNo} loaded in Edit mode`);
+                      toast.success(`Bill #${b.invoiceNo}`);
                     }}
                     className={`px-3 py-2 rounded flex items-center justify-between cursor-pointer text-xs transition-all ${
                       isSelected
@@ -2059,6 +2155,11 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       onSave={handlePcsBreakdownSave}
       locked={locked}
       initialCalcType={pcsBreakdown.calcType}
+    />
+    <LrEntryModal
+      isOpen={lrModalOpen}
+      onClose={() => setLrModalOpen(false)}
+      onSaved={() => setLrModalOpen(false)}
     />
     </>
   );

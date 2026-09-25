@@ -360,7 +360,7 @@ exports.saveCompanySettings = async (companyId, body, actorId, req) => {
     bankName, accountName, accountNo, ifsc, bankBranch, upiId, invoiceTerms,
     invoiceTemplateId, autoFestiveTheme, showFestivalGreeting,
     customField1Label, customField2Label, customField3Label,
-    uiThemeId,
+    uiThemeId, caDesk,
   } = body || {};
 
   const patch = {
@@ -374,6 +374,7 @@ exports.saveCompanySettings = async (companyId, body, actorId, req) => {
     invoiceTemplateId, autoFestiveTheme, showFestivalGreeting,
     customField1Label, customField2Label, customField3Label,
     uiThemeId,
+    caDesk: caDesk && typeof caDesk === 'object' ? caDesk : undefined,
   };
   Object.keys(patch).forEach((k) => {
     if (patch[k] === undefined) delete patch[k];

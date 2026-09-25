@@ -10,6 +10,7 @@ import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import useConfigStore from '../../store/useConfigStore';
 import { money } from '../../utils/salesBillCalc';
 import { Trash2, Plus } from 'lucide-react';
+import { peekBillNo } from '../../utils/nextBillNo';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -82,7 +83,7 @@ const ReturnModal = ({
     gstin: '',
     city: '',
     haste: '',
-    billNo: 'AUTO',
+    billNo: '',
     billDate: today(),
     entryDate: today(),
     refBillNo: '',
@@ -237,6 +238,33 @@ const ReturnModal = ({
         e.stopPropagation();
         handleOpenFindModal();
         return;
+      }
+
+      const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus';
+      const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal';
+      if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && mode === 'View' && !readOnly && !showFindModal) {
+        e.preventDefault();
+        e.stopPropagation();
+        const list = sortedReturns || [];
+        if (!list.length) return;
+        const currentIdx = list.findIndex((r) => (r._id || r.id) === selectedReturnId);
+        let nextIdx = currentIdx + (prevKey ? -1 : 1);
+        if (currentIdx === -1) nextIdx = prevKey ? list.length - 1 : 0;
+        if (nextIdx >= 0 && nextIdx < list.length) {
+          loadReturnData(list[nextIdx], 'View');
+          toast.info(`Return #${list[nextIdx].invoiceNo || list[nextIdx].returnNo} (${nextIdx + 1}/${list.length})`);
+        }
+        return;
+      }
+
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !showFindModal) {
+        if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette], [data-find-modal]')) return;
+        if (mode === 'View' && !readOnly) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleNew(returnType);
+          return;
+        }
       }
 
       if (e.altKey && e.key.toLowerCase() === 'n') {
@@ -584,7 +612,8 @@ const ReturnModal = ({
     };
   }, [gridItems, footer, header.type, header.gstType]);
 
-  const handleNew = (tType = returnType) => {
+  const handleNew = async (tType = returnType) => {
+    const billNo = await peekBillNo(tType === 'Sales' ? 'salesReturn' : 'purchaseReturn');
     setSelectedReturnId('');
     setSelectedOriginalBillId('');
     setOriginalBills([]);
@@ -596,7 +625,7 @@ const ReturnModal = ({
       gstin: '',
       city: '',
       haste: '',
-      billNo: 'AUTO',
+      billNo,
       billDate: today(),
       entryDate: today(),
       refBillNo: '',

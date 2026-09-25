@@ -44,13 +44,22 @@ const Toggle = ({ checked, onChange }) => (
   </button>
 );
 
-const FieldRow = ({ label, sub, checked, onChange }) => (
-  <div className="admin-config-field-row">
-    <div>
+const FieldRow = ({ label, sub, checked, onChange, locked = false }) => (
+  <div className="admin-config-field-row" style={{ justifyContent: 'flex-start', gap: 10 }}>
+    <Toggle checked={locked ? true : checked} onChange={locked ? () => {} : onChange} />
+    <span style={{
+      fontSize: 10,
+      fontWeight: 800,
+      letterSpacing: '0.04em',
+      color: locked ? '#b45309' : checked ? '#047857' : '#b91c1c',
+      minWidth: 58,
+    }}>
+      {locked ? 'ZAROORI' : checked ? 'ON' : 'OFF'}
+    </span>
+    <div style={{ minWidth: 0 }}>
       <p className="admin-config-field-label">{label}</p>
       {sub && <p className="admin-config-field-sub">{sub}</p>}
     </div>
-    <Toggle checked={checked} onChange={onChange} />
   </div>
 );
 
@@ -221,7 +230,8 @@ const DynamicConfig = () => {
     const key = section === 'header' ? 'headerFields' : section === 'footer' ? 'footerFields' : 'lineColumns';
     setBillConfig((prev) => {
       const arr = [...(prev[key] || [])];
-      arr[index] = { ...arr[index], visible: !arr[index].visible };
+      if (arr[index]?.required) return prev;
+      arr[index] = { ...arr[index], visible: arr[index].visible === false };
       return { ...prev, [key]: arr };
     });
   };
@@ -289,8 +299,9 @@ const DynamicConfig = () => {
                   <FieldRow
                     key={f.key}
                     label={f.label || f.key}
-                    sub={f.key}
+                    sub={f.required ? `${f.key} · bill pe hamesha rahega` : f.key}
                     checked={f.visible !== false}
+                    locked={!!f.required}
                     onChange={() => toggleBillField(sec.id, i)}
                   />
                 ))}

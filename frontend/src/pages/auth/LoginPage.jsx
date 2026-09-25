@@ -16,7 +16,7 @@ const DEMO_USERS = [
         password: 'Admin@123',
     },
     {
-        label: 'Owner (Acme Textile)',
+        label: 'Owner (Surat Demo)',
         email: 'user@textileerp.com',
         password: 'User@123',
     },

@@ -163,18 +163,8 @@ export function buildInvoiceViewModel({
   const igst = Number(invoice.igst ?? (isIgst ? gst : 0));
   const cess = Number(invoice.cess || 0);
   // Separate discount and less so templates can render them as distinct labelled rows
-  const discountAmt = Number(invoice.discountAmt || 0);
   const footerLess = Number(invoice.lessAmt || 0);
   const footerAdd = Number(invoice.addAmt || 0);
-  const discountTotal = discountAmt + footerLess;
-  // Compute gross base (before deductions) so we can derive percentages for display
-  const grossBase = taxable + discountTotal + Number(invoice.foldLess || 0);
-  const discountPer = grossBase > 0 && discountAmt > 0
-    ? Math.round((discountAmt / grossBase) * 10000) / 100
-    : Number(invoice.discountPer || 0);
-  const lessPer = grossBase > 0 && footerLess > 0
-    ? Math.round((footerLess / (grossBase - discountAmt)) * 10000) / 100
-    : Number(invoice.lessPer || 0);
 
   // Prefer line gstPer; else bill gstRate; else derive from taxable
   let gstRate = Number(invoice.gstRate || 0);
@@ -191,10 +181,12 @@ export function buildInvoiceViewModel({
     const dis1Amt = Number(line.dis1Amt || 0);
     const dis2Amt = Number(line.dis2Amt || 0);
     const addAmt = Number(line.addAmt || 0);
+    const foldLessAmt = Number(line.foldLessAmt || 0);
+    const foldAddAmt = Number(line.foldAddAmt || 0);
     const legacyDisc = Number(line.discount || 0);
     const lineDiscount = dis1Amt + dis2Amt || legacyDisc;
-    // Match salesBillCalc.lineTaxable
-    const taxableLine = amount - dis1Amt - dis2Amt + addAmt - (dis1Amt || dis2Amt ? 0 : legacyDisc);
+    // Stored line figures only — do not recompute GST / net
+    const taxableLine = amount - foldLessAmt + foldAddAmt - dis1Amt - dis2Amt + addAmt - (dis1Amt || dis2Amt ? 0 : legacyDisc);
     const lineGstPer = Number(line.gstPer || gstRate || 0);
     const lineGst = Number(line.gstAmt) || (lineGstPer ? (taxableLine * lineGstPer) / 100 : 0);
     const lineHalf = isIgst ? 0 : lineGstPer / 2;
@@ -207,6 +199,8 @@ export function buildInvoiceViewModel({
       pcs,
       mts,
       fold: line.fold ?? '',
+      foldLessAmt,
+      foldAddAmt,
       cut: line.cut ?? '',
       lot: resolveLot(line, items),
       batch: line.batch || line.batchNo || '',
@@ -246,6 +240,10 @@ export function buildInvoiceViewModel({
   const totalPcs = lines.reduce((s, l) => s + (Number(l.pcs) || 0), 0);
   const totalMts = lines.reduce((s, l) => s + (Number(l.mts) || 0), 0);
   const totalLineAmount = lines.reduce((s, l) => s + (Number(l.taxable) || Number(l.amount) || 0), 0);
+  const lineFoldLess = lines.reduce((s, l) => s + (Number(l.foldLessAmt) || 0), 0);
+  const lineDiscountTotal = lines.reduce((s, l) => s + (Number(l.discount) || 0), 0);
+  const foldLess = Number(invoice.foldLess || 0) || lineFoldLess;
+  const discountAmtResolved = Number(invoice.discountAmt || 0) || lineDiscountTotal;
 
   // Tax summary rows grouped by gst %
   const taxGroups = {};
@@ -426,12 +424,14 @@ export function buildInvoiceViewModel({
     isIgst,
     gstRate,
     totals: {
-      grossAmount: taxable + discountTotal + Number(invoice.foldLess || 0),
-      subtotal: taxable + discountTotal,
-      discount: discountTotal,
-      discountAmt,
-      discountPer: Number(invoice.discountPer || 0),
-      foldLess: Number(invoice.foldLess || 0),
+      grossAmount: taxable + (discountAmtResolved + footerLess) + foldLess,
+      subtotal: taxable + (discountAmtResolved + footerLess),
+      discount: discountAmtResolved + footerLess,
+      discountAmt: discountAmtResolved,
+      discountPer: Number(invoice.discountPer || 0) || (taxable + foldLess > 0 && discountAmtResolved > 0
+        ? Math.round((discountAmtResolved / (taxable + foldLess + discountAmtResolved)) * 10000) / 100
+        : 0),
+      foldLess,
       lessAmt: footerLess,
       lessPer: Number(invoice.lessPer || 0),
       addAmt: footerAdd,

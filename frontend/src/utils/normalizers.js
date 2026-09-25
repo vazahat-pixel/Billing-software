@@ -98,16 +98,35 @@ export const normalizePurchase = (purchase) => {
 
 export const normalizeUser = (user) => {
   if (!user) return user;
+  // Session refresh used to pass the raw { user: profile } body through.
+  // That dropped name, role, and company onto a nested key and the header
+  // fell back to "Company" / "User" / "access".
+  const src =
+    user.user &&
+    typeof user.user === 'object' &&
+    !user.email &&
+    !user.name &&
+    !user.companyId &&
+    (user.user.email || user.user.name || user.user.companyId || user.user.id)
+      ? user.user
+      : user;
   const platformRole =
-    user.role === 'super_admin' || user.role === 'user'
-      ? user.role
+    src.role === 'super_admin' || src.role === 'user'
+      ? src.role
       : 'user';
+  const settings = src.settings || src.companySettings || null;
   return {
-    ...user,
-    id: user._id || user.id,
+    ...src,
+    id: src._id || src.id,
     role: platformRole,
-    companyRole: user.companyRole || 'owner',
-    companyName: user.companyName || user.company?.name || user.settings?.legalName || ''
+    companyRole: src.companyRole || 'owner',
+    companyId: src.companyId || src.company?._id || src.company?.id || null,
+    companyName:
+      src.companyName ||
+      src.company?.name ||
+      settings?.legalName ||
+      settings?.shortName ||
+      ''
   };
 };
 

@@ -192,6 +192,7 @@ export default function SuratBold({ data }) {
               <th style={{ width: '8%' }}>Mtrs</th>
               <th style={{ width: '7%' }}>Net Mtrs</th>
               <th style={{ width: '8%' }}>Rate</th>
+              <th style={{ width: '6%' }}>Disc</th>
               <th style={{ width: '10%' }}>Amount (Rs.)</th>
             </tr>
           </thead>
@@ -246,6 +247,7 @@ export default function SuratBold({ data }) {
                 <td className="sb-num">{displayMts ? displayMts.toFixed(2) : '0.00'}</td>
                 <td className="sb-num">{displayNetMts ? displayNetMts.toFixed(2) : '0.00'}</td>
                 <td className="sb-num">{money(line.rate)}</td>
+                <td className="sb-num">{money(line.discount || 0)}</td>
                 <td className="sb-num" style={{ fontWeight: 700 }}>{money(line.amount)}</td>
               </tr>
                 );
@@ -253,7 +255,7 @@ export default function SuratBold({ data }) {
             {/* Empty rows */}
             {Array.from({ length: Math.max(0, 6 - (lines || []).length) }).map((_, i) => (
               <tr key={`e-${i}`}>
-                {Array.from({ length: 10 }).map((__, j) => (
+                {Array.from({ length: 11 }).map((__, j) => (
                   <td key={j} style={{ height: '7mm' }}>&nbsp;</td>
                 ))}
               </tr>
@@ -356,7 +358,8 @@ export default function SuratBold({ data }) {
           <div style={{ marginTop: '2mm', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1mm', fontSize: '7.5pt' }}>
             {[
               ['Gross Amount', totals.grossAmount, false],
-              totals.foldLess ? ['Fold Less', -totals.foldLess, false] : null,
+              ['Fold Less', -(Number(totals.foldLess) || 0), false],
+              ['Discount', -(Number(totals.discountAmt || totals.discount) || 0), false],
               ['Taxable Amount', totals.taxable, false],
               ['GST Amount', totals.gst, false],
               totals.roundOff ? ['Round Off', totals.roundOff, false] : null,

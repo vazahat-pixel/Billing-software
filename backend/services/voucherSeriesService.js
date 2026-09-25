@@ -33,30 +33,111 @@ async function getActiveFyCode(companyId) {
  * Allocate next document number from VoucherSeries + Counter.
  * Falls back to prefix defaults if no series configured.
  */
-async function allocateNext(companyId, module, { session = null, seriesId = null } = {}) {
-  let series = null;
-  if (seriesId) {
-    series = await VoucherSeries.findOne({ _id: seriesId, companyId, status: 'Active' }).session(session);
+const BILL_NUMBER_MODULES = [
+  { module: 'sales', label: 'Sales Invoice' },
+  { module: 'purchase', label: 'Purchase Bill' },
+  { module: 'salesReturn', label: 'Sales Return' },
+  { module: 'purchaseReturn', label: 'Purchase Return' },
+  { module: 'receipt', label: 'Bank Receipt' },
+  { module: 'payment', label: 'Bank Payment' },
+  { module: 'job', label: 'Job / Mill Challan' },
+  { module: 'note', label: 'Debit / Credit Note' },
+];
+
+function assertBillModule(module) {
+  if (!BILL_NUMBER_MODULES.some((m) => m.module === module)) {
+    const err = new Error('Unknown bill number series');
+    err.statusCode = 400;
+    throw err;
   }
-  if (!series) {
-    series = await VoucherSeries.findOne({
-      companyId,
-      module,
-      isDefault: true,
-      status: 'Active',
-    }).session(session);
+}
+
+function plainCounterId(companyId, module) {
+  return `BILLNO-${module}-${companyId}`;
+}
+
+async function peekNext(companyId, module) {
+  assertBillModule(module);
+  const row = await Counter.findById(plainCounterId(companyId, module)).lean();
+  return (Number(row?.seq) || 0) + 1;
+}
+
+async function setNext(companyId, module, next) {
+  assertBillModule(module);
+  const n = Math.max(1, parseInt(next, 10) || 1);
+  await Counter.findOneAndUpdate(
+    { _id: plainCounterId(companyId, module) },
+    { $set: { seq: n - 1 } },
+    { upsert: true }
+  );
+  return n;
+}
+
+async function listBillNumbers(companyId) {
+  const rows = [];
+  for (const m of BILL_NUMBER_MODULES) {
+    const row = await Counter.findById(plainCounterId(companyId, m.module)).lean();
+    rows.push({ module: m.module, label: m.label, next: (Number(row?.seq) || 0) + 1 });
   }
-  if (!series) {
-    series = await VoucherSeries.findOne({ companyId, module, status: 'Active' }).session(session);
+  return rows;
+}
+
+async function resetAll(companyId, next = 1) {
+  for (const m of BILL_NUMBER_MODULES) {
+    await setNext(companyId, m.module, next);
+  }
+  return listBillNumbers(companyId);
+}
+
+/**
+ * Use the typed number, or take the next 1, 2, 3… when the field is blank / AUTO.
+ * A typed integer moves the series forward so the following bill does not repeat it.
+ */
+async function reserveNumber(companyId, module, requested, session = null) {
+  assertBillModule(module);
+  const raw = String(requested ?? '').trim();
+  if (!raw || raw.toUpperCase() === 'AUTO') {
+    const allocated = await allocateNext(companyId, module, { session });
+    return allocated.number;
+  }
+  const n = Number(raw);
+  if (Number.isInteger(n) && n > 0 && String(n) === raw) {
+    const opts = { upsert: true };
+    if (session) opts.session = session;
+    await Counter.findOneAndUpdate(
+      { _id: plainCounterId(companyId, module) },
+      { $max: { seq: n } },
+      opts
+    );
+    return String(n);
+  }
+  return raw;
+}
+
+async function allocateNext(companyId, module, { session = null } = {}) {
+  if (BILL_NUMBER_MODULES.some((m) => m.module === module)) {
+    const seq = await Counter.nextSeq(plainCounterId(companyId, module), session);
+    return {
+      number: String(seq),
+      prefix: '',
+      seq,
+      seriesId: null,
+      financialYearCode: '',
+    };
   }
 
+  const series = await VoucherSeries.findOne({
+    companyId,
+    module,
+    isDefault: true,
+    status: 'Active',
+  }).session(session);
   const fyCode = series?.financialYearCode || (await getActiveFyCode(companyId));
-  const prefix = (series?.prefix || module.slice(0, 3).toUpperCase()).toUpperCase();
+  const prefix = (series?.prefix || String(module).slice(0, 3).toUpperCase()).toUpperCase();
   const pad = series?.padLength || 4;
   const counterId = `${prefix}-${fyCode}-${companyId}`;
   const seq = await Counter.nextSeq(counterId, session);
   const number = `${prefix}-${fyCode}-${String(seq).padStart(pad, '0')}`;
-
   return {
     number,
     prefix,
@@ -83,4 +164,10 @@ module.exports = {
   listSeries,
   getActiveFyCode,
   DEFAULT_SERIES,
+  BILL_NUMBER_MODULES,
+  peekNext,
+  setNext,
+  listBillNumbers,
+  resetAll,
+  reserveNumber,
 };

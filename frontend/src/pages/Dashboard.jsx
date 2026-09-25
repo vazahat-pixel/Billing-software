@@ -6,7 +6,7 @@ import {
    faHandHoldingDollar, faTruckArrowRight, faWarehouse,
    faScrewdriverWrench, faClipboardCheck, faChartPie,
    faChevronDown, faSync, faSearch, faBell,
-   faTriangleExclamation, faHandshake, faUserTie,
+   faTriangleExclamation, faUserTie,
    faRightFromBracket, faBook, faCircleQuestion, faGear,
    faRightLeft
 } from '@fortawesome/free-solid-svg-icons';
@@ -22,9 +22,14 @@ import PwaInstallPrompt from '../components/PwaInstallPrompt';
 import Modal from '../components/ui/Modal';
 import useUiStore from '../store/useUiStore';
 import { stage8Api } from '../api/stage8.api';
+import { authApi } from '../api/auth.api';
+import { salesApi } from '../api/sales.api';
+import { purchasesApi } from '../api/purchase.api';
+import { notesApi } from '../api/masters.api';
+import { focusErpWindow, minimizeErpWindow } from '../hooks/useErpWindow';
 import { showDevTools, DEV_ONLY_MENU_LABELS } from '../utils/showDevTools';
 import BookSelectionModal from '../components/BookSelectionModal';
-import ErpKeyboardHintBar from '../components/erp/ErpKeyboardHintBar';
+import ErpKeyboardHintBar, { APP_KEYBOARD_HINTS } from '../components/erp/ErpKeyboardHintBar';
 import { getDefaultBooksForModule } from '../utils/defaultBooks';
 import CompanySettingsModal from './settings/CompanySettingsModal';
 import ReportsHub from './reports/ReportsHub';
@@ -158,11 +163,85 @@ const MODULE_SUBMENU_MAP = {
   bookMaster: 'Book Master'
 };
 
+const idOf = (value) => {
+   if (value == null || value === '') return '';
+   if (typeof value === 'object') return String(value._id || value.id || '');
+   return String(value);
+};
+
+const ledgerRefId = (row) => idOf(row?.refId);
+
+async function resolveSaleDoc(sales, refId, docNo) {
+   const found = (sales || []).find((s) =>
+      (refId && idOf(s._id || s.id) === refId) ||
+      (docNo && (s.invoiceNo === docNo || s.billNo === docNo))
+   );
+   if (Array.isArray(found?.items) && found.items.length) return found;
+   const id = idOf(found?._id || found?.id) || refId;
+   if (!id) return null;
+   try {
+      const full = await salesApi.get(id);
+      return Array.isArray(full?.items) ? full : null;
+   } catch {
+      return Array.isArray(found?.items) ? found : null;
+   }
+}
+
+async function resolvePurchaseDoc(purchases, refId, docNo) {
+   const found = (purchases || []).find((p) =>
+      (refId && idOf(p._id || p.id) === refId) ||
+      (docNo && (p.invoiceNo === docNo || p.billNo === docNo || p.supplierInvoiceNo === docNo))
+   );
+   if (Array.isArray(found?.items) && found.items.length) return found;
+   const id = idOf(found?._id || found?.id) || refId;
+   if (!id) return null;
+   try {
+      const full = await purchasesApi.get(id);
+      return Array.isArray(full?.items) ? full : null;
+   } catch {
+      return Array.isArray(found?.items) ? found : null;
+   }
+}
+
+function pickNote(list, refId, docNo, hint) {
+   const rows = (list || []).filter((n) => {
+      if (String(n.status || '').toLowerCase() === 'reversed') return false;
+      if (refId && idOf(n.sourceVoucherId) === refId) return true;
+      if (refId && idOf(n._id || n.id) === refId) return true;
+      if (docNo && (n.noteNo === docNo || n.voucherNo === docNo)) return true;
+      return false;
+   });
+   if (!rows.length) return null;
+   const text = String(hint || '');
+   return rows.find((n) => text && (text.includes(n.billNo || '') || text.includes(n.noteNo || ''))) || rows[0];
+}
+
+async function resolveNoteDoc(notes, refId, docNo, hint) {
+   const local = pickNote(notes, refId, docNo, hint);
+   if (local) return local;
+   try {
+      const list = await notesApi.list();
+      return pickNote(list, refId, docNo, hint);
+   } catch {
+      return null;
+   }
+}
+
 const Dashboard = () => {
    const navigate = useNavigate();
    const { user, logout, bootstrapMasters, refreshAllData, sales, purchases, inventoryLots, jobWorkEntries, parties, items, plan, fetchDashboardSummary, dashboardSummary, dashboardLoading, vouchers, notes, books: storeBooks, ledgers, fetchBooks } = useStore();
    const companySettings = useConfigStore((s) => s.companySettings);
    const companyMeta = useConfigStore((s) => s.company);
+   const [mobileNarrow, setMobileNarrow] = useState(() =>
+      typeof window !== 'undefined' && window.matchMedia('(max-width: 820px)').matches
+   );
+   useEffect(() => {
+      const mq = window.matchMedia('(max-width: 820px)');
+      const onChange = () => setMobileNarrow(mq.matches);
+      mq.addEventListener('change', onChange);
+      return () => mq.removeEventListener('change', onChange);
+   }, []);
+   const mobileViewOnly = mobileNarrow && plan?.mobileView === true;
 
    const setupGaps = useMemo(() => {
       const st = companySettings || {};
@@ -189,6 +268,9 @@ const Dashboard = () => {
    const showRecordsHub = isFlagEnabled(bundle, 'records_hub', true);
    const showCADesk = isFlagEnabled(bundle, 'ca_desk', true);
    const permissions = useMemo(() => getPermissions(user?.companyRole, user?.role), [user?.companyRole, user?.role]);
+   const isCaUser = user?.companyRole === 'ca';
+   const [caPwd, setCaPwd] = useState({ current: '', next: '' });
+   const [caPwdSaving, setCaPwdSaving] = useState(false);
 
    const handleLogout = async () => {
       await logout();
@@ -290,6 +372,7 @@ const Dashboard = () => {
    const [salesInitialData, setSalesInitialData] = useState(null);
    const [voucherInitialId, setVoucherInitialId] = useState(null);
    const [noteInitialId, setNoteInitialId] = useState(null);
+   const [outstandingSeed, setOutstandingSeed] = useState(null);
    const [productionEngineTab, setProductionEngineTab] = useState('Board');
    const [modals, setModals] = useState({
       sales: false,
@@ -644,6 +727,43 @@ const Dashboard = () => {
       openReportsHub('summary', leafId);
    };
 
+   const shellOpen = Object.values(modals).some((v) => v === true) || bookSelection.isOpen || syncModalOpen;
+   useEffect(() => {
+      if (isCaUser) toggleModal('caDashboard', true);
+   }, [isCaUser]);
+   useEffect(() => {
+      const onKey = (e) => {
+         if (e.repeat || e.isComposing || user?.companyRole === 'ca') return;
+         const el = e.target;
+         const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+         if (typing || shellOpen) return;
+         const key = String(e.key || '').toLowerCase();
+         const ctrl = e.ctrlKey || e.metaKey;
+         if (ctrl && !e.altKey && !e.shiftKey && key === 's') {
+            e.preventDefault();
+            toggleModal('sales', true);
+            return;
+         }
+         if (!e.altKey || ctrl || e.shiftKey) return;
+         const open = {
+            s: () => toggleModal('sales', true),
+            p: () => toggleModal('purchase', true),
+            r: () => openReportsHub('summary'),
+            l: () => toggleModal('ledger', true),
+            b: () => toggleModal('receipt', true),
+            y: () => toggleModal('payment', true),
+            m: () => toggleModal('millIssue', true),
+            g: () => toggleModal('gstr1', true),
+            o: () => toggleModal('outstanding', true),
+         }[key];
+         if (!open) return;
+         e.preventDefault();
+         open();
+      };
+      window.addEventListener('keydown', onKey, true);
+      return () => window.removeEventListener('keydown', onKey, true);
+   }, [shellOpen, user?.companyRole]);
+
    const openGstinReports = (section = 'sales') => {
       setModals(prev => ({
          ...prev,
@@ -855,6 +975,7 @@ const Dashboard = () => {
       'Setup System': [
          { label: 'Setting', action: () => openSettings('appearance') },
          { label: 'Company Info', action: () => openSettings('company') },
+         { label: 'CA Access', action: () => openSettings('caAccess') },
          { label: 'Extra Event', action: () => openSettings('notificationRules') },
          { label: 'Extra Event DetailData', action: () => openSettings('notificationRules') },
          { label: 'User Setup', action: () => openSettings('users') },
@@ -876,6 +997,7 @@ const Dashboard = () => {
    const visibleMenuData = useMemo(() => {
       const filtered = {};
       Object.entries(menuData).forEach(([section, items]) => {
+         if (section === 'Advanced') return;
          if (permissions.canAccessSection(section)) {
             let allowedItems = items.filter(isMenuItemAllowed);
             if (section === 'Admin') {
@@ -895,30 +1017,27 @@ const Dashboard = () => {
    const ALL_CORE_MODULES = [
       { id: 1, label: 'Sales Billing', icon: faFileInvoiceDollar, key: 'sales' },
       { id: 2, label: 'Purchase', icon: faCartFlatbed, key: 'purchase' },
-      { id: 17, label: 'Sales Return', icon: faRightLeft, key: 'salesReturn' },
-      { id: 18, label: 'Purchase Return', icon: faRightLeft, key: 'purchaseReturn' },
+      // Sales Return & Purchase Return hidden from rail — use Transaction menu instead
       { id: 3, label: 'Bank Receipt', icon: faMoneyCheckDollar, key: 'receipt' },
       { id: 4, label: 'Bank Payment', icon: faHandHoldingDollar, key: 'payment' },
       { id: 5, label: 'Mill Issue', icon: faTruckArrowRight, key: 'millIssue' },
       { id: 6, label: 'Mill Receive', icon: faWarehouse, key: 'millRec' },
       { id: 7, label: 'Job Issue', icon: faScrewdriverWrench, key: 'jobIssue' },
       { id: 8, label: 'Job Receive', icon: faClipboardCheck, key: 'jobRec' },
-      { id: 15, label: 'Update Job', icon: faScrewdriverWrench, key: 'updateJob' },
       { id: 9, label: 'CA Desk', icon: faUserTie, key: 'caDashboard', flag: 'ca_desk' },
       { id: 10, label: 'GSTR-1', icon: faChartPie, key: 'gstr1' },
       { id: 16, label: 'GST Reports', icon: faChartPie, key: 'gstReports' },
       { id: 11, label: 'GSTR-2', icon: faChartPie, key: 'gst2bMatching' },
-      { id: 12, label: 'ETB', icon: faFileInvoiceDollar, key: 'gstCompliance' },
-      { id: 13, label: 'Visit Log', icon: faHandshake, key: 'visit' },
       { id: 14, label: 'Outstanding', icon: faChartPie, key: 'outstanding' },
    ];
 
    const coreModules = useMemo(() => {
+      if (isCaUser) return ALL_CORE_MODULES.filter((mod) => mod.key === 'caDashboard');
       const filtered = ALL_CORE_MODULES.filter(
          mod => isModuleAllowed(mod.key) && (!mod.flag || isFlagEnabled(bundle, mod.flag, true))
       );
       return filtered.length > 0 ? filtered : ALL_CORE_MODULES;
-   }, [moduleConfig, bundle, user?.role]);
+   }, [moduleConfig, bundle, user?.role, isCaUser]);
 
    const openModalDirect = (key) => {
       yieldOtherWindows(key);
@@ -952,7 +1071,7 @@ const Dashboard = () => {
                </button>
             ))}
             <div className="mt-auto pt-2 border-t border-[var(--border)] mx-1.5">
-               <button
+               {!isCaUser && <button
                   type="button"
                   onClick={() => { setActiveMenuKey('ledger'); toggleModal('ledger', true); }}
                   className={`w-full flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer ${
@@ -963,18 +1082,26 @@ const Dashboard = () => {
                >
                   <FontAwesomeIcon icon={faBook} className="text-[11px] w-3.5 shrink-0" />
                   <span className="text-[11px] font-medium truncate leading-tight">Ledger</span>
-               </button>
-               <button
+               </button>}
+               {isCaUser && <button
+                  type="button"
+                  onClick={() => setCaPwd((p) => ({ ...p, open: !p.open }))}
+                  className="w-full flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
+               >
+                  <FontAwesomeIcon icon={faGear} className="text-[11px] w-3.5 shrink-0" />
+                  <span className="text-[11px] font-medium truncate leading-tight">Settings</span>
+               </button>}
+               {!isCaUser && <button
                   type="button"
                   onClick={() => openSettings('appearance')}
                   className="w-full flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
                >
                   <FontAwesomeIcon icon={faGear} className="text-[11px] w-3.5 shrink-0" />
                   <span className="text-[11px] font-medium truncate leading-tight">Settings</span>
-               </button>
+               </button>}
                <button
                   type="button"
-                  onClick={() => toast.info('Bottom Keys bar: Ctrl+K Search · F3 Find · Ctrl+Enter Save · Esc Close. Bill forms also show shortcuts near New/Save.')}
+                  onClick={() => toast.info('Ctrl+S Sales · Alt+P Purchase · Alt+R Reports · Alt+L Ledger · Alt+B Receipt · Alt+Y Payment · Alt+M Mill · Alt+G GSTR-1 · Alt+O Outstanding. Bill open hone par yeh keys nahi chalti. Save ab bhi Ctrl+Enter hai.')}
                   className="w-full flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer text-[var(--text-secondary)] hover:bg-[var(--accent-light)] hover:text-[var(--accent)]"
                >
                   <FontAwesomeIcon icon={faCircleQuestion} className="text-[11px] w-3.5 shrink-0" />
@@ -985,51 +1112,53 @@ const Dashboard = () => {
 
          {/* Main area */}
          <main className="flex-1 min-w-0 flex flex-col bg-[var(--bg-base)] relative min-h-0">
-            <header className="shrink-0 relative z-50 bg-[var(--bg-card)] border-b border-[var(--border)]">
-               <div className="flex items-center justify-between gap-3 px-4 h-11">
-                  <div className="flex items-center gap-3 min-w-0">
-                     <div className="w-7 h-7 rounded-md bg-[var(--accent)] text-white flex items-center justify-center font-semibold text-[11px] shrink-0">
-                        {(user?.companyName || user?.company?.name || 'E').charAt(0)}
+            <header className="shrink-0 relative z-[4000] bg-[var(--bg-card)] border-b border-[var(--border)]">
+               {mobileViewOnly && (
+                  <div className="px-3 py-1 text-[11px] font-semibold text-amber-900 bg-amber-100 border-b border-amber-200">
+                     Mobile view — is plan par sirf dekh sakte ho. Bill edit, save aur master change phone par band hai.
+                  </div>
+               )}
+               <div className="flex items-center justify-between gap-2 px-3 h-8">
+                  <div className="flex items-center gap-2 min-w-0">
+                     <div className="w-5 h-5 rounded bg-[var(--accent)] text-white flex items-center justify-center font-semibold text-[10px] shrink-0">
+                        {(user?.companyName || user?.company?.name || companySettings?.legalName || companySettings?.shortName || companyMeta?.name || 'C').charAt(0)}
                      </div>
-                     <div className="min-w-0">
-                        <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate leading-tight">
-                           {user?.companyName || user?.company?.name || 'Company'}
-                        </p>
-                        <p className="text-[9px] text-[var(--text-muted)] uppercase tracking-wide">Textile ERP</p>
-                     </div>
+                     <p className="text-[11px] font-semibold text-[var(--text-primary)] truncate leading-none">
+                        {user?.companyName || user?.company?.name || companySettings?.legalName || companySettings?.shortName || companyMeta?.name || 'Company'}
+                     </p>
                   </div>
 
-                  <div className="hidden md:flex flex-1 max-w-xs mx-2">
+                  {!isCaUser && <div className="hidden md:flex flex-1 max-w-xs mx-2">
                      <div className="relative w-full">
                         <FontAwesomeIcon icon={faSearch} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-[10px]" />
                         <button
                            type="button"
                            onClick={() => openCommandPalette()}
-                           className="w-full h-7 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-md py-0 pl-7 pr-2 text-[11px] text-left text-[var(--text-muted)] hover:border-[var(--accent)]"
+                           className="w-full h-6 bg-[var(--bg-subtle)] border border-[var(--border)] rounded-md py-0 pl-7 pr-2 text-[11px] text-left text-[var(--text-muted)] hover:border-[var(--accent)]"
                         >
                            Search… <span className="text-[9px] opacity-70">Ctrl+K</span>
                         </button>
                      </div>
-                  </div>
+                  </div>}
 
                   <div className="flex items-center gap-2 shrink-0">
-                     <OfflineIndicator onOpenSync={() => setSyncModalOpen(true)} />
-                     <PanelSwitcher variant="light" />
-                     <button
+                     {!isCaUser && <OfflineIndicator onOpenSync={() => setSyncModalOpen(true)} />}
+                     {!isCaUser && <PanelSwitcher variant="light" />}
+                     {!isCaUser && <button
                         type="button"
                         onClick={() => navigate('/subscription')}
-                        className="h-7 px-2 text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border)] rounded-md bg-white hover:bg-[var(--bg-subtle)]"
+                        className="h-6 px-2 text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border)] rounded-md bg-white hover:bg-[var(--bg-subtle)]"
                         title="Subscription & billing"
                      >
                         Plan
-                     </button>
-                     <button type="button" onClick={() => refreshAllData()} className="h-7 px-2 text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border)] rounded-md bg-white hover:bg-[var(--bg-subtle)]">
+                     </button>}
+                     {!isCaUser && <button type="button" onClick={() => refreshAllData()} className="h-6 px-2 text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border)] rounded-md bg-white hover:bg-[var(--bg-subtle)]">
                         <FontAwesomeIcon icon={faSync} className={`text-[9px] mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />Sync
-                     </button>
-                     <button
+                     </button>}
+                     {!isCaUser && <button
                         type="button"
                         onClick={() => openNotificationCenter()}
-                        className="relative w-7 h-7 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                        className="relative w-6 h-6 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                         title="Notifications"
                      >
                         <FontAwesomeIcon icon={faBell} className="text-[12px]" />
@@ -1038,20 +1167,20 @@ const Dashboard = () => {
                               {notificationUnread > 99 ? '99+' : notificationUnread}
                            </span>
                         )}
-                     </button>
+                     </button>}
                      <div className="flex items-center gap-2 pl-2 border-l border-[var(--border)]">
                         <div className="text-right hidden sm:block">
-                           <p className="text-[11px] font-medium text-[var(--text-primary)] leading-none">{user?.name || 'User'}</p>
-                           <p className="text-[9px] text-[var(--text-muted)] capitalize">{user?.role?.replace('_', ' ') || 'access'}</p>
+                           <p className="text-[11px] font-medium text-[var(--text-primary)] leading-none">{user?.name || user?.email || 'User'}</p>
+                           <p className="text-[9px] text-[var(--text-muted)] capitalize">{isCaUser ? 'CA' : String(user?.companyRole || user?.role || 'access').replace(/_/g, ' ')}</p>
                         </div>
-                        <div className="w-7 h-7 rounded-md bg-[var(--accent-light)] text-[var(--accent)] flex items-center justify-center font-semibold text-[10px]">
+                        <div className="w-5 h-5 rounded bg-[var(--accent-light)] text-[var(--accent)] flex items-center justify-center font-semibold text-[9px]">
                            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
                         </div>
                         <button
                            type="button"
                            onClick={handleLogout}
                            title="Sign out"
-                           className="h-7 px-2.5 flex items-center gap-1.5 text-[10px] font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 rounded-md transition-colors"
+                           className="h-6 px-2 flex items-center gap-1 text-[10px] font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 hover:border-rose-600 rounded-md transition-colors"
                         >
                            <FontAwesomeIcon icon={faRightFromBracket} className="text-[9px]" />
                            <span className="hidden sm:inline">Logout</span>
@@ -1060,8 +1189,7 @@ const Dashboard = () => {
                   </div>
                </div>
 
-               {/* Menu Bar */}
-               <div ref={menuBarRef} className="erp-menu-bar select-none">
+               {!isCaUser && <div ref={menuBarRef} className="erp-menu-bar select-none">
                   {Object.keys(visibleMenuData).map((section) => {
                      const isOpen = openMenuSection === section;
                      return (
@@ -1097,6 +1225,16 @@ const Dashboard = () => {
                                                       className={`erp-menu-item erp-menu-item--parent ${openFlyoutPath === keyPrefix ? 'erp-menu-trigger--open' : ''}`}
                                                       onClick={(e) => {
                                                          e.stopPropagation();
+                                                         if (e.target.closest('.erp-menu-chevron')) {
+                                                            setOpenFlyoutPath((prev) => (prev === keyPrefix ? null : keyPrefix));
+                                                            return;
+                                                         }
+                                                         if (node.action) {
+                                                            setOpenMenuSection(null);
+                                                            setOpenFlyoutPath(null);
+                                                            node.action();
+                                                            return;
+                                                         }
                                                          setOpenFlyoutPath((prev) => (prev === keyPrefix ? null : keyPrefix));
                                                       }}
                                                    >
@@ -1155,13 +1293,48 @@ const Dashboard = () => {
                   >
                      Exit
                   </button>
-               </div>
+               </div>}
 
             </header>
 
             <div className="flex-1 overflow-y-auto p-4 erp-scroll-smooth relative">
                <TopProgressBar show={showSoftSync} />
                <div className="max-w-6xl mx-auto flex flex-col gap-4 erp-motion-content">
+               {isCaUser ? (
+                  <div className="erp-card p-6 max-w-lg">
+                     <p className="text-sm font-semibold">CA Desk</p>
+                     <p className="text-[12px] text-[var(--text-muted)] mt-1">You only see the reports this company allowed. Sales, purchase and accounts entry stay with the owner.</p>
+                     <button type="button" className="erp-btn erp-btn-primary h-8 px-3 text-[11px] mt-3" onClick={() => toggleModal('caDashboard', true)}>Open CA Desk</button>
+                  </div>
+               ) : null}
+               {isCaUser && caPwd.open && (
+                  <div className="erp-card p-6 max-w-lg space-y-3">
+                     <p className="text-sm font-semibold">Change password</p>
+                     <p className="text-[12px] text-[var(--text-muted)]">Use the password the company gave you, then set a new one.</p>
+                     <input type="password" value={caPwd.current} onChange={(e) => setCaPwd((p) => ({ ...p, current: e.target.value }))} placeholder="Current password" className="h-8 w-full px-2 text-[12px] rounded border border-[var(--border)]" />
+                     <input type="password" value={caPwd.next} onChange={(e) => setCaPwd((p) => ({ ...p, next: e.target.value }))} placeholder="New password" className="h-8 w-full px-2 text-[12px] rounded border border-[var(--border)]" />
+                     <button
+                        type="button"
+                        disabled={caPwdSaving}
+                        className="erp-btn erp-btn-primary h-8 px-3 text-[11px]"
+                        onClick={async () => {
+                           setCaPwdSaving(true);
+                           try {
+                              await authApi.changePassword({ currentPassword: caPwd.current, newPassword: caPwd.next });
+                              setCaPwd({ current: '', next: '', open: true });
+                              toast.success('Password changed');
+                           } catch (err) {
+                              toast.error(err?.message || 'Could not change password');
+                           } finally {
+                              setCaPwdSaving(false);
+                           }
+                        }}
+                     >
+                        {caPwdSaving ? 'Saving…' : 'Update password'}
+                     </button>
+                  </div>
+               )}
+               {!isCaUser && (<>
                {setupGaps.length > 0 && (
                   <div className="flex flex-wrap items-center gap-3 px-3 py-2.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-950">
                      <FontAwesomeIcon icon={faTriangleExclamation} className="text-amber-600 text-[12px] shrink-0" />
@@ -1260,7 +1433,8 @@ const Dashboard = () => {
                      <button type="button" onClick={() => openRecordsHub('sales')} className="mt-3 text-[11px] font-medium text-[var(--accent)] hover:underline">View all records →</button>
                   )}
                </div>
-            </div>
+               </>)}
+               </div>
             </div>
          </main>
 
@@ -1273,7 +1447,7 @@ const Dashboard = () => {
             }}
             initialData={salesInitialData}
             selectedBook={selectedBooks.sales?.name}
-            readOnly={!permissions.canSave}
+            readOnly={!permissions.canSave || mobileViewOnly}
             onChangeBook={() => promptChangeBook('sales')}
          />
          <PurchaseModal 
@@ -1284,7 +1458,7 @@ const Dashboard = () => {
             }}
             initialData={purchaseInitialData}
             selectedBook={selectedBooks.purchase?.name} 
-            readOnly={!permissions.canSave} 
+            readOnly={!permissions.canSave || mobileViewOnly} 
             onChangeBook={() => promptChangeBook('purchase')}
             onOpenSales={() => { yieldOtherWindows('sales'); toggleModal('sales', true); }}
             onOpenJobIssue={() => { yieldOtherWindows('jobIssue'); toggleModal('jobIssue', true); }}
@@ -1302,7 +1476,7 @@ const Dashboard = () => {
             initialType="Receipt"
             initialVoucherId={voucherInitialId}
             selectedBook={selectedBooks.cashBook}
-            readOnly={!permissions.canSave}
+            readOnly={!permissions.canSave || mobileViewOnly}
          />
          <CashBankBookModal
             isOpen={modals.bankBook}
@@ -1311,7 +1485,7 @@ const Dashboard = () => {
             initialType="Receipt"
             initialVoucherId={voucherInitialId}
             selectedBook={selectedBooks.bankBook}
-            readOnly={!permissions.canSave}
+            readOnly={!permissions.canSave || mobileViewOnly}
          />
          <CashBankBookModal
             isOpen={modals.receipt}
@@ -1320,7 +1494,7 @@ const Dashboard = () => {
             initialType="Receipt"
             initialVoucherId={voucherInitialId}
             selectedBook={selectedBooks.receipt}
-            readOnly={!permissions.canSave}
+            readOnly={!permissions.canSave || mobileViewOnly}
          />
          <CashBankBookModal
             isOpen={modals.payment}
@@ -1329,7 +1503,7 @@ const Dashboard = () => {
             initialType="Payment"
             initialVoucherId={voucherInitialId}
             selectedBook={selectedBooks.payment}
-            readOnly={!permissions.canSave}
+            readOnly={!permissions.canSave || mobileViewOnly}
          />
          <CashBankBookModal
             isOpen={modals.cashPayment}
@@ -1338,7 +1512,7 @@ const Dashboard = () => {
             initialType="Payment"
             initialVoucherId={voucherInitialId}
             selectedBook={selectedBooks.cashPayment}
-            readOnly={!permissions.canSave}
+            readOnly={!permissions.canSave || mobileViewOnly}
          />
          <CashBankBookModal
             isOpen={modals.cashReceipt}
@@ -1347,7 +1521,7 @@ const Dashboard = () => {
             initialType="Receipt"
             initialVoucherId={voucherInitialId}
             selectedBook={selectedBooks.cashReceipt}
-            readOnly={!permissions.canSave}
+            readOnly={!permissions.canSave || mobileViewOnly}
          />
          <IssueModal
             isOpen={modals.millIssue}
@@ -1381,60 +1555,111 @@ const Dashboard = () => {
          <LedgerModal
             isOpen={modals.ledger}
             onClose={() => toggleModal('ledger', false)}
-            onOpenJournal={(data) => {
+            onOpenJournal={() => {
+               minimizeErpWindow('ledger');
                openModalDirect('journal');
             }}
             onOpenPayment={(data) => {
                const docNo = data?.voucherNo || data?.docNo || data?.row?.billVoucherNo || '';
-               const refId = data?.row?.refId || data?.row?._id;
-               const found = (vouchers || []).find(v => (refId && String(v._id || v.id) === String(refId)) || (docNo && (v.voucherNo === docNo || v.billNo === docNo)));
-               const vId = found?._id || refId || docNo || null;
+               const refId = ledgerRefId(data?.row);
+               const found = (vouchers || []).find(v => (refId && idOf(v._id || v.id) === refId) || (docNo && (v.voucherNo === docNo || v.billNo === docNo)));
+               const vId = found?._id || refId || null;
                setVoucherInitialId(vId);
+               minimizeErpWindow('ledger');
                const isCash = String(data?.row?.particulars || '').toLowerCase().includes('cash') || docNo.startsWith('CPV') || (found && found.bookKind === 'cash');
                if (isCash) {
                   openModalDirect('cashPayment');
+                  focusErpWindow('cashbank-cash-Payment');
                } else {
                   openModalDirect('payment');
+                  focusErpWindow('cashbank-bank-Payment');
                }
             }}
             onOpenReceipt={(data) => {
                const docNo = data?.voucherNo || data?.docNo || data?.row?.billVoucherNo || '';
-               const refId = data?.row?.refId || data?.row?._id;
-               const found = (vouchers || []).find(v => (refId && String(v._id || v.id) === String(refId)) || (docNo && (v.voucherNo === docNo || v.billNo === docNo)));
-               const vId = found?._id || refId || docNo || null;
+               const refId = ledgerRefId(data?.row);
+               const found = (vouchers || []).find(v => (refId && idOf(v._id || v.id) === refId) || (docNo && (v.voucherNo === docNo || v.billNo === docNo)));
+               const vId = found?._id || refId || null;
                setVoucherInitialId(vId);
+               minimizeErpWindow('ledger');
                const isCash = String(data?.row?.particulars || '').toLowerCase().includes('cash') || docNo.startsWith('CRV') || (found && found.bookKind === 'cash');
                if (isCash) {
                   openModalDirect('cashReceipt');
+                  focusErpWindow('cashbank-cash-Receipt');
                } else {
                   openModalDirect('receipt');
+                  focusErpWindow('cashbank-bank-Receipt');
                }
             }}
-            onOpenSales={(data) => {
+            onOpenSales={async (data) => {
                const docNo = data?.invoiceNo || data?.docNo || data?.voucherNo || data?.row?.billVoucherNo || '';
-               const refId = data?.row?.refId || data?.row?._id;
-               const found = (sales || []).find(s => (refId && String(s._id || s.id) === String(refId)) || (docNo && (s.invoiceNo === docNo || s.billNo === docNo)));
-               setSalesInitialData(found || { invoiceNo: docNo, _id: refId });
+               const refId = ledgerRefId(data?.row);
+               const found = await resolveSaleDoc(sales, refId, docNo);
+               if (!found) {
+                  toast.error('Sales bill could not be opened');
+                  return;
+               }
+               minimizeErpWindow('ledger');
+               setSalesInitialData(found);
                openModalDirect('sales');
+               focusErpWindow('sales');
             }}
-            onOpenPurchase={(data) => {
+            onOpenPurchase={async (data) => {
                const docNo = data?.invoiceNo || data?.docNo || data?.voucherNo || data?.row?.billVoucherNo || '';
-               const refId = data?.row?.refId || data?.row?._id;
-               const found = (purchases || []).find(p => (refId && String(p._id || p.id) === String(refId)) || (docNo && (p.invoiceNo === docNo || p.billNo === docNo)));
-               setPurchaseInitialData(found || { invoiceNo: docNo, _id: refId });
+               const refId = ledgerRefId(data?.row);
+               const found = await resolvePurchaseDoc(purchases, refId, docNo);
+               if (!found) {
+                  toast.error('Purchase bill could not be opened');
+                  return;
+               }
+               minimizeErpWindow('ledger');
+               setPurchaseInitialData(found);
                openModalDirect('purchase');
+               focusErpWindow('purchase');
             }}
-            onOpenNote={(data) => {
+            onOpenNote={async (data) => {
                const docNo = data?.docNo || data?.voucherNo || data?.row?.billVoucherNo || '';
-               const refId = data?.row?.refId || data?.row?._id;
-               const found = (notes || []).find(n => (refId && String(n._id || n.id) === String(refId)) || (docNo && (n.noteNo === docNo || n.voucherNo === docNo)));
-               setNoteInitialId(found?._id || refId || docNo || null);
-               openModalDirect('note');
+               const refId = ledgerRefId(data?.row);
+               const hint = `${data?.row?.remarks || ''} ${data?.row?.narration || ''} ${docNo}`;
+               const found = await resolveNoteDoc(notes, refId, docNo, hint);
+               if (!found) {
+                  toast.warning('Discount note is not saved on this line. Opening the voucher instead.');
+                  minimizeErpWindow('ledger');
+                  const vt = String(data?.row?.voucherType || data?.row?.refType || '').toLowerCase();
+                  if (vt.includes('payment')) {
+                     const vId = refId || null;
+                     setVoucherInitialId(vId);
+                     openModalDirect('payment');
+                     focusErpWindow('cashbank-bank-Payment');
+                  } else {
+                     setVoucherInitialId(refId || null);
+                     openModalDirect('receipt');
+                     focusErpWindow('cashbank-bank-Receipt');
+                  }
+                  return;
+               }
+               minimizeErpWindow('ledger');
+               setNoteInitialId(found._id || found.id);
+               setModals((prev) => ({
+                  ...prev,
+                  note: true,
+                  noteType: found.noteType || prev.noteType,
+                  noteSide: found.noteSide || prev.noteSide || 'Sales',
+               }));
+               yieldOtherWindows('note');
+               const noteWindowId = `note-${found.noteSide || 'Sales'}-${found.noteType || 'Credit'}`;
+               setTimeout(() => focusErpWindow(noteWindowId), 40);
             }}
-            onOpenOutstanding={() => openModalDirect('outstanding')}
+            onOpenOutstanding={(data) => {
+               setOutstandingSeed({
+                  partyId: data?.partyId || '',
+                  osType: data?.osType || 'receivable',
+               });
+               openModalDirect('outstanding');
+            }}
          />
-         <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters} />
-         <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} readOnly={permissions.readOnlyMasters} />
+         <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters || mobileViewOnly} />
+         <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} readOnly={permissions.readOnlyMasters || mobileViewOnly} />
          {modals.outstandingSalesFull && (
             <OutstandingReportModal
                isOpen={modals.outstandingSalesFull}
@@ -1462,11 +1687,22 @@ const Dashboard = () => {
             />
          )}
          <PartyModal isOpen={modals.party} onClose={() => toggleModal('party', false)} />
-         <BookMasterModal isOpen={modals.bookMaster} onClose={() => toggleModal('bookMaster', false)} readOnly={permissions.readOnlyMasters} />
+         <BookMasterModal isOpen={modals.bookMaster} onClose={() => toggleModal('bookMaster', false)} readOnly={permissions.readOnlyMasters || mobileViewOnly} />
 
          {/* Lazy-only island — must NOT wrap Sales/Purchase or clicks go blank */}
          <Suspense fallback={null}>
-            {modals.outstanding && <SalesOutstanding isOpen={modals.outstanding} onClose={() => toggleModal('outstanding', false)} />}
+            {modals.outstanding && (
+               <SalesOutstanding
+                  isOpen={modals.outstanding}
+                  initialPartyId={outstandingSeed?.partyId || ''}
+                  initialType={outstandingSeed?.osType || 'receivable'}
+                  autoRun={!!outstandingSeed?.partyId}
+                  onClose={() => {
+                     setOutstandingSeed(null);
+                     toggleModal('outstanding', false);
+                  }}
+               />
+            )}
             {modals.gstComplianceReports && (
                <GstComplianceReportsModal
                   isOpen={modals.gstComplianceReports}
@@ -1586,22 +1822,22 @@ const Dashboard = () => {
             isOpen={modals.genericMaster} 
             onClose={() => setModals(prev => ({ ...prev, genericMaster: false }))} 
             type={modals.genericMasterType}
-            readOnly={permissions.readOnlyMasters}
+            readOnly={permissions.readOnlyMasters || mobileViewOnly}
          />
          <OpeningBalanceModal
             isOpen={modals.openingBalance}
             onClose={() => setModals(prev => ({ ...prev, openingBalance: false }))}
-            readOnly={permissions.readOnlyMasters}
+            readOnly={permissions.readOnlyMasters || mobileViewOnly}
          />
          <OpeningStockModal
             isOpen={modals.openingStock}
             onClose={() => setModals(prev => ({ ...prev, openingStock: false }))}
-            readOnly={permissions.readOnlyMasters}
+            readOnly={permissions.readOnlyMasters || mobileViewOnly}
          />
          <WarehouseMasterModal
             isOpen={modals.warehouseMaster}
             onClose={() => setModals(prev => ({ ...prev, warehouseMaster: false }))}
-            readOnly={permissions.readOnlyMasters}
+            readOnly={permissions.readOnlyMasters || mobileViewOnly}
          />
          <MergeMasterModal
             isOpen={modals.mergeMaster}
@@ -1696,7 +1932,7 @@ const Dashboard = () => {
             initialNoteId={noteInitialId}
             initialType={modals.noteType}
             initialSide={modals.noteSide || 'Sales'}
-            readOnly={!permissions.canSave}
+            readOnly={!permissions.canSave || mobileViewOnly}
          />
          <JournalEntryModal
             isOpen={modals.journal}
@@ -1744,7 +1980,21 @@ const Dashboard = () => {
          <FailedSyncModal isOpen={syncModalOpen} onClose={() => setSyncModalOpen(false)} />
          <ErpWindowDockTray />
          <PwaInstallPrompt />
-         <ErpKeyboardHintBar className="erp-shell-kbd-fixed" />
+         <ErpKeyboardHintBar
+            className="erp-shell-kbd-fixed"
+            items={[
+               ...APP_KEYBOARD_HINTS,
+               { keys: 'Ctrl+S', label: 'Sales' },
+               { keys: 'Alt+P', label: 'Purchase' },
+               { keys: 'Alt+R', label: 'Reports' },
+               { keys: 'Alt+L', label: 'Ledger' },
+               { keys: 'Alt+B', label: 'Receipt' },
+               { keys: 'Alt+Y', label: 'Payment' },
+               { keys: 'Alt+M', label: 'Mill' },
+               { keys: 'Alt+G', label: 'GSTR-1' },
+               { keys: 'Alt+O', label: 'Outstanding' },
+            ]}
+         />
 
       </div>
    );

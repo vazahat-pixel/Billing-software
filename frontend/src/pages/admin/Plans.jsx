@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, Check, Shield, Package, Database, Users as UsersIcon, Trash2, Plus, Zap, X, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, FileText, ShoppingCart, Wrench, Calculator, BarChart2, Receipt, Settings, Wifi } from 'lucide-react';
+import { CreditCard, Check, Shield, Package, Database, Users as UsersIcon, Trash2, Plus, Zap, X, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, FileText, ShoppingCart, Wrench, Calculator, BarChart2, Receipt, Settings, Wifi, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
 import { erpConfirm } from '../../utils/confirm';
@@ -49,6 +49,7 @@ const Toggle = ({ checked, onChange }) => (
 const PlanCard = ({ plan, onEdit, onDelete }) => {
     const activeModules = Object.entries(plan.features?.modules || {}).filter(([_, v]) => v).map(([k]) => k);
     const hasOffline = plan.features?.offlineMode || plan.features?.modules?.offline;
+    const hasMobile = !!plan.features?.mobileView;
 
     return (
         <motion.div
@@ -79,6 +80,9 @@ const PlanCard = ({ plan, onEdit, onDelete }) => {
                 {hasOffline && (
                     <span className="module-pill"><Wifi size={10} /> offline</span>
                 )}
+                <span className="module-pill">
+                    <Smartphone size={10} /> {hasMobile ? 'Mobile · view only' : 'No mobile'}
+                </span>
                 {activeModules.length > 0 ? activeModules.map(mod => {
                     const Icon = moduleIcons[mod] || Package;
                     return (
@@ -277,6 +281,17 @@ const PlanBuilderModal = ({ plan, onClose, onSave }) => {
                                 </div>
                                 <Toggle checked={!!form.features?.offlineMode} onChange={() => toggleFeature('offlineMode')} />
                             </div>
+
+                            <div className="flex items-center justify-between p-3 bg-white/[0.02] border border-white/[0.04] rounded-xl">
+                                <div className="flex items-center gap-2">
+                                    <Smartphone size={13} className="text-teal-400" />
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-300">Mobile view</p>
+                                        <p className="text-[9px] text-slate-600">Owner phone par sirf dekh sakta hai, edit nahi</p>
+                                    </div>
+                                </div>
+                                <Toggle checked={!!form.features?.mobileView} onChange={() => toggleFeature('mobileView')} />
+                            </div>
                         </div>
 
                         {/* Right: Module Gating */}
@@ -375,6 +390,7 @@ const Plans = () => {
         priceYearly: 0,
         features: {
             offlineMode: false,
+            mobileView: false,
             modules: { purchase: false, inventory: false, jobWork: false, sales: false, accounting: false, gst: false, reports: false, masters: false, utilities: false, offline: false },
             fields: {
                 purchase: { broker: false, lrNo: false, discount2: false },

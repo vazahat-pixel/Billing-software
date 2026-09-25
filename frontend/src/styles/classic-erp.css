@@ -933,35 +933,33 @@
 
 /* Cash & Bank Book — compact aligned header like Sale Bill */
 .cash-bank-form.classic-erp-body {
-  gap: 6px !important;
-  padding: 8px 10px !important;
+  gap: 4px !important;
+  padding: 4px 6px !important;
+  background: #e8eef6;
 }
 .cash-bank-header.classic-erp-frame {
-  padding: 6px 8px !important;
+  padding: 4px 8px !important;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  background: #fff;
 }
-.cash-bank-row {
-  display: grid;
+.cash-bank-row,
+.cash-bank-row--pack {
+  display: flex !important;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px 10px;
-  min-width: 0;
+  justify-content: flex-start;
+  gap: 4px 10px;
+  width: 100%;
 }
-.cash-bank-row--1 {
-  grid-template-columns: minmax(200px, 1.1fr) minmax(180px, 1fr) minmax(120px, 0.7fr) auto;
-}
-.cash-bank-row--2 {
-  grid-template-columns: minmax(210px, 1.1fr) minmax(140px, 0.85fr) minmax(180px, 1fr) minmax(200px, 1.2fr);
-}
-.cash-bank-row--3 {
-  grid-template-columns: minmax(0, 1fr) 120px;
-}
-.cash-bank-row--4 {
-  grid-template-columns: minmax(140px, 0.7fr) minmax(110px, 0.55fr) minmax(180px, 1.2fr) minmax(130px, 0.7fr);
-}
-.cash-bank-row--5 {
-  grid-template-columns: minmax(140px, 0.7fr) minmax(110px, 0.55fr) minmax(180px, 1.2fr) minmax(130px, 0.7fr) minmax(170px, 0.9fr);
+.cash-bank-row .classic-erp-field,
+.cash-bank-row .classic-erp-field--sm,
+.cash-bank-row .classic-erp-field--xs {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none;
+  grid-template-columns: 64px 120px !important;
 }
 /* Always-visible Paid/UnPaid chips next to Amount — no need to scroll the wide bill
    grid to see whether the entered Amount has been fully allocated to bills yet. */
@@ -1010,14 +1008,103 @@
   color: #b91c1c;
 }
 .cash-bank-row .classic-erp-field {
-  grid-template-columns: 78px minmax(0, 1fr);
-  gap: 6px;
+  grid-template-columns: 64px 120px;
+  gap: 4px;
 }
-.cash-bank-row .classic-erp-field--sm {
-  grid-template-columns: 64px minmax(0, 1fr);
+.cash-bank-row .classic-erp-label {
+  font-size: 10.5px !important;
+  line-height: 1.1;
 }
+.cash-bank-row .classic-erp-input,
+.cash-bank-row .classic-erp-select,
+.cash-bank-row .erp-combobox-input {
+  height: 24px !important;
+  min-height: 24px !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  font-size: 12px !important;
+  padding: 0 6px !important;
+}
+.cb-f-voucher { grid-template-columns: 72px 118px !important; }
+.cb-f-int { grid-template-columns: 58px 132px !important; }
+.cb-f-slip { grid-template-columns: 52px 88px !important; }
+.cb-f-date { grid-template-columns: 40px 168px !important; }
+.cb-f-cheq { grid-template-columns: 58px 96px !important; }
+.cb-f-cdate { grid-template-columns: 40px 132px !important; }
+.cb-f-clear { grid-template-columns: 56px 132px !important; }
+.cb-f-pbank { grid-template-columns: 52px 200px !important; }
+.cb-f-party { grid-template-columns: 44px 240px !important; }
+.cb-f-bank { grid-template-columns: 44px 200px !important; }
+.cb-f-amt { grid-template-columns: 56px 100px !important; }
+.cb-f-acc { grid-template-columns: 56px 52px !important; }
+.cb-f-type { grid-template-columns: 40px 100px !important; }
+.cash-bank-lines {
+  flex: 1 1 auto;
+  min-height: 0;
+  background-color: #fff !important;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 21px,
+    #e8eef5 21px,
+    #e8eef5 22px
+  );
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+  overflow: auto;
+}
+.cash-bank-bill-grid {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+.cash-bank-bill-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #1e4d8c !important;
+  color: #fff !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  height: 22px;
+  padding: 2px 5px !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.25);
+}
+.cash-bank-bill-grid td {
+  height: 22px;
+  padding: 0 2px !important;
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #eef2f7;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.cash-bank-bill-grid tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+.cash-bank-bill-grid tbody tr:hover {
+  background: #e0f2fe;
+}
+.cash-bank-bill-grid td .classic-erp-input {
+  height: 20px !important;
+  min-height: 20px !important;
+  max-height: 20px !important;
+  font-size: 11px !important;
+  padding: 0 4px !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.cash-bank-bill-grid td:nth-child(14) .classic-erp-input,
+.cash-bank-bill-grid td:nth-child(18) .classic-erp-input {
+  background: #fffbeb !important;
+  font-weight: 700;
+}
+.cash-bank-row .classic-erp-field--sm,
 .cash-bank-row .classic-erp-field--xs {
-  grid-template-columns: 58px minmax(0, 1fr);
+  flex: 0 0 auto;
 }
 .cash-bank-meta-right {
   display: flex;
@@ -1047,9 +1134,9 @@
 }
 .cash-bank-toolbar {
   display: flex;
-  justify-content: center;
-  gap: 8px;
-  padding: 2px 0;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
 }
 .cash-bank-onaccount-note {
   flex: 1;
@@ -1079,7 +1166,7 @@
 .cash-bank-footer-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr);
-  gap: 8px;
+  gap: 4px;
   align-items: stretch;
 }
 .cash-bank-footer-grid .classic-erp-frame {
@@ -1320,35 +1407,42 @@
   }
 }
 
-/* Cash & Bank Book bill adjustment grid — maroon header like legacy */
+/* Bill lines — white rows, navy header. Later rules must not paint the beige sheet back on. */
 .cash-bank-bill-grid {
-  table-layout: fixed !important;
-  width: 100% !important;
+  table-layout: auto !important;
+  width: max-content !important;
+  min-width: 100% !important;
 }
 .cash-bank-bill-grid thead th {
-  background: #8b1a1a !important;
+  background: #1e3a5f !important;
   color: #fff !important;
   font-size: 10px !important;
   letter-spacing: 0.02em;
-  padding: 5px 4px !important;
-  border-bottom: 1px solid #6b1212 !important;
+  padding: 2px 5px !important;
+  border-bottom: 1px solid #0f2744 !important;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .cash-bank-bill-grid tbody td {
   overflow: hidden;
+  background: #fff !important;
+  padding: 0 2px !important;
+  height: 22px !important;
 }
-.cash-bank-bill-grid tbody td {
-  background: #f5ecd8 !important;
-  padding: 2px 2px !important;
+.cash-bank-bill-grid tbody tr:nth-child(even) td {
+  background: #f4f7fb !important;
 }
 .cash-bank-bill-grid tbody tr:hover td {
-  background: #efe4c8 !important;
+  background: #e0f2fe !important;
+}
+.cash-bank-bill-grid tbody td:nth-child(14),
+.cash-bank-bill-grid tbody td:nth-child(18) {
+  background: #fffbeb !important;
 }
 .cash-bank-bill-grid td .classic-erp-input {
-  min-height: 22px !important;
-  height: 22px !important;
+  min-height: 20px !important;
+  height: 20px !important;
   font-size: 11px !important;
 }
 

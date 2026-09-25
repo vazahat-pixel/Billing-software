@@ -81,13 +81,10 @@ function normalizePaymentDetails(body) {
 
 // Helper to generate voucher numbers — FIXED: uses atomic Counter to prevent race conditions
 async function generateVoucherNo(companyId, type, session = null) {
-  const prefix = type === 'Payment' ? 'PV' : 'RV';
-  const currentYear = new Date().getFullYear().toString().substring(2);
-  const nextYear = (new Date().getFullYear() + 1).toString().substring(2);
-  const fy = `${currentYear}-${nextYear}`;
-  const counterId = `${prefix}-${fy}-${companyId}`;
-  const seq = await Counter.nextSeq(counterId, session);
-  return `${prefix}-${fy}-${seq.toString().padStart(4, '0')}`;
+  const voucherSeriesService = require('../services/voucherSeriesService');
+  const moduleName = type === 'Payment' ? 'payment' : 'receipt';
+  const allocated = await voucherSeriesService.allocateNext(companyId, moduleName, { session });
+  return allocated.number;
 }
 
 // Cash & Bank Book bill-adjustment columns (Tds/Discount/Rg/Claim/RD/Interest/Oth1/Oth2)

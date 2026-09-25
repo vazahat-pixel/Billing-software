@@ -79,13 +79,16 @@ function TextileTaxGrid({ data }) {
           <td style={{ fontWeight: 700, textAlign: 'right', fontSize: '8pt' }}>Gross Amount</td>
           <td className="ipe-num" style={{ textAlign: 'right' }}>{money(totals.grossAmount)}</td>
         </tr>
-        {totals.foldLess ? (
-          <tr>
-            <td colSpan={9} style={{ border: 'none', borderRight: '1px solid #000' }}>&nbsp;</td>
-            <td style={{ fontWeight: 700, textAlign: 'right', fontSize: '8pt' }}>- Fold Less</td>
-            <td className="ipe-num" style={{ textAlign: 'right' }}>{money(totals.foldLess)}</td>
-          </tr>
-        ) : null}
+        <tr>
+          <td colSpan={9} style={{ border: 'none', borderRight: '1px solid #000' }}>&nbsp;</td>
+          <td style={{ fontWeight: 700, textAlign: 'right', fontSize: '8pt' }}>- Fold Less</td>
+          <td className="ipe-num" style={{ textAlign: 'right' }}>{money(totals.foldLess || 0)}</td>
+        </tr>
+        <tr>
+          <td colSpan={9} style={{ border: 'none', borderRight: '1px solid #000' }}>&nbsp;</td>
+          <td style={{ fontWeight: 700, textAlign: 'right', fontSize: '8pt' }}>- Discount</td>
+          <td className="ipe-num" style={{ textAlign: 'right' }}>{money(totals.discountAmt || totals.discount || 0)}</td>
+        </tr>
         <tr>
           <td colSpan={9} style={{ border: 'none', borderRight: '1px solid #000' }}>&nbsp;</td>
           <td style={{ fontWeight: 700, textAlign: 'right', fontSize: '8pt' }}>+ GST Amount</td>
@@ -231,29 +234,23 @@ export default function TextilePro({ data }) {
               <td style={{ width: '55%', verticalAlign: 'top', padding: '0' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '8.5pt' }}>
                   <tbody>
-                    {/* FOLD LESS — only if > 0 */}
-                    {totals.foldLess > 0 && (
-                      <tr>
-                        <td style={{ padding: '1mm 2mm', fontWeight: 600, borderBottom: '0.5px solid #bbb' }}>FOLD LESS :</td>
-                        <td style={{ padding: '1mm 2mm', textAlign: 'right', fontWeight: 600, borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
-                          {money(totals.foldLess)}
-                        </td>
-                      </tr>
-                    )}
-                    {/* DISCOUNT — only if > 0, with @ % label */}
-                    {totals.discountAmt > 0 && (
-                      <tr>
-                        <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>
-                          DISCOUNT
-                          {totals.discountPer > 0 && (
-                            <span style={{ marginLeft: '8mm' }}>@ {totals.discountPer.toFixed(2)}%</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '1mm 2mm', textAlign: 'right', fontWeight: 700, borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
-                          {money(totals.discountAmt)}
-                        </td>
-                      </tr>
-                    )}
+                    <tr>
+                      <td style={{ padding: '1mm 2mm', fontWeight: 600, borderBottom: '0.5px solid #bbb' }}>FOLD LESS :</td>
+                      <td style={{ padding: '1mm 2mm', textAlign: 'right', fontWeight: 600, borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
+                        {money(totals.foldLess || 0)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: '1mm 2mm', borderBottom: '0.5px solid #bbb' }}>
+                        DISCOUNT
+                        {totals.discountPer > 0 && (
+                          <span style={{ marginLeft: '8mm' }}>@ {totals.discountPer.toFixed(2)}%</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '1mm 2mm', textAlign: 'right', fontWeight: 700, borderBottom: '0.5px solid #bbb', borderLeft: '0.5px solid #bbb' }}>
+                        {money(totals.discountAmt || totals.discount || 0)}
+                      </td>
+                    </tr>
                     {/* LESS — only if > 0, with @ % label */}
                     {totals.lessAmt > 0 && (
                       <tr>

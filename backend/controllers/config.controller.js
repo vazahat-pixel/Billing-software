@@ -343,4 +343,51 @@ exports.getEntitlements = async (req, res) => {
   }
 };
 
+exports.listBillNumbers = async (req, res) => {
+  try {
+    const companyId = req.companyId || req.user?.companyId;
+    const voucherSeriesService = require('../services/voucherSeriesService');
+    const rows = await voucherSeriesService.listBillNumbers(companyId);
+    res.status(200).json({ success: true, data: rows });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+  }
+};
+
+exports.peekBillNumber = async (req, res) => {
+  try {
+    const companyId = req.companyId || req.user?.companyId;
+    const voucherSeriesService = require('../services/voucherSeriesService');
+    const next = await voucherSeriesService.peekNext(companyId, req.params.module);
+    res.status(200).json({ success: true, data: { module: req.params.module, next } });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+  }
+};
+
+exports.setBillNumber = async (req, res) => {
+  try {
+    const companyId = req.companyId || req.user?.companyId;
+    const voucherSeriesService = require('../services/voucherSeriesService');
+    const next = await voucherSeriesService.setNext(companyId, req.params.module, req.body?.next);
+    res.status(200).json({ success: true, data: { module: req.params.module, next } });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+  }
+};
+
+exports.resetBillNumbers = async (req, res) => {
+  try {
+    const companyId = req.companyId || req.user?.companyId;
+    const voucherSeriesService = require('../services/voucherSeriesService');
+    const moduleName = req.body?.module;
+    const data = moduleName
+      ? [{ module: moduleName, label: moduleName, next: await voucherSeriesService.setNext(companyId, moduleName, 1) }]
+      : await voucherSeriesService.resetAll(companyId, 1);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ success: false, message: err.message });
+  }
+};
+
 exports.requireCompanyAdmin = requireCompanyAdmin;

@@ -16,6 +16,7 @@ const CompanySettingsSchema = new mongoose.Schema({
     website: { type: String, default: '' },
     address: { type: String, default: '' },
     city: { type: String, default: '' },
+    district: { type: String, default: '' },
     state: { type: String, default: '' },
     pincode: { type: String, default: '' },
     // Financial
@@ -68,6 +69,7 @@ const CompanySettingsSchema = new mongoose.Schema({
     maxInvoices: { type: Number, default: null },
     maxStorage: { type: Number, default: null },
     // Company lock override (mirrors Company.status for config bundle)
+    caDesk: { type: mongoose.Schema.Types.Mixed, default: undefined },
     isLocked: { type: Boolean, default: false },
     lockReason: { type: String, default: '' },
     ...configMetaSchema

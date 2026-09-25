@@ -27,6 +27,7 @@ const companySchema = new mongoose.Schema({
         phone: String,
         address: String,
         city: String,
+        district: String,
         pincode: String
     },
     // Accounting settings

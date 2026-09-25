@@ -5,17 +5,23 @@ import useConfigStore from '../../store/useConfigStore';
 import { toast } from '../../store/useToastStore';
 import { SkeletonTable, InlineLoader, ButtonLoader } from '../../components/ui/loaders';
 import { downloadCsv, fmtDate } from '../../utils/reportExport';
+import { openOutstandingScreenPdf } from '../../utils/screenPdf';
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 
 const money = (n) =>
   (Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const SalesOutstanding = ({ isOpen, onClose }) => {
+const SalesOutstanding = ({ isOpen, onClose, initialPartyId = '', initialType = 'receivable', autoRun = false }) => {
   const { parties, fetchOutstanding, fetchParties } = useStore();
   const companyName = useConfigStore(
     (s) => s.companySettings?.legalName || s.companySettings?.shortName || s.company?.name || 'Company'
   );
+  const companyAddress = useConfigStore((s) => {
+    const st = s.companySettings || {};
+    return [st.address, st.city, st.state, st.pincode].filter(Boolean).join(', ');
+  });
+  const companyGstin = useConfigStore((s) => s.companySettings?.gstin || '');
 
   const [showPreview, setShowPreview] = useState(false);
   const [reportData, setReportData] = useState([]);
@@ -29,21 +35,30 @@ const SalesOutstanding = ({ isOpen, onClose }) => {
   const printRef = useRef(null);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchParties?.().catch(() => {});
-      setShowPreview(false);
-      setExpanded({});
+    if (!isOpen) return undefined;
+    fetchParties?.().catch(() => {});
+    setShowPreview(false);
+    setExpanded({});
+    setPartyId(initialPartyId || '');
+    setOsType(initialType || 'receivable');
+    if (autoRun && initialPartyId) {
+      handleGeneratePreview(initialPartyId, initialType || 'receivable');
     }
-  }, [isOpen, fetchParties]);
+    return undefined;
+    // Run only when the window opens for a ledger party.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialPartyId, initialType, autoRun]);
 
-  const handleGeneratePreview = async () => {
+  const handleGeneratePreview = async (partyOverride, typeOverride) => {
+    const pid = partyOverride !== undefined ? partyOverride : partyId;
+    const kind = typeOverride || osType;
     setLoading(true);
     setExpanded({});
     try {
-      const data = await fetchOutstanding(osType, asOn);
+      const data = await fetchOutstanding(kind, asOn);
       let rows = Array.isArray(data) ? data : [];
-      if (partyId) {
-        rows = rows.filter((r) => String(r.partyId) === String(partyId));
+      if (pid) {
+        rows = rows.filter((r) => String(r.partyId) === String(pid));
       }
       if (!showZero) {
         rows = rows.filter((r) => Number(r.totalOutstanding || 0) > 0.01);
@@ -63,11 +78,37 @@ const SalesOutstanding = ({ isOpen, onClose }) => {
       }
       setReportData(rows);
       setShowPreview(true);
+      if (rows.length === 1) setExpanded({ [String(rows[0].partyId)]: true });
+      return rows;
     } catch (err) {
       toast.error(err, { fallback: 'Failed to generate report' });
+      return null;
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleScreenPdf = async () => {
+    const rows = await handleGeneratePreview();
+    if (!rows) return;
+    if (!rows.length) {
+      toast.warning('No outstanding to show in the PDF');
+      return;
+    }
+    const grand = rows.reduce((s, r) => s + Number(r.totalOutstanding || 0), 0);
+    const partyName = partyId
+      ? (parties || []).find((p) => String(p._id || p.id) === String(partyId))?.name
+      : '';
+    openOutstandingScreenPdf({
+      companyName,
+      companyAddress,
+      gstin: companyGstin,
+      title: osType === 'receivable' ? 'Sales Outstanding' : 'Purchase Outstanding',
+      subtitle: `AS ON ${fmtDate(asOn)}${partyName ? `  ·  ${partyName}` : ''}`,
+      parties: rows,
+      grandTotal: grand,
+      filename: osType === 'receivable' ? 'Sales-Outstanding.pdf' : 'Purchase-Outstanding.pdf',
+    });
   };
 
   const grandTotals = useMemo(
@@ -148,12 +189,21 @@ const SalesOutstanding = ({ isOpen, onClose }) => {
   };
 
   const handlePrint = () => {
-    if (!reportData.length) return toast.warning('Generate report preview first');
-    document.body.classList.add('ledger-printing');
-    setTimeout(() => {
-      window.print();
-      setTimeout(() => document.body.classList.remove('ledger-printing'), 400);
-    }, 50);
+    if (!reportData.length) {
+      handleScreenPdf();
+      return;
+    }
+    const grand = reportData.reduce((s, r) => s + Number(r.totalOutstanding || 0), 0);
+    openOutstandingScreenPdf({
+      companyName,
+      companyAddress,
+      gstin: companyGstin,
+      title: osType === 'receivable' ? 'Sales Outstanding' : 'Purchase Outstanding',
+      subtitle: `AS ON ${fmtDate(asOn)}`,
+      parties: reportData,
+      grandTotal: grand,
+      filename: osType === 'receivable' ? 'Sales-Outstanding.pdf' : 'Purchase-Outstanding.pdf',
+    });
   };
 
   if (!isOpen) return null;
@@ -193,7 +243,7 @@ const SalesOutstanding = ({ isOpen, onClose }) => {
               <button
                 type="button"
                 className="classic-erp-btn ledger-green-btn"
-                onClick={handleGeneratePreview}
+                onClick={handleScreenPdf}
                 disabled={loading}
               >
                 {loading ? <ButtonLoader label="Loading…" /> : 'Screen'}
@@ -277,7 +327,7 @@ const SalesOutstanding = ({ isOpen, onClose }) => {
                     {titleType} Report Parameters
                   </h3>
                   <p className="text-xs text-slate-600 mb-6">
-                    Configure your date range and party filters above, then click <strong>OK</strong> or <strong>Screen</strong> to generate the bill-wise outstanding statement.
+                    Set the date and party, then click <strong>OK</strong> to see the list here. <strong>Screen</strong> opens the same statement as a PDF.
                   </p>
                   <div className="flex justify-center gap-3">
                     <button

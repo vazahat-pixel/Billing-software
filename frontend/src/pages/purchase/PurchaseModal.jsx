@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
 import { useConfig } from '../../context/ConfigContext';
-import { resolvePurchaseFieldVisibility } from '../../utils/configHelpers';
+import { resolvePurchaseFieldVisibility, buildBillFieldVisibility } from '../../utils/configHelpers';
 import { toast } from '../../store/useToastStore';
 import { notifyError, notifySuccess } from '../../utils/notify';
 import { Trash2, Plus } from 'lucide-react';
@@ -13,6 +13,7 @@ import BillSaveNextActions from '../../components/BillSaveNextActions';
 import BillAutoFill from '../../components/BillAutoFill';
 import PurchasePrint from './PurchasePrint';
 import { warehousesApi } from '../../api';
+import { peekBillNo } from '../../utils/nextBillNo';
 import { ERPCombobox } from '../../components/erp';
 import ErpWindowControls from '../../components/erp/ErpWindowControls';
 import ErpKeyboardHintBar, { FORM_KEYBOARD_HINTS } from '../../components/erp/ErpKeyboardHintBar';
@@ -74,6 +75,7 @@ const PurchaseModal = ({
   const { bundle } = useConfig();
   const companySettings = useConfigStore((s) => s.companySettings);
   const { showBroker } = resolvePurchaseFieldVisibility(bundle, user, plan);
+  const billFields = useMemo(() => buildBillFieldVisibility(bundle, 'purchase'), [bundle]);
   const [mode, setMode] = useState('View');
   const [selectedPurchaseId, setSelectedPurchaseId] = useState('');
   const locked = readOnly || mode === 'View';
@@ -102,7 +104,7 @@ const PurchaseModal = ({
     book: selectedBook || 'PURCHASE BOOK',
     gstin: '',
     city: '',
-    vNo: 'AUTO',
+    vNo: '',
     billNo: '',
     billDate: today(),
     challanNo: '',
@@ -412,14 +414,15 @@ const PurchaseModal = ({
     }
 
     // Open the form immediately; only block if masters are missing from store.
+    const incomingId = String(initialData?._id || initialData?.id || '');
     if (!openedOnceRef.current) {
-      openedOnceRef.current = true;
+      openedOnceRef.current = incomingId || 'open';
       setSaveNextActions(null);
       setPrintInvoiceId(null);
       setBillAttachment(null);
-      if (initialData) {
+      if (initialData && Array.isArray(initialData.items)) {
         loadPurchaseData(initialData);
-        setSelectedPurchaseId(initialData._id || initialData.id || '');
+        setSelectedPurchaseId(incomingId);
         setMode('View');
       } else if (readOnly) {
         setMode('View');
@@ -427,6 +430,11 @@ const PurchaseModal = ({
         setSelectedPurchaseId('');
         handleNew();
       }
+    } else if (incomingId && openedOnceRef.current !== incomingId && Array.isArray(initialData?.items)) {
+      openedOnceRef.current = incomingId;
+      loadPurchaseData(initialData);
+      setSelectedPurchaseId(incomingId);
+      setMode('View');
     }
 
     let cancelled = false;
@@ -455,23 +463,8 @@ const PurchaseModal = ({
       fetchPurchases().catch(() => {});
     }
 
-    const t = setTimeout(() => {
-      if (suppBillRef.current && !locked) {
-        suppBillRef.current.focus();
-        try { suppBillRef.current.select(); } catch { }
-      } else if (modalContainerRef.current) {
-        const focusables = getFocusableElements(modalContainerRef.current);
-        if (focusables.length > 0) {
-          focusables[0].focus();
-          if (typeof focusables[0].select === 'function') {
-            try { focusables[0].select(); } catch { }
-          }
-        }
-      }
-    }, 80);
     return () => {
       cancelled = true;
-      clearTimeout(t);
     };
   }, [isOpen, readOnly, selectedBook, fetchParties, fetchItems, fetchPurchases]);
 
@@ -491,6 +484,46 @@ const PurchaseModal = ({
         e.stopPropagation();
         handleOpenFindModal();
         return;
+      }
+
+      const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus';
+      const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal';
+      if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && mode === 'View' && !readOnly && !showFindModal) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!bookPurchases.length) return;
+        const currentIdx = bookPurchases.findIndex((p) => (p._id || p.id) === selectedPurchaseId);
+        let nextIdx = currentIdx + (prevKey ? -1 : 1);
+        if (currentIdx === -1) nextIdx = prevKey ? bookPurchases.length - 1 : 0;
+        if (nextIdx >= 0 && nextIdx < bookPurchases.length) {
+          loadPurchaseData(bookPurchases[nextIdx]);
+          setMode('View');
+          toast.info(`Bill #${bookPurchases[nextIdx].vNo || bookPurchases[nextIdx].invoiceNo} (${nextIdx + 1}/${bookPurchases.length})`);
+        }
+        return;
+      }
+
+      // Enter on a saved bill starts a new one, cursor on Bill No.
+      // Enter with focus outside the form also lands on Bill No.
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !showFindModal) {
+        if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette]')) return;
+        const el = e.target;
+        const inField = el && (
+          el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
+          || el.closest?.('[data-erp-combobox]')
+        );
+        if (mode === 'View' && !readOnly) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleNewRef.current?.();
+          return;
+        }
+        if (mode === 'Add' && !inField && !readOnly) {
+          e.preventDefault();
+          e.stopPropagation();
+          focusPurchaseBillNo();
+          return;
+        }
       }
 
       // Alt+N: New Bill
@@ -536,7 +569,7 @@ const PurchaseModal = ({
       warehouseId: pur.warehouseId?._id || pur.warehouseId || ''
     });
 
-    setGridItems(pur.items.map((item, idx) => ({
+    setGridItems((Array.isArray(pur.items) ? pur.items : []).map((item, idx) => ({
       id: idx + 1,
       itemId: item.itemId?._id || item.itemId || '',
       itemName: item.itemId?.itemName || item.itemName || '',
@@ -780,7 +813,17 @@ const PurchaseModal = ({
     });
   };
 
-  const handleNew = () => {
+  const focusPurchaseBillNo = () => {
+    setTimeout(() => {
+      const bill = suppBillRef.current;
+      if (!bill) return;
+      bill.focus();
+      try { bill.select(); } catch { /* ignore */ }
+    }, 120);
+  };
+
+  const handleNew = async () => {
+    const vNo = await peekBillNo('purchase');
     setSelectedPurchaseId('');
     setBillAttachment(null);
     setHeader({
@@ -790,8 +833,8 @@ const PurchaseModal = ({
       book: selectedBook || 'PURCHASE BOOK',
       gstin: '',
       city: '',
-      vNo: 'AUTO',
-      billNo: '',
+      vNo,
+      billNo: vNo,
       billDate: today(),
       challanNo: '',
       chDate: today(),
@@ -820,7 +863,11 @@ const PurchaseModal = ({
       remarks: ''
     });
     setMode('Add');
+    focusPurchaseBillNo();
   };
+
+  const handleNewRef = useRef(handleNew);
+  handleNewRef.current = handleNew;
 
   const handleBillAutoApply = ({ header: h, gridItems: rows, attachment, footer: f }) => {
     setHeader((prev) => {
@@ -997,7 +1044,8 @@ const PurchaseModal = ({
       notifyError(err, 'Failed to save purchase bill');
       // Duplicate voucher — reset to AUTO so next Save gets a fresh number
       if (status === 409 || code === 'CONFLICT') {
-        setHeader((h) => ({ ...h, vNo: 'AUTO' }));
+        const next = await peekBillNo('purchase');
+        setHeader((h) => ({ ...h, vNo: next }));
         if (mode !== 'Edit') setMode('Add');
       }
     } finally {
@@ -1187,6 +1235,7 @@ const PurchaseModal = ({
         style={win.modalStyle}
         className={win.modalClassName}
         inertBackdrop={win.inertBackdrop}
+        overlayZ={win.z}
       >
         <div
           className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-card)] erp-bill-window-shell relative"
@@ -1217,7 +1266,7 @@ const PurchaseModal = ({
               />
             </div>
 
-            <div ref={modalContainerRef} className="classic-erp-body flex-1 min-h-0 overflow-y-auto overflow-x-hidden erp-bill-layout">
+            <div ref={modalContainerRef} className="classic-erp-body flex-1 min-h-0 overflow-hidden erp-bill-layout">
               {mode === 'View' && (
                 <div className="classic-erp-frame flex gap-2 items-center shrink-0">
                   <span className="classic-erp-label blue-label font-bold">Find Purchase:</span>
@@ -1258,18 +1307,24 @@ const PurchaseModal = ({
                     </div>
                   </div>
                   <div className="classic-erp-meta-grid erp-sales-ref-meta">
+                    {billFields.header('vNo') && (
                     <div className="classic-erp-field">
                       <span className="classic-erp-label">Voucher:</span>
                       <input type="text" className="classic-erp-input" value={header.vNo} readOnly />
                     </div>
+                    )}
+                    {billFields.header('challanNo') && (
                     <div className="classic-erp-field">
                       <span className="classic-erp-label">Challan:</span>
                       <input type="text" className="classic-erp-input" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
                     </div>
+                    )}
+                    {billFields.header('chDate') && (
                     <div className="classic-erp-field">
                       <span className="classic-erp-label">Ch Date:</span>
                       <input type="date" className="classic-erp-input" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
                     </div>
+                    )}
                   </div>
                 </div>
 
@@ -1332,14 +1387,14 @@ const PurchaseModal = ({
                     ) : (
                       <div />
                     )}
-                    <div className="classic-erp-field">
+                    {billFields.header('reverseCharge') && <div className="classic-erp-field">
                       <span className="classic-erp-label">RCM:</span>
                       <select className="classic-erp-select" value={header.reverseCharge} onChange={e => setHeader({ ...header, reverseCharge: e.target.value })} disabled={locked}>
                         <option value="No">No</option>
                         <option value="Yes">Yes</option>
                       </select>
-                    </div>
-                    <div className="classic-erp-field">
+                    </div>}
+                    {billFields.header('type') && <div className="classic-erp-field">
                       <span className="classic-erp-label">Type *:</span>
                       <select
                         className="classic-erp-select"
@@ -1363,12 +1418,12 @@ const PurchaseModal = ({
                         <option value="UNREGISTERED INVOICE (IN STATE)">UNREGISTERED INVOICE (IN STATE)</option>
                         <option value="UNREGISTERED INVOICE (OUT OF STATE)">UNREGISTERED INVOICE (OUT OF STATE)</option>
                       </select>
-                    </div>
+                    </div>}
                   </div>
                 </div>
               </div>
 
-              <div className="classic-erp-table-container erp-grid-panel erp-sales-grid min-h-0">
+              <div className="classic-erp-table-container erp-grid-panel erp-sales-grid">
                 <table
                   className="classic-erp-table"
                   onKeyDown={(e) => { handleFormEnterKeyDown(e); handleFormArrowKeyDown(e); }}

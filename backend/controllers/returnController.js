@@ -8,13 +8,10 @@ const accountingService = require('../services/accountingService');
 const auditService = require('../services/auditService');
 const { recalcReturnTotals } = require('../utils/returnTotals');
 
-async function generateReturnNo(companyId, type, session = null) {
-  const prefix = type === 'Sales' ? 'SR' : 'PR';
-  const currentYear = new Date().getFullYear().toString().substring(2);
-  const fy = `${currentYear}-${(parseInt(currentYear) + 1)}`;
-  const counterId = `${prefix}-${fy}-${companyId}`;
-  const seq = await Counter.nextSeq(counterId, session);
-  return `${prefix}-${fy}-${seq.toString().padStart(4, '0')}`;
+async function generateReturnNo(companyId, type, requested, session = null) {
+  const voucherSeriesService = require('../services/voucherSeriesService');
+  const moduleName = type === 'Sales' ? 'salesReturn' : 'purchaseReturn';
+  return voucherSeriesService.reserveNumber(companyId, moduleName, requested, session);
 }
 
 exports.createReturn = async (req, res) => {
@@ -41,7 +38,7 @@ exports.createReturn = async (req, res) => {
     const gstConfigService = require('../services/gstConfigService');
     await gstConfigService.assertPeriodOpen(companyId, date || new Date());
 
-    const finalInvoiceNo = invoiceNo || await generateReturnNo(companyId, returnType, session);
+    const finalInvoiceNo = await generateReturnNo(companyId, returnType, invoiceNo, session);
 
     // =====================================================================
     // Stage 4: Server-side GST recomputation (hardened)

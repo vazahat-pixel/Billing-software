@@ -36,6 +36,9 @@ import {
   normalizeVoucher,
   normalizeInventoryLot
 } from '../utils/normalizers';
+
+/** Later party fetches must not overwrite a save that already landed. */
+let partiesFetchSeq = 0;
 import { cacheEntities, getCachedEntities, generateLocalId, clearOfflineDB, prepareCompanyCache, setActiveCompanyId, patchOfflineCache } from '../utils/offlineDB';
 import { saveOffline, saveOfflineUpdate, saveOfflineDelete } from '../utils/syncQueue';
 import {
@@ -251,22 +254,33 @@ const useStore = create((set, get) => ({
       return;
     }
 
-    if (!hasLocal) {
-      return;
-    }
-
-    // Online: refresh profile in background; never clear session on failure
+    // Online: refresh profile even when localStorage lost the user object.
+    // A token-only session used to skip /auth/me and stay on "User / access".
     try {
-      const me = await authApi.me();
-      const res = { data: { data: me, user: me, success: true } };
-      const user = normalizeUser(res.data.user);
-      localStorage.setItem('role', user.role);
-      localStorage.setItem('user', JSON.stringify(user));
-      const plan = user.plan || savedUser?.plan || null;
-      persistOfflineFlag(user, plan);
-      if (user.companyId) setActiveCompanyId(user.companyId);
-      set({ user, role: user.role, plan });
-      await updateOfflineSession(user.email, { token, user });
+      const profile = await authApi.me();
+      const user = normalizeUser({
+        ...(savedUser || {}),
+        ...(profile || {}),
+        company: profile?.company || savedUser?.company || null,
+        settings: profile?.settings || savedUser?.settings || null,
+        plan: profile?.plan || savedUser?.plan || null,
+        companyId: profile?.companyId || savedUser?.companyId || null
+      });
+      if (!user?.email && !user?.companyId && !user?.name) {
+        throw new Error('empty profile');
+      }
+      const platformRole = user.role === 'super_admin' ? 'super_admin' : 'user';
+      const stored = { ...user, role: platformRole };
+      localStorage.setItem('role', platformRole);
+      localStorage.setItem('user', JSON.stringify(stored));
+      const plan = stored.plan || savedUser?.plan || null;
+      persistOfflineFlag(stored, plan);
+      if (stored.companyId) setActiveCompanyId(stored.companyId);
+      try {
+        useConfigStore.getState().hydrateFromAuth(stored, plan);
+      } catch { /* config store optional during early boot */ }
+      set({ user: stored, role: platformRole, plan, sessionReady: true });
+      if (stored.email) await updateOfflineSession(stored.email, { token, user: stored });
     } catch (err) {
       handleNetworkFailure(err);
       if (isNetworkError(err) && hasLocal) {
@@ -452,26 +466,32 @@ const useStore = create((set, get) => ({
 
   // --- MASTER ACTIONS ---
   fetchParties: async () => {
+    const seq = ++partiesFetchSeq;
     set({ partiesLoading: true });
     if (isOffline()) {
       const cached = (await getCachedEntities('parties')).map(normalizeParty);
+      if (seq !== partiesFetchSeq) return cached;
       set({ parties: cached, partiesLoading: false });
-      return;
+      return cached;
     }
     try {
       const _parties = await partiesApi.listRaw();
       const res = { data: { data: _parties } };
       const raw = res.data.data || res.data || [];
       const parties = (Array.isArray(raw) ? raw : []).map(normalizeParty);
+      if (seq !== partiesFetchSeq) return parties;
       await cacheEntities('parties', parties);
       set({ parties, partiesLoading: false });
+      return parties;
     } catch (err) {
+      if (seq !== partiesFetchSeq) return [];
       if (isNetworkError(err)) {
         const cached = (await getCachedEntities('parties')).map(normalizeParty);
         set({ parties: cached, partiesLoading: false });
       } else {
         set({ error: err.message, partiesLoading: false });
       }
+      return [];
     }
   },
 
@@ -516,6 +536,9 @@ const useStore = create((set, get) => ({
       const _party = await partiesApi.update(id, partyData);
       const res = { data: { data: _party } };
       const updatedParty = normalizeParty(res.data.data || res.data);
+      if ((!updatedParty.banks || !updatedParty.banks.length) && Array.isArray(partyData.banks) && partyData.banks.length) {
+        updatedParty.banks = partyData.banks;
+      }
       set((state) => ({
         parties: state.parties.map((p) => (String(p._id) === String(id) ? updatedParty : p))
       }));

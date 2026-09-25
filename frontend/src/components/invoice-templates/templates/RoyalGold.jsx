@@ -156,6 +156,7 @@ export default function RoyalGold({ data }) {
               <th style={{ width: '4%' }}>S.No</th>
               <th style={{ width: '29%', textAlign: 'left' }}>Description</th>
               <th style={{ width: '7%' }}>HSN</th>
+              <th style={{ width: '4%' }}>Fold</th>
               <th style={{ width: '4%' }}>Cut</th>
               <th style={{ width: '5%' }}>PCS</th>
               <th style={{ width: '7%' }}>Mtrs</th>
@@ -176,6 +177,7 @@ export default function RoyalGold({ data }) {
                   {line.designNo && <span style={{ fontSize: '6.5pt', color: MUTED }}> · {line.designNo}</span>}
                 </td>
                 <td className="rg-ctr">{line.hsn}</td>
+                <td className="rg-ctr">{line.fold || '—'}</td>
                 <td className="rg-ctr">{line.cut || '—'}</td>
                 <td className="rg-num">{line.pcs || ''}</td>
                 <td className="rg-num">{line.mts ? fmt.num(line.mts) : ''}</td>
@@ -188,13 +190,14 @@ export default function RoyalGold({ data }) {
             ))}
             {Array.from({ length: Math.max(0, 5 - (lines || []).length) }).map((_, i) => (
               <tr key={`e${i}`}>
-                {Array.from({ length: 11 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
+                {Array.from({ length: 12 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr>
               <td colSpan={3} style={{ textAlign: 'center', color: GOLD_DARK, fontWeight: 800, fontStyle: 'italic' }}>Total</td>
+              <td />
               <td />
               <td className="rg-num">{totalPcs || ''}</td>
               <td className="rg-num">{totalMts ? fmt.num(totalMts) : ''}</td>

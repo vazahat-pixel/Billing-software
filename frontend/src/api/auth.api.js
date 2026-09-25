@@ -14,7 +14,15 @@ export const authApi = {
     return unwrap(post('/auth/login', { ...payload, ...identity }));
   },
   register: (payload) => unwrap(post('/auth/register', payload)),
-  me: () => unwrap(get('/auth/me', undefined, { skipAuthRedirect: true, forceNetwork: true, silent: true })),
+  // /auth/me returns { user }, not the usual { data } envelope. unwrap()
+  // therefore hands back the wrapper; callers need the inner profile.
+  me: async () => {
+    const body = await unwrap(get('/auth/me', undefined, { skipAuthRedirect: true, forceNetwork: true, silent: true }));
+    if (body && typeof body === 'object' && body.user && typeof body.user === 'object') {
+      return body.user;
+    }
+    return body;
+  },
   changePassword: (payload) => unwrap(post('/auth/change-password', payload)),
   forgotPassword: (payload) => unwrap(post('/auth/forgot-password', payload)),
   resetPassword: (payload) => unwrap(post('/auth/reset-password', payload)),

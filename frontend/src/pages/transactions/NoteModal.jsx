@@ -7,6 +7,8 @@ import { notifySuccess, notifyWarning, notifyError } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import { notesApi } from '../../api/masters.api';
+import useErpBookKeys from '../../hooks/useErpBookKeys';
+import ErpFindOverlay from '../../components/erp/ErpFindOverlay';
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 const round2 = (n) => Number(Number(n || 0).toFixed(2));
@@ -99,6 +101,10 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
   const [error, setError] = useState('');
   const [billLookupOpen, setBillLookupOpen] = useState(false);
   const [findQuery, setFindQuery] = useState('');
+  const [showFindModal, setShowFindModal] = useState(false);
+  const [findSearch, setFindSearch] = useState('');
+  const [findActiveIdx, setFindActiveIdx] = useState(0);
+  const findInputRef = useRef(null);
   const idempotencyKeyRef = useRef(newIdempotencyKey());
   const partyFieldRef = useRef(null);
   const initialNoteLoadedRef = useRef(null);
@@ -311,14 +317,60 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
   };
 
   const handleFind = () => {
-    const q = findQuery.trim().toLowerCase();
-    const found = q
-      ? noteList.find((n) => String(n.noteNo || '').toLowerCase().includes(q)
-        || String(n.partyName || '').toLowerCase().includes(q))
-      : noteList[0];
-    if (!found) return notifyWarning('No matching note found');
-    loadNote(found);
+    setFindSearch('');
+    const currentIdx = noteList.findIndex((n) => String(n._id || n.id) === String(selectedNoteId));
+    setFindActiveIdx(currentIdx >= 0 ? currentIdx : Math.max(0, noteList.length - 1));
+    setShowFindModal(true);
+    setTimeout(() => {
+      findInputRef.current?.focus();
+      try { findInputRef.current?.select(); } catch { /* ignore */ }
+    }, 40);
   };
+
+  const filteredNotes = useMemo(() => {
+    const q = findSearch.trim().toLowerCase();
+    if (!q) return noteList;
+    return noteList.filter((n) => {
+      const no = String(n.noteNo || n.vNo || '').toLowerCase();
+      const party = String(n.partyName || '').toLowerCase();
+      return no.includes(q) || no.replace(/\D/g, '').includes(q) || party.includes(q);
+    });
+  }, [noteList, findSearch]);
+
+  const navigateToAdjacentNote = (dir) => {
+    if (!noteList.length) return;
+    const currentIdx = noteList.findIndex((n) => String(n._id || n.id) === String(selectedNoteId));
+    let nextIdx = currentIdx + dir;
+    if (currentIdx === -1) nextIdx = dir > 0 ? 0 : noteList.length - 1;
+    if (nextIdx >= 0 && nextIdx < noteList.length) {
+      loadNote(noteList[nextIdx]);
+      notifySuccess(`Note #${noteList[nextIdx].noteNo || noteList[nextIdx].vNo} (${nextIdx + 1}/${noteList.length})`);
+    }
+  };
+
+  const handleFindKeyDown = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); setShowFindModal(false); return; }
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); setFindActiveIdx((p) => Math.min(p + 1, filteredNotes.length - 1)); return; }
+    if (e.key === '-' || e.key === '_') { e.preventDefault(); setFindActiveIdx((p) => Math.max(p - 1, 0)); return; }
+    if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); setFindActiveIdx((p) => Math.min(p + 1, filteredNotes.length - 1)); return; }
+    if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); setFindActiveIdx((p) => Math.max(p - 1, 0)); return; }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const n = filteredNotes[findActiveIdx];
+      if (n) { loadNote(n); setShowFindModal(false); }
+    }
+  };
+
+  useErpBookKeys({
+    isOpen,
+    mode,
+    readOnly,
+    showFind: showFindModal || billLookupOpen,
+    onFind: handleFind,
+    onNew: resetNew,
+    onPrev: () => navigateToAdjacentNote(-1),
+    onNext: () => navigateToAdjacentNote(1),
+  });
 
   const handleEdit = () => {
     if (!selectedNoteId) return notifyWarning('Find / select a note first');
@@ -678,7 +730,7 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
                 <SaveButtonLabel saving={saving} />
               </button>
               <button className="classic-erp-btn" type="button" onClick={() => (selectedNoteId ? setMode('View') : resetNew())} disabled={locked}>Cancel</button>
-              <button className="classic-erp-btn" type="button" onClick={handleFind}>Find</button>
+              <button className="classic-erp-btn font-bold bg-amber-100 border-amber-400 text-amber-900" type="button" onClick={handleFind} title="Quick Find (F3)">Find (F3)</button>
               <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || !selectedNoteId || mode !== 'View'}
                 title="Reverses the posted note — ledger, GST and bill outstanding are restored">Delete</button>
               <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
@@ -695,6 +747,31 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
         )}
       </ErpWindowedModal>
 
+      {showFindModal && (
+        <ErpFindOverlay
+          title="FIND NOTE"
+          search={findSearch}
+          onSearch={(val) => { setFindSearch(val); setFindActiveIdx(0); }}
+          inputRef={findInputRef}
+          onKeyDown={handleFindKeyDown}
+          countLabel="notes"
+          rows={filteredNotes.map((n) => ({
+            id: n._id || n.id,
+            no: n.noteNo || n.vNo || '',
+            party: n.partyName || '—',
+            meta: n.date ? new Date(n.date).toLocaleDateString('en-IN') : '—',
+            amount: `₹${Number(n.amount || n.netAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+            raw: n,
+          }))}
+          activeIdx={findActiveIdx}
+          onSelect={(row) => {
+            const n = row.raw || filteredNotes.find((x) => String(x._id || x.id) === String(row.id));
+            if (n) loadNote(n);
+            setShowFindModal(false);
+          }}
+          onClose={() => setShowFindModal(false)}
+        />
+      )}
       <BillNoLookupModal
         isOpen={billLookupOpen}
         onClose={() => setBillLookupOpen(false)}
@@ -709,22 +786,62 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
 
 const noteStyles = `
   .note-window {
-    max-width: 840px;
-    margin: 0 auto;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    margin: 0;
+    box-shadow: none;
   }
-  .note-body { padding: 6px 10px; background: #dbe7f5; font-size: 11px; }
-  .note-row { display: grid; gap: 6px; align-items: center; }
+  .note-body { padding: 4px 6px; background: #dbe7f5; font-size: 11px; }
+  .note-row { display: grid; gap: 6px; align-items: start; }
   .note-row--2 { grid-template-columns: 1.4fr 1fr; }
   .note-row--3 { grid-template-columns: 1.2fr 1fr 0.9fr; }
   .note-row--4 { grid-template-columns: repeat(4, 1fr); }
   .note-gstin { background: #fde8cf; }
   .note-hsn { background: #fde8cf; }
+
+  /* Fix label overflow/overlap inside note-window */
+  .note-window .classic-erp-field {
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: center;
+    min-width: 0;
+    overflow: visible;
+  }
+  .note-window .classic-erp-field > .classic-erp-label {
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    max-width: 72px;
+    display: block;
+    text-align: right;
+    padding-right: 2px;
+  }
+  .note-window .classic-erp-field > .classic-erp-input,
+  .note-window .classic-erp-field > .classic-erp-select,
+  .note-window .classic-erp-field > .classic-erp-control,
+  .note-window .classic-erp-field > .erp-combobox {
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+  }
+
   .note-calc-grid { display: grid; grid-template-columns: 1.1fr 1.2fr 1fr; gap: 6px; margin-top: 2px; }
   .note-gst-box, .note-tds-box { display: flex; flex-direction: column; gap: 3px; }
-  .note-gst-row { display: grid; grid-template-columns: 65px 55px 1fr; gap: 4px; align-items: center; }
+  .note-gst-row { display: grid; grid-template-columns: 58px 52px 1fr; gap: 4px; align-items: center; }
+  .note-gst-row > .classic-erp-label {
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+    display: block;
+  }
   .note-totals { display: flex; flex-direction: column; gap: 2px; font-size: 10.5px; font-weight: 700; }
-  .note-totals > div { display: flex; justify-content: space-between; gap: 6px; padding: 1.5px 5px; background: #fff; border: 1px solid #94a3b8; border-radius: 2px; }
+  .note-totals > div { display: flex; justify-content: space-between; gap: 6px; padding: 1.5px 5px; background: #fff; border: 1px solid #94a3b8; border-radius: 2px; overflow: hidden; }
+  .note-totals > div > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
+  .note-totals > div > b { white-space: nowrap; font-family: monospace; }
   .note-totals .note-rcm { background: #fff59d; }
   .note-totals .note-rcm b { color: #b91c1c; }
   .note-totals .note-net b, .note-totals .note-final b { color: #0f172a; }
@@ -732,5 +849,6 @@ const noteStyles = `
   .note-adjust { display: flex; flex-direction: column; gap: 3px; }
   .note-adjust-btn { align-self: flex-start; font-weight: 700; }
 `;
+
 
 export default NoteModal;

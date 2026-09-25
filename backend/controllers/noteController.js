@@ -14,14 +14,9 @@ const round2 = (n) => Number(Number(n || 0).toFixed(2));
 /** Compare money as whole paise — never trust float equality on currency. */
 const toPaise = (n) => Math.round(Number(n || 0) * 100);
 
-async function generateNoteNo(companyId, type, session = null) {
-  const prefix = type === 'Debit' ? 'DN' : 'CN';
-  const currentYear = new Date().getFullYear().toString().substring(2);
-  const nextYear = (new Date().getFullYear() + 1).toString().substring(2);
-  const fy = `${currentYear}-${nextYear}`;
-  const counterId = `${prefix}-${fy}-${companyId}`;
-  const seq = await Counter.nextSeq(counterId, session);
-  return `${prefix}-${fy}-${seq.toString().padStart(4, '0')}`;
+async function generateNoteNo(companyId, type, requested, session = null) {
+  const voucherSeriesService = require('../services/voucherSeriesService');
+  return voucherSeriesService.reserveNumber(companyId, 'note', requested, session);
 }
 
 /**
@@ -417,7 +412,7 @@ async function createNoteInternal(companyId, body, session, options = {}) {
   const { noteType, noteSide, partyLedger, party, totals, bill } =
     await resolveNoteContext(companyId, body, session);
 
-  const finalNoteNo = body.noteNo || await generateNoteNo(companyId, noteType, session);
+  const finalNoteNo = await generateNoteNo(companyId, noteType, body.noteNo, session);
 
   const created = await DebitCreditNote.create([{
     companyId,

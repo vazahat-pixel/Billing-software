@@ -12,6 +12,8 @@ export const salesApi = {
   update: (id, body) => unwrap(put(`/sales/${id}`, body)),
   updateStatus: (id, status) => unwrap(put(`/sales/${id}/status`, { status })),
   remove: (id) => unwrap(del(`/sales/${id}`)),
+  /** Bulk update LR details for multiple invoices at once */
+  bulkUpdateLr: (entries) => unwrap(put('/sales/lr-bulk', { entries })),
 };
 
 export default salesApi;

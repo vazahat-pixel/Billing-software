@@ -107,28 +107,17 @@ class SalesService {
       salesData.netAmount = totals.netAmount;
       if (totals.cess != null) salesData.cess = totals.cess;
 
-      const Counter = require('../models/Counter');
       const isHybridDesktop =
         String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
         String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
 
-      if (!salesData.invoiceNo || salesData.invoiceNo === 'AUTO') {
-        if (isHybridDesktop && !options.skipLeaseAllocation) {
-          // Hybrid offline: consume central-issued lease (no parallel numbering)
-          const numberLeaseService = require('./numberLeaseService');
-          const allocated = await numberLeaseService.consumeLocalLease(companyId, 'sales', { session });
-          salesData.invoiceNo = allocated.number;
-        } else {
-          try {
-            const voucherSeriesService = require('./voucherSeriesService');
-            const allocated = await voucherSeriesService.allocateNext(companyId, 'sales', { session });
-            salesData.invoiceNo = allocated.number;
-          } catch {
-            const counterId = `INV-${companyId}`;
-            const seq = await Counter.nextSeq(counterId, session);
-            salesData.invoiceNo = `INV-${seq}`;
-          }
-        }
+      const voucherSeriesService = require('./voucherSeriesService');
+      if (isHybridDesktop && !options.skipLeaseAllocation && (!salesData.invoiceNo || salesData.invoiceNo === 'AUTO')) {
+        const numberLeaseService = require('./numberLeaseService');
+        const allocated = await numberLeaseService.consumeLocalLease(companyId, 'sales', { session });
+        salesData.invoiceNo = allocated.number;
+      } else {
+        salesData.invoiceNo = await voucherSeriesService.reserveNumber(companyId, 'sales', salesData.invoiceNo, session);
       }
 
       const sales = new Sales(salesData);
@@ -552,6 +541,31 @@ class SalesService {
 
       return sale;
     }); // end withTransaction
+  }
+
+  /**
+   * Bulk update LR transport details on multiple sales invoices.
+   * Only fields provided (non-undefined) will be updated.
+   * Bills that already have an lrNo will be skipped silently.
+   * @param {string} companyId
+   * @param {Array<{id, lrNo, lrDate, baleNo, weight, freight, transport, station, brokerId, haste, remarks}>} entries
+   * @returns {Promise<Array>} updated documents
+   */
+  async bulkUpdateLr(companyId, entries) {
+    const results = [];
+    for (const entry of entries) {
+      const { id, ...lrFields } = entry;
+      if (!id) continue;
+      const sale = await Sales.findOne({ _id: id, companyId });
+      if (!sale) continue;
+      const LR_FIELDS = ['lrNo', 'lrDate', 'baleNo', 'weight', 'freight', 'transport', 'station', 'brokerId', 'haste', 'remarks'];
+      LR_FIELDS.forEach((f) => {
+        if (lrFields[f] !== undefined) sale[f] = lrFields[f];
+      });
+      await sale.save();
+      results.push(sale);
+    }
+    return results;
   }
 }
 

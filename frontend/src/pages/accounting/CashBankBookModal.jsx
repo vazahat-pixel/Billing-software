@@ -3,7 +3,6 @@ import useStore from '../../store/useStore';
 import { ERPCombobox, ErpKeyboardHintBar, FORM_KEYBOARD_HINTS } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import { notifySuccess, notifyWarning, notifyError } from '../../utils/notify';
-import { toast } from '../../store/useToastStore';
 import { erpConfirm } from '../../utils/confirm';
 import { Plus } from 'lucide-react';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
@@ -11,6 +10,9 @@ import BillNoLookupModal from './BillNoLookupModal';
 import AccountMasterModal from '../masters/AccountMasterModal';
 import NoteModal from '../transactions/NoteModal';
 import LedgerModal from '../LedgerModal';
+import { peekBillNo } from '../../utils/nextBillNo';
+import useErpBookKeys from '../../hooks/useErpBookKeys';
+import ErpFindOverlay from '../../components/erp/ErpFindOverlay';
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 
@@ -27,6 +29,14 @@ const dayLabel = (iso) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('en-IN', { weekday: 'short' });
+};
+
+const BILL_LINE_COUNT = 12;
+const blankBillLines = (n = BILL_LINE_COUNT) => Array.from({ length: n }, () => emptyBillRow());
+const padBillLines = (rows) => {
+  const list = Array.isArray(rows) && rows.length ? rows : [emptyBillRow()];
+  if (list.length >= BILL_LINE_COUNT) return list;
+  return [...list, ...blankBillLines(BILL_LINE_COUNT - list.length)];
 };
 
 const emptyBillRow = () => ({
@@ -101,8 +111,12 @@ const CashBankBookModal = ({
   const [billLookupTargetIdx, setBillLookupTargetIdx] = useState(null);
   const [bankMasterOpen, setBankMasterOpen] = useState(false);
   const [bankLedgerOpen, setBankLedgerOpen] = useState(false);
-  // Credit Note modal — opened when user clicks toast action after a discounted receipt save
+  // Credit Note modal — opened directly after a discounted receipt/payment save
   const [creditNoteModal, setCreditNoteModal] = useState({ open: false, noteId: null, type: 'Credit', side: 'Sales' });
+  const [showFindModal, setShowFindModal] = useState(false);
+  const [findSearch, setFindSearch] = useState('');
+  const [findActiveIdx, setFindActiveIdx] = useState(0);
+  const findInputRef = useRef(null);
   const openedRef = useRef(false);
   /** BillNo cells, indexed by row — drives the Enter → select → next-line loop. */
   const billNoRefs = useRef([]);
@@ -112,7 +126,7 @@ const CashBankBookModal = ({
   const idempotencyKeyRef = useRef(newIdempotencyKey());
 
   const [header, setHeader] = useState({
-    voucherNo: 'AUTO',
+    voucherNo: '',
     intBillFlag: 'N',
     intBillNo: '',
     slipNo: '',
@@ -127,7 +141,7 @@ const CashBankBookModal = ({
     scCode: 'SC27',
   });
 
-  const [billRows, setBillRows] = useState([emptyBillRow()]);
+  const [billRows, setBillRows] = useState(() => blankBillLines());
   const [footer, setFooter] = useState({
     remark1: '',
     remark2: '',
@@ -344,12 +358,32 @@ const CashBankBookModal = ({
         if (!v.bookKind) return true;
         return v.bookKind === kind;
       })
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
+      .sort((a, b) => {
+        const na = parseInt(String(a.voucherNo || '').replace(/\D/g, ''), 10);
+        const nb = parseInt(String(b.voucherNo || '').replace(/\D/g, ''), 10);
+        if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+        return new Date(a.date || 0) - new Date(b.date || 0);
+      });
   }, [vouchers, voucherType, isBank]);
 
+  const filteredVouchers = useMemo(() => {
+    const q = findSearch.trim().toLowerCase();
+    if (!q) return viewList;
+    return viewList.filter((v) => {
+      const no = String(v.voucherNo || '').toLowerCase();
+      const num = no.replace(/\D/g, '');
+      const party = String(v.partyName || v.partyId?.name || '').toLowerCase();
+      return no.includes(q) || num.includes(q) || party.includes(q);
+    });
+  }, [viewList, findSearch]);
+
   const resetNew = () => {
+    const series = voucherType === 'Payment' ? 'payment' : 'receipt';
+    peekBillNo(series).then((voucherNo) => {
+      setHeader((h) => (h.voucherNo === 'AUTO' || h.voucherNo === '' ? { ...h, voucherNo } : h));
+    });
     setHeader({
-      voucherNo: 'AUTO',
+      voucherNo: '',
       intBillFlag: 'N',
       intBillNo: '',
       slipNo: '',
@@ -364,7 +398,7 @@ const CashBankBookModal = ({
       bankLedgerId: bankCashLedgers[0]?._id || bankCashLedgers[0]?.id || '',
       scCode: 'SC27',
     });
-    setBillRows([emptyBillRow()]);
+    setBillRows(blankBillLines());
     setFooter({ remark1: '', remark2: '', financeFlag: false, finance: 0 });
     setSelectedVoucherId('');
     setError('');
@@ -391,10 +425,8 @@ const CashBankBookModal = ({
 
     let cancelled = false;
     const state = useStore.getState();
-    const needParties = !(state.parties && state.parties.length);
     const needLedgers = !(state.ledgers && state.ledgers.length);
-    const blocking = [];
-    if (needParties) blocking.push(fetchParties());
+    const blocking = [fetchParties()];
     if (needLedgers) blocking.push(fetchLedgers());
 
     if (blocking.length) {
@@ -471,7 +503,7 @@ const CashBankBookModal = ({
   // BillLookupModal se manually select ki jaayengi.
   useEffect(() => {
     if (!isOpen || mode === 'View') return;
-    setBillRows([emptyBillRow()]);
+    setBillRows(blankBillLines());
   }, [header.partyId, header.accBill]);
 
   /** BillNo Entry — click, Enter, Space, or F4 on a row's BillNo cell opens the bill picker. */
@@ -553,7 +585,7 @@ const CashBankBookModal = ({
   }, [billRows]);
 
   const removeBillRow = (idx) => {
-    setBillRows((rows) => (rows.length <= 1 ? [emptyBillRow()] : rows.filter((_, i) => i !== idx)));
+    setBillRows((rows) => padBillLines(rows.length <= 1 ? [emptyBillRow()] : rows.filter((_, i) => i !== idx)));
   };
 
   const setH = (key) => (e) => {
@@ -666,7 +698,7 @@ const CashBankBookModal = ({
       oth1: a.oth1 || 0,
       oth2: a.oth2 || 0,
     }));
-    setBillRows(rows.length ? rows : [emptyBillRow()]);
+    setBillRows(padBillLines(rows));
     setFooter({
       remark1: v.narration || '',
       remark2: v.remark2 || '',
@@ -695,21 +727,79 @@ const CashBankBookModal = ({
   };
 
   const handleFind = () => {
-    const q = (findQuery || '').trim().toLowerCase();
-    if (!q) {
-      if (viewList[0]) loadVoucher(viewList[0]);
-      else notifyWarning('No vouchers found');
+    handleOpenFindModal();
+  };
+
+  const handleOpenFindModal = () => {
+    setFindSearch('');
+    const currentIdx = viewList.findIndex((v) => String(v._id || v.id) === String(selectedVoucherId));
+    setFindActiveIdx(currentIdx >= 0 ? currentIdx : Math.max(0, viewList.length - 1));
+    setShowFindModal(true);
+    setTimeout(() => {
+      findInputRef.current?.focus();
+      try { findInputRef.current?.select(); } catch { /* ignore */ }
+    }, 40);
+  };
+
+  const navigateToAdjacentVoucher = (dir) => {
+    if (!viewList.length) return;
+    const currentIdx = viewList.findIndex((v) => String(v._id || v.id) === String(selectedVoucherId));
+    let nextIdx = currentIdx + dir;
+    if (currentIdx === -1) nextIdx = dir > 0 ? 0 : viewList.length - 1;
+    if (nextIdx >= 0 && nextIdx < viewList.length) {
+      const next = viewList[nextIdx];
+      loadVoucher(next);
+      notifySuccess(`${voucherType} #${next.voucherNo} (${nextIdx + 1}/${viewList.length})`);
+    }
+  };
+
+  const handleFindKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setShowFindModal(false);
       return;
     }
-    const found = viewList.find(
-      (v) =>
-        String(v.voucherNo || '').toLowerCase() === q ||
-        String(v.partyName || '').toLowerCase().includes(q) ||
-        String(v.slipNo || '').toLowerCase() === q
-    );
-    if (!found) return notifyWarning('Voucher not found');
-    loadVoucher(found);
+    if (e.key === '+' || e.key === '=') {
+      e.preventDefault();
+      setFindActiveIdx((prev) => Math.min(prev + 1, filteredVouchers.length - 1));
+      return;
+    }
+    if (e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      setFindActiveIdx((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 'PageDown') {
+      e.preventDefault();
+      setFindActiveIdx((prev) => Math.min(prev + 1, filteredVouchers.length - 1));
+      return;
+    }
+    if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault();
+      setFindActiveIdx((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const v = filteredVouchers[findActiveIdx];
+      if (v) {
+        loadVoucher(v);
+        setShowFindModal(false);
+        notifySuccess(`${voucherType} #${v.voucherNo}`);
+      }
+    }
   };
+
+  useErpBookKeys({
+    isOpen,
+    mode,
+    readOnly,
+    showFind: showFindModal || billLookupOpen,
+    onFind: handleOpenFindModal,
+    onNew: handleNew,
+    onPrev: () => navigateToAdjacentVoucher(-1),
+    onNext: () => navigateToAdjacentVoucher(1),
+  });
 
   const handleCancel = () => {
     if (selectedVoucherId) {
@@ -899,28 +989,20 @@ const CashBankBookModal = ({
         status: 'Posted',
       };
 
-      /** Helper: show a Credit Note toast for each auto-generated note after save */
-      const showCreditNoteToast = (discountNotes, type) => {
+      /** Helper: directly open NoteModal for each auto-generated note after save */
+      const openCreditNoteDirectly = (discountNotes, type) => {
         if (!discountNotes || !discountNotes.length) return;
-        discountNotes.forEach((cn) => {
-          const noteId = String(cn._id || cn.id || '');
-          const noteNo = cn.noteNo || cn.vNo || '';
-          const amt = cn.amount ? `₹${Number(cn.amount).toFixed(2)}` : '';
-          const noteSide = cn.noteSide || (type === 'Receipt' ? 'Sales' : 'Purchase');
-          const noteType = cn.noteType || 'Credit';
-          toast.success(
-            `🗒️ ${noteType} Note auto-created${noteNo ? ` #${noteNo}` : ''}${amt ? ` — ${amt}` : ''} (Discount)`,
-            {
-              duration: 10000,
-              action: {
-                label: `Open ${noteType} Note`,
-                dismiss: true,
-                onClick: () => {
-                  setCreditNoteModal({ open: true, noteId, type: noteType, side: noteSide });
-                },
-              },
-            }
-          );
+        // Open the first note directly (most common case: one discount note per voucher)
+        const cn = discountNotes[0];
+        const noteId = String(cn._id || cn.id || '');
+        const noteSide = cn.noteSide || (type === 'Receipt' ? 'Sales' : 'Purchase');
+        const noteType = cn.noteType || 'Credit';
+        setCreditNoteModal({ open: true, noteId, type: noteType, side: noteSide });
+        // If multiple notes, notify for the rest
+        discountNotes.slice(1).forEach((extra) => {
+          const extraNo = extra.noteNo || extra.vNo || '';
+          const extraAmt = extra.amount ? `₹${Number(extra.amount).toFixed(2)}` : '';
+          notifySuccess(`${extra.noteType || 'Credit'} Note auto-created${extraNo ? ` #${extraNo}` : ''}${extraAmt ? ` — ${extraAmt}` : ''}`);
         });
       };
 
@@ -932,15 +1014,15 @@ const CashBankBookModal = ({
         delete editPayload.idempotencyKey;
         const result = await updateVoucher(selectedVoucherId, editPayload);
         notifySuccess(`${voucherType} updated — ledger & bill outstanding re-posted`);
-        showCreditNoteToast(result?.discountNotes, voucherType);
+        openCreditNoteDirectly(result?.discountNotes, voucherType);
       } else if (voucherType === 'Receipt') {
         const result = await addReceipt(payload);
         notifySuccess(`${voucherType} saved successfully`);
-        showCreditNoteToast(result?.discountNotes, voucherType);
+        openCreditNoteDirectly(result?.discountNotes, voucherType);
       } else {
         const result = await addPayment(payload);
         notifySuccess(`${voucherType} saved successfully`);
-        showCreditNoteToast(result?.discountNotes, voucherType);
+        openCreditNoteDirectly(result?.discountNotes, voucherType);
       }
 
       await fetchVouchers();
@@ -961,9 +1043,9 @@ const CashBankBookModal = ({
 
   return (
     <>
-    <ErpWindowedModal isOpen={isOpen} onClose={onClose} title={windowTitle} windowId={`cashbank-${bookKind}-${initialType || 'Receipt'}`} bare>
+    <ErpWindowedModal isOpen={isOpen} onClose={onClose} title={windowTitle} windowId={`cashbank-${bookKind}-${initialType || 'Receipt'}`} defaultMode="maximized" bare>
       {({ WindowControls }) => (
-      <div className="classic-erp-window flex flex-col h-full min-h-0 !max-h-none">
+      <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 !max-h-none">
         <ErpBusyOverlay show={bootLoading} message="Loading cash/bank book…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving voucher…" />
         <div className="classic-erp-header shrink-0">
@@ -973,25 +1055,18 @@ const CashBankBookModal = ({
 
         <div className="classic-erp-body cash-bank-form flex-1 overflow-y-auto flex flex-col">
           <div className="classic-erp-frame cash-bank-header">
-            <div
-              className="cash-bank-row"
-              style={{
-                gridTemplateColumns: isBankReceipt
-                  ? 'minmax(200px,1.1fr) minmax(180px,1fr) minmax(120px,0.7fr) auto'
-                  : 'minmax(200px,1.1fr) minmax(180px,1fr) auto',
-              }}
-            >
-              <div className="classic-erp-field">
+            <div className="cash-bank-row cash-bank-row--pack">
+              <div className="classic-erp-field cb-f-voucher">
                 <span className="classic-erp-label">Voucher No:</span>
                 <div className="classic-erp-control">
-                  <input type="text" className="classic-erp-input text-center" style={{ maxWidth: 72 }} value={header.voucherNo} readOnly />
+                  <input type="text" className="classic-erp-input text-center" value={header.voucherNo} readOnly />
                   <button type="button" className="classic-erp-btn" style={{ padding: '0 8px', minWidth: 28 }} title="Browse" onClick={handleFind} disabled={readOnly}>…</button>
                 </div>
               </div>
-              <div className="classic-erp-field">
+              <div className="classic-erp-field cb-f-int">
                 <span className="classic-erp-label">Int.B.No:</span>
                 <div className="classic-erp-control">
-                  <select className="classic-erp-select" style={{ maxWidth: 48 }} value={header.intBillFlag} onChange={setH('intBillFlag')} disabled={locked}>
+                  <select className="classic-erp-select" value={header.intBillFlag} onChange={setH('intBillFlag')} disabled={locked}>
                     <option value="N">N</option>
                     <option value="Y">Y</option>
                   </select>
@@ -999,27 +1074,12 @@ const CashBankBookModal = ({
                 </div>
               </div>
               {isBankReceipt && (
-                <div className="classic-erp-field classic-erp-field--sm">
+                <div className="classic-erp-field cb-f-slip">
                   <span className="classic-erp-label">Slip No:</span>
                   <input type="text" className="classic-erp-input" value={header.slipNo} onChange={setH('slipNo')} disabled={locked} />
                 </div>
               )}
-              <div className="cash-bank-meta-right">
-                <span>{Number(closingBal || 0).toFixed(2)}</span>
-                <span>{header.scCode || 'SC27'}</span>
-              </div>
-            </div>
-
-            <div
-              className="cash-bank-row"
-              style={{
-                // Date [+ Cheq No, Cheq Date, Clear Dt when bank] [+ P.Bank on any bank voucher — Payment or Receipt]
-                gridTemplateColumns: isBank
-                  ? 'minmax(180px,1fr) minmax(120px,0.8fr) minmax(150px,0.9fr) minmax(150px,0.9fr) minmax(200px,1.1fr)'
-                  : 'minmax(240px,1fr)',
-              }}
-            >
-              <div className="classic-erp-field">
+              <div className="classic-erp-field cb-f-date">
                 <span className="classic-erp-label">Date:</span>
                 <div className="classic-erp-control">
                   <input type="date" className="classic-erp-input" value={header.date} onChange={setH('date')} disabled={locked} />
@@ -1028,24 +1088,20 @@ const CashBankBookModal = ({
               </div>
               {isBank && (
                 <>
-                  <div className="classic-erp-field classic-erp-field--sm">
+                  <div className="classic-erp-field cb-f-cheq">
                     <span className="classic-erp-label">Cheq No:</span>
                     <input type="text" className="classic-erp-input" value={header.chequeNo} onChange={setH('chequeNo')} disabled={locked} />
                   </div>
-                  <div className="classic-erp-field classic-erp-field--xs">
+                  <div className="classic-erp-field cb-f-cdate">
                     <span className="classic-erp-label">Date:</span>
                     <input type="date" className="classic-erp-input" value={header.chequeDate} onChange={setH('chequeDate')} disabled={locked} />
                   </div>
-                  {/* Blank until the instrument actually clears the bank. */}
-                  <div className="classic-erp-field classic-erp-field--xs" data-enter-skip>
+                  <div className="classic-erp-field cb-f-clear" data-enter-skip>
                     <span className="classic-erp-label">Clear Dt:</span>
                     <input type="date" className="classic-erp-input" value={header.clearDate} onChange={setH('clearDate')} disabled={locked} title="Date the cheque/transfer cleared the bank" />
                   </div>
-                </>
-              )}
-              {isBank && (
-                <div className="classic-erp-field classic-erp-field--sm">
-                  <span className="classic-erp-label">P.Bank:</span>
+                  <div className="classic-erp-field cb-f-pbank">
+                    <span className="classic-erp-label">P.Bank:</span>
                   <div className="classic-erp-control">
                     <ERPCombobox
                       value={header.partyBank}
@@ -1085,11 +1141,17 @@ const CashBankBookModal = ({
                     )}
                   </div>
                 </div>
+                </>
               )}
+              <div className="cash-bank-meta-right">
+                <span>{Number(closingBal || 0).toFixed(2)}</span>
+                <span>{header.scCode || 'SC27'}</span>
+              </div>
             </div>
 
-            <div className="cash-bank-row cash-bank-row--3">
-              <div className="classic-erp-field" ref={partyFieldRef}>
+            {/* Field order here IS the Enter-key order: Party → Bank/Cash → Amount → Acc/Bill → BillNo. */}
+            <div className="cash-bank-row cash-bank-row--pack">
+              <div className="classic-erp-field cb-f-party" ref={partyFieldRef}>
                 <span className="classic-erp-label">Party:</span>
                 <ERPCombobox
                   value={header.partyId}
@@ -1104,47 +1166,42 @@ const CashBankBookModal = ({
                 <span className="classic-erp-label">Cl.Bal</span>
                 <span className="font-mono">{Number(closingBal || 0).toFixed(2)}</span>
               </div>
-            </div>
-
-            {/* Field order here IS the Enter-key order: Party → Bank/Cash → Amount → Acc/Bill → BillNo. */}
-            <div className={`cash-bank-row ${isOnAccount ? 'cash-bank-row--4' : 'cash-bank-row--5'}`}>
-              <div className="classic-erp-field classic-erp-field--xs">
-                <div className="flex items-center justify-between">
-                  <span className="classic-erp-label">{isBank ? 'Bank:' : 'Cash:'}</span>
+              <div className="classic-erp-field cb-f-bank">
+                <span className="classic-erp-label">{isBank ? 'Bank:' : 'Cash:'}</span>
+                <div className="classic-erp-control">
+                  <ERPCombobox
+                    value={header.bankLedgerId}
+                    onChange={(val) => setHeader((h) => ({ ...h, bankLedgerId: val }))}
+                    options={bankCashLedgers.map((l) => ({ value: l._id || l.id, label: l.name }))}
+                    placeholder={noBookLedger ? `No ${isBank ? 'Bank' : 'Cash'} ledger` : `Select ${isBank ? 'Bank' : 'Cash'}…`}
+                    disabled={locked}
+                    recentKey={`cash-bank-ledger-${settlementKind}`}
+                    emptyMessage={`No ledger with account type "${isBank ? 'Bank' : 'Cash'}"`}
+                  />
                   {header.bankLedgerId && (
                     <button
                       type="button"
-                      className="text-[10px] text-blue-700 hover:text-blue-900 font-bold underline cursor-pointer"
+                      className="classic-erp-btn"
                       onClick={() => setBankLedgerOpen(true)}
-                      title="Open Bank Ledger Statement (Zoom Ledger)"
+                      title="Open this bank or cash ledger"
                     >
-                      Zoom Ledger
+                      Ledger
                     </button>
                   )}
                 </div>
-                <ERPCombobox
-                  value={header.bankLedgerId}
-                  onChange={(val) => setHeader((h) => ({ ...h, bankLedgerId: val }))}
-                  options={bankCashLedgers.map((l) => ({ value: l._id || l.id, label: l.name }))}
-                  placeholder={noBookLedger ? `No ${isBank ? 'Bank' : 'Cash'} ledger` : `Select ${isBank ? 'Bank' : 'Cash'}…`}
-                  disabled={locked}
-                  recentKey={`cash-bank-ledger-${settlementKind}`}
-                  emptyMessage={`No ledger with account type "${isBank ? 'Bank' : 'Cash'}"`}
-                />
               </div>
-              <div className="classic-erp-field classic-erp-field--sm">
+              <div className="classic-erp-field cb-f-amt">
                 <span className="classic-erp-label">Amount:</span>
                 <input type="number" className="classic-erp-input text-right font-bold" value={header.amount} onChange={setH('amount')} disabled={locked} />
               </div>
-              <div className="classic-erp-field classic-erp-field--sm">
+              <div className="classic-erp-field cb-f-acc">
                 <span className="classic-erp-label">Acc/Bill:</span>
                 <select className="classic-erp-select text-center" value={header.accBill} onChange={setH('accBill')} disabled={locked}>
                   <option value="B">B</option>
                   <option value="A">A</option>
                 </select>
               </div>
-              {/* Preset by whichever menu opened this window — kept out of the Enter chain. */}
-              <div className="classic-erp-field classic-erp-field--xs" data-enter-skip>
+              <div className="classic-erp-field cb-f-type" data-enter-skip>
                 <span className="classic-erp-label">Type:</span>
                 <select className="classic-erp-select" value={voucherType} onChange={(e) => setVoucherType(e.target.value)} disabled={locked || mode === 'Edit'}>
                   <option value="Receipt">Receipt</option>
@@ -1192,7 +1249,7 @@ const CashBankBookModal = ({
               balance. No bill selection needed. Switch Acc/Bill to <b>B</b> to settle against specific bills.
             </div>
           ) : (
-          <div className="classic-erp-table-container flex-1 min-h-[200px]" style={{ background: '#f5ecd8' }}>
+          <div className="classic-erp-table-container cash-bank-lines flex-1 min-h-0">
             <table className="classic-erp-table cash-bank-bill-grid">
               <thead>
                 <tr>
@@ -1266,7 +1323,7 @@ const CashBankBookModal = ({
                             removeBillRow(idx);
                           }
                         }}
-                        placeholder="Click or Enter/Space ⇒ pick bill"
+                        placeholder="Pick bill"
                         disabled={locked}
                       />
                     </td>
@@ -1307,7 +1364,7 @@ const CashBankBookModal = ({
                 disabled={!header.partyId}
                 onClick={() => {
                   if (!header.partyId || header.accBill !== 'B') {
-                    setBillRows([emptyBillRow()]);
+                    setBillRows(blankBillLines());
                     return;
                   }
                   const rows = partyInvoices.map((inv) => ({
@@ -1323,7 +1380,7 @@ const CashBankBookModal = ({
                     netOs: inv.osAmt,
                     adjust: 0,
                   }));
-                  setBillRows(rows.length ? [...rows, emptyBillRow()] : [emptyBillRow()]);
+                  setBillRows(padBillLines(rows.length ? [...rows, emptyBillRow()] : []));
                 }}
               >
                 Load Outstanding Bills
@@ -1430,6 +1487,8 @@ const CashBankBookModal = ({
           <ErpKeyboardHintBar
             items={[
               ...FORM_KEYBOARD_HINTS,
+              { keys: 'F3', label: 'Find' },
+              { keys: '+/−', label: 'Next/Prev' },
               { keys: 'F4', label: 'Bill' },
               { keys: 'Space', label: 'O/S' },
             ]}
@@ -1455,7 +1514,7 @@ const CashBankBookModal = ({
             <SaveButtonLabel saving={saving} />
           </button>
           <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked}>Cancel</button>
-          <button className="classic-erp-btn" type="button" onClick={handleFind}>Find</button>
+          <button className="classic-erp-btn font-bold bg-amber-100 border-amber-400 text-amber-900" type="button" onClick={handleOpenFindModal} title="Quick Find (F3)">Find (F3)</button>
           <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || !selectedVoucherId || mode !== 'View'} title="Reverses posted voucher — ledger entries and bill outstanding are undone, not hard-deleted">Delete</button>
           <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
           <button className="classic-erp-btn font-bold text-blue-800" type="button" onClick={() => setBankLedgerOpen(true)} disabled={!header.bankLedgerId} title="Open Bank/Cash Ledger (Zoom Ledger)">Zoom Ledger</button>
@@ -1499,6 +1558,32 @@ const CashBankBookModal = ({
       initialSide={creditNoteModal.side}
       initialNoteId={creditNoteModal.noteId}
     />
+
+    {showFindModal && (
+      <ErpFindOverlay
+        title="FIND VOUCHER"
+        search={findSearch}
+        onSearch={(val) => { setFindSearch(val); setFindActiveIdx(0); }}
+        inputRef={findInputRef}
+        onKeyDown={handleFindKeyDown}
+        countLabel="vouchers"
+        rows={filteredVouchers.map((v) => ({
+          id: v._id || v.id,
+          no: v.voucherNo || '',
+          party: v.partyName || v.partyId?.name || '—',
+          meta: v.date ? new Date(v.date).toLocaleDateString('en-IN') : '—',
+          amount: `₹${Number(v.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+          raw: v,
+        }))}
+        activeIdx={findActiveIdx}
+        onSelect={(row) => {
+          const v = row.raw || filteredVouchers.find((x) => String(x._id || x.id) === String(row.id));
+          if (v) loadVoucher(v);
+          setShowFindModal(false);
+        }}
+        onClose={() => setShowFindModal(false)}
+      />
+    )}
 
     {bankLedgerOpen && (
       <LedgerModal

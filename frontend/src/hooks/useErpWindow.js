@@ -1,30 +1,37 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import useWindowDockStore, { yieldOtherWindows } from '../store/useWindowDockStore';
 
-const MIN_W = 640;
-const MIN_H = 400;
+const TOP_CHROME = 72;
+let windowZ = 1200;
 
-const saltFromId = (id) => {
-  const s = String(id || '');
-  let n = 0;
-  for (let i = 0; i < s.length; i += 1) n += s.charCodeAt(i);
-  return n;
-};
+/** Pull one ERP window above the others (ledger line → bill). */
+export function focusErpWindow(windowId) {
+  if (typeof window === 'undefined' || !windowId) return;
+  window.dispatchEvent(new CustomEvent('erp-window-focus', { detail: { id: windowId } }));
+}
+
+/** Step a window into the dock so the document just opened is the one on screen. */
+export function minimizeErpWindow(windowId) {
+  if (typeof window === 'undefined' || !windowId) return;
+  window.dispatchEvent(new CustomEvent('erp-window-minimize', { detail: { id: windowId } }));
+}
 
 const floatingSize = () => {
-  if (typeof window === 'undefined') return { w: 880, h: 540 };
+  if (typeof window === 'undefined') return { w: 1100, h: 640 };
+  const maxW = Math.max(320, window.innerWidth - 24);
+  const maxH = Math.max(280, window.innerHeight - TOP_CHROME - 28);
   return {
-    w: Math.min(880, Math.max(MIN_W, Math.floor(window.innerWidth * 0.62))),
-    h: Math.min(560, Math.max(MIN_H, Math.floor(window.innerHeight * 0.68))),
+    w: Math.min(maxW, 1180),
+    h: Math.min(maxH, 660),
   };
 };
 
-const floatingPos = (box, id) => {
-  if (typeof window === 'undefined') return { x: 48, y: 56 };
-  const offset = (saltFromId(id) % 6) * 28;
-  const x = Math.max(24, window.innerWidth - box.w - 28 - offset);
-  const y = Math.max(40, Math.min(72 + offset, window.innerHeight - box.h - 24));
-  return { x, y };
+const floatingPos = (box) => {
+  if (typeof window === 'undefined') return { x: 24, y: TOP_CHROME };
+  return {
+    x: Math.max(8, Math.round((window.innerWidth - box.w) / 2)),
+    y: TOP_CHROME,
+  };
 };
 
 /**
@@ -33,8 +40,9 @@ const floatingPos = (box, id) => {
  * @param {{ id?: string, title?: string, onClose?: () => void }} options
  */
 export default function useErpWindow(isOpen, options = {}) {
-  const { id = 'window', title = 'Window', onClose, defaultMode = 'maximized' } = options;
+  const { id = 'window', title = 'Window', onClose, defaultMode = 'normal' } = options;
   const [mode, setMode] = useState(defaultMode);
+  const [z, setZ] = useState(1200);
   const [box, setBox] = useState(floatingSize);
   const [pos, setPos] = useState(() => floatingPos(floatingSize(), id));
   const resizing = useRef(null);
@@ -44,6 +52,33 @@ export default function useErpWindow(isOpen, options = {}) {
   onCloseRef.current = onClose;
   titleRef.current = title;
 
+  const raise = useCallback(() => {
+    setZ((current) => {
+      if (current === windowZ && current > 1200) return current;
+      windowZ += 1;
+      return windowZ;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) setZ(1200);
+  }, [isOpen]);
+
+  useEffect(() => {
+    const onFocus = (e) => {
+      if (e.detail?.id === id) raise();
+    };
+    const onMin = (e) => {
+      if (e.detail?.id === id && isOpen) setMode('minimized');
+    };
+    window.addEventListener('erp-window-focus', onFocus);
+    window.addEventListener('erp-window-minimize', onMin);
+    return () => {
+      window.removeEventListener('erp-window-focus', onFocus);
+      window.removeEventListener('erp-window-minimize', onMin);
+    };
+  }, [id, isOpen, raise]);
+
   useEffect(() => {
     if (!isOpen) {
       setMode(defaultMode);
@@ -51,7 +86,16 @@ export default function useErpWindow(isOpen, options = {}) {
     }
   }, [isOpen, id, defaultMode]);
 
-  // Register / unregister minimized chip in global tray
+  useEffect(() => {
+    if (!isOpen || mode !== 'normal') return undefined;
+    const fit = () => {
+      const next = floatingSize();
+      setBox(next);
+      setPos(floatingPos(next));
+    };
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [isOpen, mode]);
   useEffect(() => {
     if (!isOpen || mode !== 'minimized') {
       useWindowDockStore.getState().unregister(id);
@@ -62,7 +106,8 @@ export default function useErpWindow(isOpen, options = {}) {
       title: titleRef.current || title || id,
       restore: () => {
         yieldOtherWindows(id);
-        setMode('maximized');
+        raise();
+        setMode(defaultMode === 'maximized' ? 'maximized' : 'normal');
       },
       close: () => {
         useWindowDockStore.getState().unregister(id);
@@ -70,7 +115,7 @@ export default function useErpWindow(isOpen, options = {}) {
       },
     });
     return () => useWindowDockStore.getState().unregister(id);
-  }, [isOpen, mode, id, title]);
+  }, [isOpen, mode, id, title, raise, defaultMode]);
 
   // When another window opens maximized, yield this one to the dock
   useEffect(() => {
@@ -83,7 +128,7 @@ export default function useErpWindow(isOpen, options = {}) {
     return () => window.removeEventListener('erp-window-yield', onYield);
   }, [id, isOpen]);
 
-  // Opening maximized claims focus — ask others to minimize
+  // Opening maximized claims focus â€” ask others to minimize
   useEffect(() => {
     if (isOpen && mode === 'maximized') {
       yieldOtherWindows(id);
@@ -179,12 +224,13 @@ export default function useErpWindow(isOpen, options = {}) {
 
   const onShellPointerDown = useCallback(
     (e) => {
+      raise();
       if (mode !== 'normal') return;
       if (!e.target.closest?.('.classic-erp-header')) return;
       if (e.target.closest?.('button, input, select, textarea, a, .erp-window-controls')) return;
       onDragPointerDown(e);
     },
-    [mode, onDragPointerDown]
+    [mode, onDragPointerDown, raise]
   );
 
   const isFloating = mode === 'normal';
@@ -206,7 +252,7 @@ export default function useErpWindow(isOpen, options = {}) {
 
   const modalClassName =
     mode === 'maximized'
-      ? 'max-w-[98vw] w-[98vw] !h-[calc(100dvh-16px)] !max-h-[calc(100dvh-16px)] flex flex-col'
+      ? 'erp-bill-window--max flex flex-col'
       : mode === 'normal'
         ? 'erp-bill-window--normal erp-bill-window--floating flex flex-col'
         : 'hidden';
@@ -227,7 +273,10 @@ export default function useErpWindow(isOpen, options = {}) {
     isMinimized: mode === 'minimized',
     isMaximized: mode === 'maximized',
     isFloating,
-    inertBackdrop: isFloating,
+    inertBackdrop: mode !== 'maximized', // minimized windows must NOT block UI behind them
     windowId: id,
+    z,
+    focus: raise,
   };
 }
+

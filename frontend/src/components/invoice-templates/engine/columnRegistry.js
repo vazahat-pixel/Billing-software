@@ -343,20 +343,20 @@ export const COLUMN_DEFS = {
 
 /** Preset column sets per template / business type */
 export const COLUMN_PRESETS = {
-  standard: ['sno', 'item', 'hsn', 'qty', 'rate', 'amount'],
-  gstDetailed: ['sno', 'item', 'hsn', 'qty', 'rate', 'taxable', 'gst', 'gstAmt', 'amount'],
-  /** Surat textile tax invoice — matches classic ERP print format (Fold, Cut, Pcs, Mtrs, Net Mtrs, Rate, Amount) */
-  textileClassic: ['sno', 'item', 'hsn', 'fold', 'cut', 'pcs', 'mts', 'netMts', 'rate', 'amount'],
+  standard: ['sno', 'item', 'hsn', 'fold', 'qty', 'rate', 'discount', 'amount'],
+  gstDetailed: ['sno', 'item', 'hsn', 'fold', 'qty', 'rate', 'discount', 'taxable', 'gst', 'gstAmt', 'amount'],
+  /** Surat textile tax invoice — Fold + Disc always printed so every theme matches the bill. */
+  textileClassic: ['sno', 'item', 'hsn', 'fold', 'cut', 'pcs', 'mts', 'netMts', 'rate', 'discount', 'amount'],
   textileSuratFull: [
-    'sno', 'item', 'hsn', 'fold', 'cut', 'pcs', 'mts', 'netMts', 'rate', 'amount',
+    'sno', 'item', 'hsn', 'fold', 'cut', 'pcs', 'mts', 'netMts', 'rate', 'discount', 'amount',
   ],
   textile: ['sno', 'item', 'hsn', 'lot', 'fold', 'cut', 'pcs', 'mts', 'rate', 'discount', 'amount'],
   textileFull: [
     'sno', 'item', 'hsn', 'lot', 'designNo', 'colour', 'fold', 'cut', 'pcs', 'mts',
     'weight', 'rate', 'discount', 'amount',
   ],
-  international: ['sno', 'item', 'qty', 'rate', 'taxable', 'gstAmt', 'amount'],
-  minimal: ['sno', 'item', 'qty', 'rate', 'amount'],
+  international: ['sno', 'item', 'fold', 'qty', 'rate', 'discount', 'taxable', 'gstAmt', 'amount'],
+  minimal: ['sno', 'item', 'fold', 'qty', 'rate', 'discount', 'amount'],
 };
 
 const TEMPLATE_PRESETS = {
@@ -374,7 +374,7 @@ const TEMPLATE_PRESETS = {
 export function resolvePrintColumns({ templateId, lines = [], businessType = '', columnIds } = {}) {
   const presetKey = columnIds || TEMPLATE_PRESETS[templateId] || 'standard';
   const preset = COLUMN_PRESETS[presetKey] || COLUMN_PRESETS.standard;
-  const core = new Set(['sno', 'item', 'rate', 'amount', 'qty']);
+  const core = new Set(['sno', 'item', 'rate', 'amount', 'qty', 'fold', 'discount']);
 
   const isTextile = /textile|fabric|garment|weaving|processing/i.test(businessType || '');
   let ids = [...preset];

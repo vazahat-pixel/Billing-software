@@ -62,8 +62,11 @@ const COMPANY_UPDATE_ALLOW = new Set([
     'email',
     'city',
     'state',
+    'district',
     'pincode',
 ]);
+
+const COMPANY_LOCATION_KEYS = ['city', 'state', 'district', 'gstin', 'address', 'phone', 'pincode'];
 
 // DASHBOARD STATS
 exports.getAdminStats = async (req, res) => {
@@ -116,10 +119,29 @@ exports.getAdminStats = async (req, res) => {
 // COMPANIES
 exports.getAllCompanies = async (req, res) => {
     try {
+        const CompanySettings = require('../models/CompanySettings');
         const companies = await Company.find()
             .populate('ownerId', 'name email')
-            .populate('planId');
-        res.status(200).json(companies);
+            .populate('planId')
+            .lean();
+        const settings = await CompanySettings.find({
+            companyId: { $in: companies.map((c) => c._id) },
+        }).select('companyId state city district gstin').lean();
+        const byCompany = new Map(settings.map((s) => [String(s.companyId), s]));
+        const rows = companies.map((c) => {
+            const saved = byCompany.get(String(c._id)) || {};
+            const meta = c.meta || {};
+            return {
+                ...c,
+                location: {
+                    state: saved.state || meta.state || '',
+                    city: saved.city || meta.city || '',
+                    district: saved.district || meta.district || '',
+                    gstin: saved.gstin || meta.gstin || '',
+                },
+            };
+        });
+        res.status(200).json(rows);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -283,8 +305,27 @@ exports.updateCompany = async (req, res) => {
                 delete patch.planId; // already applied via lifecycle
             } catch { /* optional — still apply other fields */ }
         }
-        if (Object.keys(patch).length) {
-            await Company.findByIdAndUpdate(id, patch, { new: true });
+        const location = {};
+        for (const key of COMPANY_LOCATION_KEYS) {
+            if (patch[key] !== undefined) {
+                location[key] = patch[key];
+                delete patch[key];
+            }
+        }
+        const sets = { ...patch };
+        for (const [key, value] of Object.entries(location)) {
+            sets[`meta.${key}`] = value;
+        }
+        if (Object.keys(sets).length) {
+            await Company.findByIdAndUpdate(id, { $set: sets }, { new: true });
+        }
+        if (Object.keys(location).length) {
+            const CompanySettings = require('../models/CompanySettings');
+            await CompanySettings.updateOne(
+                { companyId: id },
+                { $set: location },
+                { upsert: false }
+            );
         }
         const updated = await Company.findById(id)
             .populate('ownerId', 'name email')

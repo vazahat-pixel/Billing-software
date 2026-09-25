@@ -60,11 +60,13 @@ class JobService {
       }
       if (operationId) issueData.operationId = operationId;
 
-      const Counter = require('../models/Counter');
-      const counterId = `JC-${companyId}`;
-      const seq = await Counter.nextSeq(counterId, session);
-      issueData.jobCardNo =
-        issueData.jobCardNo && issueData.jobCardNo !== 'AUTO' ? issueData.jobCardNo : `JC-${seq}`;
+      const voucherSeriesService = require('./voucherSeriesService');
+      issueData.jobCardNo = await voucherSeriesService.reserveNumber(
+        companyId,
+        'job',
+        issueData.jobCardNo || issueData.challanNo,
+        session
+      );
 
       if (issueData.jobCardNo && issueData.jobCardNo !== 'AUTO') {
         const existingJob = await Job.findOne({ jobCardNo: issueData.jobCardNo, companyId }).session(session);

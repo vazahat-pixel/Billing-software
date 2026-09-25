@@ -10,6 +10,11 @@ router.get('/bills', configController.listBillConfigs);
 router.get('/bills/:billType', configController.getBillConfig);
 router.put('/bills/:billType', configController.requireCompanyAdmin, configController.saveBillConfig);
 
+router.get('/bill-numbers', configController.listBillNumbers);
+router.get('/bill-numbers/:module', configController.peekBillNumber);
+router.put('/bill-numbers/:module', configController.requireCompanyAdmin, configController.setBillNumber);
+router.post('/bill-numbers/reset', configController.requireCompanyAdmin, configController.resetBillNumbers);
+
 router.get('/settings', configController.getCompanySettings);
 router.put('/settings', configController.requireCompanyAdmin, configController.saveCompanySettings);
 

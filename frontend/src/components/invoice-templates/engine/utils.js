@@ -36,8 +36,8 @@ export function buildTotalsRows(data) {
   };
 
   push('Gross Amount', totals.grossAmount, { skipZero: true });
-  push('Discount', totals.discount, { skipZero: true });
-  push('Fold Less', totals.foldLess, { skipZero: true });
+  push('Discount', Number(totals.discountAmt || totals.discount || 0));
+  push('Fold Less', Number(totals.foldLess || 0));
   push('Additional Charges', totals.addAmt, { skipZero: true });
   push('Freight', meta.freight || totals.freight, { skipZero: true });
   push('Packing', totals.packing, { skipZero: true });

@@ -1,16 +1,20 @@
 import React, { useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Building2, Users, AlertCircle, TrendingUp, ArrowUpRight, Zap, Globe, Shield, Activity, BarChart2, Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
 
 /* ── Stat Card ── */
-const StatCard = ({ name, value, icon: Icon, gradient, delay, suffix = '' }) => (
+const StatCard = ({ name, value, icon: Icon, gradient, delay, suffix = '', onClick }) => (
     <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay, duration: 0.5, ease: 'easeOut' }}
         whileHover={{ y: -4, transition: { duration: 0.2 } }}
         className="admin-stat-card"
+        onClick={onClick}
+        role={onClick ? 'button' : undefined}
+        style={onClick ? { cursor: 'pointer' } : undefined}
     >
         <div className="admin-stat-card__glow" style={{ background: gradient }} />
         <div className="admin-stat-card__header">
@@ -164,6 +168,7 @@ const ActivityItem = ({ action, time, module, color }) => (
 );
 
 const Dashboard = () => {
+    const navigate = useNavigate();
     const { stats, fetchStats, loading } = useAdminStore();
 
     useEffect(() => {
@@ -171,7 +176,7 @@ const Dashboard = () => {
     }, [fetchStats]);
 
     const cards = [
-        { name: 'Total Companies', value: stats?.totalCompanies || 0, icon: Building2, gradient: 'linear-gradient(135deg, #0d9488, #0f766e)', delay: 0 },
+        { name: 'Total Companies', value: stats?.totalCompanies || 0, icon: Building2, gradient: 'linear-gradient(135deg, #0d9488, #0f766e)', delay: 0, onClick: () => navigate('/admin/companies') },
         { name: 'Active Subscriptions', value: stats?.activeSubs || 0, icon: Users, gradient: 'linear-gradient(135deg, #10b981, #059669)', delay: 0.1 },
         { name: 'Expiring Soon', value: stats?.expiringSoon || 0, icon: AlertCircle, gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', delay: 0.2 },
         { name: 'Monthly Revenue', value: `₹${((stats?.mrr || 0) / 1000).toFixed(1)}K`, icon: TrendingUp, gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', delay: 0.3 },

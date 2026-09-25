@@ -79,6 +79,8 @@ export default function CompactThermal({ data, pageSize = 'thermal-80' }) {
           </div>
           <div style={{ fontSize: 9 }}>
             HSN {l.hsn} | {fmt.num(l.qty)} {l.unit} x {fmt.num(l.rate)}
+            {Number(l.fold) ? ` | Fold ${l.fold}` : ''}
+            {Number(l.discount) ? ` | Disc ${fmt.num(l.discount)}` : ''}
           </div>
           {line('', fmt.num(l.total))}
         </div>
@@ -86,7 +88,8 @@ export default function CompactThermal({ data, pageSize = 'thermal-80' }) {
 
       <div style={{ borderTop: '1px dashed #000', margin: '6px 0' }} />
       {line('Gross', fmt.money(totals.grossAmount))}
-      {totals.foldLess ? line('Fold Less', fmt.money(totals.foldLess)) : null}
+      {line('Fold Less', fmt.money(totals.foldLess || 0))}
+      {line('Discount', fmt.money(totals.discountAmt || totals.discount || 0))}
       {line('Taxable', fmt.money(totals.taxable))}
       {!isIgst ? (
         <>

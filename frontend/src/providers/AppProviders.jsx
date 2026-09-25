@@ -72,6 +72,7 @@ export function AppProviders({ children }) {
   useEffect(() => {
     const onKey = (e) => {
       const key = String(e.key).toLowerCase();
+      if (user?.companyRole === 'ca') return;
       if ((e.ctrlKey || e.metaKey) && (key === 'k' || e.code === 'Space' || key === ' ')) {
         e.preventDefault();
         toggleCommandPalette();
@@ -79,7 +80,7 @@ export function AppProviders({ children }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [toggleCommandPalette]);
+  }, [toggleCommandPalette, user?.companyRole]);
 
   if (!bootDone) {
     return (

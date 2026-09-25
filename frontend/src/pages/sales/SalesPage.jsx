@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import useStore from '../../store/useStore';
-import { Plus, Search, Filter, ShoppingBag, CreditCard, User, MoreVertical, Printer, ArrowRight, History, TrendingUp } from 'lucide-react';
+import { Plus, Search, Filter, ShoppingBag, CreditCard, User, MoreVertical, Printer, ArrowRight, History, TrendingUp, Truck } from 'lucide-react';
 import SalesModal from './SalesModal';
 import SalesPrint from './SalesPrint';
+import LrEntryModal from './LrEntryModal';
 
 const SalesPage = () => {
    const { sales, parties, fetchSales, fetchParties } = useStore();
    const [isModalOpen, setIsModalOpen] = useState(false);
+   const [isLrModalOpen, setIsLrModalOpen] = useState(false);
    const [printInvoiceId, setPrintInvoiceId] = useState(null);
    const [activeTab, setActiveTab] = useState('ALL');
 
@@ -51,6 +53,12 @@ const SalesPage = () => {
             <div className="flex gap-4">
                <button className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 rounded-lg text-[11px] font-bold uppercase tracking-widest text-black hover:bg-slate-50 transition-all shadow-sm">
                   <History size={14} /> Analytics
+               </button>
+               <button
+                  onClick={() => setIsLrModalOpen(true)}
+                  className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white rounded-lg text-[11px] font-bold uppercase tracking-widest hover:bg-amber-600 transition-all shadow-lg"
+               >
+                  <Truck size={14} /> LR Entry
                </button>
                <button
                   onClick={() => setIsModalOpen(true)}
@@ -182,6 +190,11 @@ const SalesPage = () => {
 
          <SalesModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
          {printInvoiceId && <SalesPrint invoiceId={printInvoiceId} onClose={() => setPrintInvoiceId(null)} />}
+         <LrEntryModal
+            isOpen={isLrModalOpen}
+            onClose={() => setIsLrModalOpen(false)}
+            onSaved={() => setIsLrModalOpen(false)}
+         />
       </div>
    );
 };

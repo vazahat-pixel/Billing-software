@@ -12,7 +12,7 @@ export default function ErpWindowedModal({
   onClose,
   title = 'Window',
   windowId,
-  defaultMode = 'maximized',
+  defaultMode = 'normal',
   bare = true,
   className,
   children,
@@ -38,6 +38,7 @@ export default function ErpWindowedModal({
       style={win.modalStyle}
       className={twMerge(win.modalClassName, className)}
       inertBackdrop={win.inertBackdrop}
+      overlayZ={win.z}
       {...modalProps}
     >
       <div

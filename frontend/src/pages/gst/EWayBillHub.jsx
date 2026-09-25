@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Modal from '../../components/ui/Modal';
 import { stage4Api } from '../../api/stage4.api';
 import { salesApi } from '../../api/sales.api';
+import useConfigStore from '../../store/useConfigStore';
 import { notifyError } from '../../utils/notify';
 import { toast } from '../../store/useToastStore';
 import { exportTableToExcel } from '../../utils/reportExport';
@@ -13,8 +14,10 @@ import {
 
 const money = (v) => `₹${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const dt = (d) => (d ? new Date(d).toLocaleDateString('en-IN') : '');
+const EWAY_PORTAL = 'https://ewaybillgst.gov.in/';
 
 export default function EWayBillHub({ isOpen, onClose }) {
+  const ewayEnabled = useConfigStore((s) => !!s.companySettings?.eway);
   const [loading, setLoading] = useState(false);
   const [ewayList, setEwayList] = useState([]);
   const [search, setSearch] = useState('');
@@ -26,7 +29,7 @@ export default function EWayBillHub({ isOpen, onClose }) {
   const [transporterName, setTransporterName] = useState('');
   const [transporterId, setTransporterId] = useState('');
   const [vehicleNo, setVehicleNo] = useState('');
-  const [distanceKm, setDistanceKm] = useState('50');
+  const [distanceKm, setDistanceKm] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const fetchEwayList = useCallback(async () => {
@@ -63,21 +66,27 @@ export default function EWayBillHub({ isOpen, onClose }) {
 
   const handleGenerate = async (e) => {
     e.preventDefault();
+    if (!ewayEnabled) return toast.error('Turn on E-Way Bill in Company Settings first');
     if (!selectedSaleId) return toast.error('Please select an invoice');
+    const km = Number(distanceKm);
+    if (!km || km <= 0) return toast.error('Enter the travel distance in KM');
     setSubmitting(true);
     try {
-      await stage4Api.ewayGenerate({
+      const doc = await stage4Api.ewayGenerate({
         salesId: selectedSaleId,
         transporterName,
         transporterId,
         vehicleNo,
-        distanceKm: Number(distanceKm) || 50,
+        distance: km,
+        provider: 'Portal',
       });
-      toast.success('E-Way Bill generated successfully');
+      toast.success(doc?.ewbNo ? `E-Way Bill ${doc.ewbNo} saved` : 'Bill prepared. File it on the E-Way Bill website.');
       setShowGenerateModal(false);
       setSelectedSaleId('');
       setVehicleNo('');
+      setDistanceKm('');
       fetchEwayList();
+      window.open(EWAY_PORTAL, '_blank', 'noopener,noreferrer');
     } catch (err) {
       notifyError(err, 'Failed to generate E-Way Bill');
     } finally {
@@ -131,11 +140,21 @@ export default function EWayBillHub({ isOpen, onClose }) {
           </div>
 
           <div className="flex items-center gap-3">
+            <a
+              href={EWAY_PORTAL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2.5 bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+            >
+              <ExternalLink size={14} /> Open E-Way Bill website
+            </a>
             <button
               onClick={() => setShowGenerateModal(true)}
-              className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-md"
+              disabled={!ewayEnabled}
+              title={ewayEnabled ? 'Prepare this invoice for the E-Way Bill portal' : 'Turn on E-Way Bill in Company Settings'}
+              className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-md disabled:opacity-40"
             >
-              <Plus size={14} /> Generate E-Way Bill
+              <Plus size={14} /> Prepare E-Way Bill
             </button>
             <button
               onClick={handleExportExcel}
@@ -222,7 +241,7 @@ export default function EWayBillHub({ isOpen, onClose }) {
                     <tr key={i} className="hover:bg-slate-50/80 transition-colors">
                       <td className="px-4 py-2.5 text-slate-400 font-mono text-[11px]">{i + 1}</td>
                       <td className="px-4 py-2.5 font-mono font-bold text-slate-900">
-                        {ewb.ewbNo || 'GENERATED-MOCK'}
+                        {ewb.ewbNo || 'Not filed yet'}
                       </td>
                       <td className="px-4 py-2.5 text-slate-600">{dt(ewb.ewbDate || ewb.createdAt)}</td>
                       <td className="px-4 py-2.5 font-bold text-slate-800">{ewb.docNo || '—'}</td>
@@ -238,8 +257,8 @@ export default function EWayBillHub({ isOpen, onClose }) {
                       </td>
                       <td className="px-4 py-2.5 text-slate-600">{dt(ewb.validUpto)}</td>
                       <td className="px-4 py-2.5 text-center">
-                        <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold">
-                          {ewb.status || 'Active'}
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${ewb.ewbNo ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                          {ewb.ewbNo ? (ewb.status || 'Filed') : 'Ready for portal'}
                         </span>
                       </td>
                     </tr>
@@ -260,6 +279,11 @@ export default function EWayBillHub({ isOpen, onClose }) {
               <button onClick={() => setShowGenerateModal(false)} className="text-slate-400 hover:text-slate-700">✕</button>
             </div>
 
+            {!ewayEnabled && (
+              <p className="mt-3 text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                E-Way Bill is off for this company. Turn it on in Company Settings, then prepare the invoice here and file it on the government website.
+              </p>
+            )}
             <form onSubmit={handleGenerate} className="mt-4 space-y-4">
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Select Sales Invoice</label>
@@ -294,6 +318,8 @@ export default function EWayBillHub({ isOpen, onClose }) {
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Approx Distance (KM)</label>
                   <input
                     type="number"
+                    min="1"
+                    placeholder="Actual KM"
                     value={distanceKm}
                     onChange={(e) => setDistanceKm(e.target.value)}
                     className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-indigo-500"
@@ -338,7 +364,7 @@ export default function EWayBillHub({ isOpen, onClose }) {
                   disabled={submitting}
                   className="px-5 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold flex items-center gap-2"
                 >
-                  {submitting ? 'Generating...' : 'Generate EWB'}
+                  {submitting ? 'Preparing...' : 'Prepare & open website'}
                 </button>
               </div>
             </form>

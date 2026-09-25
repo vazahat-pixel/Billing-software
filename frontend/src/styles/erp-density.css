@@ -143,26 +143,33 @@
   flex-shrink: 0 !important;
 }
 
+.classic-erp-window.erp-sales-bill-compact .classic-erp-header {
+  padding: 4px 10px !important;
+  min-height: 0 !important;
+  font-size: 12px !important;
+}
+
 .classic-erp-window.erp-sales-bill-compact .classic-erp-body {
   display: flex !important;
   flex-direction: column !important;
-  padding: 8px 12px !important;
-  gap: 8px !important;
+  padding: 4px 8px !important;
+  gap: 3px !important;
   overflow: hidden !important;
+  min-height: 0 !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-frame {
-  padding: 8px 12px !important;
+  padding: 3px 6px !important;
   margin: 0 !important;
-  border-radius: 6px !important;
+  border-radius: 3px !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-input,
 .classic-erp-window.erp-sales-bill-compact .classic-erp-select,
 .classic-erp-window.erp-sales-bill-compact .erp-combobox-input {
-  height: 26px !important;
-  min-height: 26px !important;
-  font-size: 11.5px !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  font-size: 11px !important;
   padding: 0 6px !important;
   line-height: 1.2 !important;
 }
@@ -183,14 +190,15 @@
 .classic-erp-window.erp-sales-bill-compact .erp-bill-layout {
   display: flex !important;
   flex-direction: column !important;
-  gap: 8px !important;
+  gap: 4px !important;
   min-height: 0 !important;
 }
 
 /* Party left (wider) + Bill/Challan/Order right (spacious layout) */
 .classic-erp-window.erp-sales-bill-compact .classic-erp-header-split.erp-sales-top {
   grid-template-columns: minmax(0, 1.4fr) minmax(340px, 1.1fr) !important;
-  gap: 8px 16px !important;
+  gap: 4px 10px !important;
+  flex: 0 0 auto !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-header-split > .classic-erp-header-bill {
@@ -247,14 +255,33 @@
   min-width: 0;
 }
 
+/* Party, GSTIN, City, Broker and the bill block share one left edge and one label column. */
+.classic-erp-window.erp-sales-bill-compact .classic-erp-header-split .classic-erp-field,
+.classic-erp-window.erp-sales-bill-compact .classic-erp-header-split .classic-erp-field--lg {
+  grid-template-columns: 62px minmax(0, 1fr) !important;
+  gap: 6px !important;
+  align-items: center !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .classic-erp-header-split .classic-erp-field > .classic-erp-label {
+  width: 62px !important;
+  min-width: 62px !important;
+  max-width: 62px !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  padding: 0 !important;
+}
+
 .classic-erp-window.erp-sales-bill-compact .erp-sales-grid.classic-erp-table-container.erp-grid-panel {
-  max-height: min(28vh, 260px) !important;
-  flex: 1 1 0 !important;
-  min-height: 110px !important;
+  flex: 1 1 188px !important;
+  min-height: 188px !important;
+  height: auto !important;
+  max-height: none !important;
   overflow: auto !important;
   overflow-x: auto !important;
   overflow-y: auto !important;
-  border-radius: 6px !important;
+  border-radius: 2px !important;
+  background: #fff !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .erp-sales-grid .classic-erp-table {
@@ -350,33 +377,69 @@
 }
 
 .classic-erp-window.erp-sales-bill-compact .erp-sales-history-panel {
-  max-height: 80px !important;
+  max-height: 52px !important;
+  flex: 0 0 auto !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-totalbar {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex: 0 0 auto !important;
+  min-height: 22px !important;
+  padding: 2px 8px !important;
+  background: #5eead4 !important;
+  border: 1px solid #0d9488 !important;
+  color: #0f172a !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  font-family: ui-monospace, Consolas, monospace !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .erp-sales-footer {
-  gap: 8px !important;
-  flex-shrink: 1 !important;
+  gap: 6px !important;
+  flex: 0 0 auto !important;
+  flex-shrink: 0 !important;
   min-height: 0 !important;
-  max-height: min(36vh, 280px);
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  max-height: none !important;
+  overflow: visible !important;
+  align-items: start !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .erp-sales-footer > .classic-erp-frame {
-  padding: 6px 10px !important;
-  min-height: 0;
+  padding: 4px 6px !important;
+  min-height: 0 !important;
+  height: auto !important;
+  align-self: start !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-adj-row,
 .classic-erp-window.erp-sales-bill-compact .classic-erp-total-row {
-  min-height: 24px !important;
-  gap: 6px !important;
+  min-height: 18px !important;
+  gap: 4px !important;
   margin: 0 !important;
-  padding: 1px 0 !important;
+  padding: 0 !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-stack {
-  gap: 4px !important;
+  gap: 2px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-footer .flex.justify-between {
+  min-height: 18px !important;
+  gap: 6px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-footer .classic-erp-input,
+.classic-erp-window.erp-sales-bill-compact .erp-sales-footer .classic-erp-select {
+  height: 20px !important;
+  min-height: 20px !important;
+  font-size: 10.5px !important;
+}
+
+.classic-erp-window.erp-sales-bill-compact .erp-sales-footer .text-lg {
+  font-size: 13px !important;
+  line-height: 1.2 !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .classic-erp-form-footer {
@@ -404,9 +467,9 @@
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  gap: 8px !important;
-  min-height: 24px !important;
-  padding: 2px 4px !important;
+  gap: 6px !important;
+  min-height: 18px !important;
+  padding: 0 2px !important;
 }
 
 .classic-erp-window.erp-sales-bill-compact .erp-sales-footer .classic-erp-control {
@@ -443,7 +506,7 @@
 /* Dedicated action bar — always fully visible under bill body */
 .erp-bill-action-bar {
   flex-shrink: 0 !important;
-  min-height: 40px;
+  min-height: 32px;
   z-index: 30;
   box-shadow: 0 -2px 8px rgba(15, 23, 42, 0.06);
 }
@@ -468,10 +531,9 @@
   flex-shrink: 0;
 }
 
-/* Net amount always readable */
+/* Net amount highlighted, never overlay other totals */
 .classic-erp-window.erp-sales-bill-compact .erp-sales-footer .classic-erp-total-row:last-child {
-  position: sticky;
-  bottom: 0;
+  position: static;
   background: var(--accent-light, #fef3c7);
   z-index: 1;
 }
@@ -547,13 +609,38 @@
   min-height: 0;
 }
 
+/* Maximized bills fill the work area under the top menu — no side gutters. */
+.erp-bill-window--max {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 72px !important;
+  bottom: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border-left: none !important;
+  border-right: none !important;
+  box-shadow: none !important;
+}
+.erp-bill-window--max .erp-bill-window-shell,
+.erp-bill-window--max .classic-erp-window {
+  max-height: none !important;
+  height: 100% !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
 .erp-bill-window--normal {
-  width: var(--erp-win-w, 880px) !important;
-  height: var(--erp-win-h, 540px) !important;
-  max-width: 98vw !important;
-  max-height: 96dvh !important;
-  min-width: 640px !important;
-  min-height: 400px !important;
+  width: min(var(--erp-win-w, 1180px), calc(100vw - 16px)) !important;
+  height: min(var(--erp-win-h, 660px), calc(100dvh - 72px)) !important;
+  max-width: calc(100vw - 16px) !important;
+  max-height: calc(100dvh - 72px) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
 }
 
 .erp-bill-window--floating {
@@ -561,6 +648,8 @@
   left: var(--erp-win-x, 48px) !important;
   top: var(--erp-win-y, 56px) !important;
   margin: 0 !important;
+  height: min(var(--erp-win-h, 660px), calc(100dvh - 72px)) !important;
+  max-height: min(var(--erp-win-h, 660px), calc(100dvh - 72px)) !important;
   border-radius: 8px !important;
   box-shadow: 0 12px 40px rgba(15, 23, 42, 0.28) !important;
   border: 1px solid #94a3b8 !important;

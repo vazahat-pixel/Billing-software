@@ -35,6 +35,10 @@ export const configApi = {
   saveNotification: (ruleKey, body) => unwrap(put(`/config/notifications/${ruleKey}`, body)),
   getPermissions: () => unwrap(get('/config/permissions')),
   savePermissions: (body) => unwrap(put('/config/permissions', body)),
+  listBillNumbers: () => unwrap(get('/config/bill-numbers')).then((d) => asArray(d)),
+  peekBillNumber: (moduleName) => unwrap(get(`/config/bill-numbers/${moduleName}`)),
+  setBillNumber: (moduleName, next) => unwrap(put(`/config/bill-numbers/${moduleName}`, { next })),
+  resetBillNumbers: (moduleName) => unwrap(post('/config/bill-numbers/reset', moduleName ? { module: moduleName } : {})),
 };
 
 export const usersApi = {

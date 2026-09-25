@@ -9,6 +9,7 @@ import {
   findReportLeaf,
   flattenReportLeaves,
   LEGACY_TAB_TO_LEAF,
+  reportAncestorIds,
 } from '../../utils/reportTree';
 import {
   RefreshCw,
@@ -32,10 +33,10 @@ const lastOfMonth = () => {
 };
 
 const Kpi = ({ label, value, sub }) => (
-  <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-3">
-    <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{label}</p>
-    <p className="text-lg font-bold text-[var(--text-primary)] mt-1">{value}</p>
-    {sub && <p className="text-[10px] text-[var(--text-muted)]">{sub}</p>}
+  <div className="rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2.5 py-2 min-h-[64px] flex flex-col justify-center">
+    <p className="text-[9px] font-semibold uppercase tracking-wide text-[var(--text-muted)] truncate leading-none">{label}</p>
+    <p className="text-[13px] font-semibold text-[var(--text-primary)] mt-1 leading-none tabular-nums whitespace-nowrap truncate">{value}</p>
+    <p className="text-[10px] text-[var(--text-muted)] mt-1 leading-none truncate h-3">{sub || ''}</p>
   </div>
 );
 
@@ -50,11 +51,11 @@ const ReportTable = ({ columns, rows, emptyText, onExport, exportLabel }) => (
     )}
     <div className="border border-[var(--border)] rounded-lg overflow-hidden">
       <div className="overflow-x-auto max-h-[calc(90vh-320px)] overflow-y-auto">
-        <table className="w-full text-left text-[11px]">
-          <thead className="bg-[var(--bg-base)] text-[var(--text-muted)] uppercase text-[9px] tracking-wider sticky top-0 z-10">
+        <table className="w-full text-left text-[11px] border-collapse">
+          <thead className="bg-[var(--bg-base)] text-[var(--text-muted)] uppercase text-[9px] tracking-wide sticky top-0 z-10">
             <tr>
               {columns.map((c) => (
-                <th key={c.key} className={`px-3 py-2 font-semibold ${c.align === 'right' ? 'text-right' : ''}`}>
+                <th key={c.key} className={`px-2.5 py-1.5 font-semibold align-middle whitespace-nowrap ${c.align === 'right' ? 'text-right' : ''}`}>
                   {c.label}
                 </th>
               ))}
@@ -63,7 +64,7 @@ const ReportTable = ({ columns, rows, emptyText, onExport, exportLabel }) => (
           <tbody className="divide-y divide-[var(--border-subtle)]">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-3 py-10 text-center text-[var(--text-muted)]">
+                <td colSpan={columns.length} className="px-2.5 py-8 text-center text-[var(--text-muted)]">
                   {emptyText}
                 </td>
               </tr>
@@ -71,7 +72,7 @@ const ReportTable = ({ columns, rows, emptyText, onExport, exportLabel }) => (
               rows.map((row, i) => (
                 <tr key={row._key || i} className="hover:bg-[var(--bg-base)]">
                   {columns.map((c) => (
-                    <td key={c.key} className={`px-3 py-2 ${c.align === 'right' ? 'text-right font-medium' : ''}`}>
+                    <td key={c.key} className={`px-2.5 py-1 align-middle leading-none ${c.align === 'right' ? 'text-right font-medium tabular-nums whitespace-nowrap' : ''}`}>
                       {c.render ? c.render(row) : row[c.key]}
                     </td>
                   ))}
@@ -241,10 +242,12 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
     if (!isOpen) return;
     const leafId = initialLeafId || LEGACY_TAB_TO_LEAF[initialTab] || null;
     setSelectedLeafId(leafId);
-    // Folders stay closed until user clicks to expand
-    setExpanded(new Set());
+    setExpanded(new Set(leafId ? reportAncestorIds(leafId) || [] : []));
     setGenerated(false);
     setData(null);
+    if (leafId) load();
+    // Open once per menu click. `load` changes with dates; do not re-run on that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialTab, initialLeafId]);
 
   const toggleExpand = (id) => {
@@ -402,8 +405,8 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
     switch (reportKey) {
       case 'summary':
         return (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
               <Kpi label="Sales (Period)" value={`₹ ${fmtAmt(s.salesTotal)}`} sub={`${s.salesCount || 0} invoices`} />
               <Kpi label="Purchase (Period)" value={`₹ ${fmtAmt(s.purchaseTotal)}`} sub={`${s.purchaseCount || 0} bills`} />
               <Kpi label="Receivable" value={`₹ ${fmtAmt(s.receivable)}`} sub="Customer dues" />
@@ -927,7 +930,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
                 <Download size={12} /> Export CSV
               </button>
             </div>
-            <table className="w-full text-[11px]">
+            <table className="w-full text-[11px] border-collapse">
               <tbody className="divide-y divide-[var(--border-subtle)]">
                 {[
                   ['Sales (Taxable)', pl.revenue],
@@ -940,8 +943,8 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
                   ['Net Profit (approx)', pl.netProfit],
                 ].map(([label, val]) => (
                   <tr key={label}>
-                    <td className="py-2 font-medium">{label}</td>
-                    <td className="py-2 text-right font-bold">₹ {fmtAmt(val)}</td>
+                    <td className="py-1.5 align-middle leading-none font-medium">{label}</td>
+                    <td className="py-1.5 align-middle leading-none text-right font-semibold tabular-nums whitespace-nowrap">₹ {fmtAmt(val)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1101,7 +1104,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 print:p-2">{renderReportBody()}</div>
+          <div className="flex-1 overflow-y-auto p-3 print:p-2">{renderReportBody()}</div>
         </div>
       </div>
     </Modal>

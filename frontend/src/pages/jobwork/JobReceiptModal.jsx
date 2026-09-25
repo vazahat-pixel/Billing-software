@@ -169,6 +169,29 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
         return;
       }
 
+      const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus';
+      const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal';
+      if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && mode === 'View' && !findOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        const list = sortedReceipts || [];
+        if (!list.length) return;
+        const currentIdx = list.findIndex((j) => String(j._id || j.id) === String(selectedReceiptId));
+        let nextIdx = currentIdx + (prevKey ? -1 : 1);
+        if (currentIdx === -1) nextIdx = prevKey ? list.length - 1 : 0;
+        if (nextIdx >= 0 && nextIdx < list.length) loadReceipt(list[nextIdx]._id || list[nextIdx].id, 'View');
+        return;
+      }
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !findOpen) {
+        if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette], [data-find-modal]')) return;
+        if (mode === 'View') {
+          e.preventDefault();
+          e.stopPropagation();
+          handleNew();
+          return;
+        }
+      }
+
       if (e.altKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         handleNew();

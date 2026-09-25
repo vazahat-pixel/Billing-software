@@ -128,18 +128,13 @@ class PurchaseService {
       purchaseData.reverseCharge = totals.reverseCharge ? 'Yes' : 'No';
       purchaseData.rcmCharge = !!totals.reverseCharge;
 
-      const Counter = require('../models/Counter');
-      if (!purchaseData.invoiceNo || purchaseData.invoiceNo === 'AUTO') {
-        try {
-          const voucherSeriesService = require('./voucherSeriesService');
-          const allocated = await voucherSeriesService.allocateNext(purchaseData.companyId, 'purchase', { session });
-          purchaseData.invoiceNo = allocated.number;
-        } catch {
-          const counterId = `PUR-${purchaseData.companyId}`;
-          const seq = await Counter.nextSeq(counterId, session);
-          purchaseData.invoiceNo = `PUR-${seq}`;
-        }
-      }
+      const voucherSeriesService = require('./voucherSeriesService');
+      purchaseData.invoiceNo = await voucherSeriesService.reserveNumber(
+        purchaseData.companyId,
+        'purchase',
+        purchaseData.invoiceNo,
+        session
+      );
 
       const purchase = new Purchase(purchaseData);
       for (let i = 0; i < purchase.items.length; i += 1) {

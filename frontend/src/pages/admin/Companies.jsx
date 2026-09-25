@@ -64,9 +64,13 @@ const Companies = () => {
     const [editingCompany, setEditingCompany] = useState(null);
     const [licenseCompany, setLicenseCompany] = useState(null);
     const [search, setSearch] = useState('');
+    const [filterState, setFilterState] = useState('');
+    const [filterDistrict, setFilterDistrict] = useState('');
+    const [filterCity, setFilterCity] = useState('');
+    const [filterPlan, setFilterPlan] = useState('');
 
     const [createForm, setCreateForm] = useState({ name: '', ownerName: '', ownerEmail: '', ownerPassword: '', planId: '' });
-    const [editForm, setEditForm] = useState({ name: '', planId: '', status: '' });
+    const [editForm, setEditForm] = useState({ name: '', planId: '', status: '', state: '', district: '', city: '' });
     const [expiryDate, setExpiryDate] = useState('');
 
     useEffect(() => {
@@ -206,13 +210,52 @@ const Companies = () => {
 
     const startEdit = (company) => {
         setEditingCompany(company);
-        setEditForm({ name: company.name, planId: company.planId?._id || '', status: company.status || 'active' });
+        const loc = company.location || company.meta || {};
+        setEditForm({
+            name: company.name,
+            planId: company.planId?._id || '',
+            status: company.status || 'active',
+            state: loc.state || '',
+            district: loc.district || '',
+            city: loc.city || '',
+        });
     };
 
-    const filtered = companies.filter(c =>
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.ownerId?.email?.toLowerCase().includes(search.toLowerCase())
+    const locOf = (c) => c.location || c.meta || {};
+    const uniqueSorted = (values) => [...new Set(values.map((v) => String(v || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const stateOptions = uniqueSorted(companies.map((c) => locOf(c).state));
+    const districtOptions = uniqueSorted(
+        companies
+            .filter((c) => !filterState || locOf(c).state === filterState)
+            .map((c) => locOf(c).district)
     );
+    const cityOptions = uniqueSorted(
+        companies
+            .filter((c) => !filterState || locOf(c).state === filterState)
+            .filter((c) => !filterDistrict || locOf(c).district === filterDistrict)
+            .map((c) => locOf(c).city)
+    );
+
+    const filtered = companies.filter((c) => {
+        const loc = locOf(c);
+        const q = search.trim().toLowerCase();
+        const hay = [
+            c.name,
+            c.ownerId?.name,
+            c.ownerId?.email,
+            c.planId?.name,
+            loc.state,
+            loc.district,
+            loc.city,
+            loc.gstin,
+        ].join(' ').toLowerCase();
+        if (q && !hay.includes(q)) return false;
+        if (filterState && loc.state !== filterState) return false;
+        if (filterDistrict && loc.district !== filterDistrict) return false;
+        if (filterCity && loc.city !== filterCity) return false;
+        if (filterPlan && String(c.planId?._id || c.planId) !== filterPlan) return false;
+        return true;
+    });
 
     return (
         <div className="space-y-5">
@@ -227,15 +270,31 @@ const Companies = () => {
             />
 
             {/* Search & Filters */}
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="admin-toolbar">
-                <div className="admin-toolbar__search">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="admin-toolbar" style={{ flexWrap: 'wrap' }}>
+                <div className="admin-toolbar__search" style={{ minWidth: 220, flex: '1 1 240px' }}>
                     <Search size={14} className="text-slate-500 flex-shrink-0" />
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        placeholder="Search companies, owners..."
+                        placeholder="Search company, owner, city, GSTIN..."
                     />
                 </div>
+                <select className="dark-input" style={{ width: 140, height: 36 }} value={filterState} onChange={(e) => { setFilterState(e.target.value); setFilterDistrict(''); setFilterCity(''); }}>
+                    <option value="">All states</option>
+                    {stateOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <select className="dark-input" style={{ width: 140, height: 36 }} value={filterDistrict} onChange={(e) => { setFilterDistrict(e.target.value); setFilterCity(''); }}>
+                    <option value="">All districts</option>
+                    {districtOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <select className="dark-input" style={{ width: 140, height: 36 }} value={filterCity} onChange={(e) => setFilterCity(e.target.value)}>
+                    <option value="">All cities</option>
+                    {cityOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <select className="dark-input" style={{ width: 140, height: 36 }} value={filterPlan} onChange={(e) => setFilterPlan(e.target.value)}>
+                    <option value="">All plans</option>
+                    {plans.map((p) => <option key={p._id} value={p._id}>{p.name}{p.features?.mobileView ? ' · Mobile' : ''}</option>)}
+                </select>
                 <div className="flex items-center gap-2 text-xs text-slate-500 px-2">
                     <Filter size={13} />
                     <span className="font-bold">{filtered.length} results</span>
@@ -248,7 +307,7 @@ const Companies = () => {
                     <table className="admin-table">
                         <thead>
                             <tr>
-                                {['Company', 'Owner', 'Plan', 'Status', 'Actions'].map(h => (
+                                {['Company', 'Owner', 'Place', 'Plan', 'Status', 'Actions'].map(h => (
                                     <th key={h}>{h}</th>
                                 ))}
                             </tr>
@@ -277,7 +336,17 @@ const Companies = () => {
                                         <p className="text-[10px] text-slate-600">{company.ownerId?.email || ''}</p>
                                     </td>
                                     <td>
+                                        {(() => {
+                                            const loc = locOf(company);
+                                            const place = [loc.city, loc.district, loc.state].filter(Boolean).join(', ');
+                                            return <p className="text-xs font-semibold text-slate-400">{place || '—'}</p>;
+                                        })()}
+                                    </td>
+                                    <td>
                                         <span className="plan-badge">{company.planId?.name || 'No Plan'}</span>
+                                        {company.planId?.features?.mobileView && (
+                                            <p className="text-[10px] font-bold text-teal-700 mt-1">Mobile · view only</p>
+                                        )}
                                     </td>
                                     <td>
                                         <AdminBadge variant={company.status === 'active' ? 'success' : company.status === 'suspended' ? 'danger' : 'warning'} dot>
@@ -319,7 +388,7 @@ const Companies = () => {
                             ))}
                             {filtered.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="px-5 py-16 text-center">
+                                    <td colSpan={6} className="px-5 py-16 text-center">
                                         <Globe size={32} className="mx-auto mb-3 text-slate-700" />
                                         <p className="text-slate-600 font-bold text-sm">No companies found</p>
                                     </td>
@@ -355,6 +424,11 @@ const Companies = () => {
                     <DarkSelect label="Subscription Plan" value={editForm.planId} onChange={e => setEditForm({ ...editForm, planId: e.target.value })}>
                         {plans.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
                     </DarkSelect>
+                    <div className="grid grid-cols-3 gap-3">
+                        <DarkInput label="State" value={editForm.state} onChange={e => setEditForm({ ...editForm, state: e.target.value })} placeholder="Gujarat" />
+                        <DarkInput label="District" value={editForm.district} onChange={e => setEditForm({ ...editForm, district: e.target.value })} placeholder="Surat" />
+                        <DarkInput label="City" value={editForm.city} onChange={e => setEditForm({ ...editForm, city: e.target.value })} placeholder="Surat" />
+                    </div>
                     <DarkSelect label="Status" value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })}>
                         <option value="active">Active</option>
                         <option value="suspended">Suspended</option>

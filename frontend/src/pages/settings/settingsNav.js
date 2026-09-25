@@ -1,6 +1,6 @@
 import {
   Palette, FileText, Building2, Users, Receipt, Bell, Sliders, LayoutGrid, Columns, ToggleLeft, Tags,
-  MapPin, Landmark, Calendar, Paintbrush, UserCircle, Package, Wallet, CreditCard, Shield, BarChart3,
+  Paintbrush, UserCircle, Package, Wallet, CreditCard, Shield, BarChart3,
   Zap, BookOpen, Scale, Boxes, Wifi, Printer,
 } from 'lucide-react';
 
@@ -25,7 +25,7 @@ export const FORM_MODULES = [
 export const FORM_TAB_MAP = Object.fromEntries(FORM_MODULES.map((f) => [f.id, f.formKey]));
 
 export const SETTINGS_TAB_IDS = new Set([
-  'companyInfo', 'address', 'gst', 'financial', 'branding',
+  'companyInfo', 'address', 'gst', 'financial', 'branding', 'caAccess',
   'vouchers', 'custom', 'notifications', 'offline',
   'company', // legacy alias
 ]);
@@ -42,10 +42,8 @@ export const NAV_SECTIONS = [
     title: 'General',
     items: [
       { id: 'appearance', label: 'Theme', icon: Palette },
-      { id: 'companyInfo', label: 'Company Info', icon: Building2 },
-      { id: 'address', label: 'Address', icon: MapPin },
-      { id: 'gst', label: 'GST & Tax', icon: Landmark },
-      { id: 'financial', label: 'Financial Year', icon: Calendar },
+      { id: 'companyInfo', label: 'Company', icon: Building2 },
+      { id: 'caAccess', label: 'CA Access', icon: UserCircle },
       { id: 'branding', label: 'Branding & Logo', icon: Paintbrush },
     ],
   },

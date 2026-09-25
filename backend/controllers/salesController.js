@@ -69,3 +69,21 @@ exports.deleteSale = asyncHandler(async (req, res) => {
   await auditService.log(req, 'DELETE_INVOICE', 'Sales', req.params.id, result, null);
   return ok(res, result, 'Invoice cancelled');
 });
+
+/**
+ * Bulk update LR details on multiple sales invoices.
+ * Body: { entries: [{ id, lrNo, lrDate, baleNo, weight, freight, transport, station, broker, haste, remarks }] }
+ */
+exports.bulkUpdateLr = asyncHandler(async (req, res) => {
+  if (!req.companyId) throw AppError.forbidden('No company context');
+  const { entries } = req.body || {};
+  if (!Array.isArray(entries) || entries.length === 0) {
+    throw AppError.badRequest('entries array is required');
+  }
+  const results = await salesService.bulkUpdateLr(req.companyId, entries);
+  await auditService.log(req, 'BULK_LR_UPDATE', 'Sales', null, null, {
+    count: results.length,
+    ids: results.map(r => r._id),
+  });
+  return ok(res, results, `LR updated for ${results.length} bill(s)`);
+});

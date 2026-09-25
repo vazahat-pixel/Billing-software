@@ -183,26 +183,51 @@ export const LEGACY_TAB_TO_LEAF = {
   masters: 'inv-masters',
 };
 
+function firstLeaf(node) {
+  if (!node?.children?.length) return node?.reportKey || node?.external ? node : null;
+  for (const child of node.children) {
+    const leaf = firstLeaf(child);
+    if (leaf) return leaf;
+  }
+  return null;
+}
+
+/** Ids of folders that contain this leaf, so the hub can expand to it. */
+export function reportAncestorIds(id, nodes = REPORT_TREE, trail = []) {
+  for (const n of nodes) {
+    if (n.id === id) return trail;
+    if (n.children?.length) {
+      const found = reportAncestorIds(id, n.children, [...trail, n.id]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 /** Build Dashboard menu items with nested `children` from REPORT_TREE */
 export function buildReportsMenuItems({ openLeaf, openHub, openExternal }) {
+  const openNode = (node) => {
+    if (node.external && openExternal) {
+      openExternal(node.external);
+      return;
+    }
+    if (openLeaf) openLeaf(node.id);
+    else if (openHub) openHub(node.reportKey || 'summary');
+  };
+
   const mapNode = (node) => {
     if (node.children?.length) {
+      const leaf = firstLeaf(node);
       return {
         label: node.label,
         children: node.children.map(mapNode),
+        action: leaf ? () => openNode(leaf) : undefined,
       };
     }
     return {
       label: node.label,
       soon: node.soon,
-      action: () => {
-        if (node.external && openExternal) {
-          openExternal(node.external);
-          return;
-        }
-        if (openLeaf) openLeaf(node.id);
-        else if (openHub) openHub(node.reportKey || 'summary');
-      },
+      action: () => openNode(node),
     };
   };
 

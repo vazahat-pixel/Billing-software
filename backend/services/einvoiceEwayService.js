@@ -205,8 +205,15 @@ class EinvoiceEwayService {
 
   async generateEway(companyId, body, userId, { provider = 'Mock' } = {}) {
     const cfg = await gstConfigService.getOrCreate(companyId);
-    if (!cfg.eWayEnabled && provider !== 'Mock') {
-      throw new Error('E-Way Bill not enabled in GST config');
+    const CompanySettings = require('../models/CompanySettings');
+    const settings = await CompanySettings.findOne({ companyId }).select('eway').lean();
+    if (settings?.eway && !cfg.eWayEnabled) {
+      cfg.eWayEnabled = true;
+      await cfg.save();
+    }
+    const ewayOn = cfg.eWayEnabled || !!settings?.eway;
+    if (!ewayOn && provider !== 'Mock') {
+      throw new Error('Turn on E-Way Bill in Company Settings, then prepare the bill again.');
     }
 
     const { sale, requestPayload } = await this.buildEwayPayload(companyId, body);

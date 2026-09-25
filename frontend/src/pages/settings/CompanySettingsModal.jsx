@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Modal from '../../components/ui/Modal';
 import ThemePicker from '../../components/ui/ThemePicker';
 import UserRightsPanel from './UserRightsPanel';
+import CaAccessPanel from './CaAccessPanel';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import { configApi } from '../../api';
 import { useConfig } from '../../context/ConfigContext';
@@ -181,6 +182,8 @@ const CompanySettingsModal = ({ isOpen, onClose, initialTab = 'appearance', init
   const [printBillType, setPrintBillType] = useState('sales');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [billSeries, setBillSeries] = useState([]);
+  const [seriesDraft, setSeriesDraft] = useState({});
   const [expanded, setExpanded] = useState('header');
   const bundleRef = useRef(bundle);
   const settingsLoadedRef = useRef(false);
@@ -341,6 +344,9 @@ const CompanySettingsModal = ({ isOpen, onClose, initialTab = 'appearance', init
   useEffect(() => { loadReports(); }, [loadReports]);
   useEffect(() => { loadNotificationRules(); }, [loadNotificationRules]);
   useEffect(() => { loadPermissions(); }, [loadPermissions]);
+  useEffect(() => {
+    if (isOpen && activeTab === 'vouchers') loadBillSeries();
+  }, [isOpen, activeTab]);
 
   useEffect(() => {
     if (activeTab !== 'columns') return;
@@ -683,9 +689,78 @@ const CompanySettingsModal = ({ isOpen, onClose, initialTab = 'appearance', init
     </div>
   );
 
+  const loadBillSeries = async () => {
+    try {
+      const rows = await configApi.listBillNumbers();
+      const list = Array.isArray(rows) ? rows : [];
+      setBillSeries(list);
+      setSeriesDraft(Object.fromEntries(list.map((r) => [r.module, String(r.next ?? 1)])));
+    } catch (err) {
+      toast.error(err?.friendlyMessage || err?.message || 'Could not load bill numbers');
+    }
+  };
+
+  const saveSeriesNext = async (moduleName) => {
+    const next = seriesDraft[moduleName];
+    setSaving(true);
+    try {
+      await configApi.setBillNumber(moduleName, next);
+      toast.success('Next bill number saved');
+      await loadBillSeries();
+    } catch (err) {
+      toast.error(err?.friendlyMessage || err?.message || 'Could not save bill number');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetSeries = async (moduleName) => {
+    setSaving(true);
+    try {
+      await configApi.resetBillNumbers(moduleName);
+      toast.success(moduleName ? 'Series reset to 1' : 'All bill numbers reset to 1');
+      await loadBillSeries();
+    } catch (err) {
+      toast.error(err?.friendlyMessage || err?.message || 'Could not reset bill numbers');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const renderVouchers = () => (
     <div className="space-y-4">
-      <PanelHeader title="Vouchers & Print" subtitle="Bill prefixes & print options." onSave={handleSaveSettings} saving={saving} loading={loading} canEdit={canEdit} />
+      <PanelHeader title="Vouchers & Print" subtitle="Next bill number for every book. New bills start at 1, 2, 3." onSave={handleSaveSettings} saving={saving} loading={loading} canEdit={canEdit} />
+      <div className="erp-card p-4 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Bill numbers</p>
+          {canEdit && (
+            <button type="button" className="erp-btn h-7 px-2 text-[10px]" disabled={saving} onClick={() => resetSeries()}>
+              Reset all to 1
+            </button>
+          )}
+        </div>
+        <p className="text-[11px] text-[var(--text-muted)]">Next number is what a new bill will get. Change it, or reset a book back to 1.</p>
+        <div className="divide-y divide-[var(--border-subtle)]">
+          {billSeries.map((row) => (
+            <div key={row.module} className="flex items-center gap-2 py-1.5">
+              <span className="text-[11px] font-medium flex-1 min-w-0">{row.label}</span>
+              <ERPInput
+                className="w-20 text-center"
+                value={seriesDraft[row.module] ?? ''}
+                disabled={!canEdit}
+                onChange={(e) => setSeriesDraft((d) => ({ ...d, [row.module]: e.target.value.replace(/[^\d]/g, '') }))}
+              />
+              {canEdit && (
+                <>
+                  <button type="button" className="erp-btn erp-btn-primary h-7 px-2 text-[10px]" disabled={saving} onClick={() => saveSeriesNext(row.module)}>Set</button>
+                  <button type="button" className="erp-btn h-7 px-2 text-[10px]" disabled={saving} onClick={() => resetSeries(row.module)}>Reset</button>
+                </>
+              )}
+            </div>
+          ))}
+          {!billSeries.length && <p className="text-[11px] text-[var(--text-muted)] py-2">Open this tab to load series.</p>}
+        </div>
+      </div>
       {loading ? <InlineLoader /> : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
@@ -1073,10 +1148,31 @@ const CompanySettingsModal = ({ isOpen, onClose, initialTab = 'appearance', init
         </div>
       );
     }
-    if (activeTab === 'companyInfo') return renderCompanyInfo();
-    if (activeTab === 'address') return renderAddress();
-    if (activeTab === 'gst') return renderGst();
-    if (activeTab === 'financial') return renderFinancial();
+    if (activeTab === 'companyInfo' || activeTab === 'address' || activeTab === 'gst' || activeTab === 'financial') {
+      const section = activeTab === 'address' || activeTab === 'gst' || activeTab === 'financial' ? activeTab : 'companyInfo';
+      const body = section === 'address' ? renderAddress()
+        : section === 'gst' ? renderGst()
+          : section === 'financial' ? renderFinancial()
+            : renderCompanyInfo();
+      return (
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 max-w-sm">
+            <span className="text-[10px] font-semibold uppercase text-[var(--text-muted)] shrink-0">Section</span>
+            <select
+              className="h-8 flex-1 px-2 text-[12px] rounded border border-[var(--border)] bg-[var(--bg-card)]"
+              value={section}
+              onChange={(e) => setActiveTab(e.target.value)}
+            >
+              <option value="companyInfo">Company Info</option>
+              <option value="address">Address</option>
+              <option value="gst">GST & Tax</option>
+              <option value="financial">Financial Year</option>
+            </select>
+          </label>
+          {body}
+        </div>
+      );
+    }
     if (activeTab === 'branding') return renderBranding();
     if (isBillTab) return renderFieldList(billConfig, setBillConfig, SECTIONS, `${billLabel} — Field Layout`, handleSaveFields, 'Save Fields');
     if (isFormTab) return renderFieldList(formConfig, setFormConfig, [{ id: 'fields', label: 'Form Fields', prop: 'fields' }], `${formLabel} — Field Layout`, handleSaveForm, 'Save Fields');
@@ -1093,6 +1189,18 @@ const CompanySettingsModal = ({ isOpen, onClose, initialTab = 'appearance', init
     if (activeTab === 'permissions') return renderPermissions();
     if (activeTab === 'offline') return renderOffline();
     if (activeTab === 'users') return <UserRightsPanel active />;
+    if (activeTab === 'caAccess') {
+      return (
+        <CaAccessPanel
+          active
+          settings={settings}
+          setSetting={setSetting}
+          onSave={handleSaveSettings}
+          saving={saving}
+          canEdit={canEdit}
+        />
+      );
+    }
     if (activeTab === 'shortcutBooks') return renderShortcut('books', 'Book Master', 'Manage accounting books and ledgers.');
     if (activeTab === 'shortcutAutomation') return renderShortcut('automation', 'Automation Engine', 'Business rules and automated workflows.');
     if (activeTab === 'shortcutOpeningBalance') return renderShortcut('openingBalance', 'Opening Balance', 'Set opening balances for accounts.');
@@ -1116,7 +1224,7 @@ const CompanySettingsModal = ({ isOpen, onClose, initialTab = 'appearance', init
                   type="button"
                   onClick={() => { setActiveTab(id); setExpanded('header'); }}
                   className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left text-[10px] font-semibold transition-colors ${
-                    activeTab === id ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'
+                    activeTab === id || (id === 'companyInfo' && ['address', 'gst', 'financial'].includes(activeTab)) ? 'bg-[var(--accent)] text-white shadow-sm' : 'text-[var(--text-secondary)] hover:bg-[var(--accent-light)]'
                   }`}
                 >
                   <Icon size={13} className="shrink-0" /> <span className="truncate">{label}</span>
