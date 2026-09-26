@@ -303,6 +303,12 @@
   display: block;
 }
 
+.erp-menu-nest {
+  margin: 2px 0 4px 10px;
+  padding-left: 6px;
+  border-left: 2px solid #cbd5e1;
+}
+
 .erp-menu-chevron {
   margin-left: auto;
   font-size: 9px;

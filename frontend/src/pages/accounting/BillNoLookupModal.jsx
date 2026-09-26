@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '../../components/ui/Modal';
 
 const num = (n, d = 2) =>
@@ -20,6 +20,7 @@ const fmtDate = (d) => {
 export default function BillNoLookupModal({ isOpen, onClose, invoices = [], partyName = '', onSelect }) {
   const [search, setSearch] = useState('');
   const [idx, setIdx] = useState(0);
+  const activeRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -40,17 +41,26 @@ export default function BillNoLookupModal({ isOpen, onClose, invoices = [], part
     onClose?.();
   };
 
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [idx, isOpen]);
+
   const onKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      e.stopPropagation();
       setIdx((i) => Math.min(i + 1, Math.max(0, rows.length - 1)));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      e.stopPropagation();
       setIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' && rows[idx]) {
+    } else if (e.key === 'Enter') {
       e.preventDefault();
-      pick(rows[idx]);
+      e.stopPropagation();
+      if (rows[idx]) pick(rows[idx]);
     } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
       onClose?.();
     }
   };
@@ -102,6 +112,7 @@ export default function BillNoLookupModal({ isOpen, onClose, invoices = [], part
                 rows.map((r, i) => (
                   <tr
                     key={r._id}
+                    ref={i === idx ? activeRef : undefined}
                     className={`cursor-pointer ${i === idx ? 'bg-blue-600 text-white' : 'hover:bg-blue-50'}`}
                     onMouseDown={(e) => {
                       e.preventDefault();

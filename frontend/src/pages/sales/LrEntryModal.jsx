@@ -159,20 +159,58 @@ const LrEntryModal = ({ isOpen, onClose, onSaved }) => {
     { key: 'remarks',   label: 'Remarks',   type: 'text',   width: '14%' },
   ];
 
-  const handleCellKeyDown = (e, rowIdx, colIdx) => {
-    if (e.key === 'Enter' || e.key === 'Tab') {
-      e.preventDefault();
-      const nextCol = colIdx + 1;
-      if (nextCol < COLS.length) {
-        cellRefs.current[`${rowIdx}-${nextCol}`]?.focus();
-      } else {
-        const nextRow = rowIdx + 1;
-        if (nextRow < filtered.length) {
-          cellRefs.current[`${nextRow}-0`]?.focus();
-        }
-      }
+  const focusCell = (rowIdx, colIdx) => {
+    const el = cellRefs.current[`${rowIdx}-${colIdx}`];
+    if (!el || el.disabled) return false;
+    el.focus();
+    if (typeof el.select === 'function' && el.type !== 'date') {
+      try { el.select(); } catch { /* date inputs */ }
     }
+    return true;
   };
+
+  const handleCellKeyDown = (e, rowIdx, colIdx) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onClose?.();
+      return;
+    }
+    if (e.key !== 'Enter' && e.key !== 'Tab') return;
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const backward = e.shiftKey;
+    if (backward) {
+      if (colIdx > 0) {
+        focusCell(rowIdx, colIdx - 1);
+        return;
+      }
+      if (rowIdx > 0) focusCell(rowIdx - 1, COLS.length - 1);
+      return;
+    }
+    if (colIdx < COLS.length - 1) {
+      focusCell(rowIdx, colIdx + 1);
+      return;
+    }
+    if (rowIdx < filtered.length - 1) {
+      focusCell(rowIdx + 1, 0);
+      return;
+    }
+    document.querySelector('[data-lr-save-all]')?.focus();
+  };
+
+  const didFocusRef = useRef(false);
+  useEffect(() => {
+    if (!isOpen) {
+      didFocusRef.current = false;
+      return undefined;
+    }
+    if (didFocusRef.current || filtered.length === 0) return undefined;
+    didFocusRef.current = true;
+    const t = setTimeout(() => focusCell(0, 0), 40);
+    return () => clearTimeout(t);
+  }, [isOpen, filtered.length]);
 
   const dirtyCount = Object.values(lrData).filter((v) => v._dirty && v.lrNo?.trim()).length;
 
@@ -186,7 +224,17 @@ const LrEntryModal = ({ isOpen, onClose, onSaved }) => {
       <div
         className="bg-white rounded-lg shadow-2xl border-2 border-[#1a3353] flex flex-col overflow-hidden"
         style={{ width: '98vw', maxWidth: '1380px', maxHeight: '90vh' }}
+        data-erp-dialog
+        data-enter-nav="off"
+        role="dialog"
+        aria-label="LR Entry"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            onClose?.();
+          }
+        }}
       >
         {/* Header */}
         <div className="bg-[#1a3353] text-white px-4 py-2.5 flex items-center justify-between shrink-0">
@@ -207,6 +255,13 @@ const LrEntryModal = ({ isOpen, onClose, onSaved }) => {
               placeholder="Search party / bill..."
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  focusCell(0, 0);
+                }
+              }}
               className="px-2 py-1 rounded text-xs bg-[#243f5c] border border-slate-500 text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 w-44"
             />
             <button
@@ -328,7 +383,7 @@ const LrEntryModal = ({ isOpen, onClose, onSaved }) => {
               <span className="inline-block w-3 h-3 bg-green-100 border border-green-300 rounded mr-1" />
               Saved
             </span>
-            <span className="text-slate-500">Tab / Enter → next cell</span>
+            <span className="text-slate-500">Enter next · Shift+Enter back · Tab same · Ctrl+Enter save · Esc close</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-600 font-semibold">
@@ -341,6 +396,8 @@ const LrEntryModal = ({ isOpen, onClose, onSaved }) => {
               Cancel
             </button>
             <button
+              data-lr-save-all
+              data-enter-save
               onClick={handleSaveAll}
               disabled={saving || dirtyCount === 0}
               className="px-6 py-1.5 bg-[#1a3353] text-white text-xs font-bold rounded hover:bg-[#243f5c] disabled:opacity-40 disabled:cursor-not-allowed shadow"

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BarChart3, Database, FileText, Users, TrendingUp, Layers } from 'lucide-react';
 import { motion } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
+import AdminCompanySelect from './AdminCompanySelect';
 
 const Usage = () => {
     const { usage, fetchUsage, companies, fetchCompanies } = useAdminStore();
@@ -32,10 +33,13 @@ const Usage = () => {
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-4 flex flex-col sm:flex-row gap-4">
                 <div className="flex-1">
                     <label className="dark-input__label">Filter by Company</label>
-                    <select className="dark-input" value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)}>
-                        <option value="">All Companies</option>
-                        {companies.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                    </select>
+                    <AdminCompanySelect
+                        companies={companies}
+                        value={selectedCompany}
+                        onChange={setSelectedCompany}
+                        emptyLabel="All Companies"
+                        placeholder="Search company…"
+                    />
                 </div>
                 <div className="w-full sm:w-48">
                     <label className="dark-input__label">Period</label>

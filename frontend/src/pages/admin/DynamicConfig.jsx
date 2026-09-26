@@ -5,6 +5,7 @@ import {
   ChevronDown, ChevronUp, Zap, AlertCircle
 } from 'lucide-react';
 import useAdminStore from '../../store/useAdminStore';
+import AdminCompanySelect from './AdminCompanySelect';
 import { adminApi } from '../../api';
 import { notifyError } from '../../utils/notify';
 
@@ -456,12 +457,12 @@ const DynamicConfig = () => {
 
       <div className="glass-card" style={{ padding: 14 }}>
         <label className="dark-input__label">Select Company</label>
-        <select className="dark-input" value={selectedCompany} onChange={(e) => setSelectedCompany(e.target.value)}>
-          <option value="">— Choose company —</option>
-          {companies.map((c) => (
-            <option key={c._id} value={c._id}>{c.name}</option>
-          ))}
-        </select>
+        <AdminCompanySelect
+          companies={companies}
+          value={selectedCompany}
+          onChange={setSelectedCompany}
+          placeholder="Search company — name, city, GSTIN…"
+        />
       </div>
 
       {error && (

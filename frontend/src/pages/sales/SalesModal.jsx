@@ -1759,11 +1759,13 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             </div>
           )}
 
-          {/* Footer Grid / Calculations */}
-          <div className="grid grid-cols-12 gap-1.5 erp-sales-footer shrink-0">
+        </div>
+
+          {/* Footer sits under the grid so the action bar cannot cover totals */}
+          <div className="grid grid-cols-12 gap-1 erp-sales-footer shrink-0">
             
             {/* Left Adjustments Column */}
-            <div className="col-span-4 classic-erp-frame classic-erp-stack p-2">
+            <div className="col-span-4 classic-erp-frame classic-erp-stack erp-sales-footer-left">
               {[
                 { label: 'FOLD LESS', key: 'foldLess', signKey: 'foldLessSign' },
                 { label: 'RD AMT', key: 'rdAmt', signKey: 'rdAmtSign' },
@@ -1806,7 +1808,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
             {/* Middle Transport Details Column */}
             {(billFields.footer('transport') || billFields.footer('lrNo') || billFields.footer('bale')) && (
-            <div className="col-span-4 classic-erp-frame classic-erp-stack p-2">
+            <div className="col-span-4 classic-erp-frame classic-erp-stack erp-sales-footer-transport">
               <span className="classic-erp-frame-title">Transport Details</span>
               
               {billFields.footer('transport') && (
@@ -1856,7 +1858,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             )}
 
             {/* Right Totals & GST Summary Column */}
-            <div className="col-span-4 classic-erp-frame classic-erp-stack p-2 bg-[var(--accent-light)] pb-3">
+            <div className="col-span-4 classic-erp-frame classic-erp-stack erp-sales-footer-totals bg-[var(--accent-light)]">
               <div className="classic-erp-total-row font-bold">
                 <span className="classic-erp-label text-slate-800">Gross Amt:</span>
                 <span className="font-mono text-black">₹{calculations.gross.toFixed(2)}</span>
@@ -1945,8 +1947,6 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             </div>
 
           </div>
-
-        </div>
       </div>
 
         {/* Action bar — outside window so New/Save never clip */}
@@ -2155,6 +2155,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       onSave={handlePcsBreakdownSave}
       locked={locked}
       initialCalcType={pcsBreakdown.calcType}
+      overlayZ={Math.max((win.z || 1200) + 80, 10080)}
     />
     <LrEntryModal
       isOpen={lrModalOpen}

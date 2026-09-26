@@ -1746,6 +1746,7 @@ const PurchaseModal = ({
           initialCalcType={pcsBreakdown.calcType}
           onSave={handlePcsBreakdownSave}
           locked={locked}
+          overlayZ={Math.max((win.z || 1200) + 80, 10080)}
         />
 
         <AccountMasterModal

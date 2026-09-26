@@ -389,6 +389,7 @@ const Dashboard = () => {
       jobRec: false,
       updateJob: false,
       outstanding: false,
+      partyOsReport: false,
       ledger: false,
       accountMaster: false,
       itemMaster: false,
@@ -764,6 +765,79 @@ const Dashboard = () => {
       return () => window.removeEventListener('keydown', onKey, true);
    }, [shellOpen, user?.companyRole]);
 
+   useEffect(() => {
+      const isTyping = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+      const triggers = () => [...document.querySelectorAll('.erp-menu-bar .erp-menu-trigger')];
+      const openItems = () => [...document.querySelectorAll('.erp-menu-dropdown button.erp-menu-item')].filter((el) => el.offsetParent !== null);
+      const onMenuKey = (e) => {
+         if (e.altKey || e.ctrlKey || e.metaKey || e.isComposing) return;
+         const el = e.target;
+         if (e.key === 'F9') {
+            e.preventDefault();
+            e.stopPropagation();
+            const rail = [...document.querySelectorAll('aside.erp-rail button')];
+            const current = rail.find((btn) => btn.className.includes('bg-[var(--accent)]')) || rail[0];
+            current?.focus();
+            return;
+         }
+         if (e.key === 'F10') {
+            if (isTyping(el)) return;
+            e.preventDefault();
+            const first = triggers()[0];
+            first?.focus();
+            return;
+         }
+         const onRail = el?.closest?.('aside.erp-rail button');
+         if (onRail && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End')) {
+            const rail = [...document.querySelectorAll('aside.erp-rail button')];
+            const i = rail.indexOf(onRail);
+            if (i < 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const next = e.key === 'Home' ? rail[0]
+               : e.key === 'End' ? rail[rail.length - 1]
+               : rail[(i + (e.key === 'ArrowDown' ? 1 : rail.length - 1)) % rail.length];
+            next?.focus();
+            return;
+         }
+         const onTrigger = el?.closest?.('.erp-menu-trigger');
+         const inMenu = el?.closest?.('.erp-menu-dropdown');
+         if (!onTrigger && !inMenu) return;
+         if (e.key === 'Escape') {
+            e.preventDefault();
+            setOpenMenuSection(null);
+            setOpenFlyoutPath(null);
+            return;
+         }
+         if (onTrigger && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+            const list = triggers();
+            const i = list.indexOf(onTrigger);
+            if (i < 0) return;
+            e.preventDefault();
+            const next = list[(i + (e.key === 'ArrowRight' ? 1 : list.length - 1)) % list.length];
+            next?.focus();
+            next?.click();
+            return;
+         }
+         if (onTrigger && (e.key === 'ArrowDown' || e.key === 'Enter')) {
+            e.preventDefault();
+            if (!document.querySelector('.erp-menu-dropdown')) onTrigger.click();
+            setTimeout(() => openItems()[0]?.focus(), 30);
+            return;
+         }
+         if (inMenu && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+            const list = openItems();
+            const i = list.indexOf(el.closest('button') || el);
+            if (i < 0) return;
+            e.preventDefault();
+            const next = list[(i + (e.key === 'ArrowDown' ? 1 : list.length - 1)) % list.length];
+            next?.focus();
+         }
+      };
+      window.addEventListener('keydown', onMenuKey, true);
+      return () => window.removeEventListener('keydown', onMenuKey, true);
+   }, []);
+
    const openGstinReports = (section = 'sales') => {
       setModals(prev => ({
          ...prev,
@@ -1049,7 +1123,7 @@ const Dashboard = () => {
 
          {/* Core modules — compact rail */}
          <aside className="erp-rail flex flex-col py-2 gap-0.5 shrink-0 overflow-y-auto no-scrollbar">
-            <p className="px-3 py-1.5 text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider shrink-0">Quick</p>
+            <p className="px-3 py-1.5 text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider shrink-0" title="F9 focuses this list. Up and Down move. Enter opens.">Quick · F9</p>
             {coreModules.map((mod) => (
                <button
                   key={mod.id}
@@ -1225,16 +1299,6 @@ const Dashboard = () => {
                                                       className={`erp-menu-item erp-menu-item--parent ${openFlyoutPath === keyPrefix ? 'erp-menu-trigger--open' : ''}`}
                                                       onClick={(e) => {
                                                          e.stopPropagation();
-                                                         if (e.target.closest('.erp-menu-chevron')) {
-                                                            setOpenFlyoutPath((prev) => (prev === keyPrefix ? null : keyPrefix));
-                                                            return;
-                                                         }
-                                                         if (node.action) {
-                                                            setOpenMenuSection(null);
-                                                            setOpenFlyoutPath(null);
-                                                            node.action();
-                                                            return;
-                                                         }
                                                          setOpenFlyoutPath((prev) => (prev === keyPrefix ? null : keyPrefix));
                                                       }}
                                                    >
@@ -1247,7 +1311,7 @@ const Dashboard = () => {
                                                       <span className="erp-menu-chevron">{flyoutOpen ? '▾' : '▸'}</span>
                                                    </button>
                                                    {flyoutOpen && (
-                                                      <div className="erp-menu-flyout erp-menu-flyout--open">
+                                                      <div className={section === 'Reports' ? 'erp-menu-nest' : 'erp-menu-flyout erp-menu-flyout--open'}>
                                                          {kids.map((child, cIdx) => renderMenuNode(child, `${keyPrefix}-${cIdx}`))}
                                                       </div>
                                                    )}
@@ -1653,9 +1717,10 @@ const Dashboard = () => {
             onOpenOutstanding={(data) => {
                setOutstandingSeed({
                   partyId: data?.partyId || '',
+                  partyName: data?.partyName || '',
                   osType: data?.osType || 'receivable',
                });
-               openModalDirect('outstanding');
+               setModals((prev) => ({ ...prev, partyOsReport: true }));
             }}
          />
          <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters || mobileViewOnly} />
@@ -1700,6 +1765,18 @@ const Dashboard = () => {
                   onClose={() => {
                      setOutstandingSeed(null);
                      toggleModal('outstanding', false);
+                  }}
+               />
+            )}
+            {modals.partyOsReport && outstandingSeed?.partyId && (
+               <OutstandingReportModal
+                  isOpen
+                  type={outstandingSeed.osType || 'receivable'}
+                  directPartyId={outstandingSeed.partyId}
+                  directPartyName={outstandingSeed.partyName || ''}
+                  onClose={() => {
+                     setOutstandingSeed(null);
+                     setModals((prev) => ({ ...prev, partyOsReport: false }));
                   }}
                />
             )}
@@ -1969,6 +2046,7 @@ const Dashboard = () => {
             onClose={() => setModals(prev => ({ ...prev, reportsHub: false, reportsLeafId: null }))}
             initialTab={modals.reportsTab}
             initialLeafId={modals.reportsLeafId}
+            popupOnly={Boolean(modals.reportsLeafId)}
             onOpenExternal={(ext) => {
                setModals(prev => ({ ...prev, reportsHub: false, reportsLeafId: null }));
                if (ext === 'gstReports') toggleModal('gstReports', true);

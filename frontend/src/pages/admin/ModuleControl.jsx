@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
+import AdminCompanySelect from './AdminCompanySelect';
 import { adminApi } from '../../api';
 import { toast } from '../../store/useToastStore';
 
@@ -328,10 +329,12 @@ const ModuleControl = () => {
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, minWidth: 200 }}>
                         <label className="dark-input__label">Select Company to Configure</label>
-                        <select className="dark-input" value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)}>
-                            <option value="">-- Choose a company --</option>
-                            {companies.map(c => <option key={c._id} value={c._id}>{c.name} ({c.planId?.name || 'No Plan'})</option>)}
-                        </select>
+                        <AdminCompanySelect
+                            companies={companies}
+                            value={selectedCompany}
+                            onChange={setSelectedCompany}
+                            placeholder="Search company or plan…"
+                        />
                     </div>
                     {selectedCompany && config && (
                         <div style={{ display: 'flex', gap: 12 }}>

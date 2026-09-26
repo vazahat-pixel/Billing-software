@@ -52,7 +52,7 @@ export default function useErpBookKeys({
       if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
         if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette], [data-find-modal]')) return;
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         refs.current.onNew?.();
       }
     };

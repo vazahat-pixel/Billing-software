@@ -1,8 +1,15 @@
 ﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import useWindowDockStore, { yieldOtherWindows } from '../store/useWindowDockStore';
 
-const TOP_CHROME = 72;
+const TOP_CHROME = 76;
 let windowZ = 1200;
+
+/** Next stacking level. Stays under the app header (z-4000) and the keyboard bar. */
+export function allocateWindowZ() {
+  windowZ += 1;
+  if (windowZ >= 3900) windowZ = 1300;
+  return windowZ;
+}
 
 /** Pull one ERP window above the others (ledger line → bill). */
 export function focusErpWindow(windowId) {
@@ -61,7 +68,11 @@ export default function useErpWindow(isOpen, options = {}) {
   }, []);
 
   useEffect(() => {
-    if (!isOpen) setZ(1200);
+    if (!isOpen) {
+      setZ(1200);
+      return;
+    }
+    setZ(allocateWindowZ());
   }, [isOpen]);
 
   useEffect(() => {

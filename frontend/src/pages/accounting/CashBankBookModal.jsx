@@ -31,12 +31,12 @@ const dayLabel = (iso) => {
   return d.toLocaleDateString('en-IN', { weekday: 'short' });
 };
 
-const BILL_LINE_COUNT = 12;
-const blankBillLines = (n = BILL_LINE_COUNT) => Array.from({ length: n }, () => emptyBillRow());
-const padBillLines = (rows) => {
-  const list = Array.isArray(rows) && rows.length ? rows : [emptyBillRow()];
-  if (list.length >= BILL_LINE_COUNT) return list;
-  return [...list, ...blankBillLines(BILL_LINE_COUNT - list.length)];
+/** Keep only the bills that were picked. A blank picker row exists only when nothing is selected yet. */
+const withPickerRow = (rows) => {
+  const list = Array.isArray(rows) ? rows : [];
+  const filled = list.filter((r) => String(r.billNo || '').trim() || r.invoiceId);
+  if (!filled.length) return [emptyBillRow()];
+  return filled;
 };
 
 const emptyBillRow = () => ({
@@ -122,6 +122,10 @@ const CashBankBookModal = ({
   const billNoRefs = useRef([]);
   /** Row to focus once the grid has re-rendered; a ref so it costs no extra render. */
   const pendingFocusRowRef = useRef(null);
+  /** Esc from the bill list must not immediately reopen it on the same cell. */
+  const suppressLookupRef = useRef(false);
+  const advanceLookupRef = useRef(false);
+  const recentBootRef = useRef(false);
   const partyFieldRef = useRef(null);
   const idempotencyKeyRef = useRef(newIdempotencyKey());
 
@@ -141,7 +145,7 @@ const CashBankBookModal = ({
     scCode: 'SC27',
   });
 
-  const [billRows, setBillRows] = useState(() => blankBillLines());
+  const [billRows, setBillRows] = useState(() => [emptyBillRow()]);
   const [footer, setFooter] = useState({
     remark1: '',
     remark2: '',
@@ -398,7 +402,7 @@ const CashBankBookModal = ({
       bankLedgerId: bankCashLedgers[0]?._id || bankCashLedgers[0]?.id || '',
       scCode: 'SC27',
     });
-    setBillRows(blankBillLines());
+    setBillRows([emptyBillRow()]);
     setFooter({ remark1: '', remark2: '', financeFlag: false, finance: 0 });
     setSelectedVoucherId('');
     setError('');
@@ -411,6 +415,7 @@ const CashBankBookModal = ({
   useEffect(() => {
     if (!isOpen) {
       openedRef.current = false;
+      recentBootRef.current = false;
       setBootLoading(false);
       return;
     }
@@ -418,9 +423,6 @@ const CashBankBookModal = ({
     setVoucherType(initialType);
     if (!openedRef.current) {
       openedRef.current = true;
-      if (!initialVoucherId) {
-        resetNew();
-      }
     }
 
     let cancelled = false;
@@ -452,6 +454,42 @@ const CashBankBookModal = ({
       cancelled = true;
     };
   }, [isOpen, initialType, bookKind, initialVoucherId, fetchParties, fetchLedgers, fetchSales, fetchPurchases, fetchVouchers, fetchJobs]);
+
+  useEffect(() => {
+    if (!isOpen || initialVoucherId || recentBootRef.current) return undefined;
+    const kind = bookKind === 'bank' && !/cash/i.test(selectedBook?.name || bookTitle || '') ? 'bank' : 'cash';
+    const pickLatest = (list) => (list || [])
+      .filter((v) => v.voucherType === (initialType || 'Receipt'))
+      .filter((v) => v.status !== 'Reversed' && !v.isReversed)
+      .filter((v) => !v.bookKind || v.bookKind === kind)
+      .sort((a, b) => {
+        const na = parseInt(String(a.voucherNo || '').replace(/\D/g, ''), 10);
+        const nb = parseInt(String(b.voucherNo || '').replace(/\D/g, ''), 10);
+        if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) return na - nb;
+        return new Date(a.date || 0) - new Date(b.date || 0);
+      });
+    const apply = (list) => {
+      if (recentBootRef.current) return;
+      recentBootRef.current = true;
+      const latest = pickLatest(list);
+      if (latest.length) loadVoucher(latest[latest.length - 1]);
+      else resetNew();
+    };
+    const cached = useStore.getState().vouchers;
+    if (Array.isArray(cached) && cached.length) {
+      apply(cached);
+      return undefined;
+    }
+    let cancelled = false;
+    fetchVouchers()
+      .then(() => {
+        if (!cancelled) apply(useStore.getState().vouchers || []);
+      })
+      .catch(() => {
+        if (!cancelled) apply([]);
+      });
+    return () => { cancelled = true; };
+  }, [isOpen, initialVoucherId, initialType, bookKind]);
 
   useEffect(() => {
     if (!isOpen || !initialVoucherId) return;
@@ -503,7 +541,7 @@ const CashBankBookModal = ({
   // BillLookupModal se manually select ki jaayengi.
   useEffect(() => {
     if (!isOpen || mode === 'View') return;
-    setBillRows(blankBillLines());
+    setBillRows([emptyBillRow()]);
   }, [header.partyId, header.accBill]);
 
   /** BillNo Entry — click, Enter, Space, or F4 on a row's BillNo cell opens the bill picker. */
@@ -566,10 +604,17 @@ const CashBankBookModal = ({
         adjust: autoAdjust,
         netOs: round2(inv.osAmt - autoAdjust),
       };
-      if (idx === next.length - 1) next.push(emptyBillRow());
       return next;
     });
-    pendingFocusRowRef.current = idx + 1;
+  };
+
+  const closeBillLookup = () => {
+    setBillLookupOpen(false);
+    if (advanceLookupRef.current) {
+      advanceLookupRef.current = false;
+      return;
+    }
+    suppressLookupRef.current = true;
   };
 
   // Focus is applied once the new row exists in the DOM.
@@ -585,7 +630,7 @@ const CashBankBookModal = ({
   }, [billRows]);
 
   const removeBillRow = (idx) => {
-    setBillRows((rows) => padBillLines(rows.length <= 1 ? [emptyBillRow()] : rows.filter((_, i) => i !== idx)));
+    setBillRows((rows) => withPickerRow(rows.filter((_, i) => i !== idx)));
   };
 
   const setH = (key) => (e) => {
@@ -698,7 +743,7 @@ const CashBankBookModal = ({
       oth1: a.oth1 || 0,
       oth2: a.oth2 || 0,
     }));
-    setBillRows(padBillLines(rows));
+    setBillRows(rows);
     setFooter({
       remark1: v.narration || '',
       remark2: v.remark2 || '',
@@ -708,7 +753,13 @@ const CashBankBookModal = ({
     setMode('View');
   };
 
-  const handleNew = () => resetNew();
+  const handleNew = () => {
+    resetNew();
+    setTimeout(() => {
+      const el = partyFieldRef.current?.querySelector('input, [data-erp-combobox-input]');
+      el?.focus();
+    }, 40);
+  };
 
   /**
    * Unlock the loaded voucher for correction. Saving from here reverses the original
@@ -722,6 +773,7 @@ const CashBankBookModal = ({
       return notifyWarning('A reversed voucher cannot be edited');
     }
     setMode('Edit');
+    setBillRows((rows) => withPickerRow(rows));
     setError('');
     notifyWarning('Edit mode — saving re-posts this voucher and rebuilds its bill allocation');
   };
@@ -1043,9 +1095,9 @@ const CashBankBookModal = ({
 
   return (
     <>
-    <ErpWindowedModal isOpen={isOpen} onClose={onClose} title={windowTitle} windowId={`cashbank-${bookKind}-${initialType || 'Receipt'}`} defaultMode="maximized" bare>
+    <ErpWindowedModal isOpen={isOpen} onClose={onClose} title={windowTitle} windowId={`cashbank-${bookKind}-${initialType || 'Receipt'}`} defaultMode="normal" className="cash-bank-window" bare>
       {({ WindowControls }) => (
-      <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 !max-h-none">
+      <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 !max-h-none" data-enter-skip={mode === 'View' ? 'true' : undefined}>
         <ErpBusyOverlay show={bootLoading} message="Loading cash/bank book…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving voucher…" />
         <div className="classic-erp-header shrink-0">
@@ -1302,7 +1354,16 @@ const CashBankBookModal = ({
                         type="text"
                         className="classic-erp-input w-full border-0 bg-transparent"
                         value={row.billNo}
+                        data-enter-action="true"
                         onChange={(e) => updateRow(idx, 'billNo', e.target.value)}
+                        onFocus={() => {
+                          if (locked || String(row.billNo || '').length) return;
+                          if (suppressLookupRef.current) {
+                            suppressLookupRef.current = false;
+                            return;
+                          }
+                          openBillLookup(idx);
+                        }}
                         onClick={() => {
                           // Only steal the click on an empty cell — clicking to position the
                           // cursor inside an already-picked bill number must not reopen the picker.
@@ -1364,7 +1425,7 @@ const CashBankBookModal = ({
                 disabled={!header.partyId}
                 onClick={() => {
                   if (!header.partyId || header.accBill !== 'B') {
-                    setBillRows(blankBillLines());
+                    setBillRows([emptyBillRow()]);
                     return;
                   }
                   const rows = partyInvoices.map((inv) => ({
@@ -1380,7 +1441,7 @@ const CashBankBookModal = ({
                     netOs: inv.osAmt,
                     adjust: 0,
                   }));
-                  setBillRows(padBillLines(rows.length ? [...rows, emptyBillRow()] : []));
+                  setBillRows(withPickerRow(rows));
                 }}
               >
                 Load Outstanding Bills
@@ -1532,7 +1593,7 @@ const CashBankBookModal = ({
 
     <BillNoLookupModal
       isOpen={billLookupOpen}
-      onClose={() => setBillLookupOpen(false)}
+      onClose={closeBillLookup}
       invoices={billLookupInvoices}
       partyName={selectedParty?.name || ''}
       onSelect={handleBillSelect}

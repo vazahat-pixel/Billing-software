@@ -405,20 +405,32 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     }
     let cancelled = false;
     setBootLoading(true);
-    setMode('Add');
-    resetForm();
     Promise.all([fetchParties(), fetchItems(), fetchPurchases(), fetchInventory(), fetchJobs()])
       .then((results) => {
         if (cancelled) return;
         const partyList = results[0] || [];
         const purchaseList = results[2] || [];
         const lots = results[3] || [];
+        const jobs = results[4] || [];
         if (initialData) {
           applyPurchasePrefill(initialData, lots, purchaseList, partyList);
           setTimeout(() => {
             const millInput = document.querySelector('input[placeholder*="Search Mill"]');
             millInput?.focus();
           }, 150);
+        } else {
+          const sorted = [...jobs].sort((a, b) => {
+            const numA = parseInt(String(a.challanNo || a.jobCardNo || '').replace(/\D/g, ''), 10);
+            const numB = parseInt(String(b.challanNo || b.jobCardNo || '').replace(/\D/g, ''), 10);
+            if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+            return new Date(a.issueDate || a.createdAt || 0) - new Date(b.issueDate || b.createdAt || 0);
+          });
+          const latest = sorted[sorted.length - 1];
+          if (latest) loadJob(latest._id || latest.id, 'View');
+          else {
+            setMode('Add');
+            resetForm();
+          }
         }
       })
       .catch(() => {})
@@ -554,6 +566,12 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     setMode('Add');
     setFromPurchase(null);
     resetForm();
+    setTimeout(() => {
+      const el = document.querySelector('[data-erp-start="challan"]');
+      if (!el || el.disabled) return;
+      el.focus();
+      try { el.select(); } catch { /* ignore */ }
+    }, 80);
   };
 
   const handleEdit = () => {
@@ -622,16 +640,13 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         if (nextIdx >= 0 && nextIdx < list.length) loadJob(list[nextIdx]._id || list[nextIdx].id, 'View');
         return;
       }
-      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !findOpen) {
-        if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette], [data-find-modal]')) return;
-        if (mode === 'View') {
-          e.preventDefault();
-          e.stopPropagation();
-          handleNew();
-          return;
-        }
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !findOpen && mode === 'View') {
+        if (e.target?.closest?.('[data-find-modal], [data-book-selection-modal], [data-command-palette]')) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        handleNew();
+        return;
       }
-
       if (e.altKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         handleNew();
@@ -858,10 +873,11 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         onClose={onClose}
         title={`Mill Issue [ ${titleBook} ]`}
         windowId="millIssue"
+        className="job-book-window"
         bare
       >
         {({ WindowControls }) => (
-          <div className="classic-erp-window erp-density erp-job-issue-window erp-mill-issue-window flex flex-col h-full min-h-0 !max-h-none">
+          <div className="classic-erp-window erp-density erp-job-issue-window erp-mill-issue-window flex flex-col h-full min-h-0 !max-h-none" data-enter-skip={mode === 'View' ? 'true' : undefined}>
             <ErpBusyOverlay show={bootLoading} message="Loading mill issue…" />
             <ErpBusyOverlay show={!bootLoading && saving} message="Saving mill issue…" />
 
@@ -929,6 +945,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                       type="text"
                       className="classic-erp-input font-bold"
                       value={form.challanNo}
+                      data-erp-start="challan"
                       onChange={(e) => setField('challanNo', e.target.value)}
                       disabled={locked}
                     />

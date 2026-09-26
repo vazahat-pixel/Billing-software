@@ -269,6 +269,19 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       let cancelled = false;
       setBootLoading(true);
       Promise.all([fetchJobs(), fetchParties?.(), fetchInventory?.(), fetchItems?.()])
+         .then(() => {
+            if (cancelled) return;
+            const list = (useStore.getState().jobWorkEntries || [])
+               .filter((j) => j.status === 'Received' || j.status === 'Partial')
+               .sort((a, b) => {
+                  const numA = parseInt(String(a.billGpNo || a.jobCardNo || a.challanNo || '').replace(/\D/g, ''), 10);
+                  const numB = parseInt(String(b.billGpNo || b.jobCardNo || b.challanNo || '').replace(/\D/g, ''), 10);
+                  if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+                  return new Date(a.receiveDate || a.updatedAt || 0) - new Date(b.receiveDate || b.updatedAt || 0);
+               });
+            const latest = list[list.length - 1];
+            if (latest) handleLoadReceivedJob(latest);
+         })
          .catch(() => { })
          .finally(() => {
             if (!cancelled) setBootLoading(false);
@@ -303,16 +316,13 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             if (nextIdx >= 0 && nextIdx < list.length) handleLoadReceivedJob(list[nextIdx]);
             return;
          }
-         if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !showFindDialog) {
-            if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette], [data-find-modal]')) return;
-            if (isEditMode) {
-               e.preventDefault();
-               e.stopPropagation();
-               handleNew();
-               return;
-            }
+         if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !showFindDialog && isEditMode) {
+            if (e.target?.closest?.('[data-find-modal], [data-book-selection-modal], [data-command-palette]')) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            handleNew();
+            return;
          }
-
          if (e.altKey && e.key.toLowerCase() === 'n') {
             e.preventDefault();
             handleNew();
@@ -801,6 +811,12 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       setRemark('');
       setIsEditMode(false);
       notifySuccess('Cleared for new Mill Receive entry');
+      setTimeout(() => {
+        const el = document.querySelector('[data-erp-start="challan"]');
+        if (!el || el.disabled) return;
+        el.focus();
+        try { el.select(); } catch { /* ignore */ }
+      }, 80);
    };
 
    const handleLoadRecord = (record) => {
@@ -894,10 +910,11 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          onClose={onClose}
          title={`Mill Receipt [ ${selectedBook || 'PROCESS CHARGE'} ]`}
          windowId="millRec"
+         className="job-book-window"
          bare
       >
          {({ WindowControls }) => (
-            <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 overflow-hidden !max-h-none bg-[#cbd5e1]">
+            <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 overflow-hidden !max-h-none bg-[#cbd5e1]" data-enter-skip={isEditMode ? 'true' : undefined}>
                <ErpBusyOverlay show={bootLoading} message="Loading mill receive…" />
                <ErpBusyOverlay show={!bootLoading && saving} message="Saving receive…" />
 
@@ -1002,6 +1019,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                     type="text"
                                     className="classic-erp-input flex-1 bg-white"
                                     value={billGpNo}
+                                    data-erp-start="challan"
                                     onChange={(e) => setBillGpNo(e.target.value)}
                                  />
                               </div>
@@ -1044,8 +1062,8 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                         </div>
 
                         {/* 2. TRANSACTION GRID TABLE (multi-row — one line per challan) */}
-                        <div className="border border-[#808080] bg-white overflow-x-auto min-h-[140px] max-h-[220px]">
-                           <table className="min-w-[1440px] w-full text-[10px] font-mono border-collapse">
+                        <div className="mill-receive-scroll border border-[#808080] bg-white min-h-[100px] max-h-[180px]">
+                           <table className="mill-receive-grid w-full text-[10px] font-mono border-collapse">
                               <thead>
                                  <tr className="bg-[#e2e8f0] text-slate-800 border-b border-[#808080] text-[10px]">
                                     <th className="border-r border-[#808080] p-1 w-10 text-center">SrNo</th>

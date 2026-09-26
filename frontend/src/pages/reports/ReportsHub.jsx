@@ -4,6 +4,7 @@ import useStore from '../../store/useStore';
 import { notifyError } from '../../utils/notify';
 import { downloadCsv, fmtAmt, fmtDate } from '../../utils/reportExport';
 import { ReportLoader } from '../../components/ui/loaders';
+import JsmReportPane from './JsmReportPane';
 import {
   REPORT_TREE,
   findReportLeaf,
@@ -86,7 +87,15 @@ const ReportTable = ({ columns, rows, emptyText, onExport, exportLabel }) => (
   </div>
 );
 
-function filterByParty(rows, partyName, field = 'partyName') {
+function filterByParty(rows, partyName, field = 'partyName', partyNames) {
+  if (partyNames?.length) {
+    const set = new Set(partyNames);
+    return rows.filter((r) => {
+      const name = String(r[field] || r.party || r.workerName || '').toLowerCase();
+      const city = String(r.city || '').toLowerCase();
+      return set.has(name) || set.has(city);
+    });
+  }
   const q = (partyName || '').trim().toLowerCase();
   if (!q) return rows;
   return rows.filter((r) => String(r[field] || r.party || r.workerName || '').toLowerCase().includes(q));
@@ -168,11 +177,12 @@ function TreeNode({ node, depth, expanded, selectedId, onToggle, onSelect }) {
   );
 }
 
-const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = null, onOpenExternal }) => {
-  const { fetchReportsBundle, fetchTrialBalance, parties } = useStore();
+const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = null, onOpenExternal, popupOnly = false }) => {
+  const { fetchReportsBundle, fetchTrialBalance, fetchParties, parties } = useStore();
   const [fromDate, setFromDate] = useState(firstOfMonth);
   const [toDate, setToDate] = useState(lastOfMonth);
   const [partyName, setPartyName] = useState('');
+  const [partyNames, setPartyNames] = useState([]);
   const [selectedLeafId, setSelectedLeafId] = useState(null);
   const [expanded, setExpanded] = useState(() => new Set());
   const [data, setData] = useState(null);
@@ -220,12 +230,16 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
     return filterNodes(REPORT_TREE);
   }, [treeFilter]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (fromOverride, toOverride) => {
+    const from = fromOverride || fromDate;
+    const to = toOverride || toDate;
+    if (fromOverride) setFromDate(fromOverride);
+    if (toOverride) setToDate(toOverride);
     setLoading(true);
     try {
       const [bundle, tb] = await Promise.all([
-        fetchReportsBundle(fromDate, toDate),
-        fetchTrialBalance(toDate).catch(() => []),
+        fetchReportsBundle(from, to),
+        fetchTrialBalance(to).catch(() => []),
       ]);
       setData(bundle);
       setTrialBalance(Array.isArray(tb) ? tb : []);
@@ -245,7 +259,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
     setExpanded(new Set(leafId ? reportAncestorIds(leafId) || [] : []));
     setGenerated(false);
     setData(null);
-    if (leafId) load();
+    fetchParties?.().catch(() => {});
     // Open once per menu click. `load` changes with dates; do not re-run on that.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialTab, initialLeafId]);
@@ -276,20 +290,20 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
   const handlePrint = () => window.print();
 
   const salesRows = useMemo(
-    () => filterByParty(data?.salesRegister || [], partyName),
-    [data, partyName]
+    () => filterByParty(data?.salesRegister || [], partyName, 'partyName', partyNames),
+    [data, partyName, partyNames]
   );
   const purchaseRows = useMemo(
-    () => filterByParty(data?.purchaseRegister || [], partyName),
-    [data, partyName]
+    () => filterByParty(data?.purchaseRegister || [], partyName, 'partyName', partyNames),
+    [data, partyName, partyNames]
   );
   const jobRows = useMemo(
-    () => filterByParty(data?.jobWorkReport || [], partyName, 'workerName'),
-    [data, partyName]
+    () => filterByParty(data?.jobWorkReport || [], partyName, 'workerName', partyNames),
+    [data, partyName, partyNames]
   );
   const dailyRows = useMemo(
-    () => filterByParty(data?.dailyTransactions || [], partyName, 'party'),
-    [data, partyName]
+    () => filterByParty(data?.dailyTransactions || [], partyName, 'party', partyNames),
+    [data, partyName, partyNames]
   );
 
   const renderReportBody = () => {
@@ -1010,6 +1024,26 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
     }
   };
 
+  if (popupOnly) {
+    if (!isOpen || !selectedLeaf) return null;
+    return (
+      <JsmReportPane
+        reportTitle={selectedLeaf.label}
+        reportKey={reportKey}
+        parties={parties}
+        salesRows={salesRows}
+        loading={loading}
+        onGenerate={async (from, to, names) => {
+          setPartyNames(names || []);
+          await load(from, to);
+        }}
+        onExit={onClose}
+      >
+        {renderReportBody()}
+      </JsmReportPane>
+    );
+  }
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Reports — JSM Hierarchy" className="max-w-[98vw] w-full h-[92vh] p-0">
       <div className="flex h-[calc(92vh-48px)] min-h-0">
@@ -1057,54 +1091,30 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
               </div>
             </div>
 
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="flex flex-col gap-0.5">
-                <label className="text-[9px] font-bold uppercase text-[var(--text-muted)]">From</label>
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="h-8 px-2 text-xs border border-[var(--border-strong)] rounded-md"
-                />
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <label className="text-[9px] font-bold uppercase text-[var(--text-muted)]">To</label>
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="h-8 px-2 text-xs border border-[var(--border-strong)] rounded-md"
-                />
-              </div>
-              <div className="flex flex-col gap-0.5 min-w-[180px] flex-1 max-w-xs">
-                <label className="text-[9px] font-bold uppercase text-[var(--text-muted)]">Party</label>
-                <input
-                  type="text"
-                  list="report-party-list"
-                  value={partyName}
-                  onChange={(e) => setPartyName(e.target.value)}
-                  placeholder="All parties / type name…"
-                  className="h-8 px-2 text-xs border border-[var(--border-strong)] rounded-md"
-                />
-                <datalist id="report-party-list">
-                  {partyOptions.slice(0, 200).map((name) => (
-                    <option key={name} value={name} />
-                  ))}
-                </datalist>
-              </div>
-              <button
-                type="button"
-                onClick={handleGenerate}
-                disabled={loading || !selectedLeaf}
-                className="erp-btn erp-btn-primary h-8 px-4 text-[11px] gap-1 disabled:opacity-50"
-              >
-                <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-                {loading ? 'Generating…' : 'Generate Report'}
-              </button>
-            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-3 print:p-2">{renderReportBody()}</div>
+          <div className="flex-1 min-h-0 overflow-hidden flex items-center justify-center text-[var(--text-muted)] text-sm px-6 text-center">
+            Left se report choose karo. Filter popup khulega — party select karke Enter dabao, Report Control alag window mein khulega.
+          </div>
+          {selectedLeaf && (
+            <JsmReportPane
+              reportTitle={selectedLeaf.label}
+              reportKey={reportKey}
+              parties={parties}
+              salesRows={salesRows}
+              loading={loading}
+              onGenerate={async (from, to, names) => {
+                setPartyNames(names || []);
+                await load(from, to);
+              }}
+              onExit={() => {
+                setSelectedLeafId(null);
+                setGenerated(false);
+              }}
+            >
+              {renderReportBody()}
+            </JsmReportPane>
+          )}
         </div>
       </div>
     </Modal>

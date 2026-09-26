@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
+import { allocateWindowZ } from '../../hooks/useErpWindow';
 
 /**
  * @param {boolean} inertBackdrop — restore/floating mode: no dim overlay, clicks pass through to UI behind
@@ -17,9 +18,18 @@ const Modal = ({
   enableEscape = true,
   style,
   inertBackdrop = false,
-  overlayZ = 1200,
+  overlayZ,
 }) => {
   const contentRef = useRef(null);
+  const [autoZ, setAutoZ] = useState(1300);
+  const isBillWindow = String(className || '').includes('erp-bill-window');
+  const isSheet = !isBillWindow && style?.top == null && !inertBackdrop;
+  const zIndex = overlayZ ?? autoZ;
+
+  useEffect(() => {
+    if (!isOpen || overlayZ != null) return;
+    setAutoZ(allocateWindowZ());
+  }, [isOpen, overlayZ]);
 
   useEffect(() => {
     if (!isOpen || !enableEscape || !onClose) return undefined;
@@ -72,9 +82,9 @@ const Modal = ({
               ? 'overflow-hidden'
               : inertBackdrop || style?.top != null
                 ? 'pointer-events-none overflow-hidden'
-                : 'z-[1200] flex items-center justify-center p-1.5 sm:p-2 overflow-hidden'
+                : 'z-[1200] flex justify-center overflow-hidden erp-modal-safe'
           )}
-          style={{ zIndex: overlayZ || 1200 }}
+          style={{ zIndex }}
         >
           {!inertBackdrop && (
             <motion.div
@@ -98,6 +108,7 @@ const Modal = ({
             className={twMerge(
               'relative flex flex-col w-full max-h-[calc(100dvh-12px)] overflow-hidden border border-slate-200/80 shadow-[0_20px_50px_rgba(15,23,42,0.12)]',
               inertBackdrop || style?.top != null ? 'pointer-events-auto z-[2000]' : 'z-[1500]',
+              isSheet && 'erp-modal-sheet',
               bare
                 ? 'max-w-5xl rounded-[var(--radius-card)] bg-[var(--bg-card)]'
                 : 'max-w-4xl rounded-2xl bg-[var(--bg-card)]',

@@ -4,6 +4,7 @@ import useStore from '../../store/useStore';
 import { notifyWarning, notifyInfo } from '../../utils/notify';
 import { downloadCsv, fmtAmt, fmtDate } from '../../utils/reportExport';
 import { ErpBusyOverlay } from '../../components/ui/loaders';
+import { openWhatsAppShare } from '../../utils/invoiceHelpers';
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 const fyStartISO = () => {
@@ -52,8 +53,26 @@ const emptyOptions = () => ({
  * vs what's a labeled stub. Every toggle/tab below either changes the actual query (real
  * data) or is disabled with a tooltip explaining what's missing — nothing fakes a result.
  */
-const OutstandingReportModal = ({ isOpen, onClose, type = 'receivable' }) => {
+const amt2 = (n) => (Number(n) || 0).toFixed(2);
+const dmy = (d) => {
+  if (!d) return '';
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return '';
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  return `${dd}-${mm}-${dt.getFullYear()}`;
+};
+
+const OutstandingReportModal = ({
+  isOpen,
+  onClose,
+  type = 'receivable',
+  directPartyId = '',
+  directPartyName = '',
+}) => {
   const { fetchOutstandingReportFiltered, fetchOutstandingFilterOptions } = useStore();
+  const companyCode = 'SCC';
+  const partyDirect = Boolean(directPartyId);
 
   const [billDateFrom, setBillDateFrom] = useState('2000-04-01');
   const [billDateTo, setBillDateTo] = useState(todayISO());
@@ -102,7 +121,29 @@ const OutstandingReportModal = ({ isOpen, onClose, type = 'receivable' }) => {
   const title = `Outstanding (${type === 'receivable' ? 'SALES' : 'PURCHASE'})`;
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !partyDirect) return undefined;
+    let cancelled = false;
+    setLoading(true);
+    setRows(null);
+    setFindQuery('');
+    fetchOutstandingReportFiltered(type, {
+      billDateFrom: '2000-04-01',
+      billDateTo: todayISO(),
+      status: 'Pending',
+      partyIds: [directPartyId],
+      includeLastYear: true,
+    }).then((data) => {
+      if (cancelled) return;
+      setRows(data || []);
+      setLoading(false);
+    }).catch(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [isOpen, partyDirect, directPartyId, type, fetchOutstandingReportFiltered]);
+
+  useEffect(() => {
+    if (!isOpen || partyDirect) return;
     let cancelled = false;
     setBootLoading(true);
     setRows(null);
@@ -235,7 +276,7 @@ const OutstandingReportModal = ({ isOpen, onClose, type = 'receivable' }) => {
       for (const inv of party.invoices || []) {
         const rec = {
           party,
-          co: party.partyName || '',
+          co: companyCode,
           billNo: inv.docNo || '',
           billDate: inv.date,
           billAmt: Number(inv.total || 0),
@@ -308,7 +349,7 @@ const OutstandingReportModal = ({ isOpen, onClose, type = 'receivable' }) => {
     }
 
     return { lines, grand, billCount: flat.length };
-  }, [rows, groupBy1, groupBy2, groupBy3, findQuery]);
+  }, [rows, groupBy1, groupBy2, groupBy3, findQuery, companyCode]);
 
   /** Summary collapses to group totals only — the underlying bill detail is untouched. */
   const displayLines = useMemo(
@@ -394,6 +435,203 @@ const OutstandingReportModal = ({ isOpen, onClose, type = 'receivable' }) => {
   const stub = (label) => () => notifyInfo(`${label} — not implemented (no backing data/logic for this yet)`);
 
   if (!isOpen) return null;
+
+  if (partyDirect) {
+    const partyRow = (rows || [])[0];
+    const partyLabel = partyRow?.partyName || directPartyName || 'Party';
+    const shareText = `Outstanding — ${partyLabel}\nBills: ${report.billCount}\nBalance: ${amt2(report.grand.balance)}`;
+    const billCell = (col, rec) => {
+      switch (col.key) {
+        case 'co': return rec.co;
+        case 'billNo': return rec.billNo;
+        case 'billDate': return dmy(rec.billDate);
+        case 'billAmt': return amt2(rec.billAmt);
+        case 'paidDate': return rec.paidDate ? dmy(rec.paidDate) : '';
+        case 'paidAmt': return amt2(rec.paidAmt);
+        case 'goodsRtn': return amt2(rec.goodsRtn);
+        case 'addLess': return amt2(rec.addLess);
+        case 'balance': return amt2(rec.balance);
+        case 'days': return rec.days;
+        default: return '';
+      }
+    };
+    const sumCell = (col, t) => (
+      ['billAmt', 'paidAmt', 'goodsRtn', 'addLess', 'balance'].includes(col.key) ? amt2(t[col.key]) : ''
+    );
+    return (
+      <ErpWindowedModal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Report Control"
+        windowId={`os-party-${directPartyId}`}
+        defaultMode="maximized"
+        bare
+      >
+        {({ WindowControls }) => (
+          <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 !max-h-none os-control">
+            <ErpBusyOverlay show={loading} message="Loading outstanding…" />
+            <style>{osReportStyles}</style>
+            <div className="classic-erp-header shrink-0">
+              <span className="erp-window-title truncate">Report Control</span>
+              <WindowControls />
+            </div>
+            <div className="os-control-body os-report-wrap flex-1 min-h-0 overflow-auto">
+              <table className="os-control-table">
+                <thead>
+                  <tr>
+                    {visibleCols.map((c) => (
+                      <th key={c.key} className={c.align === 'right' ? 'num' : ''}>{c.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {!loading && displayLines.length === 0 && (
+                    <tr>
+                      <td colSpan={visibleCols.length} className="os-empty">
+                        {partyLabel} — no pending bills
+                      </td>
+                    </tr>
+                  )}
+                  {displayLines.map((line, i) => {
+                    if (line.kind === 'group') {
+                      return (
+                        <tr key={`g${i}`} className="os-party-head">
+                          <td colSpan={visibleCols.length}>PARTY - {partyLabel}</td>
+                        </tr>
+                      );
+                    }
+                    if (line.kind === 'total') {
+                      return (
+                        <tr key={`t${i}`} className="os-party-total">
+                          {visibleCols.map((c, ci) => (
+                            <td key={c.key} className={c.align === 'right' ? 'num' : ''}>
+                              {ci === 0 ? 'TOTAL-PARTY' : sumCell(c, line.totals)}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    }
+                    return (
+                      <tr key={`b${i}`}>
+                        {visibleCols.map((c) => (
+                          <td key={c.key} className={c.align === 'right' ? 'num' : ''}>{billCell(c, line.rec)}</td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                  {displayLines.length > 0 && (
+                    <tr className="os-grand-row">
+                      {visibleCols.map((c, ci) => (
+                        <td key={c.key} className={c.align === 'right' ? 'num' : ''}>
+                          {ci === 0 ? 'GRAND TOTAL' : sumCell(c, report.grand)}
+                        </td>
+                      ))}
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="os-control-bar shrink-0">
+              <div className="relative">
+                <button type="button" className="classic-erp-btn" onClick={() => setColumnSetOpen((v) => !v)}>ColumnSet</button>
+                {columnSetOpen && (
+                  <div className="os-colset">
+                    {COLUMNS.map((c) => (
+                      <label key={c.key}>
+                        <input
+                          type="checkbox"
+                          checked={!hiddenCols.has(c.key)}
+                          onChange={() => setHiddenCols((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(c.key)) next.delete(c.key);
+                            else next.add(c.key);
+                            return next;
+                          })}
+                        />
+                        {c.label}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="os-length">
+                <span>Total Length</span>
+                <div className="os-length-bar" />
+              </div>
+              <button type="button" className="classic-erp-btn" onClick={exportCsv} disabled={!displayLines.length}>Excel</button>
+              <button type="button" className="classic-erp-btn" onClick={() => setPreviewOpen(true)} disabled={!displayLines.length}>PreView</button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                onClick={() => {
+                  const email = partyRow?.email || '';
+                  if (!email) {
+                    notifyInfo('Party email is not saved on this account');
+                    return;
+                  }
+                  window.location.href = `mailto:${email}?subject=${encodeURIComponent(`Outstanding — ${partyLabel}`)}&body=${encodeURIComponent(shareText)}`;
+                }}
+              >
+                Mail
+              </button>
+              <button
+                type="button"
+                className="classic-erp-btn"
+                onClick={() => {
+                  const phone = partyRow?.phone || '';
+                  if (!phone) {
+                    notifyWarning('Party phone / WhatsApp number missing');
+                    return;
+                  }
+                  openWhatsAppShare(shareText, phone);
+                }}
+              >
+                Whatsapp
+              </button>
+              <button type="button" className="classic-erp-btn" onClick={doPrint} disabled={!displayLines.length}>Print</button>
+              <button type="button" className="classic-erp-btn" onClick={onClose}>Exit</button>
+            </div>
+            {previewOpen && (
+              <div className="os-preview-backdrop" onClick={() => setPreviewOpen(false)}>
+                <div className="os-preview-sheet" onClick={(e) => e.stopPropagation()}>
+                  <div className="os-preview-head">
+                    <b>PARTY - {partyLabel}</b>
+                    <span>{report.billCount} bill(s)</span>
+                    <button type="button" className="classic-erp-btn ml-auto" onClick={() => setPreviewOpen(false)}>Close</button>
+                  </div>
+                  <table className="os-control-table">
+                    <thead>
+                      <tr>{visibleCols.map((c) => <th key={c.key}>{c.label}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {displayLines.map((line, i) => {
+                        if (line.kind === 'group') return <tr key={i} className="os-party-head"><td colSpan={visibleCols.length}>PARTY - {partyLabel}</td></tr>;
+                        if (line.kind === 'total') {
+                          return (
+                            <tr key={i} className="os-party-total">
+                              {visibleCols.map((c, ci) => <td key={c.key} className={c.align === 'right' ? 'num' : ''}>{ci === 0 ? 'TOTAL-PARTY' : sumCell(c, line.totals)}</td>)}
+                            </tr>
+                          );
+                        }
+                        return (
+                          <tr key={i}>
+                            {visibleCols.map((c) => <td key={c.key} className={c.align === 'right' ? 'num' : ''}>{billCell(c, line.rec)}</td>)}
+                          </tr>
+                        );
+                      })}
+                      <tr className="os-grand-row">
+                        {visibleCols.map((c, ci) => <td key={c.key} className={c.align === 'right' ? 'num' : ''}>{ci === 0 ? 'GRAND TOTAL' : sumCell(c, report.grand)}</td>)}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </ErpWindowedModal>
+    );
+  }
 
   return (
     <ErpWindowedModal isOpen={isOpen} onClose={onClose} title={title} windowId={`outstanding-${type}`} bare>
@@ -790,6 +1028,21 @@ const OutstandingReportModal = ({ isOpen, onClose, type = 'receivable' }) => {
 };
 
 const osReportStyles = `
+  .os-control { background: #d9d9d9; }
+  .os-control-body { background: #c8c8c8; padding: 0; }
+  .os-control-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 12px; font-family: Tahoma, "Segoe UI", sans-serif; }
+  .os-control-table th { background: #f3ead2; border: 1px solid #b9b9b9; padding: 3px 6px; font-weight: 700; text-align: left; white-space: nowrap; }
+  .os-control-table th.num, .os-control-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .os-control-table td { border: 1px solid #d0d0d0; padding: 2px 6px; color: #111; }
+  .os-control-table .os-party-head td { background: #1d4ed8; color: #fff; font-weight: 700; border-color: #1e40af; }
+  .os-control-table .os-party-total td { color: #15803d; font-weight: 700; background: #fff; }
+  .os-control-table .os-grand-row td { font-weight: 700; background: #f8fafc; border-top: 2px solid #94a3b8; }
+  .os-control-table .os-empty { text-align: center; padding: 16px; color: #64748b; }
+  .os-control-bar { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #e5e5e5; border-top: 1px solid #9ca3af; }
+  .os-length { display: flex; flex-direction: column; gap: 2px; min-width: 140px; font-size: 11px; color: #1d4ed8; font-weight: 700; }
+  .os-length-bar { height: 14px; background: #22c55e; border: 1px solid #15803d; }
+  .os-colset { position: absolute; bottom: 32px; left: 0; z-index: 20; width: 160px; background: #fff; border: 2px solid #1d4ed8; padding: 6px; display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
+
   .os-report .os-group td { background: #cfe2ff; color: #0b2e6f; }
   .os-report .os-total td { background: #f1f5e8; color: #166534; }
   .os-report .os-grand td { background: #e2e8f0; color: #0f172a; border-top: 2px solid #64748b; }

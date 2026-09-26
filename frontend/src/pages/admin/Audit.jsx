@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Activity, ShieldAlert, User, Clock, Filter, RefreshCw, ShoppingCart, Receipt, Wrench, Calculator, FileText, Settings, LogIn } from 'lucide-react';
 import { motion } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
+import AdminCompanySelect from './AdminCompanySelect';
 
 const moduleColors = {
     auth: '#10b981', purchase: '#3b82f6', sales: '#a78bfa',
@@ -66,10 +67,13 @@ const Audit = () => {
                     <Filter size={14} />
                 </div>
                 <div className="flex-1">
-                    <select className="dark-input" value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)}>
-                        <option value="">All Companies</option>
-                        {companies.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                    </select>
+                    <AdminCompanySelect
+                        companies={companies}
+                        value={selectedCompany}
+                        onChange={setSelectedCompany}
+                        emptyLabel="All Companies"
+                        placeholder="Search company…"
+                    />
                 </div>
                 <div className="flex-1">
                     <select className="dark-input" value={selectedModule} onChange={e => setSelectedModule(e.target.value)}>

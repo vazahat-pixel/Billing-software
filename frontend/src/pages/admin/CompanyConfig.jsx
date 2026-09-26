@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
+import AdminCompanySelect from './AdminCompanySelect';
 import { adminApi } from '../../api';
 import { toast } from '../../store/useToastStore';
 
@@ -137,10 +138,14 @@ const CompanyConfig = () => {
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card" style={{ padding: 14 }}>
                 <label className="dark-input__label">Select Company to Configure</label>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                    <select className="dark-input" style={{ flex: 1 }} value={selectedCompany} onChange={e => setSelectedCompany(e.target.value)}>
-                        <option value="">-- Choose a company --</option>
-                        {companies.map(c => <option key={c._id} value={c._id}>{c.name} ({c.ownerId?.email})</option>)}
-                    </select>
+                    <div style={{ flex: 1 }}>
+                        <AdminCompanySelect
+                            companies={companies}
+                            value={selectedCompany}
+                            onChange={setSelectedCompany}
+                            placeholder="Search company or owner email…"
+                        />
+                    </div>
                     {selectedCompany && company && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--admin-accent-soft)', border: '1px solid #5eead4', borderRadius: 9 }}>
                             <div style={{ width: 28, height: 28, borderRadius: 7, background: 'linear-gradient(135deg,#0d9488,#0f766e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, color: 'white' }}>{company.name.charAt(0)}</div>

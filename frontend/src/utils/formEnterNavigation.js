@@ -14,6 +14,7 @@ const CONTAINER_SELECTORS = [
   '.erp-form-container',
   '.erp-modal-body',
   '[role="dialog"]',
+  '[data-erp-dialog]',
 ];
 
 function isVisible(el) {

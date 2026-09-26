@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Modal from '../../components/ui/Modal';
 
 /**
@@ -51,11 +52,28 @@ export default function PcsBreakdownModal({
   onSave,
   locked = false,
   initialCalcType = 'Mts',
+  overlayZ = 10080,
 }) {
   const [localRows, setLocalRows] = useState(() => normalizeRows(rows));
   const [calcType, setCalcType] = useState(initialCalcType || 'Mts');
   const firstPcsRef = useRef(null);
+  const calcChoiceRef = useRef(null);
   const wasOpenRef = useRef(false);
+
+  const calcChoiceHasFocus = () => {
+    const el = calcChoiceRef.current;
+    return !!el && (document.activeElement === el || el.contains(document.activeElement));
+  };
+
+  const focusCalcChoice = () => {
+    calcChoiceRef.current?.focus();
+  };
+
+  const stepCalcType = (dir) => {
+    const i = Math.max(0, CALC_TYPES.indexOf(calcType));
+    const next = CALC_TYPES[(i + dir + CALC_TYPES.length) % CALC_TYPES.length];
+    setCalcType(next);
+  };
 
   // Seed local (editable-draft) state ONLY on the closed->open transition. The parent
   // (SalesModal) recomputes its line-items on every keystroke elsewhere in the form, so
@@ -122,6 +140,41 @@ export default function PcsBreakdownModal({
     onClose?.();
   };
 
+  // ESC once: jump to Calculation. ESC again (or Cancel): close without save.
+  // Enter on the calculation choice: same as OK.
+  const handleCalcKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      onClose?.();
+      return;
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      handleOk();
+      return;
+    }
+    const letter = e.key.length === 1 ? e.key.toLowerCase() : '';
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      e.stopPropagation();
+      stepCalcType(1);
+      return;
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      e.stopPropagation();
+      stepCalcType(-1);
+      return;
+    }
+    if (letter === 'p' || letter === 'm' || letter === 'k') {
+      e.preventDefault();
+      e.stopPropagation();
+      setCalcType(letter === 'p' ? 'Pcs' : letter === 'm' ? 'Mts' : 'Kgs');
+    }
+  };
+
   // Tab-order: Pcs → Qty/Bndl → Remark → next row Pcs
   const handleKeyDown = (e, idx, field) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -147,21 +200,27 @@ export default function PcsBreakdownModal({
     setTimeout(() => document.getElementById(`pcs-${idx + 1}-pcs`)?.focus(), 0);
   };
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} className="max-w-[500px] w-[500px]">
+  const dialog = (
+    <Modal isOpen={isOpen} onClose={onClose} enableEscape={false} className="max-w-[500px] w-[500px]" overlayZ={overlayZ}>
       <div
         className="classic-erp-window flex flex-col overflow-hidden bg-slate-100 border border-slate-400"
         data-enter-nav="off"
+        data-pcs-breakdown="true"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
             e.stopPropagation();
             handleOk();
-          } else if (e.key === 'Escape') {
-            e.preventDefault();
-            e.stopPropagation();
-            onClose?.();
+            return;
           }
+          if (e.key !== 'Escape') return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (calcChoiceHasFocus()) {
+            onClose?.();
+            return;
+          }
+          focusCalcChoice();
         }}
       >
         <div className="classic-erp-header shrink-0 py-1.5 px-2 bg-slate-200 border-b border-slate-300">
@@ -173,6 +232,17 @@ export default function PcsBreakdownModal({
         {/* Calculation radio */}
         <div className="shrink-0 flex items-center gap-1 px-3 py-1.5 bg-white border-b border-slate-200">
           <span className="text-[11px] font-bold text-red-700 mr-2">Calculation :</span>
+          <div
+            ref={calcChoiceRef}
+            tabIndex={locked ? -1 : 0}
+            role="radiogroup"
+            aria-label="Calculation"
+            data-pcs-calc-choice="true"
+            data-enter-action="true"
+            title="Left/Right or P M K to choose. Enter = OK. Esc = close."
+            className="flex items-center gap-1 rounded outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1"
+            onKeyDown={handleCalcKeyDown}
+          >
           {CALC_TYPES.map((ct) => (
             <label
               key={ct}
@@ -189,11 +259,13 @@ export default function PcsBreakdownModal({
                 checked={calcType === ct}
                 onChange={() => setCalcType(ct)}
                 disabled={locked}
-                className="hidden"
+                tabIndex={-1}
+                className="sr-only"
               />
               {ct}
             </label>
           ))}
+          </div>
           <span className="ml-3 text-[10px] text-slate-500 italic">
             {calcType === 'Pcs'
               ? 'Amount = Total Pcs × Rate'
@@ -357,4 +429,7 @@ export default function PcsBreakdownModal({
       </div>
     </Modal>
   );
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(dialog, document.body);
 }

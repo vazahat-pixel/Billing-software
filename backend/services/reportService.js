@@ -158,8 +158,9 @@ class ReportService {
       status: { $ne: 'cancelled' },
       ...buildDateQuery(startDate, endDate)
     })
-      .populate('customerId', 'name gstin mobile station')
+      .populate('customerId', 'name gstin mobile station city')
       .populate('brokerId', 'name')
+      .populate('items.itemId', 'itemName name')
       .sort({ date: -1 })
       .lean();
 
@@ -184,7 +185,19 @@ class ReportService {
         paidAmount: paid,
         balance: Math.max(0, total - paid),
         status: s.status || 'active',
-        itemCount: (s.items || []).length
+        book: s.bookId || 'SALES BOOK',
+        haste: s.haste || '',
+        transport: s.transport || '',
+        itemCount: (s.items || []).length,
+        items: (s.items || []).map((it) => ({
+          name: it.itemId?.itemName || it.itemId?.name || it.desc || '',
+          pcs: it.pcs || 0,
+          qty: it.mts || 0,
+          rate: it.rate || 0,
+          amount: it.amount || 0,
+          addAmt: it.addAmt || 0,
+          lessAmt: Number(it.dis1Amt || 0) + Number(it.dis2Amt || 0),
+        })),
       });
     }
     return rows;
@@ -507,7 +520,8 @@ class ReportService {
         } : {}),
         partyId: party._id,
         partyName: party.name,
-        phone: party.mobile || party.phone,
+        phone: party.mobile || party.phone || party.whatsapp || '',
+        email: party.email || '',
         address: party.address || '',
         city: party.city || party.station || '',
         state: party.state || '',

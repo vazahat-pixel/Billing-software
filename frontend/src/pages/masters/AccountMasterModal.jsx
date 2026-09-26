@@ -268,7 +268,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-5xl">
-      <div className="classic-erp-window">
+      <div className="classic-erp-window erp-master-form">
         <ErpBusyOverlay show={bootLoading} message="Loading accounts…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving account…" />
         <div className="classic-erp-header">

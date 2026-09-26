@@ -182,16 +182,13 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
         if (nextIdx >= 0 && nextIdx < list.length) loadReceipt(list[nextIdx]._id || list[nextIdx].id, 'View');
         return;
       }
-      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !findOpen) {
-        if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette], [data-find-modal]')) return;
-        if (mode === 'View') {
-          e.preventDefault();
-          e.stopPropagation();
-          handleNew();
-          return;
-        }
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !findOpen && mode === 'View') {
+        if (e.target?.closest?.('[data-find-modal], [data-book-selection-modal], [data-command-palette]')) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        handleNew();
+        return;
       }
-
       if (e.altKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         handleNew();
@@ -219,6 +216,19 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     let cancelled = false;
     setBootLoading(true);
     Promise.all([fetchJobs(), fetchParties?.()])
+      .then(() => {
+        if (cancelled) return;
+        const list = (useStore.getState().jobWorkEntries || [])
+          .filter((j) => j.status === 'Received' || j.status === 'Partial' || j.status === 'Issued')
+          .sort((a, b) => {
+            const numA = parseInt(String(a.billChNo || a.challanNo || a.jobCardNo || '').replace(/\D/g, ''), 10);
+            const numB = parseInt(String(b.billChNo || b.challanNo || b.jobCardNo || '').replace(/\D/g, ''), 10);
+            if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+            return new Date(a.receiveDate || a.issueDate || a.createdAt || 0) - new Date(b.receiveDate || b.issueDate || b.createdAt || 0);
+          });
+        const latest = list[list.length - 1];
+        if (latest) loadReceipt(latest._id || latest.id, 'View');
+      })
       .catch(() => { })
       .finally(() => {
         if (!cancelled) setBootLoading(false);
@@ -430,6 +440,12 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     setHeader(emptyHeader(selectedBook));
     setFooter(emptyFooter());
     setLines([blankLine()]);
+    setTimeout(() => {
+      const el = document.querySelector('[data-erp-start="challan"]');
+      if (!el || el.disabled) return;
+      el.focus();
+      try { el.select(); } catch { /* ignore */ }
+    }, 80);
   };
 
   const handleEdit = () => {
@@ -602,10 +618,11 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
         onClose={onClose}
         title={`Additional Job Receipt [ ${titleBook} ]`}
         windowId="jobRec"
+        className="job-book-window"
         bare
       >
         {({ WindowControls }) => (
-          <div className="classic-erp-window erp-density erp-job-receipt-window flex flex-col h-full min-h-0 !max-h-none">
+          <div className="classic-erp-window erp-density erp-job-receipt-window flex flex-col h-full min-h-0 !max-h-none" data-enter-skip={mode === 'View' ? 'true' : undefined}>
             <ErpBusyOverlay show={bootLoading} message="Loading job receipt…" />
             <ErpBusyOverlay show={!bootLoading && saving} message="Saving job receipt…" />
 
@@ -706,6 +723,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                           type="text"
                           className="classic-erp-input"
                           value={header.billChNo}
+                          data-erp-start="challan"
                           onChange={(e) => setHeader({ ...header, billChNo: e.target.value })}
                           disabled={locked}
                         />

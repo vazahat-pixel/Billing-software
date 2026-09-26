@@ -354,12 +354,24 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
 
   useEffect(() => {
     if (!isOpen) return;
+    let cancelled = false;
     setBootLoading(true);
-    setMode('Add');
-    handleNew();
     Promise.all([fetchParties(), fetchItems(), fetchPurchases(), fetchInventory(), fetchJobs()])
+      .then(() => {
+        if (cancelled) return;
+        const list = [...(useStore.getState().jobWorkEntries || [])].sort((a, b) => {
+          const numA = parseInt(String(a.challanNo || a.jobCardNo || '').replace(/\D/g, ''), 10);
+          const numB = parseInt(String(b.challanNo || b.jobCardNo || '').replace(/\D/g, ''), 10);
+          if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+          return new Date(a.issueDate || a.createdAt || 0) - new Date(b.issueDate || b.createdAt || 0);
+        });
+        const latest = list[list.length - 1];
+        if (latest) loadJob(latest._id || latest.id, 'View');
+        else handleNew();
+      })
       .catch(() => {})
-      .finally(() => setBootLoading(false));
+      .finally(() => { if (!cancelled) setBootLoading(false); });
+    return () => { cancelled = true; };
   }, [isOpen, selectedBook]);
 
   const handlePartyChange = (partyId) => {
@@ -538,6 +550,12 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       taxRate: '0',
     });
     setLines([blankLine()]);
+    setTimeout(() => {
+      const el = document.querySelector('[data-erp-start="challan"]');
+      if (!el || el.disabled) return;
+      el.focus();
+      try { el.select(); } catch { /* ignore */ }
+    }, 80);
   };
 
   const handleEdit = () => {
@@ -628,16 +646,13 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
         if (nextIdx >= 0 && nextIdx < list.length) loadJob(list[nextIdx]._id || list[nextIdx].id, 'View');
         return;
       }
-      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !findOpen) {
-        if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette], [data-find-modal]')) return;
-        if (mode === 'View') {
-          e.preventDefault();
-          e.stopPropagation();
-          handleNew();
-          return;
-        }
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !findOpen && mode === 'View') {
+        if (e.target?.closest?.('[data-find-modal], [data-book-selection-modal], [data-command-palette]')) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        handleNew();
+        return;
       }
-
       if (e.altKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         handleNew();
@@ -791,10 +806,11 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
         onClose={onClose}
         title={`Additional Job Issue [ ${titleBook} ]`}
         windowId="jobIssue"
+        className="job-book-window job-issue-fit-window"
         bare
       >
         {({ WindowControls }) => (
-          <div className="classic-erp-window erp-density erp-job-issue-window flex flex-col h-full min-h-0 !max-h-none">
+          <div className="classic-erp-window erp-density erp-job-issue-window flex flex-col h-full min-h-0 !max-h-none" data-enter-skip={mode === 'View' ? 'true' : undefined}>
             <ErpBusyOverlay show={bootLoading} message="Loading job issue registry…" />
             <ErpBusyOverlay show={!bootLoading && saving} message="Saving job issue entries…" />
 
@@ -837,6 +853,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                           className="classic-erp-input text-center font-bold"
                           style={{ width: 110, flex: '0 0 110px' }}
                           value={header.challanNo}
+                          data-erp-start="challan"
                           onChange={(e) => setHeader({ ...header, challanNo: e.target.value })}
                           disabled={locked}
                         />
@@ -852,7 +869,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                       </div>
                     </div>
 
-                    <div className="classic-erp-field classic-erp-field--lg mt-1">
+                    <div className="classic-erp-field classic-erp-field--lg">
                       <span className="classic-erp-label red-label">Date</span>
                       <div className="flex gap-2 items-center">
                         <input
@@ -876,7 +893,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                       </div>
                     </div>
 
-                    <div className="classic-erp-field classic-erp-field--lg mt-1.5">
+                    <div className="classic-erp-field classic-erp-field--lg">
                       <span className="classic-erp-label red-label">Job Party</span>
                       <ERPCombobox
                         value={header.partyId}
@@ -894,7 +911,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                       <div className="erp-job-issue-party-address">{partyAddress || ','}</div>
                     </div>
 
-                    <div className="classic-erp-field classic-erp-field--lg mt-1">
+                    <div className="classic-erp-field classic-erp-field--lg">
                       <span className="classic-erp-label">Broker</span>
                       <input
                         type="text"
@@ -906,7 +923,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                       />
                     </div>
 
-                    <div className="classic-erp-meta-grid erp-job-issue-meta-row mt-1">
+                    <div className="classic-erp-meta-grid erp-job-issue-meta-row">
                       <div className="classic-erp-field">
                         <span className="classic-erp-label">HSN CODE</span>
                         <input
@@ -919,7 +936,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex items-center gap-2">
                       <span className="erp-job-issue-f4hint">F4 To Qty Detail Entry</span>
                       <span className="erp-job-issue-stockstrip">
                         Current Stock : Pcs: {currentStock.pcs} &nbsp; Qty: {currentStock.qty.toFixed(2)} &nbsp; Kgs: {currentStock.kgs.toFixed(2)}
@@ -943,12 +960,12 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                       <span className="erp-job-issue-gstin-badge">GSTIN:-{header.gstin || '—'}</span>
                     </div>
 
-                    <div className="erp-job-issue-taxbox mt-2">
-                      <div className="erp-job-issue-sumrow mt-1.5">
+                    <div className="erp-job-issue-taxbox">
+                      <div className="erp-job-issue-sumrow">
                         <span>Total Amount</span>
                         <input type="text" className="classic-erp-input font-mono" value={calc.gross.toFixed(2)} readOnly />
                       </div>
-                      <div className="erp-job-issue-sumrow mt-2 border-t pt-1.5">
+                      <div className="erp-job-issue-sumrow">
                         <span className="!text-[12px] !text-blue-900 font-bold">NetAmt</span>
                         <input
                           type="text"
@@ -987,7 +1004,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
               </div>
 
               {/* Grid */}
-              <div className="classic-erp-frame erp-job-issue-grid-wrap flex-1 min-h-[220px] flex flex-col">
+              <div className="classic-erp-frame erp-job-issue-grid-wrap flex-none min-h-0 flex flex-col">
                 <div className="classic-erp-table-container erp-job-issue-grid flex-1 overflow-auto">
                   <table className="classic-erp-table erp-job-issue-table w-full">
                     <thead>
@@ -1135,63 +1152,55 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
 
               {/* Footer */}
               <div className="classic-erp-frame erp-job-issue-footer-grid shrink-0">
-                <div className="classic-erp-stack">
-                  <div className="classic-erp-field">
-                    <span className="classic-erp-label">Remark</span>
-                    <input
-                      type="text"
-                      className="classic-erp-input"
-                      value={footer.remark}
-                      onChange={(e) => setFooter({ ...footer, remark: e.target.value })}
-                      disabled={locked}
-                    />
-                  </div>
-                  <div className="classic-erp-field mt-1">
-                    <span className="classic-erp-label">Transport</span>
-                    <input
-                      type="text"
-                      className="classic-erp-input"
-                      value={footer.transport}
-                      onChange={(e) => setFooter({ ...footer, transport: e.target.value })}
-                      disabled={locked}
-                    />
-                  </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Remark</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input"
+                    value={footer.remark}
+                    onChange={(e) => setFooter({ ...footer, remark: e.target.value })}
+                    disabled={locked}
+                  />
                 </div>
-
-                <div className="classic-erp-stack">
-                  <div className="classic-erp-field">
-                    <span className="classic-erp-label">Note</span>
-                    <input
-                      type="text"
-                      className="classic-erp-input"
-                      value={footer.note}
-                      onChange={(e) => setFooter({ ...footer, note: e.target.value })}
-                      disabled={locked}
-                    />
-                  </div>
-                  <div className="classic-erp-field mt-1">
-                    <span className="classic-erp-label">LrNo</span>
-                    <input
-                      type="text"
-                      className="classic-erp-input"
-                      value={footer.lrNo}
-                      onChange={(e) => setFooter({ ...footer, lrNo: e.target.value })}
-                      disabled={locked}
-                    />
-                  </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Note</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input"
+                    value={footer.note}
+                    onChange={(e) => setFooter({ ...footer, note: e.target.value })}
+                    disabled={locked}
+                  />
                 </div>
-
-                <div className="classic-erp-stack justify-end">
-                  <div className="classic-erp-field">
-                    <span className="classic-erp-label">BaleNo</span>
-                    <input
-                      type="text"
-                      className="classic-erp-input text-center font-bold"
-                      value={footer.baleNo}
-                      onChange={(e) => setFooter({ ...footer, baleNo: e.target.value })}
-                      disabled={locked}
-                    />
-                  </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Transport</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input"
+                    value={footer.transport}
+                    onChange={(e) => setFooter({ ...footer, transport: e.target.value })}
+                    disabled={locked}
+                  />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">LrNo</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input"
+                    value={footer.lrNo}
+                    onChange={(e) => setFooter({ ...footer, lrNo: e.target.value })}
+                    disabled={locked}
+                  />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">BaleNo</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input text-center font-bold"
+                    value={footer.baleNo}
+                    onChange={(e) => setFooter({ ...footer, baleNo: e.target.value })}
+                    disabled={locked}
+                  />
                 </div>
               </div>
 
