@@ -22,19 +22,63 @@ if ss -tlnp | grep -q ":${API_PORT} "; then
   fi
 fi
 
-echo "==> Ensure Node 20, nginx, pm2, git"
-apt-get update -y
+wait_for_apt_lock() {
+  local max_wait=30
+  local waited=0
+  while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+    if [ $waited -ge $max_wait ]; then
+      echo "Notice: apt lock is still held by background process. Proceeding..."
+      break
+    fi
+    echo "Waiting for background apt update to finish (${waited}s)..."
+    sleep 3
+    waited=$((waited + 3))
+  done
+}
+
+echo "==> Checking system dependencies (Node 20, Git, Nginx, PM2)"
+NEED_NODE=0
+NEED_GIT=0
+NEED_NGINX=0
+
 if ! command -v node >/dev/null 2>&1 || [[ "$(node -v | cut -d. -f1 | tr -d v)" -lt 20 ]]; then
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-  apt-get install -y nodejs build-essential git
-else
-  apt-get install -y build-essential git
+  NEED_NODE=1
 fi
-apt-get install -y nginx
+if ! command -v git >/dev/null 2>&1; then
+  NEED_GIT=1
+fi
+if ! command -v nginx >/dev/null 2>&1; then
+  NEED_NGINX=1
+fi
+
+if [[ $NEED_NODE -eq 1 || $NEED_GIT -eq 1 || $NEED_NGINX -eq 1 ]]; then
+  echo "==> Installing missing packages..."
+  wait_for_apt_lock
+  apt-get update -y || true
+  if [[ $NEED_NODE -eq 1 ]]; then
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - || true
+    apt-get install -y nodejs build-essential git || true
+  fi
+  if [[ $NEED_GIT -eq 1 ]]; then
+    apt-get install -y git || true
+  fi
+  if [[ $NEED_NGINX -eq 1 ]]; then
+    apt-get install -y nginx || true
+  fi
+else
+  echo "==> Node 20+, Git, and Nginx are already installed. Skipping apt update."
+fi
+
 command -v pm2 >/dev/null 2>&1 || npm i -g pm2
 
-if ! command -v mongod >/dev/null 2>&1 && ! systemctl is-active --quiet mongod; then
+if ss -tln | grep -q ':27017 '; then
+  echo "==> MongoDB is already active on port 27017."
+elif command -v mongod >/dev/null 2>&1 || systemctl is-active --quiet mongod; then
+  echo "==> Starting existing MongoDB service..."
+  systemctl start mongod || true
+else
   echo "==> MongoDB not found — installing MongoDB 7"
+  wait_for_apt_lock
   apt-get install -y gnupg curl
   curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --yes -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
   . /etc/os-release
@@ -43,7 +87,7 @@ if ! command -v mongod >/dev/null 2>&1 && ! systemctl is-active --quiet mongod; 
   else
     echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb-org-7.0.list
   fi
-  apt-get update -y
+  apt-get update -y || true
   apt-get install -y mongodb-org || true
   systemctl daemon-reload || true
   systemctl enable --now mongod || systemctl start mongod || true
