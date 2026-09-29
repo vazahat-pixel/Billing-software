@@ -134,9 +134,9 @@ BACKUP_DIR=./backups
 LOG_LEVEL=info
 EOF
 
-echo "==> Backend npm ci + migrate + seed"
+echo "==> Backend dependencies + migrate + seed"
 cd "$BACKEND_DIR"
-npm ci
+npm ci || npm install
 npm run migrate || true
 node seed.js || true
 
@@ -153,7 +153,7 @@ cd "$FRONTEND_DIR"
 # Empty VITE_API_URL => browser uses relative /api (nginx proxies it)
 rm -f .env.production.local
 printf 'VITE_API_URL=\n' > .env.production.local
-npm ci
+npm ci || npm install
 npm run build
 
 mkdir -p "$WEB_ROOT"
