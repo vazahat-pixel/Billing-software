@@ -1,4 +1,5 @@
-const autocannon = require('autocannon');
+let autocannon = null;
+try { autocannon = require('autocannon'); } catch { /* dev only */ }
 const { collectDbMetrics } = require('./dbMetrics');
 
 const DEFAULT_PATHS = [
