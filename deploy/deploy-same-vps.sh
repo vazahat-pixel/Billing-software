@@ -77,15 +77,21 @@ elif command -v mongod >/dev/null 2>&1 || systemctl is-active --quiet mongod; th
   echo "==> Starting existing MongoDB service..."
   systemctl start mongod || true
 else
-  echo "==> MongoDB not found — installing MongoDB 7"
+  echo "==> MongoDB not found — installing MongoDB for Ubuntu/Debian"
+  dpkg --configure -a 2>/dev/null || true
   wait_for_apt_lock
-  apt-get install -y gnupg curl
-  curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --yes -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+  apt-get install -y gnupg curl || true
   . /etc/os-release
-  if [[ "${ID:-}" == "debian" ]]; then
-    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] http://repo.mongodb.org/apt/debian ${VERSION_CODENAME}/mongodb-org/7.0 main" > /etc/apt/sources.list.d/mongodb-org-7.0.list
+  if [[ "${VERSION_CODENAME:-}" == "noble" ]]; then
+    rm -f /etc/apt/sources.list.d/mongodb-org-7.0.list
+    curl -fsSL https://pgp.mongodb.com/server-8.0.asc | gpg --yes -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" > /etc/apt/sources.list.d/mongodb-org.list
+  elif [[ "${ID:-}" == "debian" ]]; then
+    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --yes -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] http://repo.mongodb.org/apt/debian ${VERSION_CODENAME}/mongodb-org/7.0 main" > /etc/apt/sources.list.d/mongodb-org.list
   else
-    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb-org-7.0.list
+    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --yes -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb-org.list
   fi
   apt-get update -y || true
   apt-get install -y mongodb-org || true
