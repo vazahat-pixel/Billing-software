@@ -121,10 +121,16 @@ else
   JWT_SECRET="$(openssl rand -base64 32)"
 fi
 
+if [[ -f "$BACKEND_DIR/.env" ]] && grep -q '^MONGO_URI=' "$BACKEND_DIR/.env"; then
+  MONGO_URI="$(grep '^MONGO_URI=' "$BACKEND_DIR/.env" | cut -d= -f2-)"
+else
+  MONGO_URI="mongodb://127.0.0.1:27017/billing_software"
+fi
+
 cat > "$BACKEND_DIR/.env" <<EOF
 NODE_ENV=production
 PORT=${API_PORT}
-MONGO_URI=mongodb://127.0.0.1:27017/billing_software
+MONGO_URI=${MONGO_URI}
 JWT_SECRET=${JWT_SECRET}
 JWT_ACCESS_EXPIRES=8h
 JWT_REFRESH_DAYS=30
