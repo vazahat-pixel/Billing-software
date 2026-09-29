@@ -68,10 +68,6 @@
     "pdf-parse": "^2.4.5",
     "razorpay": "^2.9.8"
   },
-  "optionalDependencies": {
-    "sharp": "^0.35.3",
-    "tesseract.js": "^7.0.0"
-  },
   "devDependencies": {
     "autocannon": "^8.0.0",
     "mongodb-memory-server": "^11.2.0",
