@@ -109,7 +109,7 @@ cp -a dist/. "$WEB_ROOT/"
 # SPA fallback for deep links if using apache elsewhere; nginx handles try_files
 
 echo "==> Nginx site (frontend + /api proxy) — does not remove other sites"
-cat > /etc/nginx/sites-available/billing <<EOF
+cat > /etc/nginx/sites-available/billing.conf <<EOF
 server {
     listen 80;
     server_name ${SERVER_IP};
@@ -142,14 +142,9 @@ server {
 EOF
 
 rm -f /etc/nginx/sites-enabled/default
-ln -sf /etc/nginx/sites-available/billing /etc/nginx/sites-enabled/billing
+ln -sf /etc/nginx/sites-available/billing.conf /etc/nginx/sites-enabled/billing.conf
 nginx -t
 systemctl reload nginx
-
-ufw allow OpenSSH || true
-ufw allow 80/tcp || true
-ufw allow 443/tcp || true
-ufw --force enable || true
 
 echo ""
 echo "================ DONE ================"
