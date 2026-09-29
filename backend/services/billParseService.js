@@ -4,9 +4,27 @@
  * - PDF → PNG screenshot then OCR (never feed PDF bytes to tesseract — crashes)
  * - Photo → preprocess + item-band OCR
  */
-const sharp = require('sharp');
-const Tesseract = require('tesseract.js');
-const { PDFParse } = require('pdf-parse');
+let sharp = null;
+try {
+  sharp = require('sharp');
+} catch (e) {
+  // Optional image pre-processing module
+}
+
+let Tesseract = null;
+try {
+  Tesseract = require('tesseract.js');
+} catch (e) {
+  // Optional OCR module
+}
+
+let PDFParse = null;
+try {
+  const p = require('pdf-parse');
+  PDFParse = p.PDFParse || p;
+} catch (e) {
+  // Optional PDF parsing module
+}
 const Party = require('../models/Party');
 const Item = require('../models/Item');
 const {
