@@ -4,6 +4,7 @@ const Purchase = require('../models/Purchase');
 const InventoryLot = require('../models/InventoryLot');
 const StockMovement = require('../models/StockMovement');
 const AccountingEntry = require('../models/AccountingEntry');
+const AppError = require('../utils/AppError');
 
 class PurchaseService {
   async createPurchase(purchaseData, options = {}) {
@@ -319,12 +320,12 @@ class PurchaseService {
     return withTransaction(async (session) => {
     try {
       const purchase = await Purchase.findOne({ _id: id, companyId }).session(session);
-      if (!purchase) throw new Error('Purchase not found');
+      if (!purchase) throw AppError.notFound('Purchase not found');
       if (purchase.status === 'cancelled') {
-        throw new Error('Cannot edit a cancelled purchase. Create a new purchase instead.');
+        throw AppError.badRequest('Cannot edit a cancelled purchase. Create a new purchase instead.');
       }
       if (Number(purchase.paidAmount || 0) > 0.01) {
-        throw new Error(
+        throw AppError.badRequest(
           'Cannot edit bill with payments applied. Reverse cash/bank payments against this bill first.'
         );
       }
@@ -527,10 +528,13 @@ class PurchaseService {
   }
 
   async getPurchaseById(id, companyId) {
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      throw AppError.notFound('Purchase not found');
+    }
     const purchase = await Purchase.findOne({ _id: id, companyId })
       .populate('supplierId', 'name gstin state city')
       .populate('items.itemId', 'name hsnCode gstRate unit');
-    if (!purchase) throw new Error('Purchase not found');
+    if (!purchase) throw AppError.notFound('Purchase not found');
     return purchase;
   }
 

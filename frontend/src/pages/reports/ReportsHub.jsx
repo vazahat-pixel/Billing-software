@@ -1248,7 +1248,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
         reportTitle={selectedLeaf.label}
         reportKey={reportKey}
         parties={parties}
-        salesRows={salesRows}
+        salesRows={String(selectedLeaf?.id || '').startsWith('purchase-') || String(reportKey || '').startsWith('purchase') ? purchaseRows : salesRows}
         loading={loading}
         onGenerate={async (from, to, names) => {
           setPartyNames(names || []);
@@ -1318,7 +1318,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
               reportTitle={selectedLeaf.label}
               reportKey={reportKey}
               parties={parties}
-              salesRows={salesRows}
+              salesRows={String(selectedLeaf?.id || '').startsWith('purchase-') || String(reportKey || '').startsWith('purchase') ? purchaseRows : salesRows}
               loading={loading}
               onGenerate={async (from, to, names) => {
                 setPartyNames(names || []);

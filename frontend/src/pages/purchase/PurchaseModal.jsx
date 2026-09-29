@@ -273,6 +273,32 @@ const PurchaseModal = ({
     setPcsBreakdown({ open: false, lineIdx: -1, calcType: 'Mts' });
   };
 
+  const focusRowItem = (rowIndex) => {
+    const table = modalContainerRef.current?.querySelector('.classic-erp-table');
+    const trs = table?.querySelectorAll('tbody tr');
+    const input = trs?.[rowIndex]?.querySelector('[data-erp-combobox-input], input:not([disabled])');
+    if (table?.parentElement) table.parentElement.scrollLeft = 0;
+    input?.focus();
+    try { input?.select?.(); } catch { /* ignore */ }
+  };
+
+  const handleLineComplete = (idx, e) => {
+    if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey || locked) return;
+    if (e.shiftKey) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (idx < gridItems.length - 1) {
+      focusRowItem(idx + 1);
+      return;
+    }
+
+    setGridItems((prev) => [...prev, blankLine()]);
+    setTimeout(() => {
+      focusRowItem(idx + 1);
+    }, 50);
+  };
+
   const lineQty = (row) => {
     const unit = String(row?.unit || 'MTRS').toUpperCase();
     if (['PCS', 'PC', 'NOS', 'NO'].includes(unit)) {
@@ -828,6 +854,7 @@ const PurchaseModal = ({
   const handleNew = async () => {
     const vNo = await peekBillNo('purchase');
     setSelectedPurchaseId('');
+    setMode('Add');
     setBillAttachment(null);
     setHeader({
       party: '',
@@ -1016,14 +1043,8 @@ const PurchaseModal = ({
         igst: calculations.igst,
       };
 
-      let targetId = selectedPurchaseId;
-      if (!targetId && header.billNo && header.billNo !== 'AUTO') {
-        const existingBill = (purchases || []).find((s) => String(s.supplierInvoiceNo || s.invoiceNo || '').trim() === String(header.billNo || '').trim());
-        if (existingBill) {
-          targetId = existingBill._id || existingBill.id;
-        }
-      }
-      const isUpdating = !!targetId || mode === 'Edit';
+      const isUpdating = mode === 'Edit' && !!selectedPurchaseId;
+      const targetId = isUpdating ? selectedPurchaseId : null;
 
       const saved = isUpdating && targetId
         ? await updatePurchase(targetId, payload)
@@ -1507,12 +1528,11 @@ const PurchaseModal = ({
                           <div className="flex items-center w-full relative">
                             <input
                               type="number"
-                              data-enter-action="true"
                               className="classic-erp-input w-full text-center border-0 font-bold"
                               value={row.pcs > 0 ? row.pcs : ''}
                               onChange={e => patchLine(idx, { pcs: Number(e.target.value) || 0, _mtsManual: false }, 'pcs')}
                               onKeyDown={(e) => {
-                                if (e.key === '#' || e.key === 'Enter') {
+                                if (e.key === '#') {
                                   e.preventDefault();
                                   e.stopPropagation();
                                   openPcsBreakdown(idx);
@@ -1523,22 +1543,15 @@ const PurchaseModal = ({
                               min="0"
                               step="1"
                               placeholder="0"
-                              title="Press Enter or # to open Pcs/Kgs breakdown"
+                              title="Press # or double click to open Pcs/Kgs breakdown"
                             />
                             {!locked && (
                               <button
                                 type="button"
-                                tabIndex={0}
-                                data-enter-action="true"
+                                tabIndex={-1}
+                                data-enter-skip="true"
                                 onClick={() => openPcsBreakdown(idx)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openPcsBreakdown(idx);
-                                  }
-                                }}
-                                title="Open detailed Kgs/Pcs breakdown (keyboard: Tab here, then Enter)"
+                                title="Open detailed Kgs/Pcs breakdown"
                                 className="px-1 text-[10px] text-blue-600 hover:text-blue-800 font-bold shrink-0 border-l border-slate-200"
                               >
                                 #
@@ -1586,13 +1599,32 @@ const PurchaseModal = ({
                           <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis1Amt || ''} onChange={e => patchLine(idx, { dis1Amt: Number(e.target.value) })} disabled={locked} />
                         </td>
                         <td className="col-amt">
-                          <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0" value={row.addAmt || ''} onChange={e => patchLine(idx, { addAmt: Number(e.target.value) })} disabled={locked} />
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="classic-erp-input w-full text-right border-0"
+                            value={row.addAmt || ''}
+                            onChange={e => patchLine(idx, { addAmt: Number(e.target.value) })}
+                            onKeyDown={e => {
+                              if (calculations.isUnregistered) handleLineComplete(idx, e);
+                            }}
+                            disabled={locked}
+                          />
                         </td>
                         <td className="col-pct">
                           <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={calculations.isUnregistered ? 0 : (row.gstPer || '')} onChange={e => patchLine(idx, { gstPer: Number(e.target.value) })} disabled={locked || calculations.isUnregistered} title={calculations.isUnregistered ? 'No GST on an unregistered-supplier bill' : undefined} />
                         </td>
                         <td className="col-amt">
-                          <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono font-bold text-blue-800" value={calculations.isUnregistered ? 0 : (row.gstAmt || '')} onChange={e => patchLine(idx, { gstAmt: Number(e.target.value) })} disabled={locked || calculations.isUnregistered} title={calculations.isUnregistered ? 'No GST on an unregistered-supplier bill' : undefined} />
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="classic-erp-input w-full text-right border-0 font-mono font-bold text-blue-800"
+                            value={calculations.isUnregistered ? 0 : (row.gstAmt || '')}
+                            onChange={e => patchLine(idx, { gstAmt: Number(e.target.value) })}
+                            onKeyDown={e => handleLineComplete(idx, e)}
+                            disabled={locked || calculations.isUnregistered}
+                            title={calculations.isUnregistered ? 'No GST on an unregistered-supplier bill' : 'Press Enter to jump to next row'}
+                          />
                         </td>
                         <td className="col-del text-center">
                           <button type="button" onClick={() => {
@@ -1609,9 +1641,7 @@ const PurchaseModal = ({
               </div>
 
               <div className="flex justify-between items-center bg-[var(--bg-subtle)] p-1 border border-[var(--border)] rounded-md shrink-0 erp-sales-stockbar">
-                <button type="button" onClick={() => setGridItems([...gridItems, blankLine()])} className="classic-erp-btn" disabled={locked}>
-                  <Plus size={12} strokeWidth={3} /> Add Line Item
-                </button>
+                <span className="text-[11px] font-semibold text-slate-500">Press Enter at the end of a line to jump to the next row</span>
                 <div className="text-xs font-bold text-black font-mono">
                   TOTAL Pcs: <span className="text-blue-800">{gridItems.reduce((a, b) => a + (Number(b.pcs) || 0), 0)}</span>
                   {' / '}Qty: <span className="text-blue-800">{gridItems.reduce((a, b) => a + (Number(b.mts) || 0), 0).toFixed(2)}</span>

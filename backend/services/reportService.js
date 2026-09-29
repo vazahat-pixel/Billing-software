@@ -168,6 +168,13 @@ class ReportService {
     for (const s of sales) {
       const total = s.netAmount || s.totals?.total || 0;
       const paid = await paidAgainstDoc(companyId, s._id);
+      const tPcs = (s.items || []).reduce((acc, it) => acc + Number(it.pcs || 0), 0);
+      const tQty = (s.items || []).reduce((acc, it) => {
+        const fold = Number(it.fold || 0);
+        const qty = Number(it.mts || 0);
+        return acc + (fold > 0 ? qty * (1 - fold / 100) : qty);
+      }, 0);
+
       rows.push({
         _id: s._id,
         invoiceNo: s.invoiceNo,
@@ -180,6 +187,9 @@ class ReportService {
         cgst: s.cgst || 0,
         sgst: s.sgst || 0,
         igst: s.igst || 0,
+        tcs: s.tcsAmt || s.tcs || 0,
+        tPcs,
+        tQty: Number(tQty.toFixed(2)),
         gstAmount: s.gstAmount || 0,
         netAmount: total,
         paidAmount: paid,
@@ -189,15 +199,26 @@ class ReportService {
         haste: s.haste || '',
         transport: s.transport || '',
         itemCount: (s.items || []).length,
-        items: (s.items || []).map((it) => ({
-          name: it.itemId?.itemName || it.itemId?.name || it.desc || '',
-          pcs: it.pcs || 0,
-          qty: it.mts || 0,
-          rate: it.rate || 0,
-          amount: it.amount || 0,
-          addAmt: it.addAmt || 0,
-          lessAmt: Number(it.dis1Amt || 0) + Number(it.dis2Amt || 0),
-        })),
+        items: (s.items || []).map((it) => {
+          const add = Number(it.addAmt || 0);
+          const less = Number(it.dis1Amt || 0) + Number(it.dis2Amt || 0) + Number(it.foldLessAmt || it.foldDeductionAmt || 0);
+          const amount = Number(it.amount || 0);
+          const lineTaxable = amount + add - less;
+          const lineNet = s.taxableAmount > 0 && total > 0
+            ? (total * (lineTaxable / s.taxableAmount))
+            : (lineTaxable + Number(it.gstAmt || 0));
+          return {
+            name: it.itemId?.itemName || it.itemId?.name || it.desc || '',
+            pcs: Number(it.pcs || 0),
+            qty: Number(it.mts || 0),
+            fold: Number(it.fold || 0),
+            rate: Number(it.rate || 0),
+            amount,
+            addAmt: add,
+            lessAmt: less,
+            netAmount: Number(lineNet.toFixed(2)),
+          };
+        }),
       });
     }
     return rows;
@@ -209,8 +230,9 @@ class ReportService {
       status: { $ne: 'cancelled' },
       ...buildDateQuery(startDate, endDate)
     })
-      .populate('supplierId', 'name gstin mobile station')
+      .populate('supplierId', 'name gstin mobile station city')
       .populate('brokerId', 'name')
+      .populate('items.itemId', 'itemName name')
       .sort({ date: -1 })
       .lean();
 
@@ -218,25 +240,57 @@ class ReportService {
     for (const p of purchases) {
       const total = p.netAmount || p.totals?.total || p.totalAmount || 0;
       const paid = await paidAgainstDoc(companyId, p._id);
+      const tPcs = (p.items || []).reduce((acc, it) => acc + Number(it.pcs || 0), 0);
+      const tQty = (p.items || []).reduce((acc, it) => {
+        const fold = Number(it.fold || 0);
+        const qty = Number(it.mts || 0);
+        return acc + (fold > 0 ? qty * (1 - fold / 100) : qty);
+      }, 0);
+
       rows.push({
         _id: p._id,
+        invoiceNo: p.invoiceNo || p.billNo,
         billNo: p.invoiceNo || p.billNo,
         suppBill: p.supplierInvoiceNo || '',
         date: p.date,
         partyName: p.supplierId?.name || '—',
         gstin: p.supplierId?.gstin || '',
-        city: p.supplierId?.station || '',
+        city: p.supplierId?.city || p.supplierId?.station || '',
         broker: p.brokerId?.name || '',
         taxable: p.taxableAmount || 0,
         cgst: p.cgst || 0,
         sgst: p.sgst || 0,
         igst: p.igst || 0,
+        tcs: p.tcsAmt || p.tcs || 0,
+        tPcs,
+        tQty: Number(tQty.toFixed(2)),
         gstAmount: p.gstAmount || 0,
         netAmount: total,
         paidAmount: paid,
         balance: Math.max(0, total - paid),
         status: p.status || 'active',
-        itemCount: (p.items || []).length
+        book: p.bookId || 'PURCHASE BOOK',
+        itemCount: (p.items || []).length,
+        items: (p.items || []).map((it) => {
+          const add = Number(it.addAmt || 0);
+          const less = Number(it.dis1Amt || 0) + Number(it.dis2Amt || 0) + Number(it.foldLessAmt || it.foldDeductionAmt || 0);
+          const amount = Number(it.amount || 0);
+          const lineTaxable = amount + add - less;
+          const lineNet = p.taxableAmount > 0 && total > 0
+            ? (total * (lineTaxable / p.taxableAmount))
+            : (lineTaxable + Number(it.gstAmt || 0));
+          return {
+            name: it.itemId?.itemName || it.itemId?.name || it.desc || '',
+            pcs: Number(it.pcs || 0),
+            qty: Number(it.mts || 0),
+            fold: Number(it.fold || 0),
+            rate: Number(it.rate || 0),
+            amount,
+            addAmt: add,
+            lessAmt: less,
+            netAmount: Number(lineNet.toFixed(2)),
+          };
+        }),
       });
     }
     return rows;
