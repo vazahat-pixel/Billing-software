@@ -22,10 +22,13 @@ if ss -tlnp | grep -q ":${API_PORT} "; then
   fi
 fi
 
-echo "==> Ensure Node 20, nginx, pm2"
+echo "==> Ensure Node 20, nginx, pm2, git"
+apt-get update -y
 if ! command -v node >/dev/null 2>&1 || [[ "$(node -v | cut -d. -f1 | tr -d v)" -lt 20 ]]; then
   curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-  apt-get install -y nodejs build-essential
+  apt-get install -y nodejs build-essential git
+else
+  apt-get install -y build-essential git
 fi
 apt-get install -y nginx
 command -v pm2 >/dev/null 2>&1 || npm i -g pm2
@@ -33,20 +36,38 @@ command -v pm2 >/dev/null 2>&1 || npm i -g pm2
 if ! command -v mongod >/dev/null 2>&1 && ! systemctl is-active --quiet mongod; then
   echo "==> MongoDB not found — installing MongoDB 7"
   apt-get install -y gnupg curl
-  curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+  curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --yes -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
   . /etc/os-release
-  echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb-org-7.0.list
+  if [[ "${ID:-}" == "debian" ]]; then
+    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] http://repo.mongodb.org/apt/debian ${VERSION_CODENAME}/mongodb-org/7.0 main" > /etc/apt/sources.list.d/mongodb-org-7.0.list
+  else
+    echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb-org-7.0.list
+  fi
   apt-get update -y
   apt-get install -y mongodb-org || true
-  systemctl enable --now mongod || true
+  systemctl daemon-reload || true
+  systemctl enable --now mongod || systemctl start mongod || true
+fi
+
+if [[ ! -d "$APP_DIR" ]]; then
+  echo "==> Cloning repository to $APP_DIR..."
+  git clone https://github.com/vazahat-pixel/Billing-software.git "$APP_DIR"
+elif [[ -d "$APP_DIR/.git" ]]; then
+  echo "==> Pulling latest changes from git..."
+  git -C "$APP_DIR" pull origin main || true
 fi
 
 if [[ ! -d "$BACKEND_DIR" ]]; then
-  echo "ERROR: $BACKEND_DIR missing. Upload project first."
+  echo "ERROR: $BACKEND_DIR missing. Check git clone or project upload."
   exit 1
 fi
 
-JWT_SECRET="$(openssl rand -base64 32)"
+if [[ -f "$BACKEND_DIR/.env" ]] && grep -q '^JWT_SECRET=' "$BACKEND_DIR/.env"; then
+  JWT_SECRET="$(grep '^JWT_SECRET=' "$BACKEND_DIR/.env" | cut -d= -f2-)"
+else
+  JWT_SECRET="$(openssl rand -base64 32)"
+fi
+
 cat > "$BACKEND_DIR/.env" <<EOF
 NODE_ENV=production
 PORT=${API_PORT}
@@ -120,6 +141,7 @@ server {
 }
 EOF
 
+rm -f /etc/nginx/sites-enabled/default
 ln -sf /etc/nginx/sites-available/billing /etc/nginx/sites-enabled/billing
 nginx -t
 systemctl reload nginx
