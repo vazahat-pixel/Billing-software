@@ -9,8 +9,8 @@ FRONTEND_DIR="$APP_DIR/frontend"
 WEB_ROOT="/var/www/billing-frontend"
 API_PORT="5010"
 PM2_NAME="billing-api"
-SERVER_IP="${SERVER_IP:-200.97.175.23}"
-PUBLIC_URL="http://${SERVER_IP}"
+SERVER_DOMAIN="${DOMAIN:-app.dealingindia.com}"
+PUBLIC_URL="http://${SERVER_DOMAIN}"
 
 echo "==> Using public URL: $PUBLIC_URL"
 
@@ -156,7 +156,7 @@ echo "==> Nginx site (frontend + /api proxy) — does not remove other sites"
 cat > /etc/nginx/sites-available/billing.conf <<EOF
 server {
     listen 80;
-    server_name ${SERVER_IP};
+    server_name ${SERVER_DOMAIN};
 
     root ${WEB_ROOT};
     index index.html;
