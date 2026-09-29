@@ -56,7 +56,7 @@ app.use(helmet({
           scriptSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
           imgSrc: ["'self'", 'data:', 'blob:'],
-          connectSrc: ["'self'", process.env.FRONTEND_URL || '', 'https://*.vercel.app'].filter(Boolean),
+          connectSrc: ["'self'", process.env.FRONTEND_URL || '', 'http://app.dealingindia.com', 'https://app.dealingindia.com', 'https://*.vercel.app'].filter(Boolean),
           frameSrc: ["'none'"],
           objectSrc: ["'none'"],
         },
@@ -71,16 +71,51 @@ if (compression) {
 
 app.use(apiLimiter);
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-].filter(Boolean);
+const rawOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((s) => s.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+const allowedOrigins = new Set(rawOrigins);
+const allowedHosts = new Set();
+
+rawOrigins.forEach((url) => {
+  try {
+    const parsed = new URL(url);
+    allowedHosts.add(parsed.host.toLowerCase());
+    allowedOrigins.add(`http://${parsed.host}`);
+    allowedOrigins.add(`https://${parsed.host}`);
+  } catch {
+    const host = url.replace(/^https?:\/\//i, '').split('/')[0].toLowerCase();
+    if (host) allowedHosts.add(host);
+  }
+});
+
+// Explicitly ensure server domain is allowed on both http and https
+if (process.env.SERVER_DOMAIN) {
+  const host = process.env.SERVER_DOMAIN.toLowerCase();
+  allowedHosts.add(host);
+  allowedOrigins.add(`http://${host}`);
+  allowedOrigins.add(`https://${host}`);
+}
+allowedHosts.add('app.dealingindia.com');
+allowedOrigins.add('http://app.dealingindia.com');
+allowedOrigins.add('https://app.dealingindia.com');
 
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return callback(null, true);
-    if (origin.endsWith('.vercel.app') || allowedOrigins.includes(origin)) {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
+    if (origin.endsWith('.vercel.app') || allowedOrigins.has(origin)) {
       return callback(null, true);
+    }
+    try {
+      const originHost = new URL(origin).host.toLowerCase();
+      if (allowedHosts.has(originHost)) {
+        return callback(null, true);
+      }
+    } catch {
+      /* ignore invalid URL format */
     }
     callback(new Error(`CORS blocked: ${origin}`));
   },
