@@ -78,6 +78,9 @@ elif command -v mongod >/dev/null 2>&1 || systemctl is-active --quiet mongod; th
   systemctl start mongod || true
 else
   echo "==> MongoDB not found — installing MongoDB for Ubuntu/Debian"
+  if [[ -f /var/lib/dpkg/info/openssh-server.postinst ]]; then
+    sed -i 's/deb-systemd-invoke/echo deb-systemd-invoke/g' /var/lib/dpkg/info/openssh-server.postinst 2>/dev/null || true
+  fi
   dpkg --configure -a 2>/dev/null || true
   wait_for_apt_lock
   apt-get install -y gnupg curl || true
