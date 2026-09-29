@@ -183,8 +183,36 @@ class OutstandingEngineService {
       outstandingAmount: { $gt: 0.01 },
     }).lean();
 
+    const ReturnInvoice = require('../models/ReturnInvoice');
+    const billNos = [...new Set(bills.map((b) => b.billNo).filter(Boolean))];
+    const returnMap = {};
+    if (billNos.length) {
+      const returned = await ReturnInvoice.aggregate([
+        {
+          $match: {
+            companyId: new mongoose.Types.ObjectId(String(companyId)),
+            returnType: isReceivable ? 'Sales' : 'Purchase',
+            status: { $ne: 'cancelled' },
+            originalInvoiceNo: { $in: billNos },
+          },
+        },
+        {
+          $group: {
+            _id: { partyId: '$partyId', no: '$originalInvoiceNo' },
+            goodsRtn: { $sum: { $ifNull: ['$netAmount', 0] } },
+          },
+        },
+      ]);
+      returned.forEach((row) => {
+        returnMap[`${row._id.partyId}::${row._id.no}`] = round2(row.goodsRtn);
+      });
+    }
+
     const byParty = {};
     for (const bill of bills) {
+      const returnedAmt = returnMap[`${bill.partyId}::${bill.billNo}`] || 0;
+      const left = round2(Math.max(0, Number(bill.outstandingAmount || 0) - returnedAmt));
+      if (left <= 0.01) continue;
       const key = bill.partyId.toString();
       if (!byParty[key]) {
         byParty[key] = {
@@ -194,8 +222,8 @@ class OutstandingEngineService {
           bills: [],
         };
       }
-      const aging = this.agingBuckets(asOnDate, bill.billDate, bill.outstandingAmount);
-      byParty[key].totalOutstanding += bill.outstandingAmount;
+      const aging = this.agingBuckets(asOnDate, bill.billDate, left);
+      byParty[key].totalOutstanding += left;
       byParty[key].aging.bucket30 += aging.bucket30;
       byParty[key].aging.bucket60 += aging.bucket60;
       byParty[key].aging.bucket90 += aging.bucket90;
@@ -206,7 +234,7 @@ class OutstandingEngineService {
         billNo: bill.billNo,
         billDate: bill.billDate,
         dueDate: bill.dueDate,
-        outstanding: bill.outstandingAmount,
+        outstanding: left,
         followUpStatus: bill.followUpStatus,
         ageDays: aging.days,
       });

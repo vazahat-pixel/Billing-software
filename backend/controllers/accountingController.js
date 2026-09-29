@@ -1117,6 +1117,81 @@ exports.getProfitLoss = async (req, res) => {
   }
 };
 
+exports.getFinalHeads = async (req, res) => {
+  try {
+    const financialReports = require('../services/financialReportsService');
+    const data = await financialReports.finalHeads(req.companyId);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getJsmGroupList = async (req, res) => {
+  try {
+    const financialReports = require('../services/financialReportsService');
+    const data = await financialReports.jsmGroupList(req.companyId, {
+      asOn: req.body.asOn,
+      ledgerIds: req.body.ledgerIds,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getJsmTrialBalance = async (req, res) => {
+  try {
+    const financialReports = require('../services/financialReportsService');
+    const data = await financialReports.jsmTrialBalance(req.companyId, {
+      from: req.body.from,
+      to: req.body.to,
+      basis: req.body.basis,
+      layout: req.body.layout,
+      order: req.body.order,
+      heads: req.body.heads,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getJsmProfitLoss = async (req, res) => {
+  try {
+    const financialReports = require('../services/financialReportsService');
+    const data = await financialReports.jsmProfitAndLoss(req.companyId, {
+      from: req.body.from,
+      to: req.body.to,
+      openingStock: req.body.openingStock,
+      closingStock: req.body.closingStock,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getJsmBalanceSheet = async (req, res) => {
+  try {
+    const financialReports = require('../services/financialReportsService');
+    const data = await financialReports.jsmBalanceSheet(req.companyId, {
+      from: req.body.from,
+      asOn: req.body.asOn,
+      layout: req.body.layout,
+      order: req.body.order,
+      onlySummary: req.body.onlySummary,
+      withNetProfit: req.body.withNetProfit,
+      withStation: req.body.withStation,
+      openingStock: req.body.openingStock,
+      closingStock: req.body.closingStock,
+    });
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // 10. Balance Sheet Report (Assets vs Liabilities + Capital + P&L plug)
 exports.getBalanceSheet = async (req, res) => {
   try {

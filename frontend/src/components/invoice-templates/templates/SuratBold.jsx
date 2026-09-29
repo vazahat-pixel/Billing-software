@@ -192,7 +192,7 @@ export default function SuratBold({ data }) {
               <th style={{ width: '8%' }}>Mtrs</th>
               <th style={{ width: '7%' }}>Net Mtrs</th>
               <th style={{ width: '8%' }}>Rate</th>
-              <th style={{ width: '6%' }}>Disc</th>
+              <th style={{ width: '6%' }}>Unit</th>
               <th style={{ width: '10%' }}>Amount (Rs.)</th>
             </tr>
           </thead>
@@ -247,7 +247,7 @@ export default function SuratBold({ data }) {
                 <td className="sb-num">{displayMts ? displayMts.toFixed(2) : '0.00'}</td>
                 <td className="sb-num">{displayNetMts ? displayNetMts.toFixed(2) : '0.00'}</td>
                 <td className="sb-num">{money(line.rate)}</td>
-                <td className="sb-num">{money(line.discount || 0)}</td>
+                <td className="sb-center">{line.rateOn || 'Met'}</td>
                 <td className="sb-num" style={{ fontWeight: 700 }}>{money(line.amount)}</td>
               </tr>
                 );
@@ -283,6 +283,7 @@ export default function SuratBold({ data }) {
                 }, 0);
                 return tnm > 0 ? tnm.toFixed(2) : '0.00';
               })()}</td>
+              <td className="sb-num">&nbsp;</td>
               <td className="sb-num">&nbsp;</td>
               <td className="sb-num" style={{ fontSize: '9pt', color: NAVY }}>{money(totalAmt)}</td>
             </tr>

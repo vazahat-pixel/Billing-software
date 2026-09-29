@@ -127,6 +127,7 @@ const CashBankBookModal = ({
   const advanceLookupRef = useRef(false);
   const recentBootRef = useRef(false);
   const partyFieldRef = useRef(null);
+  const voucherNoRef = useRef(null);
   const idempotencyKeyRef = useRef(newIdempotencyKey());
 
   const [header, setHeader] = useState({
@@ -530,11 +531,11 @@ const CashBankBookModal = ({
     }
   }, [bankCashLedgers, isOpen, locked, selectedBook, header.bankLedgerId]);
 
-  // Land on Party once the masters are in, so the Enter chain starts at step 1.
+  // Enter chain starts on Voucher No, then walks forward through the header.
   useEffect(() => {
     if (!isOpen || locked || bootLoading) return;
-    const el = partyFieldRef.current?.querySelector('input');
-    if (el) el.focus();
+    voucherNoRef.current?.focus();
+    voucherNoRef.current?.select?.();
   }, [isOpen, locked, bootLoading]);
 
   // Party change hone par sirf blank row reset karo — bills Enter dabane par
@@ -756,8 +757,8 @@ const CashBankBookModal = ({
   const handleNew = () => {
     resetNew();
     setTimeout(() => {
-      const el = partyFieldRef.current?.querySelector('input, [data-erp-combobox-input]');
-      el?.focus();
+      voucherNoRef.current?.focus();
+      voucherNoRef.current?.select?.();
     }, 40);
   };
 
@@ -1111,7 +1112,7 @@ const CashBankBookModal = ({
               <div className="classic-erp-field cb-f-voucher">
                 <span className="classic-erp-label">Voucher No:</span>
                 <div className="classic-erp-control">
-                  <input type="text" className="classic-erp-input text-center" value={header.voucherNo} readOnly />
+                  <input ref={voucherNoRef} type="text" data-enter-include className="classic-erp-input text-center" value={header.voucherNo} readOnly />
                   <button type="button" className="classic-erp-btn" style={{ padding: '0 8px', minWidth: 28 }} title="Browse" onClick={handleFind} disabled={readOnly}>…</button>
                 </div>
               </div>

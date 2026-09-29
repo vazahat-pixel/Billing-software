@@ -152,9 +152,6 @@ export default function SlateElegant({ data }) {
             <th style={{ width: '7%' }}>Mtrs</th>
             <th style={{ width: '5%' }}>Unit</th>
             <th style={{ width: '8%' }}>Rate</th>
-            <th style={{ width: '5%' }}>Dis%</th>
-            <th style={{ width: '10%' }}>Taxable</th>
-            <th style={{ width: '5%' }}>GST%</th>
             <th style={{ width: '10%' }}>Amount</th>
           </tr>
         </thead>
@@ -175,17 +172,14 @@ export default function SlateElegant({ data }) {
               <td className="se-ctr">{line.cut || '—'}</td>
               <td className="se-num">{line.pcs || ''}</td>
               <td className="se-num">{line.mts ? fmt.num(line.mts) : ''}</td>
-              <td className="se-ctr">{line.unit}</td>
+              <td className="se-ctr">{line.rateOn || 'Met'}</td>
               <td className="se-num">{money(line.rate)}</td>
-              <td className="se-ctr">{line.dis1Per ? `${line.dis1Per}%` : '—'}</td>
-              <td className="se-num">{money(line.taxable)}</td>
-              <td className="se-ctr">{line.gstPer ? `${line.gstPer}%` : '—'}</td>
-              <td className="se-num" style={{ fontWeight: 700, color: SLATE }}>{money(line.total)}</td>
+              <td className="se-num" style={{ fontWeight: 700, color: SLATE }}>{money(line.amount)}</td>
             </tr>
           ))}
           {Array.from({ length: Math.max(0, 5 - (lines || []).length) }).map((_, i) => (
             <tr key={`e${i}`}>
-              {Array.from({ length: 13 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
+              {Array.from({ length: 10 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
             </tr>
           ))}
         </tbody>
@@ -194,9 +188,7 @@ export default function SlateElegant({ data }) {
             <td colSpan={5} className="se-ctr" style={{ background: SLATE_MED }}>TOTAL</td>
             <td className="se-num">{totalPcs || ''}</td>
             <td className="se-num">{totalMts ? fmt.num(totalMts) : ''}</td>
-            <td colSpan={3}>&nbsp;</td>
-            <td className="se-num">{money(totals.taxable)}</td>
-            <td>&nbsp;</td>
+            <td colSpan={2}>&nbsp;</td>
             <td className="se-num" style={{ color: ACCENT, fontSize: '9.5pt' }}>₹ {money(totals.grandTotal)}</td>
           </tr>
         </tfoot>

@@ -101,6 +101,16 @@ exports.getJobWorkReport = async (req, res) => {
   }
 };
 
+exports.getStockLedger = async (req, res) => {
+  try {
+    const stockLedgerReportService = require('../services/stockLedgerReportService');
+    const data = await stockLedgerReportService.getStockLedgerReport(companyId(req), req.query);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.getDailyTransactions = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;

@@ -11,6 +11,7 @@ import {
   fmtDate,
   amountInWords,
 } from '../../utils/invoiceHelpers';
+import { rateBasisLabel } from './engine/columnRegistry';
 
 const printTimestamp = () => {
   const now = new Date();
@@ -215,6 +216,7 @@ export function buildInvoiceViewModel({
       roll: line.roll || line.rollNo || '',
       fabricWidth: line.fabricWidth || line.width || '',
       unit: resolveUnit(line),
+      rateOn: rateBasisLabel(resolveUnit(line)),
       rate,
       discount: lineDiscount,
       dis1Per: Number(line.dis1Per || 0),

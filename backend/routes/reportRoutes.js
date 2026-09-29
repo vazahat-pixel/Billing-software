@@ -13,6 +13,7 @@ router.get('/outstanding', reportController.getOutstanding);
 router.get('/outstanding/filter-options', reportController.getOutstandingFilterOptions);
 router.get('/pl', reportController.getProfitLoss);
 router.get('/jobwork', reportController.getJobWorkReport);
+router.get('/stock-ledger', reportController.getStockLedger);
 router.get('/daily', reportController.getDailyTransactions);
 router.get('/masters', reportController.getMasterSummary);
 

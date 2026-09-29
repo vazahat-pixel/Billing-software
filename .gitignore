@@ -60,6 +60,7 @@ frontend/test-results/
 frontend/e2e/
 frontend/playwright.config.js
 frontend/scripts/
+backend/tests/**/artifacts/
 
 # QA engine generated reports
 backend/qa/reports/output/

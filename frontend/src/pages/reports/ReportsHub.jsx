@@ -87,6 +87,210 @@ const ReportTable = ({ columns, rows, emptyText, onExport, exportLabel }) => (
   </div>
 );
 
+function sumNum(rows, key) {
+  return rows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
+}
+
+function groupSum(rows, keyFn, fields) {
+  const map = new Map();
+  for (const row of rows) {
+    const key = keyFn(row) || '—';
+    const cur = map.get(key) || { name: key, jobs: 0 };
+    cur.jobs += 1;
+    fields.forEach((f) => { cur[f] = (cur[f] || 0) + (Number(row[f]) || 0); });
+    if (!cur.address && row.address) cur.address = row.address;
+    if (!cur.gstin && row.gstin) cur.gstin = row.gstin;
+    if (!cur.month && row.month) cur.month = row.month;
+    map.set(key, cur);
+  }
+  return [...map.values()];
+}
+
+function MoveStrip({ rows }) {
+  return (
+    <div className="flex flex-wrap gap-3 mb-2 px-2 py-1.5 text-[12px] font-bold bg-amber-50 border border-amber-200 rounded">
+      <span>Issued {fmtAmt(sumNum(rows, 'issueQty'))} mts</span>
+      <span>Received {fmtAmt(sumNum(rows, 'receivedQty'))} mts</span>
+      <span>Pending {fmtAmt(sumNum(rows, 'pendingQty'))} mts</span>
+      <span>Pcs pending {sumNum(rows, 'pendingPcs')}</span>
+      <span>Payment bacha {fmtAmt(sumNum(rows, 'chargesDue'))}</span>
+    </div>
+  );
+}
+
+function renderViewReport(view, { jobs, tds = [], tcs = [] }) {
+  const rows = (jobs || []).map((r) => ({
+    ...r,
+    pendingQty: r.pendingQty != null ? Number(r.pendingQty) : Math.max(0, (Number(r.issueQty) || 0) - (Number(r.receivedQty) || 0)),
+    pendingPcs: r.pendingPcs != null ? Number(r.pendingPcs) : Math.max(0, (Number(r.issuePcs) || 0) - (Number(r.receivedPcs) || 0)),
+    chargesDue: r.chargesDue != null
+      ? Number(r.chargesDue)
+      : Math.max(0, (Number(r.processCharges) || 0) + (Number(r.processGst) || 0) - (Number(r.chargesPaid) || 0)),
+  }));
+  const open = rows.filter((r) => r.pendingQty > 0.001 || r.pendingPcs > 0);
+  const qtyCols = [
+    { key: 'issueQty', label: 'Issued Mts', align: 'right', render: (r) => fmtAmt(r.issueQty) },
+    { key: 'receivedQty', label: 'Received Mts', align: 'right', render: (r) => fmtAmt(r.receivedQty) },
+    { key: 'pendingQty', label: 'Pending Mts', align: 'right', render: (r) => fmtAmt(r.pendingQty) },
+    { key: 'issuePcs', label: 'Issued Pcs', align: 'right' },
+    { key: 'receivedPcs', label: 'Rec Pcs', align: 'right' },
+    { key: 'pendingPcs', label: 'Pending Pcs', align: 'right' },
+  ];
+  const lineTable = (list, emptyText, extra = []) => (
+    <div>
+      <MoveStrip rows={list} />
+      <ReportTable
+        columns={[
+          { key: 'jobCardNo', label: 'Challan / Job', render: (r) => <span className="font-bold">{r.challanNo || r.jobCardNo}</span> },
+          { key: 'issueDate', label: 'Issue', render: (r) => fmtDate(r.issueDate) },
+          { key: 'receiveDate', label: 'Receive', render: (r) => fmtDate(r.receiveDate) },
+          { key: 'workerName', label: 'Mill / Party' },
+          { key: 'processType', label: 'Process' },
+          { key: 'lotId', label: 'Lot' },
+          ...qtyCols,
+          ...extra,
+          { key: 'status', label: 'Status' },
+        ]}
+        rows={list.map((r, i) => ({ ...r, _key: i }))}
+        emptyText={emptyText}
+        onExport={() => downloadCsv(`${view}.csv`, ['Job', 'Issue', 'Party', 'Process', 'Lot', 'Issued', 'Received', 'Pending', 'Status'], list.map((r) => [r.jobCardNo, fmtDate(r.issueDate), r.workerName, r.processType, r.lotId, r.issueQty, r.receivedQty, r.pendingQty, r.status]))}
+      />
+    </div>
+  );
+
+  if (view === 'send' || view === 'receiptDetail' || view === 'challan' || view === 'lotStatus') {
+    const list = view === 'receiptDetail' ? rows.filter((r) => r.receiveDate || r.receivedQty > 0) : rows;
+    return lineTable(list, 'Is period mein koi entry nahi');
+  }
+  if (view === 'stock' || view === 'stockZoom') {
+    const extra = view === 'stockZoom'
+      ? [{ key: 'jobRate', label: 'Rate', align: 'right', render: (r) => fmtAmt(r.jobRate) }, { key: 'chargesDue', label: 'Payment bacha', align: 'right', render: (r) => fmtAmt(r.chargesDue) }]
+      : [];
+    return lineTable(open, 'Koi pending stock nahi — sab receive ho chuka', extra);
+  }
+  if (view === 'taka') {
+    return lineTable(open.length ? open : rows, 'Koi taka / pcs stock nahi');
+  }
+  if (view === 'cutting') {
+    const list = rows.filter((r) => /cut/i.test(String(r.processType || '')));
+    return lineTable(list, 'Is period mein cutting process nahi');
+  }
+  if (view === 'receiptSummary' || view === 'itemWise') {
+    const grouped = groupSum(
+      rows,
+      (r) => (view === 'itemWise' ? r.processType : r.workerName),
+      ['issueQty', 'receivedQty', 'pendingQty', 'issuePcs', 'receivedPcs', 'pendingPcs', 'wastage', 'processCharges', 'chargesDue']
+    );
+    return (
+      <div>
+        <MoveStrip rows={rows} />
+        <ReportTable
+          columns={[
+            { key: 'name', label: view === 'itemWise' ? 'Process / Item' : 'Mill / Party', render: (r) => <span className="font-semibold">{r.name}</span> },
+            { key: 'jobs', label: 'Challans', align: 'right' },
+            { key: 'issueQty', label: 'Issued', align: 'right', render: (r) => fmtAmt(r.issueQty) },
+            { key: 'receivedQty', label: 'Received', align: 'right', render: (r) => fmtAmt(r.receivedQty) },
+            { key: 'pendingQty', label: 'Pending', align: 'right', render: (r) => fmtAmt(r.pendingQty) },
+            { key: 'wastage', label: 'Wastage', align: 'right', render: (r) => fmtAmt(r.wastage) },
+            { key: 'chargesDue', label: 'Payment bacha', align: 'right', render: (r) => fmtAmt(r.chargesDue) },
+          ]}
+          rows={grouped.map((r, i) => ({ ...r, _key: i }))}
+          emptyText="Koi entry nahi"
+        />
+      </div>
+    );
+  }
+  if (view === 'lotCost' || view === 'jobPl' || view === 'billDue') {
+    const list = view === 'billDue' ? rows.filter((r) => r.chargesDue > 0.001 || r.processCharges > 0) : rows;
+    return (
+      <div>
+        <MoveStrip rows={list} />
+        <ReportTable
+          columns={[
+            { key: 'lotId', label: 'Lot' },
+            { key: 'jobCardNo', label: 'Job' },
+            { key: 'workerName', label: 'Party' },
+            { key: 'processType', label: 'Process' },
+            { key: 'issueQty', label: 'Qty', align: 'right', render: (r) => fmtAmt(r.issueQty) },
+            { key: 'jobRate', label: 'Rate', align: 'right', render: (r) => fmtAmt(r.jobRate) },
+            { key: 'processCharges', label: 'Charges', align: 'right', render: (r) => fmtAmt(r.processCharges) },
+            { key: 'processGst', label: 'GST', align: 'right', render: (r) => fmtAmt(r.processGst) },
+            { key: 'chargesPaid', label: 'Paid', align: 'right', render: (r) => fmtAmt(r.chargesPaid) },
+            { key: 'chargesDue', label: 'Bacha', align: 'right', render: (r) => fmtAmt(r.chargesDue) },
+          ]}
+          rows={list.map((r, i) => ({ ...r, _key: i }))}
+          emptyText="Koi charge / lot entry nahi"
+        />
+      </div>
+    );
+  }
+  if (view.startsWith('tds')) {
+    const src = tds || [];
+    if (view === 'tdsHead' || view === 'tdsParty' || view === 'tdsMonthly') {
+      const grouped = groupSum(src, (r) => {
+        if (view === 'tdsHead') return r.docType;
+        if (view === 'tdsMonthly') return `${r.partyName} · ${r.month || ''}`;
+        return r.partyName;
+      }, ['taxable', 'tdsAmount', 'netAmount']);
+      return (
+        <ReportTable
+          columns={[
+            { key: 'name', label: view === 'tdsHead' ? 'Head' : 'Party', render: (r) => <span className="font-semibold">{r.name}</span> },
+            { key: 'jobs', label: 'Bills', align: 'right' },
+            { key: 'taxable', label: 'Taxable', align: 'right', render: (r) => fmtAmt(r.taxable) },
+            { key: 'tdsAmount', label: 'TDS', align: 'right', render: (r) => fmtAmt(r.tdsAmount) },
+            { key: 'netAmount', label: 'Net', align: 'right', render: (r) => fmtAmt(r.netAmount) },
+          ]}
+          rows={grouped.map((r, i) => ({ ...r, _key: i }))}
+          emptyText="Is period mein TDS nahi"
+        />
+      );
+    }
+    return (
+      <ReportTable
+        columns={[
+          { key: 'date', label: 'Date', render: (r) => fmtDate(r.date) },
+          { key: 'month', label: 'Month' },
+          { key: 'docType', label: 'Head' },
+          { key: 'docNo', label: 'Doc No' },
+          { key: 'partyName', label: 'Party' },
+          { key: 'gstin', label: 'GSTIN' },
+          { key: 'address', label: 'Address' },
+          { key: 'taxable', label: 'Taxable', align: 'right', render: (r) => fmtAmt(r.taxable) },
+          { key: 'tdsAmount', label: 'TDS', align: 'right', render: (r) => fmtAmt(r.tdsAmount) },
+          { key: 'netAmount', label: 'Net', align: 'right', render: (r) => fmtAmt(r.netAmount) },
+        ]}
+        rows={src.map((r, i) => ({ ...r, _key: i }))}
+        emptyText="Is period mein TDS nahi"
+      />
+    );
+  }
+  if (view.startsWith('tcs')) {
+    const src = (tcs || []).filter((r) => {
+      if (view === 'tcsSales') return String(r.docType || '').toLowerCase() !== 'purchase';
+      if (view === 'tcsPurchase') return String(r.docType || '').toLowerCase() === 'purchase';
+      return true;
+    });
+    return (
+      <ReportTable
+        columns={[
+          { key: 'date', label: 'Date', render: (r) => fmtDate(r.date) },
+          { key: 'docType', label: 'Book' },
+          { key: 'docNo', label: 'Doc No' },
+          { key: 'partyName', label: 'Party' },
+          { key: 'gstin', label: 'GSTIN' },
+          { key: 'taxable', label: 'Taxable', align: 'right', render: (r) => fmtAmt(r.taxable) },
+          { key: 'tcsAmount', label: 'TCS', align: 'right', render: (r) => fmtAmt(r.tcsAmount) },
+          { key: 'netAmount', label: 'Net', align: 'right', render: (r) => fmtAmt(r.netAmount) },
+        ]}
+        rows={src.map((r, i) => ({ ...r, _key: i }))}
+        emptyText={view === 'tcsPurchase' ? 'Purchase bills par TCS amount nahi hai' : 'Is period mein TCS nahi'}
+      />
+    );
+  }
+  return null;
+}
+
 function filterByParty(rows, partyName, field = 'partyName', partyNames) {
   if (partyNames?.length) {
     const set = new Set(partyNames);
@@ -328,6 +532,19 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
     }
 
     if (loading || !data) return <ReportLoader />;
+
+    const view = selectedLeaf?.view;
+    if (view) {
+      const viewed = renderViewReport(view, {
+        jobs: jobRows,
+        processSend: filterByParty(data.processSend || [], partyName, 'workerName', partyNames),
+        processReceipt: filterByParty(data.processReceipt || [], partyName, 'workerName', partyNames),
+        tds: filterByParty(data.tdsRegister || [], partyName),
+        tcs: filterByParty(data.tcsRegister || [], partyName),
+        isJob: String(selectedLeaf.id || '').startsWith('jw-'),
+      });
+      if (viewed) return viewed;
+    }
 
     const s = data.summary || {};
     const osData =

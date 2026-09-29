@@ -5,6 +5,35 @@
 
 export const REPORT_TREE = [
   {
+    id: 'fas',
+    label: 'Fas Reports',
+    children: [
+      { id: 'fas-cashbook', label: 'Bank / Cash Book', external: 'cashBook' },
+      { id: 'fas-ledger', label: 'Ledger', external: 'ledger' },
+      { id: 'fas-ledger-t', label: 'Ledger T-Format', external: 'ledger' },
+      { id: 'fas-interest', label: 'Ledger Interest', soon: true },
+      { id: 'fas-confirm', label: 'Confirmation', soon: true },
+      { id: 'fas-above', label: 'Above Below Rs.', soon: true },
+      { id: 'fas-voucher', label: 'Voucher Book', external: 'journal' },
+      { id: 'fas-ledger-old', label: 'Ledger(Old)', external: 'ledger' },
+      { id: 'fas-old-ledger', label: 'Old Ledger', external: 'ledger' },
+      { id: 'fas-import-bank', label: 'Import Bank', soon: true },
+    ],
+  },
+  {
+    id: 'final',
+    label: 'Final Reports',
+    children: [
+      { id: 'final-group', label: 'Group List', external: 'finalReport', reportKind: 'groupList' },
+      { id: 'final-tb', label: 'Trail Balance', external: 'finalReport', reportKind: 'trial' },
+      { id: 'final-pl', label: 'Profit & Loss Account', external: 'finalReport', reportKind: 'pl' },
+      { id: 'final-bs', label: 'BalanceSheet', external: 'finalReport', reportKind: 'bs' },
+      { id: 'final-diff-os', label: 'Chek Diff Os.Bill/Op.Balance', soon: true },
+      { id: 'final-cash-fin', label: 'CashBank Finance', external: 'cashBook' },
+      { id: 'final-diff-year', label: 'Check Diff Os/Ledger Cur.Year', soon: true },
+    ],
+  },
+  {
     id: 'sales',
     label: 'Sales',
     children: [
@@ -64,23 +93,29 @@ export const REPORT_TREE = [
     id: 'process',
     label: 'Process Reports',
     children: [
-      { id: 'process-send', label: 'Send', reportKey: 'processSend' },
-      { id: 'process-receipt-sum', label: 'Receipt Summary', reportKey: 'processReceiptSummary' },
-      { id: 'process-receipt-det', label: 'Receipt Detail', reportKey: 'processReceiptDetail' },
-      { id: 'process-stock', label: 'Process Stock', reportKey: 'stock' },
-      { id: 'process-item-wise', label: 'Item Wise Summary', reportKey: 'stockItem' },
+      { id: 'process-send', label: 'Send', reportKey: 'processSend', view: 'send' },
+      { id: 'process-receipt-sum', label: 'Receipt Summary', reportKey: 'processReceiptSummary', view: 'receiptSummary' },
+      { id: 'process-receipt-det', label: 'Receipt Detail', reportKey: 'processReceiptDetail', view: 'receiptDetail' },
+      { id: 'process-stock', label: 'Process Stock', reportKey: 'processSend', view: 'stock' },
+      { id: 'process-stock-zoom', label: 'Process Stock Zoom', reportKey: 'processSend', view: 'stockZoom' },
+      { id: 'process-item-wise', label: 'Item Wise Summary', reportKey: 'processSend', view: 'itemWise' },
+      { id: 'process-taka', label: 'TakaWise Stock Detail', reportKey: 'processSend', view: 'taka' },
+      { id: 'process-lot-cost', label: 'Lot Wise Costing', reportKey: 'processSend', view: 'lotCost' },
+      { id: 'process-cutting', label: 'Cutting Reports', reportKey: 'processSend', view: 'cutting' },
+      { id: 'process-lot-status', label: 'Update Lot Status', reportKey: 'processSend', view: 'lotStatus' },
+      { id: 'process-interest', label: 'Process Bill Wise Interest', reportKey: 'processSend', view: 'billDue' },
     ],
   },
   {
     id: 'jobwork',
     label: 'JobWork Reports',
     children: [
-      { id: 'jw-send', label: 'Send', reportKey: 'jobwork' },
-      { id: 'jw-receipt-sum', label: 'Receipt Summary', reportKey: 'jobwork' },
-      { id: 'jw-receipt-det', label: 'Receipt Detail', reportKey: 'jobwork' },
-      { id: 'jw-pending', label: 'Jobwork Stock/Pending Report', reportKey: 'jobworkPending' },
-      { id: 'jw-challan', label: 'Challan Status', reportKey: 'jobworkChallan' },
-      { id: 'jw-pl', label: 'Job P & L', reportKey: 'pl' },
+      { id: 'jw-send', label: 'Send', reportKey: 'jobwork', view: 'send' },
+      { id: 'jw-receipt-sum', label: 'Receipt Summary', reportKey: 'jobwork', view: 'receiptSummary' },
+      { id: 'jw-receipt-det', label: 'Receipt Detail', reportKey: 'jobwork', view: 'receiptDetail' },
+      { id: 'jw-pending', label: 'Jobwork Stock/Pending Report', reportKey: 'jobworkPending', view: 'stock' },
+      { id: 'jw-challan', label: 'Challan Status', reportKey: 'jobworkChallan', view: 'challan' },
+      { id: 'jw-pl', label: 'Job P & L', reportKey: 'jobwork', view: 'jobPl' },
     ],
   },
   {
@@ -111,36 +146,38 @@ export const REPORT_TREE = [
     id: 'stock-ledger',
     label: 'Inv Stock Ledger',
     children: [
-      { id: 'inv-lot', label: 'Lot Stock', reportKey: 'stock' },
-      { id: 'inv-item', label: 'Item Ledger', reportKey: 'stockItem' },
-      { id: 'inv-masters', label: 'Master List', reportKey: 'masters' },
-    ],
-  },
-  {
-    id: 'fas',
-    label: 'Fas Reports',
-    children: [
-      { id: 'fas-tb', label: 'Trial Balance', reportKey: 'summary' },
-      { id: 'fas-bs', label: 'Balance Sheet', reportKey: 'balanceSheet' },
-    ],
-  },
-  {
-    id: 'final',
-    label: 'Final Reports',
-    children: [
-      { id: 'final-pl', label: 'Profit & Loss', reportKey: 'pl' },
-      { id: 'final-bs', label: 'Balance Sheet', reportKey: 'balanceSheet' },
+      { id: 'stock-mts', label: 'Stock Mts Reports', external: 'stockLedger', reportKind: 'stockMts' },
+      { id: 'stock-kgs', label: 'Stock Mts Reports(Kgs)', external: 'stockLedger', reportKind: 'stockKgs' },
+      { id: 'stock-finish-shop', label: 'Finish At Shop Stock', external: 'stockLedger', reportKind: 'finishShop' },
+      { id: 'stock-grey-shop', label: 'Grey At Shop Stock', external: 'stockLedger', reportKind: 'greyShop' },
+      { id: 'stock-grey-pcs', label: 'Grey At Shop Stock (Pcs)', external: 'stockLedger', reportKind: 'greyShopPcs' },
+      { id: 'stock-grey-mill', label: 'Grey At Mill Stock - Format 2', external: 'stockLedger', reportKind: 'greyMill' },
+      { id: 'stock-finish-excel', label: 'Finish Stock Excel', external: 'stockLedger', reportKind: 'finishExcel' },
+      { id: 'stock-finish-book', label: 'Finish At Shop Stock(Book-Acc)', external: 'stockLedger', reportKind: 'finishBook' },
+      { id: 'stock-value', label: 'Stock Value Reports', external: 'stockLedger', reportKind: 'stockValue' },
     ],
   },
   {
     id: 'tds',
     label: 'Tds Reports',
-    children: [{ id: 'tds-reg', label: 'TDS Register', reportKey: 'tds' }],
+    children: [
+      { id: 'tds-head', label: 'Head Wise Report', reportKey: 'tds', view: 'tdsHead' },
+      { id: 'tds-party', label: 'Party Wise Report', reportKey: 'tds', view: 'tdsParty' },
+      { id: 'tds-monthly', label: 'Party Wise Monthly Report', reportKey: 'tds', view: 'tdsMonthly' },
+      { id: 'tds-address', label: 'Address/Acknowledge', reportKey: 'tds', view: 'tdsAddress' },
+      { id: 'tds-challan', label: 'Tax Challan', reportKey: 'tds', view: 'tdsChallan' },
+      { id: 'tds-certificate', label: 'Certificate', reportKey: 'tds', view: 'tdsCertificate' },
+      { id: 'tds-reg', label: 'Tds Register', reportKey: 'tds', view: 'tdsRegister' },
+    ],
   },
   {
     id: 'tcs',
     label: 'Tcs Reports',
-    children: [{ id: 'tcs-reg', label: 'TCS Register', reportKey: 'tcs' }],
+    children: [
+      { id: 'tcs-recpay', label: 'Tcs Rec/Pay Report', reportKey: 'tcs', view: 'tcsRecPay' },
+      { id: 'tcs-sales', label: 'Tcs Sales Register', reportKey: 'tcs', view: 'tcsSales' },
+      { id: 'tcs-purchase', label: 'Tcs Purchase Register', reportKey: 'tcs', view: 'tcsPurchase' },
+    ],
   },
 ];
 
@@ -174,13 +211,13 @@ export const LEGACY_TAB_TO_LEAF = {
   summary: 'monthly-summary',
   sales: 'sales-detail',
   purchase: 'purchase-detail',
-  stock: 'inv-lot',
-  stockItem: 'inv-item',
+  stock: 'stock-grey-shop',
+  stockItem: 'stock-mts',
   outstanding: 'gst-outstanding',
   jobwork: 'jw-send',
   pl: 'monthly-pl',
   daily: 'monthly-bank',
-  masters: 'inv-masters',
+  masters: 'monthly-summary',
 };
 
 /** Ids of folders that contain this leaf, so the hub can expand to it. */
@@ -199,7 +236,7 @@ export function reportAncestorIds(id, nodes = REPORT_TREE, trail = []) {
 export function buildReportsMenuItems({ openLeaf, openHub, openExternal }) {
   const openNode = (node) => {
     if (node.external && openExternal) {
-      openExternal(node.external);
+      openExternal(node);
       return;
     }
     if (openLeaf) openLeaf(node.id);
@@ -213,9 +250,9 @@ export function buildReportsMenuItems({ openLeaf, openHub, openExternal }) {
         children: node.children.map(mapNode),
       };
     }
+    if (node.soon) return { label: node.label, soon: true };
     return {
       label: node.label,
-      soon: node.soon,
       action: () => openNode(node),
     };
   };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Building2, Lock, Unlock, ShieldCheck, Edit3, Plus, X, Search, Filter, Users, ArrowUpRight, Globe, Download, Trash2, UserRoundSearch, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
@@ -56,6 +56,91 @@ const DarkSelect = ({ label, children, ...props }) => (
         <select className="dark-input" {...props}>{children}</select>
     </div>
 );
+
+/** Filter dropdown with a search box, so long state/city/plan lists stay usable. */
+const SearchableFilter = ({ value, onChange, allLabel, options, width = 160 }) => {
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState('');
+    const boxRef = useRef(null);
+    const inputRef = useRef(null);
+
+    useEffect(() => {
+        if (!open) return undefined;
+        const onDoc = (e) => {
+            if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+        };
+        const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+        document.addEventListener('mousedown', onDoc);
+        document.addEventListener('keydown', onKey);
+        inputRef.current?.focus();
+        return () => {
+            document.removeEventListener('mousedown', onDoc);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [open]);
+
+    const q = query.trim().toLowerCase();
+    const visible = options.filter((o) => o.label.toLowerCase().includes(q));
+    const current = options.find((o) => o.value === value);
+
+    return (
+        <div ref={boxRef} style={{ position: 'relative', width, flex: '0 0 auto' }}>
+            <button
+                type="button"
+                className="dark-input"
+                style={{ height: 36, width: '100%', textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}
+                onClick={() => { setQuery(''); setOpen((v) => !v); }}
+            >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {current?.label || allLabel}
+                </span>
+                <span style={{ color: '#94a3b8', fontSize: 10 }}>▼</span>
+            </button>
+            {open && (
+                <div
+                    style={{
+                        position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 40,
+                        width: Math.max(width, 220), background: '#fff', border: '1px solid #e2e8f0',
+                        borderRadius: 8, boxShadow: '0 12px 32px rgba(15,23,42,0.12)', overflow: 'hidden',
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderBottom: '1px solid #e2e8f0' }}>
+                        <Search size={13} className="text-slate-400" />
+                        <input
+                            ref={inputRef}
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder={`Search ${allLabel.replace(/^All\s+/i, '').toLowerCase()}…`}
+                            style={{ border: 'none', outline: 'none', width: '100%', fontSize: 12, fontWeight: 600, color: '#0f172a' }}
+                        />
+                    </div>
+                    <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                        <button
+                            type="button"
+                            onClick={() => { onChange(''); setOpen(false); }}
+                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: 12, fontWeight: 700, background: !value ? '#f0fdfa' : 'transparent', color: '#0f766e' }}
+                        >
+                            {allLabel}
+                        </button>
+                        {visible.map((o) => (
+                            <button
+                                key={o.value}
+                                type="button"
+                                onClick={() => { onChange(o.value); setOpen(false); }}
+                                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 12px', fontSize: 12, fontWeight: 600, background: value === o.value ? '#f0fdfa' : 'transparent', color: '#0f172a' }}
+                            >
+                                {o.label}
+                            </button>
+                        ))}
+                        {visible.length === 0 && (
+                            <p style={{ padding: '10px 12px', fontSize: 12, color: '#94a3b8' }}>No match</p>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const Companies = () => {
     const { companies, fetchCompanies, lockCompany, unlockCompany, generateLicense, createCompany, updateCompany, plans, fetchPlans, loading } = useAdminStore();
@@ -279,22 +364,31 @@ const Companies = () => {
                         placeholder="Search company, owner, city, GSTIN..."
                     />
                 </div>
-                <select className="dark-input" style={{ width: 140, height: 36 }} value={filterState} onChange={(e) => { setFilterState(e.target.value); setFilterDistrict(''); setFilterCity(''); }}>
-                    <option value="">All states</option>
-                    {stateOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-                <select className="dark-input" style={{ width: 140, height: 36 }} value={filterDistrict} onChange={(e) => { setFilterDistrict(e.target.value); setFilterCity(''); }}>
-                    <option value="">All districts</option>
-                    {districtOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-                <select className="dark-input" style={{ width: 140, height: 36 }} value={filterCity} onChange={(e) => setFilterCity(e.target.value)}>
-                    <option value="">All cities</option>
-                    {cityOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-                <select className="dark-input" style={{ width: 140, height: 36 }} value={filterPlan} onChange={(e) => setFilterPlan(e.target.value)}>
-                    <option value="">All plans</option>
-                    {plans.map((p) => <option key={p._id} value={p._id}>{p.name}{p.features?.mobileView ? ' · Mobile' : ''}</option>)}
-                </select>
+                <SearchableFilter
+                    value={filterState}
+                    allLabel="All states"
+                    options={stateOptions.map((s) => ({ value: s, label: s }))}
+                    onChange={(v) => { setFilterState(v); setFilterDistrict(''); setFilterCity(''); }}
+                />
+                <SearchableFilter
+                    value={filterDistrict}
+                    allLabel="All districts"
+                    options={districtOptions.map((s) => ({ value: s, label: s }))}
+                    onChange={(v) => { setFilterDistrict(v); setFilterCity(''); }}
+                />
+                <SearchableFilter
+                    value={filterCity}
+                    allLabel="All cities"
+                    options={cityOptions.map((s) => ({ value: s, label: s }))}
+                    onChange={setFilterCity}
+                />
+                <SearchableFilter
+                    value={filterPlan}
+                    allLabel="All plans"
+                    width={170}
+                    options={plans.map((p) => ({ value: p._id, label: `${p.name}${p.features?.mobileView ? ' · Mobile' : ''}` }))}
+                    onChange={setFilterPlan}
+                />
                 <div className="flex items-center gap-2 text-xs text-slate-500 px-2">
                     <Filter size={13} />
                     <span className="font-bold">{filtered.length} results</span>

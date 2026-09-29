@@ -83,23 +83,9 @@ const rowDescriptionClean = (r) => {
 const rowRemark1Clean = (r) => {
   if (r.remark1) return r.remark1;
   const remarks = String(r.remarks || '').trim();
-  const rt = String(r.refType || r.voucherType || '').toLowerCase();
-  if (remarks) {
-    // Payment/Receipt: backend sends raw bill numbers — add prefix to match reference format
-    if (rt === 'payment' || rt === 'receipt') return `Bill No.:${remarks}`;
-    // Sales/Purchase: remarks is the invoice/bill number directly
-    if (rt === 'salesinvoice' || rt === 'sales') return remarks;
-    if (rt === 'purchasebill' || rt === 'purchase') return remarks;
-    // Notes: show the note number
-    if (rt === 'debitnote' || rt === 'creditnote') return remarks;
-    return remarks;
-  }
-  if (r.billVoucherNo || r.voucherNo) {
-    const no = r.billVoucherNo || r.voucherNo;
-    if (rt === 'payment' || rt === 'receipt') return `Bill No.:${no}`;
-    return no;
-  }
-  return '—';
+  const billNo = String(r.billVoucherNo || r.voucherNo || '').trim();
+  if (!remarks || remarks === billNo) return '—';
+  return remarks;
 };
 
 const rowAuditMark = (r) => {
@@ -512,6 +498,7 @@ const LedgerModal = ({
       setListIdx((i) => Math.max(i - 1, -1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
       if (listOpen === 'head' && listIdx >= 0 && filteredHeads[listIdx]) {
         pickHead(filteredHeads[listIdx]);
       } else {
@@ -541,8 +528,11 @@ const LedgerModal = ({
       setListIdx((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
       if (listOpen === 'account' && filteredAccounts[listIdx]) {
         pickAccount(filteredAccounts[listIdx], true);
+      } else if (filteredAccounts.length === 1) {
+        pickAccount(filteredAccounts[0], true);
       } else {
         runLedger();
       }
@@ -832,6 +822,7 @@ const LedgerModal = ({
             <input
               ref={accHeadRef}
               className="classic-erp-input"
+              data-enter-action="true"
               value={accHead}
               onChange={(e) => { setAccHead(e.target.value); setListOpen('head'); setListIdx(0); }}
               onClick={() => { setListOpen((prev) => (prev === 'head' ? null : 'head')); setListIdx(-1); }}
@@ -858,6 +849,7 @@ const LedgerModal = ({
             <input
               ref={accountRef}
               data-autofocus
+              data-enter-action="true"
               className="classic-erp-input"
               value={accountText}
               onChange={(e) => {

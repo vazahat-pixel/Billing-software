@@ -13,7 +13,9 @@ const StatCard = ({ name, value, icon: Icon, gradient, delay, suffix = '', onCli
         whileHover={{ y: -4, transition: { duration: 0.2 } }}
         className="admin-stat-card"
         onClick={onClick}
+        onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
         role={onClick ? 'button' : undefined}
+        tabIndex={onClick ? 0 : undefined}
         style={onClick ? { cursor: 'pointer' } : undefined}
     >
         <div className="admin-stat-card__glow" style={{ background: gradient }} />
@@ -150,11 +152,16 @@ const MiniLineChart = ({ data = [], color = '#0d9488' }) => {
 };
 
 /* ── Recent Activity ── */
-const ActivityItem = ({ action, time, module, color }) => (
+const ActivityItem = ({ action, time, module, color, onClick }) => (
     <motion.div
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         className="flex items-center gap-3 py-3 border-b border-white/[0.03] last:border-0"
+        onClick={onClick}
+        role={onClick ? 'button' : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onKeyDown={onClick ? (e) => { if (e.key === 'Enter') onClick(); } : undefined}
+        style={onClick ? { cursor: 'pointer' } : undefined}
     >
         <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0" style={{ background: color }}>
             {module?.charAt(0)?.toUpperCase() || 'A'}
@@ -175,11 +182,26 @@ const Dashboard = () => {
         fetchStats();
     }, [fetchStats]);
 
+    const modulePath = (module) => {
+        const key = String(module || '').toLowerCase();
+        const map = {
+            companies: '/admin/companies',
+            plans: '/admin/plans',
+            subscriptions: '/admin/subscriptions',
+            licenses: '/admin/licenses',
+            audit: '/admin/audit',
+            usage: '/admin/usage',
+            lifecycle: '/admin/lifecycle',
+            users: '/admin/users',
+        };
+        return map[key] || '/admin/audit';
+    };
+
     const cards = [
         { name: 'Total Companies', value: stats?.totalCompanies || 0, icon: Building2, gradient: 'linear-gradient(135deg, #0d9488, #0f766e)', delay: 0, onClick: () => navigate('/admin/companies') },
-        { name: 'Active Subscriptions', value: stats?.activeSubs || 0, icon: Users, gradient: 'linear-gradient(135deg, #10b981, #059669)', delay: 0.1 },
-        { name: 'Expiring Soon', value: stats?.expiringSoon || 0, icon: AlertCircle, gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', delay: 0.2 },
-        { name: 'Monthly Revenue', value: `₹${((stats?.mrr || 0) / 1000).toFixed(1)}K`, icon: TrendingUp, gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', delay: 0.3 },
+        { name: 'Active Subscriptions', value: stats?.activeSubs || 0, icon: Users, gradient: 'linear-gradient(135deg, #10b981, #059669)', delay: 0.1, onClick: () => navigate('/admin/subscriptions') },
+        { name: 'Expiring Soon', value: stats?.expiringSoon || 0, icon: AlertCircle, gradient: 'linear-gradient(135deg, #f59e0b, #d97706)', delay: 0.2, onClick: () => navigate('/admin/lifecycle') },
+        { name: 'Monthly Revenue', value: `₹${((stats?.mrr || 0) / 1000).toFixed(1)}K`, icon: TrendingUp, gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', delay: 0.3, onClick: () => navigate('/admin/subscriptions') },
     ];
 
     const distribution = stats?.planDistribution || [];
@@ -260,13 +282,19 @@ const Dashboard = () => {
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3 ml-auto">
+                <button
+                    type="button"
+                    onClick={() => navigate('/admin/usage')}
+                    className="flex items-center gap-3 ml-auto"
+                    style={{ cursor: 'pointer', background: 'transparent', border: 'none', textAlign: 'right' }}
+                    title="Open usage"
+                >
                     <div className="text-right">
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Platform Health</p>
                         <p className="text-sm font-black text-emerald-400">99.8% Uptime</p>
                     </div>
                     <Shield size={32} className="text-emerald-500 opacity-40" />
-                </div>
+                </button>
             </motion.div>
 
             {/* Stat Cards */}
@@ -284,6 +312,11 @@ const Dashboard = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
                     className="lg:col-span-3 glass-card p-6"
+                    onClick={() => navigate('/admin/subscriptions')}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter') navigate('/admin/subscriptions'); }}
+                    style={{ cursor: 'pointer' }}
                 >
                     <div className="flex items-center justify-between mb-6">
                         <div>
@@ -306,6 +339,11 @@ const Dashboard = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 }}
                     className="lg:col-span-2 glass-card p-6"
+                    onClick={() => navigate('/admin/plans')}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter') navigate('/admin/plans'); }}
+                    style={{ cursor: 'pointer' }}
                 >
                     <div className="mb-5">
                         <h3 className="text-sm font-black text-white">Plan Distribution</h3>
@@ -324,15 +362,20 @@ const Dashboard = () => {
                     transition={{ delay: 0.6 }}
                     className="lg:col-span-3 glass-card p-6"
                 >
-                    <div className="flex items-center justify-between mb-4">
+                    <button
+                        type="button"
+                        onClick={() => navigate('/admin/audit')}
+                        className="flex items-center justify-between mb-4 w-full"
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                    >
                         <div>
                             <h3 className="text-sm font-black text-white">Recent Activity</h3>
                             <p className="text-[10px] text-slate-500 mt-0.5">Latest system events</p>
                         </div>
                         <Activity size={16} className="text-teal-600" />
-                    </div>
+                    </button>
                     {recentActivity.map((a, i) => (
-                        <ActivityItem key={i} {...a} />
+                        <ActivityItem key={i} {...a} onClick={() => navigate(modulePath(a.module))} />
                     ))}
                 </motion.div>
 
@@ -354,20 +397,22 @@ const Dashboard = () => {
                         { label: 'View Audit Trail', icon: Activity, color: '#f59e0b', href: '/admin/audit' },
                         { label: 'Usage Analytics', icon: BarChart2, color: '#ef4444', href: '/admin/usage' },
                     ].map((action, i) => (
-                        <motion.a
+                        <motion.button
+                            type="button"
                             key={action.label}
-                            href={action.href}
+                            onClick={() => navigate(action.href)}
                             initial={{ opacity: 0, x: 10 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.7 + i * 0.07 }}
                             className="admin-quick-action"
+                            style={{ width: '100%', cursor: 'pointer', font: 'inherit', textAlign: 'left', color: 'inherit' }}
                         >
                             <div className="admin-quick-action__icon" style={{ background: action.color }}>
                                 <action.icon size={15} />
                             </div>
                             <span className="admin-quick-action__label">{action.label}</span>
                             <ArrowUpRight size={13} className="ml-auto text-slate-600 group-hover:text-teal-600 transition-colors" />
-                        </motion.a>
+                        </motion.button>
                     ))}
                 </motion.div>
             </div>

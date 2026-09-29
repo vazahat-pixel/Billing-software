@@ -69,6 +69,8 @@ import PartyModal from './masters/PartyModal';
 import OutstandingReportModal from './reports/OutstandingReportModal';
 import SystemUtilitiesModal from './utilities/SystemUtilitiesModal';
 import TrialBalanceModal from './accounting/TrialBalanceModal';
+import FinalReportsModal from './reports/FinalReportsModal';
+import StockLedgerModal from './reports/StockLedgerModal';
 
 // Rare / heavy screens — lazy OK
 const PurchaseEngineModal = lazy(() => import('./purchase/PurchaseEngineModal'));
@@ -371,6 +373,8 @@ const Dashboard = () => {
    const [purchaseInitialData, setPurchaseInitialData] = useState(null);
    const [salesInitialData, setSalesInitialData] = useState(null);
    const [voucherInitialId, setVoucherInitialId] = useState(null);
+   const [finalReportKind, setFinalReportKind] = useState('groupList');
+   const [stockLedgerKind, setStockLedgerKind] = useState('stockMts');
    const [noteInitialId, setNoteInitialId] = useState(null);
    const [outstandingSeed, setOutstandingSeed] = useState(null);
    const [productionEngineTab, setProductionEngineTab] = useState('Board');
@@ -424,6 +428,8 @@ const Dashboard = () => {
       ewayBill: false,
       systemUtilities: false,
       zTrial: false,
+      finalReport: false,
+      stockLedger: false,
       issueMultiple: false,
       lotNoEntry: false,
       cuttingEntry: false,
@@ -992,10 +998,17 @@ const Dashboard = () => {
          ...buildReportsMenuItems({
             openLeaf: openReportLeaf,
             openHub: openReportsHub,
-            openExternal: (ext) => {
+            openExternal: (node) => {
+               const ext = typeof node === 'string' ? node : node?.external;
                if (ext === 'gstReports') toggleModal('gstReports', true);
                else if (ext === 'gstr1') toggleModal('gstr1', true);
-               else toggleModal(ext, true);
+               else if (ext === 'finalReport') {
+                  setFinalReportKind(node.reportKind || 'groupList');
+                  setModals((prev) => ({ ...prev, finalReport: true }));
+               } else if (ext === 'stockLedger') {
+                  setStockLedgerKind(node.reportKind || 'stockMts');
+                  setModals((prev) => ({ ...prev, stockLedger: true }));
+               } else if (ext) toggleModal(ext, true);
             },
          }),
          { label: 'Outstanding Report (Sales)', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
@@ -1749,6 +1762,22 @@ const Dashboard = () => {
             <TrialBalanceModal
                isOpen={modals.zTrial}
                onClose={() => setModals(prev => ({ ...prev, zTrial: false }))}
+            />
+         )}
+         {modals.finalReport && (
+            <FinalReportsModal
+               key={finalReportKind}
+               isOpen
+               kind={finalReportKind}
+               onClose={() => setModals(prev => ({ ...prev, finalReport: false }))}
+            />
+         )}
+         {modals.stockLedger && (
+            <StockLedgerModal
+               key={stockLedgerKind}
+               isOpen
+               kind={stockLedgerKind}
+               onClose={() => setModals(prev => ({ ...prev, stockLedger: false }))}
             />
          )}
          <PartyModal isOpen={modals.party} onClose={() => toggleModal('party', false)} />

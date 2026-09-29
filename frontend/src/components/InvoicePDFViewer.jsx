@@ -329,7 +329,7 @@ const InvoicePDFViewer = ({
 
   return (
     <div
-      className={`invoice-pdf-overlay invoice-page-${effectivePageSize} fixed inset-0 z-[10000] bg-[#1e293b]/90 flex flex-col print:static print:inset-auto print:block print:h-auto print:min-h-0 print:bg-white print:z-auto`}
+      className={`invoice-pdf-overlay invoice-page-${effectivePageSize} fixed inset-0 z-[10120] bg-[#1e293b]/90 flex flex-col print:static print:inset-auto print:block print:h-auto print:min-h-0 print:bg-white print:z-auto`}
     >
       {/* ── Compact Sleek Top Toolbar ── */}
       <div className="invoice-pdf-toolbar shrink-0 flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-[#0f172a] text-white border-b border-slate-700 shadow-md print:hidden text-xs">

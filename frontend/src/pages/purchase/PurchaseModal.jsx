@@ -507,6 +507,9 @@ const PurchaseModal = ({
       // Enter with focus outside the form also lands on Bill No.
       if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !showFindModal) {
         if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette]')) return;
+        const own = modalContainerRef.current?.closest('.erp-bill-window-shell') || modalContainerRef.current;
+        const inOwn = own && e.target instanceof Node && own.contains(e.target);
+        if (!inOwn && e.target instanceof Element && e.target.closest('[data-erp-dialog], [data-form-enter-nav], .classic-erp-window')) return;
         const el = e.target;
         const inField = el && (
           el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'

@@ -78,9 +78,8 @@ export default function CompactThermal({ data, pageSize = 'thermal-80' }) {
             {l.sno}. {l.name}
           </div>
           <div style={{ fontSize: 9 }}>
-            HSN {l.hsn} | {fmt.num(l.qty)} {l.unit} x {fmt.num(l.rate)}
+            HSN {l.hsn} | {fmt.num(l.qty)} {l.rateOn || 'Met'} x {fmt.num(l.rate)}
             {Number(l.fold) ? ` | Fold ${l.fold}` : ''}
-            {Number(l.discount) ? ` | Disc ${fmt.num(l.discount)}` : ''}
           </div>
           {line('', fmt.num(l.total))}
         </div>

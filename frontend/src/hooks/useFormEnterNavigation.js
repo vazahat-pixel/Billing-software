@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import {
   handleFormEnterKeyDown,
   handleFormArrowKeyDown,
-  findFormContainer
+  findFormContainer,
+  findEnterSaveButton,
 } from '../utils/formEnterNavigation';
 
 /**
@@ -32,12 +33,7 @@ export function useFormEnterNavigation(enabled = true) {
 
       // Ctrl+Enter / Cmd+Enter: Save Form
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        const container = findFormContainer(e.target);
-        if (!container) return;
-        const saveBtn =
-          container.querySelector('[data-enter-save]') ||
-          container.querySelector('.classic-erp-form-footer button.btn-blue:not([disabled])') ||
-          container.querySelector('.erp-bill-action-bar button.btn-blue:not([disabled])');
+        const saveBtn = findEnterSaveButton(findFormContainer(e.target));
         if (saveBtn) {
           e.preventDefault();
           saveBtn.click();
@@ -47,11 +43,7 @@ export function useFormEnterNavigation(enabled = true) {
 
       // Alt+S: Save Form
       if (e.altKey && e.key.toLowerCase() === 's') {
-        const container = findFormContainer(e.target);
-        const saveBtn =
-          container?.querySelector('[data-enter-save]') ||
-          container?.querySelector('.classic-erp-form-footer button.btn-blue:not([disabled])') ||
-          container?.querySelector('.erp-bill-action-bar button.btn-blue:not([disabled])');
+        const saveBtn = findEnterSaveButton(findFormContainer(e.target));
         if (saveBtn) {
           e.preventDefault();
           saveBtn.click();

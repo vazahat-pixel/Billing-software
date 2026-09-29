@@ -65,7 +65,7 @@ const Modal = ({
         return;
       }
       const first = root.querySelector(
-        'input:not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]), [data-erp-combobox-input]'
+        'input:not([disabled]):not([readonly]):not([type="hidden"]):not([type="file"]), select:not([disabled]), textarea:not([disabled]), [data-erp-combobox-input]'
       );
       first?.focus();
     }, 40);
@@ -115,6 +115,7 @@ const Modal = ({
               className
             )}
             onClick={(e) => e.stopPropagation()}
+            data-erp-dialog
           >
             {!bare && (
               <div className="h-14 shrink-0 flex items-center justify-between px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-card)]">

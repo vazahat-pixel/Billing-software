@@ -201,6 +201,15 @@ export default function ERPCombobox({
           setQuery('');
           return;
         }
+        // Already filled and the user did not type a search: keep the value and move on.
+        if (!query.trim() && selected) {
+          setOpen(false);
+          setQuery('');
+          requestAnimationFrame(() => {
+            if (inputRef.current) focusNextField(inputRef.current);
+          });
+          return;
+        }
         const opt = filtered[activeIdx];
         if (opt) selectOption(opt);
         return;

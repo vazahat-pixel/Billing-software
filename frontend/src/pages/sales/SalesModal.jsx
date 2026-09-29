@@ -871,6 +871,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       if (mode !== 'View' || readOnly) return;
       if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
         if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette]')) return;
+        const own = modalContainerRef.current?.closest('.erp-bill-window-shell') || modalContainerRef.current;
+        const inOwn = own && e.target instanceof Node && own.contains(e.target);
+        if (!inOwn && e.target instanceof Element && e.target.closest('[data-erp-dialog], [data-form-enter-nav], .classic-erp-window')) return;
         e.preventDefault();
         e.stopPropagation();
         handleNewRef.current();
@@ -2160,7 +2163,11 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     <LrEntryModal
       isOpen={lrModalOpen}
       onClose={() => setLrModalOpen(false)}
-      onSaved={() => setLrModalOpen(false)}
+      onOpenBill={(bill) => {
+        loadInvoiceData(bill);
+        setMode('View');
+        setLrModalOpen(false);
+      }}
     />
     </>
   );

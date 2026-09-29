@@ -160,10 +160,8 @@ export default function RoyalGold({ data }) {
               <th style={{ width: '4%' }}>Cut</th>
               <th style={{ width: '5%' }}>PCS</th>
               <th style={{ width: '7%' }}>Mtrs</th>
+              <th style={{ width: '6%' }}>Unit</th>
               <th style={{ width: '8%' }}>Rate</th>
-              <th style={{ width: '5%' }}>Dis%</th>
-              <th style={{ width: '11%' }}>Taxable</th>
-              <th style={{ width: '5%' }}>GST%</th>
               <th style={{ width: '11%' }}>Amount</th>
             </tr>
           </thead>
@@ -181,16 +179,14 @@ export default function RoyalGold({ data }) {
                 <td className="rg-ctr">{line.cut || '—'}</td>
                 <td className="rg-num">{line.pcs || ''}</td>
                 <td className="rg-num">{line.mts ? fmt.num(line.mts) : ''}</td>
+                <td className="rg-ctr">{line.rateOn || 'Met'}</td>
                 <td className="rg-num">{money(line.rate)}</td>
-                <td className="rg-ctr">{line.dis1Per ? `${line.dis1Per}%` : '—'}</td>
-                <td className="rg-num">{money(line.taxable)}</td>
-                <td className="rg-ctr">{line.gstPer ? `${line.gstPer}%` : '—'}</td>
-                <td className="rg-num" style={{ fontWeight: 700 }}>{money(line.total)}</td>
+                <td className="rg-num" style={{ fontWeight: 700 }}>{money(line.amount)}</td>
               </tr>
             ))}
             {Array.from({ length: Math.max(0, 5 - (lines || []).length) }).map((_, i) => (
               <tr key={`e${i}`}>
-                {Array.from({ length: 12 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
+                {Array.from({ length: 10 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
               </tr>
             ))}
           </tbody>
@@ -202,8 +198,6 @@ export default function RoyalGold({ data }) {
               <td className="rg-num">{totalPcs || ''}</td>
               <td className="rg-num">{totalMts ? fmt.num(totalMts) : ''}</td>
               <td colSpan={2}>&nbsp;</td>
-              <td className="rg-num" style={{ color: GOLD_DARK }}>{money(totals.taxable)}</td>
-              <td>&nbsp;</td>
               <td className="rg-num" style={{ color: GOLD_DARK, fontSize: '9pt' }}>{money(totals.grandTotal)}</td>
             </tr>
           </tfoot>

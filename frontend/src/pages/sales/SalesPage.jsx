@@ -9,6 +9,7 @@ const SalesPage = () => {
    const { sales, parties, fetchSales, fetchParties } = useStore();
    const [isModalOpen, setIsModalOpen] = useState(false);
    const [isLrModalOpen, setIsLrModalOpen] = useState(false);
+   const [billToOpen, setBillToOpen] = useState(null);
    const [printInvoiceId, setPrintInvoiceId] = useState(null);
    const [activeTab, setActiveTab] = useState('ALL');
 
@@ -188,12 +189,20 @@ const SalesPage = () => {
             </div>
          </div>
 
-         <SalesModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+         <SalesModal
+            isOpen={isModalOpen}
+            initialData={billToOpen}
+            onClose={() => { setIsModalOpen(false); setBillToOpen(null); }}
+         />
          {printInvoiceId && <SalesPrint invoiceId={printInvoiceId} onClose={() => setPrintInvoiceId(null)} />}
          <LrEntryModal
             isOpen={isLrModalOpen}
             onClose={() => setIsLrModalOpen(false)}
-            onSaved={() => setIsLrModalOpen(false)}
+            onOpenBill={(bill) => {
+              setBillToOpen(bill);
+              setIsLrModalOpen(false);
+              setIsModalOpen(true);
+            }}
          />
       </div>
    );

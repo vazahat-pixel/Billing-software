@@ -318,8 +318,17 @@ class ReportService {
       issueQty: j.issueQty || 0,
       receivedPcs: j.receivedPcs || 0,
       receivedQty: j.receivedQty || 0,
+      pendingPcs: Math.max(0, Number(j.issuePcs || 0) - Number(j.receivedPcs || 0)),
+      pendingQty: round2(Math.max(0, Number(j.issueQty || 0) - Number(j.receivedQty || 0))),
       wastage: j.wastage || 0,
       wastagePct: j.issueQty ? ((j.wastage || 0) / j.issueQty * 100).toFixed(1) : 0,
+      challanNo: j.challanNo || '',
+      jobRate: j.jobRate || 0,
+      processCharges: j.processCharges || 0,
+      processGst: j.processGstAmount || 0,
+      chargesBill: round2(Number(j.processCharges || 0) + Number(j.processGstAmount || 0)),
+      chargesPaid: j.chargesPaidAmount || 0,
+      chargesDue: round2(Math.max(0, Number(j.processCharges || 0) + Number(j.processGstAmount || 0) - Number(j.chargesPaidAmount || 0))),
       status: j.status
     }));
   }
@@ -914,7 +923,7 @@ class ReportService {
     const dateQ = buildDateQuery(startDate, endDate);
     const [purchases, notes] = await Promise.all([
       Purchase.find({ companyId, status: { $ne: 'cancelled' }, tdsAmount: { $gt: 0 }, ...dateQ })
-        .populate('supplierId', 'name gstin')
+        .populate('supplierId', 'name gstin address city')
         .lean(),
       DebitCreditNote.find({ companyId, tdsAmount: { $gt: 0 }, ...dateQ })
         .populate('partyId', 'name gstin')
@@ -930,6 +939,8 @@ class ReportService {
         docNo: p.invoiceNo || p.billNo,
         partyName: p.supplierId?.name || '—',
         gstin: p.supplierId?.gstin || '',
+        address: [p.supplierId?.address, p.supplierId?.city].filter(Boolean).join(', '),
+        month: p.date ? new Date(p.date).toLocaleString('en-IN', { month: 'short', year: 'numeric' }) : '',
         taxable: p.taxableAmount || 0,
         tdsAmount: p.tdsAmount || 0,
         netAmount: p.netAmount || 0,
@@ -942,6 +953,8 @@ class ReportService {
         docNo: n.noteNo || n.invoiceNo || '',
         partyName: n.partyId?.name || '—',
         gstin: n.partyId?.gstin || '',
+        address: '',
+        month: n.date ? new Date(n.date).toLocaleString('en-IN', { month: 'short', year: 'numeric' }) : '',
         taxable: n.taxableAmount || n.netAmount || 0,
         tdsAmount: n.tdsAmount || 0,
         netAmount: n.finalAmount || n.netAmount || 0,
@@ -967,6 +980,7 @@ class ReportService {
         docNo: s.invoiceNo,
         partyName: s.customerId?.name || '—',
         gstin: s.customerId?.gstin || '',
+        month: s.date ? new Date(s.date).toLocaleString('en-IN', { month: 'short', year: 'numeric' }) : '',
         taxable: s.taxableAmount || 0,
         tcsAmount: s.tcsAmount || 0,
         netAmount: s.netAmount || 0,

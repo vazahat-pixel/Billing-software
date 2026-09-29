@@ -27,6 +27,11 @@ router.get('/trial-balance', read, accountingController.getTrialBalance);
 router.get('/trial-balance/grouped', read, accountingController.getGroupedTrialBalance);
 router.get('/profit-loss', read, accountingController.getProfitLoss);
 router.get('/balance-sheet', read, accountingController.getBalanceSheet);
+router.get('/reports/final-heads', read, accountingController.getFinalHeads);
+router.post('/reports/group-list', read, accountingController.getJsmGroupList);
+router.post('/reports/trial-balance', read, accountingController.getJsmTrialBalance);
+router.post('/reports/profit-loss', read, accountingController.getJsmProfitLoss);
+router.post('/reports/balance-sheet', read, accountingController.getJsmBalanceSheet);
 router.get('/outstanding', read, accountingController.getOutstandingReport);
 
 // Manual Journal Entries

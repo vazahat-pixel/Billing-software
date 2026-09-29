@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { salesApi } from '../../api/sales.api';
 import useStore from '../../store/useStore';
 import { toast } from '../../store/useToastStore';
+import SalesPrint from './SalesPrint';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -26,50 +27,74 @@ const EMPTY_LR = {
  * User fills LR fields row-by-row and saves in bulk or one by one.
  * After save those bills disappear from the list on next refresh.
  */
-const LrEntryModal = ({ isOpen, onClose, onSaved }) => {
+const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
   const { sales, parties, fetchSales } = useStore();
   const [pendingBills, setPendingBills] = useState([]);
   const [lrData, setLrData] = useState({});
   const [saving, setSaving] = useState(false);
   const [filterText, setFilterText] = useState('');
+  const [printId, setPrintId] = useState(null);
   const cellRefs = useRef({});
+  const savedKeep = useRef(new Map());
+
+  const partyInfo = useCallback((bill) => {
+    const raw = bill?.customerId;
+    const embedded = raw && typeof raw === 'object' ? raw : null;
+    const id = embedded ? (embedded._id || embedded.id) : raw;
+    const party = (parties || []).find((p) => String(p._id || p.id) === String(id || ''));
+    return {
+      name: party?.name || embedded?.name || bill?.customerName || bill?.partyName || '',
+      city: party?.city || party?.station || embedded?.city || embedded?.station || bill?.city || '',
+    };
+  }, [parties]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      savedKeep.current = new Map();
+      setPrintId(null);
+      return;
+    }
     const pending = (sales || []).filter(
       (s) => !s.lrNo && s.status !== 'cancelled'
     );
-    setPendingBills(pending);
+    const kept = [...savedKeep.current.values()].filter(
+      (b) => !pending.some((p) => String(p._id || p.id) === String(b._id || b.id))
+    );
+    const list = [...kept, ...pending];
+    setPendingBills(list);
     setLrData((prev) => {
       const next = { ...prev };
-      pending.forEach((b) => {
+      list.forEach((b) => {
         const id = b._id || b.id;
         if (!next[id] || !next[id]._dirty) {
+          const info = partyInfo(b);
           next[id] = {
             ...EMPTY_LR,
-            lrNo: b.lrNo || '',
-            lrDate: b.lrDate ? String(b.lrDate).split('T')[0] : today(),
+            lrNo: b.lrNo || next[id]?.lrNo || '',
+            lrDate: b.lrDate ? String(b.lrDate).split('T')[0] : (next[id]?.lrDate || today()),
             baleNo: b.baleNo || '',
             weight: b.weight || '',
             freight: b.freight || '',
             transport: b.transport || '',
-            station: b.station || '',
+            station: b.station || info.city || '',
             haste: b.haste || '',
             remarks: b.remarks || '',
+            _saved: Boolean(savedKeep.current.has(String(id)) || next[id]?._saved),
           };
         }
       });
       return next;
     });
-  }, [isOpen, sales]);
+  }, [isOpen, sales, partyInfo]);
 
   const filtered = pendingBills.filter((b) => {
     if (!filterText) return true;
     const q = filterText.toLowerCase();
-    const party = parties?.find((p) => p._id === b.customerId || p.id === b.customerId);
+    const party = partyInfo(b);
     return (
       String(b.invoiceNo || '').toLowerCase().includes(q) ||
-      (party?.name || '').toLowerCase().includes(q)
+      party.name.toLowerCase().includes(q) ||
+      party.city.toLowerCase().includes(q)
     );
   });
 
@@ -106,22 +131,29 @@ const LrEntryModal = ({ isOpen, onClose, onSaved }) => {
     try {
       await salesApi.bulkUpdateLr(entries);
       toast.success(`${entries.length} bill(s) ka LR save ho gaya!`);
-      const savedIds = new Set(entries.map((e) => e.id));
+      const savedIds = new Set(entries.map((e) => String(e.id)));
+      entries.forEach((entry) => {
+        const bill = pendingBills.find((b) => String(b._id || b.id) === String(entry.id));
+        if (bill) {
+          savedKeep.current.set(String(entry.id), { ...bill, ...entry, lrNo: entry.lrNo });
+        }
+      });
+      await fetchSales();
       setLrData((prev) => {
         const next = { ...prev };
         savedIds.forEach((id) => {
-          if (next[id]) next[id] = { ...next[id], _saved: true, _dirty: false };
+          const key = Object.keys(next).find((k) => String(k) === id) || id;
+          if (next[key]) next[key] = { ...next[key], _saved: true, _dirty: false };
         });
         return next;
       });
-      await fetchSales();
       if (onSaved) onSaved(entries.length);
     } catch (err) {
       toast.error(err?.message || 'Save karte waqt error aaya');
     } finally {
       setSaving(false);
     }
-  }, [lrData, fetchSales, onSaved]);
+  }, [lrData, fetchSales, onSaved, pendingBills]);
 
   const handleSaveRow = useCallback(async (bill) => {
     const id = bill._id || bill.id;
@@ -134,11 +166,12 @@ const LrEntryModal = ({ isOpen, onClose, onSaved }) => {
     try {
       await salesApi.bulkUpdateLr([buildEntry(id, lr)]);
       toast.success(`Bill #${bill.invoiceNo} ka LR save!`);
+      savedKeep.current.set(String(id), { ...bill, ...buildEntry(id, lr) });
+      await fetchSales();
       setLrData((prev) => ({
         ...prev,
         [id]: { ...prev[id], _saved: true, _dirty: false },
       }));
-      await fetchSales();
       if (onSaved) onSaved(1);
     } catch (err) {
       toast.error(err?.message || 'Save failed');
@@ -302,9 +335,10 @@ const LrEntryModal = ({ isOpen, onClose, onSaved }) => {
                 {filtered.map((bill, rowIdx) => {
                   const id = bill._id || bill.id;
                   const lr = lrData[id] || { ...EMPTY_LR };
-                  const party = parties?.find((p) => p._id === bill.customerId || p.id === bill.customerId);
+                  const party = partyInfo(bill);
                   const isSaved = lr._saved;
                   const isDirty = lr._dirty;
+                  const openBill = () => onOpenBill?.(bill);
 
                   return (
                     <tr
@@ -320,12 +354,23 @@ const LrEntryModal = ({ isOpen, onClose, onSaved }) => {
                       }`}
                     >
                       <td className="px-2 py-1 text-center text-slate-400 font-mono text-[10px]">{rowIdx + 1}</td>
-                      <td className="px-2 py-1 font-bold text-slate-800 font-mono">{bill.invoiceNo}</td>
+                      <td className="px-2 py-1 font-bold font-mono">
+                        <button
+                          type="button"
+                          className="text-blue-800 underline decoration-blue-300 hover:text-blue-950"
+                          title="Open this bill"
+                          onClick={openBill}
+                        >
+                          {bill.invoiceNo}
+                        </button>
+                      </td>
                       <td className="px-2 py-1 text-slate-500 text-[10px]">
                         {bill.date ? new Date(bill.date).toLocaleDateString('en-IN') : '—'}
                       </td>
-                      <td className="px-2 py-1 font-semibold text-slate-700 truncate max-w-[120px]" title={party?.name || ''}>
-                        {party?.name || <span className="text-slate-300">—</span>}
+                      <td className="px-2 py-1 font-semibold text-slate-800 truncate max-w-[160px]" title={party.name}>
+                        <button type="button" className="text-left hover:underline" onClick={openBill}>
+                          {party.name || '—'}
+                        </button>
                       </td>
 
                       {COLS.map((col, colIdx) => (
@@ -351,9 +396,15 @@ const LrEntryModal = ({ isOpen, onClose, onSaved }) => {
                         </td>
                       ))}
 
-                      <td className="px-1 py-1 text-center">
+                      <td className="px-1 py-1 text-center whitespace-nowrap">
                         {isSaved ? (
-                          <span className="text-green-600 font-bold text-[10px]">✓ Saved</span>
+                          <button
+                            type="button"
+                            onClick={() => setPrintId(id)}
+                            className="px-2 py-1 bg-emerald-700 text-white text-[10px] font-bold rounded hover:bg-emerald-800"
+                          >
+                            Invoice Print
+                          </button>
                         ) : (
                           <button
                             onClick={() => handleSaveRow(bill)}
@@ -407,6 +458,7 @@ const LrEntryModal = ({ isOpen, onClose, onSaved }) => {
           </div>
         </div>
       </div>
+      {printId && <SalesPrint invoiceId={printId} onClose={() => setPrintId(null)} />}
     </div>,
     document.body
   );

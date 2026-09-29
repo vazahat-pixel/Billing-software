@@ -6,6 +6,7 @@ import { toast } from '../../store/useToastStore';
 import { SkeletonTable, InlineLoader, ButtonLoader } from '../../components/ui/loaders';
 import { downloadCsv, fmtDate } from '../../utils/reportExport';
 import { openOutstandingScreenPdf } from '../../utils/screenPdf';
+import { reportApi } from '../../api/report.api';
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 
@@ -13,7 +14,7 @@ const money = (n) =>
   (Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const SalesOutstanding = ({ isOpen, onClose, initialPartyId = '', initialType = 'receivable', autoRun = false }) => {
-  const { parties, fetchOutstanding, fetchParties } = useStore();
+  const { parties, fetchParties } = useStore();
   const companyName = useConfigStore(
     (s) => s.companySettings?.legalName || s.companySettings?.shortName || s.company?.name || 'Company'
   );
@@ -50,16 +51,38 @@ const SalesOutstanding = ({ isOpen, onClose, initialPartyId = '', initialType = 
   }, [isOpen, initialPartyId, initialType, autoRun]);
 
   const handleGeneratePreview = async (partyOverride, typeOverride) => {
-    const pid = partyOverride !== undefined ? partyOverride : partyId;
+    // A click handler passes the event as the first argument. Only a real party id counts.
+    const pid = typeof partyOverride === 'string' ? partyOverride : partyId;
     const kind = typeOverride || osType;
     setLoading(true);
     setExpanded({});
     try {
-      const data = await fetchOutstanding(kind, asOn);
-      let rows = Array.isArray(data) ? data : [];
+      // Bill list comes from posted purchase/sales less payments and returns.
+      // A bill whose balance is already zero is left out of that list.
+      const data = await reportApi.outstanding({ type: kind, asOn: asOn || '' });
+      let rows = (Array.isArray(data) ? data : []).map((r) => ({
+        ...r,
+        bills: (r.bills || r.invoices || []).map((b) => ({
+          ...b,
+          billNo: b.billNo || b.docNo,
+          billDate: b.billDate || b.date,
+          outstanding: Number(b.outstanding || 0),
+          followUpStatus: b.followUpStatus || (Number(b.paid) > 0.01 ? 'Partial' : 'Pending'),
+        })),
+      }));
       if (pid) {
         rows = rows.filter((r) => String(r.partyId) === String(pid));
       }
+      rows = rows
+        .map((r) => ({
+          ...r,
+          bills: (r.bills || []).filter((b) => Number(b.outstanding || 0) > 0.01),
+        }))
+        .filter((r) => (r.bills || []).length > 0)
+        .map((r) => ({
+          ...r,
+          totalOutstanding: (r.bills || []).reduce((s, b) => s + Number(b.outstanding || 0), 0),
+        }));
       if (!showZero) {
         rows = rows.filter((r) => Number(r.totalOutstanding || 0) > 0.01);
       }

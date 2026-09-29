@@ -119,41 +119,86 @@ class LedgerEngineService {
       for (const d of docs) map[String(d._id)] = pick(d);
     };
 
-    const load = async (refTypes, modelName, pick, fields) => {
+    const load = async (refTypes, modelName, pick, fields, populate) => {
       const ids = refTypes.flatMap((t) => idsByType[t] || []);
       if (!ids.length) return;
       const Model = require(`../models/${modelName}`);
-      const docs = await Model.find({ _id: { $in: ids }, companyId }).select(fields).lean();
+      let query = Model.find({ _id: { $in: ids }, companyId }).select(fields);
+      if (populate) query = query.populate(populate);
+      const docs = await query.lean();
       collect(docs, pick);
     };
 
     await Promise.all([
-      // Payment/Receipt: store raw bill numbers in remarks (no prefix — frontend adds it per-row)
+      // Bank/Cash voucher: remark names the bank and the bills it settled.
+      // The voucher number already sits in Bill/VNo, so it is not repeated here.
       load(['Payment', 'Receipt'], 'PaymentVoucher',
         (d) => {
-          const billNos = (d.againstInvoices || []).map((x) => x.invoiceNo).filter(Boolean).join(', ');
+          const bankName = d.bankLedgerId?.name || d.bookName || '';
+          const fromLines = (d.againstInvoices || []).map((x) => x.invoiceNo).filter(Boolean);
+          // Bill series is PUR-2026-27-0008 (4-digit year) as well as PR-26-27-0007.
+          const fromNote = String(d.narration || d.remark2 || '').match(/[A-Z]{1,6}-\d{2,4}-\d{2}-\d+/gi) || [];
+          const ownNo = String(d.voucherNo || '').toUpperCase();
+          const billNos = [...new Set([...fromLines, ...fromNote].map((n) => String(n).toUpperCase()))]
+            .filter((n) => n && n !== ownNo)
+            .join(', ');
+          const onAccount = String(d.accBill || '').toUpperCase() === 'A' || !billNos;
+          let remarks = bankName;
+          if (billNos) remarks = bankName ? `${bankName} · ${billNos}` : billNos;
+          else if (onAccount) remarks = bankName ? `${bankName} · On Account` : 'On Account';
           return {
             docNo: d.voucherNo,
             chequeNo: d.chequeNo || '',
-            // raw bill nos — frontend formats as "Bill No.:<nos>" for Payment/Receipt rows
-            remarks: billNos || d.narration || d.remark2 || '',
+            remarks,
             accBill: d.accBill || 'B',
             scCode: d.scCode || 'SCC',
           };
         },
-        'voucherNo chequeNo narration remark2 againstInvoices accBill scCode'),
-      // Sales: remark = just the invoice number; description will be SALES BOOK
+        'voucherNo chequeNo narration remark2 againstInvoices accBill scCode bookName',
+        { path: 'bankLedgerId', select: 'name' }),
+      // Sales / Purchase: bill number is already Bill/VNo. Remark only if the operator typed one.
       load(['SalesInvoice'], 'Sales',
-        (d) => ({ docNo: d.invoiceNo, remarks: d.invoiceNo || d.narration || '', accBill: 'B', scCode: 'SCC' }),
+        (d) => {
+          const note = String(d.narration || d.remarks || '').trim();
+          return {
+            docNo: d.invoiceNo,
+            remarks: note && note !== String(d.invoiceNo || '') ? note : '',
+            accBill: 'B',
+            scCode: 'SCC',
+          };
+        },
         'invoiceNo narration remarks'),
-      // Purchase: remark = just the invoice number; description will be PURCHASE BOOK
       load(['PurchaseBill'], 'Purchase',
-        (d) => ({ docNo: d.invoiceNo, remarks: d.invoiceNo || d.narration || '', accBill: 'B', scCode: 'SCC' }),
+        (d) => {
+          const note = String(d.narration || d.remarks || '').trim();
+          return {
+            docNo: d.invoiceNo,
+            remarks: note && note !== String(d.invoiceNo || '') ? note : '',
+            accBill: 'B',
+            scCode: 'SCC',
+          };
+        },
         'invoiceNo narration remarks'),
-      // Credit/Debit notes: remark = note number
+      // A return's remark names the original bill it came off.
+      load(['SalesReturn', 'PurchaseReturn'], 'ReturnInvoice',
+        (d) => ({
+          docNo: d.invoiceNo,
+          remarks: d.originalInvoiceNo ? `Return of ${d.originalInvoiceNo}` : (d.remarks || ''),
+          accBill: 'B',
+          scCode: 'SCC',
+        }),
+        'invoiceNo originalInvoiceNo remarks'),
       load(['DebitNote', 'CreditNote'], 'DebitCreditNote',
-        (d) => ({ docNo: d.vNo || d.noteNo, remarks: d.vNo || d.noteNo || d.reason || d.narration || '', accBill: 'B', scCode: 'SCC' }),
-        'vNo noteNo noteType reason narration'),
+        (d) => {
+          const against = d.againstInvoiceNo || d.billNo || '';
+          return {
+            docNo: d.vNo || d.noteNo,
+            remarks: against ? `Against ${against}` : (d.reason || ''),
+            accBill: 'B',
+            scCode: 'SCC',
+          };
+        },
+        'vNo noteNo noteType reason narration billNo againstInvoiceNo'),
       // Job Work / Mill Charges / Receive / Issue: docNo = billGpNo / challanNo / jobCardNo
       load(['JobWorkCharges', 'JobReceive', 'JobIssue'], 'Job',
         (d) => ({

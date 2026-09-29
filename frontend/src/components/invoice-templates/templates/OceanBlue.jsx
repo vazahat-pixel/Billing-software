@@ -155,9 +155,6 @@ export default function OceanBlue({ data }) {
             <th style={{ width: '7%' }}>Meters</th>
             <th style={{ width: '5%' }}>Unit</th>
             <th style={{ width: '8%' }}>Rate</th>
-            <th style={{ width: '5%' }}>Disc.%</th>
-            <th style={{ width: '10%' }}>Taxable</th>
-            <th style={{ width: '5%' }}>GST%</th>
             <th style={{ width: '10%' }}>Amount</th>
           </tr>
         </thead>
@@ -180,17 +177,14 @@ export default function OceanBlue({ data }) {
               <td className="ob-ctr">{line.cut || '—'}</td>
               <td className="ob-num">{line.pcs || ''}</td>
               <td className="ob-num">{line.mts ? fmt.num(line.mts) : ''}</td>
-              <td className="ob-ctr">{line.unit}</td>
+              <td className="ob-ctr">{line.rateOn || 'Met'}</td>
               <td className="ob-num">{money(line.rate)}</td>
-              <td className="ob-ctr">{line.dis1Per ? `${line.dis1Per}%` : '—'}</td>
-              <td className="ob-num">{money(line.taxable)}</td>
-              <td className="ob-ctr">{line.gstPer ? `${line.gstPer}%` : '—'}</td>
-              <td className="ob-num" style={{ fontWeight: 700, color: BLUE }}>{money(line.total)}</td>
+              <td className="ob-num" style={{ fontWeight: 700, color: BLUE }}>{money(line.amount)}</td>
             </tr>
           ))}
           {Array.from({ length: Math.max(0, 5 - (lines || []).length) }).map((_, i) => (
             <tr key={`e${i}`}>
-              {Array.from({ length: 13 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
+              {Array.from({ length: 10 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
             </tr>
           ))}
         </tbody>
@@ -199,9 +193,7 @@ export default function OceanBlue({ data }) {
             <td colSpan={5} className="ob-ctr">TOTAL</td>
             <td className="ob-num">{totalPcs || ''}</td>
             <td className="ob-num">{totalMts ? fmt.num(totalMts) : ''}</td>
-            <td colSpan={3}>&nbsp;</td>
-            <td className="ob-num">{money(totals.taxable)}</td>
-            <td>&nbsp;</td>
+            <td colSpan={2}>&nbsp;</td>
             <td className="ob-num" style={{ fontSize: '9pt' }}>₹ {money(totals.grandTotal)}</td>
           </tr>
         </tfoot>

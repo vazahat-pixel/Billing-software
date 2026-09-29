@@ -228,7 +228,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
         <>
           <button type="button" className="erp-btn erp-btn-secondary" disabled={saving} onClick={() => { setEditId(null); setFormData(emptyForm()); }}>Clear</button>
           <button type="button" className="erp-btn erp-btn-secondary" disabled={saving} onClick={onClose}>Cancel</button>
-          <button type="button" className="erp-btn erp-btn-primary" disabled={saving} onClick={handleSave}>
+          <button type="button" className="erp-btn erp-btn-primary" disabled={saving} data-enter-save="true" onClick={handleSave}>
             {saving ? 'Saving…' : (editId ? 'Update item' : 'Save item')}
           </button>
         </>
@@ -307,7 +307,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
               )}
               {!readOnly && (
                 <div className="flex gap-2">
-                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onBrowseImage} />
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" tabIndex={-1} data-enter-skip="true" onChange={onBrowseImage} />
                   <button type="button" className="erp-btn erp-btn-secondary h-8 px-3 text-[11px]" onClick={() => fileRef.current?.click()}>
                     Browse Image
                   </button>

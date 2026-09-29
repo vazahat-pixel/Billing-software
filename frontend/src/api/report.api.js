@@ -9,6 +9,7 @@ export const reportApi = {
   outstandingFilterOptions: (params) => unwrap(get('/reports/outstanding/filter-options', params)),
   pl: (params) => unwrap(get('/reports/pl', params)),
   jobwork: (params) => unwrap(get('/reports/jobwork', params)),
+  stockLedger: (params) => unwrap(get('/reports/stock-ledger', params)),
   daily: (params) => unwrap(get('/reports/daily', params)),
   masters: (params) => unwrap(get('/reports/masters', params)),
 };

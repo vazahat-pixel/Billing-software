@@ -10,6 +10,14 @@ const num = (v) => {
 
 const str = (v) => (v != null && String(v).trim() !== '' ? String(v).trim() : null);
 
+/** Rate is charged on this basis — matches the Pcs / Mts / Kgs choice on the bill. */
+export function rateBasisLabel(unit) {
+  const u = String(unit || '').toUpperCase();
+  if (['PCS', 'PC', 'NOS', 'NO'].includes(u)) return 'Pcs';
+  if (u === 'KGS' || u === 'KG') return 'Kgs';
+  return 'Met';
+}
+
 export const COLUMN_DEFS = {
   sno: {
     id: 'sno',
@@ -155,6 +163,14 @@ export const COLUMN_DEFS = {
     align: 'right',
     format: 'money',
     getValue: (line) => line.rate,
+  },
+  rateUnit: {
+    id: 'rateUnit',
+    key: 'rateOn',
+    label: 'Unit',
+    width: '5%',
+    align: 'center',
+    getValue: (line) => line.rateOn || rateBasisLabel(line.unit),
   },
   discount: {
     id: 'discount',
@@ -343,20 +359,19 @@ export const COLUMN_DEFS = {
 
 /** Preset column sets per template / business type */
 export const COLUMN_PRESETS = {
-  standard: ['sno', 'item', 'hsn', 'fold', 'qty', 'rate', 'discount', 'amount'],
-  gstDetailed: ['sno', 'item', 'hsn', 'fold', 'qty', 'rate', 'discount', 'taxable', 'gst', 'gstAmt', 'amount'],
-  /** Surat textile tax invoice — Fold + Disc always printed so every theme matches the bill. */
-  textileClassic: ['sno', 'item', 'hsn', 'fold', 'cut', 'pcs', 'mts', 'netMts', 'rate', 'discount', 'amount'],
+  standard: ['sno', 'item', 'hsn', 'fold', 'qty', 'rate', 'rateUnit', 'amount'],
+  gstDetailed: ['sno', 'item', 'hsn', 'fold', 'qty', 'rate', 'rateUnit', 'amount'],
+  textileClassic: ['sno', 'item', 'hsn', 'fold', 'cut', 'pcs', 'mts', 'netMts', 'rate', 'rateUnit', 'amount'],
   textileSuratFull: [
-    'sno', 'item', 'hsn', 'fold', 'cut', 'pcs', 'mts', 'netMts', 'rate', 'discount', 'amount',
+    'sno', 'item', 'hsn', 'fold', 'cut', 'pcs', 'mts', 'netMts', 'rate', 'rateUnit', 'amount',
   ],
-  textile: ['sno', 'item', 'hsn', 'lot', 'fold', 'cut', 'pcs', 'mts', 'rate', 'discount', 'amount'],
+  textile: ['sno', 'item', 'hsn', 'lot', 'fold', 'cut', 'pcs', 'mts', 'rate', 'rateUnit', 'amount'],
   textileFull: [
     'sno', 'item', 'hsn', 'lot', 'designNo', 'colour', 'fold', 'cut', 'pcs', 'mts',
-    'weight', 'rate', 'discount', 'amount',
+    'weight', 'rate', 'rateUnit', 'amount',
   ],
-  international: ['sno', 'item', 'fold', 'qty', 'rate', 'discount', 'taxable', 'gstAmt', 'amount'],
-  minimal: ['sno', 'item', 'fold', 'qty', 'rate', 'discount', 'amount'],
+  international: ['sno', 'item', 'fold', 'qty', 'rate', 'rateUnit', 'amount'],
+  minimal: ['sno', 'item', 'fold', 'qty', 'rate', 'rateUnit', 'amount'],
 };
 
 const TEMPLATE_PRESETS = {
@@ -374,7 +389,7 @@ const TEMPLATE_PRESETS = {
 export function resolvePrintColumns({ templateId, lines = [], businessType = '', columnIds } = {}) {
   const presetKey = columnIds || TEMPLATE_PRESETS[templateId] || 'standard';
   const preset = COLUMN_PRESETS[presetKey] || COLUMN_PRESETS.standard;
-  const core = new Set(['sno', 'item', 'rate', 'amount', 'qty', 'fold', 'discount']);
+  const core = new Set(['sno', 'item', 'rate', 'rateUnit', 'amount', 'qty', 'fold']);
 
   const isTextile = /textile|fabric|garment|weaving|processing/i.test(businessType || '');
   let ids = [...preset];

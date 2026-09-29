@@ -466,7 +466,7 @@ class SalesService {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const [sales, total] = await Promise.all([
       Sales.find(query)
-        .populate('customerId', 'name gstin state')
+        .populate('customerId', 'name gstin state city station')
         .populate('items.itemId', 'name hsnCode gstRate')
         .sort({ date: -1, createdAt: -1 })
         .skip(skip)

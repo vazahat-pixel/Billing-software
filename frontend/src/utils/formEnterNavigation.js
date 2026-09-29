@@ -1,5 +1,6 @@
 const FOCUSABLE_SELECTOR = [
   'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([disabled]):not([readonly]):not([tabindex="-1"])',
+  'input[data-enter-include]:not([disabled]):not([tabindex="-1"])',
   'input[data-erp-combobox-input]:not([disabled]):not([readonly])',
   'select:not([disabled]):not([tabindex="-1"])',
   'textarea:not([disabled]):not([readonly]):not([tabindex="-1"])',
@@ -57,29 +58,47 @@ export function focusElement(el) {
   }
 }
 
+function nextFocusableAfter(container, currentEl) {
+  const focusable = getFocusableElements(container);
+  const idx = focusable.indexOf(currentEl);
+  if (idx !== -1) return focusable[idx + 1] || null;
+  // Open combobox marks itself data-enter-skip, so the current input is
+  // missing from the list. Still step to the next field after it.
+  for (const el of focusable) {
+    if (currentEl.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) return el;
+  }
+  return null;
+}
+
+export function findEnterSaveButton(container) {
+  if (!container) return null;
+  const host = container.parentElement || container;
+  return host.querySelector('[data-enter-save]:not([disabled])')
+    || container.querySelector('.classic-erp-form-footer button.btn-blue:not([disabled])')
+    || container.querySelector('.erp-bill-action-bar button.btn-blue:not([disabled])');
+}
+
 export function focusNextField(currentEl) {
   const container = findFormContainer(currentEl);
   if (!container) return false;
 
-  const focusable = getFocusableElements(container);
-  const idx = focusable.indexOf(currentEl);
-  if (idx === -1) return false;
-
-  const next = focusable[idx + 1];
+  const next = nextFocusableAfter(container, currentEl);
   if (next) {
     focusElement(next);
     return true;
   }
 
   const form = container.tagName === 'FORM' ? container : container.closest('form');
-  if (form) {
+  if (form && !container.hasAttribute('data-form-enter-nav')) {
     return false;
   }
 
-  const saveBtn = container.querySelector('[data-enter-save]')
-    || container.querySelector('.classic-erp-form-footer button.btn-blue:not([disabled])')
-    || container.querySelector('.erp-modal-footer button.erp-btn-primary:not([disabled])');
+  const saveBtn = findEnterSaveButton(container);
   if (saveBtn && saveBtn !== currentEl) {
+    if (saveBtn.hasAttribute('data-enter-save')) {
+      saveBtn.click();
+      return true;
+    }
     saveBtn.focus();
     return true;
   }

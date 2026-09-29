@@ -18,6 +18,11 @@ export const accountingApi = {
   groupedTrialBalance: (params) => unwrap(get('/accounting/trial-balance/grouped', params)),
   profitLoss: (params) => unwrap(get('/accounting/profit-loss', params)),
   balanceSheet: (params) => unwrap(get('/accounting/balance-sheet', params)),
+  finalHeads: () => unwrap(get('/accounting/reports/final-heads')),
+  groupListReport: (body) => unwrap(post('/accounting/reports/group-list', body)),
+  jsmTrialBalance: (body) => unwrap(post('/accounting/reports/trial-balance', body)),
+  jsmProfitLoss: (body) => unwrap(post('/accounting/reports/profit-loss', body)),
+  jsmBalanceSheet: (body) => unwrap(post('/accounting/reports/balance-sheet', body)),
   outstanding: (params) => unwrap(get('/accounting/outstanding', params)),
   journal: (body) => unwrap(post('/accounting/journal', body)),
   /** Stage 3 financial engine */
