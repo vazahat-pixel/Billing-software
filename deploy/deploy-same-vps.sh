@@ -136,7 +136,8 @@ EOF
 
 echo "==> Backend dependencies + migrate + seed"
 cd "$BACKEND_DIR"
-npm ci || npm install
+rm -rf node_modules
+npm install --omit=dev --legacy-peer-deps
 npm run migrate || true
 node seed.js || true
 
@@ -153,7 +154,8 @@ cd "$FRONTEND_DIR"
 # Empty VITE_API_URL => browser uses relative /api (nginx proxies it)
 rm -f .env.production.local
 printf 'VITE_API_URL=\n' > .env.production.local
-npm ci || npm install
+rm -rf node_modules
+npm install --legacy-peer-deps
 npm run build
 
 mkdir -p "$WEB_ROOT"
