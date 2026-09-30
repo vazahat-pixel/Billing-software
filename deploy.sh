@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Automated 1-Click Deployment Script for Billing Software
+# Automated 1-Click Fast Deployment Script for Billing Software
 # Usage: ./deploy.sh
 # =============================================================================
 set -e
@@ -10,17 +10,17 @@ cd "$SCRIPT_DIR"
 
 echo ""
 echo "=========================================="
-echo "🚀 STARTING AUTOMATED DEPLOYMENT"
+echo "🚀 STARTING FAST AUTOMATED DEPLOYMENT"
 echo "=========================================="
 echo ""
 
 # 1. Pull Latest Code
-echo "📥 [1/5] Pulling latest code from GitHub..."
+echo "📥 [1/4] Pulling latest code from GitHub..."
 git pull origin main
 
 # 2. Backend Check & Restart
 echo ""
-echo "⚙️  [2/5] Updating & Restarting Backend..."
+echo "⚙️  [2/4] Updating & Restarting Backend..."
 cd "$SCRIPT_DIR/backend"
 if [ ! -d "node_modules" ]; then
   echo "Installing backend dependencies..."
@@ -38,38 +38,26 @@ else
   echo "⚠️ PM2 not found, skipping PM2 restart."
 fi
 
-# 3. Frontend Build
+# 3. Deploy Frontend (Pre-built, 0 npm install needed on VPS!)
 echo ""
-echo "🎨 [3/5] Building Frontend..."
-cd "$SCRIPT_DIR/frontend"
+echo "📦 [3/4] Deploying Frontend to /var/www/billing-frontend/..."
+mkdir -p /var/www/billing-frontend
 
-# If vite is missing or node_modules broken, install cleanly
-if [ ! -f "node_modules/.bin/vite" ]; then
-  echo "Vite missing in node_modules, installing dependencies..."
-  rm -rf node_modules package-lock.json
-  if ! npm install --legacy-peer-deps; then
-    echo ""
-    echo "⚠️ npm install encountered an error. Checking last npm log:"
-    LATEST_LOG=$(ls -t /root/.npm/_logs/*-debug-0.log 2>/dev/null | head -n 1 || true)
-    if [ -n "$LATEST_LOG" ]; then
-      tail -n 35 "$LATEST_LOG"
-    fi
-    exit 1
-  fi
+if [ -d "$SCRIPT_DIR/frontend/dist" ] && [ -f "$SCRIPT_DIR/frontend/dist/index.html" ]; then
+  echo "Found pre-built frontend bundle. Deploying instantly..."
+  rm -rf /var/www/billing-frontend/*
+  cp -a "$SCRIPT_DIR/frontend/dist/." /var/www/billing-frontend/
+else
+  echo "Building frontend bundle on server..."
+  cd "$SCRIPT_DIR/frontend"
+  npm run build
+  rm -rf /var/www/billing-frontend/*
+  cp -a dist/. /var/www/billing-frontend/
 fi
 
-npm run build
-
-# 4. Copy to Web Root
+# 4. Reload Nginx
 echo ""
-echo "📦 [4/5] Deploying build to /var/www/billing-frontend/..."
-mkdir -p /var/www/billing-frontend
-rm -rf /var/www/billing-frontend/*
-cp -a dist/. /var/www/billing-frontend/
-
-# 5. Reload Nginx
-echo ""
-echo "🔄 [5/5] Reloading Nginx Web Server..."
+echo "🔄 [4/4] Reloading Nginx Web Server..."
 if command -v systemctl >/dev/null 2>&1; then
   systemctl reload nginx || true
 elif command -v service >/dev/null 2>&1; then
@@ -78,7 +66,7 @@ fi
 
 echo ""
 echo "=========================================="
-echo "✅ DEPLOYMENT COMPLETED SUCCESSFULLY!"
+echo "✅ DEPLOYMENT COMPLETED SUCCESSFULLY in seconds!"
 echo "🌐 URL: https://app.dealingindia.com"
 echo "=========================================="
 echo ""
