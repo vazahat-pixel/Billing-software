@@ -45,9 +45,17 @@ cd "$SCRIPT_DIR/frontend"
 
 # If vite is missing or node_modules broken, install cleanly
 if [ ! -f "node_modules/.bin/vite" ]; then
-  echo "Vite missing in node_modules, installing cleanly..."
+  echo "Vite missing in node_modules, installing dependencies..."
   rm -rf node_modules package-lock.json
-  npm install --legacy-peer-deps --no-audit --no-fund
+  if ! npm install --legacy-peer-deps; then
+    echo ""
+    echo "⚠️ npm install encountered an error. Checking last npm log:"
+    LATEST_LOG=$(ls -t /root/.npm/_logs/*-debug-0.log 2>/dev/null | head -n 1 || true)
+    if [ -n "$LATEST_LOG" ]; then
+      tail -n 35 "$LATEST_LOG"
+    fi
+    exit 1
+  fi
 fi
 
 npm run build
