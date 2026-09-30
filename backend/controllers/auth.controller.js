@@ -62,22 +62,30 @@ exports.getMe = async (req, res) => {
         let moduleConfig = null;
         let settings = null;
 
-        let resolvedCompanyId = user.companyId;
+        let resolvedCompanyId = req.companyId || user.companyId;
         if (user.role === 'user' && user.companyId) {
-            const company = await Company.findById(user.companyId).populate('planId');
-            planFeatures = company?.planId?.features || null;
-            companyInfo = company ? { name: company.name, status: company.status } : null;
+            const home = await Company.findById(user.companyId).populate('planId');
+            planFeatures = home?.planId?.features || null;
+            const company = String(resolvedCompanyId) === String(user.companyId)
+                ? home
+                : await Company.findById(resolvedCompanyId);
+            companyInfo = company ? {
+                name: company.name,
+                status: company.status,
+                coCode: company.coCode || '',
+                groupCode: company.groupCode || '',
+            } : null;
 
-            moduleConfig = await CompanyModuleConfig.findOne({ companyId: user.companyId });
-            if (!moduleConfig) {
+            moduleConfig = await CompanyModuleConfig.findOne({ companyId: resolvedCompanyId });
+            if (!moduleConfig && String(resolvedCompanyId) === String(user.companyId)) {
                 moduleConfig = await CompanyModuleConfig.create({ companyId: user.companyId });
             }
 
-            settings = await CompanySettings.findOne({ companyId: user.companyId });
-            if (!settings) {
+            settings = await CompanySettings.findOne({ companyId: resolvedCompanyId });
+            if (!settings && home && String(resolvedCompanyId) === String(user.companyId)) {
                 settings = await CompanySettings.create({
                     companyId: user.companyId,
-                    legalName: company.name
+                    legalName: home.name
                 });
             }
         } else if (user.role === 'super_admin') {
@@ -198,6 +206,58 @@ exports.changePassword = async (req, res) => {
         res.status(200).json({ message: 'Password updated', mustChangePassword: false });
     } catch (err) {
         res.status(400).json({ message: err.message });
+    }
+};
+
+exports.listCompanies = async (req, res) => {
+    try {
+        const companyGroupService = require('../services/companyGroupService');
+        const data = await companyGroupService.listForUser(req.user);
+        res.status(200).json({ success: true, data });
+    } catch (err) {
+        res.status(err.statusCode || 400).json({ success: false, message: err.message });
+    }
+};
+
+exports.createCompany = async (req, res) => {
+    try {
+        const companyGroupService = require('../services/companyGroupService');
+        const data = await companyGroupService.createSibling(req.user, req.body || {});
+        res.status(201).json({ success: true, data });
+    } catch (err) {
+        res.status(err.statusCode || 400).json({ success: false, message: err.message });
+    }
+};
+
+exports.switchCompany = async (req, res) => {
+    try {
+        const companyGroupService = require('../services/companyGroupService');
+        const data = await companyGroupService.switchCompany(req.user, req.body?.companyId, req.sessionId);
+        res.status(200).json({ success: true, data });
+    } catch (err) {
+        res.status(err.statusCode || 400).json({ success: false, message: err.message });
+    }
+};
+
+exports.updateCompany = async (req, res) => {
+    try {
+        const companyGroupService = require('../services/companyGroupService');
+        const targetId = req.params?.id || req.body?.companyId || req.body?.id || req.companyId;
+        const data = await companyGroupService.updateCompany(req.user, targetId, req.body || {});
+        res.status(200).json({ success: true, data });
+    } catch (err) {
+        res.status(err.statusCode || 400).json({ success: false, message: err.message });
+    }
+};
+
+exports.deleteCompany = async (req, res) => {
+    try {
+        const companyGroupService = require('../services/companyGroupService');
+        const targetId = req.params?.id || req.body?.companyId || req.body?.id;
+        const data = await companyGroupService.deleteCompany(req.user, targetId);
+        res.status(200).json({ success: true, data });
+    } catch (err) {
+        res.status(err.statusCode || 400).json({ success: false, message: err.message });
     }
 };
 

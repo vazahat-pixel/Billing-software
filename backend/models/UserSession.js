@@ -6,6 +6,7 @@ const { enterpriseIntegrityPlugin } = require('./mixins/enterpriseMetaSchema');
  */
 const UserSessionSchema = new mongoose.Schema({
   companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', default: null, index: true },
+  activeCompanyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', default: null },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   sessionId: { type: String, required: true, unique: true, index: true },
   refreshTokenHash: { type: String, required: true, select: false },

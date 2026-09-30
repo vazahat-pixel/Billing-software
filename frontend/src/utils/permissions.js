@@ -36,7 +36,7 @@ export const getPermissions = (companyRole = 'owner', systemRole = 'user') => {
 
   const sectionAccess = {
     owner: ALL_SECTIONS,
-    admin: ALL_SECTIONS.filter(s => s !== 'Company'),
+    admin: ALL_SECTIONS,
     accountant: ['Master', 'Transaction', 'Inventory', 'GST / Tax', 'Records', 'Reports', 'Others Reports', 'Ledger'],
     sales: ['Transaction', 'Inventory', 'Records', 'Reports', 'Others Reports'],
     viewer: ['Records', 'Reports', 'Others Reports', 'Ledger']

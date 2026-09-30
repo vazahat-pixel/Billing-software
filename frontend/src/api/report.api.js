@@ -1,4 +1,4 @@
-import { get, unwrap } from './http';
+import { get, post, unwrap } from './http';
 
 export const reportApi = {
   bundle: (params) => unwrap(get('/reports/bundle', params)),
@@ -12,6 +12,12 @@ export const reportApi = {
   stockLedger: (params) => unwrap(get('/reports/stock-ledger', params)),
   daily: (params) => unwrap(get('/reports/daily', params)),
   masters: (params) => unwrap(get('/reports/masters', params)),
+  ledgerInterest: (params) => unwrap(get('/reports/ledger-interest', params)),
+  confirmation: (params) => unwrap(get('/reports/confirmation', params)),
+  aboveBelow: (params) => unwrap(get('/reports/above-below', params)),
+  diffOpening: (params) => unwrap(get('/reports/diff-opening', params)),
+  diffYear: (params) => unwrap(get('/reports/diff-ledger', params)),
+  importBank: (body) => unwrap(post('/reports/import-bank', body)),
 };
 
 /** @deprecated alias */

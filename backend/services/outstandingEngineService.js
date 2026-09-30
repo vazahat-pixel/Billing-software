@@ -241,7 +241,9 @@ class OutstandingEngineService {
     }
 
     const partyIds = Object.keys(byParty);
-    const parties = await Party.find({ _id: { $in: partyIds }, companyId }).lean();
+    const companyGroupService = require('./companyGroupService');
+    const masterCompanyId = await companyGroupService.masterId(companyId);
+    const parties = await Party.find({ _id: { $in: partyIds }, companyId: { $in: [companyId, masterCompanyId] } }).lean();
     const partyMap = {};
     parties.forEach((p) => { partyMap[p._id.toString()] = p; });
 

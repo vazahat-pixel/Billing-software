@@ -28,6 +28,7 @@ const integrityRoutes = require('./integrity.routes');
 const warehouseRoutes = require('./warehouse.routes');
 const mastersRoutes = require('./masters.routes');
 const authMiddleware = require('../middlewares/auth.middleware');
+const masterScope = require('../middlewares/masterScope.middleware');
 const subscriptionMiddleware = require('../middlewares/subscription.middleware');
 const companyIsolationMiddleware = require('../middlewares/companyIsolation.middleware');
 const { requireModule, blockWritesWhenReadOnly } = require('../middlewares/moduleGate.middleware');
@@ -89,11 +90,11 @@ router.use('/sync', require('./sync.routes'));
 
 // --- Masters: the shell of the product, shipped with every plan -------------
 router.use('/masters', requireModule('masters'), mastersRoutes);
-router.use('/parties', requireModule('masters'), partyRoutes);
-router.use('/items', requireModule('masters'), itemRoutes);
-router.use('/books', requireModule('masters'), bookRoutes);
-router.use('/submasters', requireModule('masters'), subMasterRoutes);
-router.use('/warehouses', requireModule('masters'), warehouseRoutes);
+router.use('/parties', requireModule('masters'), masterScope, partyRoutes);
+router.use('/items', requireModule('masters'), masterScope, itemRoutes);
+router.use('/books', requireModule('masters'), masterScope, bookRoutes);
+router.use('/submasters', requireModule('masters'), masterScope, subMasterRoutes);
+router.use('/warehouses', requireModule('masters'), masterScope, warehouseRoutes);
 
 // --- Sellable modules -------------------------------------------------------
 router.use('/sales', requireModule('sales'), salesRoutes);

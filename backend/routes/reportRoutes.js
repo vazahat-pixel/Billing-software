@@ -16,5 +16,11 @@ router.get('/jobwork', reportController.getJobWorkReport);
 router.get('/stock-ledger', reportController.getStockLedger);
 router.get('/daily', reportController.getDailyTransactions);
 router.get('/masters', reportController.getMasterSummary);
+router.get('/ledger-interest', reportController.getLedgerInterest);
+router.get('/confirmation', reportController.getConfirmation);
+router.get('/above-below', reportController.getAboveBelow);
+router.get('/diff-opening', reportController.getDiffOpening);
+router.get('/diff-ledger', reportController.getDiffYear);
+router.post('/import-bank', reportController.postImportBank);
 
 module.exports = router;

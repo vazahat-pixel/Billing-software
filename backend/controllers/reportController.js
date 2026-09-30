@@ -1,4 +1,5 @@
 const reportService = require('../services/reportService');
+const fasCheckReportService = require('../services/fasCheckReportService');
 
 const companyId = (req) => req.companyId || req.query.companyId;
 
@@ -140,3 +141,19 @@ exports.getReportBundle = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+const sendCheck = (fn) => async (req, res) => {
+  try {
+    const data = await fn(req);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getLedgerInterest = sendCheck((req) => fasCheckReportService.ledgerInterest(companyId(req), req.query));
+exports.getConfirmation = sendCheck((req) => fasCheckReportService.confirmation(companyId(req), req.query));
+exports.getAboveBelow = sendCheck((req) => fasCheckReportService.aboveBelow(companyId(req), req.query));
+exports.getDiffOpening = sendCheck((req) => fasCheckReportService.diffOpening(companyId(req), req.query));
+exports.getDiffYear = sendCheck((req) => fasCheckReportService.diffYear(companyId(req), req.query));
+exports.postImportBank = sendCheck((req) => fasCheckReportService.importBank(companyId(req), req.body || {}));

@@ -168,7 +168,20 @@ class SessionService {
     if (meta.ip) session.ip = meta.ip;
     await session.save();
 
-    const accessToken = this.signAccess(user, session.sessionId);
+    const companyGroupService = require('./companyGroupService');
+    const scope = await companyGroupService.resolveAccess(user, session.activeCompanyId || user.companyId);
+    const accessToken = jwt.sign(
+      {
+        id: user._id,
+        role: user.role,
+        companyId: scope.companyId,
+        masterCompanyId: scope.masterCompanyId,
+        sid: session.sessionId,
+        typ: 'access',
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: this.accessTtl() }
+    );
     await this.recordLogin(user, 'refresh', req, { sessionId: session.sessionId, success: true });
 
     return {

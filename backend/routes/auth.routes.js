@@ -12,6 +12,12 @@ router.get('/me', authMiddleware, authController.getMe);
 router.post('/change-password', authMiddleware, authController.changePassword);
 router.post('/logout', authMiddleware, authController.logout);
 router.post('/logout-all', authMiddleware, authController.logoutAll);
+router.get('/companies', authMiddleware, authController.listCompanies);
+router.post('/companies', authMiddleware, authController.createCompany);
+router.post('/switch-company', authMiddleware, authController.switchCompany);
+router.put('/company', authMiddleware, authController.updateCompany);
+router.put('/companies/:id', authMiddleware, authController.updateCompany);
+router.delete('/companies/:id', authMiddleware, authController.deleteCompany);
 
 // Prevent unmatched /auth/* from falling through to global authMiddleware
 router.use((req, res) => {

@@ -53,8 +53,16 @@ const authMiddleware = async (req, res, next) => {
     }
 
     req.user = user;
-    req.companyId = user.companyId;
     req.branchId = req.headers['x-branch-id'] || null;
+    if (user.role !== 'super_admin' && user.companyId) {
+      const companyGroupService = require('../services/companyGroupService');
+      const scope = await companyGroupService.resolveAccess(user, decoded.companyId);
+      req.companyId = scope.companyId;
+      req.masterCompanyId = scope.masterCompanyId;
+    } else {
+      req.companyId = user.companyId;
+      req.masterCompanyId = user.companyId || null;
+    }
 
     // Super admin without a company of their own selects a tenant with
     // X-Company-Id. Reads may fall back to the oldest company for convenience;
@@ -89,6 +97,7 @@ const authMiddleware = async (req, res, next) => {
         if (!fallback) fallback = await Company.findOne().sort({ createdAt: 1 });
         if (fallback) {
           req.companyId = fallback._id;
+          req.masterCompanyId = fallback.masterCompanyId || fallback._id;
           req.superAdminTenant = true;
           req.superAdminFallback = true;
           logger.warn('Super-admin read using fallback oldest company — send X-Company-Id header', {

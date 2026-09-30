@@ -83,7 +83,8 @@ class FinancialReportsService {
     )];
     const partiesById = new Map();
     if (partyIds.length) {
-      const parties = await Party.find({ _id: { $in: partyIds }, companyId }).select('type city state').lean();
+      const masterCompanyId = await require('./companyGroupService').masterId(companyId);
+    const parties = await Party.find({ _id: { $in: partyIds }, companyId: masterCompanyId }).select('type city state').lean();
       parties.forEach((p) => partiesById.set(String(p._id), p));
     }
 
@@ -341,7 +342,8 @@ class FinancialReportsService {
     )];
     const partiesById = new Map();
     if (partyIds.length) {
-      const parties = await Party.find({ _id: { $in: partyIds }, companyId })
+      const masterCompanyId = await require('./companyGroupService').masterId(companyId);
+      const parties = await Party.find({ _id: { $in: partyIds }, companyId: masterCompanyId })
         .select('type city state address pan name')
         .lean();
       parties.forEach((p) => partiesById.set(String(p._id), p));
@@ -376,7 +378,8 @@ class FinancialReportsService {
     const partyIds = [...new Set(ledgers.map((l) => l.linkedPartyId).filter(Boolean).map(String))];
     const partiesById = new Map();
     if (partyIds.length) {
-      const parties = await Party.find({ _id: { $in: partyIds }, companyId }).select('type').lean();
+      const masterCompanyId = await require('./companyGroupService').masterId(companyId);
+      const parties = await Party.find({ _id: { $in: partyIds }, companyId: masterCompanyId }).select('type').lean();
       parties.forEach((p) => partiesById.set(String(p._id), p));
     }
     const accounts = ledgers.map((l) => {

@@ -70,6 +70,9 @@ import OutstandingReportModal from './reports/OutstandingReportModal';
 import SystemUtilitiesModal from './utilities/SystemUtilitiesModal';
 import TrialBalanceModal from './accounting/TrialBalanceModal';
 import FinalReportsModal from './reports/FinalReportsModal';
+import FasCheckReportsModal from './reports/FasCheckReportsModal';
+import CompanySwitchModal from './company/CompanySwitchModal';
+import CompanyMasterModal from './company/CompanyMasterModal';
 import StockLedgerModal from './reports/StockLedgerModal';
 
 // Rare / heavy screens — lazy OK
@@ -311,6 +314,10 @@ const Dashboard = () => {
 
    const isMenuItemAllowed = (item) => {
       if (user?.role === 'super_admin') return true;
+      const rawLabel = String(item?.label || '');
+      if (rawLabel.startsWith('Change Company') || rawLabel.startsWith('Change Year') || rawLabel === 'Company Master' || rawLabel === 'Information') {
+         return true;
+      }
       // Nested report folders stay visible; leaf gating happens inside runner / plan modules
       if (Array.isArray(item?.children) && item.children.length > 0) return true;
 
@@ -374,6 +381,7 @@ const Dashboard = () => {
    const [salesInitialData, setSalesInitialData] = useState(null);
    const [voucherInitialId, setVoucherInitialId] = useState(null);
    const [finalReportKind, setFinalReportKind] = useState('groupList');
+   const [fasCheckKind, setFasCheckKind] = useState('interest');
    const [stockLedgerKind, setStockLedgerKind] = useState('stockMts');
    const [noteInitialId, setNoteInitialId] = useState(null);
    const [outstandingSeed, setOutstandingSeed] = useState(null);
@@ -429,6 +437,8 @@ const Dashboard = () => {
       systemUtilities: false,
       zTrial: false,
       finalReport: false,
+      fasCheck: false,
+      companySwitch: false,
       stockLedger: false,
       issueMultiple: false,
       lotNoEntry: false,
@@ -734,6 +744,15 @@ const Dashboard = () => {
       openReportsHub('summary', leafId);
    };
 
+   const [companyPanel, setCompanyPanel] = useState('list');
+   const openCompanyPanel = (panel) => {
+      setCompanyPanel(panel);
+      if (panel === 'master' || panel === 'new') {
+         setModals((prev) => ({ ...prev, companyMaster: true }));
+      } else {
+         setModals((prev) => ({ ...prev, companySwitch: true }));
+      }
+   };
    const shellOpen = Object.values(modals).some((v) => v === true) || bookSelection.isOpen || syncModalOpen;
    useEffect(() => {
       if (isCaUser) toggleModal('caDashboard', true);
@@ -749,6 +768,11 @@ const Dashboard = () => {
          if (ctrl && !e.altKey && !e.shiftKey && key === 's') {
             e.preventDefault();
             toggleModal('sales', true);
+            return;
+         }
+         if (!ctrl && !e.altKey && !e.shiftKey && (e.key === 'F2' || e.key === 'F3')) {
+            e.preventDefault();
+            openCompanyPanel(e.key === 'F2' ? 'year' : 'list');
             return;
          }
          if (!e.altKey || ctrl || e.shiftKey) return;
@@ -1005,6 +1029,9 @@ const Dashboard = () => {
                else if (ext === 'finalReport') {
                   setFinalReportKind(node.reportKind || 'groupList');
                   setModals((prev) => ({ ...prev, finalReport: true }));
+               } else if (ext === 'fasCheck') {
+                  setFasCheckKind(node?.reportKind || 'interest');
+                  setModals((prev) => ({ ...prev, fasCheck: true }));
                } else if (ext === 'stockLedger') {
                   setStockLedgerKind(node.reportKind || 'stockMts');
                   setModals((prev) => ({ ...prev, stockLedger: true }));
@@ -1076,8 +1103,10 @@ const Dashboard = () => {
          { label: 'Item Records', action: () => openRecordsHub('items') }
       ] : [],
       Company: [
-         { label: 'Company Master', action: () => openSettings('company') },
-         { label: 'Information', action: () => toast.info('Textile ERP — use Setup → Setting for company GSTIN, bank & print.') },
+         { label: 'Change Company  F3', action: () => openCompanyPanel('list') },
+         { label: 'Change Year  F2', action: () => openCompanyPanel('year') },
+         { label: 'Company Master', action: () => openCompanyPanel('master') },
+         { label: 'Information', action: () => openCompanyPanel('info') },
       ]
    };
 
@@ -1098,8 +1127,15 @@ const Dashboard = () => {
             }
          }
       });
+      const companyItems = (menuData.Company || []).filter(isMenuItemAllowed);
+      if (companyItems.length) filtered.Company = companyItems;
       return filtered;
    }, [permissions, moduleConfig, bundle, user?.role, showRecordsHub]);
+
+   const menuSections = useMemo(() => {
+      const keys = Object.keys(visibleMenuData);
+      return visibleMenuData.Company ? ['Company', ...keys.filter((key) => key !== 'Company')] : keys;
+   }, [visibleMenuData]);
 
    const ALL_CORE_MODULES = [
       { id: 1, label: 'Sales Billing', icon: faFileInvoiceDollar, key: 'sales' },
@@ -1137,6 +1173,16 @@ const Dashboard = () => {
          {/* Core modules — compact rail */}
          <aside className="erp-rail flex flex-col py-2 gap-0.5 shrink-0 overflow-y-auto no-scrollbar">
             <p className="px-3 py-1.5 text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider shrink-0" title="F9 focuses this list. Up and Down move. Enter opens.">Quick · F9</p>
+            {!isCaUser && (
+               <button
+                  type="button"
+                  onClick={() => openCompanyPanel('list')}
+                  className="w-[calc(100%-0.5rem)] mx-1 flex items-center gap-2 h-8 px-2 rounded-lg text-left text-[var(--accent)] bg-[var(--accent-light)] hover:bg-[var(--accent)] hover:text-white"
+                  title="Change Company, year, and licence"
+               >
+                  <span className="text-[11px] font-semibold truncate leading-tight">Company</span>
+               </button>
+            )}
             {coreModules.map((mod) => (
                <button
                   key={mod.id}
@@ -1210,9 +1256,17 @@ const Dashboard = () => {
                      <div className="w-5 h-5 rounded bg-[var(--accent)] text-white flex items-center justify-center font-semibold text-[10px] shrink-0">
                         {(user?.companyName || user?.company?.name || companySettings?.legalName || companySettings?.shortName || companyMeta?.name || 'C').charAt(0)}
                      </div>
-                     <p className="text-[11px] font-semibold text-[var(--text-primary)] truncate leading-none">
-                        {user?.companyName || user?.company?.name || companySettings?.legalName || companySettings?.shortName || companyMeta?.name || 'Company'}
-                     </p>
+                     <button
+                        type="button"
+                        onClick={() => openCompanyPanel('list')}
+                        className="min-w-0 text-left"
+                        title="Change Company (F3)"
+                     >
+                        <p className="text-[11px] font-semibold text-[var(--text-primary)] truncate leading-none">
+                           {user?.companyName || user?.company?.name || companySettings?.legalName || companySettings?.shortName || companyMeta?.name || 'Company'}
+                        </p>
+                        <p className="text-[9px] font-semibold text-[var(--accent)] leading-none">Change company · F3</p>
+                     </button>
                   </div>
 
                   {!isCaUser && <div className="hidden md:flex flex-1 max-w-xs mx-2">
@@ -1277,7 +1331,7 @@ const Dashboard = () => {
                </div>
 
                {!isCaUser && <div ref={menuBarRef} className="erp-menu-bar select-none">
-                  {Object.keys(visibleMenuData).map((section) => {
+                  {menuSections.map((section) => {
                      const isOpen = openMenuSection === section;
                      return (
                      <div key={section} className="relative shrink-0">
@@ -1772,6 +1826,28 @@ const Dashboard = () => {
                onClose={() => setModals(prev => ({ ...prev, finalReport: false }))}
             />
          )}
+         {modals.fasCheck && (
+            <FasCheckReportsModal
+               key={fasCheckKind}
+               isOpen
+               kind={fasCheckKind}
+               onClose={() => setModals(prev => ({ ...prev, fasCheck: false }))}
+            />
+         )}
+         {modals.companySwitch && (
+            <CompanySwitchModal
+               isOpen
+               panel={companyPanel}
+               onClose={() => setModals(prev => ({ ...prev, companySwitch: false }))}
+            />
+         )}
+         {modals.companyMaster && (
+            <CompanyMasterModal
+               isOpen
+               initialCompanyId={user?.companyId}
+               onClose={() => setModals(prev => ({ ...prev, companyMaster: false }))}
+            />
+         )}
          {modals.stockLedger && (
             <StockLedgerModal
                key={stockLedgerKind}
@@ -2076,11 +2152,21 @@ const Dashboard = () => {
             initialTab={modals.reportsTab}
             initialLeafId={modals.reportsLeafId}
             popupOnly={Boolean(modals.reportsLeafId)}
-            onOpenExternal={(ext) => {
+            onOpenExternal={(node) => {
+               const ext = typeof node === 'string' ? node : node?.external;
                setModals(prev => ({ ...prev, reportsHub: false, reportsLeafId: null }));
                if (ext === 'gstReports') toggleModal('gstReports', true);
                else if (ext === 'gstr1') toggleModal('gstr1', true);
-               else toggleModal(ext, true);
+               else if (ext === 'finalReport') {
+                  setFinalReportKind(node?.reportKind || 'groupList');
+                  setModals((prev) => ({ ...prev, finalReport: true }));
+               } else if (ext === 'fasCheck') {
+                  setFasCheckKind(node?.reportKind || 'interest');
+                  setModals((prev) => ({ ...prev, fasCheck: true }));
+               } else if (ext === 'stockLedger') {
+                  setStockLedgerKind(node?.reportKind || 'stockMts');
+                  setModals((prev) => ({ ...prev, stockLedger: true }));
+               } else if (ext) toggleModal(ext, true);
             }}
          />
 

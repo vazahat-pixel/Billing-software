@@ -26,6 +26,11 @@ export const authApi = {
   changePassword: (payload) => unwrap(post('/auth/change-password', payload)),
   forgotPassword: (payload) => unwrap(post('/auth/forgot-password', payload)),
   resetPassword: (payload) => unwrap(post('/auth/reset-password', payload)),
+  listCompanies: () => unwrap(get('/auth/companies')),
+  createCompany: (payload) => unwrap(post('/auth/companies', payload)),
+  switchCompany: (companyId) => unwrap(post('/auth/switch-company', { companyId })),
+  updateCompany: (payload, companyId) => companyId ? unwrap(put(`/auth/companies/${companyId}`, payload)) : unwrap(put('/auth/company', payload)),
+  deleteCompany: (companyId) => unwrap(del(`/auth/companies/${companyId}`)),
 };
 
 export default authApi;

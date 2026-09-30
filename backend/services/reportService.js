@@ -434,7 +434,9 @@ class ReportService {
     } = filters;
 
     const partyGroup = isReceivable ? 'Customer' : 'Supplier';
-    const partyFilter = { companyId, type: { $in: [partyGroup, 'Both'] } };
+    const companyGroupService = require('./companyGroupService');
+    const masterCompanyId = await companyGroupService.masterId(companyId);
+    const partyFilter = { companyId: masterCompanyId, type: { $in: [partyGroup, 'Both'] } };
     if (partyIds.length) partyFilter._id = { $in: partyIds };
     if (states.length) partyFilter.state = { $in: states };
     if (msmeTypes.length) partyFilter.msmeType = { $in: msmeTypes };
@@ -615,20 +617,22 @@ class ReportService {
     const partyGroup = isReceivable ? 'Customer' : 'Supplier';
     const DocModel = isReceivable ? Sales : Purchase;
 
+    const companyGroupService = require('./companyGroupService');
+    const masterCompanyId = await companyGroupService.masterId(companyId);
     const [parties, brokers, stations, hastes, bookIds, states, mainGroups] = await Promise.all([
-      Party.find({ companyId, type: { $in: [partyGroup, 'Both'] } })
+      Party.find({ companyId: masterCompanyId, type: { $in: [partyGroup, 'Both'] } })
         .select('name address city state msmeType')
         .sort({ name: 1 })
         .lean(),
-      Party.find({ companyId, type: { $in: ['Broker', 'Both'] } })
+      Party.find({ companyId: masterCompanyId, type: { $in: ['Broker', 'Both'] } })
         .select('name')
         .sort({ name: 1 })
         .lean(),
       isReceivable ? DocModel.distinct('station', { companyId, station: { $nin: [null, ''] } }) : [],
       isReceivable ? DocModel.distinct('haste', { companyId, haste: { $nin: [null, ''] } }) : [],
       DocModel.distinct('bookId', { companyId, bookId: { $nin: [null, ''] } }),
-      Party.distinct('state', { companyId, type: { $in: [partyGroup, 'Both'] }, state: { $nin: [null, ''] } }),
-      Party.distinct('mainGroupId', { companyId, type: { $in: [partyGroup, 'Both'] }, mainGroupId: { $nin: [null, ''] } }),
+      Party.distinct('state', { companyId: masterCompanyId, type: { $in: [partyGroup, 'Both'] }, state: { $nin: [null, ''] } }),
+      Party.distinct('mainGroupId', { companyId: masterCompanyId, type: { $in: [partyGroup, 'Both'] }, mainGroupId: { $nin: [null, ''] } }),
     ]);
 
     return {

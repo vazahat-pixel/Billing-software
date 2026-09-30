@@ -187,7 +187,7 @@
 /* Top menu bar — clean, no retro grey */
 .erp-menu-bar {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem;
   padding: 0.1rem 0.5rem;

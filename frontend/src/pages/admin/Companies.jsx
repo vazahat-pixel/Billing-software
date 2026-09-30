@@ -154,7 +154,7 @@ const Companies = () => {
     const [filterCity, setFilterCity] = useState('');
     const [filterPlan, setFilterPlan] = useState('');
 
-    const [createForm, setCreateForm] = useState({ name: '', ownerName: '', ownerEmail: '', ownerPassword: '', planId: '' });
+    const [createForm, setCreateForm] = useState({ name: '', ownerName: '', ownerEmail: '', ownerPassword: '', planId: '', groupCode: '' });
     const [editForm, setEditForm] = useState({ name: '', planId: '', status: '', state: '', district: '', city: '' });
     const [expiryDate, setExpiryDate] = useState('');
 
@@ -175,9 +175,10 @@ const Companies = () => {
             return notifyWarning('Please fill in all fields.');
         }
         try {
-            await createCompany(createForm);
+            const created = await createCompany(createForm);
             setIsCreateOpen(false);
-            setCreateForm({ name: '', ownerName: '', ownerEmail: '', ownerPassword: '', planId: plans[0]?._id || '' });
+            setCreateForm({ name: '', ownerName: '', ownerEmail: '', ownerPassword: '', planId: plans[0]?._id || '', groupCode: '' });
+            if (created?.groupCode) notifySuccess(`Company created. Group code: ${created.groupCode}`);
         } catch (err) { notifyError(err, 'Failed to create company'); }
     };
 
@@ -505,6 +506,7 @@ const Companies = () => {
                     </div>
                     <DarkInput label="Owner Email" type="email" value={createForm.ownerEmail} onChange={e => setCreateForm({ ...createForm, ownerEmail: e.target.value })} placeholder="owner@company.com" required />
                     <DarkInput label="Owner Password" type="password" value={createForm.ownerPassword} onChange={e => setCreateForm({ ...createForm, ownerPassword: e.target.value })} placeholder="••••••••" required />
+                    <DarkInput label="Group code" type="text" value={createForm.groupCode} onChange={e => setCreateForm({ ...createForm, groupCode: e.target.value.toUpperCase() })} placeholder="Blank = auto" />
                     <button type="submit" className="dark-submit-btn w-full">
                         <Building2 size={15} /> Register & Seed Company
                     </button>

@@ -479,7 +479,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
 
   const selectLeaf = (node) => {
     if (node.external && onOpenExternal) {
-      onOpenExternal(node.external);
+      onOpenExternal(node);
       return;
     }
     setSelectedLeafId(node.id);

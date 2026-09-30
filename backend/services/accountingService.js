@@ -76,10 +76,16 @@ class AccountingService {
   async getOrCreatePartyLedger(companyId, partyId, session = null) {
     let ledger = await LedgerMaster.findOne({ companyId, linkedPartyId: partyId }).session(session);
     if (!ledger) {
-      const party = await Party.findOne({ _id: partyId, companyId }).session(session);
+      const companyGroupService = require('./companyGroupService');
+      const masterCompanyId = await companyGroupService.masterId(companyId);
+      const party = await Party.findOne({
+        _id: partyId,
+        companyId: { $in: [companyId, masterCompanyId] },
+      }).session(session);
       if (!party) {
         throw new Error(`Party with ID ${partyId} not found`);
       }
+      const copyOpening = String(masterCompanyId) === String(companyId);
       // Fix: 'Both' type parties are treated as Supplier (Creditor)
       const isCreditor = ['Supplier', 'Both', 'Job Worker', 'Broker', 'Transport', 'Agent'].includes(party.type);
       const group = isCreditor ? 'Liabilities' : 'Assets';
@@ -94,7 +100,7 @@ class AccountingService {
           linkedPartyId: partyId,
           accountType: 'Party',
           nature: isCreditor ? 'Cr' : 'Dr',
-          openingBalance: party.openingBalance || 0,
+          openingBalance: copyOpening ? (party.openingBalance || 0) : 0,
           openingBalanceType: party.openingBalanceType || (isCreditor ? 'Cr' : 'Dr')
         }],
         { session }

@@ -149,7 +149,7 @@ exports.getAllCompanies = async (req, res) => {
 
 exports.createCompany = async (req, res) => {
     try {
-        const { name, ownerName, ownerEmail, ownerPassword, planId } = req.body;
+        const { name, ownerName, ownerEmail, ownerPassword, planId, groupCode } = req.body;
 
         if (!name || !ownerName || !ownerEmail || !ownerPassword) {
             return res.status(400).json({ message: 'Company name, owner name, email and password are required.' });
@@ -182,6 +182,7 @@ exports.createCompany = async (req, res) => {
         // 3. Create Company — new admin-provisioned tenants are SaaS-enforced
         let company;
         try {
+            const crypto = require('crypto');
             company = new Company({
                 name,
                 ownerId: user._id,
@@ -189,6 +190,18 @@ exports.createCompany = async (req, res) => {
                 commercialPolicy: 'saas_enforced',
                 status: 'active',
                 isActive: true,
+                groupCode: String(groupCode || '').trim().toUpperCase() || crypto.randomBytes(4).toString('hex').toUpperCase(),
+                coCode: '100',
+                fyFrom: (() => {
+                    const now = new Date();
+                    const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+                    return `${y}-04-01`;
+                })(),
+                fyTo: (() => {
+                    const now = new Date();
+                    const y = now.getMonth() >= 3 ? now.getFullYear() + 1 : now.getFullYear();
+                    return `${y}-03-31`;
+                })(),
             });
             await company.save();
         } catch (companyErr) {

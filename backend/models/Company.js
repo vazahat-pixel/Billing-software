@@ -13,6 +13,13 @@ const companySchema = new mongoose.Schema({
         required: true
     },
     licenseKey: { type: String, unique: true, sparse: true },
+    /** Shared master set. Blank masterCompanyId means this company holds the masters. */
+    groupCode: { type: String, uppercase: true, trim: true, index: true },
+    coCode: { type: String, trim: true, default: '' },
+    masterCompanyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', default: null, index: true },
+    workType: { type: String, trim: true, default: '' },
+    fyFrom: { type: String, default: '' },
+    fyTo: { type: String, default: '' },
     status: {
         type: String,
         enum: ['active', 'suspended', 'expired'],
@@ -20,15 +27,8 @@ const companySchema = new mongoose.Schema({
     },
     isActive: { type: Boolean, default: true },
     meta: {
-        industry: String,
-        state: String,
-        gstin: { type: String, uppercase: true, trim: true },
-        pan: { type: String, uppercase: true, trim: true },
-        phone: String,
-        address: String,
-        city: String,
-        district: String,
-        pincode: String
+        type: mongoose.Schema.Types.Mixed,
+        default: () => ({})
     },
     // Accounting settings
     settings: {

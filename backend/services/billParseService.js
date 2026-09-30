@@ -261,9 +261,10 @@ async function parseUploadedBill({ companyId, buffer, mimeType, originalName, pa
     throw err;
   }
 
+  const masterCompanyId = await require('./companyGroupService').masterId(companyId);
   const [parties, items] = await Promise.all([
-    Party.find({ companyId }).select('name gstin address city station type').lean(),
-    Item.find({ companyId }).select('name itemName hsnCode gstRate purchaseRate unit category').lean(),
+    Party.find({ companyId: masterCompanyId }).select('name gstin address city station type').lean(),
+    Item.find({ companyId: masterCompanyId }).select('name itemName hsnCode gstRate purchaseRate unit category').lean(),
   ]);
 
   const draft = parsePurchaseBillText(text, { parties, items });

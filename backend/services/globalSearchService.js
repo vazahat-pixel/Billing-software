@@ -18,6 +18,8 @@ const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'
  */
 class GlobalSearchService {
   async search(companyId, q, { limit = 8, types } = {}) {
+    const companyGroupService = require('./companyGroupService');
+    const masterCompanyId = await companyGroupService.masterId(companyId);
     const query = String(q || '').trim();
     if (!query || query.length < 1) {
       return { query, groups: [], total: 0 };
@@ -36,7 +38,7 @@ class GlobalSearchService {
     if (want('party') || want('customer') || want('supplier') || want('broker')) {
       tasks.push(
         Party.find({
-          companyId,
+          companyId: masterCompanyId,
           $or: [{ name: rx }, { gstin: rx }, { mobile: rx }, { city: rx }],
         })
           .select('name type gstin mobile isFavorite lastUsedAt')
@@ -62,7 +64,7 @@ class GlobalSearchService {
     if (want('item')) {
       tasks.push(
         Item.find({
-          companyId,
+          companyId: masterCompanyId,
           $or: [
             { name: rx },
             { hsnCode: rx },
@@ -217,7 +219,7 @@ class GlobalSearchService {
 
     if (want('warehouse')) {
       tasks.push(
-        Warehouse.find({ companyId, $or: [{ name: rx }, { code: rx }] })
+        Warehouse.find({ companyId: masterCompanyId, $or: [{ name: rx }, { code: rx }] })
           .select('name code')
           .limit(per)
           .lean()
@@ -238,7 +240,7 @@ class GlobalSearchService {
 
     if (want('book') || want('ledger') || want('voucher')) {
       tasks.push(
-        Book.find({ companyId, $or: [{ name: rx }, { bookType: rx }] })
+        Book.find({ companyId: masterCompanyId, $or: [{ name: rx }, { bookType: rx }] })
           .select('name bookType')
           .limit(per)
           .lean()
