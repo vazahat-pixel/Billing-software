@@ -69,6 +69,13 @@ const OutstandingReportModal = ({
   const partyDirect = Boolean(directPartyId);
   const companyCode = 'SCC';
 
+  /* ── active type (Sales vs Purchase) ── */
+  const [curType, setCurType] = useState(type || 'receivable');
+
+  useEffect(() => {
+    if (type) setCurType(type);
+  }, [type]);
+
   /* ── state ── */
   const [billDateFrom, setBillDateFrom] = useState('2000-04-01');
   const [billDateTo, setBillDateTo]     = useState(todayISO());
@@ -110,32 +117,77 @@ const OutstandingReportModal = ({
   const [rows, setRows]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [bootLoading, setBootLoading] = useState(false);
-  const [stage, setStage]     = useState('filter');   // 'filter' | 'result'
+  const [stage, setStage]     = useState(() => (directPartyId ? 'result' : 'filter'));
 
-  const title = `Outstanding (${type === 'receivable' ? 'SALES' : 'PURCHASE'})`;
+  const title = `Outstanding (${curType === 'receivable' ? 'SALES' : 'PURCHASE'})`;
 
-  /* ── boot ── */
+  /* ── generate helper ── */
+  const runFetch = async (targetType = curType, customFilters = {}) => {
+    setLoading(true); setFindQuery('');
+    try {
+      const pIds = customFilters.partyIds !== undefined ? customFilters.partyIds : [...selected.parties];
+      const data = await fetchOutstandingReportFiltered(targetType, {
+        billDateFrom, billDateTo,
+        paidDateFrom: usePaidDate ? paidDateFrom : undefined,
+        paidDateTo:   usePaidDate ? paidDateTo   : undefined,
+        status,
+        partyIds: pIds,
+        brokerIds: [...selected.brokers],
+        stations: [...selected.stations],
+        mainGroups: [...selected.mainGroups],
+        hastes: [...selected.hastes],
+        bookIds: [...selected.books],
+        states: [...selected.states],
+        msmeTypes: [...selected.msmeTypes],
+        remarkSearch,
+        dueDaysMin: dueDaysMin !== '' ? Number(dueDaysMin) : undefined,
+        onlyFullBill, onlyPartReceived, includeLastYear,
+        fyStartDate: fyStartISO(),
+        onlyRgPending, onlyDirectBillClose, withLedgerBalance,
+        ...customFilters,
+      });
+      setRows(data || []);
+      setStage('result');
+      return data || [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ── boot: filter first. A chosen party opens only from OK or Enter. ── */
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
+
     if (partyDirect) {
       setLoading(true); setRows(null); setStage('result');
-      fetchOutstandingReportFiltered(type, {
-        billDateFrom:'2000-04-01', billDateTo:todayISO(),
-        status:'Pending', partyIds:[directPartyId], includeLastYear:true,
-      }).then(d => { if (!cancelled) { setRows(d||[]); setLoading(false); } })
+      fetchOutstandingReportFiltered(curType, {
+        billDateFrom: '2000-04-01', billDateTo: todayISO(),
+        status: 'Pending', partyIds: [directPartyId], includeLastYear: true,
+      }).then(d => { if (!cancelled) { setRows(d || []); setLoading(false); } })
         .catch(() => { if (!cancelled) setLoading(false); });
     } else {
-      setBootLoading(true); setRows(null); setStage('filter'); setSelected(emptySelected());
-      fetchOutstandingFilterOptions(type)
-        .then(d => {
-          if (!cancelled) setOptions({...emptyOptions(), ...(d || {})});
+      setRows(null);
+      setStage('filter');
+      setSelected(emptySelected());
+      setBootLoading(true);
+      fetchOutstandingFilterOptions(curType)
+        .then((opts) => {
+          if (!cancelled) setOptions({ ...emptyOptions(), ...(opts || {}) });
         })
-        .catch(err => console.error('[Outstanding] filter options error:', err))
+        .catch(err => console.error('[Outstanding] error loading filters:', err))
         .finally(() => { if (!cancelled) setBootLoading(false); });
     }
     return () => { cancelled = true; };
-  }, [isOpen, type, partyDirect, fetchOutstandingFilterOptions, fetchOutstandingReportFiltered]);
+  }, [isOpen, curType, partyDirect, directPartyId, fetchOutstandingFilterOptions, fetchOutstandingReportFiltered]);
+
+  const switchType = (newType) => {
+    if (newType === curType) return;
+    setCurType(newType);
+    setSelected(emptySelected());
+    setRows(null);
+    setStage('filter');
+  };
 
   /* ── tab list ── */
   const activeList = useMemo(() => {
@@ -155,37 +207,19 @@ const OutstandingReportModal = ({
   const unselectAll = () => setSelected(p => ({...p, [activeTab]:new Set()}));
 
   /* ── generate ── */
-  const generate = async () => {
-    setLoading(true); setFindQuery('');
-    try {
-      const data = await fetchOutstandingReportFiltered(type, {
-        billDateFrom, billDateTo,
-        paidDateFrom: usePaidDate ? paidDateFrom : undefined,
-        paidDateTo:   usePaidDate ? paidDateTo   : undefined,
-        status,
-        partyIds:[...selected.parties], brokerIds:[...selected.brokers],
-        stations:[...selected.stations], mainGroups:[...selected.mainGroups],
-        hastes:[...selected.hastes], bookIds:[...selected.books],
-        states:[...selected.states], msmeTypes:[...selected.msmeTypes],
-        remarkSearch, dueDaysMin: dueDaysMin !== '' ? Number(dueDaysMin) : undefined,
-        onlyFullBill, onlyPartReceived, includeLastYear,
-        fyStartDate:fyStartISO(), onlyRgPending, onlyDirectBillClose, withLedgerBalance,
-      });
-      setRows(data || []);
-      if (!data?.length) notifyWarning('No outstanding bills match this filter');
-      setStage('result');
-    } finally { setLoading(false); }
-  };
+  const generate = () => runFetch(curType);
+  const generateRef = useRef(generate);
+  generateRef.current = generate;
 
   /* ── report computation ── */
   const dimVal = (dim, party, inv) => {
     switch(dim){
-      case 'Party': return party.partyName||'—';
-      case 'Broker': return inv.broker?.name||inv.broker||'—';
-      case 'Station': return inv.station||'—';
-      case 'Book': return inv.bookId||'—';
-      case 'State': return party.state||'—';
-      case 'MSME Type': return party.msmeType||'None';
+      case 'Party': return party?.partyName || party?.name || '—';
+      case 'Broker': return inv?.broker?.name || inv?.broker || '—';
+      case 'Station': return inv?.station || party?.city || party?.station || '—';
+      case 'Book': return inv?.bookId || '—';
+      case 'State': return party?.state || '—';
+      case 'MSME Type': return party?.msmeType || 'None';
       default: return null;
     }
   };
@@ -198,21 +232,22 @@ const OutstandingReportModal = ({
 
     const flat = [];
     for (const party of rows) {
-      for (const inv of (party.invoices||[])) {
+      for (const inv of (party.invoices || party.bills || [])) {
         const rec = {
+          ...inv,
           party, co:companyCode,
-          billNo: inv.docNo||'',
-          billDate: inv.date,
-          billAmt: Number(inv.total||0),
-          paidDate: inv.paidDate||null,
-          paidAmt: Number(inv.paid||0),
-          goodsRtn: Number(inv.goodsRtn||0),
-          addLess: Number(inv.addLess||0),
-          balance: Number(inv.outstanding||0),
-          days: Number(inv.ageDays||0),
+          billNo: inv.docNo || inv.billNo || '',
+          billDate: inv.date || inv.billDate,
+          billAmt: Number(inv.total || inv.billAmt || 0),
+          paidDate: inv.paidDate || null,
+          paidAmt: Number(inv.paid || inv.paidAmt || 0),
+          goodsRtn: Number(inv.goodsRtn || 0),
+          addLess: Number(inv.addLess || 0),
+          balance: Number(inv.outstanding || inv.balance || 0),
+          days: Number(inv.ageDays || inv.days || 0),
         };
         if (q) {
-          const hay = [rec.co,rec.billNo,rec.billAmt,rec.balance,rec.days,party.partyName].join(' ').toLowerCase();
+          const hay = [rec.co, rec.billNo, rec.billAmt, rec.balance, rec.days, party.partyName, party.name].join(' ').toLowerCase();
           if (!hay.includes(q)) continue;
         }
         flat.push(rec);
@@ -283,13 +318,28 @@ const OutstandingReportModal = ({
     downloadCsv(`outstanding-${type}-${todayISO()}.csv`, hdr, body);
   };
 
-  /* ── F3 for Find ── */
+  /* ── F3 for Find. On the filter, Enter is OK once a party is selected. ── */
   useEffect(() => {
-    if (!isOpen) return;
-    const fn = e => { if (e.key==='F3'){e.preventDefault();findRef.current?.focus();findRef.current?.select();}};
-    window.addEventListener('keydown', fn);
-    return () => window.removeEventListener('keydown', fn);
-  }, [isOpen]);
+    if (!isOpen) return undefined;
+    const fn = (e) => {
+      if (e.key === 'F3') {
+        e.preventDefault();
+        findRef.current?.focus();
+        findRef.current?.select();
+        return;
+      }
+      if (stage !== 'filter' || partyDirect) return;
+      if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+      const tag = String(e.target?.tagName || '').toUpperCase();
+      if (tag === 'BUTTON' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (!selected.parties.size) return;
+      e.preventDefault();
+      e.stopPropagation();
+      generateRef.current();
+    };
+    window.addEventListener('keydown', fn, true);
+    return () => window.removeEventListener('keydown', fn, true);
+  }, [isOpen, stage, partyDirect, selected]);
 
   if (!isOpen) return null;
 
@@ -306,6 +356,24 @@ const OutstandingReportModal = ({
           {/* ─── Title bar ─── */}
           <div className="os-titlebar">
             <span className="os-title-text">{title}</span>
+            {!partyDirect && (
+              <div className="os-type-toggle">
+                <button
+                  type="button"
+                  className={`os-type-btn ${curType === 'receivable' ? 'active' : ''}`}
+                  onClick={() => switchType('receivable')}
+                >
+                  Sales Outstanding (Receivable)
+                </button>
+                <button
+                  type="button"
+                  className={`os-type-btn ${curType === 'payable' ? 'active' : ''}`}
+                  onClick={() => switchType('payable')}
+                >
+                  Purchase Outstanding (Payable)
+                </button>
+              </div>
+            )}
             <WindowControls />
           </div>
 
@@ -435,6 +503,20 @@ const OutstandingReportModal = ({
             <div className="os-result-body">
               {/* Toolbar */}
               <div className="os-result-toolbar">
+                <button
+                  type="button"
+                  className="os-tbtn os-tbtn-filter"
+                  onClick={() => setStage(s => s === 'result' ? 'filter' : 'result')}
+                >
+                  ⚙️ Filter Options
+                </button>
+                <button
+                  type="button"
+                  className="os-tbtn"
+                  onClick={() => runFetch(curType)}
+                >
+                  🔄 Refresh
+                </button>
                 <span className="os-bill-count">{report.count} bill{report.count!==1?'s':''} · grouped by {[groupBy1,groupBy2,groupBy3].filter(d=>d!=='None').join(' › ')||'None'}</span>
                 <span className="os-find-label">Find</span>
                 <input ref={findRef} className="os-find-input" placeholder="F3 — party / bill / amount…"
@@ -531,7 +613,7 @@ const OutstandingReportModal = ({
             <label className="os-fchk"><input type="checkbox" checked={tableMode} onChange={e=>setTableMode(e.target.checked)} /> Table</label>
             <div style={{flex:1}} />
             <button type="button" className="os-fbtn os-ok" onClick={stage==='filter'?generate:()=>setStage('filter')}>
-              {stage==='filter' ? 'Ok' : 'Ok'}
+              {stage==='filter' ? 'OK' : 'Filter Options'}
             </button>
             <button type="button" className="os-fbtn" onClick={onClose}>Exit</button>
           </div>
@@ -547,8 +629,12 @@ const css = `
 .os-root { display:flex; flex-direction:column; height:100%; min-height:0; background:#b8d8d8; font-family:Tahoma,'Segoe UI',sans-serif; font-size:12px; }
 
 /* Title bar */
-.os-titlebar { display:flex; align-items:center; background:#003087; color:#fff; padding:2px 6px; min-height:26px; font-weight:700; font-size:13px; }
+.os-titlebar { display:flex; align-items:center; background:#003087; color:#fff; padding:2px 6px; min-height:28px; font-weight:700; font-size:13px; }
 .os-title-text { flex:1; }
+.os-type-toggle { display:flex; gap:4px; margin-right:12px; }
+.os-type-btn { background:#002060; color:#c0d0f0; border:1px solid #3b82f6; padding:2px 8px; font-size:11px; font-weight:700; cursor:pointer; border-radius:3px; }
+.os-type-btn.active { background:#ffaa00; color:#000; border-color:#fff; }
+.os-tbtn-filter { background:#003087 !important; color:#fff !important; }
 
 /* ── FILTER ── */
 .os-filter-body { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:2px; padding:4px; }

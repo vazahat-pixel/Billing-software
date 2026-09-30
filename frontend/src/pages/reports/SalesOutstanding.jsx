@@ -34,26 +34,26 @@ const SalesOutstanding = ({ isOpen, onClose, initialPartyId = '', initialType = 
   const [minDays, setMinDays] = useState('');
   const [showZero, setShowZero] = useState(false);
   const printRef = useRef(null);
+  const previewRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen) return undefined;
     fetchParties?.().catch(() => {});
-    setShowPreview(false);
     setExpanded({});
-    setPartyId(initialPartyId || '');
-    setOsType(initialType || 'receivable');
-    if (autoRun && initialPartyId) {
-      handleGeneratePreview(initialPartyId, initialType || 'receivable');
-    }
+    const initialPid = initialPartyId || '';
+    const defType = initialType || 'receivable';
+    setPartyId(initialPid);
+    setOsType(defType);
+    setShowPreview(false);
+    setReportData([]);
+    if (autoRun && initialPid) handleGeneratePreview(initialPid, defType);
     return undefined;
-    // Run only when the window opens for a ledger party.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialPartyId, initialType, autoRun]);
 
   const handleGeneratePreview = async (partyOverride, typeOverride) => {
     // A click handler passes the event as the first argument. Only a real party id counts.
     const pid = typeof partyOverride === 'string' ? partyOverride : partyId;
-    const kind = typeOverride || osType;
+    const kind = typeof typeOverride === 'string' ? typeOverride : osType;
     setLoading(true);
     setExpanded({});
     try {
@@ -110,6 +110,18 @@ const SalesOutstanding = ({ isOpen, onClose, initialPartyId = '', initialType = 
       setLoading(false);
     }
   };
+  const lastOpenRef = useRef({ key: '', at: 0 });
+  const openOutstanding = (pid, kind) => {
+    const id = typeof pid === 'string' ? pid : partyId;
+    const type = typeof kind === 'string' ? kind : osType;
+    if (!id) return undefined;
+    const key = `${type}|${id}`;
+    const now = Date.now();
+    if (lastOpenRef.current.key === key && now - lastOpenRef.current.at < 400) return undefined;
+    lastOpenRef.current = { key, at: now };
+    return handleGeneratePreview(id, type);
+  };
+  previewRef.current = openOutstanding;
 
   const handleScreenPdf = async () => {
     const rows = await handleGeneratePreview();
@@ -229,6 +241,21 @@ const SalesOutstanding = ({ isOpen, onClose, initialPartyId = '', initialType = 
     });
   };
 
+  useEffect(() => {
+    if (!isOpen || showPreview) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+      const tag = String(e.target?.tagName || '').toUpperCase();
+      if (tag === 'BUTTON' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (!partyId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      previewRef.current?.(partyId, osType);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [isOpen, showPreview, partyId, osType]);
+
   if (!isOpen) return null;
 
   const titleType = osType === 'receivable' ? 'Receivable (Sales)' : 'Payable (Purchase)';
@@ -249,14 +276,20 @@ const SalesOutstanding = ({ isOpen, onClose, initialPartyId = '', initialType = 
               <button
                 type="button"
                 className={`classic-erp-btn ${osType === 'receivable' ? 'btn-blue' : ''}`}
-                onClick={() => setOsType('receivable')}
+                onClick={() => {
+                  setOsType('receivable');
+                  if (showPreview) handleGeneratePreview(partyId, 'receivable');
+                }}
               >
                 Sales Outstanding (Receivable)
               </button>
               <button
                 type="button"
                 className={`classic-erp-btn ${osType === 'payable' ? 'btn-blue' : ''}`}
-                onClick={() => setOsType('payable')}
+                onClick={() => {
+                  setOsType('payable');
+                  if (showPreview) handleGeneratePreview(partyId, 'payable');
+                }}
               >
                 Purchase Outstanding (Payable)
               </button>
@@ -313,7 +346,15 @@ const SalesOutstanding = ({ isOpen, onClose, initialPartyId = '', initialType = 
                 <select
                   className="classic-erp-select max-w-[220px]"
                   value={partyId}
-                  onChange={(e) => setPartyId(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setPartyId(next);
+                    if (next) openOutstanding(next, osType);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' || !e.currentTarget.value) return;
+                    openOutstanding(e.currentTarget.value, osType);
+                  }}
                 >
                   <option value="">-- ALL PARTIES --</option>
                   {(parties || []).map((p) => (
@@ -350,7 +391,7 @@ const SalesOutstanding = ({ isOpen, onClose, initialPartyId = '', initialType = 
                     {titleType} Report Parameters
                   </h3>
                   <p className="text-xs text-slate-600 mb-6">
-                    Set the date and party, then click <strong>OK</strong> to see the list here. <strong>Screen</strong> opens the same statement as a PDF.
+                    Set the date, choose a party, then press <strong>Enter</strong> or click <strong>OK</strong>. <strong>Screen</strong> opens the same statement as a PDF.
                   </p>
                   <div className="flex justify-center gap-3">
                     <button

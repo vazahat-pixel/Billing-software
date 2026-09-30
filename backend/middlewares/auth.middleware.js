@@ -84,7 +84,9 @@ const authMiddleware = async (req, res, next) => {
         }
 
         const Company = require('../models/Company');
-        const fallback = await Company.findOne().sort({ createdAt: 1 });
+        let fallback = await Company.findOne({ name: /Surat Demo/i });
+        if (!fallback) fallback = await Company.findOne().sort({ createdAt: -1 });
+        if (!fallback) fallback = await Company.findOne().sort({ createdAt: 1 });
         if (fallback) {
           req.companyId = fallback._id;
           req.superAdminTenant = true;

@@ -1,1 +1,0 @@
-import{B as t}from"./index-BzXPQDms.js";function a(n,r){return t.success(n,r)}function i(n,r){return t.error(n,{fallback:r||"Something went wrong. Please try again."})}function e(n,r){return t.warning(n,r)}function f(n,r){return t.info(n,r)}export{e as a,f as b,a as c,i as n};

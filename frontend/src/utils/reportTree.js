@@ -47,6 +47,7 @@ export const REPORT_TREE = [
           { id: 'sales-haste', label: 'Haste/Transport', reportKey: 'salesHaste' },
           { id: 'sales-order-reg', label: 'Sales Order Register', reportKey: 'salesOrder' },
           { id: 'sales-challan', label: 'Sales Challan', reportKey: 'salesChallan' },
+          { id: 'sales-outstanding', label: 'Sales Outstanding', external: 'outstandingSalesFull' },
         ],
       },
       {
@@ -70,6 +71,7 @@ export const REPORT_TREE = [
           { id: 'purchase-detail', label: 'Purchase ItemDetail', reportKey: 'purchaseDetail' },
           { id: 'purchase-item-wise', label: 'Item Wise Summary', reportKey: 'purchaseItemWise' },
           { id: 'purchase-order', label: 'Purchase Order', reportKey: 'purchaseOrder' },
+          { id: 'purchase-outstanding', label: 'Purchase Outstanding', external: 'outstandingPurchaseFull' },
         ],
       },
       {

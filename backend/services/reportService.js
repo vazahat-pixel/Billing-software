@@ -452,11 +452,15 @@ class ReportService {
     if (bookIds.length) docFilter.bookId = { $in: bookIds };
     if (isReceivable && stations.length) docFilter.station = { $in: stations };
     if (isReceivable && hastes.length) docFilter.haste = { $in: hastes };
-    if (remarkSearch.trim()) docFilter.remarks = { $regex: remarkSearch.trim(), $options: 'i' };
+    const dateQuery = buildDateQuery(billDateFrom, billDateTo);
     if (!includeLastYear && fyStartDate) {
-      docFilter.date = { ...(docFilter.date || {}), $gte: new Date(fyStartDate) };
+      const fyStart = new Date(fyStartDate);
+      dateQuery.date = dateQuery.date || {};
+      dateQuery.date.$gte = dateQuery.date.$gte && dateQuery.date.$gte > fyStart
+        ? dateQuery.date.$gte
+        : fyStart;
     }
-    Object.assign(docFilter, buildDateQuery(billDateFrom, billDateTo));
+    Object.assign(docFilter, dateQuery);
 
     const documents = isReceivable
       ? await Sales.find(docFilter).lean()
@@ -532,6 +536,8 @@ class ReportService {
         billId: doc._id,
         docNo,
         date: doc.date,
+        dueDate: doc.dueDate || (doc.creditDays ? new Date(new Date(doc.date).getTime() + doc.creditDays * 86400000) : null),
+        creditDays: doc.creditDays || 0,
         total,
         paid,
         paidDate: s.lastPaidDate || null,
@@ -597,6 +603,7 @@ class ReportService {
         partyTotals: totals,
         aging,
         invoices,
+        bills: invoices,
       });
     }
     return lines.sort((a, b) => b.totalOutstanding - a.totalOutstanding);

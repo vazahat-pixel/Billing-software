@@ -8,8 +8,7 @@ node_modules/
 
 # Build output
 dist/
-!frontend/dist
-!frontend/dist/**
+frontend/dist/
 dist-ssr/
 build/
 .vite/
