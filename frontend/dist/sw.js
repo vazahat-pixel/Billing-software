@@ -1,4 +1,4 @@
-const CACHE_NAME = 'billing-erp-v7';
+const CACHE_NAME = 'billing-erp-v8';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -43,8 +43,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Never intercept API calls
-  if (url.pathname.startsWith('/api')) return;
+  // Never intercept API or health probe calls
+  if (url.pathname.startsWith('/api') || url.pathname.startsWith('/health')) return;
 
   // App navigation: network-first
   if (isAppNavigation(request)) {

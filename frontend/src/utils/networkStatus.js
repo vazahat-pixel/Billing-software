@@ -68,9 +68,7 @@ export const markServerReachable = () => {
 export const getApiOrigin = () => {
   if (typeof window === 'undefined') return '';
   try {
-    const desktopUrl =
-      window.textileDesktop?.getApiBaseUrlSync?.() ||
-      import.meta.env?.VITE_API_URL;
+    const desktopUrl = window.textileDesktop?.getApiBaseUrlSync?.();
     if (desktopUrl) {
       const u = new URL(desktopUrl, 'http://127.0.0.1');
       return u.origin;
@@ -78,10 +76,17 @@ export const getApiOrigin = () => {
   } catch {
     /* fall through */
   }
-  if (import.meta.env?.VITE_API_URL) {
+
+  const envUrl = import.meta.env?.VITE_API_URL;
+  if (envUrl) {
     try {
-      const u = new URL(import.meta.env.VITE_API_URL, window.location.origin);
-      return u.origin;
+      const isLocalHost =
+        typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      if (isLocalHost || (!envUrl.includes('localhost') && !envUrl.includes('127.0.0.1'))) {
+        const u = new URL(envUrl, window.location.origin);
+        return u.origin;
+      }
     } catch {
       /* fall through */
     }
