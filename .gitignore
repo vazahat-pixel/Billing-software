@@ -7,9 +7,10 @@ node_modules/
 !.env.example
 
 # Build output
-dist/
-frontend/dist/
+/dist/
 dist-ssr/
+!frontend/dist/
+!frontend/dist/**
 build/
 .vite/
 *.local

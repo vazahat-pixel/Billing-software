@@ -16,7 +16,8 @@ echo ""
 
 # 1. Pull Latest Code
 echo "📥 [1/4] Pulling latest code from GitHub..."
-git pull origin main
+git fetch origin main
+git reset --hard origin/main
 
 # 2. Backend Check & Restart
 echo ""
@@ -50,10 +51,16 @@ if [ -d "$SCRIPT_DIR/frontend/dist" ] && [ -f "$SCRIPT_DIR/frontend/dist/index.h
 else
   echo "Building frontend bundle on server..."
   cd "$SCRIPT_DIR/frontend"
+  if [ ! -d "node_modules" ]; then
+    npm install --no-audit --no-fund
+  fi
   npm run build
   rm -rf /var/www/billing-frontend/*
   cp -a dist/. /var/www/billing-frontend/
 fi
+
+chown -R www-data:www-data /var/www/billing-frontend 2>/dev/null || true
+chmod -R 755 /var/www/billing-frontend 2>/dev/null || true
 
 # 4. Reload Nginx
 echo ""
