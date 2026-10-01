@@ -67,6 +67,15 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
   const setAuth = useStore((s) => s.setAuth);
   const patchCompanySettings = useConfigStore((s) => s.patchCompanySettings);
 
+  const formRef = useRef(null);
+  const newBtnRef = useRef(null);
+  const editBtnRef = useRef(null);
+  const saveBtnRef = useRef(null);
+  const cancelBtnRef = useRef(null);
+  const findBtnRef = useRef(null);
+  const deleteBtnRef = useRef(null);
+  const exitBtnRef = useRef(null);
+
   const [activeTab, setActiveTab] = useState('companyDetail'); // 'companyDetail' | 'others'
   const [companies, setCompanies] = useState([]);
   const [groupCode, setGroupCode] = useState('');
@@ -77,7 +86,12 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
   const [busy, setBusy] = useState(false);
   const [showFindModal, setShowFindModal] = useState(false);
   const [findFilter, setFindFilter] = useState('');
+  const [findSelectedIndex, setFindSelectedIndex] = useState(0);
   const [currentTime, setCurrentTime] = useState('');
+
+  useEffect(() => {
+    setFindSelectedIndex(0);
+  }, [findFilter, showFindModal]);
 
   // Live clock for ERP status bar & timestamp
   useEffect(() => {
@@ -225,10 +239,23 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
   };
 
   const handleFieldChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFormData((prev) => {
+      const updated = {
+        ...prev,
+        [field]: value,
+      };
+      if (field === 'gstin') {
+        const val = String(value || '').trim().toUpperCase();
+        if (val.length >= 10 && !prev.pan) {
+          updated.pan = val.substring(2, 12);
+        }
+        if (val.length >= 2 && !prev.stateCode) {
+          const sc = stateCodeFromGstin(val);
+          if (sc) updated.stateCode = sc;
+        }
+      }
+      return updated;
+    });
   };
 
   const handleBankChange = (field, value) => {
@@ -282,10 +309,12 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
 
   // Toolbar Actions - NO ADMIN RESTRICTION, ANY USER CAN USE
   const handleNew = () => {
+    setActiveTab('companyDetail');
     initNewCompany();
   };
 
   const handleEdit = () => {
+    setActiveTab('companyDetail');
     setMode('edit');
   };
 
@@ -295,7 +324,7 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
   };
 
   const handleSave = async (e) => {
-    if (e) e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!formData.name.trim()) {
       toast.error('Company Name is required');
       return;
@@ -413,6 +442,274 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
 
   const readOnly = mode === 'view';
 
+  // Auto-focus logic: Focus 'New' button on open/view mode; Focus first input on 'new'/'edit' mode
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (mode === 'view') {
+      const t = setTimeout(() => {
+        newBtnRef.current?.focus();
+      }, 70);
+      return () => clearTimeout(t);
+    } else if (mode === 'new' || mode === 'edit') {
+      const t = setTimeout(() => {
+        if (!formRef.current) return;
+        const firstField = formRef.current.querySelector(
+          'input:not([disabled]):not([readonly]):not([type="hidden"]), select:not([disabled]):not([readonly])'
+        );
+        if (firstField) {
+          firstField.focus();
+          firstField.select?.();
+        }
+      }, 70);
+      return () => clearTimeout(t);
+    }
+  }, [mode, isOpen, activeTab]);
+
+  // Comprehensive ERP keyboard navigation & shortcuts
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e) => {
+      // 1. If Quick Find modal is open, let it handle ArrowUp/ArrowDown and Enter
+      if (showFindModal) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setShowFindModal(false);
+          return;
+        }
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setFindSelectedIndex((prev) => Math.min(prev + 1, Math.max(0, filteredCompanies.length - 1)));
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setFindSelectedIndex((prev) => Math.max(0, prev - 1));
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (filteredCompanies && filteredCompanies.length > 0) {
+            const target = filteredCompanies[findSelectedIndex] || filteredCompanies[0];
+            if (target) {
+              handleSelectCompanyFromFind(target);
+            }
+          }
+          return;
+        }
+        return;
+      }
+
+      // 2. Escape key: Cancel edit/new mode or close modal
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        if (mode === 'new' || mode === 'edit') {
+          handleCancel();
+        } else {
+          onClose();
+        }
+        return;
+      }
+
+      // 3. Ctrl+Enter or Cmd+Enter -> Save
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        if (mode === 'new' || mode === 'edit') {
+          handleSave();
+        }
+        return;
+      }
+
+      // 4. Alt+S -> Save
+      if (e.altKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (mode === 'new' || mode === 'edit') {
+          handleSave();
+        }
+        return;
+      }
+
+      // 5. Alt+N -> New Company
+      if (e.altKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        handleNew();
+        return;
+      }
+
+      // 6. F2 -> Edit Company
+      if (e.key === 'F2') {
+        e.preventDefault();
+        if (mode === 'view') {
+          handleEdit();
+        }
+        return;
+      }
+
+      // 7. F3 -> Find Company
+      if (e.key === 'F3') {
+        e.preventDefault();
+        setShowFindModal(true);
+        return;
+      }
+
+      // 8. In VIEW MODE: Arrow keys move between toolbar buttons, Enter clicks the active button (OK)
+      if (mode === 'view') {
+        const buttons = [
+          newBtnRef.current,
+          editBtnRef.current,
+          saveBtnRef.current,
+          cancelBtnRef.current,
+          findBtnRef.current,
+          deleteBtnRef.current,
+          exitBtnRef.current,
+        ].filter((btn) => btn && !btn.disabled);
+
+        const activeEl = document.activeElement;
+        const btnIndex = buttons.indexOf(activeEl);
+
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (btnIndex === -1) {
+            buttons[0]?.focus();
+          } else {
+            const nextBtn = buttons[(btnIndex + 1) % buttons.length];
+            nextBtn?.focus();
+          }
+          return;
+        }
+
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (btnIndex === -1) {
+            buttons[buttons.length - 1]?.focus();
+          } else {
+            const prevBtn = buttons[(btnIndex - 1 + buttons.length) % buttons.length];
+            prevBtn?.focus();
+          }
+          return;
+        }
+
+        if (e.key === 'Enter') {
+          if (activeEl && activeEl.tagName === 'BUTTON') {
+            // Button executes naturally
+            return;
+          }
+          // Default action in view mode: Start New Company
+          e.preventDefault();
+          handleNew();
+          return;
+        }
+        return;
+      }
+
+      // 9. In NEW / EDIT MODE: ArrowDown moves to next field, ArrowUp moves to previous field
+      if (mode === 'new' || mode === 'edit') {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          const activeEl = document.activeElement;
+          // Don't intercept inside textarea, select, or date picker
+          if (activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.type === 'date')) {
+            return;
+          }
+
+          if (formRef.current) {
+            e.preventDefault();
+            const selector = [
+              'input:not([disabled]):not([readonly]):not([type="hidden"])',
+              'select:not([disabled]):not([readonly])',
+              'textarea:not([disabled]):not([readonly])',
+            ].join(',');
+
+            const formFields = Array.from(
+              formRef.current.querySelectorAll(selector)
+            ).filter((el) => {
+              const style = window.getComputedStyle(el);
+              return style.display !== 'none' && style.visibility !== 'hidden' && el.offsetParent !== null;
+            });
+
+            const idx = formFields.indexOf(activeEl);
+            if (e.key === 'ArrowDown' && idx !== -1 && idx < formFields.length - 1) {
+              formFields[idx + 1].focus();
+              formFields[idx + 1].select?.();
+            } else if (e.key === 'ArrowUp' && idx > 0) {
+              formFields[idx - 1].focus();
+              formFields[idx - 1].select?.();
+            }
+            return;
+          }
+        }
+      }
+
+      // 10. In NEW / EDIT MODE: Enter moves forward to next field, Shift+Enter moves back
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const activeEl = document.activeElement;
+
+        // If on action buttons, let them click naturally on Enter
+        if (activeEl && activeEl.tagName === 'BUTTON') {
+          if (activeEl === saveBtnRef.current) {
+            e.preventDefault();
+            handleSave();
+          }
+          return;
+        }
+
+        // If in textarea, allow normal Enter for new line unless Shift+Enter
+        if (activeEl && activeEl.tagName === 'TEXTAREA' && !e.shiftKey) {
+          return;
+        }
+
+        e.preventDefault();
+
+        if (!formRef.current) return;
+
+        const selector = [
+          'input:not([disabled]):not([readonly]):not([type="hidden"])',
+          'select:not([disabled]):not([readonly])',
+          'textarea:not([disabled]):not([readonly])',
+        ].join(',');
+
+        const formFields = Array.from(
+          formRef.current.querySelectorAll(selector)
+        ).filter((el) => {
+          const style = window.getComputedStyle(el);
+          return style.display !== 'none' && style.visibility !== 'hidden' && el.offsetParent !== null;
+        });
+
+        const focusables = [...formFields];
+        if (saveBtnRef.current && !saveBtnRef.current.disabled) {
+          focusables.push(saveBtnRef.current);
+        }
+
+        const idx = focusables.indexOf(activeEl);
+
+        if (e.shiftKey) {
+          // Shift+Enter: Move to previous field
+          if (idx > 0) {
+            const prev = focusables[idx - 1];
+            prev.focus();
+            prev.select?.();
+          }
+        } else {
+          // Enter: Move to next field
+          if (idx !== -1 && idx < focusables.length - 1) {
+            const next = focusables[idx + 1];
+            next.focus();
+            next.select?.();
+          } else if (idx === focusables.length - 1 || activeEl === saveBtnRef.current) {
+            // At the end / on Save button -> Trigger Save
+            handleSave();
+          } else if (focusables.length > 0) {
+            focusables[0].focus();
+            focusables[0].select?.();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen, mode, showFindModal, formData, originalData, selectedId, findSelectedIndex, filteredCompanies]);
+
   if (!isOpen) return null;
 
   // Exact Classic Desktop ERP Styles (matching original screenshot)
@@ -496,7 +793,7 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
         </div>
 
         {/* Form Body - Classic Light Theme, Pure White Inputs, Single Screen */}
-        <form onSubmit={handleSave} className="bg-white p-2.5 space-y-1.5">
+        <form ref={formRef} onSubmit={handleSave} className="bg-white p-2.5 space-y-1.5">
           {activeTab === 'companyDetail' ? (
             <div className="space-y-1">
               {/* TOP SPLIT: Left (Company Fields) | Right (Large ID & Maroon Bank Box) */}
@@ -1067,8 +1364,10 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
         <div className="flex items-center justify-between px-3 py-1.5 bg-[#e2e8f0] border-t border-[#cbd5e1]">
           <div className="flex items-center gap-1.5">
             <button
+              ref={newBtnRef}
               type="button"
               onClick={handleNew}
+              title="New Company (Enter / Alt+N)"
               className={`h-[27px] px-5 text-[11px] font-bold rounded-[2px] border border-gray-400 transition-all shadow-xs ${
                 mode === 'new'
                   ? 'bg-[#1e40af] text-white ring-1 ring-blue-500'
@@ -1078,9 +1377,11 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
               New
             </button>
             <button
+              ref={editBtnRef}
               type="button"
               onClick={handleEdit}
               disabled={mode === 'edit' || mode === 'new'}
+              title="Edit Company (F2)"
               className={`h-[27px] px-5 text-[11px] font-bold rounded-[2px] border border-gray-400 transition-all shadow-xs ${
                 mode === 'edit'
                   ? 'bg-amber-500 text-white'
@@ -1090,29 +1391,36 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
               Edit
             </button>
             <button
+              ref={saveBtnRef}
               type="button"
               onClick={handleSave}
               disabled={readOnly || busy}
+              title="Save Company (Ctrl+Enter)"
               className="h-[27px] px-5 text-[11px] font-bold rounded-[2px] border border-emerald-600 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 transition-all shadow-xs"
             >
               {busy ? 'Saving...' : 'Save'}
             </button>
             <button
+              ref={cancelBtnRef}
               type="button"
               onClick={handleCancel}
               disabled={readOnly}
+              title="Cancel (Esc)"
               className="h-[27px] px-5 text-[11px] font-bold rounded-[2px] border border-gray-400 bg-white text-gray-800 hover:bg-gray-100 disabled:opacity-50 transition-all shadow-xs"
             >
               Cancel
             </button>
             <button
+              ref={findBtnRef}
               type="button"
               onClick={() => setShowFindModal(true)}
+              title="Find Company (F3)"
               className="h-[27px] px-5 text-[11px] font-bold rounded-[2px] border border-gray-400 bg-white text-gray-800 hover:bg-gray-100 transition-all shadow-xs flex items-center gap-1"
             >
               Find
             </button>
             <button
+              ref={deleteBtnRef}
               type="button"
               onClick={handleDelete}
               disabled={mode === 'new' || !selectedId}
@@ -1121,15 +1429,20 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
               Delete
             </button>
             <button
+              ref={exitBtnRef}
               type="button"
               onClick={onClose}
+              title="Exit (Esc)"
               className="h-[27px] px-5 text-[11px] font-bold rounded-[2px] border border-gray-400 bg-white text-gray-800 hover:bg-gray-100 transition-all shadow-xs"
             >
               Exit
             </button>
           </div>
-          <div className="text-[10px] text-gray-600 font-medium">
-            Press <kbd className="px-1 py-0.5 bg-gray-200 border border-gray-300 rounded font-mono">Esc</kbd> to Exit
+          <div className="text-[10px] text-gray-600 font-medium flex items-center gap-2">
+            <span><kbd className="px-1 py-0.5 bg-gray-200 border border-gray-300 rounded font-mono">Enter</kbd> Next Field</span>
+            <span><kbd className="px-1 py-0.5 bg-gray-200 border border-gray-300 rounded font-mono">Shift+Enter</kbd> Back</span>
+            <span><kbd className="px-1 py-0.5 bg-gray-200 border border-gray-300 rounded font-mono">Ctrl+Enter</kbd> Save</span>
+            <span><kbd className="px-1 py-0.5 bg-gray-200 border border-gray-300 rounded font-mono">Esc</kbd> Exit</span>
           </div>
         </div>
 
@@ -1177,6 +1490,26 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
                   placeholder="Search by company name, code, GSTIN, or city..."
                   value={findFilter}
                   onChange={(e) => setFindFilter(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setFindSelectedIndex((prev) => Math.min(prev + 1, Math.max(0, filteredCompanies.length - 1)));
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setFindSelectedIndex((prev) => Math.max(0, prev - 1));
+                    } else if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (filteredCompanies && filteredCompanies.length > 0) {
+                        const target = filteredCompanies[findSelectedIndex] || filteredCompanies[0];
+                        if (target) {
+                          handleSelectCompanyFromFind(target);
+                        }
+                      }
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setShowFindModal(false);
+                    }
+                  }}
                   className="w-full h-7 pl-8 pr-3 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:border-blue-600"
                 />
               </div>
@@ -1193,12 +1526,14 @@ export default function CompanyMasterModal({ isOpen, initialCompanyId, onClose }
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCompanies.map((c) => (
+                  {filteredCompanies.map((c, idx) => (
                     <tr
                       key={c.id}
                       onClick={() => handleSelectCompanyFromFind(c)}
-                      className={`cursor-pointer border-b hover:bg-blue-50 ${
-                        String(c.id) === String(selectedId) ? 'bg-blue-100 font-bold' : ''
+                      className={`cursor-pointer border-b transition-colors ${
+                        idx === findSelectedIndex
+                          ? 'bg-blue-100 font-bold text-blue-900 border-l-4 border-blue-600'
+                          : 'hover:bg-blue-50'
                       }`}
                     >
                       <td className="p-1.5 font-mono">{c.coCode}</td>

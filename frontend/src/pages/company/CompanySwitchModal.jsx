@@ -125,12 +125,49 @@ export default function CompanySwitchModal({ isOpen, panel, onClose }) {
     }
   };
 
-  const onKeyDown = (e) => {
-    if (e.key !== 'Enter' || view !== 'list') return;
-    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'TEXTAREA') return;
-    e.preventDefault();
-    switchTo(selected);
-  };
+  useEffect(() => {
+    if (!isOpen || view !== 'list') return undefined;
+
+    const handleKeyDown = (e) => {
+      // Don't intercept if user is typing in input or textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const currentIndex = rows.findIndex((row) => String(row.id) === String(selected));
+        if (currentIndex < rows.length - 1) {
+          setSelected(String(rows[currentIndex + 1].id));
+        } else if (rows.length > 0 && currentIndex === -1) {
+          setSelected(String(rows[0].id));
+        }
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const currentIndex = rows.findIndex((row) => String(row.id) === String(selected));
+        if (currentIndex > 0) {
+          setSelected(String(rows[currentIndex - 1].id));
+        }
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        if (e.target.tagName === 'BUTTON') return;
+        e.preventDefault();
+        switchTo(selected);
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [isOpen, view, rows, selected, busy]);
 
   if (view === 'new' || view === 'master') {
     return (
@@ -149,7 +186,7 @@ export default function CompanySwitchModal({ isOpen, panel, onClose }) {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={view === 'year' ? 'Change Year' : view === 'info' ? 'Information' : 'Company'} className="max-w-2xl">
-      <div className="px-5 py-4" onKeyDown={onKeyDown}>
+      <div className="px-5 py-4">
         {view === 'list' && (
           <div className="space-y-4">
             <table className="w-full text-xs border border-[var(--border)]">
@@ -164,13 +201,17 @@ export default function CompanySwitchModal({ isOpen, panel, onClose }) {
                 {rows.map((row) => (
                   <tr
                     key={row.id}
-                    className={String(row.id) === String(selected) ? 'bg-blue-50' : 'hover:bg-[var(--bg-subtle)]'}
+                    className={`cursor-pointer transition-colors ${
+                      String(row.id) === String(selected)
+                        ? 'bg-blue-100 font-bold text-blue-900 border-l-4 border-blue-600'
+                        : 'hover:bg-blue-50'
+                    }`}
                     onClick={() => setSelected(String(row.id))}
                     onDoubleClick={() => switchTo(row.id)}
                   >
-                    <td className="p-2">{row.name}</td>
-                    <td className="p-2">{row.year}</td>
-                    <td className="p-2">{row.coCode}</td>
+                    <td className="p-2 uppercase font-medium">{row.name}</td>
+                    <td className="p-2 font-mono">{row.year}</td>
+                    <td className="p-2 font-mono">{row.coCode}</td>
                   </tr>
                 ))}
                 {!rows.length && (
@@ -178,7 +219,7 @@ export default function CompanySwitchModal({ isOpen, panel, onClose }) {
                 )}
               </tbody>
             </table>
-            <div className="flex justify-between gap-2">
+            <div className="flex justify-between items-center gap-2">
               <div className="flex items-center gap-2">
                 <button type="button" className="h-8 px-3 text-xs border border-[var(--border)] rounded hover:bg-gray-100" onClick={() => setView('new')}>
                   New Company Creation
@@ -189,7 +230,10 @@ export default function CompanySwitchModal({ isOpen, panel, onClose }) {
                   </button>
                 )}
               </div>
-              <button type="button" className="h-8 px-4 text-xs rounded bg-[var(--accent)] text-white" disabled={busy} onClick={() => switchTo(selected)}>OK</button>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-gray-500 font-medium">Use <kbd className="px-1 py-0.5 bg-gray-200 border rounded font-mono">↑</kbd> <kbd className="px-1 py-0.5 bg-gray-200 border rounded font-mono">↓</kbd> then <kbd className="px-1 py-0.5 bg-gray-200 border rounded font-mono">Enter</kbd></span>
+                <button type="button" className="h-8 px-5 text-xs font-bold rounded bg-[var(--accent)] hover:opacity-90 text-white shadow-xs" disabled={busy} onClick={() => switchTo(selected)}>OK</button>
+              </div>
             </div>
           </div>
         )}
