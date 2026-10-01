@@ -367,7 +367,7 @@ async function startServer(opts = {}) {
 }
 
 if (!process.env.VERCEL && require.main === module) {
-  const PORT = process.env.PORT || 5000;
+  const PORT = process.env.PORT || (process.env.NODE_ENV === 'production' ? 5010 : 5000);
   ensureDbBoot()
     .then(() => {
       server = app.listen(PORT, () => {
