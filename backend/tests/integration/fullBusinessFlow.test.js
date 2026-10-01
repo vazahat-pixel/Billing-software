@@ -330,7 +330,7 @@ describe('Full business flow with critical fixes', () => {
       const AuditLog = require('../../models/AuditLog');
       const audit = await AuditLog.findOne({
         referenceId: note._id,
-        action: { $in: ['CREATE_CREDIT_NOTE', 'CREATE_DEBIT_NOTE'] }
+        action: { $in: ['CREATE_CREDIT_NOTE', 'CREATE_DEBIT_NOTE', 'CREATE_SALES_CREDIT_NOTE', 'CREATE_PURCHASE_DEBIT_NOTE'] }
       });
       assert.ok(audit, 'Audit log should exist for note creation');
     }

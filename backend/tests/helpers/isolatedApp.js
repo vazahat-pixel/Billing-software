@@ -39,12 +39,23 @@ async function bootIsolatedApp(extraEnv = {}) {
 
   assertNotProduction(process.env.MONGO_URI);
 
+  const realStartSession = mongoose.startSession.bind(mongoose);
+  mongoose.startSession = async function () {
+    const session = await realStartSession();
+    session.startTransaction = () => {};
+    session.commitTransaction = async () => {};
+    session.abortTransaction = async () => {};
+    session.inTransaction = () => false;
+    return session;
+  };
+
   return {
     app,
     mongoose,
     request,
     uri,
     async shutdown() {
+      mongoose.startSession = realStartSession;
       await stopMemoryDb();
     },
   };

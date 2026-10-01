@@ -171,10 +171,13 @@ async function runPostConnectHooks() {
     logger.warn('entitlement cache hooks failed to install', { error: err.message });
   }
   try {
-    require('./services/cacheService').init();
-    require('./services/jobQueueService').startWorker({
-      intervalMs: Number(process.env.JOB_POLL_MS || 5000),
-    });
+    const isTest = process.env.NODE_ENV === 'test';
+    const isDesktop = String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+    if (!isTest) {
+      require('./services/jobQueueService').startWorker({
+        intervalMs: Number(process.env.JOB_POLL_MS || 5000),
+      });
+    }
     const jobQueue = require('./services/jobQueueService');
     const backupService = require('./services/backupService');
     jobQueue.registerHandler('backup.run', async (job) => {
@@ -183,8 +186,7 @@ async function runPostConnectHooks() {
     });
 
     const dunningMs = Number(process.env.DUNNING_INTERVAL_MS ?? 21600000);
-    const isDesktop = String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
-    if (!isDesktop && dunningMs > 0) {
+    if (!isDesktop && !isTest && dunningMs > 0) {
       const dunningService = require('./services/dunningService');
       const run = () => {
         dunningService.runDunningSweep().catch((e) =>
@@ -226,11 +228,20 @@ if (process.env.MONGO_DEBUG === 'true') {
 }
 
 app.get(['/health', '/api/health'], (req, res) => {
-  res.json({
+  const isMongoConnected = mongoose.connection.readyState === 1;
+  let appVersion = '1.0.0';
+  try {
+    appVersion = require('./package.json').version || '1.0.0';
+  } catch {
+    /* ignore */
+  }
+  res.status(200).json({
     success: true,
-    message: 'ok',
+    message: isMongoConnected ? 'ok' : 'degraded',
     data: {
-      mongo: mongoose.connection.readyState === 1 ? 'up' : 'down',
+      status: isMongoConnected ? 'healthy' : 'degraded',
+      mongo: isMongoConnected ? 'up' : 'down',
+      version: process.env.npm_package_version || appVersion,
       env: process.env.NODE_ENV || 'development',
       uptimeSec: Math.round((Date.now() - startedAt) / 1000),
     },
@@ -245,9 +256,19 @@ app.get(['/health/live', '/api/health/live'], (req, res) => {
 
 app.get(['/health/ready', '/api/health/ready'], (req, res) => {
   const ready = mongoose.connection.readyState === 1;
+  let appVersion = '1.0.0';
+  try {
+    appVersion = require('./package.json').version || '1.0.0';
+  } catch {
+    /* ignore */
+  }
   res.status(ready ? 200 : 503).json({
     success: ready,
-    data: { status: ready ? 'ready' : 'not_ready', mongo: ready ? 'up' : 'down' },
+    data: {
+      status: ready ? 'ready' : 'not_ready',
+      mongo: ready ? 'up' : 'down',
+      version: process.env.npm_package_version || appVersion,
+    },
   });
 });
 

@@ -3,7 +3,7 @@
  * Production deployment file
  *
  * Usage from repo root:
- *   pm2 startOrReload deploy/ecosystem.config.cjs
+ *   pm2 startOrReload ecosystem.config.cjs
  * or:
  *   pm2 reload billing-api --update-env
  */

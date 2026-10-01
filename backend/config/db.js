@@ -13,6 +13,8 @@ const MONGO_OPTIONS = {
 
 let isConnecting = false;
 let retryCount = 0;
+let isShuttingDown = false;
+let reconnectTimer = null;
 const MAX_RETRIES = 5;
 const INITIAL_RETRY_DELAY_MS = 2000;
 
@@ -20,6 +22,7 @@ const INITIAL_RETRY_DELAY_MS = 2000;
  * Connects to MongoDB with retry logic and configures connection handlers.
  */
 async function connectDB() {
+  isShuttingDown = false;
   const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/billing_software';
 
   if (mongoose.connection.readyState === 1) {
@@ -45,6 +48,9 @@ async function connectDB() {
     });
 
     mongoose.connection.on('disconnected', () => {
+      if (isShuttingDown || process.env.NODE_ENV === 'test') {
+        return;
+      }
       logger.warn('MongoDB disconnected. Attempting to reconnect...');
       scheduleReconnect();
     });
@@ -88,9 +94,18 @@ async function attemptConnection(uri) {
 }
 
 function scheduleReconnect() {
+  if (isShuttingDown || process.env.NODE_ENV === 'test') {
+    return;
+  }
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
   if (mongoose.connection.readyState === 0 && !isConnecting) {
     const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/billing_software';
-    setTimeout(() => {
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      if (isShuttingDown) return;
       attemptConnection(uri).catch((err) => {
         logger.error('Scheduled reconnect failed', { error: err.message });
       });
@@ -128,6 +143,11 @@ function dbCheckMiddleware(req, res, next) {
 }
 
 async function disconnectDB() {
+  isShuttingDown = true;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
   if (mongoose.connection.readyState !== 0) {
     await mongoose.disconnect();
     logger.info('MongoDB disconnected cleanly');

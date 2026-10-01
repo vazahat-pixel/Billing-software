@@ -143,8 +143,11 @@ EOF
 
 echo "==> Backend dependencies + migrate + seed"
 cd "$BACKEND_DIR"
-rm -rf node_modules package-lock.json
-npm install --omit=dev --no-audit --no-fund
+if [ -f "package-lock.json" ]; then
+  npm ci --omit=dev --no-audit --no-fund || npm install --omit=dev --no-audit --no-fund
+else
+  npm install --omit=dev --no-audit --no-fund
+fi
 npm run migrate || true
 node seed.js || true
 
@@ -161,8 +164,11 @@ cd "$FRONTEND_DIR"
 # Empty VITE_API_URL => browser uses relative /api (nginx proxies it)
 rm -f .env.production.local
 printf 'VITE_API_URL=\n' > .env.production.local
-rm -rf node_modules package-lock.json
-npm install --no-audit --no-fund
+if [ -f "package-lock.json" ]; then
+  npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+else
+  npm install --no-audit --no-fund
+fi
 npm run build
 
 mkdir -p "$WEB_ROOT"
