@@ -23,8 +23,8 @@ git reset --hard origin/main
 echo ""
 echo "⚙️  [2/4] Updating & Restarting Backend..."
 cd "$SCRIPT_DIR/backend"
-if [ ! -d "node_modules" ]; then
-  echo "Installing backend dependencies..."
+if [ ! -d "node_modules" ] || ! node -e "require('mongoose')" >/dev/null 2>&1; then
+  echo "Installing / repairing backend dependencies..."
   npm install --omit=dev --no-audit --no-fund
 fi
 
