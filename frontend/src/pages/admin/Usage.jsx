@@ -30,7 +30,7 @@ const Usage = () => {
             </motion.div>
 
             {/* Filters */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-4 flex flex-col sm:flex-row gap-4">
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass-card p-4 flex flex-col sm:flex-row gap-4" style={{ overflow: 'visible', position: 'relative', zIndex: 40 }}>
                 <div className="flex-1">
                     <label className="dark-input__label">Filter by Company</label>
                     <AdminCompanySelect

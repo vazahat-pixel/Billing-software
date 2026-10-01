@@ -455,7 +455,7 @@ const DynamicConfig = () => {
         </div>
       </motion.div>
 
-      <div className="glass-card" style={{ padding: 14 }}>
+      <div className="glass-card" style={{ padding: 14, overflow: 'visible', position: 'relative', zIndex: 40 }}>
         <label className="dark-input__label">Select Company</label>
         <AdminCompanySelect
           companies={companies}

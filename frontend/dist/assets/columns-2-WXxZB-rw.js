@@ -1,0 +1,6 @@
+import{c as o}from"./index-QtGGEsFl.js";/**
+ * @license lucide-react v1.28.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const t=[["rect",{width:"18",height:"18",x:"3",y:"3",rx:"2",key:"afitv7"}],["path",{d:"M12 3v18",key:"108xh3"}]],e=o("columns-2",t);export{e as C};

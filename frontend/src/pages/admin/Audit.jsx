@@ -62,7 +62,7 @@ const Audit = () => {
             </motion.div>
 
             {/* Filters */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-4 flex flex-col sm:flex-row gap-4">
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-4 flex flex-col sm:flex-row gap-4" style={{ overflow: 'visible', position: 'relative', zIndex: 40 }}>
                 <div className="flex items-center gap-2 text-slate-600">
                     <Filter size={14} />
                 </div>

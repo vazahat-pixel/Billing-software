@@ -325,7 +325,7 @@ const ModuleControl = () => {
             </motion.div>
 
             {/* Company Selector */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card" style={{ padding: 14 }}>
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card" style={{ padding: 14, overflow: 'visible', position: 'relative', zIndex: 40 }}>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, minWidth: 200 }}>
                         <label className="dark-input__label">Select Company to Configure</label>

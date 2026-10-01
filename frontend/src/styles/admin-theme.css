@@ -418,6 +418,12 @@
 }
 .glass-card::before { display: none; }
 
+.glass-card:has(.admin-company-select-box),
+.glass-card.glass-card--overflow-visible,
+.glass-card--overflow-visible {
+  overflow: visible !important;
+}
+
 .glass-card-hover:hover {
   border-color: var(--admin-border-hover);
   box-shadow: var(--admin-shadow-md);
