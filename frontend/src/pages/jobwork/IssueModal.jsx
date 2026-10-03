@@ -9,6 +9,7 @@ import AccountMasterModal from '../masters/AccountMasterModal';
 import PuBillLookupModal from './PuBillLookupModal';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import JobWorkPrint from '../../components/print/JobWorkPrint';
+import { peekBillNo } from '../../utils/nextBillNo';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -329,8 +330,31 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     }));
   }, [jobWorkEntries, lotSort]);
 
-  const resetForm = useCallback(() => {
-    setForm(emptyForm(selectedBook));
+  const getNextChallanNo = useCallback(async () => {
+    const maxFromStore = (jobWorkEntries || []).reduce((max, j) => {
+      const raw = String(j.challanNo || j.jobCardNo || '').trim();
+      const n = parseInt(raw, 10);
+      if (!isNaN(n) && String(n) === raw && n > max) return n;
+      return max;
+    }, 0);
+
+    let nextFromCounter = 1;
+    try {
+      const peeked = await peekBillNo('job');
+      const num = parseInt(peeked, 10);
+      if (!isNaN(num) && num > 0) nextFromCounter = num;
+    } catch {
+      nextFromCounter = 1;
+    }
+
+    return String(Math.max(maxFromStore + 1, nextFromCounter));
+  }, [jobWorkEntries]);
+
+  const resetForm = useCallback((nextChallan = '') => {
+    setForm({
+      ...emptyForm(selectedBook),
+      ...(nextChallan ? { challanNo: nextChallan } : {}),
+    });
     setSelectedJobId('');
     setFindOpen(false);
   }, [selectedBook]);
@@ -414,6 +438,10 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         const jobs = results[4] || [];
         if (initialData) {
           applyPurchasePrefill(initialData, lots, purchaseList, partyList);
+          getNextChallanNo().then((nextNo) => {
+            if (!cancelled) setField('challanNo', nextNo);
+          });
+          setMode('Add');
           setTimeout(() => {
             const millInput = document.querySelector('input[placeholder*="Search Mill"]');
             millInput?.focus();
@@ -426,10 +454,13 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
             return new Date(a.issueDate || a.createdAt || 0) - new Date(b.issueDate || b.createdAt || 0);
           });
           const latest = sorted[sorted.length - 1];
-          if (latest) loadJob(latest._id || latest.id, 'View');
-          else {
+          if (latest) {
+            loadJob(latest._id || latest.id, 'View');
+          } else {
             setMode('Add');
-            resetForm();
+            getNextChallanNo().then((nextNo) => {
+              if (!cancelled) resetForm(nextNo);
+            });
           }
         }
       })
@@ -440,7 +471,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     return () => {
       cancelled = true;
     };
-  }, [isOpen, selectedBook, initialData, applyPurchasePrefill, fetchParties, fetchItems, fetchPurchases, fetchInventory, fetchJobs, resetForm]);
+  }, [isOpen, selectedBook, initialData, applyPurchasePrefill, fetchParties, fetchItems, fetchPurchases, fetchInventory, fetchJobs, resetForm, getNextChallanNo]);
 
   const applyPuBillRow = (row) => {
     if (!row) return;
@@ -562,10 +593,11 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     toast.success(`Mill "${party.name}" added`);
   };
 
-  const handleNew = () => {
+  const handleNew = async () => {
     setMode('Add');
     setFromPurchase(null);
-    resetForm();
+    const nextNo = await getNextChallanNo();
+    resetForm(nextNo);
     setTimeout(() => {
       const el = document.querySelector('[data-erp-start="challan"]');
       if (!el || el.disabled) return;
@@ -579,9 +611,10 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     setMode('Edit');
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (mode === 'Add') {
-      resetForm();
+      const nextNo = await getNextChallanNo();
+      resetForm(nextNo);
       return;
     }
     setMode('View');
@@ -767,7 +800,8 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       const remaining = fromPurchase ? findLotsFromPurchase(lots || [], fromPurchase) : [];
 
       if (keepOpen) {
-        const base = { ...emptyForm(selectedBook), millId, procType, finish, jobRate };
+        const nextNo = await getNextChallanNo();
+        const base = { ...emptyForm(selectedBook), challanNo: nextNo, millId, procType, finish, jobRate };
         setMode('Add');
         setSelectedJobId('');
         if (remaining.length) {
@@ -777,6 +811,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
           const puRate = lot.rate ?? lot.purchaseRate ?? lot.avgRate ?? '';
           setForm({
             ...base,
+            challanNo: nextNo,
             lotId,
             itemName,
             issPcs: String(lot.remainingPcs ?? ''),
@@ -790,6 +825,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
           toast.info('Ready for next challan (same mill)');
         }
       } else if (remaining.length) {
+        const nextNo = await getNextChallanNo();
         const lot = remaining[0];
         const lotId = lot._id || lot.id;
         const itemName = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
@@ -797,6 +833,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         setMode('Add');
         setForm({
           ...emptyForm(selectedBook),
+          challanNo: nextNo,
           millId,
           procType,
           finish,
@@ -812,7 +849,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         toast.success(`Next lot from purchase ready (${remaining.length} left)`);
       } else {
         if (fromPurchase) setFromPurchase(null);
-        handleNew();
+        await handleNew();
         setMode('View');
         setFindOpen(true);
       }

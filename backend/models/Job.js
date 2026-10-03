@@ -50,6 +50,7 @@ const JobSchema = new mongoose.Schema({
   toleranceWastagePct: { type: Number, default: 3, min: 0 },
   processCharges: { type: Number, default: 0, min: 0 },
   processGstAmount: { type: Number, default: 0, min: 0 },
+  roundOff: { type: Number, default: 0 },
   /** Bill-wise settlement of Job Work Charges via Payment voucher (mirrors Purchase.paidAmount). */
   chargesPaidAmount: { type: Number, default: 0, min: 0 },
   finishedLotId: {

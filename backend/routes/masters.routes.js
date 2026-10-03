@@ -7,6 +7,9 @@ const { objectIdParam } = require('../validators');
 router.post('/merge/parties', requirePermission('masters', 'update'), masterDataController.mergeParties);
 router.post('/merge/items', requirePermission('masters', 'update'), masterDataController.mergeItems);
 router.post('/import', requirePermission('masters', 'create'), masterDataController.importMasters);
+router.post('/import/suggest-mappings', requirePermission('masters', 'create'), masterDataController.suggestMappings);
+router.post('/import/preview', requirePermission('masters', 'create'), masterDataController.previewImport);
+router.post('/import/execute', requirePermission('masters', 'create'), masterDataController.executeImport);
 router.get('/export', requirePermission('masters', 'read'), masterDataController.exportMasters);
 
 router.get('/financial-years', requirePermission('masters', 'read'), masterDataController.listFinancialYears);

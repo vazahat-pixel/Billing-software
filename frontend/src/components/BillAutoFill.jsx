@@ -299,7 +299,7 @@ const BillAutoFill = ({ parties = [], items = [], disabled = false, onApply, onM
           <input
             ref={inputRef}
             type="file"
-            accept="image/*,.pdf,application/pdf"
+            accept=".pdf,application/pdf,.jpg,.jpeg,.png,.webp,.bmp,image/*"
             className="hidden"
             disabled={disabled || busy}
             onChange={handleFile}
@@ -309,11 +309,14 @@ const BillAutoFill = ({ parties = [], items = [], disabled = false, onApply, onM
             className="classic-erp-btn btn-blue flex items-center gap-1 text-[11px]"
             disabled={disabled || busy}
             onClick={() => inputRef.current?.click()}
-            title="Upload PDF or photo of purchase bill from supplier"
+            title="Upload supplier bill (PDF or JPG/PNG image). Automatically reads Bill No, Date, Vendor, & Line Items."
           >
             <Upload size={12} />
-            {busy ? 'Reading…' : 'Upload Bill PDF / Photo'}
+            {busy ? 'Reading…' : 'Upload Bill (PDF / Photo)'}
           </button>
+          <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">
+            (PDF, JPG, PNG)
+          </span>
           <button
             type="button"
             className="classic-erp-btn flex items-center gap-1 text-[11px]"

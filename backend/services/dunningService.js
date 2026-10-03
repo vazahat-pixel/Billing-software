@@ -18,12 +18,17 @@ function reminderKey(daysLeft) {
 }
 
 async function runDunningSweep() {
-  const companies = await Company.find({ isActive: { $ne: false } }).select('_id name status ownerId').lean();
+  const companies = await Company.find({ isActive: { $ne: false } }).select('_id name status ownerId commercialPolicy isQaTenant').lean();
   const results = { checked: 0, reminded: 0, suspended: 0, errors: 0 };
+
+  const bypass = String(process.env.ALLOW_SUBSCRIPTION_BYPASS || '').toLowerCase() === 'true';
 
   for (const c of companies) {
     results.checked += 1;
     try {
+      if (bypass || c.commercialPolicy === 'legacy_open' || c.isQaTenant) {
+        continue;
+      }
       const ent = await entitlementService.resolve(c._id, { fresh: true });
       const owner = c.ownerId
         ? await User.findById(c.ownerId).select('name email').lean()

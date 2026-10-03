@@ -59,7 +59,35 @@ function plainCounterId(companyId, module) {
 async function peekNext(companyId, module) {
   assertBillModule(module);
   const row = await Counter.findById(plainCounterId(companyId, module)).lean();
-  return (Number(row?.seq) || 0) + 1;
+  let next = (Number(row?.seq) || 0) + 1;
+  if (module === 'job') {
+    try {
+      const Job = require('../models/Job');
+      const jobs = await Job.find({ companyId }).select('jobCardNo challanNo').lean();
+      let max = 0;
+      for (const j of jobs) {
+        const v1 = parseInt(String(j.jobCardNo || '').trim(), 10);
+        if (!isNaN(v1) && String(v1) === String(j.jobCardNo || '').trim()) {
+          if (v1 > max) max = v1;
+        }
+        const v2 = parseInt(String(j.challanNo || '').trim(), 10);
+        if (!isNaN(v2) && String(v2) === String(j.challanNo || '').trim()) {
+          if (v2 > max) max = v2;
+        }
+      }
+      if (max >= next) {
+        next = max + 1;
+        await Counter.findByIdAndUpdate(
+          plainCounterId(companyId, module),
+          { $max: { seq: max } },
+          { upsert: true }
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return next;
 }
 
 async function setNext(companyId, module, next) {
@@ -116,6 +144,36 @@ async function reserveNumber(companyId, module, requested, session = null) {
 
 async function allocateNext(companyId, module, { session = null } = {}) {
   if (BILL_NUMBER_MODULES.some((m) => m.module === module)) {
+    if (module === 'job') {
+      try {
+        const Job = require('../models/Job');
+        const query = Job.find({ companyId }).select('jobCardNo challanNo');
+        if (session) query.session(session);
+        const jobs = await query.lean();
+        let max = 0;
+        for (const j of jobs) {
+          const v1 = parseInt(String(j.jobCardNo || '').trim(), 10);
+          if (!isNaN(v1) && String(v1) === String(j.jobCardNo || '').trim()) {
+            if (v1 > max) max = v1;
+          }
+          const v2 = parseInt(String(j.challanNo || '').trim(), 10);
+          if (!isNaN(v2) && String(v2) === String(j.challanNo || '').trim()) {
+            if (v2 > max) max = v2;
+          }
+        }
+        if (max > 0) {
+          const opts = { upsert: true };
+          if (session) opts.session = session;
+          await Counter.findOneAndUpdate(
+            { _id: plainCounterId(companyId, module) },
+            { $max: { seq: max } },
+            opts
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     const seq = await Counter.nextSeq(plainCounterId(companyId, module), session);
     return {
       number: String(seq),

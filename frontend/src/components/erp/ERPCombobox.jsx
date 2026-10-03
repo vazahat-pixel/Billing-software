@@ -158,7 +158,8 @@ export default function ERPCombobox({
       e.preventDefault();
       if (!open) {
         setOpen(true);
-        setActiveIdx(0);
+        const currentIdx = filtered.findIndex((o) => String(o.value) === String(value));
+        setActiveIdx(currentIdx >= 0 ? Math.min(currentIdx + 1, listCount - 1) : 0);
         return;
       }
       setActiveIdx((i) => Math.min(i + 1, listCount - 1));
@@ -169,6 +170,8 @@ export default function ERPCombobox({
       e.preventDefault();
       if (!open) {
         setOpen(true);
+        const currentIdx = filtered.findIndex((o) => String(o.value) === String(value));
+        setActiveIdx(currentIdx >= 0 ? Math.max(currentIdx - 1, 0) : 0);
         return;
       }
       setActiveIdx((i) => Math.max(i - 1, 0));
@@ -189,7 +192,8 @@ export default function ERPCombobox({
         e.stopPropagation();
         setOpen(true);
         setQuery('');
-        setActiveIdx(0);
+        const currentIdx = filtered.findIndex((o) => String(o.value) === String(value));
+        setActiveIdx(currentIdx >= 0 ? currentIdx : 0);
         return;
       }
       if (open && listCount > 0) {
@@ -199,15 +203,6 @@ export default function ERPCombobox({
           onCreateNew(query.trim());
           setOpen(false);
           setQuery('');
-          return;
-        }
-        // Already filled and the user did not type a search: keep the value and move on.
-        if (!query.trim() && selected) {
-          setOpen(false);
-          setQuery('');
-          requestAnimationFrame(() => {
-            if (inputRef.current) focusNextField(inputRef.current);
-          });
           return;
         }
         const opt = filtered[activeIdx];
@@ -335,6 +330,8 @@ export default function ERPCombobox({
             if (!disabled && !readOnly) {
               setOpen(true);
               setQuery('');
+              const currentIdx = filtered.findIndex((o) => String(o.value) === String(value));
+              setActiveIdx(currentIdx >= 0 ? currentIdx : 0);
             }
           }}
           onChange={(e) => {

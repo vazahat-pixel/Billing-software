@@ -21,6 +21,17 @@ const round2 = (n) => Number(Number(n || 0).toFixed(2));
 /** Mirrors toPaise() in accountingController — keeps the two rules from disagreeing. */
 const toPaise = (n) => Math.round(Number(n || 0) * 100);
 
+/** Formats amount cleanly: whole numbers without decimal point (.00), fractions with 2 decimals */
+const fmtAmt = (val) => {
+  if (val == null || val === '') return '0';
+  const n = Number(val);
+  if (Number.isNaN(n)) return '0';
+  if (Number.isInteger(n) || Math.abs(n - Math.round(n)) < 0.001) {
+    return String(Math.round(n));
+  }
+  return n.toFixed(2);
+};
+
 const newIdempotencyKey = () =>
   `cbb-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
@@ -120,8 +131,10 @@ const CashBankBookModal = ({
   const openedRef = useRef(false);
   /** BillNo cells, indexed by row — drives the Enter → select → next-line loop. */
   const billNoRefs = useRef([]);
+  const adjustRefs = useRef([]);
   /** Row to focus once the grid has re-rendered; a ref so it costs no extra render. */
   const pendingFocusRowRef = useRef(null);
+  const pendingFocusAdjustRef = useRef(null);
   /** Esc from the bill list must not immediately reopen it on the same cell. */
   const suppressLookupRef = useRef(false);
   const advanceLookupRef = useRef(false);
@@ -138,6 +151,7 @@ const CashBankBookModal = ({
     date: todayISO(),
     chequeNo: '',
     chequeDate: todayISO(),
+    clearDate: todayISO(),
     partyBank: '',
     partyId: '',
     amount: 0,
@@ -237,11 +251,13 @@ const CashBankBookModal = ({
         return String(pid || '') === String(header.partyId) && doc.status !== 'cancelled';
       })
       .map((doc) => {
-        const total = round2(doc.netAmount || doc.totalAmount || 0);
-        const paid = round2(doc.paidAmount || 0);
-        const rawOs = round2(Math.max(0, total - paid));
+        // Enforce round-off on invoice amounts so paise fractions (< ₹1) are rounded to nearest whole rupee
+        const rawTotal = Number(doc.netAmount || doc.totalAmount || 0);
+        const total = Math.round(rawTotal);
+        const paid = Math.round(Number(doc.paidAmount || 0));
+        const rawOs = Math.max(0, total - paid);
         // Business round-off rule: residual paise (< ₹1) is considered 0 (fully settled)
-        const outstanding = rawOs < 1.00 ? 0 : rawOs;
+        const outstanding = rawOs < 1.00 ? 0 : Math.round(rawOs);
         const billDt = doc.date ? new Date(doc.date).toISOString().split('T')[0] : '';
         const osDy = billDt
           ? Math.max(0, Math.floor((Date.now() - new Date(billDt).getTime()) / 86400000))
@@ -260,16 +276,18 @@ const CashBankBookModal = ({
       .filter((inv) => inv.osAmt >= 1.00);
 
     // Job Workers don't have Sales/Purchase invoices — what they're owed is the Job Work
-    // Charges posted on Job Receive (job.processCharges + processGstAmount). Fold those in
+    // Charges posted on Job Receive (job.processCharges + processGstAmount + roundOff). Fold those in
     // as bills too, or a Job Worker's party would never show anything to settle against.
     const jobBills = (jobWorkEntries || [])
       .filter((j) => String(j.workerId?._id || j.workerId || '') === String(header.partyId))
       .filter((j) => j.status === 'Received' && (Number(j.processCharges || 0) + Number(j.processGstAmount || 0)) > 0)
       .map((j) => {
-        const billAmt = round2(Number(j.processCharges || 0) + Number(j.processGstAmount || 0));
-        const paid = round2(j.chargesPaidAmount || 0);
-        const rawOs = round2(Math.max(0, billAmt - paid));
-        const outstanding = rawOs < 1.00 ? 0 : rawOs;
+        // Job work billing round-off rule: round to whole rupee
+        const rawBillAmt = Number(j.processCharges || 0) + Number(j.processGstAmount || 0) + Number(j.roundOff || 0);
+        const billAmt = Math.round(rawBillAmt);
+        const paid = Math.round(Number(j.chargesPaidAmount || 0));
+        const rawOs = Math.max(0, billAmt - paid);
+        const outstanding = rawOs < 1.00 ? 0 : Math.round(rawOs);
         const billDt = j.receiveDate ? new Date(j.receiveDate).toISOString().split('T')[0] : '';
         const osDy = billDt
           ? Math.max(0, Math.floor((Date.now() - new Date(billDt).getTime()) / 86400000))
@@ -348,10 +366,10 @@ const CashBankBookModal = ({
     if (selectedParty) {
       const recv = Number(selectedParty.outstandingReceivable || 0);
       const pay = Number(selectedParty.outstandingPayable || 0);
-      if (voucherType === 'Receipt') return recv || billsOutstandingTotal;
-      return pay || billsOutstandingTotal;
+      const raw = voucherType === 'Receipt' ? (recv || billsOutstandingTotal) : (pay || billsOutstandingTotal);
+      return Math.round(raw);
     }
-    return billsOutstandingTotal;
+    return Math.round(billsOutstandingTotal);
   }, [selectedParty, billsOutstandingTotal, voucherType]);
 
   const viewList = useMemo(() => {
@@ -395,7 +413,7 @@ const CashBankBookModal = ({
       date: todayISO(),
       chequeNo: '',
       chequeDate: todayISO(),
-      clearDate: '',
+      clearDate: todayISO(),
       partyBank: '',
       partyId: '',
       amount: 0,
@@ -607,6 +625,19 @@ const CashBankBookModal = ({
       };
       return next;
     });
+    // Immediately queue focus on Adjust for this row so user can verify or press Enter
+    pendingFocusAdjustRef.current = idx;
+  };
+
+  const advanceToNextBillRow = (currentIdx) => {
+    const nextIdx = currentIdx + 1;
+    setBillRows((prev) => {
+      if (nextIdx < prev.length) {
+        return prev;
+      }
+      return [...prev, emptyBillRow()];
+    });
+    pendingFocusRowRef.current = nextIdx;
   };
 
   const closeBillLookup = () => {
@@ -630,13 +661,34 @@ const CashBankBookModal = ({
     }
   }, [billRows]);
 
+  useEffect(() => {
+    if (pendingFocusAdjustRef.current != null) {
+      const target = pendingFocusAdjustRef.current;
+      pendingFocusAdjustRef.current = null;
+      setTimeout(() => {
+        const el = adjustRefs.current[target];
+        if (el) {
+          el.focus();
+          el.select?.();
+        }
+      }, 50);
+    }
+  }, [billRows]);
+
   const removeBillRow = (idx) => {
     setBillRows((rows) => withPickerRow(rows.filter((_, i) => i !== idx)));
   };
 
   const setH = (key) => (e) => {
     const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setHeader((h) => ({ ...h, [key]: val }));
+    setHeader((h) => {
+      const next = { ...h, [key]: val };
+      if (key === 'date') {
+        if (!h.chequeDate || h.chequeDate === h.date) next.chequeDate = val;
+        if (!h.clearDate || h.clearDate === h.date) next.clearDate = val;
+      }
+      return next;
+    });
   };
 
   /** Party already has this bank — just select it, no master screen needed. New name?
@@ -708,8 +760,8 @@ const CashBankBookModal = ({
       slipNo: v.slipNo || '',
       date: v.date ? new Date(v.date).toISOString().split('T')[0] : todayISO(),
       chequeNo: v.chequeNo || '',
-      chequeDate: v.chequeDate ? new Date(v.chequeDate).toISOString().split('T')[0] : todayISO(),
-      clearDate: v.clearDate ? new Date(v.clearDate).toISOString().split('T')[0] : '',
+      chequeDate: v.chequeDate ? new Date(v.chequeDate).toISOString().split('T')[0] : (v.date ? new Date(v.date).toISOString().split('T')[0] : todayISO()),
+      clearDate: v.clearDate ? new Date(v.clearDate).toISOString().split('T')[0] : (v.date ? new Date(v.date).toISOString().split('T')[0] : todayISO()),
       partyBank: v.partyBank || '',
       partyId: resolvedPartyId,
       amount: v.amount || 0,
@@ -1123,7 +1175,14 @@ const CashBankBookModal = ({
                     <option value="N">N</option>
                     <option value="Y">Y</option>
                   </select>
-                  <input type="text" className="classic-erp-input" value={header.intBillNo} onChange={setH('intBillNo')} disabled={locked} />
+                  <input
+                    type="text"
+                    className="classic-erp-input"
+                    value={header.intBillNo}
+                    onChange={setH('intBillNo')}
+                    disabled={locked || header.intBillFlag !== 'Y'}
+                    data-enter-skip={header.intBillFlag !== 'Y' ? 'true' : undefined}
+                  />
                 </div>
               </div>
               {isBankReceipt && (
@@ -1149,12 +1208,35 @@ const CashBankBookModal = ({
                     <span className="classic-erp-label">Date:</span>
                     <input type="date" className="classic-erp-input" value={header.chequeDate} onChange={setH('chequeDate')} disabled={locked} />
                   </div>
-                  <div className="classic-erp-field cb-f-clear" data-enter-skip>
+                  <div className="classic-erp-field cb-f-clear">
                     <span className="classic-erp-label">Clear Dt:</span>
                     <input type="date" className="classic-erp-input" value={header.clearDate} onChange={setH('clearDate')} disabled={locked} title="Date the cheque/transfer cleared the bank" />
                   </div>
-                  <div className="classic-erp-field cb-f-pbank">
-                    <span className="classic-erp-label">P.Bank:</span>
+                </>
+              )}
+              <div className="cash-bank-meta-right">
+                <span>{fmtAmt(closingBal)}</span>
+                <span>{header.scCode || 'SC27'}</span>
+              </div>
+            </div>
+
+            {/* Field order here IS the Enter-key order: Party → P.Bank → Bank/Cash → Amount → Acc/Bill → BillNo. */}
+            <div className="cash-bank-row cash-bank-row--pack">
+              <div className="classic-erp-field cb-f-party" ref={partyFieldRef}>
+                <span className="classic-erp-label">Party:</span>
+                <ERPCombobox
+                  value={header.partyId}
+                  onChange={(val) => setHeader((h) => ({ ...h, partyId: val, partyBank: '' }))}
+                  options={partyOptions}
+                  placeholder="Search party…"
+                  disabled={locked}
+                  recentKey="cash-bank-party"
+                />
+              </div>
+
+              {isBankReceipt && (
+                <div className="classic-erp-field cb-f-pbank">
+                  <span className="classic-erp-label">P.Bank:</span>
                   <div className="classic-erp-control">
                     <ERPCombobox
                       value={header.partyBank}
@@ -1194,30 +1276,10 @@ const CashBankBookModal = ({
                     )}
                   </div>
                 </div>
-                </>
               )}
-              <div className="cash-bank-meta-right">
-                <span>{Number(closingBal || 0).toFixed(2)}</span>
-                <span>{header.scCode || 'SC27'}</span>
-              </div>
-            </div>
-
-            {/* Field order here IS the Enter-key order: Party → Bank/Cash → Amount → Acc/Bill → BillNo. */}
-            <div className="cash-bank-row cash-bank-row--pack">
-              <div className="classic-erp-field cb-f-party" ref={partyFieldRef}>
-                <span className="classic-erp-label">Party:</span>
-                <ERPCombobox
-                  value={header.partyId}
-                  onChange={(val) => setHeader((h) => ({ ...h, partyId: val, partyBank: '' }))}
-                  options={partyOptions}
-                  placeholder="Search party…"
-                  disabled={locked}
-                  recentKey="cash-bank-party"
-                />
-              </div>
               <div className="cash-bank-clbal">
                 <span className="classic-erp-label">Cl.Bal</span>
-                <span className="font-mono">{Number(closingBal || 0).toFixed(2)}</span>
+                <span className="font-mono">{fmtAmt(closingBal)}</span>
               </div>
               <div className="classic-erp-field cb-f-bank">
                 <span className="classic-erp-label">{isBank ? 'Bank:' : 'Cash:'}</span>
@@ -1268,11 +1330,11 @@ const CashBankBookModal = ({
                 >
                   <div className={`cash-bank-paid-chip ${amountMismatch ? 'is-mismatch' : 'is-ok'}`}>
                     <span>Paid</span>
-                    <b>{paidTotal.toFixed(2)}</b>
+                    <b>{fmtAmt(paidTotal)}</b>
                   </div>
                   <div className={`cash-bank-paid-chip ${amountMismatch ? 'is-mismatch' : ''}`}>
                     <span>UnPaid</span>
-                    <b>{unpaidTotal.toFixed(2)}</b>
+                    <b>{fmtAmt(unpaidTotal)}</b>
                   </div>
                 </div>
               )}
@@ -1371,18 +1433,32 @@ const CashBankBookModal = ({
                           if (!String(row.billNo || '').length) openBillLookup(idx);
                         }}
                         onKeyDown={(e) => {
-                          // Reference ERP: SpaceBar → Open O/S Bill, F4 → Open Bill, Del → Delete Row.
-                          // Enter keeps working too, and Space/Del only fire on an empty cell so
-                          // neither one is stolen from ordinary typing.
                           const cellEmpty = !String(row.billNo || '').length;
-                          if (e.key === 'Enter' || e.key === 'F4' || (e.key === ' ' && cellEmpty)) {
+                          if (e.key === 'F4' || (e.key === ' ' && cellEmpty)) {
                             e.preventDefault();
                             e.stopPropagation();
                             openBillLookup(idx);
+                          } else if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (cellEmpty) {
+                              if (suppressLookupRef.current) {
+                                suppressLookupRef.current = false;
+                                document.querySelector('.cash-bank-footer-grid input')?.focus();
+                              } else {
+                                openBillLookup(idx);
+                              }
+                            } else {
+                              adjustRefs.current[idx]?.focus();
+                              adjustRefs.current[idx]?.select?.();
+                            }
                           } else if (e.key === 'Delete' && (e.ctrlKey || e.shiftKey || cellEmpty)) {
                             e.preventDefault();
                             pendingFocusRowRef.current = Math.max(0, idx - 1);
                             removeBillRow(idx);
+                          } else if (e.key === 'ArrowDown' && cellEmpty && idx === billRows.length - 1) {
+                            e.preventDefault();
+                            document.querySelector('.cash-bank-footer-grid input')?.focus();
                           }
                         }}
                         placeholder="Pick bill"
@@ -1399,17 +1475,63 @@ const CashBankBookModal = ({
                     <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.rd || ''} onChange={(e) => updateRow(idx, 'rd', Number(e.target.value))} disabled={locked} /></td>
                     <td className="text-center font-mono">{row.osDy || 0}</td>
                     <td><input type="text" className="classic-erp-input w-full border-0 bg-transparent" value={row.billType} onChange={(e) => updateRow(idx, 'billType', e.target.value)} disabled={locked} /></td>
-                    <td className="text-right font-mono pr-1">{Number(row.osAmt || 0).toFixed(2)}</td>
-                    <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right font-bold text-blue-900" value={row.adjust || ''} onChange={(e) => updateRow(idx, 'adjust', Number(e.target.value))} disabled={locked} /></td>
+                    <td className="text-right font-mono pr-1">{fmtAmt(row.osAmt)}</td>
+                    <td>
+                      <input
+                        ref={(el) => { adjustRefs.current[idx] = el; }}
+                        type="number"
+                        className="classic-erp-input w-full border-0 bg-transparent text-right font-bold text-blue-900"
+                        value={row.adjust || ''}
+                        onChange={(e) => updateRow(idx, 'adjust', Number(e.target.value))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            advanceToNextBillRow(idx);
+                          }
+                        }}
+                        disabled={locked}
+                      />
+                    </td>
                     <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.jvDis || ''} onChange={(e) => updateRow(idx, 'jvDis', Number(e.target.value))} disabled={locked} /></td>
                     <td><input type="text" className="classic-erp-input w-full border-0 bg-transparent text-center" value={row.pq} onChange={(e) => updateRow(idx, 'pq', e.target.value)} disabled={locked} /></td>
                     <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.disPer || ''} onChange={(e) => updateRow(idx, 'disPer', Number(e.target.value))} disabled={locked} /></td>
-                    <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.discount || ''} onChange={(e) => updateRow(idx, 'discount', Number(e.target.value))} disabled={locked} /></td>
+                    <td>
+                      <input
+                        type="number"
+                        className="classic-erp-input w-full border-0 bg-transparent text-right"
+                        value={row.discount || ''}
+                        onChange={(e) => updateRow(idx, 'discount', Number(e.target.value))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            advanceToNextBillRow(idx);
+                          }
+                        }}
+                        disabled={locked}
+                      />
+                    </td>
                     <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.interest || ''} onChange={(e) => updateRow(idx, 'interest', Number(e.target.value))} disabled={locked} /></td>
                     <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.oth1 || ''} onChange={(e) => updateRow(idx, 'oth1', Number(e.target.value))} disabled={locked} /></td>
                     <td><input type="number" className="classic-erp-input w-full border-0 bg-transparent text-right" value={row.oth2 || ''} onChange={(e) => updateRow(idx, 'oth2', Number(e.target.value))} disabled={locked} /></td>
-                    <td><input type="text" className="classic-erp-input w-full border-0 bg-transparent text-center" value={row.bc} onChange={(e) => updateRow(idx, 'bc', e.target.value)} disabled={locked} /></td>
-                    <td className="text-right font-mono font-bold pr-1">{Number(row.netOs || 0).toFixed(2)}</td>
+                    <td>
+                      <input
+                        type="text"
+                        className="classic-erp-input w-full border-0 bg-transparent text-center"
+                        value={row.bc}
+                        onChange={(e) => updateRow(idx, 'bc', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            advanceToNextBillRow(idx);
+                          }
+                        }}
+                        disabled={locked}
+                      />
+                    </td>
+                    <td className="text-right font-mono font-bold pr-1">{fmtAmt(row.netOs)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1474,27 +1596,27 @@ const CashBankBookModal = ({
                     type="text"
                     className="classic-erp-input text-right font-mono"
                     style={amountMismatch ? { color: '#b91c1c', fontWeight: 700 } : undefined}
-                    value={unpaidTotal.toFixed(2)}
+                    value={fmtAmt(unpaidTotal)}
                     readOnly
                   />
                 </div>
                 <div className="classic-erp-field classic-erp-field--xs">
                   <span className="classic-erp-label">Paid:</span>
-                  <input type="text" className="classic-erp-input text-right font-mono font-bold" value={paidTotal.toFixed(2)} readOnly />
+                  <input type="text" className="classic-erp-input text-right font-mono font-bold" value={fmtAmt(paidTotal)} readOnly />
                 </div>
               </div>
             </div>
             <div className="classic-erp-frame" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ flex: 1, minHeight: 40, borderRadius: 4, border: '1px solid #f59e0b', background: '#fff59d', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', display: 'flex', flexWrap: 'wrap', gap: '2px 6px', alignContent: 'flex-start' }}>
-                <span>( B.AMT- {breakdownTotals.billAmt.toFixed(0)} )</span>
-                <span>( TDS- {breakdownTotals.tds.toFixed(0)} )</span>
-                <span>( RG- {breakdownTotals.rg.toFixed(0)} )</span>
-                <span>( CLAIM- {breakdownTotals.claim.toFixed(0)} )</span>
-                <span>( RD- {breakdownTotals.rd.toFixed(0)} )</span>
-                <span>( DISC- {breakdownTotals.discount.toFixed(0)} )</span>
-                <span>( INT- {breakdownTotals.interest.toFixed(0)} )</span>
-                <span>( OTH1- {breakdownTotals.oth1.toFixed(0)} )</span>
-                <span>( OTH2- {breakdownTotals.oth2.toFixed(0)} )</span>
+                <span>( B.AMT- {fmtAmt(breakdownTotals.billAmt)} )</span>
+                <span>( TDS- {fmtAmt(breakdownTotals.tds)} )</span>
+                <span>( RG- {fmtAmt(breakdownTotals.rg)} )</span>
+                <span>( CLAIM- {fmtAmt(breakdownTotals.claim)} )</span>
+                <span>( RD- {fmtAmt(breakdownTotals.rd)} )</span>
+                <span>( DISC- {fmtAmt(breakdownTotals.discount)} )</span>
+                <span>( INT- {fmtAmt(breakdownTotals.interest)} )</span>
+                <span>( OTH1- {fmtAmt(breakdownTotals.oth1)} )</span>
+                <span>( OTH2- {fmtAmt(breakdownTotals.oth2)} )</span>
               </div>
               {/* Receipt vs allocation, recomputed on every keystroke (spec §6). */}
               <div
@@ -1510,14 +1632,14 @@ const CashBankBookModal = ({
                 }}
               >
                 <span className="text-slate-600">{receivedAmount > 0 ? 'Received' : 'Received (from bills)'}</span>
-                <span className="text-right font-mono font-bold">{effectiveReceived.toFixed(2)}</span>
+                <span className="text-right font-mono font-bold">{fmtAmt(effectiveReceived)}</span>
                 <span className="text-slate-600">Allocated ({allocatedBillCount} bill{allocatedBillCount === 1 ? '' : 's'})</span>
-                <span className="text-right font-mono font-bold">{paidTotal.toFixed(2)}</span>
+                <span className="text-right font-mono font-bold">{fmtAmt(paidTotal)}</span>
                 <span className={amountMismatch ? 'text-red-700 font-bold' : 'text-slate-600'}>
                   {amountMismatch ? 'Check Amount' : 'Difference'}
                 </span>
                 <span className={`text-right font-mono font-bold ${amountMismatch ? 'text-red-700' : 'text-green-700'}`}>
-                  {unpaidTotal.toFixed(2)}
+                  {fmtAmt(unpaidTotal)}
                 </span>
               </div>
               <div className="text-center text-xs text-slate-500">AVG DAYS: {avgDays.toFixed(2)}</div>

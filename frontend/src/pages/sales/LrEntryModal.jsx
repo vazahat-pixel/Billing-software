@@ -138,6 +138,13 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
           savedKeep.current.set(String(entry.id), { ...bill, ...entry, lrNo: entry.lrNo });
         }
       });
+      // Synchronously update Zustand store so sales has the LR info immediately
+      useStore.setState((state) => ({
+        sales: (state.sales || []).map((s) => {
+          const entry = entries.find((e) => String(e.id) === String(s._id || s.id));
+          return entry ? { ...s, ...entry } : s;
+        }),
+      }));
       await fetchSales();
       setLrData((prev) => {
         const next = { ...prev };
@@ -166,7 +173,14 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
     try {
       await salesApi.bulkUpdateLr([buildEntry(id, lr)]);
       toast.success(`Bill #${bill.invoiceNo} ka LR save!`);
-      savedKeep.current.set(String(id), { ...bill, ...buildEntry(id, lr) });
+      const updatedRow = { ...bill, ...buildEntry(id, lr) };
+      savedKeep.current.set(String(id), updatedRow);
+      // Synchronously update Zustand store so sales has the LR info immediately
+      useStore.setState((state) => ({
+        sales: (state.sales || []).map((s) =>
+          String(s._id || s.id) === String(id) ? { ...s, ...buildEntry(id, lr) } : s
+        ),
+      }));
       await fetchSales();
       setLrData((prev) => ({
         ...prev,
@@ -458,7 +472,16 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
           </div>
         </div>
       </div>
-      {printId && <SalesPrint invoiceId={printId} onClose={() => setPrintId(null)} />}
+      {printId && (
+        <SalesPrint
+          invoiceId={printId}
+          invoice={
+            savedKeep.current.get(String(printId)) ||
+            (sales || []).find((s) => String(s._id || s.id) === String(printId))
+          }
+          onClose={() => setPrintId(null)}
+        />
+      )}
     </div>,
     document.body
   );

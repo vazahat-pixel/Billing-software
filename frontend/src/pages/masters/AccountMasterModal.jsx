@@ -5,6 +5,7 @@ import { ERPSelect } from '../../components/forms/FormElements';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
+import DataImportModal from '../../components/import/DataImportModal';
 
 const EMPTY_ACCOUNT = {
   name: '',
@@ -61,6 +62,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   const [selectedPartyId, setSelectedPartyId] = useState('');
   const [saving, setSaving] = useState(false);
   const [bootLoading, setBootLoading] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   
   const [formData, setFormData] = useState({ ...EMPTY_ACCOUNT });
 
@@ -274,6 +276,13 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
         <div className="classic-erp-header">
           <span>Account Master — {formData.group || 'SUNDRY DEBTORS'}</span>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowImport(true)}
+              className="text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-300 rounded px-2 py-0.5 cursor-pointer"
+            >
+              📥 Import (Excel)
+            </button>
             <span style={{ fontSize: 10, opacity: 0.85, fontWeight: 500 }}>{mode} Mode</span>
             <button type="button" className="classic-erp-close-btn" onClick={onClose}>×</button>
           </div>
@@ -595,7 +604,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
         <div className="classic-erp-form-footer">
           <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving}>New</button>
           <button className="classic-erp-btn" type="button" onClick={handleEdit} disabled={readOnly || mode !== 'View' || saving}>Edit</button>
-          <button className="classic-erp-btn btn-blue" type="button" onClick={handleSave} disabled={locked || saving || bootLoading}>
+          <button className="classic-erp-btn btn-blue" type="button" data-enter-save="true" onClick={handleSave} disabled={locked || saving || bootLoading}>
             <SaveButtonLabel saving={saving} />
           </button>
           <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked || saving}>Cancel</button>
@@ -604,6 +613,14 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
           <button className="classic-erp-btn" type="button" onClick={onClose} disabled={saving}>Exit</button>
         </div>
       </div>
+      <DataImportModal
+        isOpen={showImport}
+        onClose={() => {
+          setShowImport(false);
+          fetchParties?.();
+        }}
+        initialEntity="party"
+      />
     </Modal>
   );
 };

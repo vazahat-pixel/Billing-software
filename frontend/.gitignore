@@ -11,6 +11,11 @@ node_modules
 # dist/ is tracked for pre-built VPS deployment
 !dist/
 !dist/**
+dist/downloads/
+dist/downloads/**
+public/downloads/
+public/downloads/**
+*.exe
 dist-ssr
 *.local
 

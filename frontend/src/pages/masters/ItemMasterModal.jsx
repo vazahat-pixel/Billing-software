@@ -4,6 +4,7 @@ import { ERPInput, ERPSelect, FormField } from '../../components/forms/FormEleme
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
 import useStore from '../../store/useStore';
+import DataImportModal from '../../components/import/DataImportModal';
 
 const GST_OPTIONS = [
   { value: 'GST 5%', label: 'GST 5%', rate: 5 },
@@ -87,6 +88,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
   const [formData, setFormData] = useState(emptyForm());
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -234,19 +236,28 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
         </>
       )}
     >
-      <div className="flex border-b border-[var(--border)] px-4 pt-2 gap-1 shrink-0">
-        {['Add', 'View'].map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-              activeTab === tab ? 'bg-[var(--blue-bg)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-base)]'
-            }`}
-          >
-            {tab === 'Add' ? (editId ? 'Edit Item' : 'Add Item') : `View List (${items.length})`}
-          </button>
-        ))}
+      <div className="flex items-center justify-between border-b border-[var(--border)] px-4 pt-2 gap-1 shrink-0">
+        <div className="flex gap-1">
+          {['Add', 'View'].map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                activeTab === tab ? 'bg-[var(--blue-bg)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-base)]'
+              }`}
+            >
+              {tab === 'Add' ? (editId ? 'Edit Item' : 'Add Item') : `View List (${items.length})`}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowImport(true)}
+          className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition shadow-sm"
+        >
+          📥 Import Items (Excel)
+        </button>
       </div>
 
       {activeTab === 'View' ? (
@@ -404,6 +415,14 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
           </FormField>
         </div>
       )}
+      <DataImportModal
+        isOpen={showImport}
+        onClose={() => {
+          setShowImport(false);
+          fetchItems?.();
+        }}
+        initialEntity="item"
+      />
     </Modal>
   );
 };

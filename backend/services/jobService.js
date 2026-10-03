@@ -67,6 +67,9 @@ class JobService {
         issueData.jobCardNo || issueData.challanNo,
         session
       );
+      if (!issueData.challanNo) {
+        issueData.challanNo = issueData.jobCardNo;
+      }
 
       if (issueData.jobCardNo && issueData.jobCardNo !== 'AUTO') {
         const existingJob = await Job.findOne({ jobCardNo: issueData.jobCardNo, companyId }).session(session);
@@ -342,6 +345,8 @@ class JobService {
       const gstBase = previouslyReceivedQty > 0 ? Number(job.processGstAmount || 0) : 0;
       job.processCharges = Number((chargesBase + charges).toFixed(2));
       job.processGstAmount = Number((gstBase + gstAmount).toFixed(2));
+      const preRound = job.processCharges + job.processGstAmount;
+      job.roundOff = Number((Math.round(preRound) - preRound).toFixed(2));
       job.status = isFinal ? 'Received' : 'Partial';
       job.receiveDate = new Date();
       job.billGpNo = billGpNo || job.billGpNo || '';

@@ -9,9 +9,21 @@ node_modules/
 # Build output
 /dist/
 dist-ssr/
+frontend/dist/downloads/
+frontend/public/downloads/
+downloads/
+*.exe
 !frontend/dist/
-!frontend/dist/**
+!frontend/dist/assets/
+!frontend/dist/assets/**
+!frontend/dist/index.html
+!frontend/dist/favicon*
+!frontend/dist/icon*
+!frontend/dist/manifest*
+!frontend/dist/*.svg
 build/
+desktop/dist/
+desktop/renderer/
 .vite/
 *.local
 
@@ -72,8 +84,12 @@ backend/scratch/
 scratch/
 backend/scripts/seedFeatureSetup.js
 
-# PDF / binary assets not needed in repo
+# PDF / binary / executable assets not needed in repo (GitHub 100MB limit)
 *.pdf
+*.exe
+frontend/public/downloads/
+frontend/dist/downloads/
+downloads/
 
 # Optional local tooling
 .cursor/

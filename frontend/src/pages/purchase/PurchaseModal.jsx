@@ -20,7 +20,7 @@ import ErpKeyboardHintBar, { FORM_KEYBOARD_HINTS } from '../../components/erp/Er
 import useErpWindow from '../../hooks/useErpWindow';
 import { erpConfirm } from '../../utils/confirm';
 import { resolveParty, buildWhatsAppMessage, openWhatsAppShare, shareInvoiceWhatsApp } from '../../utils/invoiceHelpers';
-import { getFocusableElements, handleFormEnterKeyDown, handleFormArrowKeyDown } from '../../utils/formEnterNavigation';
+import { getFocusableElements, focusNextField, handleFormEnterKeyDown, handleFormArrowKeyDown } from '../../utils/formEnterNavigation';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import useConfigStore from '../../store/useConfigStore';
 import { resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
@@ -28,7 +28,7 @@ import { money, lineTaxable } from '../../utils/salesBillCalc';
 import PcsBreakdownModal from '../sales/PcsBreakdownModal';
 
 const today = () => new Date().toISOString().split('T')[0];
-const DEFAULT_UNITS = ['PCS', 'KGS', 'NETQTY', 'QTY'];
+const DEFAULT_UNITS = ['MTRS', 'PCS', 'KGS', 'NETQTY', 'QTY'];
 
 // Fold Less/Add (the % adjustment entered in the Fold cell) applies to Qty- AND Pcs-billed
 // lines — matching the reference software, where a piece-billed item (e.g. a garment) gets
@@ -271,15 +271,35 @@ const PurchaseModal = ({
       _amountManual: false,
     }, 'pcsDetails');
     setPcsBreakdown({ open: false, lineIdx: -1, calcType: 'Mts' });
+
+    // Focus Rate field directly after Pcs breakdown so user can continue typing
+    setTimeout(() => {
+      const table = modalContainerRef.current?.querySelector('.classic-erp-table');
+      const trs = table?.querySelectorAll('tbody tr');
+      const targetRow = trs?.[idx];
+      const rateInput = targetRow?.querySelector('.col-rate input') || targetRow?.querySelectorAll('td')?.[7]?.querySelector('input');
+      rateInput?.focus();
+      rateInput?.select?.();
+    }, 60);
   };
 
-  const focusRowItem = (rowIndex) => {
+  const focusRowItem = (rowIndex, attempt = 0) => {
     const table = modalContainerRef.current?.querySelector('.classic-erp-table');
     const trs = table?.querySelectorAll('tbody tr');
-    const input = trs?.[rowIndex]?.querySelector('[data-erp-combobox-input], input:not([disabled])');
-    if (table?.parentElement) table.parentElement.scrollLeft = 0;
-    input?.focus();
-    try { input?.select?.(); } catch { /* ignore */ }
+    const targetRow = trs?.[rowIndex];
+    if (!targetRow) {
+      if (attempt < 15) {
+        setTimeout(() => focusRowItem(rowIndex, attempt + 1), 35);
+      }
+      return;
+    }
+    const gridPanel = modalContainerRef.current?.querySelector('.erp-grid-panel') || table?.parentElement;
+    if (gridPanel) gridPanel.scrollLeft = 0;
+    const input = targetRow.querySelector('[data-erp-combobox-input], input:not([disabled]):not([readonly])');
+    if (input) {
+      input.focus();
+      try { input.select?.(); } catch { /* ignore */ }
+    }
   };
 
   const handleLineComplete = (idx, e) => {
@@ -294,9 +314,7 @@ const PurchaseModal = ({
     }
 
     setGridItems((prev) => [...prev, blankLine()]);
-    setTimeout(() => {
-      focusRowItem(idx + 1);
-    }, 50);
+    setTimeout(() => focusRowItem(idx + 1), 40);
   };
 
   const lineQty = (row) => {
@@ -339,20 +357,24 @@ const PurchaseModal = ({
     let foldLessAmt = 0;
     let foldAddAmt = 0;
     let baseAmt = grossAmt;
+    const rawFold = Number(row.fold) || 0;
+
     if (isNetQty && !row._amountManual) {
-      const fold = Number(row.fold || 0);
-      foldDeductionAmt = Number(((grossAmt * (100 - fold)) / 100).toFixed(2));
-      baseAmt = Number((grossAmt - foldDeductionAmt).toFixed(2));
+      if (rawFold > 0 && rawFold < 100) {
+        foldDeductionAmt = Number(((grossAmt * (100 - rawFold)) / 100).toFixed(2));
+        baseAmt = Number((grossAmt - foldDeductionAmt).toFixed(2));
+      }
     }
 
     // Step 2b (Qty/Pcs units): Fold Less / Fold Add
+    // Fold applies only when explicitly entered (rawFold > 0 and rawFold !== 100).
+    // If empty (0) or standard (100), NO deduction or addition is made!
     if (isQty && !row._amountManual) {
-      const fold = Number(row.fold ?? 100);
-      if (fold < 100) {
-        foldLessAmt = Number(((grossAmt * (100 - fold)) / 100).toFixed(2));
+      if (rawFold > 0 && rawFold < 100) {
+        foldLessAmt = Number(((grossAmt * (100 - rawFold)) / 100).toFixed(2));
         baseAmt = Number((grossAmt - foldLessAmt).toFixed(2));
-      } else if (fold > 100) {
-        foldAddAmt = Number(((grossAmt * (fold - 100)) / 100).toFixed(2));
+      } else if (rawFold > 100) {
+        foldAddAmt = Number(((grossAmt * (rawFold - 100)) / 100).toFixed(2));
         baseAmt = Number((grossAmt + foldAddAmt).toFixed(2));
       }
     }
@@ -818,28 +840,78 @@ const PurchaseModal = ({
   const handleCreateBroker = (search) => setInlineModal({ type: 'account', target: 'broker', initialData: { name: search, group: 'BROKER' } });
   const handleCreateItem = (search, index) => setInlineModal({ type: 'item', initialData: { itemName: search }, rowIndex: index });
 
+  const focusAfterParty = () => {
+    setTimeout(() => {
+      const brokerInput = modalContainerRef.current?.querySelector('.erp-sales-broker-row [data-erp-combobox-input], .erp-sales-broker-row input, .erp-sales-broker-row select');
+      if (brokerInput) {
+        brokerInput.focus();
+        try { brokerInput.select?.(); } catch {}
+      } else {
+        focusPurchaseBillNo();
+      }
+    }, 120);
+  };
+
+  const focusAfterBroker = () => {
+    setTimeout(() => {
+      const nextEl = modalContainerRef.current?.querySelector('.erp-sales-broker-row select:not([disabled]), .erp-sales-bill-meta input:not([disabled])');
+      if (nextEl) {
+        nextEl.focus();
+      } else {
+        focusPurchaseBillNo();
+      }
+    }, 120);
+  };
+
   const handleAccountSuccess = (newAccount) => {
     fetchParties();
     const id = newAccount._id || newAccount.id;
-    if (inlineModal.target === 'broker') {
+    const target = inlineModal.target;
+    setInlineModal({ type: null, target: 'party', initialData: null, rowIndex: null });
+
+    if (target === 'broker') {
       setHeader(prev => ({ ...prev, broker: id }));
+      focusAfterBroker();
       return;
     }
     setHeader(prev => ({
       ...prev, party: id, add: newAccount.address || '', gstin: newAccount.gstin || '', city: newAccount.station || newAccount.city || ''
     }));
+    focusAfterParty();
   };
 
   const handleItemSuccess = (newItem) => {
     fetchItems();
-    if (inlineModal.rowIndex == null) return;
-    patchLine(inlineModal.rowIndex, {
+    const rIdx = inlineModal.rowIndex;
+    setInlineModal({ type: null, target: 'party', initialData: null, rowIndex: null });
+    if (rIdx == null) return;
+
+    const itemUnit = String(newItem.unit || 'MTRS').toUpperCase();
+    if (itemUnit) {
+      setExtraUnits(prev => prev.includes(itemUnit) ? prev : [...prev, itemUnit]);
+    }
+
+    patchLine(rIdx, {
       itemId: newItem._id || newItem.id,
       itemName: newItem.itemName || newItem.name || '',
-      rate: newItem.purRate || newItem.purchaseRate || 0,
-      unit: String(newItem.unit || 'MTRS').toUpperCase(),
+      rate: Number(newItem.purRate || newItem.purchaseRate || 0),
+      unit: itemUnit || 'MTRS',
       gstPer: Number(newItem.gstRate || 0),
-    });
+    }, 'itemId');
+
+    setTimeout(() => {
+      const table = modalContainerRef.current?.querySelector('.classic-erp-table');
+      const trs = table?.querySelectorAll('tbody tr');
+      const rowTr = trs?.[rIdx];
+      if (rowTr) {
+        const inputs = Array.from(rowTr.querySelectorAll('input:not([disabled]):not([readonly]), select:not([disabled])'));
+        const nextInput = inputs.find(el => !el.hasAttribute('data-erp-combobox-input') && !el.closest('[data-erp-combobox]'));
+        if (nextInput) {
+          nextInput.focus();
+          try { nextInput.select(); } catch {}
+        }
+      }
+    }, 150);
   };
 
   const focusPurchaseBillNo = () => {
@@ -1119,10 +1191,15 @@ const PurchaseModal = ({
   );
 
   const brokerOptions = useMemo(
-    () =>
-      parties
+    () => {
+      const list = parties
         .filter((p) => p.type === 'Broker')
-        .map((p) => ({ value: p._id || p.id, label: p.name })),
+        .map((p) => ({ value: p._id || p.id, label: p.name }));
+      return [
+        { value: '', label: '- None (Direct) -' },
+        ...list,
+      ];
+    },
     [parties]
   );
 
@@ -1150,9 +1227,7 @@ const PurchaseModal = ({
     const fromItems = items.map((i) => String(i.unit || '').trim().toUpperCase()).filter(Boolean);
     const fromLines = gridItems.map((r) => String(r.unit || '').trim().toUpperCase()).filter(Boolean);
     const all = [...DEFAULT_UNITS, ...fromItems, ...fromLines, ...extraUnits.map((u) => String(u).toUpperCase())];
-    return [...new Set(all)]
-      .filter((u) => u !== 'MTRS' && u !== 'ROLL')
-      .map((u) => ({ value: u, label: u }));
+    return [...new Set(all.filter(Boolean))].map((u) => ({ value: u, label: u }));
   }, [items, gridItems, extraUnits]);
 
   const handleCreateUnit = (name, idx) => {
@@ -1317,38 +1392,41 @@ const PurchaseModal = ({
                 </div>
               )}
 
-              {/* Vendor left | Bill + Challan right (same as sales) */}
+              {/* Vendor left | Bill right (same as sales) */}
               <div className="classic-erp-frame classic-erp-header-split erp-sales-top shrink-0">
                 <div className="classic-erp-stack classic-erp-header-bill">
                   <div className="classic-erp-meta-grid erp-sales-bill-meta">
-                    <div className="classic-erp-field">
+                    <div className="classic-erp-field" style={{ gridColumn: 'span 2' }}>
                       <span className="classic-erp-label red-label">Supp. Bill *:</span>
-                      <input ref={suppBillRef} type="text" className="classic-erp-input" value={header.billNo} placeholder="Supp Bill No…" onChange={e => setHeader({ ...header, billNo: e.target.value })} disabled={locked} />
-                    </div>
-                    <div className="classic-erp-field">
-                      <span className="classic-erp-label">Date *:</span>
-                      <input type="date" className="classic-erp-input" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
+                      <input
+                        ref={suppBillRef}
+                        type="text"
+                        className="classic-erp-input"
+                        style={{ width: '100%', maxWidth: 'none' }}
+                        value={header.billNo}
+                        placeholder="Supp Bill No…"
+                        onChange={e => setHeader({ ...header, billNo: e.target.value })}
+                        disabled={locked}
+                      />
                     </div>
                   </div>
                   <div className="classic-erp-meta-grid erp-sales-ref-meta">
                     {billFields.header('vNo') && (
-                    <div className="classic-erp-field">
-                      <span className="classic-erp-label">Voucher:</span>
-                      <input type="text" className="classic-erp-input" value={header.vNo} readOnly />
-                    </div>
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label">Voucher:</span>
+                        <input type="text" className="classic-erp-input" value={header.vNo} readOnly />
+                      </div>
                     )}
-                    {billFields.header('challanNo') && (
                     <div className="classic-erp-field">
-                      <span className="classic-erp-label">Challan:</span>
-                      <input type="text" className="classic-erp-input" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
+                      <span className="classic-erp-label red-label">Date *:</span>
+                      <input
+                        type="date"
+                        className="classic-erp-input"
+                        value={header.billDate}
+                        onChange={e => setHeader({ ...header, billDate: e.target.value })}
+                        disabled={locked}
+                      />
                     </div>
-                    )}
-                    {billFields.header('chDate') && (
-                    <div className="classic-erp-field">
-                      <span className="classic-erp-label">Ch Date:</span>
-                      <input type="date" className="classic-erp-input" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
-                    </div>
-                    )}
                   </div>
                 </div>
 
@@ -1394,8 +1472,9 @@ const PurchaseModal = ({
                             value={header.broker}
                             onChange={(val) => setHeader({ ...header, broker: val })}
                             options={brokerOptions}
-                            placeholder="Search broker…"
+                            placeholder="Search broker / None…"
                             disabled={locked}
+                            allowClear
                             recentKey="purchase-broker"
                             onCreateNew={!locked ? (q) => handleCreateBroker(q) : undefined}
                             createLabel="Broker"
@@ -1528,11 +1607,12 @@ const PurchaseModal = ({
                           <div className="flex items-center w-full relative">
                             <input
                               type="number"
+                              data-enter-action="true"
                               className="classic-erp-input w-full text-center border-0 font-bold"
                               value={row.pcs > 0 ? row.pcs : ''}
                               onChange={e => patchLine(idx, { pcs: Number(e.target.value) || 0, _mtsManual: false }, 'pcs')}
                               onKeyDown={(e) => {
-                                if (e.key === '#') {
+                                if (e.key === '#' || e.key === 'Enter') {
                                   e.preventDefault();
                                   e.stopPropagation();
                                   openPcsBreakdown(idx);
@@ -1543,14 +1623,21 @@ const PurchaseModal = ({
                               min="0"
                               step="1"
                               placeholder="0"
-                              title="Press # or double click to open Pcs/Kgs breakdown"
+                              title="Press Enter or # to open Pcs/Kgs breakdown"
                             />
                             {!locked && (
                               <button
                                 type="button"
-                                tabIndex={-1}
-                                data-enter-skip="true"
+                                tabIndex={0}
+                                data-enter-action="true"
                                 onClick={() => openPcsBreakdown(idx)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openPcsBreakdown(idx);
+                                  }
+                                }}
                                 title="Open detailed Kgs/Pcs breakdown"
                                 className="px-1 text-[10px] text-blue-600 hover:text-blue-800 font-bold shrink-0 border-l border-slate-200"
                               >
@@ -1562,22 +1649,21 @@ const PurchaseModal = ({
                         <td className="col-qty">
                           <input type="number" className="classic-erp-input w-full text-center border-0" value={row.mts > 0 ? row.mts : ''} onChange={e => patchLine(idx, { mts: Number(e.target.value) || 0, _mtsManual: true, _amountManual: false }, 'mts')} disabled={locked} min="0" step="0.001" placeholder="0.000" title="Auto = Cut × Pcs. Type to override." />
                         </td>
-                        <td className="col-qty">
+                        <td className="col-qty col-rate">
                           <input type="number" className="classic-erp-input w-full text-right border-0" value={row.rate || ''} onChange={e => patchLine(idx, { rate: Number(e.target.value) })} disabled={locked} />
                         </td>
                         <td className="col-unit">
                           <ERPCombobox
-                            value={row.unit || 'MTRS'}
-                            onChange={(val) => patchLine(idx, { unit: String(val || 'MTRS').toUpperCase() })}
+                            value={String(row.unit || 'MTRS').toUpperCase()}
+                            onChange={(val) => patchLine(idx, { unit: String(val || 'MTRS').toUpperCase(), _amountManual: false })}
                             options={unitOptions}
                             placeholder="Unit…"
                             disabled={locked}
-                            recentKey="purchase-unit"
                             openOnEnter
                             onCreateNew={!locked ? (q) => handleCreateUnit(q, idx) : undefined}
                             createLabel="Unit"
                             emptyMessage="No unit — type & Create"
-                            inputClassName="border-0 text-center"
+                            inputClassName="border-0 text-center font-bold"
                           />
                         </td>
                         <td className="col-amt">
@@ -1602,6 +1688,7 @@ const PurchaseModal = ({
                           <input
                             type="number"
                             step="0.01"
+                            data-enter-action={calculations.isUnregistered ? 'true' : undefined}
                             className="classic-erp-input w-full text-right border-0"
                             value={row.addAmt || ''}
                             onChange={e => patchLine(idx, { addAmt: Number(e.target.value) })}
@@ -1618,6 +1705,7 @@ const PurchaseModal = ({
                           <input
                             type="number"
                             step="0.01"
+                            data-enter-action="true"
                             className="classic-erp-input w-full text-right border-0 font-mono font-bold text-blue-800"
                             value={calculations.isUnregistered ? 0 : (row.gstAmt || '')}
                             onChange={e => patchLine(idx, { gstAmt: Number(e.target.value) })}
@@ -1774,7 +1862,18 @@ const PurchaseModal = ({
 
         <PcsBreakdownModal
           isOpen={pcsBreakdown.open}
-          onClose={() => setPcsBreakdown({ open: false, lineIdx: -1, calcType: 'Mts' })}
+          onClose={() => {
+            const lineIdx = pcsBreakdown.lineIdx;
+            setPcsBreakdown({ open: false, lineIdx: -1, calcType: 'Mts' });
+            if (lineIdx >= 0) {
+              setTimeout(() => {
+                const table = modalContainerRef.current?.querySelector('.classic-erp-table');
+                const trs = table?.querySelectorAll('tbody tr');
+                const pcsInput = trs?.[lineIdx]?.querySelector('.col-num input[data-enter-action]');
+                pcsInput?.focus();
+              }, 60);
+            }
+          }}
           rows={pcsBreakdown.lineIdx >= 0 ? gridItems[pcsBreakdown.lineIdx]?.pcsDetails || [] : []}
           initialCalcType={pcsBreakdown.calcType}
           onSave={handlePcsBreakdownSave}

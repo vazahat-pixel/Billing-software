@@ -1,6 +1,6 @@
 appId: com.textileerp.desktop
 productName: Textile ERP
-copyright: Copyright © Textile ERP
+copyright: Copyright (C) Textile ERP
 directories:
   output: dist
   buildResources: assets
@@ -9,21 +9,16 @@ files:
   - preload.js
   - updater.js
   - machineId.js
+  - config.json
   - config.example.json
   - localRuntime/**/*
   - renderer/**/*
   - assets/**/*
 extraResources:
+  - from: config.json
+    to: config.json
   - from: config.example.json
     to: config.example.json
-  - from: vendor/mongodb
-    to: vendor/mongodb
-    filter:
-      - '**/*'
-  - from: resources/backend
-    to: backend
-    filter:
-      - '**/*'
 asarUnpack:
   - localRuntime/**/*
 win:
@@ -32,6 +27,7 @@ win:
       arch:
         - x64
   artifactName: TextileERP-Setup-${version}.${ext}
+  signAndEditExecutable: false
 nsis:
   oneClick: false
   perMachine: false

@@ -2,7 +2,7 @@
   "name": "textile-erp-desktop",
   "version": "1.0.0",
   "private": true,
-  "description": "Textile ERP Desktop — standalone offline (1 PC = 1 company)",
+  "description": "Textile ERP Desktop - Client Application",
   "main": "main.js",
   "author": "Textile ERP",
   "scripts": {
@@ -27,6 +27,7 @@
       "preload.js",
       "updater.js",
       "machineId.js",
+      "config.json",
       "config.example.json",
       "localRuntime/**/*",
       "renderer/**/*",
@@ -34,23 +35,18 @@
     ],
     "extraResources": [
       {
+        "from": "config.json",
+        "to": "config.json"
+      },
+      {
         "from": "config.example.json",
         "to": "config.example.json"
-      },
-      {
-        "from": "vendor/mongodb",
-        "to": "vendor/mongodb",
-        "filter": ["**/*"]
-      },
-      {
-        "from": "resources/backend",
-        "to": "backend",
-        "filter": ["**/*"]
       }
     ],
     "asarUnpack": [
       "localRuntime/**/*"
     ],
+    "copyright": "Copyright (C) 2026 Textile ERP",
     "win": {
       "target": [
         {
@@ -58,7 +54,8 @@
           "arch": ["x64"]
         }
       ],
-      "artifactName": "TextileERP-Setup-${version}.${ext}"
+      "artifactName": "TextileERP-Setup-${version}.${ext}",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,

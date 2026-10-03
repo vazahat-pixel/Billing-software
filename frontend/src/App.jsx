@@ -32,6 +32,7 @@ const AdminLifecycle = lazy(() => import('./pages/admin/Lifecycle'));
 const PanelPortal = lazy(() => import('./pages/PanelPortal'));
 const SubscriptionBillingPage = lazy(() => import('./pages/billing/SubscriptionBillingPage'));
 const MustChangePasswordGate = lazy(() => import('./components/auth/MustChangePasswordGate'));
+const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
 
 function RouteFallback() {
   return (
@@ -55,6 +56,8 @@ function App() {
       <ApiLoader />
       <Suspense fallback={<RouteFallback />}>
       <Routes>
+        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/landing-page" element={<Navigate to="/landing" replace />} />
         <Route path="/portal" element={<PanelPortal />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/offline-login" element={<LoginPage />} />

@@ -105,6 +105,15 @@ allowedOrigins.add('https://app.dealingindia.com');
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
+    if (
+      origin === 'null' ||
+      origin === 'file://' ||
+      origin.startsWith('file:') ||
+      origin.startsWith('electron://') ||
+      origin.startsWith('vscode-')
+    ) {
+      return callback(null, true);
+    }
     if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
     if (origin.endsWith('.vercel.app') || allowedOrigins.has(origin)) {
       return callback(null, true);
@@ -273,6 +282,19 @@ app.get(['/health/ready', '/api/health/ready'], (req, res) => {
 });
 
 app.use('/api', dbCheckMiddleware, require('./routes/index.js'));
+
+// Static downloads directory (Desktop app installers, templates, etc.)
+app.use('/downloads', express.static(path.join(__dirname, 'public/downloads')));
+app.get(['/download/desktop', '/downloads/desktop'], (req, res) => {
+  const fs = require('fs');
+  const setupPath = path.join(__dirname, 'public/downloads/BillingSoftware-Setup.exe');
+  if (fs.existsSync(setupPath)) {
+    res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
+    res.setHeader('Content-Disposition', 'attachment; filename="BillingSoftware-Setup.exe"');
+    return res.download(setupPath, 'BillingSoftware-Setup.exe');
+  }
+  return res.status(404).send('Setup installer not found');
+});
 
 app.get('/', (req, res) => {
   res.json({

@@ -89,6 +89,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const [bootLoading, setBootLoading] = useState(false);
   const [saveNextActions, setSaveNextActions] = useState(null);
   const [printInvoiceId, setPrintInvoiceId] = useState(null);
+  const [printInvoiceData, setPrintInvoiceData] = useState(null);
   const [lrModalOpen, setLrModalOpen] = useState(false);
   const openedOnceRef = useRef(false);
   const modalContainerRef = useRef(null);
@@ -465,6 +466,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       openedOnceRef.current = false;
       setSaveNextActions(null);
       setPrintInvoiceId(null);
+      setPrintInvoiceData(null);
       setBootLoading(false);
       return;
     }
@@ -762,16 +764,41 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const handleCreateBroker = (search) => setInlineModal({ type: 'account', target: 'broker', initialData: { name: search, group: 'BROKER' } });
   const handleCreateItem = (search, index) => setInlineModal({ type: 'item', initialData: { itemName: search }, rowIndex: index });
 
+  const focusAfterParty = () => {
+    setTimeout(() => {
+      const partyContainer = modalContainerRef.current?.querySelector('.classic-erp-header-party');
+      const cityInput = partyContainer?.querySelector('.erp-sales-party-meta input:not([readonly]):not([disabled])');
+      const brokerInput = partyContainer?.querySelector('.erp-sales-broker-row [data-erp-combobox-input], .erp-sales-broker-row input, .erp-sales-broker-row select');
+      const targetEl = (cityInput && !cityInput.value) ? cityInput : (brokerInput || cityInput);
+      if (targetEl) {
+        targetEl.focus();
+        try { targetEl.select?.(); } catch {}
+      }
+    }, 120);
+  };
+
+  const focusAfterBroker = () => {
+    setTimeout(() => {
+      const partyContainer = modalContainerRef.current?.querySelector('.classic-erp-header-party');
+      const nextEl = partyContainer?.querySelector('.erp-sales-broker-row input:not([readonly]):not([disabled]):not([data-erp-combobox-input]), .erp-sales-broker-row select:not([disabled])');
+      if (nextEl) {
+        nextEl.focus();
+      }
+    }, 120);
+  };
+
   const handleAccountSuccess = (newAccount) => {
     fetchParties();
     const id = newAccount._id || newAccount.id;
     if (inlineModal.target === 'broker') {
       setHeader(prev => ({ ...prev, broker: id }));
+      focusAfterBroker();
       return;
     }
     setHeader(prev => ({
       ...prev, party: id, add: newAccount.address || '', gstin: newAccount.gstin || '', city: newAccount.station || newAccount.city || ''
     }));
+    focusAfterParty();
   };
 
   const handleItemSuccess = async (newItem) => {
@@ -988,6 +1015,21 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         : await addSale(payload);
       const savedId = saved?._id || saved?.id || targetId;
       if (savedId) setSelectedInvoiceId(savedId);
+
+      // Immediately sync saved LR & transport fields into footer state
+      if (saved) {
+        setFooter((prev) => ({
+          ...prev,
+          transport: saved.transport ?? prev.transport,
+          station: saved.station ?? prev.station,
+          lrNo: saved.lrNo ?? prev.lrNo,
+          lrDate: saved.lrDate ? String(saved.lrDate).split('T')[0] : prev.lrDate,
+          baleNo: saved.baleNo ?? prev.baleNo,
+          freight: saved.freight ?? prev.freight,
+          weight: saved.weight ?? prev.weight,
+        }));
+      }
+
       setSaveNextActions({
         id: savedId,
         invoiceNo: saved?.invoiceNo || header.billNo,
@@ -1025,11 +1067,52 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const handlePrint = () => {
     const id = selectedInvoiceId || initialData?._id || initialData?.id;
     if (!id) return toast.error('Select or save an invoice first');
+    
+    const fromStore = (sales || []).find((s) => String(s._id || s.id) === String(id));
+    
+    // Construct composite live invoice from active form state so newly entered LR details are immediately present in print
+    const liveInvoice = {
+      ...(fromStore || {}),
+      _id: id,
+      id,
+      invoiceNo: header.billNo || fromStore?.invoiceNo,
+      date: header.billDate || fromStore?.date,
+      customerId: header.party || fromStore?.customerId,
+      customerName: parties.find(p => String(p._id || p.id) === String(header.party))?.name || fromStore?.customerName,
+      brokerId: header.broker || fromStore?.brokerId,
+      brokerName: parties.find(p => String(p._id || p.id) === String(header.broker))?.name || fromStore?.brokerName,
+      haste: header.haste || fromStore?.haste,
+      transport: footer.transport || fromStore?.transport,
+      station: footer.station || fromStore?.station,
+      lrNo: footer.lrNo || fromStore?.lrNo,
+      lrDate: footer.lrDate || fromStore?.lrDate,
+      baleNo: footer.baleNo || fromStore?.baleNo,
+      freight: Number(footer.freight || fromStore?.freight || 0),
+      weight: Number(footer.weight || fromStore?.weight || 0),
+      eway: footer.eway || fromStore?.eway,
+      remarks: footer.remarks || fromStore?.remarks,
+      orderNo: header.orderNo || fromStore?.orderNo,
+      orderDate: header.orderDate || fromStore?.orderDate,
+      challanNo: header.challanNo || fromStore?.challanNo,
+      chDate: header.chDate || fromStore?.chDate,
+      taxableAmount: calculations.taxable,
+      gstAmount: calculations.gstAmt,
+      netAmount: calculations.net,
+      items: (gridItems.filter(r => r.itemId || r.itemName || r.mts > 0)).map(r => ({
+        ...r,
+        rate: r.saleRate || r.rate || 0,
+      }))
+    };
+    
+    setPrintInvoiceData(liveInvoice);
     setPrintInvoiceId(id);
   };
 
   const openPdfForSaved = () => {
-    if (saveNextActions?.id) setPrintInvoiceId(saveNextActions.id);
+    if (saveNextActions?.id) {
+      setPrintInvoiceData(saveNextActions.invoice || null);
+      setPrintInvoiceId(saveNextActions.id);
+    }
   };
 
   const shareSavedWhatsApp = async () => {
@@ -1070,14 +1153,19 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   );
 
   const brokerOptions = useMemo(
-    () =>
-      parties
+    () => {
+      const list = parties
         .filter((p) => p.type === 'Broker')
         .map((p) => ({
           value: p._id || p.id,
           label: p.name,
           meta: p.mobile || p.phone || '',
-        })),
+        }));
+      return [
+        { value: '', label: '- None (Direct) -' },
+        ...list,
+      ];
+    },
     [parties]
   );
 
@@ -1095,8 +1183,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     const fromItems = items.map((i) => String(i.unit || '').trim().toUpperCase()).filter(Boolean);
     const fromLines = gridItems.map((r) => String(r.unit || '').trim().toUpperCase()).filter(Boolean);
     const all = [...DEFAULT_UNITS, ...fromItems, ...fromLines, ...extraUnits.map((u) => String(u).toUpperCase())];
-    return [...new Set(all)]
-      .filter((u) => u !== 'MTRS' && u !== 'ROLL')
+    return [...new Set(all.filter(Boolean))]
+      .filter((u) => !['MTRS', 'MTS', 'METER', 'METERS', 'ROLL'].includes(u))
       .map((u) => ({ value: u, label: u }));
   }, [items, gridItems, extraUnits]);
 
@@ -1376,8 +1464,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                         value={header.broker}
                         onChange={(val) => setHeader({ ...header, broker: val })}
                         options={brokerOptions}
-                        placeholder="Search broker…"
+                        placeholder="Search broker / None…"
                         disabled={locked}
+                        allowClear
                         recentKey="sales-broker"
                         onCreateNew={!locked ? (q) => handleCreateBroker(q) : undefined}
                         createLabel="Broker"
@@ -1581,7 +1670,6 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                         options={unitOptions}
                         placeholder="Unit…"
                         disabled={locked}
-                        recentKey="sales-unit"
                         openOnEnter
                         onCreateNew={!locked ? (q) => handleCreateUnit(q, idx) : undefined}
                         createLabel="Unit"
@@ -1653,10 +1741,17 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                             focusPrevField(e.currentTarget);
                             return;
                           }
-                          const focusRowItem = (rowIndex) => {
+                          const focusRowItem = (rowIndex, attempt = 0) => {
                             const grid = modalContainerRef.current?.querySelector('.erp-sales-grid');
                             const trs = grid?.querySelectorAll('tbody tr');
-                            const input = trs?.[rowIndex]?.querySelector('[data-erp-combobox-input], input');
+                            const targetRow = trs?.[rowIndex];
+                            if (!targetRow) {
+                              if (attempt < 15) {
+                                setTimeout(() => focusRowItem(rowIndex, attempt + 1), 35);
+                              }
+                              return;
+                            }
+                            const input = targetRow?.querySelector('[data-erp-combobox-input], input:not([disabled]):not([readonly])');
                             if (grid) grid.scrollLeft = 0;
                             input?.focus();
                             try { input?.select?.(); } catch { /* ignore */ }
@@ -2147,7 +2242,14 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     )}
 
     {typeof document !== 'undefined' && printInvoiceId && createPortal(
-      <SalesPrint invoiceId={printInvoiceId} onClose={() => setPrintInvoiceId(null)} />,
+      <SalesPrint
+        invoiceId={printInvoiceId}
+        invoice={printInvoiceData}
+        onClose={() => {
+          setPrintInvoiceId(null);
+          setPrintInvoiceData(null);
+        }}
+      />,
       document.body
     )}
 
@@ -2163,6 +2265,18 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     <LrEntryModal
       isOpen={lrModalOpen}
       onClose={() => setLrModalOpen(false)}
+      onSaved={async () => {
+        await fetchSales();
+        const id = selectedInvoiceId || initialData?._id || initialData?.id;
+        if (id) {
+          try {
+            const freshBill = await salesApi.get(id);
+            if (freshBill) {
+              loadInvoiceData(freshBill);
+            }
+          } catch {}
+        }
+      }}
       onOpenBill={(bill) => {
         loadInvoiceData(bill);
         setMode('View');

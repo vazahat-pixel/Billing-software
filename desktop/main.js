@@ -77,6 +77,7 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false,
       spellcheck: true,
+      webSecurity: false,
     },
   });
 
@@ -402,6 +403,14 @@ app.whenReady().then(async () => {
   } catch {
     /* ignore */
   }
+
+  const { session } = require('electron');
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    if (details.url && details.url.includes('dealingindia.com')) {
+      details.requestHeaders['Origin'] = 'https://app.dealingindia.com';
+    }
+    callback({ cancel: false, requestHeaders: details.requestHeaders });
+  });
 
   buildMenu();
   createWindow();

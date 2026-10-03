@@ -2,21 +2,56 @@ const asyncHandler = require('../utils/asyncHandler');
 const { ok } = require('../utils/apiResponse');
 const masterDataService = require('../services/masterDataService');
 const setupMasterService = require('../services/setupMasterService');
+const dataImportService = require('../services/dataImportService');
 
 exports.mergeParties = asyncHandler(async (req, res) => {
-  const data = await masterDataService.mergeParties(req.companyId, {
-    ...req.body,
+  const { sourceId, targetId } = req.body;
+  const result = await masterDataService.mergeParties(req.companyId, {
+    sourceId,
+    targetId,
     userId: req.user?._id || req.user?.id,
   });
-  return ok(res, data, 'Parties merged');
+  return ok(res, result, 'Parties merged successfully');
 });
 
 exports.mergeItems = asyncHandler(async (req, res) => {
-  const data = await masterDataService.mergeItems(req.companyId, {
-    ...req.body,
+  const { sourceId, targetId } = req.body;
+  const result = await masterDataService.mergeItems(req.companyId, {
+    sourceId,
+    targetId,
     userId: req.user?._id || req.user?.id,
   });
-  return ok(res, data, 'Items merged');
+  return ok(res, result, 'Items merged successfully');
+});
+
+exports.suggestMappings = asyncHandler(async (req, res) => {
+  const { headers, entity } = req.body;
+  const result = dataImportService.suggestMappings(headers || [], entity || 'auto');
+  return ok(res, result, 'Mappings suggested');
+});
+
+exports.previewImport = asyncHandler(async (req, res) => {
+  const { entity, rows, columnMappings } = req.body;
+  const data = await dataImportService.preview({
+    companyId: req.companyId,
+    entity: entity || 'item',
+    rows: rows || [],
+    columnMappings: columnMappings || {},
+  });
+  return ok(res, data, 'Import preview generated');
+});
+
+exports.executeImport = asyncHandler(async (req, res) => {
+  const { entity, rows, columnMappings, options } = req.body;
+  const data = await dataImportService.execute({
+    companyId: req.companyId,
+    entity: entity || 'item',
+    rows: rows || [],
+    columnMappings: columnMappings || {},
+    options: options || {},
+    userId: req.user?._id || req.user?.id,
+  });
+  return ok(res, data, 'Import executed successfully');
 });
 
 exports.importMasters = asyncHandler(async (req, res) => {

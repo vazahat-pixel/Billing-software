@@ -220,7 +220,7 @@ async function buildAllocationPlan(companyId, { partyLedger, accBill, againstInv
     }
 
     const billAmount = kind === 'job'
-      ? round2((doc.processCharges || 0) + (doc.processGstAmount || 0))
+      ? round2((doc.processCharges || 0) + (doc.processGstAmount || 0) + (doc.roundOff || 0))
       : round2(doc.netAmount || 0);
     const paidSoFar = kind === 'job' ? round2(doc.chargesPaidAmount || 0) : round2(doc.paidAmount || 0);
     const outstanding = round2(billAmount - paidSoFar);

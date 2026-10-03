@@ -756,8 +756,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const computedFinalAmt = useMemo(() => {
       const net = computedNetAmt;
       const tds = Number(tdsAmt) || 0;
-      return (net - tds).toFixed(2);
-   }, [computedNetAmt, tdsAmt]);
+      const roundOff = Number(computedRoundOff) || 0;
+      return (net + roundOff - tds).toFixed(2);
+   }, [computedNetAmt, computedRoundOff, tdsAmt]);
 
    /**
     * Job Card / Cutting Report sheet, built from the live grid rows and the header the

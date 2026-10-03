@@ -57,4 +57,65 @@ router.post('/offline-login', async (req, res, next) => {
   }
 });
 
+const fs = require('fs');
+const path = require('path');
+
+function getInstallerPath() {
+  const candidates = [
+    path.resolve(__dirname, '../public/downloads/BillingSoftware-Setup.exe'),
+    path.resolve(__dirname, '../public/downloads/TextileERP-Setup-1.0.0.exe'),
+    path.resolve(__dirname, '../../frontend/public/downloads/BillingSoftware-Setup.exe'),
+    path.resolve(__dirname, '../../desktop/dist/TextileERP-Setup-1.0.0.exe'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+/** Public metadata about latest desktop build */
+router.get('/download-info', (req, res) => {
+  const installerPath = getInstallerPath();
+  if (!installerPath) {
+    return res.status(404).json({
+      success: false,
+      message: 'Desktop installer is currently being built or unavailable.',
+      data: { available: false },
+    });
+  }
+  const stat = fs.statSync(installerPath);
+  const sizeMB = (stat.size / (1024 * 1024)).toFixed(1) + ' MB';
+  return res.json({
+    success: true,
+    data: {
+      available: true,
+      version: '1.0.0',
+      fileName: 'BillingSoftware-Setup.exe',
+      sizeBytes: stat.size,
+      sizeMB,
+      releaseDate: '2026-10-02',
+      os: 'Windows 10 / 11 (64-bit)',
+      downloadUrl: '/api/desktop/download',
+      directUrl: '/downloads/BillingSoftware-Setup.exe',
+    },
+  });
+});
+
+/** Direct binary download for desktop installer */
+router.get('/download', (req, res) => {
+  const installerPath = getInstallerPath();
+  if (!installerPath) {
+    return res.status(404).json({
+      success: false,
+      message: 'Desktop setup file not found. Please contact support.',
+    });
+  }
+  res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
+  res.setHeader('Content-Disposition', 'attachment; filename="BillingSoftware-Setup.exe"');
+  return res.download(installerPath, 'BillingSoftware-Setup.exe');
+});
+
 module.exports = router;
+

@@ -8,7 +8,7 @@ import {
    faChevronDown, faSync, faSearch, faBell,
    faTriangleExclamation, faUserTie,
    faRightFromBracket, faBook, faCircleQuestion, faGear,
-   faRightLeft
+   faRightLeft, faDesktop, faDownload
 } from '@fortawesome/free-solid-svg-icons';
 import useStore from '../store/useStore';
 import useConfigStore from '../store/useConfigStore';
@@ -74,6 +74,9 @@ import FasCheckReportsModal from './reports/FasCheckReportsModal';
 import CompanySwitchModal from './company/CompanySwitchModal';
 import CompanyMasterModal from './company/CompanyMasterModal';
 import StockLedgerModal from './reports/StockLedgerModal';
+import DataImportModal from '../components/import/DataImportModal';
+import DownloadDesktopModal from '../components/desktop/DownloadDesktopModal';
+import { downloadMasterTemplate } from '../utils/excelTemplateGenerator';
 
 // Rare / heavy screens — lazy OK
 const PurchaseEngineModal = lazy(() => import('./purchase/PurchaseEngineModal'));
@@ -466,6 +469,9 @@ const Dashboard = () => {
       settingsBillType: 'sales',
       openingBalance: false,
       openingStock: false,
+      dataImport: false,
+      dataImportEntity: 'auto',
+      downloadDesktop: false,
       recordsHub: false,
       recordsTab: 'accounts',
       reportsHub: false,
@@ -963,7 +969,8 @@ const Dashboard = () => {
          { label: 'Opening Balance', action: () => setModals(prev => ({ ...prev, openingBalance: true })) },
          { label: 'Opening StockEntry', action: () => setModals(prev => ({ ...prev, openingStock: true })) },
          { label: 'Merge Event', action: () => setModals(prev => ({ ...prev, mergeMaster: true })) },
-         { label: 'Item Rate Master', action: () => toggleModal('itemMaster', true) }
+         { label: 'Item Rate Master', action: () => toggleModal('itemMaster', true) },
+         { label: 'Bulk Import (Excel / CSV)', action: () => setModals(prev => ({ ...prev, dataImport: true, dataImportEntity: 'auto' })) }
       ],
       Transaction: [
          { label: 'Sales', key: 'sales' },
@@ -1084,6 +1091,8 @@ const Dashboard = () => {
          { label: 'Missing Series', action: () => setModals(prev => ({ ...prev, systemUtilities: true })) },
          { label: 'Update Main Account Master', action: () => toggleModal('accountMaster', true) },
          { label: 'Gst Updation', action: () => toggleModal('caDashboard', true) },
+         { label: 'Data Import & Migration Assistant', action: () => setModals(prev => ({ ...prev, dataImport: true, dataImportEntity: 'auto' })) },
+         { label: 'Download Desktop App (.exe)', action: () => setModals(prev => ({ ...prev, downloadDesktop: true })) },
          { label: 'Application Sync', action: () => refreshAllData().then(() => toast.success('All data refreshed.')) },
       ],
       'Setup System': [
@@ -1296,6 +1305,18 @@ const Dashboard = () => {
                      {!isCaUser && <button type="button" onClick={() => refreshAllData()} className="h-6 px-2 text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] border border-[var(--border)] rounded-md bg-white hover:bg-[var(--bg-subtle)]">
                         <FontAwesomeIcon icon={faSync} className={`text-[9px] mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />Sync
                      </button>}
+                     {!isCaUser && (
+                        <button
+                           type="button"
+                           onClick={() => setModals(prev => ({ ...prev, downloadDesktop: true }))}
+                           className="h-6 px-2.5 flex items-center gap-1.5 text-[10px] font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-md transition-all shadow-2xs"
+                           title="Download Desktop Application (.exe) for Windows"
+                        >
+                           <FontAwesomeIcon icon={faDesktop} className="text-[10px] text-emerald-600" />
+                           <span className="hidden sm:inline">Desktop App</span>
+                           <span className="bg-emerald-600 text-white text-[8px] font-bold px-1 rounded-xs uppercase tracking-wider">.exe</span>
+                        </button>
+                     )}
                      {!isCaUser && <button
                         type="button"
                         onClick={() => openNotificationCenter()}
@@ -1428,9 +1449,9 @@ const Dashboard = () => {
 
             </header>
 
-            <div className="flex-1 overflow-y-auto p-4 erp-scroll-smooth relative">
+            <div className="flex-1 overflow-y-auto lg:overflow-hidden p-2 sm:p-2.5 pb-8 lg:pb-2.5 erp-scroll-smooth relative flex flex-col justify-between">
                <TopProgressBar show={showSoftSync} />
-               <div className="max-w-6xl mx-auto flex flex-col gap-4 erp-motion-content">
+               <div className="w-full flex-1 flex flex-col gap-2 min-h-0 erp-motion-content justify-between">
                {isCaUser ? (
                   <div className="erp-card p-6 max-w-lg">
                      <p className="text-sm font-semibold">CA Desk</p>
@@ -1484,6 +1505,48 @@ const Dashboard = () => {
                      </button>
                   </div>
                )}
+               {user?.company?.status === 'suspended' && (
+                  <div className="flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-950 shadow-sm">
+                     <FontAwesomeIcon icon={faTriangleExclamation} className="text-rose-600 text-base shrink-0" />
+                     <div className="flex-1 min-w-[200px]">
+                        <p className="text-[13px] font-bold text-rose-950">Company Subscription / License Inactive</p>
+                        <p className="text-[11px] text-rose-800/90 mt-0.5">
+                           Your company account is currently suspended. All your transactions and master data are safely preserved in the database. Please contact your administrator to renew or reactivate the license.
+                        </p>
+                     </div>
+                  </div>
+               )}
+               {user?.company?.status !== 'suspended' && (!items?.length || items.length === 0) && (!parties?.length || parties.length === 0) && (
+                  <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50/90 via-indigo-50/40 to-white text-blue-950 shadow-sm">
+                     <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                           <FontAwesomeIcon icon={faWarehouse} className="text-base" />
+                        </div>
+                        <div>
+                           <p className="text-[13px] font-bold text-blue-950">Quick Setup: Import your previous software data</p>
+                           <p className="text-[11px] text-blue-800/80 mt-0.5">
+                              Migrate your Parties, Items, and Opening Stock from Excel / Tally in 1 click, or download our clean template.
+                           </p>
+                        </div>
+                     </div>
+                     <div className="flex items-center gap-2">
+                        <button
+                           type="button"
+                           className="erp-btn erp-btn-secondary h-8 px-3 text-[11px]"
+                           onClick={() => downloadMasterTemplate()}
+                        >
+                           Download Template (.xlsx)
+                        </button>
+                        <button
+                           type="button"
+                           className="erp-btn erp-btn-primary h-8 px-4 text-[11px] bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                           onClick={() => setModals((prev) => ({ ...prev, dataImport: true, dataImportEntity: 'auto' }))}
+                        >
+                           📥 Import Data Now
+                        </button>
+                     </div>
+                  </div>
+               )}
                <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
                      <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Dashboard</h2>
@@ -1517,52 +1580,191 @@ const Dashboard = () => {
                ) : (
                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 erp-motion-stagger">
                   {[
-                     { label: 'Sales Today', value: dashboardSummary?.salesToday?.amount, sub: dashboardSummary?.salesToday?.count != null ? `${dashboardSummary.salesToday.count} bills` : null },
-                     { label: 'Purchase Today', value: dashboardSummary?.purchaseToday?.amount, sub: dashboardSummary?.purchaseToday?.count != null ? `${dashboardSummary.purchaseToday.count} bills` : null },
-                     { label: 'Cash / Receipts', value: dashboardSummary?.cashToday },
-                     { label: 'Receivable', value: dashboardSummary?.receivable },
-                     { label: 'Payable', value: dashboardSummary?.payable },
-                     { label: 'Low Stock Lots', value: dashboardSummary?.lowStockLots, raw: true },
+                     { 
+                        label: 'Sales Today', 
+                        value: dashboardSummary?.salesToday?.amount, 
+                        sub: dashboardSummary?.salesToday?.count != null ? `${dashboardSummary.salesToday.count} bills` : null,
+                        iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+                        icon: faChartPie
+                     },
+                     { 
+                        label: 'Purchase Today', 
+                        value: dashboardSummary?.purchaseToday?.amount, 
+                        sub: dashboardSummary?.purchaseToday?.count != null ? `${dashboardSummary.purchaseToday.count} bills` : null,
+                        iconBg: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20',
+                        icon: faCartFlatbed
+                     },
+                     { 
+                        label: 'Cash / Receipts', 
+                        value: dashboardSummary?.cashToday,
+                        iconBg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20',
+                        icon: faMoneyCheckDollar
+                     },
+                     { 
+                        label: 'Receivable', 
+                        value: dashboardSummary?.receivable,
+                        iconBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+                        icon: faUserTie
+                     },
+                     { 
+                        label: 'Payable', 
+                        value: dashboardSummary?.payable,
+                        iconBg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20',
+                        icon: faFileInvoiceDollar
+                     },
+                     { 
+                        label: 'Low Stock Lots', 
+                        value: dashboardSummary?.lowStockLots, 
+                        raw: true,
+                        iconBg: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20',
+                        icon: faWarehouse
+                     },
                   ].map((card) => (
-                     <div key={card.label} className="erp-card p-3">
-                        <p className="text-[9px] uppercase tracking-wide text-[var(--text-muted)] font-semibold">{card.label}</p>
-                        <p className="text-[14px] font-bold text-[var(--text-primary)] mt-1 tabular-nums">
-                          {card.raw
-                              ? (card.value ?? '—')
-                              : `₹ ${Number(card.value || 0).toLocaleString('en-IN')}`}
-                        </p>
-                        {card.sub && <p className="text-[9px] text-[var(--text-muted)] mt-0.5">{card.sub}</p>}
+                     <div key={card.label} className="erp-card p-2 sm:p-2.5 flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                           <p className="text-[9px] uppercase tracking-wide text-[var(--text-muted)] font-semibold">{card.label}</p>
+                           <p className="text-[13px] sm:text-[14px] font-bold text-[var(--text-primary)] mt-0.5 tabular-nums truncate">
+                             {card.raw
+                                 ? (card.value ?? '—')
+                                 : `₹ ${Number(card.value || 0).toLocaleString('en-IN')}`}
+                           </p>
+                           {card.sub && <p className="text-[9px] text-[var(--text-muted)] mt-0.5 font-medium">{card.sub}</p>}
+                        </div>
+                        <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0 ${card.iconBg}`}>
+                           <FontAwesomeIcon icon={card.icon} className="text-[11px]" />
+                        </div>
                      </div>
                   ))}
                </div>
                )}
 
-               <div className="erp-card p-4 relative">
-                  {showDashboardSkeleton && (
-                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-[var(--bg-card)]/80 rounded-[inherit]">
-                        <InlineLoader message="Loading activity…" />
-                     </div>
-                  )}
-                  {showSoftSync && !showDashboardSkeleton && (
-                     <div className="absolute top-2 right-3 z-10">
-                        <InlineLoader message="Updating…" />
-                     </div>
-                  )}
-                  <h3 className="text-[12px] font-semibold mb-3 text-[var(--text-primary)]">Recent Activity</h3>
-                  <div className="flex flex-col gap-2">
-                     {(recentActivity.length ? recentActivity : [{ text: 'No recent transactions', time: '—', type: 'empty' }]).map((act, i) => (
-                        <div key={i} className="flex gap-2 items-start erp-motion-fade-in">
-                           <div className="w-1.5 h-1.5 mt-1.5 rounded-full bg-[var(--accent)] shrink-0" />
-                           <div>
-                              <div className="text-[11px] text-[var(--text-primary)]">{act.text}</div>
-                              <div className="text-[10px] text-[var(--text-muted)]">{act.time}</div>
-                           </div>
+               {/* Appzeto SaaS 3D Hero Showcase & Recent Activity Layout — Seamless Background Fit (Zero Squashing, Pristine Proportions) */}
+               <div 
+                  className="flex-1 w-full min-h-[380px] lg:min-h-[420px] relative rounded-2xl overflow-hidden border border-slate-200/70 dark:border-[var(--border)] shadow-sm flex flex-col lg:flex-row items-stretch select-none bg-[#F6FAFE] dark:bg-[var(--bg-card)]"
+                  style={{
+                     backgroundImage: "url('/assets/dashboard-hero-bg-clean.png')",
+                     backgroundRepeat: 'no-repeat',
+                     backgroundPosition: 'right center',
+                     backgroundSize: 'cover'
+                  }}
+               >
+                  {/* Floating Live Recent Activity Card (Left side) */}
+                  <div className="w-full lg:w-[320px] xl:w-[335px] shrink-0 bg-white/95 dark:bg-[var(--bg-card)]/95 backdrop-blur-sm rounded-2xl border border-slate-200/80 dark:border-[var(--border)] p-3 sm:p-3.5 shadow-sm relative flex flex-col justify-between my-2 ml-2 sm:ml-2.5 z-10 max-h-[380px] lg:max-h-none">
+                     {showDashboardSkeleton && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 dark:bg-[var(--bg-card)]/80 rounded-[inherit]">
+                           <InlineLoader message="Loading activity…" />
                         </div>
-                     ))}
+                     )}
+                     {showSoftSync && !showDashboardSkeleton && (
+                        <div className="absolute top-2.5 right-3 z-10">
+                           <InlineLoader message="Updating…" />
+                        </div>
+                     )}
+                     <div>
+                        <h3 className="text-[12px] font-bold text-slate-800 dark:text-[var(--text-primary)] mb-2.5">
+                           Recent Activity
+                        </h3>
+
+                        {recentActivity.length > 0 ? (
+                           <div className="space-y-2.5">
+                              {recentActivity.slice(0, 6).map((act, i) => (
+                                 <div key={i} className="flex items-start justify-between gap-2">
+                                    <div className="flex items-start gap-2 min-w-0 flex-1">
+                                       <span className="w-2 h-2 rounded-full bg-blue-600 dark:bg-[var(--accent)] mt-1 shrink-0" />
+                                       <div className="min-w-0 flex-1">
+                                          <div className="text-[11px] font-semibold text-slate-800 dark:text-[var(--text-primary)] leading-tight truncate">
+                                             {act.text}
+                                          </div>
+                                          <div className="text-[9px] text-slate-400 dark:text-[var(--text-muted)] mt-0.5 font-medium">
+                                             {act.time}
+                                          </div>
+                                       </div>
+                                    </div>
+
+                                    {act.type && (
+                                       <span className={`px-2 py-0.5 rounded-md text-[9px] font-semibold shrink-0 ${
+                                          act.type === 'sales'
+                                             ? 'bg-[#E6F8F0] text-[#059669] dark:bg-emerald-500/15 dark:text-emerald-400'
+                                             : act.type === 'purchase'
+                                             ? 'bg-[#E6F4FE] text-[#0284C7] dark:bg-sky-500/15 dark:text-sky-400'
+                                             : act.type === 'job'
+                                             ? 'bg-[#EEF2FF] text-[#4F46E5] dark:bg-indigo-500/15 dark:text-indigo-400'
+                                             : 'bg-slate-50 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400'
+                                       }`}>
+                                          {act.type === 'sales' ? 'Sales' : act.type === 'purchase' ? 'Purchase' : act.type === 'job' ? 'Mill / Job' : 'General'}
+                                       </span>
+                                    )}
+                                 </div>
+                              ))}
+                           </div>
+                        ) : (
+                           <div className="flex flex-col items-center justify-center py-6 text-center">
+                              <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">No recent transactions yet</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Your recent sales, purchases and mill chalan entries will appear here live</p>
+                           </div>
+                        )}
+                     </div>
+
+                     {showRecordsHub && (
+                        <div className="pt-2 mt-2 border-t border-slate-100 dark:border-[var(--border)]">
+                           <button
+                              type="button"
+                              onClick={() => openRecordsHub('sales')}
+                              className="text-[11px] font-bold text-blue-600 dark:text-[var(--accent)] hover:underline flex items-center gap-1"
+                           >
+                              <span>View all records</span>
+                              <span>→</span>
+                           </button>
+                        </div>
+                     )}
                   </div>
-                  {showRecordsHub && (
-                     <button type="button" onClick={() => openRecordsHub('sales')} className="mt-3 text-[11px] font-medium text-[var(--accent)] hover:underline">View all records →</button>
-                  )}
+
+                  {/* Right side: Seamless Appzeto 3D Showcase (No box, no border, interactive hotspots over background) */}
+                  <div className="flex-1 relative min-h-[260px] lg:min-h-0">
+                     {/* Interactive Clickable Hotspots for 4 Modules */}
+                     <div 
+                        onClick={() => toggleModal('cashBook', true)}
+                        title="Accounting: Cash & Bank Book"
+                        className="absolute left-[2%] top-[45%] w-[18%] h-[18%] cursor-pointer hover:bg-emerald-500/10 rounded-xl transition-colors"
+                     />
+                     <div 
+                        onClick={() => toggleModal('inventoryPage', true)}
+                        title="Inventory: Stock & Lots"
+                        className="absolute left-[21%] top-[45%] w-[18%] h-[18%] cursor-pointer hover:bg-blue-500/10 rounded-xl transition-colors"
+                     />
+                     <div 
+                        onClick={() => toggleModal('caDashboard', true)}
+                        title="GST / Tax: Compliance Ready"
+                        className="absolute left-[40%] top-[45%] w-[18%] h-[18%] cursor-pointer hover:bg-amber-500/10 rounded-xl transition-colors"
+                     />
+                     <div 
+                        onClick={() => openReportsHub('summary')}
+                        title="Reports: Insightful Analytics"
+                        className="absolute left-[59%] top-[45%] w-[18%] h-[18%] cursor-pointer hover:bg-purple-500/10 rounded-xl transition-colors"
+                     />
+
+                     {/* Interactive Clickable Hotspots for 4 Bottom Pedestals */}
+                     <div 
+                        onClick={() => toggleModal('sales', true)}
+                        title="Grow Your Business: Create Invoice"
+                        className="absolute left-[17%] bottom-[2%] w-[19%] h-[24%] cursor-pointer hover:bg-blue-500/10 rounded-xl transition-colors"
+                     />
+                     <div 
+                        onClick={() => setModals(prev => ({ ...prev, downloadDesktop: true }))}
+                        title="Secure & Reliable: Download Windows Offline App"
+                        className="absolute left-[38%] bottom-[2%] w-[19%] h-[24%] cursor-pointer hover:bg-blue-500/10 rounded-xl transition-colors"
+                     />
+                     <div 
+                        onClick={() => handleSync()}
+                        title="Cloud Technology: Sync Data"
+                        className="absolute left-[59%] bottom-[2%] w-[19%] h-[24%] cursor-pointer hover:bg-blue-500/10 rounded-xl transition-colors"
+                     />
+                     <div 
+                        onClick={() => openRecordsHub('sales')}
+                        title="Trusted by Businesses: View Records"
+                        className="absolute left-[80%] bottom-[2%] w-[19%] h-[24%] cursor-pointer hover:bg-blue-500/10 rounded-xl transition-colors"
+                     />
+                  </div>
                </div>
                </>)}
                </div>
@@ -2024,6 +2226,15 @@ const Dashboard = () => {
          <MergeMasterModal
             isOpen={modals.mergeMaster}
             onClose={() => setModals(prev => ({ ...prev, mergeMaster: false }))}
+         />
+         <DataImportModal
+            isOpen={modals.dataImport}
+            onClose={() => setModals(prev => ({ ...prev, dataImport: false }))}
+            initialEntity={modals.dataImportEntity || 'auto'}
+         />
+         <DownloadDesktopModal
+            isOpen={modals.downloadDesktop}
+            onClose={() => setModals(prev => ({ ...prev, downloadDesktop: false }))}
          />
          <Suspense fallback={null}>
             {modals.purchaseEngine && (
