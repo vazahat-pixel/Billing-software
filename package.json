@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "test": "npm --prefix backend test",
-    "build": "cd frontend && npm install && npm run build && cd ..",
+    "build": "node api.js && cd frontend && npm install && npm run build && cd ..",
     "install:backend": "cd backend && npm install && cd ..",
     "desktop:start": "cd desktop && npm start",
     "desktop:ui": "cd desktop && npm run build:ui",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Download,
@@ -29,6 +29,8 @@ import {
   Truck,
   Scissors,
   Receipt,
+  Menu,
+  X,
   Building2,
   Calendar,
   CheckCircle,
@@ -59,6 +61,8 @@ export default function LandingPage() {
   const [activeTab, setActiveTab] = useState('sales');
   const [openFaq, setOpenFaq] = useState(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef(null);
 
   useEffect(() => {
     document.title = 'Dealing India - Textile Billing & ERP Software | Offline Desktop & Cloud';
@@ -70,6 +74,24 @@ export default function LandingPage() {
       );
     }
   }, []);
+
+  // Close mobile menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target)) {
+        setMobileMenuOpen(false);
+      }
+    };
+    if (mobileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [mobileMenuOpen]);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [navigate]);
 
   const toggleTheme = () => {
     setIsDark(prev => {
@@ -259,15 +281,15 @@ export default function LandingPage() {
       isDark ? 'bg-slate-950 text-slate-100 selection:bg-blue-600 selection:text-white' : 'bg-slate-50/60 text-slate-900 selection:bg-blue-600 selection:text-white'
     }`}>
       {/* 1. TOP ANNOUNCEMENT BANNER */}
-      <div className="bg-gradient-to-r from-blue-700 via-indigo-600 to-emerald-600 text-white text-[12px] font-medium py-2 px-4 text-center flex items-center justify-center gap-2 shadow-sm">
-        <Sparkles size={14} className="animate-pulse shrink-0" />
-        <span>Dealing India v2.4.0 Released: Offline Windows Desktop App + Live Cloud Sync Now Available!</span>
+      <div className="bg-gradient-to-r from-blue-700 via-indigo-600 to-emerald-600 text-white text-[11px] sm:text-[12px] font-medium py-2 px-3 sm:px-4 text-center flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm flex-wrap">
+        <Sparkles size={14} className="animate-pulse shrink-0 hidden sm:block" />
+        <span className="leading-snug">Dealing India v2.4.0 Released: Offline Desktop App + Cloud Sync!</span>
         <a
           href={downloadUrl}
           download="BillingSoftware-Setup.exe"
-          className="underline ml-2 hover:text-amber-200 transition-colors font-bold inline-flex items-center gap-1"
+          className="underline ml-1 sm:ml-2 hover:text-amber-200 transition-colors font-bold inline-flex items-center gap-1 whitespace-nowrap"
         >
-          Download Free (.EXE) <ArrowRight size={12} />
+          Download (.EXE) <ArrowRight size={12} />
         </a>
       </div>
 
@@ -275,27 +297,27 @@ export default function LandingPage() {
       <header className={`sticky top-0 z-50 backdrop-blur-md border-b transition-colors ${
         isDark ? 'bg-slate-950/90 border-slate-800' : 'bg-white/95 border-slate-200 shadow-sm'
       }`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between">
           {/* Logo */}
-          <Link to="/landing" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform font-black text-xl tracking-wider">
+          <Link to="/landing" className="flex items-center gap-2 sm:gap-3 group shrink-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform font-black text-base sm:text-xl tracking-wider">
               DI
             </div>
             <div>
-              <div className={`text-lg font-black tracking-tight flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <div className={`text-sm sm:text-lg font-black tracking-tight flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 DEALING INDIA
-                <span className="text-[10px] uppercase tracking-wider bg-blue-500/10 text-blue-600 border border-blue-500/20 px-1.5 py-0.2 rounded font-bold">
+                <span className="text-[9px] sm:text-[10px] uppercase tracking-wider bg-blue-500/10 text-blue-600 border border-blue-500/20 px-1 sm:px-1.5 py-0.5 rounded font-bold">
                   ERP
                 </span>
               </div>
-              <div className={`text-[10px] font-medium tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <div className={`text-[9px] sm:text-[10px] font-medium tracking-wide hidden xs:block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                 Textile Billing & Inventory Software
               </div>
             </div>
           </Link>
 
-          {/* Desktop Nav Links (Updated with Software Information and About) */}
-          <nav className={`hidden md:flex items-center gap-6 text-[13px] font-semibold ${
+          {/* Desktop Nav Links */}
+          <nav className={`hidden lg:flex items-center gap-6 text-[13px] font-semibold ${
             isDark ? 'text-slate-300' : 'text-slate-600'
           }`}>
             <a href="#features" className="hover:text-blue-600 transition-colors">Features</a>
@@ -306,12 +328,12 @@ export default function LandingPage() {
           </nav>
 
           {/* Action CTAs & Theme Toggle */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
             {/* Theme Toggle Button */}
             <button
               type="button"
               onClick={toggleTheme}
-              className={`p-2 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
                 isDark
                   ? 'bg-slate-900 border-slate-700 text-amber-300 hover:bg-slate-800'
                   : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
@@ -324,7 +346,7 @@ export default function LandingPage() {
 
             <Link
               to="/login"
-              className={`px-3.5 py-2 text-[12px] font-bold rounded-lg border transition-all flex items-center gap-1.5 shadow-sm ${
+              className={`hidden sm:flex px-3.5 py-2 text-[12px] font-bold rounded-lg border transition-all items-center gap-1.5 shadow-sm ${
                 isDark
                   ? 'text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 border-slate-700'
                   : 'text-slate-700 hover:text-blue-600 bg-white hover:bg-slate-50 border-slate-200'
@@ -338,17 +360,88 @@ export default function LandingPage() {
             <a
               href={downloadUrl}
               download="BillingSoftware-Setup.exe"
-              className="px-4 py-2 text-[12px] font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg shadow-md shadow-blue-600/20 hover:shadow-blue-600/40 transition-all flex items-center gap-2 group"
+              className="hidden sm:flex px-4 py-2 text-[12px] font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg shadow-md shadow-blue-600/20 hover:shadow-blue-600/40 transition-all items-center gap-2 group"
             >
               <Download size={14} className="group-hover:-translate-y-0.5 transition-transform" />
-              <span className="hidden sm:inline">Download</span> .EXE
+              <span className="hidden md:inline">Download</span> .EXE
             </a>
+
+            {/* Mobile Hamburger Menu Button */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className={`lg:hidden p-1.5 sm:p-2 rounded-lg border transition-colors ${
+                isDark
+                  ? 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                  : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+              }`}
+              aria-label="Toggle mobile menu"
+            >
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Dropdown Menu */}
+        {mobileMenuOpen && (
+          <div
+            ref={mobileMenuRef}
+            className={`lg:hidden border-t transition-all ${
+              isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'
+            }`}
+          >
+            <nav className="flex flex-col px-4 py-3 gap-1">
+              {[
+                { href: '#features', label: 'Features' },
+                { href: '#software-info', label: 'Software Information' },
+                { href: '#about', label: 'About' },
+                { href: '#desktop-app', label: 'Desktop (.EXE)' },
+                { href: '#faqs', label: 'FAQs' },
+              ].map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`py-2.5 px-3 rounded-lg text-sm font-semibold transition-colors ${
+                    isDark
+                      ? 'text-slate-300 hover:text-white hover:bg-slate-900'
+                      : 'text-slate-600 hover:text-blue-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {item.label}
+                </a>
+              ))}
+
+              {/* Mobile-only action buttons */}
+              <div className="flex flex-col gap-2 pt-2 mt-1 border-t sm:hidden ${
+                isDark ? 'border-slate-800' : 'border-slate-200'
+              }">
+                <Link
+                  to="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`py-2.5 px-3 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors ${
+                    isDark
+                      ? 'text-slate-200 hover:bg-slate-900'
+                      : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <Cloud size={16} className="text-blue-600" /> Online Login
+                </Link>
+                <a
+                  href={downloadUrl}
+                  download="BillingSoftware-Setup.exe"
+                  className="py-2.5 px-3 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center gap-2"
+                >
+                  <Download size={16} /> Download .EXE
+                </a>
+              </div>
+            </nav>
+          </div>
+        )}
       </header>
 
       {/* 3. HERO SECTION */}
-      <section className={`relative pt-14 pb-16 overflow-hidden ${
+      <section className={`relative pt-8 sm:pt-14 pb-10 sm:pb-16 overflow-hidden ${
         isDark
           ? 'bg-slate-950'
           : 'bg-gradient-to-b from-white via-slate-50/50 to-blue-50/30'
@@ -369,7 +462,7 @@ export default function LandingPage() {
           </div>
 
           {/* Main Headline */}
-          <h1 className={`text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight max-w-4xl mx-auto leading-[1.15] ${
+          <h1 className={`text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight max-w-4xl mx-auto leading-[1.15] ${
             isDark ? 'text-white' : 'text-slate-900'
           }`}>
             Speed, Precision & Full Control For Your{' '}
@@ -379,29 +472,29 @@ export default function LandingPage() {
           </h1>
 
           {/* Subtitle */}
-          <p className={`mt-5 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed ${
+          <p className={`mt-4 sm:mt-5 text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed px-2 sm:px-0 ${
             isDark ? 'text-slate-300' : 'text-slate-600'
           }`}>
             Manage Grey & Finished Stock, Mill Issue/Receive, Job Cards, Lot Tracking, Taka Pcs Breakdown, GST Returns & Financial Accounting — <strong className={isDark ? 'text-white' : 'text-slate-900'}>100% Offline on Windows Desktop PC</strong> with Instant Cloud Sync.
           </p>
 
           {/* CTAs */}
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">
+          <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-2.5 sm:gap-3.5 px-4 sm:px-0">
             <a
               href={downloadUrl}
               download="BillingSoftware-Setup.exe"
-              className="px-6 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-600/25 flex items-center gap-2.5 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2.5 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               <Download size={18} />
               <span>Download for Windows (.EXE)</span>
-              <span className="text-[11px] bg-blue-900/60 px-2 py-0.5 rounded text-blue-100 font-mono font-normal">
+              <span className="text-[11px] bg-blue-900/60 px-2 py-0.5 rounded text-blue-100 font-mono font-normal hidden sm:inline">
                 v2.4.0
               </span>
             </a>
 
             <Link
               to="/login"
-              className={`px-6 py-3.5 rounded-xl font-bold text-sm border shadow-sm flex items-center gap-2 transition-all hover:scale-[1.02] ${
+              className={`w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl font-bold text-sm border shadow-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] ${
                 isDark
                   ? 'bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700'
                   : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-300'
@@ -415,7 +508,7 @@ export default function LandingPage() {
             <button
               type="button"
               onClick={handleCopyLink}
-              className={`px-4 py-3.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-colors ${
+              className={`hidden sm:flex px-4 py-3.5 rounded-xl text-xs font-semibold border items-center gap-1.5 transition-colors ${
                 isDark
                   ? 'bg-slate-900/70 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border-slate-800'
                   : 'bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border-slate-200'
@@ -428,7 +521,7 @@ export default function LandingPage() {
           </div>
 
           {/* Micro Trust Indicators */}
-          <div className={`mt-7 flex flex-wrap items-center justify-center gap-6 text-[12px] font-medium ${
+          <div className={`mt-5 sm:mt-7 flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-[11px] sm:text-[12px] font-medium px-2 ${
             isDark ? 'text-slate-400' : 'text-slate-600'
           }`}>
             <span className="flex items-center gap-1.5">
@@ -446,7 +539,7 @@ export default function LandingPage() {
           </div>
 
           {/* 4. REALISTIC ERP SOFTWARE PREVIEW MOCKUP */}
-          <div className={`mt-10 relative max-w-5xl mx-auto rounded-2xl p-2 shadow-2xl border transition-all ${
+          <div className={`mt-6 sm:mt-10 relative max-w-5xl mx-auto rounded-xl sm:rounded-2xl p-1.5 sm:p-2 shadow-2xl border transition-all ${
             isDark
               ? 'bg-gradient-to-b from-slate-800/60 to-slate-900/80 border-slate-700/80 shadow-blue-950/40'
               : 'bg-gradient-to-b from-slate-200 to-slate-300/80 border-slate-300 shadow-slate-300/60'
@@ -455,62 +548,63 @@ export default function LandingPage() {
               isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
             }`}>
               {/* Window Titlebar */}
-              <div className={`px-4 py-2.5 border-b flex items-center justify-between text-xs ${
+              <div className={`px-2.5 sm:px-4 py-2 sm:py-2.5 border-b flex items-center justify-between text-[10px] sm:text-xs ${
                 isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-100 border-slate-200 text-slate-700'
               }`}>
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex gap-1 sm:gap-1.5 shrink-0">
+                    <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-rose-500" />
+                    <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-amber-500" />
+                    <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-emerald-500" />
                   </div>
-                  <span className={`font-mono ml-2 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                    Dealing India — Surat Demo Textile Mills Pvt Ltd [PROCESS ISSUE & RECEIPT]
+                  <span className={`font-mono ml-1 sm:ml-2 font-medium truncate ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    <span className="hidden sm:inline">Dealing India — Surat Demo Textile Mills Pvt Ltd [PROCESS ISSUE & RECEIPT]</span>
+                    <span className="sm:hidden">Dealing India — Demo Textile Mills</span>
                   </span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className={`flex items-center gap-1 text-[11px] font-semibold border px-2 py-0.5 rounded ${
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                  <span className={`flex items-center gap-1 text-[9px] sm:text-[11px] font-semibold border px-1.5 sm:px-2 py-0.5 rounded ${
                     isDark
                       ? 'text-emerald-400 bg-emerald-950/60 border-emerald-800/50'
                       : 'text-emerald-700 bg-emerald-50 border-emerald-200'
                   }`}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> ONLINE SYNC
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> <span className="hidden sm:inline">ONLINE </span>SYNC
                   </span>
-                  <span className={`text-[11px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>v2.4.0</span>
+                  <span className={`text-[10px] sm:text-[11px] font-mono hidden sm:inline ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>v2.4.0</span>
                 </div>
               </div>
 
               {/* High-Density ERP Screen Body */}
-              <div className={`p-4 text-left space-y-3 ${isDark ? 'bg-slate-900/90' : 'bg-slate-50/70'}`}>
+              <div className={`p-2.5 sm:p-4 text-left space-y-2.5 sm:space-y-3 ${isDark ? 'bg-slate-900/90' : 'bg-slate-50/70'}`}>
                 {/* Stats Bar */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2.5">
                   <div className={`p-2.5 rounded-lg border shadow-xs ${
                     isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-white border-slate-200'
                   }`}>
-                    <div className={`text-[10px] uppercase font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Today Sales</div>
-                    <div className={`text-lg font-bold font-mono mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>₹ 4,82,450.00</div>
-                    <div className="text-[10px] text-emerald-600 font-semibold">↑ 12 Invoices Generated</div>
+                    <div className={`text-[9px] sm:text-[10px] uppercase font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Today Sales</div>
+                    <div className={`text-sm sm:text-lg font-bold font-mono mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>₹ 4,82,450</div>
+                    <div className="text-[9px] sm:text-[10px] text-emerald-600 font-semibold">↑ 12 Invoices</div>
                   </div>
                   <div className={`p-2.5 rounded-lg border shadow-xs ${
                     isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-white border-slate-200'
                   }`}>
-                    <div className={`text-[10px] uppercase font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Total Outstanding</div>
-                    <div className="text-lg font-bold text-amber-600 font-mono mt-0.5">₹ 18,92,300.00</div>
-                    <div className={`text-[10px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>24 Parties with Dues</div>
+                    <div className={`text-[9px] sm:text-[10px] uppercase font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Outstanding</div>
+                    <div className="text-sm sm:text-lg font-bold text-amber-600 font-mono mt-0.5">₹ 18,92,300</div>
+                    <div className={`text-[9px] sm:text-[10px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>24 Parties</div>
                   </div>
                   <div className={`p-2.5 rounded-lg border shadow-xs ${
                     isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-white border-slate-200'
                   }`}>
-                    <div className={`text-[10px] uppercase font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Grey Stock Lots</div>
-                    <div className="text-lg font-bold text-blue-600 font-mono mt-0.5">1,48,220 Mts</div>
-                    <div className="text-[10px] text-blue-600 font-medium">84 Active Godown Lots</div>
+                    <div className={`text-[9px] sm:text-[10px] uppercase font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Grey Stock</div>
+                    <div className="text-sm sm:text-lg font-bold text-blue-600 font-mono mt-0.5">1,48,220 Mts</div>
+                    <div className="text-[9px] sm:text-[10px] text-blue-600 font-medium">84 Lots</div>
                   </div>
                   <div className={`p-2.5 rounded-lg border shadow-xs ${
                     isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-white border-slate-200'
                   }`}>
-                    <div className={`text-[10px] uppercase font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>In Process at Mill</div>
-                    <div className="text-lg font-bold text-indigo-600 font-mono mt-0.5">62,800 Mts</div>
-                    <div className="text-[10px] text-indigo-600 font-medium">Challan #1 to #8 Pending</div>
+                    <div className={`text-[9px] sm:text-[10px] uppercase font-bold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>In Process</div>
+                    <div className="text-sm sm:text-lg font-bold text-indigo-600 font-mono mt-0.5">62,800 Mts</div>
+                    <div className="text-[9px] sm:text-[10px] text-indigo-600 font-medium">8 Challans</div>
                   </div>
                 </div>
 
@@ -518,13 +612,14 @@ export default function LandingPage() {
                 <div className={`border rounded-lg overflow-hidden shadow-xs ${
                   isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-white border-slate-200'
                 }`}>
-                  <div className={`px-3 py-1.5 text-[11px] font-bold flex justify-between items-center ${
+                  <div className={`px-2 sm:px-3 py-1.5 text-[9px] sm:text-[11px] font-bold flex justify-between items-center gap-2 ${
                     isDark ? 'bg-slate-800/80 text-slate-200' : 'bg-slate-100 text-slate-800 border-b border-slate-200'
                   }`}>
-                    <span>LIVE VOUCHER: SALES BILL #INV-2026-0042 [PARTY: HARSHIKA TEXTILES, SURAT]</span>
-                    <span className="text-emerald-600 font-mono">STATUS: SAVED & E-WAY SYNCED</span>
+                    <span className="truncate"><span className="hidden sm:inline">LIVE VOUCHER: </span>SALES BILL #INV-2026-0042 <span className="hidden sm:inline">[PARTY: HARSHIKA TEXTILES, SURAT]</span></span>
+                    <span className="text-emerald-600 font-mono shrink-0 hidden sm:inline">SAVED & E-WAY SYNCED</span>
+                    <span className="text-emerald-600 font-mono shrink-0 sm:hidden">SAVED ✓</span>
                   </div>
-                  <div className="overflow-x-auto text-[11px] font-mono">
+                  <div className="overflow-x-auto text-[10px] sm:text-[11px] font-mono">
                     <table className="w-full text-left border-collapse">
                       <thead className={`border-b text-[10px] uppercase ${
                         isDark ? 'bg-slate-900 text-slate-400 border-slate-800' : 'bg-slate-50 text-slate-600 border-slate-200'
@@ -566,15 +661,15 @@ export default function LandingPage() {
                       </tbody>
                     </table>
                   </div>
-                  <div className={`px-3 py-2 border-t flex justify-between items-center text-xs ${
+                  <div className={`px-2 sm:px-3 py-1.5 sm:py-2 border-t flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 text-xs ${
                     isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50 border-slate-200'
                   }`}>
-                    <div className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                      Broker: <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>PRAVINBHAI SHAH (1.0%)</span> · Transport: <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>SURAT GOODS (LR: 48210)</span>
+                    <div className={`text-[10px] sm:text-[11px] truncate w-full sm:w-auto ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Broker: <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>PRAVINBHAI SHAH (1.0%)</span><span className="hidden sm:inline"> · Transport: <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>SURAT GOODS (LR: 48210)</span></span>
                     </div>
-                    <div className="text-right">
-                      <span className={`mr-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Net Bill Amount:</span>
-                      <span className="text-sm font-bold text-emerald-600 font-mono">₹ 1,54,854.00</span>
+                    <div className="text-right shrink-0">
+                      <span className={`mr-1 sm:mr-2 text-[10px] sm:text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Net:</span>
+                      <span className="text-xs sm:text-sm font-bold text-emerald-600 font-mono">₹ 1,54,854</span>
                     </div>
                   </div>
                 </div>
@@ -589,9 +684,9 @@ export default function LandingPage() {
         isDark ? 'border-slate-800 bg-slate-900/40' : 'border-slate-200 bg-white'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 text-center">
             <div>
-              <div className="text-3xl sm:text-4xl font-black text-blue-600 font-mono">
+              <div className="text-2xl sm:text-3xl md:text-4xl font-black text-blue-600 font-mono">
                 5,000+
               </div>
               <div className={`text-xs mt-1 font-semibold uppercase tracking-wider ${
@@ -601,7 +696,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div>
-              <div className="text-3xl sm:text-4xl font-black text-emerald-600 font-mono">
+              <div className="text-2xl sm:text-3xl md:text-4xl font-black text-emerald-600 font-mono">
                 ₹850 Cr+
               </div>
               <div className={`text-xs mt-1 font-semibold uppercase tracking-wider ${
@@ -611,7 +706,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div>
-              <div className="text-3xl sm:text-4xl font-black text-amber-500 font-mono">
+              <div className="text-2xl sm:text-3xl md:text-4xl font-black text-amber-500 font-mono">
                 100%
               </div>
               <div className={`text-xs mt-1 font-semibold uppercase tracking-wider ${
@@ -621,7 +716,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div>
-              <div className="text-3xl sm:text-4xl font-black text-indigo-600 font-mono">
+              <div className="text-2xl sm:text-3xl md:text-4xl font-black text-indigo-600 font-mono">
                 0.2s
               </div>
               <div className={`text-xs mt-1 font-semibold uppercase tracking-wider ${
@@ -635,13 +730,13 @@ export default function LandingPage() {
       </section>
 
       {/* 6. INTERACTIVE FEATURE MODULE EXPLORER */}
-      <section id="features" className="py-16 relative">
+      <section id="features" className="py-10 sm:py-16 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-10">
             <h2 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1.5">
               Comprehensive ERP Suite
             </h2>
-            <h3 className={`text-3xl sm:text-4xl font-black tracking-tight ${
+            <h3 className={`text-2xl sm:text-3xl md:text-4xl font-black tracking-tight ${
               isDark ? 'text-white' : 'text-slate-900'
             }`}>
               Engineered for Every Stage of the Textile Supply Chain
@@ -652,7 +747,7 @@ export default function LandingPage() {
           </div>
 
           {/* Module Selector Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mb-7">
+          <div className="flex overflow-x-auto sm:overflow-visible sm:flex-wrap items-center justify-start sm:justify-center gap-2 mb-7 pb-2 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -660,7 +755,7 @@ export default function LandingPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+                  className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-bold flex items-center gap-1.5 sm:gap-2 transition-all whitespace-nowrap shrink-0 ${
                     isActive
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 scale-105'
                       : isDark
@@ -676,7 +771,7 @@ export default function LandingPage() {
           </div>
 
           {/* Active Tab Detailed View Card */}
-          <div className={`border rounded-2xl p-6 sm:p-8 shadow-lg transition-all ${
+          <div className={`border rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 shadow-lg transition-all ${
             isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
           }`}>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
@@ -684,7 +779,7 @@ export default function LandingPage() {
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-600 text-xs font-bold uppercase tracking-wider">
                   <Sparkles size={12} /> {activeTabData.label}
                 </div>
-                <h4 className={`text-2xl sm:text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <h4 className={`text-xl sm:text-2xl md:text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {activeTabData.headline}
                 </h4>
                 <p className={`text-sm leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
@@ -763,7 +858,7 @@ export default function LandingPage() {
             <h2 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1.5 flex items-center justify-center gap-1.5">
               <Info size={14} /> Software Specifications & Technical Details
             </h2>
-            <h3 className={`text-3xl sm:text-4xl font-black tracking-tight ${
+            <h3 className={`text-2xl sm:text-3xl md:text-4xl font-black tracking-tight ${
               isDark ? 'text-white' : 'text-slate-900'
             }`}>
               Built for Unstoppable Reliability & Textile Scale
@@ -809,26 +904,26 @@ export default function LandingPage() {
               <span>Technical Compatibility & System Specifications</span>
               <span className="text-blue-600 font-mono">v2.4.0 Certified</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-slate-800 text-xs">
-              <div className="p-4 space-y-1">
-                <div className="text-[11px] font-bold text-slate-500 uppercase">Operating System</div>
-                <div className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Windows 10, 11 (64-bit)</div>
-                <div className="text-[10px] text-slate-500">Also runs on Web & Tablets</div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-slate-800 text-xs">
+              <div className="p-3 sm:p-4 space-y-1">
+                <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase">Operating System</div>
+                <div className={`text-[11px] sm:text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Windows 10, 11 (64-bit)</div>
+                <div className="text-[9px] sm:text-[10px] text-slate-500">Also runs on Web & Tablets</div>
               </div>
-              <div className="p-4 space-y-1">
-                <div className="text-[11px] font-bold text-slate-500 uppercase">Hardware Min Req.</div>
-                <div className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>4 GB RAM / 1 GB Disk</div>
-                <div className="text-[10px] text-slate-500">Intel Core i3 or equivalent</div>
+              <div className="p-3 sm:p-4 space-y-1">
+                <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase">Hardware Min Req.</div>
+                <div className={`text-[11px] sm:text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>4 GB RAM / 1 GB Disk</div>
+                <div className="text-[9px] sm:text-[10px] text-slate-500">Intel Core i3 or equivalent</div>
               </div>
-              <div className="p-4 space-y-1">
-                <div className="text-[11px] font-bold text-slate-500 uppercase">Printer Drivers</div>
-                <div className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>TSC, TVS, Epson, Laser</div>
-                <div className="text-[10px] text-slate-500">ESC/POS & Standard A4/A5</div>
+              <div className="p-3 sm:p-4 space-y-1">
+                <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase">Printer Drivers</div>
+                <div className={`text-[11px] sm:text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>TSC, TVS, Epson, Laser</div>
+                <div className="text-[9px] sm:text-[10px] text-slate-500">ESC/POS & Standard A4/A5</div>
               </div>
-              <div className="p-4 space-y-1">
-                <div className="text-[11px] font-bold text-slate-500 uppercase">Backup Engine</div>
-                <div className={`font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Daily Local + Cloud</div>
-                <div className="text-[10px] text-slate-500">AES-256 Encrypted Snapshots</div>
+              <div className="p-3 sm:p-4 space-y-1">
+                <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase">Backup Engine</div>
+                <div className={`text-[11px] sm:text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>Daily Local + Cloud</div>
+                <div className="text-[9px] sm:text-[10px] text-slate-500">AES-256 Encrypted Snapshots</div>
               </div>
             </div>
           </div>
@@ -836,7 +931,7 @@ export default function LandingPage() {
       </section>
 
       {/* 8. NEW SECTION: ABOUT US */}
-      <section id="about" className={`py-16 border-t transition-colors ${
+      <section id="about" className={`py-10 sm:py-16 border-t transition-colors ${
         isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-50/60 border-slate-200'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -845,7 +940,7 @@ export default function LandingPage() {
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 text-xs font-bold uppercase tracking-wider">
                 <Building size={14} /> About Dealing India
               </div>
-              <h3 className={`text-3xl sm:text-4xl font-black tracking-tight leading-snug ${
+              <h3 className={`text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-snug ${
                 isDark ? 'text-white' : 'text-slate-900'
               }`}>
                 Born in Surat's Textile Markets, Built for Indian Fabric Leaders
@@ -934,11 +1029,11 @@ export default function LandingPage() {
       </section>
 
       {/* 9. DESKTOP APP (.EXE) HIGHLIGHT SECTION */}
-      <section id="desktop-app" className={`py-16 border-t transition-colors ${
+      <section id="desktop-app" className={`py-10 sm:py-16 border-t transition-colors ${
         isDark ? 'bg-slate-950 border-slate-800' : 'bg-gradient-to-b from-white to-blue-50/40 border-slate-200'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className={`rounded-3xl p-8 sm:p-12 relative overflow-hidden border shadow-xl ${
+          <div className={`rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-12 relative overflow-hidden border shadow-xl ${
             isDark
               ? 'bg-gradient-to-tr from-blue-950/60 via-slate-900 to-slate-950 border-blue-500/20'
               : 'bg-gradient-to-tr from-blue-50/80 via-white to-indigo-50/60 border-blue-200'
@@ -950,7 +1045,7 @@ export default function LandingPage() {
                   <span>Native Windows Desktop Software</span>
                 </div>
 
-                <h3 className={`text-3xl sm:text-4xl font-black tracking-tight leading-snug ${
+                <h3 className={`text-xl sm:text-3xl md:text-4xl font-black tracking-tight leading-snug ${
                   isDark ? 'text-white' : 'text-slate-900'
                 }`}>
                   Work 100% Offline When Internet is Down. Sync Automatically When Online.
@@ -988,11 +1083,11 @@ export default function LandingPage() {
                 </div>
 
                 {/* Direct Download Box */}
-                <div className="pt-2 flex flex-wrap items-center gap-4">
+                <div className="pt-2 flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 sm:gap-4">
                   <a
                     href={downloadUrl}
                     download="BillingSoftware-Setup.exe"
-                    className="px-7 py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-600/25 flex items-center gap-2.5 transition-all hover:scale-105"
+                    className="w-full sm:w-auto px-5 sm:px-7 py-3 sm:py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg shadow-emerald-600/25 flex items-center justify-center sm:justify-start gap-2.5 transition-all hover:scale-105"
                   >
                     <Download size={18} />
                     <span>Download Installer (.EXE)</span>
@@ -1069,7 +1164,7 @@ export default function LandingPage() {
       </section>
 
       {/* 10. FAQ ACCORDION */}
-      <section id="faqs" className={`py-16 border-t transition-colors ${
+      <section id="faqs" className={`py-10 sm:py-16 border-t transition-colors ${
         isDark ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-50/70 border-slate-200'
       }`}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1077,7 +1172,7 @@ export default function LandingPage() {
             <h2 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1.5">
               Got Questions?
             </h2>
-            <h3 className={`text-3xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <h3 className={`text-2xl sm:text-3xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
               Frequently Asked Questions
             </h3>
           </div>
@@ -1097,7 +1192,7 @@ export default function LandingPage() {
                   <button
                     type="button"
                     onClick={() => setOpenFaq(isOpen ? null : idx)}
-                    className={`w-full p-4 sm:p-5 text-left flex justify-between items-center gap-4 text-sm font-bold transition-colors ${
+                    className={`w-full p-3.5 sm:p-5 text-left flex justify-between items-start sm:items-center gap-3 sm:gap-4 text-[13px] sm:text-sm font-bold transition-colors ${
                       isDark ? 'text-slate-200 hover:text-white' : 'text-slate-800 hover:text-blue-600'
                     }`}
                   >
@@ -1121,20 +1216,20 @@ export default function LandingPage() {
       </section>
 
       {/* 11. BOTTOM FINAL CALL TO ACTION */}
-      <section className="py-14 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white text-center relative overflow-hidden">
+      <section className="py-10 sm:py-14 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white text-center relative overflow-hidden">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <h3 className="text-3xl sm:text-4xl font-black tracking-tight leading-snug">
+          <h3 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-snug">
             Ready to Upgrade Your Textile Mandi Operations?
           </h3>
           <p className="mt-3 text-sm text-blue-100 max-w-xl mx-auto leading-relaxed">
             Download the Windows offline software now or register your company to use the cloud web portal. Zero installation hassle.
           </p>
 
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">
+          <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-2.5 sm:gap-3.5 px-4 sm:px-0">
             <a
               href={downloadUrl}
               download="BillingSoftware-Setup.exe"
-              className="px-6 py-3 rounded-xl font-bold text-xs bg-white text-blue-800 hover:bg-blue-50 shadow-lg flex items-center gap-2 transition-all hover:scale-105"
+              className="w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-xs bg-white text-blue-800 hover:bg-blue-50 shadow-lg flex items-center justify-center gap-2 transition-all hover:scale-105"
             >
               <Download size={16} />
               <span>Download Free Windows App (.EXE)</span>
@@ -1142,7 +1237,7 @@ export default function LandingPage() {
 
             <Link
               to="/signup"
-              className="px-6 py-3 rounded-xl font-bold text-xs bg-blue-900/60 hover:bg-blue-900 text-white border border-blue-400/40 flex items-center gap-2 transition-all"
+              className="w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-xs bg-blue-900/60 hover:bg-blue-900 text-white border border-blue-400/40 flex items-center justify-center gap-2 transition-all"
             >
               <Users size={16} />
               <span>Register New Company</span>
@@ -1150,7 +1245,7 @@ export default function LandingPage() {
 
             <Link
               to="/login"
-              className="px-5 py-3 rounded-xl font-bold text-xs bg-transparent hover:bg-blue-600/40 text-blue-100 border border-blue-400/30 flex items-center gap-1.5 transition-all"
+              className="w-full sm:w-auto px-5 py-3 rounded-xl font-bold text-xs bg-transparent hover:bg-blue-600/40 text-blue-100 border border-blue-400/30 flex items-center justify-center gap-1.5 transition-all"
             >
               <Cloud size={16} />
               <span>Online Login</span>
@@ -1160,10 +1255,10 @@ export default function LandingPage() {
       </section>
 
       {/* 12. COMPREHENSIVE FOOTER */}
-      <footer className="bg-slate-950 text-slate-400 py-12 border-t border-slate-900 text-left">
+      <footer className="bg-slate-950 text-slate-400 py-8 sm:py-12 border-t border-slate-900 text-left">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-            <div className="space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 mb-8">
+            <div className="col-span-2 md:col-span-1 space-y-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-sm">
                   DI
