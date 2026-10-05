@@ -44,25 +44,19 @@ const DEMO_USERS = [
 
 const isDev = import.meta.env.DEV;
 
-const AppzetoLogo = () => (
+const DealingIndiaLogo = () => (
     <div className="flex items-center gap-2.5">
-        <svg width="34" height="34" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0 drop-shadow-sm">
-            <path d="M7 32L17.5 11C18.3 9.4 20.7 9.4 21.5 11L32 32H25L20 22L14 32H7Z" fill="url(#appzeto-grad-1)"/>
-            <path d="M19.5 8C20.3 6.6 22.3 6.6 23.1 8L34.5 28C35.4 29.6 34.2 31.6 32.4 31.6H25.5L18.5 18L19.5 8Z" fill="url(#appzeto-grad-2)"/>
-            <defs>
-                <linearGradient id="appzeto-grad-1" x1="7" y1="9" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#0066FF"/>
-                    <stop offset="1" stopColor="#0052CC"/>
-                </linearGradient>
-                <linearGradient id="appzeto-grad-2" x1="18" y1="7" x2="35" y2="32" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#38BDF8"/>
-                    <stop offset="1" stopColor="#0284C7"/>
-                </linearGradient>
-            </defs>
-        </svg>
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0066FF] to-[#4F46E5] flex items-center justify-center text-white shadow-md shadow-blue-500/25 shrink-0 font-black text-base tracking-wider select-none">
+            DI
+        </div>
         <div className="flex flex-col leading-none">
-            <span className="text-[20px] font-black tracking-tight text-slate-900 font-sans">Appzeto</span>
-            <span className="text-[9.5px] font-semibold text-slate-400 tracking-wider">SaaS Software Company</span>
+            <div className="flex items-center gap-1.5">
+                <span className="text-[20px] font-black tracking-tight text-slate-900 font-sans">Dealing India</span>
+                <span className="text-[9px] uppercase tracking-wider bg-blue-50 text-[#0066FF] border border-blue-200 px-1 py-0.5 rounded font-bold">
+                    ERP
+                </span>
+            </div>
+            <span className="text-[9.5px] font-semibold text-slate-400 tracking-wider mt-0.5">Textile Billing & ERP</span>
         </div>
     </div>
 );
@@ -162,9 +156,9 @@ const LoginPage = () => {
                 {/* Left Column: Form Card (col-span-12 lg:col-span-6 xl:col-span-5) */}
                 <div className="lg:col-span-6 xl:col-span-5 p-6 sm:p-8 lg:p-10 flex flex-col justify-between bg-white relative z-10 border-r border-slate-100/80">
                     
-                    {/* Top Row: Appzeto Branding + Language Picker */}
+                    {/* Top Row: Dealing India Branding + Language Picker */}
                     <div className="flex items-center justify-between gap-3 mb-5">
-                        <AppzetoLogo />
+                        <DealingIndiaLogo />
                         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-700 shadow-xs">
                             <span className="text-[13px]">🇮🇳</span>
                             <span>English</span>
@@ -444,7 +438,7 @@ const LoginPage = () => {
                         <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-blue-900/12 border border-white/90 bg-white/40 backdrop-blur-xs">
                             <img 
                                 src="/assets/user-login-laptop.jpg" 
-                                alt="Appzeto Textile ERP Interface"
+                                alt="Dealing India Textile ERP Interface"
                                 className="w-full h-auto max-h-[260px] xl:max-h-[290px] object-cover object-top transition-transform duration-700 group-hover:scale-[1.02]"
                             />
                             
