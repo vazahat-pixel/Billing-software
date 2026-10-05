@@ -101,8 +101,9 @@ export default function LandingPage() {
     });
   };
 
-  const [downloadUrl, setDownloadUrl] = useState('/api/desktop/download');
-  const [downloadAltUrl, setDownloadAltUrl] = useState('/downloads/BillingSoftware-Setup.exe');
+  const CANONICAL_RELEASE_URL = 'https://github.com/vazahat-pixel/Billing-software/releases/download/v1.0.0/BillingSoftware-Setup.exe';
+  const [downloadUrl, setDownloadUrl] = useState(CANONICAL_RELEASE_URL);
+  const [downloadAltUrl, setDownloadAltUrl] = useState(CANONICAL_RELEASE_URL);
 
   useEffect(() => {
     fetch('/api/desktop/download-info')
