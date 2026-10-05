@@ -101,11 +101,26 @@ export default function LandingPage() {
     });
   };
 
-  const downloadUrl = '/downloads/BillingSoftware-Setup.exe';
-  const downloadAltUrl = '/downloads/TextileERP-Setup-1.0.0.exe';
+  const [downloadUrl, setDownloadUrl] = useState('/api/desktop/download');
+  const [downloadAltUrl, setDownloadAltUrl] = useState('/downloads/BillingSoftware-Setup.exe');
+
+  useEffect(() => {
+    fetch('/api/desktop/download-info')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => {
+        if (res?.success && res.data) {
+          if (res.data.directUrl && res.data.directUrl.startsWith('http')) {
+            setDownloadUrl(res.data.directUrl);
+          } else if (res.data.downloadUrl) {
+            setDownloadUrl(res.data.downloadUrl);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleCopyLink = () => {
-    const fullUrl = `${window.location.origin}${downloadUrl}`;
+    const fullUrl = downloadUrl.startsWith('http') ? downloadUrl : `${window.location.origin}${downloadUrl}`;
     navigator.clipboard?.writeText(fullUrl).then(() => {
       setCopiedLink(true);
       toast.success('Download link copied to clipboard!');

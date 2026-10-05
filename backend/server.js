@@ -287,12 +287,34 @@ app.use('/api', dbCheckMiddleware, require('./routes/index.js'));
 app.use('/downloads', express.static(path.join(__dirname, 'public/downloads')));
 app.get(['/download/desktop', '/downloads/desktop'], (req, res) => {
   const fs = require('fs');
-  const setupPath = path.join(__dirname, 'public/downloads/BillingSoftware-Setup.exe');
-  if (fs.existsSync(setupPath)) {
-    res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
-    res.setHeader('Content-Disposition', 'attachment; filename="BillingSoftware-Setup.exe"');
-    return res.download(setupPath, 'BillingSoftware-Setup.exe');
+  const candidates = [
+    path.join(__dirname, 'public/downloads/BillingSoftware-Setup.exe'),
+    '/var/www/billing-frontend/downloads/BillingSoftware-Setup.exe',
+    path.join(__dirname, '../frontend/dist/downloads/BillingSoftware-Setup.exe'),
+    path.join(__dirname, '../frontend/public/downloads/BillingSoftware-Setup.exe'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      try {
+        const stat = fs.statSync(candidate);
+        if (stat.isFile() && stat.size > 1024 * 1024) {
+          res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
+          res.setHeader('Content-Disposition', 'attachment; filename="BillingSoftware-Setup.exe"');
+          res.setHeader('Content-Length', stat.size);
+          res.setHeader('Accept-Ranges', 'bytes');
+          return res.download(candidate, 'BillingSoftware-Setup.exe');
+        }
+      } catch {
+        // continue
+      }
+    }
   }
+
+  const externalUrl = process.env.DESKTOP_DOWNLOAD_URL || process.env.DESKTOP_INSTALLER_URL;
+  if (externalUrl) {
+    return res.redirect(302, externalUrl);
+  }
+
   return res.status(404).send('Setup installer not found');
 });
 

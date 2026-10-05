@@ -257,6 +257,14 @@ fi
 if [ -d "$WEB_ROOT" ]; then
   echo ""
   echo "📦 Updating frontend static files in $WEB_ROOT..."
+
+  # Preserve installer downloads if already present on server
+  if [ -d "$WEB_ROOT/downloads" ] && [ "$(ls -A "$WEB_ROOT/downloads" 2>/dev/null)" ]; then
+    echo "   Preserving existing installer files in $WEB_ROOT/downloads..."
+    mkdir -p /tmp/billing_downloads_backup
+    cp -a "$WEB_ROOT/downloads/." /tmp/billing_downloads_backup/
+  fi
+
   if [ -d "$SCRIPT_DIR/frontend/dist" ] && [ -f "$SCRIPT_DIR/frontend/dist/index.html" ]; then
     echo "   Deploying pre-built bundle..."
     rm -rf "${WEB_ROOT:?}/"*
@@ -272,6 +280,14 @@ if [ -d "$WEB_ROOT" ]; then
     npm run build
     rm -rf "${WEB_ROOT:?}/"*
     cp -a dist/. "$WEB_ROOT/"
+  fi
+
+  # Restore preserved downloads
+  if [ -d /tmp/billing_downloads_backup ]; then
+    echo "   Restoring preserved installer files to $WEB_ROOT/downloads..."
+    mkdir -p "$WEB_ROOT/downloads"
+    cp -an /tmp/billing_downloads_backup/. "$WEB_ROOT/downloads/"
+    rm -rf /tmp/billing_downloads_backup
   fi
 
   chown -R www-data:www-data "$WEB_ROOT" 2>/dev/null || true

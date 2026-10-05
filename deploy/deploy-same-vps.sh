@@ -172,9 +172,23 @@ fi
 npm run build
 
 mkdir -p "$WEB_ROOT"
+# Preserve downloads folder (e.g. installers) before replacing web root
+if [ -d "$WEB_ROOT/downloads" ] && [ "$(ls -A "$WEB_ROOT/downloads" 2>/dev/null)" ]; then
+  echo "==> Preserving existing downloads in $WEB_ROOT/downloads..."
+  mkdir -p /tmp/billing_downloads_backup
+  cp -a "$WEB_ROOT/downloads/." /tmp/billing_downloads_backup/
+fi
+
 rm -rf "${WEB_ROOT:?}/"*
 cp -a dist/. "$WEB_ROOT/"
-# SPA fallback for deep links if using apache elsewhere; nginx handles try_files
+
+# Restore downloads if previously backed up
+if [ -d /tmp/billing_downloads_backup ]; then
+  echo "==> Restoring installer downloads to $WEB_ROOT/downloads..."
+  mkdir -p "$WEB_ROOT/downloads"
+  cp -an /tmp/billing_downloads_backup/. "$WEB_ROOT/downloads/"
+  rm -rf /tmp/billing_downloads_backup
+fi
 
 echo "==> Nginx site (frontend + /api proxy) — does not remove other sites"
 cat > /etc/nginx/sites-available/billing.conf <<EOF
@@ -201,6 +215,30 @@ server {
         proxy_pass http://127.0.0.1:${API_PORT}/health;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
+    }
+
+    # Dedicated desktop app downloads — NEVER fall back to SPA index.html
+    location /downloads/ {
+        alias ${WEB_ROOT}/downloads/;
+        try_files \$uri @proxy_downloads;
+        default_type application/vnd.microsoft.portable-executable;
+        add_header Content-Disposition 'attachment; filename="BillingSoftware-Setup.exe"';
+        add_header X-Content-Type-Options nosniff;
+        add_header Accept-Ranges bytes;
+        sendfile on;
+        sendfile_max_chunk 2m;
+        tcp_nopush on;
+    }
+
+    location @proxy_downloads {
+        proxy_pass http://127.0.0.1:${API_PORT}/downloads/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
     }
 
     location / {

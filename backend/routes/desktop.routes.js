@@ -64,57 +64,84 @@ function getInstallerPath() {
   const candidates = [
     path.resolve(__dirname, '../public/downloads/BillingSoftware-Setup.exe'),
     path.resolve(__dirname, '../public/downloads/TextileERP-Setup-1.0.0.exe'),
+    path.resolve('/var/www/billing-frontend/downloads/BillingSoftware-Setup.exe'),
+    path.resolve('/var/www/billing-frontend/downloads/TextileERP-Setup-1.0.0.exe'),
+    path.resolve(__dirname, '../../frontend/dist/downloads/BillingSoftware-Setup.exe'),
     path.resolve(__dirname, '../../frontend/public/downloads/BillingSoftware-Setup.exe'),
     path.resolve(__dirname, '../../desktop/dist/TextileERP-Setup-1.0.0.exe'),
   ];
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
-      return candidate;
+      try {
+        const stat = fs.statSync(candidate);
+        // Ensure installer is an actual binary (canonical installer is ~238 MB, at least > 1MB)
+        // Avoid serving truncated or placeholder HTML files
+        if (stat.isFile() && stat.size > 1024 * 1024) {
+          return { filePath: candidate, size: stat.size };
+        }
+      } catch {
+        // Continue checking other candidates
+      }
     }
   }
   return null;
 }
 
+const getExternalUrl = () => process.env.DESKTOP_DOWNLOAD_URL || process.env.DESKTOP_INSTALLER_URL || null;
+
 /** Public metadata about latest desktop build */
 router.get('/download-info', (req, res) => {
-  const installerPath = getInstallerPath();
-  if (!installerPath) {
+  const installer = getInstallerPath();
+  const externalUrl = getExternalUrl();
+
+  if (!installer && !externalUrl) {
     return res.status(404).json({
       success: false,
       message: 'Desktop installer is currently being built or unavailable.',
       data: { available: false },
     });
   }
-  const stat = fs.statSync(installerPath);
-  const sizeMB = (stat.size / (1024 * 1024)).toFixed(1) + ' MB';
+
+  const sizeBytes = installer ? installer.size : 250518424;
+  const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(1) + ' MB';
+
   return res.json({
     success: true,
     data: {
       available: true,
       version: '1.0.0',
       fileName: 'BillingSoftware-Setup.exe',
-      sizeBytes: stat.size,
+      sizeBytes,
       sizeMB,
       releaseDate: '2026-10-02',
       os: 'Windows 10 / 11 (64-bit)',
       downloadUrl: '/api/desktop/download',
-      directUrl: '/downloads/BillingSoftware-Setup.exe',
+      directUrl: externalUrl || '/downloads/BillingSoftware-Setup.exe',
+      sha256: '5FD407ABFB0C37CA7BC51DB4BC126F1C179ACE9781C2728153A385A2B1BE8D5E',
     },
   });
 });
 
 /** Direct binary download for desktop installer */
 router.get('/download', (req, res) => {
-  const installerPath = getInstallerPath();
-  if (!installerPath) {
-    return res.status(404).json({
-      success: false,
-      message: 'Desktop setup file not found. Please contact support.',
-    });
+  const installer = getInstallerPath();
+  if (installer) {
+    res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
+    res.setHeader('Content-Disposition', 'attachment; filename="BillingSoftware-Setup.exe"');
+    res.setHeader('Content-Length', installer.size);
+    res.setHeader('Accept-Ranges', 'bytes');
+    return res.download(installer.filePath, 'BillingSoftware-Setup.exe');
   }
-  res.setHeader('Content-Type', 'application/vnd.microsoft.portable-executable');
-  res.setHeader('Content-Disposition', 'attachment; filename="BillingSoftware-Setup.exe"');
-  return res.download(installerPath, 'BillingSoftware-Setup.exe');
+
+  const externalUrl = getExternalUrl();
+  if (externalUrl) {
+    return res.redirect(302, externalUrl);
+  }
+
+  return res.status(404).json({
+    success: false,
+    message: 'Desktop setup file not found. Please contact support.',
+  });
 });
 
 module.exports = router;
