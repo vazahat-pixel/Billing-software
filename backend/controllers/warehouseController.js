@@ -11,12 +11,20 @@ exports.list = asyncHandler(async (req, res) => {
 });
 
 exports.create = asyncHandler(async (req, res) => {
-  const data = await warehouseService.create(req.companyId, req.body);
+  const data = await warehouseService.create(req.companyId, req.body, {
+    userId: req.user?.id || req.user?._id,
+    deviceId: req.headers['x-device-id'] || '',
+    operationId: req.body?.operationId,
+  });
   return created(res, data, 'Warehouse created');
 });
 
 exports.update = asyncHandler(async (req, res) => {
-  const data = await warehouseService.update(req.params.id, req.companyId, req.body);
+  const data = await warehouseService.update(req.params.id, req.companyId, req.body, {
+    userId: req.user?.id || req.user?._id,
+    deviceId: req.headers['x-device-id'] || '',
+    operationId: req.body?.operationId,
+  });
   return ok(res, data, 'Warehouse updated');
 });
 

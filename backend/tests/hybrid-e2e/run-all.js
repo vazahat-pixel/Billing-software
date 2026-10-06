@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 /**
  * HYBRID ERP FULL CROSS-MODULE HARNESS
@@ -41,11 +41,11 @@ async function runAll() {
 
   // ── PHASE 1: Sales regression baseline (must pass before anything else) ──
   header('PHASE 1: SALES REGRESSION BASELINE');
-  const { default: salesRunner } = await import('./run.js').catch(() => ({ default: null }));
-  // The Sales runner (run.js) uses process.exit — wrap it as a child process instead
   const { spawn } = require('child_process');
   const runScript = (scriptPath) => new Promise((resolve) => {
-    const proc = spawn(process.execPath, [scriptPath, keepData ? '--keep' : ''], {
+    const args = [scriptPath];
+    if (keepData) args.push('--keep');
+    const proc = spawn(process.execPath, args, {
       cwd: path.join(__dirname, '..', '..'),
       stdio: 'inherit',
     });
@@ -76,15 +76,30 @@ async function runAll() {
   const jobWorkPath = path.join(__dirname, 'modules', 'job-work', 'run.js');
   const fs = require('fs');
   if (fs.existsSync(jobWorkPath)) {
-    console.log('\n[3/3] Running Job Work certification...');
+    console.log('\n[3/4] Running Job Work certification...');
     const jobCode = await runScript(jobWorkPath);
     results.push({ module: 'job_work', passed: jobCode === 0 });
     if (jobCode !== 0) totalFailed++;
     else totalPassed++;
-    console.log(`[3/3] Job Work certification ${jobCode === 0 ? 'PASSED' : 'FAILED'}.\n`);
+    console.log(`[3/4] Job Work certification ${jobCode === 0 ? 'PASSED' : 'FAILED'}.\n`);
   } else {
-    console.log('[3/3] Job Work certification suite not yet implemented — skipping.\n');
+    console.log('[3/4] Job Work certification suite not yet implemented — skipping.\n');
     results.push({ module: 'job_work', passed: null, skipped: true });
+  }
+
+  // ── PHASE 4: Web + Desktop Synchronization ──────────────────────────────
+  header('PHASE 4: WEB + DESKTOP SYNCHRONIZATION CERTIFICATION');
+  const webDesktopPath = path.join(__dirname, 'modules', 'web-desktop', 'run.js');
+  if (fs.existsSync(webDesktopPath)) {
+    console.log('\n[4/4] Running Web + Desktop certification...');
+    const webDesktopCode = await runScript(webDesktopPath);
+    results.push({ module: 'web_desktop', passed: webDesktopCode === 0 });
+    if (webDesktopCode !== 0) totalFailed++;
+    else totalPassed++;
+    console.log(`[4/4] Web + Desktop certification ${webDesktopCode === 0 ? 'PASSED' : 'FAILED'}.\n`);
+  } else {
+    console.log('[4/4] Web + Desktop certification suite not found — skipping.\n');
+    results.push({ module: 'web_desktop', passed: null, skipped: true });
   }
 
   // ── Final summary ────────────────────────────────────────────────────────

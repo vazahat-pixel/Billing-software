@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
     Mail, 
     Lock, 
@@ -72,12 +72,15 @@ const LoginPage = () => {
     const [savedProfiles, setSavedProfiles] = useState([]);
     
     const navigate = useNavigate();
+    const location = useLocation();
     const setAuth = useStore(state => state.setAuth);
 
     useEffect(() => {
         let cancelled = false;
         (async () => {
             try {
+                if (location.state?.fromActivate) return;
+
                 const local =
                     typeof window.textileDesktop?.isLocalSync === 'function'
                         ? window.textileDesktop.isLocalSync()
@@ -93,7 +96,7 @@ const LoginPage = () => {
             }
         })();
         return () => { cancelled = true; };
-    }, [navigate]);
+    }, [navigate, location.state]);
 
     useEffect(() => {
         const unsub = subscribeNetworkStatus(({ isOffline: offline, browserOnline }) => {

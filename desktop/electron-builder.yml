@@ -13,12 +13,19 @@ files:
   - config.example.json
   - localRuntime/**/*
   - renderer/**/*
+  - '!renderer/downloads/**/*'
   - assets/**/*
 extraResources:
   - from: config.json
     to: config.json
   - from: config.example.json
     to: config.example.json
+  - from: resources/backend
+    to: backend
+  - from: vendor/mongodb
+    to: vendor/mongodb
+  - from: vendor/node
+    to: vendor/node
 asarUnpack:
   - localRuntime/**/*
 win:

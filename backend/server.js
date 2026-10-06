@@ -435,8 +435,9 @@ if (!process.env.VERCEL && require.main === module) {
   const PORT = process.env.PORT || (process.env.NODE_ENV === 'production' ? 5010 : 5000);
   ensureDbBoot()
     .then(() => {
-      server = app.listen(PORT, () => {
-        logger.info(`Server listening on http://localhost:${PORT}`);
+      const HOST = process.env.HOST || '0.0.0.0';
+      server = app.listen(PORT, HOST, () => {
+        logger.info(`Server listening on http://${HOST}:${PORT}`);
       });
       try {
         require('./services/syncAgentWorker').startSyncAgentWorker();

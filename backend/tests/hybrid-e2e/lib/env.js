@@ -8,6 +8,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
 const net = require('net');
+process.env.MONGOMS_SPAWN_TIMEOUT = process.env.MONGOMS_SPAWN_TIMEOUT || '60000';
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { MongoClient } = require('mongodb');
 const { assertNotProduction } = require('../../helpers/memoryDb');
@@ -25,10 +26,19 @@ function findFreePort() {
   });
 }
 
-function waitHealth(port, timeoutMs = 90000) {
+function waitHealth(port, timeoutMs = 90000, proc = null) {
   const start = Date.now();
   return new Promise((resolve, reject) => {
     const tick = () => {
+      if (proc && proc.exitCode !== null) {
+        const stderr = proc._hybridLogs?.stderr || '';
+        const stdout = proc._hybridLogs?.stdout || '';
+        return reject(
+          new Error(
+            `process exited prematurely with code ${proc.exitCode}\n--- stderr ---\n${stderr.slice(-1500)}\n--- stdout ---\n${stdout.slice(-1500)}`
+          )
+        );
+      }
       const req = http.get(
         { host: '127.0.0.1', port, path: '/api/health/live', timeout: 2000 },
         (res) => {
@@ -119,6 +129,7 @@ function spawnApi({ name, mongoUri, port, extraEnv = {} }) {
 
 async function stopProc(proc) {
   if (!proc || proc.killed) return;
+  const port = proc._hybridPort;
   await new Promise((resolve) => {
     const done = () => resolve();
     proc.once('exit', done);
@@ -143,6 +154,21 @@ async function stopProc(proc) {
     }
     setTimeout(done, 8000);
   });
+
+  // On Windows, wait up to 6 seconds for TCP port TIME_WAIT teardown
+  if (port) {
+    const net = require('net');
+    for (let i = 0; i < 30; i++) {
+      const free = await new Promise((res) => {
+        const s = net.createServer();
+        s.once('error', () => res(false));
+        s.once('listening', () => s.close(() => res(true)));
+        s.listen(port, '127.0.0.1');
+      });
+      if (free) break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
 }
 
 /**
@@ -150,8 +176,8 @@ async function stopProc(proc) {
  */
 async function bootHybridE2eEnv() {
   const stamp = Date.now();
-  const centralMms = await MongoMemoryServer.create();
-  const localMms = await MongoMemoryServer.create();
+  const centralMms = await MongoMemoryServer.create({ instance: { launchTimeout: 60000 } });
+  const localMms = await MongoMemoryServer.create({ instance: { launchTimeout: 60000 } });
   const centralUri = centralMms.getUri(`central_hybrid_e2e_test_${stamp}`);
   const localUri = localMms.getUri(`local_hybrid_e2e_test_${stamp}`);
   assertNotProduction(centralUri);
@@ -186,7 +212,7 @@ async function bootHybridE2eEnv() {
         },
       });
       try {
-        await waitHealth(this.centralPort);
+        await waitHealth(this.centralPort, 90000, this.centralProc);
       } catch (err) {
         const logs = this.centralProc?._hybridLogs;
         throw new Error(
@@ -216,7 +242,14 @@ async function bootHybridE2eEnv() {
           ...extraEnv,
         },
       });
-      await waitHealth(this.localPort);
+      try {
+        await waitHealth(this.localPort, 90000, this.localProc);
+      } catch (err) {
+        const logs = this.localProc?._hybridLogs;
+        throw new Error(
+          `${err.message}\n--- local stderr ---\n${(logs?.stderr || '').slice(-2000)}\n--- stdout ---\n${(logs?.stdout || '').slice(-2000)}`
+        );
+      }
       return this.localBase();
     },
     async stopLocal() {

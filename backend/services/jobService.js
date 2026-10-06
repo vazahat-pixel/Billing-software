@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { withTransaction } = require('../utils/withTransaction');
 const Job = require('../models/Job');
 const InventoryLot = require('../models/InventoryLot');
 const ProcessChainTemplate = require('../models/ProcessChainTemplate');
@@ -39,10 +40,7 @@ function computeWastageSplit(issueQty, receivedQty, tolerancePct) {
 
 class JobService {
   async issueToJob(issueData, options = {}) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
+    return withTransaction(async (session) => {
       const { lotId, issueQty, issuePcs, companyId, chainTemplateId } = issueData;
 
       const operationId = String(options.operationId || issueData.operationId || '').trim() || null;
@@ -54,7 +52,6 @@ class JobService {
       if (operationId) {
         const existingByOp = await Job.findOne({ companyId, operationId }).session(session);
         if (existingByOp) {
-          await session.commitTransaction();
           return existingByOp;
         }
       }
@@ -143,8 +140,6 @@ class JobService {
       const accountingService = require('./accountingService');
       await accountingService.onJobIssuePost(job, lot, session);
 
-      await session.commitTransaction();
-
       // Hybrid desktop: durable outbox for central sync (after commit, non-blocking)
       if (isHybridDesktop && options.enqueueOutbox !== false && !options.fromSync) {
         try {
@@ -152,7 +147,8 @@ class JobService {
           const syncOutboxService = require('./syncOutboxService');
           const opId = operationId || crypto.randomUUID();
           if (!job.operationId) {
-            await Job.updateOne({ _id: job._id }, { $set: { operationId: opId } });
+            job.operationId = opId;
+            await job.save({ session });
           }
           const payload = job.toObject ? job.toObject() : { ...job };
           await syncOutboxService.enqueue({
@@ -160,10 +156,12 @@ class JobService {
             companyId,
             userId: issueData.createdBy || options.userId || null,
             deviceId: options.deviceId || issueData.deviceId || '',
+            installationId: options.installationId || '',
             entityType: 'job_issue',
             entityId: job._id,
             operationType: 'create',
             payload: { ...payload, operationId: opId },
+            session,
           });
         } catch (outboxErr) {
           console.warn('Sync outbox enqueue after job issue:', outboxErr.message);
@@ -171,12 +169,7 @@ class JobService {
       }
 
       return job;
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
-    }
+    });
   }
 
   /**
@@ -205,10 +198,7 @@ class JobService {
    * those, a receive still completes the current step in one shot, exactly as before.
    */
   async receiveFromJob(receiveData, options = {}) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
+    return withTransaction(async (session) => {
       const { jobId, companyId, billGpNo } = receiveData;
       const trancheQty = Number(receiveData.receivedQty || 0);
       const tranchePcs = Number(receiveData.receivedPcs || 0);
@@ -220,10 +210,19 @@ class JobService {
 
       // Idempotent retry: if a receive with this operationId already completed, return it
       if (operationId) {
-        const existingByOp = await Job.findOne({ companyId, operationId: `RECV:${operationId}` }).session(session);
-        if (existingByOp) {
-          await session.commitTransaction();
-          return { job: existingByOp, duplicate: true };
+        const targetOpId = operationId.startsWith('RECV:') ? operationId : `RECV:${operationId}`;
+        const SyncOutbox = require('../models/SyncOutbox');
+        const ProcessedOperation = require('../models/ProcessedOperation');
+        const [existingOutbox, existingProc, existingByLast] = await Promise.all([
+          SyncOutbox.findOne({ companyId, operationId: { $in: [operationId, targetOpId] } }).session(session),
+          ProcessedOperation.findOne({ companyId, operationId: { $in: [operationId, targetOpId] } }).session(session),
+          Job.findOne({ companyId, lastReceiveOperationId: targetOpId }).session(session),
+        ]);
+        if (existingOutbox || existingProc || existingByLast) {
+          const target = existingByLast || (jobId ? await Job.findOne({ _id: jobId, companyId }).session(session) : null);
+          if (target) {
+            return { job: target, duplicate: true };
+          }
         }
       }
 
@@ -473,7 +472,6 @@ class JobService {
         );
       }
 
-      await session.commitTransaction();
       try {
         const eventBus = require('../events/eventBus');
         eventBus.emitSafe('job.received', {
@@ -494,14 +492,16 @@ class JobService {
           const syncOutboxService = require('./syncOutboxService');
           const opId = operationId || crypto.randomUUID();
           // Use prefixed operationId to distinguish receive ops from issue ops on the same job
-          const receiveOpId = `RECV:${opId}`;
-          await Job.updateOne({ _id: job._id }, { $set: { operationId: receiveOpId } });
+          const receiveOpId = opId.startsWith('RECV:') ? opId : `RECV:${opId}`;
+          job.lastReceiveOperationId = receiveOpId;
+          await job.save({ session });
           const payload = job.toObject ? job.toObject() : { ...job };
           await syncOutboxService.enqueue({
             operationId: receiveOpId,
             companyId,
             userId: receiveData.createdBy || options.userId || null,
             deviceId: options.deviceId || receiveData.deviceId || '',
+            installationId: options.installationId || '',
             entityType: 'job_receive',
             entityId: job._id,
             operationType: 'create',
@@ -514,6 +514,7 @@ class JobService {
               isFinal,
               operationId: receiveOpId,
             },
+            session,
           });
         } catch (outboxErr) {
           console.warn('Sync outbox enqueue after job receive:', outboxErr.message);
@@ -529,12 +530,7 @@ class JobService {
         isFinal,
         pendingQty: isFinal ? 0 : Number((Number(job.issueQty || 0) - cumulativeReceivedQty).toFixed(4)),
       };
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
-    }
+    });
   }
 
   async advanceStep(jobId, companyId, data = {}) {
@@ -610,13 +606,10 @@ class JobService {
       return Job.findOneAndUpdate({ _id: jobId, companyId }, { status }, { new: true });
     }
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
-    try {
+    return withTransaction(async (session) => {
       const job = await Job.findOne({ _id: jobId, companyId }).session(session);
       if (!job) throw AppError.notFound('Job not found');
       if (job.status === 'Cancelled') {
-        await session.commitTransaction();
         return job;
       }
       if (job.status === 'Received') {
@@ -687,21 +680,12 @@ class JobService {
 
       job.status = 'Cancelled';
       await job.save({ session });
-      await session.commitTransaction();
       return job;
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
-    }
+    });
   }
 
   async updateJobReceive(receiveData) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
+    return withTransaction(async (session) => {
       const { jobId, companyId, billGpNo, receivedQty, receivedPcs, charges, gstAmount, receiveDate, isFinal, workerId, billType } = receiveData;
       const job = await Job.findOne({ _id: jobId, companyId }).session(session);
       if (!job) throw AppError.notFound('Job record not found');
@@ -831,8 +815,6 @@ class JobService {
         );
       }
 
-      await session.commitTransaction();
-
       try {
         const eventBus = require('../events/eventBus');
         eventBus.emitSafe('job.receive-updated', {
@@ -845,19 +827,11 @@ class JobService {
       }
 
       return job;
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
-    }
+    });
   }
 
   async reverseJobReceive(jobId, companyId) {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
-    try {
+    return withTransaction(async (session) => {
       const job = await Job.findOne({ _id: jobId, companyId }).session(session);
       if (!job) throw AppError.notFound('Job not found');
       // Reversal undoes EVERYTHING received so far in one shot (all tranches at once),
@@ -931,8 +905,6 @@ class JobService {
       }
       await job.save({ session });
 
-      await session.commitTransaction();
-
       try {
         const eventBus = require('../events/eventBus');
         eventBus.emitSafe('job.receive-reversed', {
@@ -945,12 +917,7 @@ class JobService {
       }
 
       return job;
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
-    }
+    });
   }
 
   async getJobs(companyId, { status } = {}) {

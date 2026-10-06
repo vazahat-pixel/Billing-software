@@ -14,7 +14,7 @@ function sanitizeBanks(banks) {
 }
 
 class PartyService {
-  async createParty(partyData) {
+  async createParty(partyData, options = {}) {
     const name = (partyData.name || '').trim();
     if (!name) {
       throw new Error('Party name is required.');
@@ -36,10 +36,16 @@ class PartyService {
     const highest = await Party.findOne({ companyId: partyData.companyId }).sort({ accd: -1 });
     const nextAccd = highest && typeof highest.accd === 'number' ? highest.accd + 1 : 1001;
 
+    let targetAccd = partyData.accd !== undefined ? Number(partyData.accd) : nextAccd;
+    if (partyData.accd !== undefined) {
+      const existingAccd = await Party.findOne({ companyId: partyData.companyId, accd: targetAccd });
+      if (existingAccd) targetAccd = nextAccd;
+    }
+
     const normalized = {
       name,
       type,
-      accd: partyData.accd !== undefined ? Number(partyData.accd) : nextAccd,
+      accd: targetAccd,
       gstin: partyData.gstin || '',
       pan: partyData.pan || '',
       mobile: partyData.mobile || '',
@@ -106,6 +112,31 @@ class PartyService {
     if (saved.openingBalance) {
       await this.syncOpeningToLedger(saved);
     }
+
+    const isHybridDesktop =
+      String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+      String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+    if (isHybridDesktop && options.enqueueOutbox !== false && !options.fromSync) {
+      try {
+        const crypto = require('crypto');
+        const syncOutboxService = require('./syncOutboxService');
+        const opId = options.operationId || crypto.randomUUID();
+        const payload = saved.toObject ? saved.toObject() : { ...saved };
+        await syncOutboxService.enqueue({
+          operationId: opId,
+          companyId: saved.companyId,
+          userId: options.userId || null,
+          deviceId: options.deviceId || '',
+          entityType: 'party',
+          entityId: saved._id,
+          operationType: 'create',
+          payload: { ...payload, operationId: opId },
+        });
+      } catch (outboxErr) {
+        console.warn('Sync outbox enqueue after party create:', outboxErr.message);
+      }
+    }
+
     return saved;
   }
 
@@ -177,7 +208,7 @@ class PartyService {
     return await Party.findOne({ _id: id, companyId });
   }
 
-  async updateParty(id, companyId, updateData) {
+  async updateParty(id, companyId, updateData, options = {}) {
     const allowed = [
       'name', 'type', 'gstin', 'pan', 'mobile', 'email', 'address', 'city', 'state',
       'creditLimit', 'openingBalance', 'openingBalanceType', 'station', 'group',
@@ -219,6 +250,31 @@ class PartyService {
     ) {
       await this.syncOpeningToLedger(party);
     }
+
+    const isHybridDesktop =
+      String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+      String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+    if (isHybridDesktop && options.enqueueOutbox !== false && !options.fromSync) {
+      try {
+        const crypto = require('crypto');
+        const syncOutboxService = require('./syncOutboxService');
+        const opId = options.operationId || crypto.randomUUID();
+        const payload = party.toObject ? party.toObject() : { ...party };
+        await syncOutboxService.enqueue({
+          operationId: opId,
+          companyId: party.companyId,
+          userId: options.userId || null,
+          deviceId: options.deviceId || '',
+          entityType: 'party',
+          entityId: party._id,
+          operationType: 'update',
+          payload: { ...payload, operationId: opId },
+        });
+      } catch (outboxErr) {
+        console.warn('Sync outbox enqueue after party update:', outboxErr.message);
+      }
+    }
+
     return party;
   }
 

@@ -104,6 +104,7 @@ async function pushPending(ctx) {
       });
     }
     for (const fail of result.failedOperations || []) {
+      console.warn('[syncAgentWorker] push failed operation:', JSON.stringify(fail));
       await syncOutboxService.markFailed(fail.operationId, ctx.companyId, {
         errorCode: fail.errorCode,
         errorMessage: fail.errorMessage,
@@ -152,16 +153,28 @@ async function pullIncremental(ctx) {
     if (result.serverChanges?.length) {
       await require('./syncPullService').applyPulledChanges(result.serverChanges);
     }
-    cursor = result.nextCursor || '';
+    const nextCursor = result.nextCursor || '';
+    if (result.complete) {
+      cursor = nextCursor;
+      await setAgentContext({ pullCursor: cursor });
+      break;
+    }
+    if (cursor === nextCursor) break;
+    cursor = nextCursor;
     await setAgentContext({ pullCursor: cursor });
-    if (result.complete) break;
-    if (!result.serverChanges?.length) break;
   }
 }
 
 async function tick() {
-  if (running || !isHybridDesktop()) return;
+  if (!isHybridDesktop()) return;
   if (!centralBase()) return;
+  if (running) {
+    let waited = 0;
+    while (running && waited < 100) {
+      await new Promise(r => setTimeout(r, 100));
+      waited++;
+    }
+  }
   running = true;
   try {
     const ctx = await getAgentContext();
@@ -181,6 +194,7 @@ async function tick() {
     });
   } catch (err) {
     console.warn('[syncAgentWorker]', err.message);
+    await setAgentContext({ syncState: 'issue', lastError: err.message });
   } finally {
     running = false;
   }
@@ -194,7 +208,9 @@ function startSyncAgentWorker(intervalMs = Number(process.env.SYNC_AGENT_INTERVA
     tick().catch(() => {});
   }, intervalMs);
   if (timer.unref) timer.unref();
-  setTimeout(() => tick().catch(() => {}), 5000);
+  if (process.env.NODE_ENV !== 'test' && String(process.env.HYBRID_E2E || '').toLowerCase() !== 'true') {
+    setTimeout(() => tick().catch(() => {}), 5000);
+  }
 }
 
 function stopSyncAgentWorker() {

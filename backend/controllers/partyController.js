@@ -5,7 +5,11 @@ const AppError = require('../utils/AppError');
 
 exports.createParty = asyncHandler(async (req, res) => {
   if (!req.companyId) throw AppError.forbidden('No company context. Log in with a company user account.');
-  const party = await partyService.createParty({ ...req.body, companyId: req.companyId });
+  const party = await partyService.createParty({ ...req.body, companyId: req.companyId }, {
+    userId: req.user?.id || req.user?._id,
+    deviceId: req.headers['x-device-id'] || '',
+    operationId: req.body?.operationId,
+  });
   return created(res, party, 'Party created');
 });
 
@@ -39,6 +43,10 @@ exports.updateParty = asyncHandler(async (req, res) => {
   const party = await partyService.updateParty(req.params.id, req.companyId, {
     ...req.body,
     companyId: req.companyId,
+  }, {
+    userId: req.user?.id || req.user?._id,
+    deviceId: req.headers['x-device-id'] || '',
+    operationId: req.body?.operationId,
   });
   return ok(res, party, 'Party updated');
 });

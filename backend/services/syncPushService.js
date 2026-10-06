@@ -203,6 +203,18 @@ async function processJobReceive(op, { companyId, userId, deviceId }) {
   delete payload.id;
   delete payload.companyId;
 
+  const Job = require('../models/Job');
+  let targetJob = await Job.findOne({ _id: payload.jobId, companyId });
+  if (!targetJob && payload.jobCardNo) {
+    targetJob = await Job.findOne({ jobCardNo: payload.jobCardNo, companyId });
+  }
+  if (!targetJob && payload.challanNo) {
+    targetJob = await Job.findOne({ challanNo: payload.challanNo, companyId });
+  }
+  if (targetJob) {
+    payload.jobId = targetJob._id;
+  }
+
   const jobService = require('./jobService');
   const receiveResult = await jobService.receiveFromJob(
     { ...payload, companyId, operationId, createdBy: userId || payload.createdBy },
@@ -218,6 +230,230 @@ async function processJobReceive(op, { companyId, userId, deviceId }) {
   });
 
   return { operationId, status: 'accepted', duplicate: receiveResult.duplicate || false, entityId: job._id, result: resultSummary };
+}
+
+// ---------------------------------------------------------------------------
+// Party Sync (Customer / Supplier / Job Worker)
+// ---------------------------------------------------------------------------
+
+async function processPartySync(op, { companyId, userId, deviceId }) {
+  const operationId = String(op.operationId || '').trim();
+  if (!operationId) throw AppError.badRequest('operationId is required');
+
+  const existing = await checkProcessed(companyId, operationId);
+  if (existing) {
+    return { operationId, status: 'accepted', duplicate: true, entityId: existing.entityId, result: existing.result };
+  }
+
+  const payload = { ...(op.payload || {}) };
+  delete payload._id;
+  delete payload.id;
+  delete payload.companyId;
+
+  const Party = require('../models/Party');
+  let target = null;
+  if (op.entityId) {
+    target = await Party.findOne({ _id: op.entityId, companyId });
+  }
+  if (!target && payload.name) {
+    target = await Party.findOne({ name: payload.name, companyId });
+  }
+
+  const partyService = require('./partyService');
+  if (target) {
+    if (target.updatedAt && payload.updatedAt && new Date(target.updatedAt) > new Date(payload.updatedAt)) {
+      const summary = { _id: target._id, name: target.name, skipped: 'cloud_newer' };
+      await recordProcessed({
+        companyId, operationId, deviceId, entityType: 'party',
+        operationType: op.operationType, entityId: target._id, result: summary,
+      });
+      return { operationId, status: 'accepted', duplicate: false, entityId: target._id, result: summary };
+    }
+    const updated = await partyService.updateParty(target._id, companyId, { ...payload, companyId }, {
+      fromSync: true, enqueueOutbox: false,
+    });
+    const summary = { _id: updated._id, name: updated.name };
+    await recordProcessed({
+      companyId, operationId, deviceId, entityType: 'party',
+      operationType: op.operationType, entityId: updated._id, result: summary,
+    });
+    return { operationId, status: 'accepted', duplicate: false, entityId: updated._id, result: summary };
+  } else {
+    const created = await partyService.createParty({ ...payload, companyId }, {
+      fromSync: true, enqueueOutbox: false,
+    });
+    const summary = { _id: created._id, name: created.name };
+    await recordProcessed({
+      companyId, operationId, deviceId, entityType: 'party',
+      operationType: 'create', entityId: created._id, result: summary,
+    });
+    return { operationId, status: 'accepted', duplicate: false, entityId: created._id, result: summary };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Item Sync
+// ---------------------------------------------------------------------------
+
+async function processItemSync(op, { companyId, userId, deviceId }) {
+  const operationId = String(op.operationId || '').trim();
+  if (!operationId) throw AppError.badRequest('operationId is required');
+
+  const existing = await checkProcessed(companyId, operationId);
+  if (existing) {
+    return { operationId, status: 'accepted', duplicate: true, entityId: existing.entityId, result: existing.result };
+  }
+
+  const payload = { ...(op.payload || {}) };
+  delete payload._id;
+  delete payload.id;
+  delete payload.companyId;
+
+  const Item = require('../models/Item');
+  let target = null;
+  if (op.entityId) {
+    target = await Item.findOne({ _id: op.entityId, companyId });
+  }
+  if (!target && payload.name) {
+    target = await Item.findOne({ name: payload.name, companyId });
+  }
+
+  const itemService = require('./itemService');
+  if (target) {
+    if (target.updatedAt && payload.updatedAt && new Date(target.updatedAt) > new Date(payload.updatedAt)) {
+      const summary = { _id: target._id, name: target.name, skipped: 'cloud_newer' };
+      await recordProcessed({
+        companyId, operationId, deviceId, entityType: 'item',
+        operationType: op.operationType, entityId: target._id, result: summary,
+      });
+      return { operationId, status: 'accepted', duplicate: false, entityId: target._id, result: summary };
+    }
+    const updated = await itemService.updateItem(target._id, companyId, { ...payload, companyId });
+    const summary = { _id: updated._id, name: updated.name };
+    await recordProcessed({
+      companyId, operationId, deviceId, entityType: 'item',
+      operationType: op.operationType, entityId: updated._id, result: summary,
+    });
+    return { operationId, status: 'accepted', duplicate: false, entityId: updated._id, result: summary };
+  } else {
+    const created = await itemService.createItem({ ...payload, companyId });
+    const summary = { _id: created._id, name: created.name };
+    await recordProcessed({
+      companyId, operationId, deviceId, entityType: 'item',
+      operationType: 'create', entityId: created._id, result: summary,
+    });
+    return { operationId, status: 'accepted', duplicate: false, entityId: created._id, result: summary };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Warehouse Sync
+// ---------------------------------------------------------------------------
+
+async function processWarehouseSync(op, { companyId, userId, deviceId }) {
+  const operationId = String(op.operationId || '').trim();
+  if (!operationId) throw AppError.badRequest('operationId is required');
+
+  const existing = await checkProcessed(companyId, operationId);
+  if (existing) {
+    return { operationId, status: 'accepted', duplicate: true, entityId: existing.entityId, result: existing.result };
+  }
+
+  const payload = { ...(op.payload || {}) };
+  delete payload._id;
+  delete payload.id;
+  delete payload.companyId;
+
+  const Warehouse = require('../models/Warehouse');
+  let target = null;
+  if (op.entityId) {
+    target = await Warehouse.findOne({ _id: op.entityId, companyId });
+  }
+  if (!target && payload.code) {
+    target = await Warehouse.findOne({ code: String(payload.code).toUpperCase(), companyId });
+  }
+
+  const warehouseService = require('./warehouseService');
+  if (target) {
+    if (target.updatedAt && payload.updatedAt && new Date(target.updatedAt) > new Date(payload.updatedAt)) {
+      const summary = { _id: target._id, code: target.code, skipped: 'cloud_newer' };
+      await recordProcessed({
+        companyId, operationId, deviceId, entityType: 'warehouse',
+        operationType: op.operationType, entityId: target._id, result: summary,
+      });
+      return { operationId, status: 'accepted', duplicate: false, entityId: target._id, result: summary };
+    }
+    const updated = await warehouseService.update(target._id, companyId, payload);
+    const summary = { _id: updated._id, code: updated.code };
+    await recordProcessed({
+      companyId, operationId, deviceId, entityType: 'warehouse',
+      operationType: op.operationType, entityId: updated._id, result: summary,
+    });
+    return { operationId, status: 'accepted', duplicate: false, entityId: updated._id, result: summary };
+  } else {
+    const created = await warehouseService.create(companyId, payload);
+    const summary = { _id: created._id, code: created.code };
+    await recordProcessed({
+      companyId, operationId, deviceId, entityType: 'warehouse',
+      operationType: 'create', entityId: created._id, result: summary,
+    });
+    return { operationId, status: 'accepted', duplicate: false, entityId: created._id, result: summary };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SubMaster Sync
+// ---------------------------------------------------------------------------
+
+async function processSubMasterSync(op, { companyId, userId, deviceId }) {
+  const operationId = String(op.operationId || '').trim();
+  if (!operationId) throw AppError.badRequest('operationId is required');
+
+  const existing = await checkProcessed(companyId, operationId);
+  if (existing) {
+    return { operationId, status: 'accepted', duplicate: true, entityId: existing.entityId, result: existing.result };
+  }
+
+  const payload = { ...(op.payload || {}) };
+  delete payload._id;
+  delete payload.id;
+  delete payload.companyId;
+
+  const SubMaster = require('../models/SubMaster');
+  let target = null;
+  if (op.entityId) {
+    target = await SubMaster.findOne({ _id: op.entityId, companyId });
+  }
+  if (!target && payload.type && payload.name) {
+    target = await SubMaster.findOne({ type: payload.type, name: payload.name, companyId });
+  }
+
+  if (target) {
+    if (target.updatedAt && payload.updatedAt && new Date(target.updatedAt) > new Date(payload.updatedAt)) {
+      const summary = { _id: target._id, name: target.name, skipped: 'cloud_newer' };
+      await recordProcessed({
+        companyId, operationId, deviceId, entityType: 'submaster',
+        operationType: op.operationType, entityId: target._id, result: summary,
+      });
+      return { operationId, status: 'accepted', duplicate: false, entityId: target._id, result: summary };
+    }
+    Object.assign(target, payload);
+    await target.save();
+    const summary = { _id: target._id, name: target.name };
+    await recordProcessed({
+      companyId, operationId, deviceId, entityType: 'submaster',
+      operationType: op.operationType, entityId: target._id, result: summary,
+    });
+    return { operationId, status: 'accepted', duplicate: false, entityId: target._id, result: summary };
+  } else {
+    const created = await SubMaster.create({ ...payload, companyId });
+    const summary = { _id: created._id, name: created.name };
+    await recordProcessed({
+      companyId, operationId, deviceId, entityType: 'submaster',
+      operationType: 'create', entityId: created._id, result: summary,
+    });
+    return { operationId, status: 'accepted', duplicate: false, entityId: created._id, result: summary };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -242,8 +478,16 @@ async function pushOperations({ companyId, userId, deviceId, operations = [] }) 
 
   for (const op of operations) {
     try {
-      let result;
-      const key = `${op.entityType}/${op.operationType}`;
+      const rawEntity = String(op.entityType || '').toLowerCase();
+      const rawOp = String(op.operationType || '').toLowerCase();
+      let entity = rawEntity;
+      let action = rawOp;
+      if (rawOp.includes('/')) {
+        const parts = rawOp.split('/');
+        entity = parts[0] || entity;
+        action = parts[1] || action;
+      }
+      const key = `${entity}/${action}`;
       if (key === 'sales/create') {
         result = await processSalesCreate(op, { companyId, userId, deviceId });
       } else if (key === 'purchase/create') {
@@ -252,6 +496,14 @@ async function pushOperations({ companyId, userId, deviceId, operations = [] }) 
         result = await processJobIssue(op, { companyId, userId, deviceId });
       } else if (key === 'job_receive/create') {
         result = await processJobReceive(op, { companyId, userId, deviceId });
+      } else if (key === 'party/create' || key === 'party/update') {
+        result = await processPartySync(op, { companyId, userId, deviceId });
+      } else if (key === 'item/create' || key === 'item/update') {
+        result = await processItemSync(op, { companyId, userId, deviceId });
+      } else if (key === 'warehouse/create' || key === 'warehouse/update') {
+        result = await processWarehouseSync(op, { companyId, userId, deviceId });
+      } else if (key === 'submaster/create' || key === 'submaster/update') {
+        result = await processSubMasterSync(op, { companyId, userId, deviceId });
       } else {
         failedOperations.push({
           operationId: op.operationId,

@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 /**
  * HYBRID PURCHASE E2E CERTIFICATION SUITE
@@ -37,40 +37,106 @@ function assert(cond, msg) {
 }
 
 async function login(base, email, password, deviceId) {
-  const res = await api(base).post('/auth/login', { body: { email, password }, deviceId });
+  const res = await api(base).post('/auth/login', {
+    body: { email, password, deviceId, isDesktop: true, deviceName: 'HYBRID-E2E' },
+    deviceId,
+  });
   if (res.status !== 200) throw new Error(`Login failed: ${JSON.stringify(res.body)}`);
-  return res.body.token || res.body.data?.token;
+  const payload = res.body?.data || res.body;
+  return { token: payload.token, refreshToken: payload.refreshToken, user: payload.user };
 }
 
 async function agentTick(base, token, deviceId) {
-  return api(base).post('/sync/agent-tick', { token, deviceId });
+  return api(base).post('/sync/agent-tick', { token, deviceId, body: {} });
+}
+
+/**
+ * Use raw MongoClient to avoid mongoose singleton connection conflicts
+ * when querying both central and local URIs concurrently.
+ */
+async function withClient(uri, fn) {
+  const { MongoClient } = require('mongodb');
+  const client = new MongoClient(uri);
+  await client.connect();
+  const dbName = new URL(uri).pathname.replace('/', '') || 'test';
+  const db = client.db(dbName);
+  try {
+    return await fn(db);
+  } finally {
+    await client.close();
+  }
+}
+
+function toOid(val) {
+  const { ObjectId } = require('mongodb');
+  try { return new ObjectId(String(val)); } catch { return val; }
 }
 
 async function countPurchases(uri, companyId) {
-  return withMongoose(uri, async () => {
-    const Purchase = require('../../../../models/Purchase');
-    return Purchase.countDocuments({ companyId });
+  return withClient(uri, async (db) => {
+    return db.collection('purchases').countDocuments({ companyId: toOid(companyId) });
   });
 }
 
 async function findPurchaseByOp(uri, companyId, operationId) {
-  return withMongoose(uri, async () => {
-    const Purchase = require('../../../../models/Purchase');
-    const AccountingEntry = require('../../../../models/AccountingEntry');
-    const InventoryLot = require('../../../../models/InventoryLot');
-    const SyncOutbox = require('../../../../models/SyncOutbox');
-    const ProcessedOperation = require('../../../../models/ProcessedOperation');
-
-    const purchase = await Purchase.findOne({ companyId, operationId }).lean();
+  return withClient(uri, async (db) => {
+    const purchase = await db.collection('purchases').findOne({ companyId: toOid(companyId), operationId });
     if (!purchase) return { purchase: null, purchaseLots: [], accounting: [], outbox: null, processed: null };
-    const purchaseLots = await InventoryLot.find({ companyId, source: 'purchase', purchaseId: purchase._id }).lean();
+    const purchaseLots = await db.collection('inventorylots').find({
+      companyId: toOid(companyId),
+      source: 'purchase',
+      purchaseId: purchase._id,
+    }).toArray();
     const accounting = purchase.accountingEntryId
-      ? await AccountingEntry.find({ _id: purchase.accountingEntryId, companyId }).lean()
-      : await AccountingEntry.find({ companyId, refId: purchase._id }).lean();
-    const outbox = await SyncOutbox.findOne({ companyId, operationId }).lean();
-    const processed = await ProcessedOperation.findOne({ companyId, operationId }).lean();
+      ? await db.collection('accountingentries').find({ _id: purchase.accountingEntryId, companyId: toOid(companyId) }).toArray()
+      : await db.collection('accountingentries').find({ companyId: toOid(companyId), refId: purchase._id }).toArray();
+    const outbox = await db.collection('sync_outbox').findOne({ companyId: toOid(companyId), operationId });
+    const processed = await db.collection('processed_operations').findOne({ companyId: toOid(companyId), operationId });
     return { purchase, purchaseLots, accounting, outbox, processed };
   });
+}
+
+/**
+ * Seed the central JWT directly into local Mongo's SyncState,
+ * exactly as the sales suite does. This is critical: the local JWT
+ * session-id (sid) does not exist in central's UserSession collection,
+ * so only the central JWT is accepted by central's auth middleware.
+ */
+async function seedCentralTokenOnLocal(localUri, { companyId, token, refreshToken, deviceId }) {
+  return withClient(localUri, async (db) => {
+    const key = 'hybrid:agent';
+    const existing = await db.collection('sync_state').findOne({ key });
+    const current = existing?.value || {};
+    await db.collection('sync_state').updateOne(
+      { key },
+      {
+        $set: {
+          value: {
+            ...current,
+            companyId: String(companyId),
+            token,
+            refreshToken: refreshToken || '',
+            deviceId: String(deviceId || ''),
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      },
+      { upsert: true }
+    );
+  });
+}
+
+/**
+ * Poll central until purchase appears (same pattern as sales waitCentralSale).
+ */
+async function waitCentralPurchase(centralUri, localBase, localToken, deviceId, companyId, operationId, tries = 15) {
+  for (let i = 0; i < tries; i++) {
+    const { purchase } = await findPurchaseByOp(centralUri, companyId, operationId);
+    if (purchase) return purchase;
+    await api(localBase).post('/sync/agent-tick', { token: localToken, deviceId, body: {} });
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  return null;
 }
 
 // ─── main ─────────────────────────────────────────────────────────────────────
@@ -102,13 +168,15 @@ async function runPurchaseSuite({ keepData = false } = {}) {
       await c.connect(); await c.db().command({ ping: 1 }); await c.close();
     });
 
-    await test('Central API startup', async () => {
-      await env.startCentral({ MODULE_GATE_ENFORCE: 'false' });
-    });
-
     await test('Seed central fixtures (company, supplier, item)', async () => {
       fx = await seedCentralFixtures(centralUri, `PUR-${Date.now()}`);
       await withMongoose(centralUri, async () => {
+        const CompanyModuleConfig = require('../../../../models/CompanyModuleConfig');
+        await CompanyModuleConfig.updateOne(
+          { companyId: fx.companyId },
+          { $set: { 'modules.purchase': true } },
+          { upsert: true }
+        );
         const Party = require('../../../../models/Party');
         const supplier = await Party.create({
           companyId: fx.companyId,
@@ -123,13 +191,28 @@ async function runPurchaseSuite({ keepData = false } = {}) {
       assert(fx.supplierId, 'supplierId present');
     });
 
+    await test('Central API startup', async () => {
+      await env.startCentral({ MODULE_GATE_ENFORCE: 'false' });
+    });
+
     await test('Local API startup (clone central fixtures)', async () => {
       await env.cloneCentralToLocal();
       await env.startLocal({ MODULE_GATE_ENFORCE: 'false' });
     });
 
     await test('Online purchase baseline (central)', async () => {
-      centralToken = await login(env.centralBase(), fx.email, fx.password, fx.deviceId);
+      const localAuth = await login(env.localBase(), fx.email, fx.password, fx.deviceId);
+      const centralAuth = await login(env.centralBase(), fx.email, fx.password, fx.deviceId);
+      centralToken = centralAuth.token;
+      localToken = localAuth.token;
+
+      await seedCentralTokenOnLocal(localUri, {
+        companyId: fx.companyId,
+        token: centralToken,
+        refreshToken: centralAuth.refreshToken,
+        deviceId: fx.deviceId,
+      });
+
       const res = await api(env.centralBase()).post('/purchases', {
         token: centralToken, deviceId: fx.deviceId,
         body: {
@@ -153,7 +236,7 @@ async function runPurchaseSuite({ keepData = false } = {}) {
     });
 
     await test('Offline purchase creation (local)', async () => {
-      localToken = await login(env.localBase(), fx.email, fx.password, fx.deviceId);
+      // Use the existing localToken (already logged in during baseline test)
       const res = await api(env.localBase()).post('/purchases', {
         token: localToken, deviceId: fx.deviceId,
         body: {
@@ -206,18 +289,30 @@ async function runPurchaseSuite({ keepData = false } = {}) {
 
     await test('Connectivity restored: restart central', async () => {
       await env.startCentral({ MODULE_GATE_ENFORCE: 'false' });
-      centralToken = await login(env.centralBase(), fx.email, fx.password, fx.deviceId);
+      // Login to local first, then central (single-session policy: last login wins on central)
+      const localAuth = await login(env.localBase(), fx.email, fx.password, fx.deviceId);
+      const centralAuth = await login(env.centralBase(), fx.email, fx.password, fx.deviceId);
+      centralToken = centralAuth.token;
+      localToken = localAuth.token;
+      // Seed the fresh central JWT into local Mongo for the sync agent
+      await seedCentralTokenOnLocal(localUri, {
+        companyId: fx.companyId,
+        token: centralToken,
+        refreshToken: centralAuth.refreshToken,
+        deviceId: fx.deviceId,
+      });
     });
 
     await test('Agent-tick triggers synchronization', async () => {
-      localToken = await login(env.localBase(), fx.email, fx.password, fx.deviceId);
       const res = await agentTick(env.localBase(), localToken, fx.deviceId);
       assert(res.status === 200 || res.status === 204, `tick HTTP ${res.status}`);
       await new Promise(r => setTimeout(r, 1500));
     });
 
     await test('Purchase synced to central MongoDB', async () => {
-      const { purchase: centralPurchase } = await findPurchaseByOp(centralUri, fx.companyId, operationId);
+      const centralPurchase = await waitCentralPurchase(
+        centralUri, env.localBase(), localToken, fx.deviceId, fx.companyId, operationId
+      );
       assert(centralPurchase, 'Purchase with operationId found in central DB');
       assert(Math.abs(centralPurchase.netAmount - 2100) < 0.01, `central netAmount ${centralPurchase.netAmount}`);
     });
@@ -272,17 +367,18 @@ async function runPurchaseSuite({ keepData = false } = {}) {
     });
 
     await test('Idempotency: no duplicate Purchase in central', async () => {
-      const cnt = await withMongoose(centralUri, async () => {
-        const Purchase = require('../../../../models/Purchase');
-        return Purchase.countDocuments({ companyId: fx.companyId, operationId });
+      const cnt = await withClient(centralUri, async (db) => {
+        return db.collection('purchases').countDocuments({ companyId: toOid(fx.companyId), operationId });
       });
       assert(cnt === 1, `Expected exactly 1 purchase with operationId, got ${cnt}`);
     });
 
     await test('Retry handling: RETRY outbox re-processes without duplicate', async () => {
-      await withMongoose(localUri, async () => {
-        const SyncOutbox = require('../../../../models/SyncOutbox');
-        await SyncOutbox.updateOne({ companyId: fx.companyId, operationId }, { $set: { status: 'RETRY' } });
+      await withClient(localUri, async (db) => {
+        await db.collection('sync_outbox').updateOne(
+          { companyId: toOid(fx.companyId), operationId },
+          { $set: { status: 'RETRY' } }
+        );
       });
       const before = await countPurchases(centralUri, fx.companyId);
       await agentTick(env.localBase(), localToken, fx.deviceId);
@@ -295,7 +391,17 @@ async function runPurchaseSuite({ keepData = false } = {}) {
       const before = await countPurchases(centralUri, fx.companyId);
       await env.stopLocal();
       await env.startLocal({ MODULE_GATE_ENFORCE: 'false' });
-      localToken = await login(env.localBase(), fx.email, fx.password, fx.deviceId);
+      // After restart, re-seed central token and login
+      const localAuth = await login(env.localBase(), fx.email, fx.password, fx.deviceId);
+      const centralAuth = await login(env.centralBase(), fx.email, fx.password, fx.deviceId);
+      localToken = localAuth.token;
+      centralToken = centralAuth.token;
+      await seedCentralTokenOnLocal(localUri, {
+        companyId: fx.companyId,
+        token: centralToken,
+        refreshToken: centralAuth.refreshToken,
+        deviceId: fx.deviceId,
+      });
       await agentTick(env.localBase(), localToken, fx.deviceId);
       await new Promise(r => setTimeout(r, 1500));
       const after = await countPurchases(centralUri, fx.companyId);
@@ -303,9 +409,8 @@ async function runPurchaseSuite({ keepData = false } = {}) {
     });
 
     await test('Company isolation: Company B sees 0 purchases with this operationId', async () => {
-      const cnt = await withMongoose(centralUri, async () => {
-        const Purchase = require('../../../../models/Purchase');
-        return Purchase.countDocuments({ companyId: fx.companyBId, operationId });
+      const cnt = await withClient(centralUri, async (db) => {
+        return db.collection('purchases').countDocuments({ companyId: toOid(fx.companyBId), operationId });
       });
       assert(cnt === 0, `Company B sees ${cnt} purchases (should be 0)`);
     });
@@ -323,21 +428,27 @@ async function runPurchaseSuite({ keepData = false } = {}) {
         },
       });
       assert(res.status === 201 || res.status === 200, `Create failed: ${res.status}`);
-      await withMongoose(localUri, async () => {
-        const SyncOutbox = require('../../../../models/SyncOutbox');
-        await SyncOutbox.updateOne({ companyId: fx.companyId, operationId: failId },
-          { $set: { status: 'FAILED', retryCount: 0 } });
+      await withClient(localUri, async (db) => {
+        await db.collection('sync_outbox').updateOne(
+          { companyId: toOid(fx.companyId), operationId: failId },
+          { $set: { status: 'FAILED', retryCount: 0 } }
+        );
       });
-      await agentTick(env.localBase(), localToken, fx.deviceId);
-      await new Promise(r => setTimeout(r, 1500));
-      const central = await withMongoose(centralUri, async () => {
-        const Purchase = require('../../../../models/Purchase');
-        return Purchase.findOne({ companyId: fx.companyId, operationId: failId }).lean();
-      });
-      assert(central, 'Failed-op recovery: purchase synced to central');
+      // Poll until the recovery completes
+      const recovered = await waitCentralPurchase(
+        centralUri, env.localBase(), localToken, fx.deviceId, fx.companyId, failId
+      );
+      assert(recovered, 'Failed-op recovery: purchase synced to central');
     });
 
   } finally {
+    if (failures.length) {
+      const logs = env?.logs?.();
+      console.log('\n--- Central stdout ---\n', logs?.central?.stdout?.slice(-2000));
+      console.log('\n--- Central stderr ---\n', logs?.central?.stderr?.slice(-2000));
+      console.log('\n--- Local stdout ---\n', logs?.local?.stdout?.slice(-2000));
+      console.log('\n--- Local stderr ---\n', logs?.local?.stderr?.slice(-2000));
+    }
     await env.shutdown({ keepData });
   }
 

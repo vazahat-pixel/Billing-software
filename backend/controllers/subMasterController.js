@@ -24,6 +24,30 @@ exports.createSubMaster = async (req, res) => {
       extraFields: extraFields || {}
     });
 
+    const isHybridDesktop =
+      String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+      String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+    if (isHybridDesktop) {
+      try {
+        const crypto = require('crypto');
+        const syncOutboxService = require('../services/syncOutboxService');
+        const opId = req.body?.operationId || crypto.randomUUID();
+        const payload = subMaster.toObject ? subMaster.toObject() : { ...subMaster };
+        await syncOutboxService.enqueue({
+          operationId: opId,
+          companyId: subMaster.companyId,
+          userId: req.user?.id || req.user?._id || null,
+          deviceId: req.headers['x-device-id'] || '',
+          entityType: 'submaster',
+          entityId: subMaster._id,
+          operationType: 'create',
+          payload: { ...payload, operationId: opId },
+        });
+      } catch (outboxErr) {
+        console.warn('Sync outbox enqueue after submaster create:', outboxErr.message);
+      }
+    }
+
     res.status(201).json({ success: true, data: subMaster });
   } catch (error) {
     if (error.code === 11000) {
@@ -64,6 +88,30 @@ exports.updateSubMaster = async (req, res) => {
 
     if (!subMaster) {
       return res.status(404).json({ success: false, message: 'Record not found' });
+    }
+
+    const isHybridDesktop =
+      String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+      String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+    if (isHybridDesktop) {
+      try {
+        const crypto = require('crypto');
+        const syncOutboxService = require('../services/syncOutboxService');
+        const opId = req.body?.operationId || crypto.randomUUID();
+        const payload = subMaster.toObject ? subMaster.toObject() : { ...subMaster };
+        await syncOutboxService.enqueue({
+          operationId: opId,
+          companyId: subMaster.companyId,
+          userId: req.user?.id || req.user?._id || null,
+          deviceId: req.headers['x-device-id'] || '',
+          entityType: 'submaster',
+          entityId: subMaster._id,
+          operationType: 'update',
+          payload: { ...payload, operationId: opId },
+        });
+      } catch (outboxErr) {
+        console.warn('Sync outbox enqueue after submaster update:', outboxErr.message);
+      }
     }
 
     res.status(200).json({ success: true, data: subMaster });

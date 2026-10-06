@@ -62,29 +62,32 @@ const path = require('path');
 
 function getInstallerPath() {
   const candidates = [
+    path.resolve(__dirname, '../../desktop/dist/TextileERP-Setup-1.0.0.exe'),
     path.resolve(__dirname, '../public/downloads/BillingSoftware-Setup.exe'),
     path.resolve(__dirname, '../public/downloads/TextileERP-Setup-1.0.0.exe'),
     path.resolve('/var/www/billing-frontend/downloads/BillingSoftware-Setup.exe'),
     path.resolve('/var/www/billing-frontend/downloads/TextileERP-Setup-1.0.0.exe'),
     path.resolve(__dirname, '../../frontend/dist/downloads/BillingSoftware-Setup.exe'),
+    path.resolve(__dirname, '../../frontend/dist/downloads/TextileERP-Setup-1.0.0.exe'),
     path.resolve(__dirname, '../../frontend/public/downloads/BillingSoftware-Setup.exe'),
-    path.resolve(__dirname, '../../desktop/dist/TextileERP-Setup-1.0.0.exe'),
+    path.resolve(__dirname, '../../frontend/public/downloads/TextileERP-Setup-1.0.0.exe'),
   ];
+  const found = [];
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
       try {
         const stat = fs.statSync(candidate);
-        // Ensure installer is an actual binary (canonical installer is ~238 MB, at least > 1MB)
-        // Avoid serving truncated or placeholder HTML files
         if (stat.isFile() && stat.size > 1024 * 1024) {
-          return { filePath: candidate, size: stat.size };
+          found.push({ filePath: candidate, size: stat.size, mtime: stat.mtimeMs });
         }
       } catch {
         // Continue checking other candidates
       }
     }
   }
-  return null;
+  if (found.length === 0) return null;
+  found.sort((a, b) => b.mtime - a.mtime || b.size - a.size);
+  return found[0];
 }
 
 const getExternalUrl = () => process.env.DESKTOP_DOWNLOAD_URL || process.env.DESKTOP_INSTALLER_URL || null;
@@ -104,6 +107,9 @@ router.get('/download-info', (req, res) => {
 
   const sizeBytes = installer ? installer.size : 250518424;
   const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(1) + ' MB';
+  const releaseDate = installer
+    ? new Date(installer.mtime).toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
 
   return res.json({
     success: true,
@@ -113,7 +119,7 @@ router.get('/download-info', (req, res) => {
       fileName: 'BillingSoftware-Setup.exe',
       sizeBytes,
       sizeMB,
-      releaseDate: '2026-10-02',
+      releaseDate,
       os: 'Windows 10 / 11 (64-bit)',
       downloadUrl: '/api/desktop/download',
       directUrl: externalUrl || '/downloads/BillingSoftware-Setup.exe',

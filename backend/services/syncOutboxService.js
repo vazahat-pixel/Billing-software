@@ -29,10 +29,12 @@ async function enqueue({
 }) {
   const opId = String(operationId || crypto.randomUUID()).trim();
   const sequenceNumber = await nextSequence(companyId, deviceId);
+  const mongoose = require('mongoose');
+  const safeUserId = (userId && mongoose.Types.ObjectId.isValid(String(userId))) ? userId : null;
   const doc = {
     operationId: opId,
     companyId,
-    userId,
+    userId: safeUserId,
     deviceId: String(deviceId || ''),
     installationId: String(installationId || ''),
     entityType,

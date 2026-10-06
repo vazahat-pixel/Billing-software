@@ -391,7 +391,7 @@ app.whenReady().then(async () => {
     splash.destroy();
     dialog.showErrorBox(
       'Textile ERP failed to start',
-      `${err.message}\n\nInstall MongoDB locally or run desktop/scripts/fetch-mongodb.cjs, then retry.\nData folder: ${userData}`
+      `${err.message}\n\nPlease install the latest official setup package or contact support.\nData folder: ${userData}`
     );
     app.isQuiting = true;
     app.quit();
@@ -429,6 +429,37 @@ app.whenReady().then(async () => {
 app.on('before-quit', async (e) => {
   if (app._stackStopped) return;
   e.preventDefault();
+
+  if (!app._forceQuitConfirmed) {
+    try {
+      const base = resolveApiBaseUrl();
+      if (base) {
+        const url = base.endsWith('/api') ? `${base}/sync/status` : `${base}/api/sync/status`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(1500) });
+        if (res.ok) {
+          const json = await res.json();
+          const pending = Number(json?.data?.pendingOutbox || 0);
+          if (pending > 0) {
+            const { response } = await dialog.showMessageBox(mainWindow || undefined, {
+              type: 'warning',
+              title: 'Pending Cloud Synchronization',
+              message: `You have ${pending} offline transaction(s) that have not synced to the cloud yet.`,
+              detail: 'Closing now will pause cloud synchronization until the application is opened again. Are you sure you want to quit?',
+              buttons: ['Cancel', 'Quit Anyway'],
+              defaultId: 0,
+              cancelId: 0,
+            });
+            if (response !== 1) {
+              return;
+            }
+          }
+        }
+      }
+    } catch {
+      /* ignore probe errors on shutdown */
+    }
+  }
+
   app._stackStopped = true;
   app.isQuiting = true;
   try {

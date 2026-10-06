@@ -5,7 +5,11 @@ const AppError = require('../utils/AppError');
 
 exports.createItem = asyncHandler(async (req, res) => {
   if (!req.companyId) throw AppError.forbidden('No company context');
-  const item = await itemService.createItem({ ...req.body, companyId: req.companyId });
+  const item = await itemService.createItem({ ...req.body, companyId: req.companyId }, {
+    userId: req.user?.id || req.user?._id,
+    deviceId: req.headers['x-device-id'] || '',
+    operationId: req.body?.operationId,
+  });
   return created(res, item, 'Item created');
 });
 
@@ -38,6 +42,10 @@ exports.updateItem = asyncHandler(async (req, res) => {
   const item = await itemService.updateItem(req.params.id, req.companyId, {
     ...req.body,
     companyId: req.companyId,
+  }, {
+    userId: req.user?.id || req.user?._id,
+    deviceId: req.headers['x-device-id'] || '',
+    operationId: req.body?.operationId,
   });
   return ok(res, item, 'Item updated');
 });

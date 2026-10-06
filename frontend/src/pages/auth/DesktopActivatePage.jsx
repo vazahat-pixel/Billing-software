@@ -274,7 +274,7 @@ const DesktopActivatePage = () => {
 
         <p className="mt-6 text-center text-slate-500 text-sm">
           Already activated?{' '}
-          <Link to="/login" className="text-slate-300 hover:text-white">
+          <Link to="/login" state={{ fromActivate: true }} className="text-slate-300 hover:text-white">
             Sign in
           </Link>
         </p>

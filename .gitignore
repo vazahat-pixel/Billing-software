@@ -24,6 +24,8 @@ downloads/
 build/
 desktop/dist/
 desktop/renderer/
+desktop/resources/
+desktop/vendor/
 .vite/
 *.local
 

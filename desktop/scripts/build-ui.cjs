@@ -43,4 +43,9 @@ if (!fs.existsSync(indexHtml)) {
   process.exit(1);
 }
 
+const downloadsDir = path.join(desktopRoot, 'renderer', 'downloads');
+if (fs.existsSync(downloadsDir)) {
+  fs.rmSync(downloadsDir, { recursive: true, force: true });
+}
+
 console.log('[desktop] UI ready at desktop/renderer');

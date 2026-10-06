@@ -11,9 +11,10 @@
     "prepare:backend": "node scripts/prepare-backend.cjs",
     "build:ui": "node scripts/build-ui.cjs",
     "smoke:local": "node scripts/smoke-local-boot.js",
+    "sync:installer": "node scripts/sync-installer.cjs",
     "pack": "npm run prepare:backend && npm run build:ui && electron-builder --dir",
-    "dist": "npm run prepare:backend && npm run build:ui && electron-builder",
-    "dist:win": "npm run prepare:backend && npm run build:ui && electron-builder --win nsis"
+    "dist": "npm run prepare:backend && npm run build:ui && electron-builder && npm run sync:installer",
+    "dist:win": "npm run prepare:backend && npm run build:ui && electron-builder --win nsis && npm run sync:installer"
   },
   "build": {
     "appId": "com.textileerp.desktop",
@@ -31,6 +32,7 @@
       "config.example.json",
       "localRuntime/**/*",
       "renderer/**/*",
+      "!renderer/downloads/**/*",
       "assets/**/*"
     ],
     "extraResources": [
@@ -41,6 +43,18 @@
       {
         "from": "config.example.json",
         "to": "config.example.json"
+      },
+      {
+        "from": "resources/backend",
+        "to": "backend"
+      },
+      {
+        "from": "vendor/mongodb",
+        "to": "vendor/mongodb"
+      },
+      {
+        "from": "vendor/node",
+        "to": "vendor/node"
       }
     ],
     "asarUnpack": [

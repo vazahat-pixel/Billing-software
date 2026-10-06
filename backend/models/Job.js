@@ -150,6 +150,12 @@ const JobSchema = new mongoose.Schema({
     index: true,
     sparse: true,
   },
+  lastReceiveOperationId: {
+    type: String,
+    default: null,
+    index: true,
+    sparse: true,
+  },
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

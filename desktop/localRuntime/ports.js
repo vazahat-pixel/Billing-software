@@ -19,6 +19,13 @@ function isPortFree(port, host = '127.0.0.1') {
 
 async function findFreePort(preferred = 5050, host = '127.0.0.1') {
   const start = Number(preferred) || 5050;
+  // If preferred port is specified, allow up to 10s for TIME_WAIT socket teardown on restart
+  for (let i = 0; i < 20; i++) {
+    // eslint-disable-next-line no-await-in-loop
+    if (await isPortFree(start, host)) return start;
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((r) => setTimeout(r, 500));
+  }
   for (let p = start; p < start + 40; p++) {
     // eslint-disable-next-line no-await-in-loop
     if (await isPortFree(p, host)) return p;

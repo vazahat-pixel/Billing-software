@@ -5,20 +5,29 @@ const Party = require('../models/Party');
 const Item = require('../models/Item');
 const InventoryLot = require('../models/InventoryLot');
 const Sales = require('../models/Sales');
+const Purchase = require('../models/Purchase');
+const Job = require('../models/Job');
+const SubMaster = require('../models/SubMaster');
+const Warehouse = require('../models/Warehouse');
 const CompanyModuleConfig = require('../models/CompanyModuleConfig');
 const GstConfig = require('../models/GstConfig');
 const PermissionMatrix = require('../models/PermissionMatrix');
 const SyncDeviceState = require('../models/SyncDeviceState');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 const AppError = require('../utils/AppError');
 
 const PHASES = [
   'config',
   'users',
   'permissions',
+  'submasters',
+  'warehouses',
   'parties',
   'items',
   'lots',
+  'purchases',
+  'jobs',
   'sales',
   'done',
 ];
@@ -64,6 +73,11 @@ async function pullChanges({
   let offset = Number(cursor.offset || 0);
   const updatedAfter = cursor.updatedAfter ? new Date(cursor.updatedAfter) : null;
 
+  if (phase === 'done') {
+    phase = 'submasters';
+    offset = 0;
+  }
+
   const serverChanges = [];
   let nextPhase = phase;
   let nextOffset = offset;
@@ -100,6 +114,32 @@ async function pullChanges({
   } else if (phase === 'permissions') {
     const rows = await PermissionMatrix.find({ companyId }).skip(offset).limit(limitN).lean();
     for (const doc of rows) serverChanges.push({ entityType: 'PermissionMatrix', doc });
+    if (rows.length < limitN) {
+      nextPhase = 'submasters';
+      nextOffset = 0;
+    } else {
+      nextOffset = offset + rows.length;
+    }
+  } else if (phase === 'submasters') {
+    const rows = await SubMaster.find(updatedFilter())
+      .sort({ updatedAt: 1 })
+      .skip(offset)
+      .limit(limitN)
+      .lean();
+    for (const doc of rows) serverChanges.push({ entityType: 'SubMaster', doc });
+    if (rows.length < limitN) {
+      nextPhase = 'warehouses';
+      nextOffset = 0;
+    } else {
+      nextOffset = offset + rows.length;
+    }
+  } else if (phase === 'warehouses') {
+    const rows = await Warehouse.find(updatedFilter())
+      .sort({ updatedAt: 1 })
+      .skip(offset)
+      .limit(limitN)
+      .lean();
+    for (const doc of rows) serverChanges.push({ entityType: 'Warehouse', doc });
     if (rows.length < limitN) {
       nextPhase = 'parties';
       nextOffset = 0;
@@ -140,6 +180,32 @@ async function pullChanges({
       .lean();
     for (const doc of rows) serverChanges.push({ entityType: 'InventoryLot', doc });
     if (rows.length < limitN) {
+      nextPhase = 'purchases';
+      nextOffset = 0;
+    } else {
+      nextOffset = offset + rows.length;
+    }
+  } else if (phase === 'purchases') {
+    const rows = await Purchase.find(updatedFilter())
+      .sort({ updatedAt: 1 })
+      .skip(offset)
+      .limit(limitN)
+      .lean();
+    for (const doc of rows) serverChanges.push({ entityType: 'Purchase', doc });
+    if (rows.length < limitN) {
+      nextPhase = 'jobs';
+      nextOffset = 0;
+    } else {
+      nextOffset = offset + rows.length;
+    }
+  } else if (phase === 'jobs') {
+    const rows = await Job.find(updatedFilter())
+      .sort({ updatedAt: 1 })
+      .skip(offset)
+      .limit(limitN)
+      .lean();
+    for (const doc of rows) serverChanges.push({ entityType: 'Job', doc });
+    if (rows.length < limitN) {
       nextPhase = 'sales';
       nextOffset = 0;
     } else {
@@ -164,15 +230,16 @@ async function pullChanges({
     nextPhase = 'done';
   }
 
+  const now = new Date();
   const nextCursor = encodeCursor({
     phase: nextPhase,
     offset: nextOffset,
-    updatedAfter: updatedAfter ? updatedAfter.toISOString() : null,
+    updatedAfter: complete ? now.toISOString() : (updatedAfter ? updatedAfter.toISOString() : null),
   });
 
   const deviceState = await getOrCreateDeviceState(companyId, deviceId);
   deviceState.pullCursor = nextCursor;
-  deviceState.lastPullAt = new Date();
+  deviceState.lastPullAt = now;
   deviceState.checkpoint = { phase: nextPhase, offset: nextOffset };
   if (complete) deviceState.initialSyncComplete = true;
   deviceState.syncVersion = (deviceState.syncVersion || 0) + 1;
@@ -189,7 +256,8 @@ async function pullChanges({
 }
 
 /**
- * Apply pulled docs onto local Mongo (upsert by _id). Used by desktop agent.
+ * Apply pulled docs onto local Mongo (upsert by _id with versioning & conflict checks).
+ * Used by desktop agent.
  */
 async function applyPulledChanges(serverChanges = []) {
   const modelMap = {
@@ -197,6 +265,10 @@ async function applyPulledChanges(serverChanges = []) {
     Item,
     InventoryLot,
     Sales,
+    Purchase,
+    Job,
+    SubMaster,
+    Warehouse,
     CompanyModuleConfig,
     GstConfig,
     PermissionMatrix,
@@ -209,13 +281,92 @@ async function applyPulledChanges(serverChanges = []) {
     const { _id, __v, ...rest } = change.doc;
 
     // Sales: prefer merge by operationId to avoid duplicate local+server invoices
-    if (change.entityType === 'Sales' && rest.operationId) {
-      const existing = await Sales.findOne({
-        companyId: rest.companyId,
-        operationId: rest.operationId,
-      });
+    if (change.entityType === 'Sales') {
+      let existing = null;
+      if (rest.operationId) {
+        existing = await Sales.findOne({
+          companyId: rest.companyId,
+          operationId: rest.operationId,
+        });
+      }
+      if (!existing && _id) {
+        existing = await Sales.findOne({ _id });
+      }
       if (existing) {
+        if (existing.updatedAt && rest.updatedAt && new Date(existing.updatedAt) > new Date(rest.updatedAt)) {
+          continue;
+        }
+        const preserveAccountingId = existing.accountingEntryId || rest.accountingEntryId;
         await Sales.updateOne(
+          { _id: existing._id },
+          {
+            $set: {
+              ...rest,
+              accountingEntryId: preserveAccountingId,
+              syncServerId: _id,
+            },
+          }
+        );
+        applied += 1;
+        continue;
+      }
+    }
+
+    // Purchase: prefer merge by operationId to avoid duplicate local+server purchases
+    if (change.entityType === 'Purchase') {
+      let existing = null;
+      if (rest.operationId) {
+        existing = await Purchase.findOne({
+          companyId: rest.companyId,
+          operationId: rest.operationId,
+        });
+      }
+      if (!existing && _id) {
+        existing = await Purchase.findOne({ _id });
+      }
+      if (existing) {
+        if (existing.updatedAt && rest.updatedAt && new Date(existing.updatedAt) > new Date(rest.updatedAt)) {
+          continue;
+        }
+        const preserveAccountingId = existing.accountingEntryId || rest.accountingEntryId;
+        await Purchase.updateOne(
+          { _id: existing._id },
+          {
+            $set: {
+              ...rest,
+              accountingEntryId: preserveAccountingId,
+              syncServerId: _id,
+            },
+          }
+        );
+        applied += 1;
+        continue;
+      }
+    }
+
+    // Job: prefer merge by operationId or jobCardNo
+    if (change.entityType === 'Job') {
+      let existing = null;
+      if (rest.operationId) {
+        existing = await Job.findOne({
+          companyId: rest.companyId,
+          operationId: rest.operationId,
+        });
+      }
+      if (!existing && rest.jobCardNo) {
+        existing = await Job.findOne({
+          companyId: rest.companyId,
+          jobCardNo: rest.jobCardNo,
+        });
+      }
+      if (!existing && _id) {
+        existing = await Job.findOne({ _id });
+      }
+      if (existing) {
+        if (existing.updatedAt && rest.updatedAt && new Date(existing.updatedAt) > new Date(rest.updatedAt)) {
+          continue;
+        }
+        await Job.updateOne(
           { _id: existing._id },
           {
             $set: {
@@ -229,9 +380,44 @@ async function applyPulledChanges(serverChanges = []) {
       }
     }
 
+    // Master data versioning & conflict avoidance:
+    // Check if local document is newer before overwriting
+    let existingDoc = await Model.findById(_id).lean();
+    if (!existingDoc) {
+      if (change.entityType === 'Party' && rest.companyId && rest.name) {
+        existingDoc = await Party.findOne({ companyId: rest.companyId, name: rest.name }).lean();
+      } else if (change.entityType === 'Item' && rest.companyId && rest.name) {
+        existingDoc = await Item.findOne({ companyId: rest.companyId, name: rest.name }).lean();
+      } else if (change.entityType === 'Warehouse' && rest.companyId && rest.code) {
+        existingDoc = await Warehouse.findOne({ companyId: rest.companyId, code: rest.code }).lean();
+      } else if (change.entityType === 'SubMaster' && rest.companyId && rest.type && rest.name) {
+        existingDoc = await SubMaster.findOne({ companyId: rest.companyId, type: rest.type, name: rest.name }).lean();
+      } else if (change.entityType === 'CompanyModuleConfig' && rest.companyId) {
+        existingDoc = await CompanyModuleConfig.findOne({ companyId: rest.companyId }).lean();
+      } else if (change.entityType === 'GstConfig' && rest.companyId) {
+        existingDoc = await GstConfig.findOne({ companyId: rest.companyId }).lean();
+      } else if (change.entityType === 'User' && rest.email) {
+        existingDoc = await User.findOne({ email: rest.email }).lean();
+      } else if (change.entityType === 'PermissionMatrix' && rest.companyId) {
+        existingDoc = await PermissionMatrix.findOne({ companyId: rest.companyId, ...(rest.role ? { role: rest.role } : {}) }).lean();
+      }
+    }
+
+    if (existingDoc && existingDoc.updatedAt && rest.updatedAt && new Date(existingDoc.updatedAt) > new Date(rest.updatedAt)) {
+      // Local document was modified more recently than pulled change — do NOT overwrite blindly
+      continue;
+    }
+
+    if (rest.companyId && mongoose.Types.ObjectId.isValid(String(rest.companyId))) {
+      rest.companyId = new mongoose.Types.ObjectId(String(rest.companyId));
+    }
+    const targetId = existingDoc
+      ? existingDoc._id
+      : (mongoose.Types.ObjectId.isValid(String(_id)) ? new mongoose.Types.ObjectId(String(_id)) : _id);
+
     await Model.updateOne(
-      { _id },
-      { $set: { ...rest, _id } },
+      { _id: targetId },
+      { $set: { ...rest, _id: targetId } },
       { upsert: true }
     );
     applied += 1;

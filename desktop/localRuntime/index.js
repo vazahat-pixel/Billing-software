@@ -53,7 +53,7 @@ async function bootLocalStack(ctx) {
   const exampleCfg = ctx.desktopRoot ? readJson(path.join(ctx.desktopRoot, 'config.example.json')) : null;
   const cfg = { ...(exampleCfg || {}), ...(desktopCfg || {}), ...(readJson(cfgPath) || {}) };
 
-  const mode = String(cfg.mode || process.env.ERP_DESKTOP_MODE || 'hybrid').toLowerCase();
+  const mode = String(cfg.mode || process.env.ERP_DESKTOP_MODE || 'local').toLowerCase();
 
   if (mode === 'remote' && cfg.apiBaseUrl && !process.env.ERP_FORCE_LOCAL) {
     writeJson(cfgPath, {

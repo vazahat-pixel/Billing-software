@@ -331,6 +331,7 @@ exports.login = async (email, password, req = null) => {
                     const up = await fetch(`${centralBase}/auth/login`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId },
+                        signal: AbortSignal.timeout(3000),
                         body: JSON.stringify({
                             email: user.email,
                             password: req.body.password,

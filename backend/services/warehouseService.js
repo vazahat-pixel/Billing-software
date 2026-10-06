@@ -9,7 +9,7 @@ class WarehouseService {
     return Warehouse.find(filter).sort({ type: 1, name: 1 });
   }
 
-  async create(companyId, data) {
+  async create(companyId, data, options = {}) {
     const code = String(data.code || data.name || '').trim().toUpperCase();
     const name = String(data.name || '').trim();
     if (!name || !code) throw AppError.badRequest('Warehouse name and code are required');
@@ -18,7 +18,7 @@ class WarehouseService {
       await Warehouse.updateMany({ companyId, isDefault: true }, { isDefault: false });
     }
 
-    return Warehouse.create({
+    const created = await Warehouse.create({
       companyId,
       name,
       code,
@@ -28,9 +28,35 @@ class WarehouseService {
       isDefault: !!data.isDefault,
       status: data.status || 'Active',
     });
+
+    const isHybridDesktop =
+      String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+      String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+    if (isHybridDesktop && options.enqueueOutbox !== false && !options.fromSync) {
+      try {
+        const crypto = require('crypto');
+        const syncOutboxService = require('./syncOutboxService');
+        const opId = options.operationId || crypto.randomUUID();
+        const payload = created.toObject ? created.toObject() : { ...created };
+        await syncOutboxService.enqueue({
+          operationId: opId,
+          companyId: created.companyId,
+          userId: options.userId || null,
+          deviceId: options.deviceId || '',
+          entityType: 'warehouse',
+          entityId: created._id,
+          operationType: 'create',
+          payload: { ...payload, operationId: opId },
+        });
+      } catch (outboxErr) {
+        console.warn('Sync outbox enqueue after warehouse create:', outboxErr.message);
+      }
+    }
+
+    return created;
   }
 
-  async update(id, companyId, data) {
+  async update(id, companyId, data, options = {}) {
     const patch = {};
     ['name', 'code', 'type', 'parentId', 'address', 'isDefault', 'status'].forEach((k) => {
       if (data[k] !== undefined) patch[k] = data[k];
@@ -44,6 +70,31 @@ class WarehouseService {
       runValidators: true,
     });
     if (!doc) throw AppError.notFound('Warehouse not found');
+
+    const isHybridDesktop =
+      String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+      String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+    if (isHybridDesktop && options.enqueueOutbox !== false && !options.fromSync) {
+      try {
+        const crypto = require('crypto');
+        const syncOutboxService = require('./syncOutboxService');
+        const opId = options.operationId || crypto.randomUUID();
+        const payload = doc.toObject ? doc.toObject() : { ...doc };
+        await syncOutboxService.enqueue({
+          operationId: opId,
+          companyId: doc.companyId,
+          userId: options.userId || null,
+          deviceId: options.deviceId || '',
+          entityType: 'warehouse',
+          entityId: doc._id,
+          operationType: 'update',
+          payload: { ...payload, operationId: opId },
+        });
+      } catch (outboxErr) {
+        console.warn('Sync outbox enqueue after warehouse update:', outboxErr.message);
+      }
+    }
+
     return doc;
   }
 

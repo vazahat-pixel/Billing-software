@@ -84,6 +84,7 @@ async function seedCentralFixtures(uri, stamp) {
       {
         $set: {
           'modules.sales': true,
+          'modules.purchase': true,
           'modules.inventory': true,
           'modules.accounting': true,
           'modules.gst': true,

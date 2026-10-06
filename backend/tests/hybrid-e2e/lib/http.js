@@ -21,7 +21,7 @@ function request(baseUrl, method, path, { token, body, headers = {}, deviceId } 
         path: `${url.pathname}${url.search}`,
         method,
         headers: hdrs,
-        timeout: 30000,
+        timeout: Number(process.env.TEST_HTTP_TIMEOUT_MS || 60000),
       },
       (res) => {
         let raw = '';

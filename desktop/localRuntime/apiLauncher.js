@@ -199,7 +199,13 @@ async function stopApi() {
     proc.once('exit', done);
     try {
       if (process.platform === 'win32') {
-        spawn('taskkill', ['/pid', String(proc.pid), '/f', '/t'], { windowsHide: true }).on('exit', done);
+        try {
+          const { execSync } = require('child_process');
+          execSync(`taskkill /pid ${proc.pid} /f /t`, { windowsHide: true, stdio: 'ignore' });
+        } catch {
+          /* ignore */
+        }
+        done();
       } else {
         proc.kill('SIGTERM');
         setTimeout(() => {
@@ -213,7 +219,7 @@ async function stopApi() {
     } catch {
       done();
     }
-    setTimeout(done, 8000);
+    setTimeout(done, 5000);
   });
 }
 

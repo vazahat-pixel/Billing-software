@@ -93,7 +93,7 @@ function normalizePayload(itemData, { requireName = true } = {}) {
 }
 
 class ItemService {
-  async createItem(itemData) {
+  async createItem(itemData, options = {}) {
     const normalized = normalizePayload(itemData, { requireName: true });
 
     const existing = await Item.findOne({
@@ -114,7 +114,33 @@ class ItemService {
       }
     }
 
-    return await new Item(normalized).save();
+    const saved = await new Item(normalized).save();
+
+    const isHybridDesktop =
+      String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+      String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+    if (isHybridDesktop && options.enqueueOutbox !== false && !options.fromSync) {
+      try {
+        const crypto = require('crypto');
+        const syncOutboxService = require('./syncOutboxService');
+        const opId = options.operationId || crypto.randomUUID();
+        const payload = saved.toObject ? saved.toObject() : { ...saved };
+        await syncOutboxService.enqueue({
+          operationId: opId,
+          companyId: saved.companyId,
+          userId: options.userId || null,
+          deviceId: options.deviceId || '',
+          entityType: 'item',
+          entityId: saved._id,
+          operationType: 'create',
+          payload: { ...payload, operationId: opId },
+        });
+      } catch (outboxErr) {
+        console.warn('Sync outbox enqueue after item create:', outboxErr.message);
+      }
+    }
+
+    return saved;
   }
 
   async getItems(companyId, { favorites, page, limit } = {}) {
@@ -153,7 +179,7 @@ class ItemService {
     return await Item.findOne({ _id: id, companyId });
   }
 
-  async updateItem(id, companyId, updateData) {
+  async updateItem(id, companyId, updateData, options = {}) {
     const existing = await Item.findOne({ _id: id, companyId });
     if (!existing) return null;
 
@@ -167,11 +193,37 @@ class ItemService {
     const mapped = normalizePayload(merged, { requireName: true });
     delete mapped.companyId;
 
-    return await Item.findOneAndUpdate(
+    const updated = await Item.findOneAndUpdate(
       { _id: id, companyId },
       mapped,
       { new: true, runValidators: true }
     );
+
+    const isHybridDesktop =
+      String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+      String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+    if (isHybridDesktop && options.enqueueOutbox !== false && !options.fromSync) {
+      try {
+        const crypto = require('crypto');
+        const syncOutboxService = require('./syncOutboxService');
+        const opId = options.operationId || crypto.randomUUID();
+        const payload = updated.toObject ? updated.toObject() : { ...updated };
+        await syncOutboxService.enqueue({
+          operationId: opId,
+          companyId: updated.companyId,
+          userId: options.userId || null,
+          deviceId: options.deviceId || '',
+          entityType: 'item',
+          entityId: updated._id,
+          operationType: 'update',
+          payload: { ...payload, operationId: opId },
+        });
+      } catch (outboxErr) {
+        console.warn('Sync outbox enqueue after item update:', outboxErr.message);
+      }
+    }
+
+    return updated;
   }
 
   async deleteItem(id, companyId) {
