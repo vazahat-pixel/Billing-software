@@ -169,10 +169,65 @@ exports.login = async (email, password, req = null) => {
     const securityConfigService = require('./securityConfigService');
     const sessionService = require('./sessionService');
 
-    const user = await User.findOne({ email }).select('+password +failedLoginAttempts +lockUntil +totpSecret +totpEnabled');
+    let user = await User.findOne({ email }).select('+password +failedLoginAttempts +lockUntil +totpSecret +totpEnabled');
     if (!user) {
-        if (req) await sessionService.recordLogin(null, 'login_failed', req, { success: false, reason: 'unknown_user', meta: { email } });
-        throw new Error('Invalid credentials');
+        const isDesktopLocal = String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+        const centralBase = String(process.env.CENTRAL_API_BASE_URL || '').replace(/\/$/, '');
+        if (isDesktopLocal && centralBase) {
+            try {
+                const up = await fetch(`${centralBase}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: AbortSignal.timeout(6000),
+                    body: JSON.stringify({ email, password, isDesktop: true }),
+                });
+                const uj = await up.json().catch(() => ({}));
+                const payload = uj?.data || uj;
+                if (up.ok && payload?.token && payload?.user) {
+                    const cu = payload.user;
+                    if (cu.companyId) {
+                        const existingCo = await Company.findById(cu.companyId);
+                        if (!existingCo) {
+                            let plan = await Plan.findOne({ isActive: true });
+                            if (!plan) {
+                                plan = await Plan.create({
+                                    name: 'Enterprise',
+                                    slug: 'enterprise',
+                                    isActive: true,
+                                    priceMonthly: 0,
+                                    priceYearly: 0,
+                                }).catch(() => null);
+                            }
+                            await Company.create({
+                                _id: cu.companyId,
+                                name: cu.company?.name || 'Textile ERP Company',
+                                ownerId: cu.id,
+                                planId: plan?._id || cu.company?.planId,
+                                status: 'active',
+                                isActive: true,
+                            });
+                        }
+                    }
+                    user = await User.create({
+                        _id: cu.id,
+                        name: cu.name,
+                        email: cu.email,
+                        password,
+                        role: cu.role || 'user',
+                        companyRole: cu.companyRole || 'owner',
+                        companyId: cu.companyId || null,
+                        isActive: true,
+                    });
+                    user = await User.findById(cu.id).select('+password +failedLoginAttempts +lockUntil +totpSecret +totpEnabled');
+                }
+            } catch (centralErr) {
+                console.warn('[authService] Desktop cloud bootstrap attempt failed:', centralErr.message);
+            }
+        }
+        if (!user) {
+            if (req) await sessionService.recordLogin(null, 'login_failed', req, { success: false, reason: 'unknown_user', meta: { email } });
+            throw new Error('Invalid credentials');
+        }
     }
 
     if (user.isLocked && user.isLocked()) {
@@ -181,18 +236,43 @@ exports.login = async (email, password, req = null) => {
     }
 
     if (!(await user.comparePassword(password))) {
-        const cfg = await securityConfigService.getOrCreate(user.companyId);
-        const max = cfg.lockout?.maxFailedAttempts || 5;
-        const mins = cfg.lockout?.lockoutMinutes || 30;
-        user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
-        user.lastFailedLoginAt = new Date();
-        if (user.failedLoginAttempts >= max) {
-            user.lockUntil = new Date(Date.now() + mins * 60 * 1000);
-            user.failedLoginAttempts = 0;
+        const isDesktopLocal = String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+        const centralBase = String(process.env.CENTRAL_API_BASE_URL || '').replace(/\/$/, '');
+        let reauthSuccess = false;
+        if (isDesktopLocal && centralBase) {
+            try {
+                const up = await fetch(`${centralBase}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: AbortSignal.timeout(6000),
+                    body: JSON.stringify({ email, password, isDesktop: true }),
+                });
+                if (up.ok) {
+                    user.password = password;
+                    user.failedLoginAttempts = 0;
+                    user.lockUntil = null;
+                    await user.save();
+                    reauthSuccess = true;
+                }
+            } catch {
+                /* fall through */
+            }
         }
-        await user.save();
-        await sessionService.recordLogin(user, 'login_failed', req || {}, { success: false, reason: 'bad_password' });
-        throw new Error('Invalid credentials');
+
+        if (!reauthSuccess) {
+            const cfg = await securityConfigService.getOrCreate(user.companyId);
+            const max = cfg.lockout?.maxFailedAttempts || 5;
+            const mins = cfg.lockout?.lockoutMinutes || 30;
+            user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+            user.lastFailedLoginAt = new Date();
+            if (user.failedLoginAttempts >= max) {
+                user.lockUntil = new Date(Date.now() + mins * 60 * 1000);
+                user.failedLoginAttempts = 0;
+            }
+            await user.save();
+            await sessionService.recordLogin(user, 'login_failed', req || {}, { success: false, reason: 'bad_password' });
+            throw new Error('Invalid credentials');
+        }
     }
 
     if (!user.isActive) throw new Error('Account deactivated. Please contact support.');

@@ -83,30 +83,75 @@ async function bootLocalStack(ctx) {
   const mongoPort = await findFreePort(Number(cfg.mongoPort || 27028));
   const jwtSecret = ensureJwtSecret(userData);
 
-  // Hybrid + local: single-node replica set for ACID withTransaction
-  const mongo = await startMongo({
-    dataDir: mongoData,
-    port: mongoPort,
-    logPath: mongoLog,
-    resourcesPath: ctx.resourcesPath,
-    desktopRoot: ctx.desktopRoot,
-    replicaSet: 'rs0',
-  });
-
   const centralApiBaseUrl = cfg.centralApiBaseUrl
     ? String(cfg.centralApiBaseUrl).replace(/\/$/, '')
-    : process.env.CENTRAL_API_BASE_URL || '';
+    : process.env.CENTRAL_API_BASE_URL || 'https://app.dealingindia.com/api';
 
-  const api = await startApi({
-    port: apiPort,
-    mongoUri: mongo.uri,
-    userData,
-    desktopRoot: ctx.desktopRoot,
-    resourcesPath: ctx.resourcesPath,
-    jwtSecret,
-    hybrid: isHybrid,
-    centralApiBaseUrl,
-  });
+  // Hybrid + local: single-node replica set for ACID withTransaction
+  let mongo = null;
+  try {
+    mongo = await startMongo({
+      dataDir: mongoData,
+      port: mongoPort,
+      logPath: mongoLog,
+      resourcesPath: ctx.resourcesPath,
+      desktopRoot: ctx.desktopRoot,
+      replicaSet: 'rs0',
+    });
+  } catch (mongoErr) {
+    console.warn('[localRuntime] Local database engine unavailable:', mongoErr.message);
+    if (centralApiBaseUrl) {
+      console.log('[localRuntime] Seamlessly switching to Cloud API mode:', centralApiBaseUrl);
+      const fallbackCfg = {
+        ...cfg,
+        mode: 'remote',
+        apiBaseUrl: centralApiBaseUrl,
+        centralApiBaseUrl,
+      };
+      writeJson(cfgPath, fallbackCfg);
+      return {
+        mode: 'remote',
+        apiBaseUrl: centralApiBaseUrl,
+        centralApiBaseUrl,
+        configPath: cfgPath,
+      };
+    }
+    throw mongoErr;
+  }
+
+  let api = null;
+  try {
+    api = await startApi({
+      port: apiPort,
+      mongoUri: mongo.uri,
+      userData,
+      desktopRoot: ctx.desktopRoot,
+      resourcesPath: ctx.resourcesPath,
+      jwtSecret,
+      hybrid: isHybrid,
+      centralApiBaseUrl,
+    });
+  } catch (apiErr) {
+    console.warn('[localRuntime] Local Express API unavailable:', apiErr.message);
+    await stopMongo().catch(() => {});
+    if (centralApiBaseUrl) {
+      console.log('[localRuntime] Seamlessly switching to Cloud API mode:', centralApiBaseUrl);
+      const fallbackCfg = {
+        ...cfg,
+        mode: 'remote',
+        apiBaseUrl: centralApiBaseUrl,
+        centralApiBaseUrl,
+      };
+      writeJson(cfgPath, fallbackCfg);
+      return {
+        mode: 'remote',
+        apiBaseUrl: centralApiBaseUrl,
+        centralApiBaseUrl,
+        configPath: cfgPath,
+      };
+    }
+    throw apiErr;
+  }
 
   const apiBaseUrl = `http://127.0.0.1:${apiPort}/api`;
   const nextCfg = {

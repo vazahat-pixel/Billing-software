@@ -61,9 +61,9 @@ function App() {
         <Route path="/portal" element={<PanelPortal />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/offline-login" element={<LoginPage />} />
-        <Route path="/signup" element={isDesktopShell ? <Navigate to="/activate" replace /> : <SignupPage />} />
-        <Route path="/setup" element={<DesktopSetupPage />} />
-        <Route path="/activate" element={<DesktopActivatePage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/setup" element={<Navigate to="/login" replace />} />
+        <Route path="/activate" element={<Navigate to="/login" replace />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/admin/login" element={<AdminLogin />} />

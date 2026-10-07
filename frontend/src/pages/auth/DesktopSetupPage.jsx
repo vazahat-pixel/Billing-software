@@ -5,5 +5,5 @@
 import { Navigate } from 'react-router-dom';
 
 export default function DesktopSetupPage() {
-  return <Navigate to="/activate" replace />;
+  return <Navigate to="/login" replace />;
 }

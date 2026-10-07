@@ -306,6 +306,14 @@ async function startMongo(opts) {
 
   const bin = resolveMongodBinary(opts);
   if (bin) {
+    try {
+      const { execFileSync } = require('child_process');
+      execFileSync(bin, ['--version'], { timeout: 3000, windowsHide: true, stdio: 'ignore' });
+    } catch (probeErr) {
+      console.warn('[localRuntime] mongod binary execution probe failed:', probeErr.message);
+      throw new Error(`mongod binary cannot execute on this system: ${probeErr.message}\nTried binary: ${bin}`);
+    }
+
     const args = [
       '--dbpath', dataDir,
       '--port', String(port),
@@ -345,7 +353,7 @@ async function startMongo(opts) {
     });
 
     try {
-      await waitForPort(port, '127.0.0.1', 90000, mongodProc, opts.logPath);
+      await waitForPort(port, '127.0.0.1', 10000, mongodProc, opts.logPath);
     } catch (err) {
       await stopMongo();
       throw new Error(`${err.message}\nTried binary: ${bin}\nStdout:\n${stdout.slice(-800)}\nStderr:\n${stderr.slice(-800)}`);

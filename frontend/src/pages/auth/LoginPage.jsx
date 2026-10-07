@@ -75,28 +75,10 @@ const LoginPage = () => {
     const location = useLocation();
     const setAuth = useStore(state => state.setAuth);
 
+    // Desktop: Always allow direct sign in by default; no forced redirect to /activate
     useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            try {
-                if (location.state?.fromActivate) return;
-
-                const local =
-                    typeof window.textileDesktop?.isLocalSync === 'function'
-                        ? window.textileDesktop.isLocalSync()
-                        : window.textileDesktop?.isLocal;
-                if (local === false) return;
-
-                if (window.textileDesktop?.needsSetup) {
-                    const needs = await window.textileDesktop.needsSetup();
-                    if (!cancelled && needs) navigate('/activate', { replace: true });
-                }
-            } catch {
-                /* ignore */
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [navigate, location.state]);
+        // Ready for direct sign-in
+    }, []);
 
     useEffect(() => {
         const unsub = subscribeNetworkStatus(({ isOffline: offline, browserOnline }) => {

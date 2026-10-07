@@ -305,27 +305,8 @@ ipcMain.handle('desktop:sync-status', () => {
 });
 ipcMain.handle('desktop:central-url', () => localStack?.centralApiBaseUrl || null);
 ipcMain.handle('desktop:needs-setup', async () => {
-  // Remote API (existing SaaS / shared Mongo) — no provisioning pack required
-  const mode = localStack?.mode || readJsonSafe(path.join(app.getPath('userData'), 'config.json'))?.mode || 'local';
-  if (String(mode).toLowerCase() === 'remote') return false;
-
-  // Prefer local API activation status (Mongo) over legacy setup.done file
-  try {
-    const base = resolveApiBaseUrl();
-    if (base) {
-      const res = await fetch(`${String(base).replace(/\/$/, '')}/desktop/activation-status`);
-      if (res.ok) {
-        const json = await res.json();
-        const activated = !!(json?.data?.activated ?? json?.activated);
-        if (activated) return false;
-        return true;
-      }
-    }
-  } catch {
-    /* fall through */
-  }
-  const flag = path.join(app.getPath('userData'), 'setup.done');
-  return !fs.existsSync(flag);
+  // Always permit direct sign-in for users; never block on import/activation screen
+  return false;
 });
 ipcMain.handle('desktop:mark-setup-done', () => {
   fs.writeFileSync(path.join(app.getPath('userData'), 'setup.done'), new Date().toISOString(), 'utf8');

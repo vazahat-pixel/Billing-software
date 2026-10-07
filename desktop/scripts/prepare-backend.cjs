@@ -28,7 +28,7 @@ if (process.platform === 'win32') {
   fs.mkdirSync(dest, { recursive: true });
   try {
     execSync(
-      `robocopy "${src}" "${dest}" /E /XD tests performance coverage .nyc_output /XF .env* *.log test_output.txt /NFL /NDL /NJH /NJS`,
+      `robocopy "${src}" "${dest}" /E /XD tests performance coverage .nyc_output downloads /XF .env* *.log test_output.txt *.exe *.zip /NFL /NDL /NJH /NJS`,
       { stdio: 'inherit' }
     );
   } catch (err) {
@@ -42,7 +42,13 @@ if (process.platform === 'win32') {
   if (fs.existsSync(dest)) {
     fs.rmSync(dest, { recursive: true, force: true });
   }
-  copyRecursive(src, dest, new Set(['.env', 'test_output.txt', 'coverage', '.nyc_output', 'tests', 'performance']));
+  copyRecursive(src, dest, new Set(['.env', 'test_output.txt', 'coverage', '.nyc_output', 'tests', 'performance', 'downloads']));
+}
+
+// Clean any accidental downloads directory in bundled backend
+const bundledDownloads = path.join(dest, 'public', 'downloads');
+if (fs.existsSync(bundledDownloads)) {
+  fs.rmSync(bundledDownloads, { recursive: true, force: true });
 }
 
 console.log('Copied backend →', dest);

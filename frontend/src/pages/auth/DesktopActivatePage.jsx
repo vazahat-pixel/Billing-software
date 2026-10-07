@@ -26,34 +26,7 @@ const DesktopActivatePage = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!isDesktopShell()) {
-      navigate('/login', { replace: true });
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const local = window.textileDesktop?.isLocalSync?.();
-        if (local === false) {
-          navigate('/login', { replace: true });
-          return;
-        }
-        const { data } = await client.get('/desktop/activation-status');
-        const status = data?.data || data;
-        if (!cancelled && status?.activated) {
-          navigate('/login', { replace: true });
-        }
-      } catch {
-        /* remote / API without DESKTOP_LOCAL → go login */
-        if (!cancelled) {
-          const local = window.textileDesktop?.isLocalSync?.();
-          if (local === false) navigate('/login', { replace: true });
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    navigate('/login', { replace: true });
   }, [navigate]);
 
   const onFile = async (e) => {
