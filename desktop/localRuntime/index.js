@@ -53,20 +53,11 @@ async function bootLocalStack(ctx) {
   const exampleCfg = ctx.desktopRoot ? readJson(path.join(ctx.desktopRoot, 'config.example.json')) : null;
   const cfg = { ...(exampleCfg || {}), ...(desktopCfg || {}), ...(readJson(cfgPath) || {}) };
 
-  const mode = String(cfg.mode || process.env.ERP_DESKTOP_MODE || 'local').toLowerCase();
-
-  if (mode === 'remote' && cfg.apiBaseUrl && !process.env.ERP_FORCE_LOCAL) {
-    writeJson(cfgPath, {
-      ...cfg,
-      mode: 'remote',
-      apiBaseUrl: String(cfg.apiBaseUrl).replace(/\/$/, ''),
-    });
-    return {
-      mode: 'remote',
-      apiBaseUrl: String(cfg.apiBaseUrl).replace(/\/$/, ''),
-      centralApiBaseUrl: cfg.centralApiBaseUrl || null,
-      configPath: cfgPath,
-    };
+  // If user config had 'remote' written from an old run, heal it back to 'hybrid' for offline capability
+  let mode = String(cfg.mode || process.env.ERP_DESKTOP_MODE || 'hybrid').toLowerCase();
+  if (mode === 'remote' && !process.env.ERP_FORCE_REMOTE) {
+    console.log('[localRuntime] Healing legacy remote setting to hybrid for offline ERP capability');
+    mode = 'hybrid';
   }
 
   const isHybrid = mode === 'hybrid';
@@ -87,7 +78,7 @@ async function bootLocalStack(ctx) {
     ? String(cfg.centralApiBaseUrl).replace(/\/$/, '')
     : process.env.CENTRAL_API_BASE_URL || 'https://app.dealingindia.com/api';
 
-  // Hybrid + local: single-node replica set for ACID withTransaction
+  // Hybrid + local: single-node replica set for ACID withTransaction; fallback to standalone
   let mongo = null;
   try {
     mongo = await startMongo({
@@ -99,24 +90,20 @@ async function bootLocalStack(ctx) {
       replicaSet: 'rs0',
     });
   } catch (mongoErr) {
-    console.warn('[localRuntime] Local database engine unavailable:', mongoErr.message);
-    if (centralApiBaseUrl) {
-      console.log('[localRuntime] Seamlessly switching to Cloud API mode:', centralApiBaseUrl);
-      const fallbackCfg = {
-        ...cfg,
-        mode: 'remote',
-        apiBaseUrl: centralApiBaseUrl,
-        centralApiBaseUrl,
-      };
-      writeJson(cfgPath, fallbackCfg);
-      return {
-        mode: 'remote',
-        apiBaseUrl: centralApiBaseUrl,
-        centralApiBaseUrl,
-        configPath: cfgPath,
-      };
+    console.warn('[localRuntime] Local replicaSet start failed, retrying in robust standalone mode:', mongoErr.message);
+    try {
+      mongo = await startMongo({
+        dataDir: mongoData,
+        port: mongoPort,
+        logPath: mongoLog,
+        resourcesPath: ctx.resourcesPath,
+        desktopRoot: ctx.desktopRoot,
+        replicaSet: false,
+      });
+    } catch (retryErr) {
+      console.error('[localRuntime] Standalone mongo startup failed:', retryErr.message);
+      throw retryErr;
     }
-    throw mongoErr;
   }
 
   let api = null;
@@ -130,26 +117,11 @@ async function bootLocalStack(ctx) {
       jwtSecret,
       hybrid: isHybrid,
       centralApiBaseUrl,
+      replicaSet: mongo.replicaSet,
     });
   } catch (apiErr) {
-    console.warn('[localRuntime] Local Express API unavailable:', apiErr.message);
+    console.error('[localRuntime] Local Express API startup failed:', apiErr.message);
     await stopMongo().catch(() => {});
-    if (centralApiBaseUrl) {
-      console.log('[localRuntime] Seamlessly switching to Cloud API mode:', centralApiBaseUrl);
-      const fallbackCfg = {
-        ...cfg,
-        mode: 'remote',
-        apiBaseUrl: centralApiBaseUrl,
-        centralApiBaseUrl,
-      };
-      writeJson(cfgPath, fallbackCfg);
-      return {
-        mode: 'remote',
-        apiBaseUrl: centralApiBaseUrl,
-        centralApiBaseUrl,
-        configPath: cfgPath,
-      };
-    }
     throw apiErr;
   }
 

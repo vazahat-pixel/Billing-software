@@ -103,7 +103,7 @@ export const probeServerReachability = async () => {
   if (typeof window === 'undefined') return getNetworkStatus();
 
   browserOnline = navigator.onLine;
-  if (!browserOnline) {
+  if (!browserOnline && !useLocalApiAsSourceOfTruth()) {
     if (serverReachable) {
       serverReachable = false;
       notify();

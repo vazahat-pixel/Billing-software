@@ -192,17 +192,28 @@ function resolveMemoryServerModule(desktopRoot) {
  * Initiate single-node replica set so local Express can use real ACID transactions.
  * Safe to call repeatedly (already-initiated sets are ignored).
  */
-async function ensureReplicaSet(port, replSetName = 'rs0') {
+async function ensureReplicaSet(port, replSetName = 'rs0', opts = {}) {
   let MongoClient;
-  try {
-    ({ MongoClient } = require('mongodb'));
-  } catch {
+  const candidates = [
+    'mongodb',
+    opts?.resourcesPath && path.join(opts.resourcesPath, 'backend', 'node_modules', 'mongodb'),
+    opts?.desktopRoot && path.join(opts.desktopRoot, '..', 'backend', 'node_modules', 'mongodb'),
+    path.join(__dirname, '..', '..', 'backend', 'node_modules', 'mongodb'),
+    path.join(__dirname, '..', 'resources', 'backend', 'node_modules', 'mongodb'),
+  ].filter(Boolean);
+
+  for (const c of candidates) {
     try {
-      ({ MongoClient } = require(path.join(__dirname, '..', '..', 'backend', 'node_modules', 'mongodb')));
-    } catch (err) {
-      console.warn('[localRuntime] mongodb driver missing; skipping rs.initiate:', err.message);
-      return false;
+      const m = require(c);
+      MongoClient = m.MongoClient || m;
+      if (MongoClient) break;
+    } catch {
+      /* continue */
     }
+  }
+  if (!MongoClient) {
+    console.warn('[localRuntime] mongodb driver missing in all candidates; skipping rs.initiate');
+    return false;
   }
   const uri = `mongodb://127.0.0.1:${port}/?directConnection=true`;
   const client = new MongoClient(uri, { serverSelectionTimeoutMS: 15000 });
@@ -293,7 +304,7 @@ async function startMongo(opts) {
   if (await portInUse(port)) {
     startedByUs = false;
     if (replSetName) {
-      await ensureReplicaSet(port, replSetName);
+      await ensureReplicaSet(port, replSetName, opts);
     }
     const qs = replSetName ? `?replicaSet=${replSetName}` : '';
     return {
@@ -302,6 +313,16 @@ async function startMongo(opts) {
       reused: true,
       replicaSet: replSetName,
     };
+  }
+
+  // Clean stale lock file left behind by unclean shutdown / crash if port is not in use
+  const lockFile = path.join(dataDir, 'mongod.lock');
+  if (fs.existsSync(lockFile)) {
+    try {
+      fs.unlinkSync(lockFile);
+    } catch {
+      /* ignore */
+    }
   }
 
   const bin = resolveMongodBinary(opts);
@@ -353,14 +374,18 @@ async function startMongo(opts) {
     });
 
     try {
-      await waitForPort(port, '127.0.0.1', 10000, mongodProc, opts.logPath);
+      await waitForPort(port, '127.0.0.1', 45000, mongodProc, opts.logPath);
     } catch (err) {
       await stopMongo();
+      if (replSetName) {
+        console.warn('[localRuntime] mongod failed with replSet, retrying in standalone mode...');
+        return await startMongo({ ...opts, replicaSet: false });
+      }
       throw new Error(`${err.message}\nTried binary: ${bin}\nStdout:\n${stdout.slice(-800)}\nStderr:\n${stderr.slice(-800)}`);
     }
 
     if (replSetName) {
-      await ensureReplicaSet(port, replSetName);
+      await ensureReplicaSet(port, replSetName, opts);
     }
 
     const qs = replSetName ? `?replicaSet=${replSetName}` : '';

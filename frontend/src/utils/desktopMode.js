@@ -14,6 +14,17 @@ export function isDesktopShell() {
 export function isDesktopLocalMode() {
   if (!isDesktopShell()) return false;
   try {
+    const desktopApi =
+      typeof window.textileDesktop?.getApiBaseUrlSync === 'function'
+        ? window.textileDesktop.getApiBaseUrlSync()
+        : '';
+    if (desktopApi && (desktopApi.includes('127.0.0.1') || desktopApi.includes('localhost'))) {
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
     const mode =
       typeof window.textileDesktop?.getModeSync === 'function'
         ? window.textileDesktop.getModeSync()

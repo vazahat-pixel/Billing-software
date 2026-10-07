@@ -104,7 +104,7 @@ async function startApi(opts) {
     DESKTOP_HYBRID: isHybrid ? 'true' : (process.env.DESKTOP_HYBRID || 'false'),
     HYBRID_SYNC_ENABLED: isHybrid ? 'true' : (process.env.HYBRID_SYNC_ENABLED || 'false'),
     CENTRAL_API_BASE_URL: opts.centralApiBaseUrl || process.env.CENTRAL_API_BASE_URL || '',
-    MONGO_REPLICA_SET: 'true',
+    MONGO_REPLICA_SET: opts.replicaSet ? 'true' : 'false',
     ALLOW_PUBLIC_REGISTER: 'false',
     ALLOW_SUBSCRIPTION_BYPASS: 'false',
     DUNNING_INTERVAL_MS: '0',

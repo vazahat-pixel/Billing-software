@@ -115,8 +115,27 @@ client.interceptors.request.use((config) => {
     }
   }
 
+  // Refresh desktop baseURL if running inside Electron shell
+  if (typeof window !== 'undefined' && window.textileDesktop?.getApiBaseUrlSync) {
+    try {
+      const desktopUrl = window.textileDesktop.getApiBaseUrlSync();
+      if (desktopUrl && (!config.baseURL || config.baseURL === '/api' || config.baseURL.includes('dealingindia.com'))) {
+        config.baseURL = String(desktopUrl).replace(/\/$/, '');
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   const isAuthRequest = (config.url || '').includes('/auth/');
-  if (isOffline() && !config.forceNetwork && !isAuthRequest && typeof navigator !== 'undefined' && !navigator.onLine) {
+  const currentBase = String(config.baseURL || getBaseUrl() || '');
+  const isLocalApi =
+    (typeof window !== 'undefined' && !!window.textileDesktop) ||
+    currentBase.includes('127.0.0.1') ||
+    currentBase.includes('localhost') ||
+    import.meta.env.VITE_DESKTOP === '1';
+
+  if (!isLocalApi && isOffline() && !config.forceNetwork && !isAuthRequest && typeof navigator !== 'undefined' && !navigator.onLine) {
     if (!silent) updateActiveRequests(-1, mutating);
     const err = new Error('Network Error');
     err.code = 'ERR_NETWORK';

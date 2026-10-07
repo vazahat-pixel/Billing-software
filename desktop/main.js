@@ -95,6 +95,25 @@ function createWindow() {
     }
   });
 
+  // F12 key to toggle Developer Console
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
+
+  // Right-click Inspect Element & Reload context menu
+  mainWindow.webContents.on('context-menu', (_e, params) => {
+    const contextMenu = Menu.buildFromTemplate([
+      { label: 'Inspect Element', click: () => mainWindow.webContents.inspectElement(params.x, params.y) },
+      { type: 'separator' },
+      { label: 'Reload', role: 'reload' },
+      { label: 'Toggle Developer Tools (F12)', click: () => mainWindow.webContents.toggleDevTools() },
+    ]);
+    contextMenu.popup(mainWindow);
+  });
+
   mainWindow.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
     shell.openExternal(targetUrl);
     return { action: 'deny' };
@@ -218,7 +237,12 @@ function buildMenu() {
         { role: 'resetZoom' },
         { type: 'separator' },
         {
-          label: 'Toggle Developer Tools',
+          label: 'Toggle Developer Tools (Console)',
+          accelerator: 'F12',
+          click: () => mainWindow?.webContents.toggleDevTools(),
+        },
+        {
+          label: 'Developer Tools (Alt)',
           accelerator: 'CmdOrCtrl+Shift+I',
           click: () => mainWindow?.webContents.toggleDevTools(),
         },

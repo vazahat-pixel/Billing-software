@@ -227,12 +227,14 @@ class LedgerEngineService {
       ledger = await LedgerMaster.findOne({ companyId, linkedPartyId: cleanId });
     }
     if (!ledger) {
+      const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const safeClean = escapeRegex(cleanId);
       const Party = require('../models/Party');
       const party = await Party.findOne({
         companyId,
         $or: [
           ...(mongoose.Types.ObjectId.isValid(cleanId) ? [{ _id: cleanId }] : []),
-          { name: { $regex: new RegExp('^' + cleanId + '$', 'i') } }
+          { name: { $regex: new RegExp('^' + safeClean + '$', 'i') } }
         ]
       });
       if (party) {
@@ -241,9 +243,11 @@ class LedgerEngineService {
       }
     }
     if (!ledger && cleanId) {
+      const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const safeClean = escapeRegex(cleanId);
       ledger = await LedgerMaster.findOne({
         companyId,
-        name: { $regex: new RegExp('^' + cleanId + '$', 'i') }
+        name: { $regex: new RegExp('^' + safeClean + '$', 'i') }
       });
     }
     if (!ledger) throw new Error('Ledger not found');
