@@ -27,6 +27,11 @@ import { resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
 import { money, lineTaxable } from '../../utils/salesBillCalc';
 import PcsBreakdownModal from '../sales/PcsBreakdownModal';
 
+const PURCHASE_KEYBOARD_HINTS = [
+  { keys: '- / +', label: 'Prev/Next' },
+  ...FORM_KEYBOARD_HINTS
+];
+
 const today = () => new Date().toISOString().split('T')[0];
 const DEFAULT_UNITS = ['MTRS', 'PCS', 'KGS', 'NETQTY', 'QTY'];
 
@@ -115,19 +120,32 @@ const PurchaseModal = ({
     warehouseId: ''
   });
 
-  // Sorted list of bills in this book / company for Find
+  // Sorted list of bills in this book / company for Find and voucher navigation
   const bookPurchases = useMemo(() => {
-    const list = (purchases || []).filter(p => {
-      if (header.book && p.bookId) {
-        return String(p.bookId).toLowerCase() === String(header.book).toLowerCase();
-      }
-      return true;
+    const all = Array.isArray(purchases) ? purchases : [];
+    if (!all.length) return [];
+
+    const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const currentBookNorm = norm(header.book);
+
+    let list = all.filter((p) => {
+      if (!currentBookNorm) return true;
+      if (!p.bookId) return true;
+      const bNorm = norm(p.bookId);
+      return bNorm === currentBookNorm || bNorm.includes(currentBookNorm) || currentBookNorm.includes(bNorm);
     });
+
+    if (!list.length && all.length) {
+      list = all;
+    }
+
     return [...list].sort((a, b) => {
-      const numA = parseInt(String(a.vNo || a.invoiceNo || '').replace(/\D/g, ''), 10);
-      const numB = parseInt(String(b.vNo || b.invoiceNo || '').replace(/\D/g, ''), 10);
-      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-      return new Date(a.date || 0) - new Date(b.date || 0);
+      const noA = a.vNo || a.invoiceNo || a.supplierInvoiceNo || a.billNo || '';
+      const noB = b.vNo || b.invoiceNo || b.supplierInvoiceNo || b.billNo || '';
+      const numA = parseInt(String(noA).replace(/\D/g, ''), 10);
+      const numB = parseInt(String(noB).replace(/\D/g, ''), 10);
+      if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+      return new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0);
     });
   }, [purchases, header.book]);
 
@@ -452,153 +470,8 @@ const PurchaseModal = ({
     remarks: ''
   });
 
-  useEffect(() => {
-    if (!isOpen) {
-      openedOnceRef.current = false;
-      setSaveNextActions(null);
-      setPrintInvoiceId(null);
-      setBootLoading(false);
-      return;
-    }
-
-    // Open the form immediately; only block if masters are missing from store.
-    const incomingId = String(initialData?._id || initialData?.id || '');
-    if (!openedOnceRef.current) {
-      openedOnceRef.current = incomingId || 'open';
-      setSaveNextActions(null);
-      setPrintInvoiceId(null);
-      setBillAttachment(null);
-      if (initialData && Array.isArray(initialData.items)) {
-        loadPurchaseData(initialData);
-        setSelectedPurchaseId(incomingId);
-        setMode('View');
-      } else if (readOnly) {
-        setMode('View');
-      } else {
-        setSelectedPurchaseId('');
-        handleNew();
-      }
-    } else if (incomingId && openedOnceRef.current !== incomingId && Array.isArray(initialData?.items)) {
-      openedOnceRef.current = incomingId;
-      loadPurchaseData(initialData);
-      setSelectedPurchaseId(incomingId);
-      setMode('View');
-    }
-
-    let cancelled = false;
-    const state = useStore.getState();
-    const needParties = !(state.parties && state.parties.length);
-    const needItems = !(state.items && state.items.length);
-    const blocking = [];
-    if (needParties) blocking.push(fetchParties());
-    if (needItems) blocking.push(fetchItems());
-
-    if (blocking.length) {
-      setBootLoading(true);
-      Promise.all(blocking)
-        .catch(() => { })
-        .finally(() => {
-          if (!cancelled) setBootLoading(false);
-        });
-    } else {
-      setBootLoading(false);
-    }
-    // Warehouses are optional for the shell — never block bill open on this call
-    warehousesApi.list().then((list) => setWarehouses(Array.isArray(list) ? list : [])).catch(() => setWarehouses([]));
-
-    // Warm purchase find-list in background — do not block the form shell.
-    if (!(state.purchases && state.purchases.length)) {
-      fetchPurchases().catch(() => {});
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen, readOnly, selectedBook, fetchParties, fetchItems, fetchPurchases]);
-
-  useEffect(() => {
-    if (isOpen && selectedBook) {
-      setHeader((h) => ({ ...h, book: selectedBook }));
-    }
-  }, [isOpen, selectedBook]);
-
-  useEffect(() => {
-    if (!isOpen) return undefined;
-
-    const onKeyDown = (e) => {
-      // F3 or Alt+F: Open Find Bill dialog
-      if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'f')) {
-        e.preventDefault();
-        e.stopPropagation();
-        handleOpenFindModal();
-        return;
-      }
-
-      const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus';
-      const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal';
-      if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && mode === 'View' && !readOnly && !showFindModal) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!bookPurchases.length) return;
-        const currentIdx = bookPurchases.findIndex((p) => (p._id || p.id) === selectedPurchaseId);
-        let nextIdx = currentIdx + (prevKey ? -1 : 1);
-        if (currentIdx === -1) nextIdx = prevKey ? bookPurchases.length - 1 : 0;
-        if (nextIdx >= 0 && nextIdx < bookPurchases.length) {
-          loadPurchaseData(bookPurchases[nextIdx]);
-          setMode('View');
-          toast.info(`Bill #${bookPurchases[nextIdx].vNo || bookPurchases[nextIdx].invoiceNo} (${nextIdx + 1}/${bookPurchases.length})`);
-        }
-        return;
-      }
-
-      // Enter on a saved bill starts a new one, cursor on Bill No.
-      // Enter with focus outside the form also lands on Bill No.
-      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !showFindModal) {
-        if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette]')) return;
-        const own = modalContainerRef.current?.closest('.erp-bill-window-shell') || modalContainerRef.current;
-        const inOwn = own && e.target instanceof Node && own.contains(e.target);
-        if (!inOwn && e.target instanceof Element && e.target.closest('[data-erp-dialog], [data-form-enter-nav], .classic-erp-window')) return;
-        const el = e.target;
-        const inField = el && (
-          el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
-          || el.closest?.('[data-erp-combobox]')
-        );
-        if (mode === 'View' && !readOnly) {
-          e.preventDefault();
-          e.stopPropagation();
-          handleNewRef.current?.();
-          return;
-        }
-        if (mode === 'Add' && !inField && !readOnly) {
-          e.preventDefault();
-          e.stopPropagation();
-          focusPurchaseBillNo();
-          return;
-        }
-      }
-
-      // Alt+N: New Bill
-      if (e.altKey && e.key.toLowerCase() === 'n') {
-        e.preventDefault();
-        handleNew();
-        return;
-      }
-
-      // Alt+E or F2: Edit Bill
-      if ((e.altKey && e.key.toLowerCase() === 'e') || e.key === 'F2') {
-        if (selectedPurchaseId && mode === 'View') {
-          e.preventDefault();
-          setMode('Edit');
-          toast.info('Switched to Edit mode');
-        }
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown, true);
-    return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [isOpen, selectedPurchaseId, mode, showFindModal, bookPurchases]);
-
   const loadPurchaseData = (pur) => {
+    if (!pur) return;
     const purId = pur._id || pur.id || '';
     if (purId) setSelectedPurchaseId(purId);
     setBillAttachment(pur.billAttachment || null);
@@ -606,14 +479,14 @@ const PurchaseModal = ({
       party: pur.supplierId?._id || pur.supplierId || '',
       add: pur.narration || '',
       broker: pur.brokerId || '',
-      book: pur.bookId || 'PURCHASE BOOK',
+      book: pur.bookId || selectedBook || 'PURCHASE BOOK',
       gstin: pur.supplierId?.gstin || '',
       city: pur.station || '',
-      vNo: pur.invoiceNo || '',
-      billNo: pur.supplierInvoiceNo || '',
-      billDate: pur.date ? pur.date.split('T')[0] : today(),
+      vNo: pur.invoiceNo || pur.vNo || '',
+      billNo: pur.supplierInvoiceNo || pur.billNo || pur.invoiceNo || '',
+      billDate: pur.date ? String(pur.date).split('T')[0] : today(),
       challanNo: pur.challanNo || '',
-      chDate: pur.challanDate ? pur.challanDate.split('T')[0] : today(),
+      chDate: pur.challanDate ? String(pur.challanDate).split('T')[0] : today(),
       type: pur.invoiceType || (pur.gstType === 'IGST' ? 'INVOICE OUT OF STATE' : 'INVOICE IN STATE'),
       gstType: pur.gstType || 'CGST+SGST',
       reverseCharge: pur.reverseCharge || 'No',
@@ -664,6 +537,205 @@ const PurchaseModal = ({
       remarks: pur.narration || ''
     });
   };
+
+  const navigateToAdjacentBill = (dir) => {
+    if (!bookPurchases.length) {
+      toast.info('No purchase bills to navigate');
+      return;
+    }
+    const currentIdx = bookPurchases.findIndex((p) => String(p._id || p.id) === String(selectedPurchaseId));
+    if (currentIdx === -1) {
+      if (dir < 0) {
+        const lastBill = bookPurchases[bookPurchases.length - 1];
+        loadPurchaseData(lastBill);
+        setMode('View');
+        toast.info(`Bill #${lastBill.invoiceNo || lastBill.vNo || lastBill.supplierInvoiceNo || ''} (${bookPurchases.length}/${bookPurchases.length})`);
+      } else {
+        const firstBill = bookPurchases[0];
+        loadPurchaseData(firstBill);
+        setMode('View');
+        toast.info(`Bill #${firstBill.invoiceNo || firstBill.vNo || firstBill.supplierInvoiceNo || ''} (1/${bookPurchases.length})`);
+      }
+      return;
+    }
+
+    const nextIdx = currentIdx + dir;
+    if (nextIdx >= 0 && nextIdx < bookPurchases.length) {
+      const nextBill = bookPurchases[nextIdx];
+      loadPurchaseData(nextBill);
+      setMode('View');
+      toast.info(`Bill #${nextBill.invoiceNo || nextBill.vNo || nextBill.supplierInvoiceNo || ''} (${nextIdx + 1}/${bookPurchases.length})`);
+    } else if (nextIdx >= bookPurchases.length && dir > 0) {
+      handleNew();
+      toast.info('New Purchase Bill (Add mode)');
+    } else if (nextIdx < 0) {
+      toast.info(`First bill reached (1/${bookPurchases.length})`);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      openedOnceRef.current = false;
+      setSaveNextActions(null);
+      setPrintInvoiceId(null);
+      setBootLoading(false);
+      return;
+    }
+
+    const incomingId = String(initialData?._id || initialData?.id || '');
+    if (!openedOnceRef.current) {
+      openedOnceRef.current = incomingId || 'open';
+      setSaveNextActions(null);
+      setPrintInvoiceId(null);
+      setBillAttachment(null);
+      if (initialData && Array.isArray(initialData.items)) {
+        loadPurchaseData(initialData);
+        setSelectedPurchaseId(incomingId);
+        setMode('View');
+      } else if (readOnly) {
+        setMode('View');
+      } else if (bookPurchases.length > 0) {
+        const last = bookPurchases[bookPurchases.length - 1];
+        loadPurchaseData(last);
+        setMode('View');
+      } else {
+        setSelectedPurchaseId('');
+        setMode('View');
+      }
+    } else if (incomingId && openedOnceRef.current !== incomingId && Array.isArray(initialData?.items)) {
+      openedOnceRef.current = incomingId;
+      loadPurchaseData(initialData);
+      setSelectedPurchaseId(incomingId);
+      setMode('View');
+    }
+
+    let cancelled = false;
+    const state = useStore.getState();
+    const needParties = !(state.parties && state.parties.length);
+    const needItems = !(state.items && state.items.length);
+    const blocking = [];
+    if (needParties) blocking.push(fetchParties());
+    if (needItems) blocking.push(fetchItems());
+
+    if (blocking.length) {
+      setBootLoading(true);
+      Promise.all(blocking)
+        .catch(() => { })
+        .finally(() => {
+          if (!cancelled) setBootLoading(false);
+        });
+    } else {
+      setBootLoading(false);
+    }
+    warehousesApi.list().then((list) => setWarehouses(Array.isArray(list) ? list : [])).catch(() => setWarehouses([]));
+
+    // Always fetch latest purchases on modal open
+    fetchPurchases().catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, readOnly, selectedBook, fetchParties, fetchItems, fetchPurchases]);
+
+  // When purchases load into store (e.g. from background fetch) and no bill is selected yet:
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    if (initialData || readOnly || mode === 'Edit' || selectedPurchaseId) return undefined;
+    if (!bookPurchases.length) return undefined;
+    const last = bookPurchases[bookPurchases.length - 1];
+    loadPurchaseData(last);
+    setMode('View');
+    return undefined;
+  }, [isOpen, bookPurchases, initialData, readOnly, mode, selectedPurchaseId]);
+
+  useEffect(() => {
+    if (isOpen && selectedBook) {
+      setHeader((h) => ({ ...h, book: selectedBook }));
+    }
+  }, [isOpen, selectedBook]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const onKeyDown = (e) => {
+      // F3 or Alt+F: Open Find Bill dialog
+      if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'f')) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleOpenFindModal();
+        return;
+      }
+
+      const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
+      const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
+      if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && !showFindModal) {
+        if (mode === 'View') {
+          e.preventDefault();
+          e.stopPropagation();
+          navigateToAdjacentBill(prevKey ? -1 : 1);
+          return;
+        }
+
+        const isPageNav = e.key === 'PageUp' || e.key === 'PageDown';
+        const el = e.target;
+        const inTextInput = el && (
+          (el.tagName === 'INPUT' && !['button', 'submit', 'checkbox', 'radio'].includes(el.type)) ||
+          el.tagName === 'TEXTAREA'
+        );
+
+        if (isPageNav || !inTextInput || (mode === 'Add' && prevKey && !gridItems.some(i => i.itemId))) {
+          e.preventDefault();
+          e.stopPropagation();
+          navigateToAdjacentBill(prevKey ? -1 : 1);
+          return;
+        }
+      }
+
+      // Enter on a saved bill starts a new one, cursor on Bill No.
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !showFindModal) {
+        if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette]')) return;
+        const own = modalContainerRef.current?.closest('.erp-bill-window-shell') || modalContainerRef.current;
+        const inOwn = own && e.target instanceof Node && own.contains(e.target);
+        if (!inOwn && e.target instanceof Element && e.target.closest('[data-erp-dialog], [data-form-enter-nav], .classic-erp-window')) return;
+        const el = e.target;
+        const inField = el && (
+          el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
+          || el.closest?.('[data-erp-combobox]')
+        );
+        if (mode === 'View' && !readOnly) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleNewRef.current?.();
+          return;
+        }
+        if (mode === 'Add' && !inField && !readOnly) {
+          e.preventDefault();
+          e.stopPropagation();
+          focusPurchaseBillNo();
+          return;
+        }
+      }
+
+      // Alt+N: New Bill
+      if (e.altKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        handleNew();
+        return;
+      }
+
+      // Alt+E or F2: Edit Bill
+      if ((e.altKey && e.key.toLowerCase() === 'e') || e.key === 'F2') {
+        if (selectedPurchaseId && mode === 'View') {
+          e.preventDefault();
+          setMode('Edit');
+          toast.info('Switched to Edit mode');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [isOpen, selectedPurchaseId, mode, showFindModal, bookPurchases, readOnly, gridItems]);
 
   const handleSelectPurchase = (e) => {
     const id = e.target.value;
@@ -1170,8 +1242,10 @@ const PurchaseModal = ({
 
   const handleCancel = () => {
     if (selectedPurchaseId) {
-      const pur = purchases.find(p => p._id === selectedPurchaseId || p.id === selectedPurchaseId);
+      const pur = purchases.find(p => String(p._id || p.id) === String(selectedPurchaseId));
       if (pur) loadPurchaseData(pur);
+    } else if (bookPurchases.length) {
+      loadPurchaseData(bookPurchases[bookPurchases.length - 1]);
     }
     setMode('View');
   };
@@ -1369,12 +1443,30 @@ const PurchaseModal = ({
               {mode === 'View' && (
                 <div className="classic-erp-frame flex gap-2 items-center shrink-0">
                   <span className="classic-erp-label blue-label font-bold">Find Purchase:</span>
+                  <button
+                    type="button"
+                    className="px-2.5 py-0.5 text-xs font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 rounded cursor-pointer border border-slate-400 transition-colors shrink-0"
+                    onClick={() => navigateToAdjacentBill(-1)}
+                    title="Previous Bill (- or PageUp)"
+                  >
+                    ◀ Prev (-)
+                  </button>
                   <select className="classic-erp-input flex-1" value={selectedPurchaseId} onChange={handleSelectPurchase}>
-                    <option value="">- Select Purchase to View/Edit -</option>
-                    {purchases.map(p => (
-                      <option key={p._id || p.id} value={p._id || p.id}>Voucher #{p.invoiceNo} - {p.supplierId?.name} (₹{p.netAmount?.toFixed(2)})</option>
+                    <option value="">- Select Purchase to View/Edit ({bookPurchases.length} bills) -</option>
+                    {bookPurchases.map(p => (
+                      <option key={p._id || p.id} value={p._id || p.id}>
+                        Voucher #{p.invoiceNo || p.vNo || p.supplierInvoiceNo || ''} - {p.supplierId?.name || p.supplierName || 'Party'} (₹{Number(p.netAmount || 0).toFixed(2)})
+                      </option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    className="px-2.5 py-0.5 text-xs font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 rounded cursor-pointer border border-slate-400 transition-colors shrink-0"
+                    onClick={() => navigateToAdjacentBill(1)}
+                    title="Next Bill (+ or PageDown)"
+                  >
+                    Next (+) ▶
+                  </button>
                 </div>
               )}
 
@@ -1839,7 +1931,7 @@ const PurchaseModal = ({
 
           {/* Action bar — outside scroll/window so New/Save never clip */}
           <div className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]">
-            <ErpKeyboardHintBar items={FORM_KEYBOARD_HINTS} dense className="mr-auto min-w-0 flex-1 max-w-full sm:max-w-[55%]" />
+            <ErpKeyboardHintBar items={PURCHASE_KEYBOARD_HINTS} dense className="mr-auto min-w-0 flex-1 max-w-full sm:max-w-[55%]" />
             <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving} title="New Bill (Alt+N)">New</button>
             <button className="classic-erp-btn btn-blue" type="button" data-enter-save onClick={handleSave} disabled={locked || saving || bootLoading}>
               <SaveButtonLabel saving={saving} />

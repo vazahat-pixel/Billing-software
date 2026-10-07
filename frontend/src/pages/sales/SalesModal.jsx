@@ -26,6 +26,11 @@ import PcsBreakdownModal from './PcsBreakdownModal';
 import { peekBillNo } from '../../utils/nextBillNo';
 import LrEntryModal from './LrEntryModal';
 
+const SALES_KEYBOARD_HINTS = [
+  { keys: '- / +', label: 'Prev/Next' },
+  ...FORM_KEYBOARD_HINTS
+];
+
 const today = () => new Date().toISOString().split('T')[0];
 const DEFAULT_UNITS = ['PCS', 'KGS', 'NETQTY', 'QTY'];
 
@@ -887,8 +892,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         handleOpenFindModal();
         return;
       }
-      const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus';
-      const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal';
+      const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
+      const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
       if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && mode === 'View' && !readOnly) {
         e.preventDefault();
         e.stopPropagation();
@@ -1362,12 +1367,28 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           {mode === 'View' && (
             <div className="classic-erp-frame flex gap-2 items-center shrink-0">
               <span className="classic-erp-label blue-label font-bold">Find Invoice:</span>
+              <button
+                type="button"
+                className="px-2.5 py-0.5 text-xs font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 rounded cursor-pointer border border-slate-400 transition-colors shrink-0"
+                onClick={() => navigateToAdjacentBill(-1)}
+                title="Previous Bill (- or PageUp)"
+              >
+                ◀ Prev (-)
+              </button>
               <select className="classic-erp-input flex-1" value={selectedInvoiceId} onChange={handleSelectInvoice}>
-                <option value="">- Select Invoice to View/Edit -</option>
-                {sales.map(s => (
-                  <option key={s._id || s.id} value={s._id || s.id}>Invoice #{s.invoiceNo} - {s.customerId?.name} (₹{s.netAmount?.toFixed(2)})</option>
+                <option value="">- Select Invoice to View/Edit ({bookSales.length} bills) -</option>
+                {bookSales.map(s => (
+                  <option key={s._id || s.id} value={s._id || s.id}>Invoice #{s.invoiceNo} - {s.customerId?.name || 'Party'} (₹{Number(s.netAmount || 0).toFixed(2)})</option>
                 ))}
               </select>
+              <button
+                type="button"
+                className="px-2.5 py-0.5 text-xs font-bold bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-100 rounded cursor-pointer border border-slate-400 transition-colors shrink-0"
+                onClick={() => navigateToAdjacentBill(1)}
+                title="Next Bill (+ or PageDown)"
+              >
+                Next (+) ▶
+              </button>
             </div>
           )}
 
@@ -2049,7 +2070,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
         {/* Action bar — outside window so New/Save never clip */}
         <div className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]">
-          <ErpKeyboardHintBar items={FORM_KEYBOARD_HINTS} dense className="mr-auto min-w-0 flex-1 max-w-full sm:max-w-[55%]" />
+          <ErpKeyboardHintBar items={SALES_KEYBOARD_HINTS} dense className="mr-auto min-w-0 flex-1 max-w-full sm:max-w-[55%]" />
           <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving} title="New Bill (Alt+N)">New</button>
           <button className="classic-erp-btn btn-blue" type="button" data-enter-save onClick={handleSave} disabled={locked || saving || bootLoading}>
             <SaveButtonLabel saving={saving} />

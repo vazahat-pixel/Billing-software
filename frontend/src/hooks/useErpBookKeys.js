@@ -34,8 +34,8 @@ export default function useErpBookKeys({
         refs.current.onFind?.();
         return;
       }
-      const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus';
-      const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal';
+      const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
+      const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
       if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && mode === 'View' && !readOnly) {
         if (isTypingTarget(e.target) && (e.target?.type === 'number' || e.target?.type === 'text')) {
           if (String(e.target.value || '').length && document.activeElement === e.target) {
