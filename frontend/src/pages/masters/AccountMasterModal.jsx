@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
 import { ERPSelect } from '../../components/forms/FormElements';
@@ -6,6 +6,7 @@ import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import DataImportModal from '../../components/import/DataImportModal';
+import { GST_STATE_CODES } from '../../utils/gstStateCodes';
 
 const EMPTY_ACCOUNT = {
   name: '',
@@ -65,6 +66,21 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   const [showImport, setShowImport] = useState(false);
   
   const [formData, setFormData] = useState({ ...EMPTY_ACCOUNT });
+  const nameInputRef = useRef(null);
+  const stateRef = useRef(null);
+  const gstinRef = useRef(null);
+  const saveBtnRef = useRef(null);
+
+  // Auto-focus Party Name when opened in Add mode
+  useEffect(() => {
+    if (isOpen && mode === 'Add') {
+      const t = setTimeout(() => {
+        nameInputRef.current?.focus();
+        try { nameInputRef.current?.select(); } catch {}
+      }, 70);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen, mode]);
 
   // Fetch once per open — NOT keyed on `initialData` (an object). fetchParties() always
   // returns a fresh array/object references even when the data is unchanged, so keying
@@ -203,7 +219,11 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       
       if (onSuccess) onSuccess(result);
       fetchParties();
-      setMode('View');
+      if (onSuccess || mode === 'Add') {
+        onClose?.();
+      } else {
+        setMode('View');
+      }
     } catch (err) {
       notifyError(err, 'Failed to save account');
     } finally {
@@ -318,7 +338,16 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
               <div className="classic-erp-frame">
                 <div className="classic-erp-field-row">
                   <span className="classic-erp-label red-label classic-erp-label--fixed">Account</span>
-                  <input type="text" className="classic-erp-input flex-1" value={formData.name} onChange={setField('name')} disabled={locked} placeholder="Party / account name" />
+                  <input
+                    ref={nameInputRef}
+                    type="text"
+                    className="classic-erp-input flex-1 font-bold"
+                    value={formData.name}
+                    onChange={setField('name')}
+                    disabled={locked}
+                    placeholder="Party / account name"
+                    autoFocus={mode === 'Add'}
+                  />
                   <span className="classic-erp-label classic-erp-label--fixed-sm">Accd</span>
                   <input type="text" className="classic-erp-input w-20" value={formData.accd || ''} readOnly placeholder="Auto" />
                 </div>
@@ -367,9 +396,35 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
 
                   <div className="classic-erp-field-row">
                     <span className="classic-erp-label classic-erp-label--fixed-sm">City</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.city} onChange={setField('city')} disabled={locked} />
+                    <input
+                      type="text"
+                      className="classic-erp-input flex-1"
+                      value={formData.city}
+                      onChange={setField('city')}
+                      disabled={locked}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          stateRef.current?.focus();
+                        }
+                      }}
+                    />
                     <span className="classic-erp-label classic-erp-label--fixed-sm">Pin</span>
-                    <input type="text" className="classic-erp-input w-24" value={formData.pincode} onChange={setField('pincode')} disabled={locked} />
+                    <input
+                      type="text"
+                      className="classic-erp-input w-24"
+                      value={formData.pincode}
+                      onChange={setField('pincode')}
+                      disabled={locked}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          stateRef.current?.focus();
+                        }
+                      }}
+                    />
                   </div>
 
                   <div className="classic-erp-field-row">
@@ -434,14 +489,59 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                   </div>
 
                   <div className="classic-erp-field-row">
-                    <span className="classic-erp-label red-label classic-erp-label--fixed">GSTIN</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.gstin} onChange={setField('gstin')} disabled={locked} maxLength={15} placeholder="15 char GSTIN" />
+                    <span className="classic-erp-label classic-erp-label--fixed-sm">State</span>
+                    <select
+                      ref={stateRef}
+                      className="classic-erp-select flex-1 font-bold"
+                      value={formData.stateCode || '24'}
+                      onChange={(e) => {
+                        const code = e.target.value;
+                        const name = GST_STATE_CODES[code] || `${code}-State`;
+                        const gstType = code === '24' ? 'INVOICE (IN STATE)' : 'INVOICE (OUT OF STATE)';
+                        setFormData(prev => ({
+                          ...prev,
+                          stateCode: code,
+                          stateName: `${code}-${name}`,
+                          gstType,
+                        }));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          gstinRef.current?.focus();
+                          try { gstinRef.current?.select?.(); } catch {}
+                        }
+                      }}
+                      disabled={locked}
+                    >
+                      {Object.entries(GST_STATE_CODES).map(([code, sName]) => (
+                        <option key={code} value={code}>
+                          {code} - {sName}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed-sm">State</span>
-                    <input type="text" className="classic-erp-input w-12" value={formData.stateCode} readOnly />
-                    <input type="text" className="classic-erp-input flex-1" value={formData.stateName} readOnly />
+                    <span className="classic-erp-label red-label classic-erp-label--fixed">GSTIN</span>
+                    <input
+                      ref={gstinRef}
+                      type="text"
+                      className="classic-erp-input flex-1 font-mono uppercase"
+                      value={formData.gstin}
+                      onChange={setField('gstin')}
+                      disabled={locked}
+                      maxLength={15}
+                      placeholder="15 char GSTIN (Optional)"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleSave();
+                        }
+                      }}
+                    />
                   </div>
 
                   <div className="classic-erp-field-row">
@@ -604,7 +704,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
         <div className="classic-erp-form-footer">
           <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving}>New</button>
           <button className="classic-erp-btn" type="button" onClick={handleEdit} disabled={readOnly || mode !== 'View' || saving}>Edit</button>
-          <button className="classic-erp-btn btn-blue" type="button" data-enter-save="true" onClick={handleSave} disabled={locked || saving || bootLoading}>
+          <button ref={saveBtnRef} className="classic-erp-btn btn-blue" type="button" data-enter-save="true" onClick={handleSave} disabled={locked || saving || bootLoading}>
             <SaveButtonLabel saving={saving} />
           </button>
           <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked || saving}>Cancel</button>
