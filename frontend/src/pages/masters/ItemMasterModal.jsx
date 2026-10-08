@@ -5,6 +5,7 @@ import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
 import useStore from '../../store/useStore';
 import DataImportModal from '../../components/import/DataImportModal';
+import { handleFormEnterKeyDown } from '../../utils/formEnterNavigation';
 
 const GST_OPTIONS = [
   { value: 'GST 5%', label: 'GST 5%', rate: 5 },
@@ -194,11 +195,13 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
       }
       if (onSuccess) {
         onSuccess({ ...response, id: response?._id, _id: response?._id });
+        onClose?.();
+      } else {
+        setEditId(null);
+        setFormData(emptyForm());
+        fetchItems();
+        setActiveTab('View');
       }
-      setEditId(null);
-      setFormData(emptyForm());
-      fetchItems();
-      setActiveTab('View');
     } catch (err) {
       notifyError(err, 'Failed to save item');
     } finally {
@@ -306,7 +309,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
           </table>
         </div>
       ) : (
-        <div className="erp-modal-body max-h-[70vh] overflow-y-auto space-y-3">
+        <div className="erp-modal-body max-h-[70vh] overflow-y-auto space-y-3" onKeyDown={handleFormEnterKeyDown}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               {formData.imageUrl ? (
@@ -339,7 +342,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
           </div>
 
           <FormField label="Item Name">
-            <ERPInput value={formData.itemName} onChange={(e) => setField('itemName', e.target.value)} disabled={readOnly} />
+            <ERPInput autoFocus={activeTab === 'Add'} value={formData.itemName} onChange={(e) => setField('itemName', e.target.value)} disabled={readOnly} />
           </FormField>
 
           <div className="erp-grid erp-grid-2">

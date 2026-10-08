@@ -795,7 +795,10 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const handleAccountSuccess = (newAccount) => {
     fetchParties();
     const id = newAccount._id || newAccount.id;
-    if (inlineModal.target === 'broker') {
+    const target = inlineModal.target;
+    setInlineModal({ type: null, target: 'party', initialData: null, rowIndex: null });
+
+    if (target === 'broker') {
       setHeader(prev => ({ ...prev, broker: id }));
       focusAfterBroker();
       return;
@@ -809,11 +812,39 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const handleItemSuccess = async (newItem) => {
     fetchItems();
     const itemId = newItem._id || newItem.id;
-    const updatedGrid = [...gridItems];
-    updatedGrid[inlineModal.rowIndex] = {
-      ...updatedGrid[inlineModal.rowIndex], itemId: itemId, itemName: newItem.itemName, saleRate: newItem.salesRate
-    };
-    setGridItems(updatedGrid);
+    const rIdx = inlineModal.rowIndex;
+    setInlineModal({ type: null, target: 'party', initialData: null, rowIndex: null });
+    if (rIdx == null || rIdx < 0) return;
+
+    const itemUnit = String(newItem.unit || 'MTRS').toUpperCase();
+    if (itemUnit) {
+      setExtraUnits(prev => prev.includes(itemUnit) ? prev : [...prev, itemUnit]);
+    }
+
+    patchLine(rIdx, {
+      itemId: itemId,
+      itemName: newItem.itemName || newItem.name || '',
+      saleRate: Number(newItem.salesRate || 0),
+      gstPer: Number(newItem.gstRate ?? newItem.taxRate ?? 0),
+      unit: itemUnit,
+      cut: Number(newItem.cut || 0),
+    }, 'itemId');
+    setActiveItemId(itemId);
+
+    // Focus next input in row (Desc, Fold, Cut, Pcs, Qty, Rate)
+    setTimeout(() => {
+      const grid = modalContainerRef.current?.querySelector('.erp-sales-grid');
+      const trs = grid?.querySelectorAll('tbody tr');
+      const rowTr = trs?.[rIdx];
+      if (rowTr) {
+        const inputs = Array.from(rowTr.querySelectorAll('input:not([disabled]):not([readonly]), select:not([disabled])'));
+        const nextInput = inputs.find(el => !el.hasAttribute('data-erp-combobox-input') && !el.closest('[data-erp-combobox]'));
+        if (nextInput) {
+          nextInput.focus();
+          try { nextInput.select?.(); } catch {}
+        }
+      }
+    }, 120);
   };
 
   const handleNew = async () => {
@@ -1296,6 +1327,41 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       _amountManual: false,
     }, 'pcsDetails');
     setPcsBreakdown({ open: false, lineIdx: -1, calcType: 'Mts' });
+
+    // Focus next field in line item (Qty/Mts or Rate) so user continues smoothly
+    setTimeout(() => {
+      const grid = modalContainerRef.current?.querySelector('.erp-sales-grid');
+      const trs = grid?.querySelectorAll('tbody tr');
+      const targetRow = trs?.[idx];
+      const nextInput = targetRow?.querySelector('.col-qty input') || targetRow?.querySelector('.col-amt input');
+      nextInput?.focus();
+      try { nextInput?.select?.(); } catch {}
+    }, 60);
+  };
+
+  const focusRowItem = (rowIndex, attempt = 0) => {
+    const grid = modalContainerRef.current?.querySelector('.erp-sales-grid');
+    const trs = grid?.querySelectorAll('tbody tr');
+    const targetRow = trs?.[rowIndex];
+    if (!targetRow) {
+      if (attempt < 15) {
+        setTimeout(() => focusRowItem(rowIndex, attempt + 1), 35);
+      }
+      return;
+    }
+    const input = targetRow?.querySelector('[data-erp-combobox-input], input:not([disabled]):not([readonly])');
+    if (grid) grid.scrollLeft = 0;
+    input?.focus();
+    try { input?.select?.(); } catch { /* ignore */ }
+  };
+
+  const deleteRow = (idx) => {
+    if (locked) return;
+    const updated = gridItems.filter((_, i) => i !== idx);
+    const nextRows = updated.length ? updated : [blankLine()];
+    setGridItems(nextRows);
+    const targetIdx = Math.min(idx, nextRows.length - 1);
+    setTimeout(() => focusRowItem(targetIdx), 50);
   };
 
   const onGridItemSelect = (val, idx) => {
@@ -1555,7 +1621,17 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
               </thead>
               <tbody>
                 {gridItems.map((row, idx) => (
-                  <tr key={row.id || idx}>
+                  <tr
+                    key={row.id || idx}
+                    onKeyDown={(e) => {
+                      if (locked) return;
+                      if ((e.shiftKey && e.key === 'Delete') || (e.ctrlKey && e.key === 'Delete') || (e.altKey && (e.key === 'd' || e.key === 'D'))) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        deleteRow(idx);
+                      }
+                    }}
+                  >
                     <td className="col-sr text-center font-bold">{idx + 1}</td>
                     <td className="col-item" style={{position:'relative'}}>
                       <div style={{display:'flex',alignItems:'center',gap:2,minWidth:0}}>
@@ -1620,15 +1696,17 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                       <div className="flex items-center w-full relative">
                         <input
                           type="number"
-                          data-enter-action="true"
                           className="classic-erp-input w-full text-center border-0 font-bold"
                           value={row.pcs > 0 ? row.pcs : ''}
                           onChange={e => patchLine(idx, { pcs: Number(e.target.value) || 0, _mtsManual: false }, 'pcs')}
                           onKeyDown={(e) => {
-                            if (e.key === '#' || e.key === 'Enter') {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openPcsBreakdown(idx);
+                            if (!locked && (e.key === '0' || e.key === 'Numpad0')) {
+                              const isAllSelected = e.target.selectionStart === 0 && e.target.selectionEnd === String(e.target.value || '').length;
+                              if (!e.target.value || e.target.value === '0' || isAllSelected) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openPcsBreakdown(idx);
+                              }
                             }
                           }}
                           onDoubleClick={() => !locked && openPcsBreakdown(idx)}
@@ -1636,27 +1714,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                           min="0"
                           step="1"
                           placeholder="0"
-                          title="Press Enter or # to open Pcs/Kgs breakdown"
+                          title="Type pcs or press 0 to open Pcs/Qty breakdown"
                         />
-                        {!locked && (
-                          <button
-                            type="button"
-                            tabIndex={0}
-                            data-enter-action="true"
-                            onClick={() => openPcsBreakdown(idx)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openPcsBreakdown(idx);
-                              }
-                            }}
-                            title="Open detailed Kgs/Pcs breakdown (keyboard: Tab here, then Enter)"
-                            className="px-1 text-[10px] text-blue-600 hover:text-blue-800 font-bold shrink-0 border-l border-slate-200"
-                          >
-                            #
-                          </button>
-                        )}
                       </div>
                     </td>
                     <td className="col-qty">
@@ -1762,21 +1821,6 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                             focusPrevField(e.currentTarget);
                             return;
                           }
-                          const focusRowItem = (rowIndex, attempt = 0) => {
-                            const grid = modalContainerRef.current?.querySelector('.erp-sales-grid');
-                            const trs = grid?.querySelectorAll('tbody tr');
-                            const targetRow = trs?.[rowIndex];
-                            if (!targetRow) {
-                              if (attempt < 15) {
-                                setTimeout(() => focusRowItem(rowIndex, attempt + 1), 35);
-                              }
-                              return;
-                            }
-                            const input = targetRow?.querySelector('[data-erp-combobox-input], input:not([disabled]):not([readonly])');
-                            if (grid) grid.scrollLeft = 0;
-                            input?.focus();
-                            try { input?.select?.(); } catch { /* ignore */ }
-                          };
                           if (idx !== gridItems.length - 1) {
                             focusRowItem(idx + 1);
                             return;
@@ -1787,10 +1831,21 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                       />
                     </td>
                     <td className="col-del text-center">
-                      <button type="button" onClick={() => {
-                        const updated = gridItems.filter((_, i) => i !== idx);
-                        setGridItems(updated.length ? updated : [blankLine()]);
-                      }} className="text-red-700 hover:text-red-950 p-1" disabled={locked}>
+                      <button
+                        type="button"
+                        tabIndex={locked ? -1 : 0}
+                        title="Delete line (Delete / Space / Enter or Shift+Delete from any column)"
+                        onClick={() => deleteRow(idx)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            deleteRow(idx);
+                          }
+                        }}
+                        className="text-red-700 hover:text-red-950 hover:bg-red-100 focus:bg-red-200 focus:outline-none focus:ring-1 focus:ring-red-500 rounded p-1 transition-colors"
+                        disabled={locked}
+                      >
                         <Trash2 size={13} />
                       </button>
                     </td>

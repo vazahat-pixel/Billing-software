@@ -320,6 +320,15 @@ const PurchaseModal = ({
     }
   };
 
+  const deleteRow = (idx) => {
+    if (locked) return;
+    const updated = gridItems.filter((_, i) => i !== idx);
+    const nextRows = updated.length ? updated : [blankLine()];
+    setGridItems(nextRows);
+    const targetIdx = Math.min(idx, nextRows.length - 1);
+    setTimeout(() => focusRowItem(targetIdx), 50);
+  };
+
   const handleLineComplete = (idx, e) => {
     if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey || locked) return;
     if (e.shiftKey) return;
@@ -1645,7 +1654,17 @@ const PurchaseModal = ({
                   </thead>
                   <tbody>
                     {gridItems.map((row, idx) => (
-                      <tr key={row.id || idx}>
+                      <tr
+                        key={row.id || idx}
+                        onKeyDown={(e) => {
+                          if (locked) return;
+                          if ((e.shiftKey && e.key === 'Delete') || (e.ctrlKey && e.key === 'Delete') || (e.altKey && (e.key === 'd' || e.key === 'D'))) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            deleteRow(idx);
+                          }
+                        }}
+                      >
                         <td className="col-sr text-center font-bold">{idx + 1}</td>
                         <td className="col-item" style={{ position: 'relative' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
@@ -1699,15 +1718,17 @@ const PurchaseModal = ({
                           <div className="flex items-center w-full relative">
                             <input
                               type="number"
-                              data-enter-action="true"
                               className="classic-erp-input w-full text-center border-0 font-bold"
                               value={row.pcs > 0 ? row.pcs : ''}
                               onChange={e => patchLine(idx, { pcs: Number(e.target.value) || 0, _mtsManual: false }, 'pcs')}
                               onKeyDown={(e) => {
-                                if (e.key === '#' || e.key === 'Enter') {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  openPcsBreakdown(idx);
+                                if (!locked && (e.key === '0' || e.key === 'Numpad0')) {
+                                  const isAllSelected = e.target.selectionStart === 0 && e.target.selectionEnd === String(e.target.value || '').length;
+                                  if (!e.target.value || e.target.value === '0' || isAllSelected) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openPcsBreakdown(idx);
+                                  }
                                 }
                               }}
                               onDoubleClick={() => !locked && openPcsBreakdown(idx)}
@@ -1715,27 +1736,8 @@ const PurchaseModal = ({
                               min="0"
                               step="1"
                               placeholder="0"
-                              title="Press Enter or # to open Pcs/Kgs breakdown"
+                              title="Type pcs or press 0 to open Pcs/Qty breakdown"
                             />
-                            {!locked && (
-                              <button
-                                type="button"
-                                tabIndex={0}
-                                data-enter-action="true"
-                                onClick={() => openPcsBreakdown(idx)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openPcsBreakdown(idx);
-                                  }
-                                }}
-                                title="Open detailed Kgs/Pcs breakdown"
-                                className="px-1 text-[10px] text-blue-600 hover:text-blue-800 font-bold shrink-0 border-l border-slate-200"
-                              >
-                                #
-                              </button>
-                            )}
                           </div>
                         </td>
                         <td className="col-qty">
@@ -1807,10 +1809,21 @@ const PurchaseModal = ({
                           />
                         </td>
                         <td className="col-del text-center">
-                          <button type="button" onClick={() => {
-                            const updated = gridItems.filter((_, i) => i !== idx);
-                            setGridItems(updated.length ? updated : [blankLine()]);
-                          }} className="text-red-700 hover:text-red-950 p-1" disabled={locked}>
+                          <button
+                            type="button"
+                            tabIndex={locked ? -1 : 0}
+                            title="Delete line (Delete / Space / Enter or Shift+Delete from any column)"
+                            onClick={() => deleteRow(idx)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                deleteRow(idx);
+                              }
+                            }}
+                            className="text-red-700 hover:text-red-950 hover:bg-red-100 focus:bg-red-200 focus:outline-none focus:ring-1 focus:ring-red-500 rounded p-1 transition-colors"
+                            disabled={locked}
+                          >
                             <Trash2 size={13} />
                           </button>
                         </td>
@@ -1961,7 +1974,7 @@ const PurchaseModal = ({
               setTimeout(() => {
                 const table = modalContainerRef.current?.querySelector('.classic-erp-table');
                 const trs = table?.querySelectorAll('tbody tr');
-                const pcsInput = trs?.[lineIdx]?.querySelector('.col-num input[data-enter-action]');
+                const pcsInput = trs?.[lineIdx]?.querySelectorAll('.col-num input')?.[2] || trs?.[lineIdx]?.querySelector('.col-num input');
                 pcsInput?.focus();
               }, 60);
             }
