@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ERPSelect } from '../../components/forms/FormElements';
+import { focusNextField } from '../../utils/formEnterNavigation';
+import AccountMasterModal from '../masters/AccountMasterModal';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
@@ -76,9 +78,11 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const [saving, setSaving] = useState(false);
    const [bootLoading, setBootLoading] = useState(false);
    const [isEditMode, setIsEditMode] = useState(false);
+   const [activeReceiptKey, setActiveReceiptKey] = useState('');
 
    // Header (bill-level — shared across every line in this receipt)
    const [selectedJobPartyId, setSelectedJobPartyId] = useState('');
+   const [accountModal, setAccountModal] = useState(null);
    const [gstin, setGstin] = useState('');
    const [billGpNo, setBillGpNo] = useState('');
    const [reverseCharge, setReverseCharge] = useState('No');
@@ -87,6 +91,8 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const [totalProcessAmt] = useState('1164');
    const [serialNo, setSerialNo] = useState('1');
    const [receiveDate, setReceiveDate] = useState(today());
+   const [rConDt, setRConDt] = useState('');
+   const [bill2A, setBill2A] = useState('');
 
    // Multi-row grid — one row per challan being received into this bill
    const [lines, setLines] = useState([blankLine()]);
@@ -124,6 +130,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const [findSearchText, setFindSearchText] = useState('');
    const [findActiveIdx, setFindActiveIdx] = useState(0);
    const findInputRef = useRef(null);
+   const kbRef = useRef({ isEditMode: false });
 
    const sortedReceivedJobs = useMemo(() => {
       const list = (jobWorkEntries || []).filter(j => j.status === 'Received' || j.status === 'Partial');
@@ -134,6 +141,18 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          return new Date(a.receiveDate || a.updatedAt || 0) - new Date(b.receiveDate || b.updatedAt || 0);
       });
    }, [jobWorkEntries]);
+
+   const receiptBills = useMemo(() => {
+      const seen = new Set();
+      const bills = [];
+      for (const job of sortedReceivedJobs) {
+         const key = String(job.billGpNo || '').trim() || String(job._id || job.id || '');
+         if (!key || seen.has(key)) continue;
+         seen.add(key);
+         bills.push(job);
+      }
+      return bills;
+   }, [sortedReceivedJobs]);
 
    const filteredReceivedJobs = useMemo(() => {
       const q = findSearchText.trim().toLowerCase();
@@ -157,13 +176,18 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       }, 50);
    };
 
+   const receiptKeyOf = (job) => String(job?.billGpNo || '').trim() || String(job?._id || job?.id || '');
+
    const handleLoadReceivedJob = (job) => {
       if (!job) return;
+      setActiveReceiptKey(receiptKeyOf(job));
       const workerId = job.workerId?._id || job.workerId || '';
       setSelectedJobPartyId(workerId);
       const workerParty = (parties || []).find(p => String(p._id || p.id) === String(workerId));
       setGstin(job.workerId?.gstin || workerParty?.gstin || '');
       setBillGpNo(job.billGpNo || '');
+      const loadedSerial = String(job.serialNo || job.billGpNo || '').replace(/\D/g, '');
+      if (loadedSerial) setSerialNo(loadedSerial);
       setReceiveDate(job.receiveDate ? String(job.receiveDate).slice(0, 10) : today());
       setBillType(job.billType || 'Process');
 
@@ -220,9 +244,28 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       setIgstPercent('0');
 
       setIsEditMode(true);
+      kbRef.current.isEditMode = true;
       setShowFindDialog(false);
       setActiveTab('Mill Receive');
-      notifySuccess(`Loaded Receipt #${job.billGpNo || job.jobCardNo} in Edit mode`);
+   };
+
+   const navigateReceipt = (dir) => {
+      const list = receiptBills;
+      if (!list.length) return;
+      if (dir === 'first') {
+         handleLoadReceivedJob(list[0]);
+         return;
+      }
+      if (dir === 'last') {
+         handleLoadReceivedJob(list[list.length - 1]);
+         return;
+      }
+      const currentIdx = list.findIndex((j) => receiptKeyOf(j) === activeReceiptKey);
+      let nextIdx = currentIdx + dir;
+      if (currentIdx === -1) nextIdx = dir > 0 ? 0 : list.length - 1;
+      if (nextIdx >= 0 && nextIdx < list.length && nextIdx !== currentIdx) {
+         handleLoadReceivedJob(list[nextIdx]);
+      }
    };
 
    const handleFindKeyDown = (e) => {
@@ -290,6 +333,12 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          });
       const latest = list[list.length - 1];
       if (latest) handleLoadReceivedJob(latest);
+      else {
+         setIsEditMode(false);
+         kbRef.current.isEditMode = false;
+         setSerialNo('1');
+      }
+      focusSerialNo();
 
       // 2. Background refresh
       const backgroundTasks = [];
@@ -328,43 +377,41 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       if (!isOpen) return undefined;
 
       const onKeyDown = (e) => {
+         const kb = kbRef.current;
+         if (kb.showFindDialog || kb.showLotDropdown) return;
+         if (e.target instanceof Element && e.target.closest('[data-erp-dialog], [data-book-selection-modal]')) return;
+
          if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'f')) {
             e.preventDefault();
             e.stopPropagation();
-            handleOpenFindModal();
+            kb.openFind?.();
             return;
          }
 
-         const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus';
-         const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal';
-         if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && isEditMode && !showFindDialog) {
+         const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
+         const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
+         if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && kb.isEditMode) {
             e.preventDefault();
             e.stopPropagation();
-            const list = sortedReceivedJobs || [];
-            if (!list.length) return;
-            const currentNo = String(billGpNo || '');
-            const currentIdx = list.findIndex((j) => String(j.billGpNo || '') === currentNo);
-            let nextIdx = currentIdx + (prevKey ? -1 : 1);
-            if (currentIdx === -1) nextIdx = prevKey ? list.length - 1 : 0;
-            if (nextIdx >= 0 && nextIdx < list.length) handleLoadReceivedJob(list[nextIdx]);
+            kb.navigate?.(prevKey ? -1 : 1);
             return;
          }
-         if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !showFindDialog && isEditMode) {
-            if (e.target?.closest?.('[data-find-modal], [data-book-selection-modal], [data-command-palette]')) return;
+         if (e.altKey && e.key.toLowerCase() === 'l') {
             e.preventDefault();
-            e.stopImmediatePropagation();
-            handleNew();
+            e.stopPropagation();
+            kb.openLot?.(0);
             return;
          }
          if (e.altKey && e.key.toLowerCase() === 'n') {
             e.preventDefault();
-            handleNew();
+            e.stopImmediatePropagation();
+            kb.handleNew?.();
          }
       };
 
       window.addEventListener('keydown', onKeyDown, true);
       return () => window.removeEventListener('keydown', onKeyDown, true);
-   }, [isOpen, sortedReceivedJobs, showFindDialog]);
+   }, [isOpen]);
 
    // Auto-sync GST from Item Master whenever a challan/item is loaded in the grid
    useEffect(() => {
@@ -418,6 +465,30 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          label: name
       }));
    }, [pendingJobs, parties]);
+
+   const selectedParty = useMemo(
+      () => (parties || []).find((p) => String(p._id || p.id) === String(selectedJobPartyId)) || null,
+      [parties, selectedJobPartyId]
+   );
+   const partyAddress = [selectedParty?.address, selectedParty?.address2, selectedParty?.city].filter(Boolean).join(', ');
+
+   const openNewParty = (search = '') => {
+      setAccountModal({ name: search || '', group: 'JOB WORKER' });
+   };
+
+   const handleAccountSuccess = (newAccount) => {
+      const id = newAccount?._id || newAccount?.id || '';
+      if (id) {
+         setSelectedJobPartyId(id);
+         setGstin(newAccount?.gstin || '');
+         setLines([blankLine()]);
+      }
+      setAccountModal(null);
+      setTimeout(() => {
+         const el = document.getElementById('mill-rec-party');
+         if (el) focusNextField(el);
+      }, 120);
+   };
 
    const partyPendingJobs = useMemo(() => {
       if (!selectedJobPartyId) return [];
@@ -530,12 +601,6 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       return String(Math.max(maxNo, receivedCount) + 1);
    }, [jobWorkEntries]);
 
-   useEffect(() => {
-      if (!isEditMode && isOpen) {
-         setSerialNo(getNextSerialNo());
-      }
-   }, [isOpen, isEditMode, getNextSerialNo]);
-
    const addLine = () => setLines(prev => [...prev, { ...blankLine(), srNo: prev.length + 1 }]);
 
    const removeLine = async (idx) => {
@@ -602,7 +667,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       setCgstPercent(rawGst > 0 ? (rawGst / 2).toString() : '2.5');
       setIgstPercent('0');
 
-      const focusFieldId = options.focusField || `grid-finish-mts-${idx}`;
+      const focusFieldId = options.focusField || `grid-gpcs-${idx}`;
       setTimeout(() => {
          const el = document.getElementById(focusFieldId);
          if (el) {
@@ -857,22 +922,39 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       setFoundRecords([]);
    };
 
+   const focusSerialNo = () => {
+      setTimeout(() => {
+         const el = document.getElementById('mill-rec-serial');
+         if (!el || el.disabled) return;
+         el.focus();
+         try { el.select(); } catch { /* ignore */ }
+      }, 80);
+   };
+
    const handleNew = () => {
+      kbRef.current.isEditMode = false;
       setLines([blankLine()]);
       setSelectedJobPartyId('');
       setGstin('');
       setBillGpNo('');
+      setRConDt('');
+      setBill2A('');
       setReceiveDate(today());
       setRemark('');
       setIsEditMode(false);
-      setSerialNo(getNextSerialNo());
-      notifySuccess('Cleared for new Mill Receive entry');
-      setTimeout(() => {
-        const el = document.querySelector('[data-erp-start="challan"]');
-        if (!el || el.disabled) return;
-        el.focus();
-        try { el.select(); } catch { /* ignore */ }
-      }, 80);
+      setActiveReceiptKey('');
+      setSerialNo('1');
+      focusSerialNo();
+   };
+
+   kbRef.current = {
+      isEditMode,
+      showFindDialog,
+      showLotDropdown,
+      openFind: handleOpenFindModal,
+      openLot: openLotLookup,
+      navigate: navigateReceipt,
+      handleNew,
    };
 
    const handleLoadRecord = (record) => {
@@ -974,7 +1056,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          bare
       >
          {({ WindowControls }) => (
-            <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 overflow-hidden !max-h-none bg-[#cbd5e1]" data-enter-skip={isEditMode ? 'true' : undefined}>
+            <div className="classic-erp-window erp-density mill-rec-sheet flex flex-col h-full min-h-0 overflow-hidden !max-h-none bg-[#d4d0c8]">
                <ErpBusyOverlay show={bootLoading} message="Loading mill receive…" />
                <ErpBusyOverlay show={!bootLoading && saving} message="Saving receive…" />
 
@@ -1014,117 +1096,148 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                         {/* SCROLLABLE FORM CONTENT */}
                         <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5">
 
-                        {/* 1. TOP HEADER GRID FORM */}
-                        <div className="border border-[#808080] p-2 bg-[#d4d0c8] shadow-[inset_1px_1px_0px_#fff]">
-                           <div className="grid grid-cols-12 gap-x-2 gap-y-1.5 text-[11px]">
+                        {/* Header — same fields and places as the classic Mill Receipt */}
+                        <div className="mill-rec-head">
+                           <span className="mill-rec-lab" style={{ gridArea: 'plab' }}>Job Party</span>
+                           <div style={{ gridArea: 'party', display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                              <ERPSelect
+                                 id="mill-rec-party"
+                                 className="classic-erp-select mill-rec-in flex-1 min-w-0 bg-white"
+                                 data-enter-order="3"
+                                 value={selectedJobPartyId}
+                                 onChange={(e) => {
+                                    const id = e.target.value;
+                                    setSelectedJobPartyId(id);
+                                    const party = (parties || []).find((p) => String(p._id || p.id) === String(id));
+                                    setGstin(party?.gstin || '');
+                                    setLines([blankLine()]);
+                                 }}
+                                 options={jobPartyOptions}
+                                 placeholder=""
+                                 recentKey="mill-receive-party"
+                                 onCreateNew={(q) => openNewParty(q)}
+                                 createLabel="Party"
+                              />
+                              <button
+                                 type="button"
+                                 title="Add new party"
+                                 onClick={() => openNewParty('')}
+                                 style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 2, height: 20, padding: '0 6px', fontSize: 10, fontWeight: 700, color: '#fff', background: '#16a34a', border: 'none', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                              >
+                                 <Plus size={10} /> Add
+                              </button>
+                           </div>
+                           <span className="mill-rec-lab" style={{ gridArea: 'gstlab' }}>GSTIN:-</span>
+                           <input style={{ gridArea: 'gstin' }} type="text" className="classic-erp-input mill-rec-in bg-white font-mono" value={gstin} readOnly tabIndex={-1} />
+                           <span className="mill-rec-lab text-right" style={{ gridArea: 'totlab' }}>Total Process Amt(Party)</span>
+                           <input style={{ gridArea: 'tot' }} type="text" className="classic-erp-input mill-rec-in text-right bg-white font-bold" value={totalProcessAmt} readOnly tabIndex={-1} />
+                           <span className="mill-rec-lab" style={{ gridArea: 'serlab' }}>Serial No</span>
+                           <input
+                              id="mill-rec-serial"
+                              data-autofocus="true"
+                              data-enter-order="1"
+                              data-enter-nav="off"
+                              style={{ gridArea: 'serial' }}
+                              type="text"
+                              className="classic-erp-input mill-rec-in text-center bg-white font-bold"
+                              value={serialNo || '1'}
+                              onChange={(e) => setSerialNo(e.target.value)}
+                              title="Sr No — Enter goes to Date, then Job Party"
+                              onKeyDown={(e) => {
+                                 if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
+                                 e.preventDefault();
+                                 e.stopPropagation();
+                                 const next = document.getElementById('mill-rec-date');
+                                 next?.focus();
+                              }}
+                           />
 
-                              {/* Row 1 */}
-                              <div className="col-span-5 flex items-center gap-1">
-                                 <span className="w-20 text-slate-800 font-semibold text-right">Job Party:</span>
-                                 <ERPSelect
-                                    className="classic-erp-select flex-1 bg-white"
-                                    value={selectedJobPartyId}
-                                    onChange={(e) => {
-                                       setSelectedJobPartyId(e.target.value);
-                                       setLines([blankLine()]); // switching party invalidates picked challans
-                                    }}
-                                    options={jobPartyOptions}
-                                    placeholder="- Select Job Party -"
-                                    recentKey="mill-receive-party"
-                                 />
-                              </div>
-                              <div className="col-span-2 flex items-center gap-1">
-                                 <span className="text-slate-800 font-semibold">GSTIN:-</span>
-                                 <input
-                                    type="text"
-                                    className="classic-erp-input flex-1 bg-slate-100 font-mono text-[10px]"
-                                    value={gstin}
-                                    onChange={(e) => setGstin(e.target.value)}
-                                    placeholder=""
-                                    disabled
-                                 />
-                              </div>
-                              <div className="col-span-2 flex items-center gap-1">
-                                 <span className="text-[10px] text-slate-800 font-semibold leading-tight text-right w-24">Total Process Amt(Party):</span>
-                                 <input
-                                    type="text"
-                                    className="classic-erp-input w-20 text-right bg-slate-100 font-bold"
-                                    value={totalProcessAmt}
-                                    disabled
-                                 />
-                              </div>
-                              <div className="col-span-1 flex items-center gap-1">
-                                 <span className="text-slate-800 font-semibold">SrNo:</span>
-                                 <input
-                                    type="text"
-                                    className="classic-erp-input w-12 text-center bg-white font-bold"
-                                    value={serialNo || '1'}
-                                    onChange={(e) => setSerialNo(e.target.value)}
-                                    title="SrNo (Auto-increments starting from 1)"
-                                 />
-                              </div>
-                              <div className="col-span-2 flex items-center gap-1">
-                                 <span className="text-slate-800 font-semibold">Date:</span>
-                                 <input
-                                    type="date"
-                                    className="classic-erp-input flex-1 bg-white font-mono"
-                                    value={receiveDate}
-                                    onChange={(e) => setReceiveDate(e.target.value)}
-                                 />
-                              </div>
+                           <div className="mill-rec-addr" style={{ gridArea: 'addr' }}>{partyAddress}</div>
+                           <span className="mill-rec-lab" style={{ gridArea: 'rlab' }}>R.ConDt</span>
+                           <input
+                              data-enter-order="4"
+                              style={{ gridArea: 'rcon' }}
+                              type="text"
+                              className="classic-erp-input mill-rec-in bg-white text-center"
+                              value={rConDt}
+                              onChange={(e) => setRConDt(e.target.value)}
+                              placeholder="/  /"
+                           />
+                           <span className="mill-rec-lab" style={{ gridArea: 'datelab' }}>Date</span>
+                           <input
+                              id="mill-rec-date"
+                              data-enter-order="2"
+                              data-enter-nav="off"
+                              style={{ gridArea: 'date' }}
+                              type="date"
+                              className="classic-erp-input mill-rec-in bg-white font-mono"
+                              value={receiveDate}
+                              onChange={(e) => setReceiveDate(e.target.value)}
+                              onKeyDown={(e) => {
+                                 if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
+                                 e.preventDefault();
+                                 e.stopPropagation();
+                                 document.getElementById('mill-rec-party')?.focus();
+                              }}
+                           />
 
-                              {/* Row 2 */}
-                              <div className="col-span-3 flex items-center gap-1">
-                                 <span className="w-20 text-slate-800 font-semibold text-right">Bill/Gp No:</span>
-                                 <input
-                                    type="text"
-                                    className="classic-erp-input flex-1 bg-white"
-                                    value={billGpNo}
-                                    data-erp-start="challan"
-                                    onChange={(e) => setBillGpNo(e.target.value)}
-                                 />
-                              </div>
-                              <div className="col-span-3 flex items-center px-1">
-                                 <span className="text-red-700 font-bold italic text-[9px]">Click ChlnNo cell (or Alt+L) to pick a challan — Add Line for more</span>
-                              </div>
-                              <div className="col-span-2 flex items-center gap-1">
-                                 <span className="text-slate-800 font-semibold text-right w-24">Reverse Charge:</span>
-                                 <select
-                                    className="classic-erp-select flex-1 bg-white h-[30px] border border-slate-300"
-                                    value={reverseCharge}
-                                    onChange={(e) => setReverseCharge(e.target.value)}
-                                 >
-                                    <option value="No">No</option>
-                                    <option value="Yes">Yes</option>
-                                 </select>
-                              </div>
-                              <div className="col-span-2 flex items-center gap-1">
-                                 <span className="text-slate-800 font-semibold text-right w-16">HSN CD:</span>
-                                 <input
-                                    type="text"
-                                    className="classic-erp-input flex-1 bg-white"
-                                    value={hsnCd}
-                                    onChange={(e) => setHsnCd(e.target.value)}
-                                 />
-                              </div>
-                              <div className="col-span-2 flex items-center gap-1">
-                                 <span className="text-slate-800 font-semibold text-right w-12">TYPE:</span>
-                                 <select
-                                    className="classic-erp-select flex-1 bg-white h-[30px] border border-slate-300"
-                                    value={billType}
-                                    onChange={(e) => setBillType(e.target.value)}
-                                 >
-                                    <option value="Process">Process</option>
-                                    <option value="Other">Other</option>
-                                 </select>
-                              </div>
+                           <span className="mill-rec-lab" style={{ gridArea: 'blab' }}>Bill/Gp No</span>
+                           <input
+                              data-enter-order="5"
+                              style={{ gridArea: 'bill' }}
+                              type="text"
+                              className="classic-erp-input mill-rec-in bg-white"
+                              value={billGpNo}
+                              onChange={(e) => setBillGpNo(e.target.value)}
+                           />
+                           <div className="mill-rec-altl" style={{ gridArea: 'altl' }}>Press (ALT+L) To LotNo Entry</div>
+                           <span className="mill-rec-lab" style={{ gridArea: 'revlab' }}>Reverse Charge</span>
+                           <select
+                              data-enter-order="6"
+                              style={{ gridArea: 'rev' }}
+                              className="classic-erp-select mill-rec-in bg-white"
+                              value={reverseCharge}
+                              onChange={(e) => setReverseCharge(e.target.value)}
+                           >
+                              <option value="No">No</option>
+                              <option value="Yes">Yes</option>
+                           </select>
+                           <span className="mill-rec-lab" style={{ gridArea: 'b2lab' }}>2A BillNo</span>
+                           <input
+                              data-enter-order="7"
+                              style={{ gridArea: 'b2' }}
+                              type="text"
+                              className="classic-erp-input mill-rec-in bg-white"
+                              value={bill2A}
+                              onChange={(e) => setBill2A(e.target.value)}
+                           />
 
+                           <span className="mill-rec-lab" style={{ gridArea: 'hsnlab' }}>HSN CD</span>
+                           <input
+                              data-enter-order="8"
+                              style={{ gridArea: 'hsn' }}
+                              type="text"
+                              className="classic-erp-input mill-rec-in bg-white"
+                              value={hsnCd}
+                              onChange={(e) => setHsnCd(e.target.value)}
+                           />
+                           <div style={{ gridArea: 'type' }} className="flex items-center gap-1 min-w-0">
+                              <span className="mill-rec-lab shrink-0">TYPE</span>
+                              <select
+                                 data-enter-order="9"
+                                 className="classic-erp-select mill-rec-in bg-white flex-1 min-w-0"
+                                 value={billType}
+                                 onChange={(e) => setBillType(e.target.value)}
+                              >
+                                 <option value="Process">Process</option>
+                                 <option value="Other">Other</option>
+                              </select>
                            </div>
                         </div>
 
                         {/* 2. TRANSACTION GRID TABLE (multi-row — one line per challan) */}
                         <div className="mill-receive-scroll border border-[#808080] bg-white min-h-[100px] max-h-[180px]">
-                           <table className="mill-receive-grid w-full text-[10px] font-mono border-collapse">
+                           <table className="mill-receive-grid w-full text-[10px] font-mono border-collapse" data-line-grid>
                               <thead>
                                  <tr className="bg-[#e2e8f0] text-slate-800 border-b border-[#808080] text-[10px]">
                                     <th className="border-r border-[#808080] p-1 w-10 text-center">SrNo</th>
@@ -1180,27 +1293,36 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                           }
                                        }}
                                     >
-                                       <td
-                                          className="border-r border-slate-300 p-1 text-center bg-slate-100 font-bold select-none cursor-pointer"
-                                          tabIndex={0}
-                                          title="Click / focus to select line, press Delete to remove"
-                                          onKeyDown={(e) => {
-                                             if (e.key === 'Delete') {
-                                                e.preventDefault();
-                                                removeLine(idx);
-                                             }
-                                          }}
-                                       >
-                                          {idx + 1}
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             id={idx === 0 ? 'grid-srno-0' : undefined}
+                                             type="text"
+                                             data-enter-include=""
+                                             data-line-start
+                                             className="w-full h-6 px-1 border-none bg-slate-100 text-center font-bold"
+                                             value={idx + 1}
+                                             readOnly
+                                             title="SrNo — Enter moves to the next column"
+                                          />
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
+                                             id={`grid-lot-${idx}`}
                                              type="text"
-                                             className="w-full h-6 px-1 border-none bg-slate-100 text-slate-500 font-mono"
+                                             data-enter-include=""
+                                             data-enter-nav="off"
+                                             className="w-full h-6 px-1 border-none bg-slate-100 text-slate-500 font-mono cursor-pointer"
                                              value={line.lotNo}
                                              readOnly
-                                             disabled
-                                             placeholder="Auto-filled"
+                                             placeholder="Auto"
+                                             title="Enter opens Select Challan. Click or Alt+L also opens it"
+                                             onClick={() => openLotLookup(idx)}
+                                             onKeyDown={(e) => {
+                                                if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                openLotLookup(idx);
+                                             }}
                                           />
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
@@ -1211,30 +1333,22 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                              value={line.chlnNo}
                                              onChange={(e) => setLineField(idx, 'chlnNo', e.target.value)}
                                              onClick={() => openLotLookup(idx)}
-                                             onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                   if (!line.chlnNo || !line.jobId) {
-                                                      e.preventDefault();
-                                                      e.stopPropagation();
-                                                      openLotLookup(idx);
-                                                   } else {
-                                                      handleChlnNoEnter(e, idx);
-                                                   }
-                                                }
-                                             }}
                                              placeholder="Press Enter or Click..."
                                           />
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
+                                             id={`grid-item-${idx}`}
                                              type="text"
+                                             data-enter-include=""
                                              className="w-full h-6 px-1 border-none bg-slate-100 text-slate-700"
                                              value={line.itemName}
-                                             disabled
+                                             readOnly
                                           />
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
+                                             id={`grid-gpcs-${idx}`}
                                              type="number"
                                              className="w-full h-6 px-1 border-none text-right bg-transparent"
                                              value={line.gPcs}
@@ -1269,9 +1383,10 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
                                              type="text"
+                                             data-enter-include=""
                                              className="w-full h-6 px-1 border-none text-right bg-slate-100"
                                              value={lineShortagePct(line)}
-                                             disabled
+                                             readOnly
                                           />
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
@@ -1284,14 +1399,16 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
-                                             type="number"
+                                             type="text"
+                                             data-enter-include=""
                                              className="w-full h-6 px-1 border-none text-right bg-slate-100 font-bold"
                                              value={line.jobAmt}
-                                             disabled
+                                             readOnly
                                           />
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
+                                             id={`grid-cp-${idx}`}
                                              type="text"
                                              className="w-full h-6 px-1 border-none text-center bg-transparent"
                                              value={line.cp}
@@ -1369,8 +1486,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                           <button
                                              type="button"
                                              className="text-red-600 hover:text-red-800 disabled:opacity-30"
+                                             data-delete-line
                                              onClick={() => removeLine(idx)}
-                                             title="Remove line"
+                                             title="Delete this line (Delete key)"
                                           >
                                              <Trash2 size={12} />
                                           </button>
@@ -1385,6 +1503,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                            <button
                               type="button"
                               className="px-3 py-1 text-[10px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1] flex items-center gap-1"
+                              data-add-line
                               onClick={addLine}
                            >
                               <Plus size={11} /> Add Line
@@ -1401,7 +1520,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                         </div>
 
                         {/* 4. FOOTER MULTI-COLUMN ADJUSTMENTS */}
-                        <div className="grid grid-cols-12 gap-2 text-[11px] p-2 border border-[#808080] bg-[#d4d0c8]">
+                        <div className="mill-rec-foot grid grid-cols-12 gap-1 text-[11px] px-1 py-1 border border-[#808080] bg-[#d4d0c8]" data-enter-footer>
 
                            {/* Column 1: Adjustments */}
                            <div className="col-span-3 space-y-1.5 border-r border-[#a0a0a0] pr-2">
@@ -1497,7 +1616,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                            </div>
 
                            {/* Column 3: GST Details */}
-                           <div className="col-span-3 space-y-1.5 border-r border-[#a0a0a0] px-2">
+                           <div className="mill-rec-gstbox col-span-3 space-y-1 border-r border-[#a0a0a0] px-1">
                               <div className="flex items-center gap-1">
                                  <span className="w-20 text-slate-800 font-semibold text-right">TaxableAmt:</span>
                                  <input
@@ -1587,7 +1706,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                  <span className="w-24 text-slate-700 font-semibold text-right">Round Off:</span>
                                  <input
                                     type="text"
-                                    className="classic-erp-input flex-1 text-right bg-slate-100"
+                                    className="classic-erp-input flex-1 text-right mill-rec-round"
                                     value={computedRoundOff}
                                     disabled
                                  />
@@ -1627,66 +1746,63 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                         </div>
 
                         {/* 5. ACTION BUTTONS FOOTER BAR (PINNED AT BOTTOM) */}
-                         <div className="shrink-0 flex flex-col gap-1.5 p-2 border-t-2 border-[#808080] bg-[#d4d0c8] shadow-md z-10">
-
-                            {/* Row 1: Primary Toolbar */}
-                            <div className="flex justify-start gap-1.5 flex-wrap items-center">
-                               <button type="button" onClick={handleNew} className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]" title="New (Alt+N)">New</button>
-                               <button 
-                                  type="button" 
+                         <div className="mill-rec-actions shrink-0 z-10">
+                            <div className="mill-rec-action-row">
+                               <button
+                                  type="button"
+                                  onClick={handleNew}
+                                  className="mill-rec-btn mill-rec-btn-new"
+                                  title="New (Alt+N)"
+                               >
+                                  New
+                               </button>
+                               <button
+                                  type="button"
                                   onClick={() => {
                                      setActiveTab('View Mill Rec');
                                      notifySuccess('Select any receipt from the list below to edit');
-                                  }} 
-                                  className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]"
+                                  }}
+                                  className="mill-rec-btn"
                                   title="View and select a receipt to edit"
                                >
                                   Edit
                                </button>
                                <button
-                                  type="submit"
+                                  type="button"
                                   onClick={handleSubmit}
                                   disabled={saving || !selectedJobPartyId}
-                                  className={`px-6 py-1 text-[11px] font-extrabold border shadow-sm text-white disabled:opacity-50 ${
-                                     isEditMode
-                                        ? 'border-amber-900 bg-amber-600 hover:bg-amber-700 active:bg-amber-800'
-                                        : 'border-blue-900 bg-blue-700 hover:bg-blue-800 active:bg-blue-900'
-                                  }`}
+                                  data-enter-save="true"
+                                  className="mill-rec-btn"
                                >
-                                  <SaveButtonLabel saving={saving} idle={isEditMode ? "Update" : "Save"} busy={isEditMode ? "Updating…" : "Saving…"} />
+                                  <SaveButtonLabel saving={saving} idle={isEditMode ? 'Update' : 'Save'} busy={isEditMode ? 'Updating…' : 'Saving…'} />
                                </button>
-                               <button type="button" onClick={onClose} className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Cancel</button>
-                               <button type="button" onClick={handleOpenFindModal} className="px-5 py-1 text-[11px] font-bold bg-amber-100 border-amber-400 text-amber-900 active:bg-amber-200" title="Quick Find Receipt (F3 / Alt+F)">Find (F3)</button>
-                               <button type="button" onClick={handleOpenFindModal} className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Sp.Find</button>
-                               <button type="button" onClick={() => notifyWarning('Select a record to delete')} className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1] text-red-800">Delete</button>
-                               <button type="button" onClick={onClose} className="px-5 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Exit</button>
+                               <button type="button" onClick={onClose} className="mill-rec-btn">Cancel</button>
+                               <button type="button" onClick={handleOpenFindModal} className="mill-rec-btn" title="Find (F3)">Find</button>
+                               <button type="button" onClick={handleOpenFindModal} className="mill-rec-btn">Sp.Find</button>
+                               <button type="button" onClick={() => notifyWarning('Select a record to delete')} className="mill-rec-btn">Delete</button>
+                               <button type="button" onClick={onClose} className="mill-rec-btn">Exit</button>
+                               <span className="flex-1" />
+                               <button type="button" className="mill-rec-btn" onClick={() => document.getElementById('grid-cp-0')?.focus()} title="Go to CP">CP</button>
+                               <span className="flex-1" />
+                               <button
+                                  type="button"
+                                  className="mill-rec-btn"
+                                  onClick={() => {
+                                     if (onOpenPayment) onOpenPayment(selectedJobPartyId);
+                                     else notifyWarning('Open Transaction > Bank Payment / Cash Payment to make payment');
+                                  }}
+                               >
+                                  Payment Entry
+                               </button>
+                               <button type="button" onClick={handlePrint} className="mill-rec-btn">Print</button>
                             </div>
-
-                            {/* Row 2: Navigation & Custom Action Buttons */}
-                            <div className="flex justify-between items-center flex-wrap gap-2">
-                               <div className="flex gap-1">
-                                  <button type="button" className="px-3 py-0.5 text-[10px] border border-slate-400 bg-[#f1f5f9] active:bg-[#e2e8f0]">First</button>
-                                  <button type="button" className="px-3 py-0.5 text-[10px] border border-slate-400 bg-[#f1f5f9] active:bg-[#e2e8f0]">Next</button>
-                                  <button type="button" className="px-3 py-0.5 text-[10px] border border-slate-400 bg-[#f1f5f9] active:bg-[#e2e8f0]">PriV</button>
-                                  <button type="button" className="px-3 py-0.5 text-[10px] border border-slate-400 bg-[#f1f5f9] active:bg-[#e2e8f0]">Last</button>
-                               </div>
-
-                               <div className="flex gap-1.5">
-                                  <button type="button" className="px-4 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Close Bill</button>
-                                  <button
-                                     type="button"
-                                     onClick={() => {
-                                        if (onOpenPayment) onOpenPayment(selectedJobPartyId);
-                                        else notifyWarning('Open Transaction > Bank Payment / Cash Payment to make payment');
-                                     }}
-                                     className="px-4 py-1 text-[11px] font-bold border border-red-400 text-red-700 bg-red-50 hover:bg-red-100 active:bg-red-200"
-                                  >
-                                     Payment Entry
-                                  </button>
-                                  <button type="button" onClick={handlePrint} className="px-4 py-1 text-[11px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1]">Print</button>
-                               </div>
+                            <div className="mill-rec-nav-row">
+                               <div className="mill-rec-status">{isEditMode ? `Editing #${billGpNo || ''}` : 'Pending'}</div>
+                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt('first')}>First</button>
+                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(1)}>Next</button>
+                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(-1)}>Prv</button>
+                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt('last')}>Last</button>
                             </div>
-
                          </div>
 
                       </div>
@@ -1968,6 +2084,13 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                {printOpen && (
                   <JobWorkPrint variant="millReceive" data={printData} onClose={() => setPrintOpen(false)} />
                )}
+
+               <AccountMasterModal
+                  isOpen={!!accountModal}
+                  onClose={() => setAccountModal(null)}
+                  initialData={accountModal}
+                  onSuccess={handleAccountSuccess}
+               />
 
             </div>
          )}

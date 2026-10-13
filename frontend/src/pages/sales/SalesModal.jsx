@@ -1388,7 +1388,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       }
       return;
     }
-    const input = targetRow?.querySelector('[data-erp-combobox-input], input:not([disabled]):not([readonly])');
+    const input = targetRow?.querySelector('[data-line-start]')
+      || targetRow?.querySelector('[data-erp-combobox-input], input:not([disabled]):not([readonly])');
     if (grid) grid.scrollLeft = 0;
     input?.focus();
     try { input?.select?.(); } catch { /* ignore */ }
@@ -1637,7 +1638,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
           {/* Item Grid Table */}
           <div className="classic-erp-table-container erp-grid-panel erp-sales-grid">
-            <table className="classic-erp-table">
+            <table className="classic-erp-table" data-line-grid>
               <thead>
                 <tr>
                   <th className="col-sr text-center font-bold">SrNo</th>
@@ -1693,7 +1694,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                     <td
                       className="col-sr text-center font-bold select-none cursor-pointer"
                       tabIndex={0}
-                      title="Click / focus to select line, press Delete to delete"
+                      data-line-start
+                      title="Sr No — Enter moves to the next field. Delete removes this line"
                       onKeyDown={(e) => {
                         if (e.key === 'Delete') {
                           e.preventDefault();
@@ -1905,6 +1907,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                         type="button"
                         tabIndex={locked ? -1 : 0}
                         title="Delete line (Delete / Space / Enter or Shift+Delete from any column)"
+                        data-delete-line
                         onClick={() => deleteRow(idx)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete') {
@@ -2006,7 +2009,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         </div>
 
           {/* Footer sits under the grid so the action bar cannot cover totals */}
-          <div className="grid grid-cols-12 gap-1 erp-sales-footer shrink-0">
+          <div className="grid grid-cols-12 gap-1 erp-sales-footer shrink-0" data-enter-footer>
             
             {/* Left Adjustments Column */}
             <div className="col-span-4 classic-erp-frame classic-erp-stack erp-sales-footer-left">

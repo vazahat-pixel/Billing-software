@@ -981,7 +981,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                 {!locked && (
                   <div className="erp-job-issue-toolbar flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <button type="button" className="classic-erp-btn" onClick={addLine}>
+                      <button type="button" className="classic-erp-btn" data-add-line onClick={addLine}>
                         <Plus size={12} className="inline mr-0.5" /> Add Line
                       </button>
                       <button
@@ -1006,7 +1006,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
               {/* Grid */}
               <div className="classic-erp-frame erp-job-issue-grid-wrap flex-none min-h-0 flex flex-col">
                 <div className="classic-erp-table-container erp-job-issue-grid flex-1 overflow-auto">
-                  <table className="classic-erp-table erp-job-issue-table w-full">
+                  <table className="classic-erp-table erp-job-issue-table w-full" data-line-grid>
                     <thead>
                       <tr>
                         <th className="w-8">Sno</th>
@@ -1021,7 +1021,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                     <tbody>
                       {calc.linesWithAmt.map((line, idx) => (
                         <tr key={line.id}>
-                          <td className="text-center text-slate-500 font-bold">{idx + 1}</td>
+                          <td className="text-center text-slate-500 font-bold" tabIndex={0} data-line-start>{idx + 1}</td>
                           {gridCols.map((c) => {
                             if (c.key === 'itemName') {
                               return (
@@ -1071,6 +1071,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                               <button
                                 type="button"
                                 className="text-red-600 hover:text-red-800 disabled:opacity-30"
+                                data-delete-line
                                 onClick={() => removeLine(idx)}
                                 disabled={locked}
                               >

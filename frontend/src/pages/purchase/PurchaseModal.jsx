@@ -314,7 +314,8 @@ const PurchaseModal = ({
     }
     const gridPanel = modalContainerRef.current?.querySelector('.erp-grid-panel') || table?.parentElement;
     if (gridPanel) gridPanel.scrollLeft = 0;
-    const input = targetRow.querySelector('[data-erp-combobox-input], input:not([disabled]):not([readonly])');
+    const input = targetRow.querySelector('[data-line-start]')
+      || targetRow.querySelector('[data-erp-combobox-input], input:not([disabled]):not([readonly])');
     if (input) {
       input.focus();
       try { input.select?.(); } catch { /* ignore */ }
@@ -1035,7 +1036,7 @@ const PurchaseModal = ({
       book: selectedBook || 'PURCHASE BOOK',
       gstin: '',
       city: '',
-      vNo: '',
+      vNo: '1',
       billNo: '',
       billDate: today(),
       challanNo: '',
@@ -1064,14 +1065,13 @@ const PurchaseModal = ({
       rcmChargeSign: '+',
       remarks: ''
     });
-    focusPurchaseBillNo();
-    toast.info('New Purchase Bill (Add mode)');
-
-    try {
-      let vNo = await peekBillNo('purchase');
-      if (!vNo || vNo === '0') vNo = '1';
-      setHeader((h) => ({ ...h, vNo, billNo: h.billNo || vNo }));
-    } catch {}
+    toast.info('New Purchase Bill — Sr No 1');
+    setTimeout(() => {
+      const sr = document.getElementById('purchase-srno');
+      if (!sr) return;
+      sr.focus();
+      try { sr.select(); } catch { /* ignore */ }
+    }, 80);
   };
 
   const handleNewRef = useRef(handleNew);
@@ -1579,13 +1579,14 @@ const PurchaseModal = ({
                     {billFields.header('vNo') && (
                       <div className="classic-erp-field">
                         <span className="classic-erp-label">SrNo:</span>
-                        <input type="text" className="classic-erp-input font-bold text-center" value={header.vNo || '1'} readOnly title="SrNo (Auto-increments starting from 1)" />
+                        <input id="purchase-srno" data-enter-order="1" data-enter-include="" type="text" className="classic-erp-input font-bold text-center" value={header.vNo || '1'} readOnly title="Sr No — Enter moves to Date, then Party" />
                       </div>
                     )}
                     <div className="classic-erp-field">
                       <span className="classic-erp-label red-label">Date *:</span>
                       <input
                         type="date"
+                        data-enter-order="2"
                         className="classic-erp-input"
                         value={header.billDate}
                         onChange={e => setHeader({ ...header, billDate: e.target.value })}
@@ -1601,6 +1602,7 @@ const PurchaseModal = ({
                     <div className="classic-erp-control" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <ERPCombobox
                         value={header.party}
+                        data-enter-order="3"
                         onChange={onVendorSelect}
                         options={vendorOptions}
                         placeholder="Search vendor / supplier…"
@@ -1694,6 +1696,7 @@ const PurchaseModal = ({
               <div className="classic-erp-table-container erp-grid-panel erp-sales-grid">
                 <table
                   className="classic-erp-table"
+                  data-line-grid
                   onKeyDown={(e) => { handleFormEnterKeyDown(e); handleFormArrowKeyDown(e); }}
                 >
                   <thead>
@@ -1749,7 +1752,8 @@ const PurchaseModal = ({
                         <td
                           className="col-sr text-center font-bold select-none cursor-pointer"
                           tabIndex={0}
-                          title="Click / focus to select line, press Delete to delete"
+                          data-line-start
+                          title="Sr No — Enter moves forward. Delete removes this line"
                           onKeyDown={(e) => {
                             if (e.key === 'Delete') {
                               e.preventDefault();
@@ -1763,6 +1767,7 @@ const PurchaseModal = ({
                           <div style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
                             <ERPCombobox
                               value={row.itemId}
+                              openOnEnter
                               onChange={(val) => onPurchaseItemSelect(val, idx)}
                               options={itemOptions}
                               placeholder="Search item…"
@@ -1906,6 +1911,7 @@ const PurchaseModal = ({
                             type="button"
                             tabIndex={locked ? -1 : 0}
                             title="Delete line (Delete / Space / Enter or Shift+Delete from any column)"
+                            data-delete-line
                             onClick={() => deleteRow(idx)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete') {
@@ -1934,7 +1940,7 @@ const PurchaseModal = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-12 gap-1.5 erp-sales-footer shrink-0">
+              <div className="grid grid-cols-12 gap-1.5 erp-sales-footer shrink-0" data-enter-footer>
                 <div className="col-span-4 classic-erp-frame classic-erp-stack p-2">
                   {[
                     { label: 'DISCOUNT', key: 'discountAmt', signKey: 'discountSign' },

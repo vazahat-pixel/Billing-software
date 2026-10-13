@@ -27,7 +27,7 @@ export function AppProviders({ children }) {
   const setNotificationUnread = useUiStore((s) => s.setNotificationUnread);
   const [bootDone, setBootDone] = useState(false);
 
-  useFormEnterNavigation(!commandPaletteOpen);
+  useFormEnterNavigation(!commandPaletteOpen); // Enter, Shift+Tab → footer
 
   useEffect(() => {
     installBrowserDialogGuard();

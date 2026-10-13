@@ -917,7 +917,7 @@ const ReturnModal = ({
 
             {/* Item grid — same container/table rules as Sales (no nested scroll wrapper) */}
             <div className="classic-erp-table-container erp-grid-panel erp-sales-grid min-h-0">
-              <table className="classic-erp-table erp-return-grid-table">
+              <table className="classic-erp-table erp-return-grid-table" data-line-grid>
                 <thead>
                   <tr>
                     <th className="col-sr text-center">Sr</th>
@@ -972,7 +972,8 @@ const ReturnModal = ({
                       <td
                         className="col-sr text-center font-bold select-none cursor-pointer"
                         tabIndex={0}
-                        title="Click / focus to select line, press Delete to delete"
+                        data-line-start
+                        title="Sr No — Enter moves forward. Delete removes this line"
                         onKeyDown={(e) => {
                           if (e.key === 'Delete') {
                             e.preventDefault();
@@ -1111,6 +1112,7 @@ const ReturnModal = ({
                         {!locked && (
                           <button
                             type="button"
+                            data-delete-line
                             onClick={() => removeGridRow(idx)}
                             className="text-red-700 hover:text-red-950 p-1"
                             title="Remove row"
@@ -1128,6 +1130,7 @@ const ReturnModal = ({
             <div className="flex justify-between items-center bg-[var(--bg-subtle)] p-1.5 border border-[var(--border)] rounded-md shrink-0">
               <button
                 type="button"
+                data-add-line
                 onClick={addGridRow}
                 className="classic-erp-btn"
                 disabled={locked}

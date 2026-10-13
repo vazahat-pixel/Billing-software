@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
@@ -72,7 +73,7 @@ const Modal = ({
     return () => clearTimeout(t);
   }, [isOpen, inertBackdrop]);
 
-  return (
+  const tree = (
     <AnimatePresence>
       {isOpen && (
         <div
@@ -144,6 +145,9 @@ const Modal = ({
       )}
     </AnimatePresence>
   );
+
+  if (typeof document === 'undefined') return tree;
+  return createPortal(tree, document.body);
 };
 
 export default Modal;

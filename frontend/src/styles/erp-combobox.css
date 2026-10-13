@@ -170,6 +170,10 @@
   border-top: 1px solid var(--border-subtle);
   margin-top: 2px;
   padding-top: 9px;
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-card);
+  z-index: 1;
 }
 
 .erp-combobox-create.active {

@@ -7,14 +7,20 @@ export default function ErpWindowControls({
   onToggleMax,
   onClose,
 }) {
+  const press = (e, fn) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fn?.();
+  };
+
   return (
-    <div className="erp-window-controls" onClick={(e) => e.stopPropagation()}>
+    <div className="erp-window-controls" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         className="erp-window-btn"
         title="Minimize"
         aria-label="Minimize"
-        onClick={onMinimize}
+        onPointerDown={(e) => press(e, onMinimize)}
       >
         _
       </button>
@@ -23,7 +29,7 @@ export default function ErpWindowControls({
         className="erp-window-btn"
         title={isMaximized ? 'Restore' : 'Maximize'}
         aria-label={isMaximized ? 'Restore' : 'Maximize'}
-        onClick={onToggleMax}
+        onPointerDown={(e) => press(e, onToggleMax)}
       >
         {isMaximized ? '❐' : '□'}
       </button>
@@ -32,7 +38,7 @@ export default function ErpWindowControls({
         className="erp-window-btn erp-window-btn--close"
         title="Close"
         aria-label="Close"
-        onClick={onClose}
+        onPointerDown={(e) => press(e, onClose)}
       >
         X
       </button>

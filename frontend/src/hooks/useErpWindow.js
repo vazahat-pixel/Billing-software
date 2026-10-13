@@ -235,10 +235,11 @@ export default function useErpWindow(isOpen, options = {}) {
 
   const onShellPointerDown = useCallback(
     (e) => {
+      if (e.target.closest?.('.erp-window-controls, .classic-erp-close-btn')) return;
       raise();
       if (mode !== 'normal') return;
       if (!e.target.closest?.('.classic-erp-header')) return;
-      if (e.target.closest?.('button, input, select, textarea, a, .erp-window-controls')) return;
+      if (e.target.closest?.('button, input, select, textarea, a')) return;
       onDragPointerDown(e);
     },
     [mode, onDragPointerDown, raise]

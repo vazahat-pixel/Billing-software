@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import {
   handleFormEnterKeyDown,
   handleFormArrowKeyDown,
+  handleGridDeleteKey,
+  focusFormFooter,
   findFormContainer,
   findEnterSaveButton,
 } from '../utils/formEnterNavigation';
@@ -19,6 +21,16 @@ export function useFormEnterNavigation(enabled = true) {
     if (!enabled) return undefined;
 
     const onKeyDown = (e) => {
+      if (e.key === 'Tab' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (focusFormFooter(e.target)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        return;
+      }
+
+      if (e.key === 'Delete' && handleGridDeleteKey(e)) return;
+
       // Enter / Shift+Enter navigation
       if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.metaKey) {
         handleFormEnterKeyDown(e);

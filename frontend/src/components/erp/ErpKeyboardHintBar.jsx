@@ -17,6 +17,7 @@ const DEFAULT_APP_HINTS = [
 
 const FORM_HINTS = [
   { keys: 'Enter', label: 'Next' },
+  { keys: 'Shift+Tab', label: 'Bottom / Save' },
   { keys: 'Shift+Enter', label: 'Back' },
   { keys: 'F3', label: 'Find' },
   { keys: 'F2', label: 'Edit' },

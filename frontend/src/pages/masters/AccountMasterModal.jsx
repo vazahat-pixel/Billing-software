@@ -67,6 +67,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   
   const [formData, setFormData] = useState({ ...EMPTY_ACCOUNT });
   const nameInputRef = useRef(null);
+  const cityRef = useRef(null);
   const stateRef = useRef(null);
   const gstinRef = useRef(null);
   const saveBtnRef = useRef(null);
@@ -356,6 +357,16 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                     disabled={locked}
                     placeholder="Party / account name"
                     autoFocus={mode === 'Add'}
+                    data-enter-nav={mode === 'Add' ? 'off' : undefined}
+                    onKeyDown={(e) => {
+                      if (mode !== 'Add') return;
+                      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        cityRef.current?.focus();
+                        try { cityRef.current?.select(); } catch { /* ignore */ }
+                      }
+                    }}
                   />
                   <span className="classic-erp-label classic-erp-label--fixed-sm">Accd</span>
                   <input type="text" className="classic-erp-input w-20" value={formData.accd || ''} readOnly placeholder="Auto" />
@@ -406,11 +417,13 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                   <div className="classic-erp-field-row">
                     <span className="classic-erp-label classic-erp-label--fixed-sm">City</span>
                     <input
+                      ref={cityRef}
                       type="text"
                       className="classic-erp-input flex-1"
                       value={formData.city}
                       onChange={setField('city')}
                       disabled={locked}
+                      data-enter-nav="off"
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
                           e.preventDefault();
@@ -501,6 +514,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                     <span className="classic-erp-label classic-erp-label--fixed-sm">State</span>
                     <select
                       ref={stateRef}
+                      data-enter-nav="off"
                       className="classic-erp-select flex-1 font-bold"
                       value={formData.stateCode || '24'}
                       onChange={(e) => {

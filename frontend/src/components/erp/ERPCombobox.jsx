@@ -29,11 +29,14 @@ export default function ERPCombobox({
   emptyMessage = 'No matches',
   allowClear = false,
   openOnEnter = false,
+  id: inputIdProp,
   'data-enter-nav': enterNav,
   'data-enter-skip': enterSkip,
+  'data-enter-order': enterOrder,
   'data-autofocus': autoFocusProp,
 }) {
-  const inputId = useId();
+  const autoId = useId();
+  const inputId = inputIdProp || autoId;
   const rootRef = useRef(null);
   const inputRef = useRef(null);
   const listRef = useRef(null);
@@ -88,11 +91,19 @@ export default function ERPCombobox({
     const el = rootRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    const width = Math.max(rect.width, 260);
+    const spaceBelow = window.innerHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    const openUp = spaceBelow < 180 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(96, Math.min(280, openUp ? spaceAbove : spaceBelow));
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
     setDropdownStyle({
       position: 'fixed',
-      top: rect.bottom + 2,
-      left: rect.left,
-      width: Math.max(rect.width, 220),
+      top: openUp ? undefined : rect.bottom + 2,
+      bottom: openUp ? window.innerHeight - rect.top + 2 : undefined,
+      left,
+      width,
+      maxHeight,
       zIndex: 10050,
     });
   }, []);
@@ -323,6 +334,7 @@ export default function ERPCombobox({
           autoComplete="off"
           data-erp-combobox-input="true"
           data-enter-nav={enterNav}
+          data-enter-order={enterOrder || undefined}
           data-autofocus={autoFocusProp}
           aria-expanded={open}
           aria-autocomplete="list"

@@ -1,6 +1,7 @@
 const FOCUSABLE_SELECTOR = [
   'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([disabled]):not([readonly]):not([tabindex="-1"])',
   'input[data-enter-include]:not([disabled]):not([tabindex="-1"])',
+  '[data-line-start]:not([disabled]):not([tabindex="-1"])',
   'input[data-erp-combobox-input]:not([disabled]):not([readonly])',
   'select:not([disabled]):not([tabindex="-1"])',
   'textarea:not([disabled]):not([readonly]):not([tabindex="-1"])',
@@ -37,13 +38,23 @@ export function findFormContainer(el) {
 
 export function getFocusableElements(container) {
   if (!container) return [];
-  return Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter((el) => {
+  const list = Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter((el) => {
     if (!isVisible(el)) return false;
-    if (el.closest('[data-enter-nav="off"]')) return false;
+    const offHost = el.closest('[data-enter-nav="off"]');
+    if (offHost && offHost !== el) return false;
     const skipEl = el.closest('[data-enter-skip]');
-    if (skipEl && skipEl.getAttribute('data-enter-skip') !== 'false') return false;
+    const keepCombobox = el.hasAttribute('data-erp-combobox-input');
+    if (!keepCombobox && skipEl && skipEl.getAttribute('data-enter-skip') !== 'false') return false;
     return true;
   });
+  return list
+    .map((el, domIndex) => {
+      const raw = el.getAttribute('data-enter-order');
+      const order = raw != null && raw !== '' && !Number.isNaN(Number(raw)) ? Number(raw) : 1000 + domIndex;
+      return { el, order };
+    })
+    .sort((a, b) => a.order - b.order)
+    .map((row) => row.el);
 }
 
 export function focusElement(el) {
@@ -106,6 +117,27 @@ export function focusNextField(currentEl) {
   return false;
 }
 
+/** Shift+Tab jumps from the item grid to the bottom block (transport, totals, then Enter saves). */
+export function focusFormFooter(currentEl) {
+  if (!(currentEl instanceof HTMLElement)) return false;
+  const container = findFormContainer(currentEl);
+  if (!container) return false;
+  const footer = container.querySelector('[data-enter-footer]');
+  if (!footer || footer.contains(currentEl)) return false;
+  const first = getFocusableElements(footer)[0];
+  if (first) {
+    focusElement(first);
+    first.scrollIntoView?.({ block: 'nearest' });
+    return true;
+  }
+  const saveBtn = footer.querySelector('[data-enter-save]:not([disabled])') || findEnterSaveButton(container);
+  if (saveBtn) {
+    saveBtn.focus();
+    return true;
+  }
+  return false;
+}
+
 export function focusPrevField(currentEl) {
   const container = findFormContainer(currentEl);
   if (!container) return false;
@@ -152,6 +184,83 @@ export function focusGridCell(currentEl, direction) {
   return false;
 }
 
+function lineGridOf(el) {
+  return el?.closest?.('[data-line-grid]') || null;
+}
+
+function addLineButton(grid) {
+  if (!grid) return null;
+  return grid.querySelector('[data-add-line]')
+    || grid.parentElement?.querySelector('[data-add-line]')
+    || grid.closest('.classic-erp-window, [data-erp-dialog], [role="dialog"]')?.querySelector('[data-add-line]')
+    || null;
+}
+
+function focusLineStart(row) {
+  if (!row) return false;
+  const start = row.querySelector('[data-line-start]') || getFocusableElements(row)[0];
+  if (!start) return false;
+  focusElement(start);
+  return true;
+}
+
+/** Enter on the last cell of a line moves to the next line, or adds one. Sr No stays 1, 2, 3… */
+export function advanceGridLine(currentEl) {
+  const grid = lineGridOf(currentEl);
+  const row = currentEl?.closest?.('tbody tr');
+  if (!grid || !row || !grid.contains(row)) return false;
+
+  const focusable = getFocusableElements(row);
+  const idx = focusable.indexOf(currentEl);
+  if (idx === -1 || idx < focusable.length - 1) return false;
+
+  const rows = Array.from(grid.querySelectorAll('tbody tr'));
+  const rowIdx = rows.indexOf(row);
+  if (rowIdx >= 0 && rowIdx < rows.length - 1) {
+    return focusLineStart(rows[rowIdx + 1]);
+  }
+
+  const addBtn = addLineButton(grid);
+  if (!addBtn || addBtn.disabled) return false;
+  addBtn.click();
+  setTimeout(() => {
+    const fresh = grid.querySelectorAll('tbody tr');
+    focusLineStart(fresh[fresh.length - 1]);
+  }, 50);
+  return true;
+}
+
+function valueFullySelected(el) {
+  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) return true;
+  if (el.readOnly || el.disabled) return true;
+  try {
+    return el.selectionStart === 0 && el.selectionEnd === String(el.value || '').length;
+  } catch {
+    return true;
+  }
+}
+
+/** Delete removes the current grid row (empty cell, full selection, or Shift/Ctrl+Delete). */
+export function handleGridDeleteKey(e) {
+  if (e.key !== 'Delete' || e.altKey || e.metaKey) return false;
+  const el = e.target;
+  if (!(el instanceof HTMLElement)) return false;
+  const row = el.closest('[data-line-grid] tbody tr');
+  if (!row) return false;
+  const del = row.querySelector('[data-delete-line]:not([disabled])');
+  if (!del) return false;
+
+  const force = e.shiftKey || e.ctrlKey;
+  const isField = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
+  const empty = !isField || !String(el.value || '').trim();
+  if (!force && !empty && !valueFullySelected(el)) return false;
+
+  e.preventDefault();
+  e.stopPropagation();
+  del.click();
+  return true;
+}
+
 export function shouldHandleFormNavigation(e) {
   if (e.ctrlKey || e.altKey || e.metaKey) return false;
   if (e.defaultPrevented) return false;
@@ -160,7 +269,8 @@ export function shouldHandleFormNavigation(e) {
   if (!(target instanceof HTMLElement)) return false;
 
   const tag = target.tagName;
-  if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA' && tag !== 'BUTTON') return false;
+  const lineStart = target.hasAttribute('data-line-start');
+  if (!lineStart && tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA' && tag !== 'BUTTON') return false;
 
   // Elements with custom Enter actions or opting out of navigation
   if (target.dataset.enterAction === 'true') return false;
@@ -193,6 +303,12 @@ export function handleFormEnterKeyDown(e) {
   }
 
   if (!shouldHandleFormNavigation(e)) return;
+
+  if (advanceGridLine(e.target)) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
 
   const moved = focusNextField(e.target);
   if (moved) {

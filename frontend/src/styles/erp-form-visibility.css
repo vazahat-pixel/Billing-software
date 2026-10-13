@@ -728,6 +728,24 @@ textarea.classic-erp-input {
 .erp-modal-sheet .classic-erp-window {
   max-height: calc(100dvh - 112px) !important;
 }
+.erp-modal-sheet .classic-erp-window.erp-master-form {
+  display: flex !important;
+  flex-direction: column !important;
+  height: auto !important;
+  max-height: calc(100dvh - 112px) !important;
+  overflow: hidden !important;
+}
+.erp-modal-sheet .erp-master-form .classic-erp-header,
+.erp-modal-sheet .erp-master-form .classic-erp-tabs,
+.erp-modal-sheet .erp-master-form .classic-erp-form-footer {
+  flex: 0 0 auto !important;
+}
+.erp-modal-sheet .erp-master-form .classic-erp-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: calc(100dvh - 210px) !important;
+  overflow-y: auto !important;
+}
 .erp-modal-sheet .classic-erp-window .classic-erp-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -1184,4 +1202,197 @@ textarea.classic-erp-input {
 .cash-bank-window .cb-f-party .erp-combobox input,
 .cash-bank-window .cb-f-bank .erp-combobox input {
   width: 100% !important;
+}
+
+/* Mill Receipt — classic field placement */
+.mill-rec-head {
+  display: grid;
+  grid-template-columns: 72px minmax(160px, 1.6fr) 70px minmax(90px, 1fr) 132px 68px 68px minmax(96px, 0.9fr);
+  grid-template-areas:
+    "plab party gstlab gstin totlab tot serlab serial"
+    ".    addr  rlab   rcon  .      .   datelab date"
+    "blab bill  altl   altl  revlab rev b2lab   b2"
+    ".    .     .      .     hsnlab hsn hsn     type";
+  gap: 2px 4px;
+  align-items: center;
+  padding: 3px 4px;
+  background: #d4d0c8;
+  border: 1px solid #808080;
+}
+.mill-rec-lab {
+  font-size: 11px;
+  font-weight: 600;
+  color: #111;
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 3px;
+}
+.mill-rec-sheet .mill-rec-in,
+.mill-rec-sheet .mill-rec-head .classic-erp-input,
+.mill-rec-sheet .mill-rec-head .classic-erp-select,
+.mill-rec-sheet .mill-rec-foot .classic-erp-input,
+.mill-rec-sheet .mill-rec-foot .classic-erp-select {
+  height: 20px !important;
+  min-height: 20px !important;
+  max-height: 20px !important;
+  font-size: 11px !important;
+  padding: 0 4px !important;
+  border-radius: 0 !important;
+}
+.mill-rec-addr {
+  background: #fff;
+  border: 1px solid #808080;
+  min-height: 20px;
+  height: 20px;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 4px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.mill-rec-altl {
+  background: #111;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  height: 20px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.mill-rec-gstbox {
+  background: #f6e6c0;
+  border: 1px solid #d6c08a;
+  padding: 2px 4px;
+}
+.mill-rec-round {
+  background: #fff59a !important;
+}
+.mill-rec-actions {
+  background: #000;
+  padding: 3px 4px 4px;
+}
+.mill-rec-action-row,
+.mill-rec-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.mill-rec-nav-row { margin-top: 2px; }
+.mill-rec-btn {
+  background: #d9d9d9;
+  color: #111;
+  border: 1px solid #fff;
+  border-right-color: #555;
+  border-bottom-color: #555;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  padding: 2px 8px;
+  min-width: 52px;
+}
+.mill-rec-btn:disabled { opacity: 0.45; }
+.mill-rec-btn-new {
+  background: #0000b4;
+  color: #fff;
+  border-color: #7aa2ff #00004a #00004a #7aa2ff;
+}
+.mill-rec-status {
+  flex: 1;
+  background: #f7b6c8;
+  color: #111;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  min-height: 18px;
+  line-height: 18px;
+  margin-right: 4px;
+}
+.mill-rec-sheet .mill-receive-grid th {
+  white-space: nowrap !important;
+  word-break: normal !important;
+  font-size: 10px !important;
+  background: #e8e8e8;
+}
+
+/* Job Receipt — tight classic sheet, no empty stretch */
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-body {
+  justify-content: flex-start !important;
+  padding: 3px 5px !important;
+  gap: 3px !important;
+}
+.classic-erp-window.erp-job-receipt-window .classic-erp-label {
+  font-size: 10px !important;
+  line-height: 1.1 !important;
+  white-space: nowrap !important;
+}
+.classic-erp-window.erp-job-receipt-window input.classic-erp-input,
+.classic-erp-window.erp-job-receipt-window select.classic-erp-select,
+.classic-erp-window.erp-job-receipt-window .classic-erp-control input,
+.classic-erp-window.erp-job-receipt-window .erp-combobox-input {
+  height: 22px !important;
+  min-height: 22px !important;
+  max-height: 22px !important;
+  font-size: 11px !important;
+  padding: 0 4px !important;
+  border-radius: 2px !important;
+}
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-header {
+  padding: 3px 5px !important;
+}
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-header-grid {
+  gap: 4px !important;
+}
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-address-box {
+  min-height: 18px !important;
+  height: 18px !important;
+  max-height: 18px !important;
+  margin-top: 2px !important;
+  padding: 0 4px !important;
+  font-size: 10px !important;
+  line-height: 16px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-body {
+  overflow: hidden !important;
+  min-height: 0 !important;
+}
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-grid-wrap {
+  flex: 1 1 auto !important;
+  min-height: 88px !important;
+  max-height: none !important;
+  overflow: hidden !important;
+}
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-grid {
+  flex: 1 1 auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: auto !important;
+}
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-table thead th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+}
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-table td {
+  height: 18px !important;
+}
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-table .classic-erp-input,
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-table .classic-erp-select,
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-table .erp-combobox-input {
+  height: 18px !important;
+  min-height: 18px !important;
+  max-height: 18px !important;
+  font-size: 10px !important;
+  padding: 0 2px !important;
+}
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-footer-grid {
+  gap: 4px !important;
+}
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-adjust,
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-totals {
+  padding: 2px 4px !important;
 }

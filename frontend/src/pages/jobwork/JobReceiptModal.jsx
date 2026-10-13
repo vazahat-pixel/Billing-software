@@ -6,7 +6,8 @@ import useStore from '../../store/useStore';
 import { toast } from '../../store/useToastStore';
 import { erpConfirmDeleteLine } from '../../utils/confirm';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
-import { handleFormEnterKeyDown, handleFormArrowKeyDown } from '../../utils/formEnterNavigation';
+import { handleFormEnterKeyDown, handleFormArrowKeyDown, focusNextField } from '../../utils/formEnterNavigation';
+import AccountMasterModal from '../masters/AccountMasterModal';
 import JobWorkPrint from '../../components/print/JobWorkPrint';
 import { Plus, Trash2 } from 'lucide-react';
 import {
@@ -80,6 +81,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
   const [lotLookupOpen, setLotLookupOpen] = useState(false);
   const [lotLookupTargetIdx, setLotLookupTargetIdx] = useState(null);
   const [lotEntryValue, setLotEntryValue] = useState('');
+  const [accountModal, setAccountModal] = useState(null);
 
   const locked = mode === 'View';
   const titleBook = selectedBook || header.book || 'JOBWORK BOOK';
@@ -163,6 +165,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     if (!isOpen) return undefined;
 
     const onKeyDown = (e) => {
+      if (!(e.target instanceof Element) || !e.target.closest('.erp-job-receipt-window')) return;
       if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'f')) {
         e.preventDefault();
         e.stopPropagation();
@@ -392,12 +395,6 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     return String(Math.max(max, receivedCount) + 1);
   }, [jobWorkEntries]);
 
-  useEffect(() => {
-    if (isOpen && mode === 'Add' && (!header.partyId || header.serialNo === '1')) {
-      setHeader((h) => ({ ...h, serialNo: getNextSerialNo() }));
-    }
-  }, [isOpen, mode, getNextSerialNo]);
-
   const addLine = () => setLines((prev) => [...prev, { ...blankLine(), srNo: prev.length + 1 }]);
 
   const removeLine = async (idx) => {
@@ -414,6 +411,25 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
       partyId: partyId || '',
       gstin: party?.gstin || '',
     }));
+  };
+
+  const openNewParty = (search = '') => {
+    if (locked) return;
+    setAccountModal({ name: search || '', group: 'JOB WORKER' });
+  };
+
+  const handleAccountSuccess = (newAccount) => {
+    const id = newAccount?._id || newAccount?.id || '';
+    setHeader((h) => ({
+      ...h,
+      partyId: id,
+      gstin: newAccount?.gstin || '',
+    }));
+    setAccountModal(null);
+    setTimeout(() => {
+      const el = document.getElementById('job-rec-party');
+      if (el) focusNextField(el);
+    }, 120);
   };
 
   const loadPendingChallans = () => {
@@ -484,11 +500,11 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     setMode('Add');
     setSelectedReceiptId('');
     setFindOpen(false);
-    setHeader({ ...emptyHeader(selectedBook), serialNo: getNextSerialNo() });
+    setHeader({ ...emptyHeader(selectedBook), serialNo: '1' });
     setFooter(emptyFooter());
     setLines([blankLine()]);
     setTimeout(() => {
-      const el = document.querySelector('[data-erp-start="challan"]');
+      const el = document.getElementById('job-rec-serial');
       if (!el || el.disabled) return;
       el.focus();
       try { el.select(); } catch { /* ignore */ }
@@ -687,7 +703,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
             <form
               onSubmit={handleSave}
               onKeyDown={handleHeaderKeyDown}
-              className="classic-erp-body erp-job-receipt-body flex-1 overflow-hidden min-h-0 flex flex-col justify-between"
+              className="classic-erp-body erp-job-receipt-body flex-1 overflow-hidden min-h-0 flex flex-col justify-start"
             >
               {findOpen && (
                 <div className="classic-erp-frame erp-job-receipt-find shrink-0">
@@ -712,15 +728,32 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                     <div className="erp-job-receipt-party-row">
                       <div className="classic-erp-field classic-erp-field--lg erp-job-receipt-party-field">
                         <span className="classic-erp-label red-label">Job Party</span>
-                        <ERPCombobox
-                          value={header.partyId}
-                          onChange={handlePartyChange}
-                          disabled={locked}
-                          options={partyOptions}
-                          placeholder="Select job worker / mill…"
-                          recentKey="job-receipt-party"
-                          allowClear
-                        />
+                        <div className="classic-erp-control" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <ERPCombobox
+                            id="job-rec-party"
+                            className="flex-1 min-w-0"
+                            value={header.partyId}
+                            data-enter-order="3"
+                            onChange={handlePartyChange}
+                            disabled={locked}
+                            options={partyOptions}
+                            placeholder="Select job worker / mill…"
+                            recentKey="job-receipt-party"
+                            allowClear
+                            onCreateNew={!locked ? (q) => openNewParty(q) : undefined}
+                            createLabel="Party"
+                          />
+                          {!locked && (
+                            <button
+                              type="button"
+                              title="Add new party"
+                              onClick={() => openNewParty('')}
+                              style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 2, height: 22, padding: '0 6px', fontSize: 10, fontWeight: 700, color: '#fff', background: '#16a34a', border: 'none', borderRadius: 3, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                            >
+                              <Plus size={10} /> Add
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <span className="erp-job-receipt-gstin-badge">GSTIN:-{header.gstin || '24AAAGM0289C1ZP'}</span>
                     </div>
@@ -744,6 +777,9 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                       <div className="classic-erp-field">
                         <span className="classic-erp-label red-label">SrNo</span>
                         <input
+                          id="job-rec-serial"
+                          data-autofocus="true"
+                          data-enter-order="1"
                           type="text"
                           className="classic-erp-input text-center font-bold"
                           value={header.serialNo}
@@ -757,6 +793,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                         <div className="classic-erp-control">
                           <input
                             type="date"
+                            data-enter-order="2"
                             className="classic-erp-input erp-job-receipt-date"
                             value={header.date}
                             onChange={(e) => setHeader({ ...header, date: e.target.value })}
@@ -820,7 +857,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                     <button type="button" className="classic-erp-btn" onClick={loadPendingChallans}>
                       Load Pending Challans
                     </button>
-                    <button type="button" className="classic-erp-btn" onClick={addLine}>
+                    <button type="button" className="classic-erp-btn" data-add-line onClick={addLine}>
                       <Plus size={12} className="inline mr-0.5" /> Add Line
                     </button>
                     <span className="erp-job-receipt-pending-tag">
@@ -832,9 +869,10 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
 
               {/* Line grid */}
               <div className="classic-erp-frame erp-job-receipt-grid-wrap flex-1 min-h-0 flex flex-col">
-                <div className="classic-erp-table-container erp-job-receipt-grid flex-1 min-h-[140px]">
+                <div className="classic-erp-table-container erp-job-receipt-grid flex-1 min-h-0">
                   <table
                     className="classic-erp-table erp-job-receipt-table"
+                    data-line-grid
                     onKeyDown={(e) => { handleFormEnterKeyDown(e); handleFormArrowKeyDown(e); }}
                   >
                     <thead>
@@ -882,7 +920,8 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                           <td
                             className="text-center font-bold text-slate-700 select-none cursor-pointer"
                             tabIndex={0}
-                            title="Click / focus to select line, press Delete to remove"
+                            data-line-start
+                            title="Sr No — Enter moves forward. Delete removes this line"
                             onKeyDown={(e) => {
                               if (e.key === 'Delete') {
                                 e.preventDefault();
@@ -985,6 +1024,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                               <button
                                 type="button"
                                 className="erp-job-receipt-del"
+                                data-delete-line
                                 onClick={() => removeLine(idx)}
                                 title="Remove line"
                               >
@@ -1007,7 +1047,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
               </div>
 
               {/* Footer — adjustments + totals */}
-              <div className="erp-job-receipt-footer-grid shrink-0">
+              <div className="erp-job-receipt-footer-grid shrink-0" data-enter-footer>
                 <div className="classic-erp-frame erp-job-receipt-adjust">
                   <div className="erp-job-receipt-adj-grid">
                     <div className="classic-erp-field">
@@ -1256,7 +1296,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                 >
                   Edit
                 </button>
-                <button type="submit" className="classic-erp-btn btn-blue" disabled={saving || locked}>
+                <button type="submit" className="classic-erp-btn btn-blue" data-enter-save="true" disabled={saving || locked}>
                   <SaveButtonLabel saving={saving} label="Save" />
                 </button>
                 <button type="button" className="classic-erp-btn" onClick={handleCancel} disabled={saving}>
@@ -1449,6 +1489,13 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
       {printOpen && (
         <JobWorkPrint variant="jobReceive" data={printData} onClose={() => setPrintOpen(false)} />
       )}
+
+      <AccountMasterModal
+        isOpen={!!accountModal}
+        onClose={() => setAccountModal(null)}
+        initialData={accountModal}
+        onSuccess={handleAccountSuccess}
+      />
     </>
   );
 };
