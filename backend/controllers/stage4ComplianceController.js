@@ -118,12 +118,21 @@ exports.ewayGenerate = asyncHandler(async (req, res) => {
   return created(
     res,
     await einvoiceEway.generateEway(req.companyId, req.body, uid(req), {
-      provider: req.body.provider || 'Mock',
+      provider: req.body.provider || 'Auto',
     })
   );
 });
 exports.ewayList = asyncHandler(async (req, res) => {
   return ok(res, await einvoiceEway.listEway(req.companyId, req.query));
+});
+exports.ewayConfigStatus = asyncHandler(async (req, res) => {
+  return ok(res, einvoiceEway.getConfigStatus());
+});
+exports.ewayPortalJson = asyncHandler(async (req, res) => {
+  return ok(res, await einvoiceEway.getPortalJson(req.companyId, req.params.salesId));
+});
+exports.ewayCancel = asyncHandler(async (req, res) => {
+  return ok(res, await einvoiceEway.cancelEway(req.companyId, req.params.id, req.body, uid(req)));
 });
 
 // ─── 4.7 CA Workspace ────────────────────────────────────────

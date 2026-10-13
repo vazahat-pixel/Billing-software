@@ -13,7 +13,7 @@ export const FormField = ({ label, error, children, className = '', required = f
   </div>
 );
 
-export const ERPInput = ({
+export const ERPInput = React.forwardRef(({
   type = 'text',
   placeholder,
   value,
@@ -22,8 +22,9 @@ export const ERPInput = ({
   disabled,
   className = '',
   ...props
-}) => (
+}, ref) => (
   <input
+    ref={ref}
     type={type}
     className={`erp-input ${error ? 'border-[var(--red)]' : ''} ${className}`}
     placeholder={placeholder}
@@ -32,7 +33,8 @@ export const ERPInput = ({
     disabled={disabled}
     {...props}
   />
-);
+));
+ERPInput.displayName = 'ERPInput';
 
 export const ERPSelect = ({
   options = [],

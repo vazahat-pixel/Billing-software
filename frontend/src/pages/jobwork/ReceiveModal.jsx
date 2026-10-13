@@ -4,6 +4,7 @@ import { ERPSelect } from '../../components/forms/FormElements';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
+import { erpConfirmDeleteLine } from '../../utils/confirm';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import JobWorkPrint from '../../components/print/JobWorkPrint';
 import { Plus, Trash2 } from 'lucide-react';
@@ -13,6 +14,7 @@ const today = () => new Date().toISOString().substring(0, 10);
 /** One grid row = one Mill Issue challan being received against this bill. */
 const blankLine = () => ({
    id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+   srNo: 1,
    jobId: '',
    lotNo: '',
    chlnNo: '',
@@ -83,7 +85,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const [hsnCd, setHsnCd] = useState('');
    const [billType, setBillType] = useState('Process');
    const [totalProcessAmt] = useState('1164');
-   const [serialNo] = useState('4');
+   const [serialNo, setSerialNo] = useState('1');
    const [receiveDate, setReceiveDate] = useState(today());
 
    // Multi-row grid — one row per challan being received into this bill
@@ -267,20 +269,51 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          return;
       }
       let cancelled = false;
-      setBootLoading(true);
-      Promise.all([fetchJobs(), fetchParties?.(), fetchInventory?.(), fetchItems?.()])
+      const state = useStore.getState();
+      const existingJobs = state.jobWorkEntries || [];
+      const hasBasicMasters = (state.parties || []).length > 0 && (state.items || []).length > 0;
+
+      if (!hasBasicMasters) {
+         setBootLoading(true);
+      } else {
+         setBootLoading(false);
+      }
+
+      // 1. Instant load from store if available
+      const list = existingJobs
+         .filter((j) => j.status === 'Received' || j.status === 'Partial')
+         .sort((a, b) => {
+            const numA = parseInt(String(a.billGpNo || a.jobCardNo || a.challanNo || '').replace(/\D/g, ''), 10);
+            const numB = parseInt(String(b.billGpNo || b.jobCardNo || b.challanNo || '').replace(/\D/g, ''), 10);
+            if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+            return new Date(a.receiveDate || a.updatedAt || 0) - new Date(b.receiveDate || b.updatedAt || 0);
+         });
+      const latest = list[list.length - 1];
+      if (latest) handleLoadReceivedJob(latest);
+
+      // 2. Background refresh
+      const backgroundTasks = [];
+      if (!(state.parties || []).length) backgroundTasks.push(fetchParties?.());
+      if (!(state.items || []).length) backgroundTasks.push(fetchItems?.());
+      backgroundTasks.push(fetchJobs());
+      backgroundTasks.push(fetchInventory?.());
+
+      Promise.all(backgroundTasks)
          .then(() => {
             if (cancelled) return;
-            const list = (useStore.getState().jobWorkEntries || [])
-               .filter((j) => j.status === 'Received' || j.status === 'Partial')
-               .sort((a, b) => {
-                  const numA = parseInt(String(a.billGpNo || a.jobCardNo || a.challanNo || '').replace(/\D/g, ''), 10);
-                  const numB = parseInt(String(b.billGpNo || b.jobCardNo || b.challanNo || '').replace(/\D/g, ''), 10);
-                  if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
-                  return new Date(a.receiveDate || a.updatedAt || 0) - new Date(b.receiveDate || b.updatedAt || 0);
-               });
-            const latest = list[list.length - 1];
-            if (latest) handleLoadReceivedJob(latest);
+            const freshState = useStore.getState();
+            if (!list.length && freshState.jobWorkEntries?.length) {
+               const freshList = freshState.jobWorkEntries
+                  .filter((j) => j.status === 'Received' || j.status === 'Partial')
+                  .sort((a, b) => {
+                     const numA = parseInt(String(a.billGpNo || a.jobCardNo || a.challanNo || '').replace(/\D/g, ''), 10);
+                     const numB = parseInt(String(b.billGpNo || b.jobCardNo || b.challanNo || '').replace(/\D/g, ''), 10);
+                     if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+                     return new Date(a.receiveDate || a.updatedAt || 0) - new Date(b.receiveDate || b.updatedAt || 0);
+                  });
+               const freshLatest = freshList[freshList.length - 1];
+               if (freshLatest) handleLoadReceivedJob(freshLatest);
+            }
          })
          .catch(() => { })
          .finally(() => {
@@ -289,7 +322,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       return () => {
          cancelled = true;
       };
-   }, [isOpen, fetchJobs, fetchParties, fetchInventory, fetchItems]);
+   }, [isOpen]);
 
    useEffect(() => {
       if (!isOpen) return undefined;
@@ -484,9 +517,30 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       });
    };
 
-   const addLine = () => setLines(prev => [...prev, blankLine()]);
+   const getNextSerialNo = React.useCallback(() => {
+      const list = Array.isArray(jobWorkEntries) ? jobWorkEntries : [];
+      let maxNo = 0;
+      list.forEach((j) => {
+         const num = parseInt(String(j.serialNo || j.billGpNo || '').replace(/\D/g, ''), 10);
+         if (!isNaN(num) && num > maxNo) {
+            maxNo = num;
+         }
+      });
+      const receivedCount = list.filter((j) => j.status === 'Received' || j.status === 'Partial').length;
+      return String(Math.max(maxNo, receivedCount) + 1);
+   }, [jobWorkEntries]);
 
-   const removeLine = (idx) => {
+   useEffect(() => {
+      if (!isEditMode && isOpen) {
+         setSerialNo(getNextSerialNo());
+      }
+   }, [isOpen, isEditMode, getNextSerialNo]);
+
+   const addLine = () => setLines(prev => [...prev, { ...blankLine(), srNo: prev.length + 1 }]);
+
+   const removeLine = async (idx) => {
+      const ok = await erpConfirmDeleteLine();
+      if (!ok) return;
       setLines(prev => (prev.length <= 1 ? [blankLine()] : prev.filter((_, i) => i !== idx)));
    };
 
@@ -811,6 +865,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       setReceiveDate(today());
       setRemark('');
       setIsEditMode(false);
+      setSerialNo(getNextSerialNo());
       notifySuccess('Cleared for new Mill Receive entry');
       setTimeout(() => {
         const el = document.querySelector('[data-erp-start="challan"]');
@@ -825,6 +880,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       setSelectedJobPartyId(record.partyId || '');
       setGstin(record.gstin || '');
       setBillGpNo(record.billGpNo || '');
+      if (record.serialNo) setSerialNo(String(record.serialNo));
       setReceiveDate(record.receiveDate || today());
       setRemark(record.remark || '');
       if (record.lines && Array.isArray(record.lines)) {
@@ -881,6 +937,8 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                workerId: selectedJobPartyId,
                billType: billType,
                receiveDate: receiveDate,
+               serialNo: serialNo || getNextSerialNo(),
+               srNo: ok + 1,
                isFinal: line.isFinal !== false,
             };
 
@@ -894,6 +952,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          notifySuccess(isEditMode ? `Receipt #${billGpNo} updated successfully!` : `Challan(s) received — ${ok} finished lot(s) added to stock!`);
          setBillGpNo('');
          setLines([blankLine()]);
+         setSerialNo(String(Number(serialNo || 1) + 1));
          setIsEditMode(false);
          setActiveTab('View Mill Rec');
          await fetchJobs();
@@ -995,12 +1054,13 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                  />
                               </div>
                               <div className="col-span-1 flex items-center gap-1">
-                                 <span className="text-slate-800 font-semibold">Serial No:</span>
+                                 <span className="text-slate-800 font-semibold">SrNo:</span>
                                  <input
                                     type="text"
-                                    className="classic-erp-input w-12 text-center bg-slate-100 font-bold"
-                                    value={serialNo}
-                                    disabled
+                                    className="classic-erp-input w-12 text-center bg-white font-bold"
+                                    value={serialNo || '1'}
+                                    onChange={(e) => setSerialNo(e.target.value)}
+                                    title="SrNo (Auto-increments starting from 1)"
                                  />
                               </div>
                               <div className="col-span-2 flex items-center gap-1">
@@ -1092,8 +1152,47 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                               </thead>
                               <tbody>
                                  {linesWithAmt.map((line, idx) => (
-                                    <tr key={line.id} className="border-b border-slate-200 hover:bg-slate-50">
-                                       <td className="border-r border-slate-300 p-1 text-center bg-slate-100 font-bold">{idx + 1}</td>
+                                    <tr
+                                       key={line.id}
+                                       className="border-b border-slate-200 hover:bg-slate-50"
+                                       onKeyDown={(e) => {
+                                          const isPlainDelete = e.key === 'Delete' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey;
+                                          const isShortcutDelete =
+                                             (e.shiftKey && e.key === 'Delete') ||
+                                             (e.ctrlKey && e.key === 'Delete') ||
+                                             (e.altKey && (e.key === 'd' || e.key === 'D'));
+
+                                          if (isShortcutDelete) {
+                                             e.preventDefault();
+                                             e.stopPropagation();
+                                             removeLine(idx);
+                                             return;
+                                          }
+
+                                          if (isPlainDelete) {
+                                             const el = e.target;
+                                             const isInputOrTextarea = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+                                             if (!isInputOrTextarea || !el.value?.trim()) {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                removeLine(idx);
+                                             }
+                                          }
+                                       }}
+                                    >
+                                       <td
+                                          className="border-r border-slate-300 p-1 text-center bg-slate-100 font-bold select-none cursor-pointer"
+                                          tabIndex={0}
+                                          title="Click / focus to select line, press Delete to remove"
+                                          onKeyDown={(e) => {
+                                             if (e.key === 'Delete') {
+                                                e.preventDefault();
+                                                removeLine(idx);
+                                             }
+                                          }}
+                                       >
+                                          {idx + 1}
+                                       </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
                                              type="text"

@@ -4,6 +4,7 @@ const EWayBill = require('../models/EWayBill');
 const Sales = require('../models/Sales');
 const gstConfigService = require('./gstConfigService');
 const auditService = require('./auditService');
+const gspClient = require('./gspClient');
 const { validateGstin, stateCodeFromGstin } = require('../utils/gstDetermination');
 
 const round2 = (n) => Number(Number(n || 0).toFixed(2));
@@ -203,7 +204,7 @@ class EinvoiceEwayService {
     return { cfg, sale, requestPayload };
   }
 
-  async generateEway(companyId, body, userId, { provider = 'Mock' } = {}) {
+  async generateEway(companyId, body, userId, { provider = 'Auto' } = {}) {
     const cfg = await gstConfigService.getOrCreate(companyId);
     const CompanySettings = require('../models/CompanySettings');
     const settings = await CompanySettings.findOne({ companyId }).select('eway').lean();
@@ -212,31 +213,26 @@ class EinvoiceEwayService {
       await cfg.save();
     }
     const ewayOn = cfg.eWayEnabled || !!settings?.eway;
-    if (!ewayOn && provider !== 'Mock') {
+    if (!ewayOn && provider !== 'Mock' && provider !== 'Auto') {
       throw new Error('Turn on E-Way Bill in Company Settings, then prepare the bill again.');
     }
 
     const { sale, requestPayload } = await this.buildEwayPayload(companyId, body);
     const value = requestPayload.totalValue;
-    if (value < (cfg.eWayThreshold || 50000) && provider !== 'Mock') {
+    if (value < (cfg.eWayThreshold || 50000) && provider !== 'Mock' && provider !== 'Auto') {
       throw new Error(`Value below e-way threshold ₹${cfg.eWayThreshold}`);
     }
 
-    let ewbNo = '';
-    let ewbDate = null;
-    let validUpto = null;
-    let status = 'Generated';
-    let responsePayload = {};
+    // Company auth credentials (for GSP login)
+    const Company = require('../models/Company');
+    const comp = await Company.findById(companyId).lean();
+    const companyAuth = {
+      ewayUsername: comp?.meta?.others?.ewayUsername || comp?.meta?.ewayUsername || '',
+      ewayPassword: comp?.meta?.others?.ewayPassword || comp?.meta?.ewayPassword || '',
+    };
 
-    if (provider === 'Mock') {
-      ewbNo = `EWB${Date.now().toString().slice(-12)}`;
-      ewbDate = new Date();
-      validUpto = new Date(Date.now() + Math.max(1, requestPayload.transDistance || 100) * 60 * 60 * 1000);
-      responsePayload = { ewayBillNo: ewbNo, ewayBillDate: ewbDate, validUpto };
-    } else {
-      status = 'Ready';
-      responsePayload = { Status: 'PENDING_NIC' };
-    }
+    // Call GSP Client — seamlessly auto-switches to real GSP when .env keys exist
+    const gspResult = await gspClient.generate(requestPayload, companyAuth);
 
     const doc = await EWayBill.create({
       companyId,
@@ -244,10 +240,10 @@ class EinvoiceEwayService {
       refId: body.salesId || body.refId || sale?._id,
       docNo: requestPayload.docNo,
       docDate: requestPayload.docDate,
-      status,
-      ewbNo,
-      ewbDate,
-      validUpto,
+      status: gspResult.status || 'Generated',
+      ewbNo: gspResult.ewbNo,
+      ewbDate: gspResult.ewbDate,
+      validUpto: gspResult.validUpto,
       fromGstin: requestPayload.fromGstin,
       toGstin: requestPayload.toGstin,
       fromStateCode: String(requestPayload.fromStateCode),
@@ -266,14 +262,65 @@ class EinvoiceEwayService {
       lrDate: requestPayload.transDocDate,
       distance: requestPayload.transDistance,
       requestPayload,
-      responsePayload,
-      provider,
+      responsePayload: gspResult.rawResponse || {},
+      provider: gspResult.provider || 'Auto',
       createdBy: userId,
     });
 
+    // Auto-update sales bill with eway bill number so it immediately prints
+    if (sale?._id && gspResult.ewbNo) {
+      await Sales.findByIdAndUpdate(sale._id, {
+        eway: gspResult.ewbNo,
+      });
+    }
+
     await auditService.logSystem({
       companyId, userId, action: 'EWAY_GENERATE', module: 'EWayBill',
-      referenceId: doc._id, after: { ewbNo, status },
+      referenceId: doc._id, after: { ewbNo: gspResult.ewbNo, status: doc.status },
+    });
+
+    const docObj = doc.toObject();
+    if (gspResult.alert) docObj.alert = gspResult.alert;
+    return docObj;
+  }
+
+  getConfigStatus() {
+    return gspClient.getStatus();
+  }
+
+  async getPortalJson(companyId, salesId) {
+    const sale = await Sales.findOne({ _id: salesId, companyId })
+      .populate('customerId')
+      .populate('items.itemId')
+      .lean();
+    if (!sale) throw new Error('Sales invoice not found');
+
+    const cfg = await gstConfigService.getOrCreate(companyId);
+    const Company = require('../models/Company');
+    const comp = await Company.findById(companyId).lean();
+
+    const { requestPayload } = await this.buildEwayPayload(companyId, { salesId });
+    return gspClient.buildGovtPortalJson(
+      { ...requestPayload, docNo: sale.invoiceNo, docDate: sale.date },
+      { ...comp, gstin: cfg.gstin },
+      sale.customerId
+    );
+  }
+
+  async cancelEway(companyId, id, { cancelRsnCode = '1', cancelRmrk = 'Order Cancelled' } = {}, userId) {
+    const doc = await EWayBill.findOne({ _id: id, companyId });
+    if (!doc) throw new Error('E-Way Bill not found');
+    doc.status = 'Cancelled';
+    doc.errorMessage = cancelRmrk;
+    await doc.save();
+
+    if (doc.refId) {
+      await Sales.findByIdAndUpdate(doc.refId, { eway: '' });
+    }
+
+    await auditService.logSystem({
+      companyId, userId, action: 'EWAY_CANCEL', module: 'EWayBill',
+      referenceId: doc._id, after: { status: 'Cancelled' },
     });
     return doc;
   }

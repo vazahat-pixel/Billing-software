@@ -69,20 +69,25 @@ const BookSelectionModal = ({ isOpen, onClose, moduleName, onSelectBook, bookFil
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
+        e.stopPropagation();
         setSelectedIdx((prev) => (prev + 1) % books.length);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
+        e.stopPropagation();
         setSelectedIdx((prev) => (prev - 1 + books.length) % books.length);
       } else if (e.key === 'Enter') {
         e.preventDefault();
+        e.stopPropagation();
         if (books[selectedIdx]) onSelectBook(books[selectedIdx]);
       } else if (e.key === 'Escape') {
+        e.stopPropagation();
         onClose();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    // Use capture phase so this fires BEFORE sidebar/rail handlers
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, books, selectedIdx, onSelectBook, onClose]);
 
   if (!isOpen || books.length === 1) return null;

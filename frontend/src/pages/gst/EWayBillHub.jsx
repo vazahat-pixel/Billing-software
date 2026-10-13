@@ -9,7 +9,7 @@ import { exportTableToExcel } from '../../utils/reportExport';
 import {
   Truck, Calendar, Download, RefreshCw, Search, Plus,
   FileSpreadsheet, CheckCircle2, AlertTriangle, Printer,
-  FileText, ExternalLink
+  FileText, ExternalLink, Zap
 } from 'lucide-react';
 
 const money = (v) => `₹${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -22,6 +22,7 @@ export default function EWayBillHub({ isOpen, onClose }) {
   const [ewayList, setEwayList] = useState([]);
   const [search, setSearch] = useState('');
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [configStatus, setConfigStatus] = useState(null);
 
   // Form for generating new E-Way Bill
   const [salesInvoices, setSalesInvoices] = useState([]);
@@ -31,6 +32,15 @@ export default function EWayBillHub({ isOpen, onClose }) {
   const [vehicleNo, setVehicleNo] = useState('');
   const [distanceKm, setDistanceKm] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const fetchConfigStatus = useCallback(async () => {
+    try {
+      const res = await stage4Api.ewayConfigStatus();
+      setConfigStatus(res);
+    } catch {
+      setConfigStatus({ isConfigured: false, provider: 'mock', mode: 'Simulated Mode' });
+    }
+  }, []);
 
   const fetchEwayList = useCallback(async () => {
     if (!isOpen) return;
@@ -61,8 +71,9 @@ export default function EWayBillHub({ isOpen, onClose }) {
     if (isOpen) {
       fetchEwayList();
       loadEligibleSales();
+      fetchConfigStatus();
     }
-  }, [isOpen, fetchEwayList, loadEligibleSales]);
+  }, [isOpen, fetchEwayList, loadEligibleSales, fetchConfigStatus]);
 
   const handleGenerate = async (e) => {
     e.preventDefault();
@@ -78,19 +89,55 @@ export default function EWayBillHub({ isOpen, onClose }) {
         transporterId,
         vehicleNo,
         distance: km,
-        provider: 'Portal',
+        provider: 'Auto',
       });
-      toast.success(doc?.ewbNo ? `E-Way Bill ${doc.ewbNo} saved` : 'Bill prepared. File it on the E-Way Bill website.');
+      if (doc?.ewbNo) {
+        toast.success(`E-Way Bill ${doc.ewbNo} generated & saved to invoice!`);
+      } else {
+        toast.success('E-Way Bill prepared successfully');
+      }
+      if (doc?.alert) {
+        toast.info(doc.alert);
+      }
       setShowGenerateModal(false);
       setSelectedSaleId('');
       setVehicleNo('');
       setDistanceKm('');
       fetchEwayList();
-      window.open(EWAY_PORTAL, '_blank', 'noopener,noreferrer');
+      loadEligibleSales();
     } catch (err) {
       notifyError(err, 'Failed to generate E-Way Bill');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDownloadPortalJson = async (salesId) => {
+    const sId = salesId || selectedSaleId;
+    if (!sId) return toast.error('Please select an invoice first');
+    try {
+      const json = await stage4Api.ewayPortalJson(sId);
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(json, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', `EWB_Portal_Upload_${Date.now()}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      toast.success('NIC Bulk JSON downloaded! Upload directly on ewaybillgst.gov.in');
+    } catch (err) {
+      notifyError(err, 'Failed to download Portal JSON');
+    }
+  };
+
+  const handleCancelEwb = async (id, ewbNo) => {
+    if (!window.confirm(`Are you sure you want to cancel E-Way Bill ${ewbNo || ''}?`)) return;
+    try {
+      await stage4Api.ewayCancel(id, { cancelRsnCode: '1', cancelRmrk: 'Order Cancelled' });
+      toast.success('E-Way Bill cancelled successfully');
+      fetchEwayList();
+    } catch (err) {
+      notifyError(err, 'Failed to cancel E-Way Bill');
     }
   };
 
@@ -132,9 +179,20 @@ export default function EWayBillHub({ isOpen, onClose }) {
               <Truck size={22} />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">E-Way Bill Hub</h2>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                Transit Compliance • Rule 138 • Part A & Part B Management
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">E-Way Bill Hub</h2>
+                {configStatus?.isConfigured ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 shadow-sm">
+                    ⚡ Live GSP: {configStatus.provider?.toUpperCase()}
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200 flex items-center gap-1 shadow-sm">
+                    🧪 Simulated / Ready for .env Keys
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                Transit Compliance • Rule 138 • Part A &amp; Part B Management • NIC JSON Ready
               </p>
             </div>
           </div>
@@ -146,7 +204,7 @@ export default function EWayBillHub({ isOpen, onClose }) {
               rel="noopener noreferrer"
               className="px-4 py-2.5 bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
             >
-              <ExternalLink size={14} /> Open E-Way Bill website
+              <ExternalLink size={14} /> Open ewaybillgst.gov.in
             </a>
             <button
               onClick={() => setShowGenerateModal(true)}
@@ -154,7 +212,7 @@ export default function EWayBillHub({ isOpen, onClose }) {
               title={ewayEnabled ? 'Prepare this invoice for the E-Way Bill portal' : 'Turn on E-Way Bill in Company Settings'}
               className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-md disabled:opacity-40"
             >
-              <Plus size={14} /> Prepare E-Way Bill
+              <Plus size={14} /> Generate E-Way Bill
             </button>
             <button
               onClick={handleExportExcel}
@@ -215,12 +273,13 @@ export default function EWayBillHub({ isOpen, onClose }) {
                   <th className="px-4 py-3 text-right">Value (₹)</th>
                   <th className="px-4 py-3">Valid Upto</th>
                   <th className="px-4 py-3 text-center">Status</th>
+                  <th className="px-4 py-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="py-20 text-center text-slate-400">
+                    <td colSpan={11} className="py-20 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <RefreshCw className="animate-spin text-amber-600" size={24} />
                         <span className="font-semibold text-xs">Loading E-Way Bill registry...</span>
@@ -229,7 +288,7 @@ export default function EWayBillHub({ isOpen, onClose }) {
                   </tr>
                 ) : !filtered.length ? (
                   <tr>
-                    <td colSpan={10} className="py-20 text-center text-slate-400">
+                    <td colSpan={11} className="py-20 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Truck size={32} className="text-slate-300" />
                         <span className="font-semibold text-xs">No E-Way Bills found. Click Generate to create one.</span>
@@ -257,9 +316,41 @@ export default function EWayBillHub({ isOpen, onClose }) {
                       </td>
                       <td className="px-4 py-2.5 text-slate-600">{dt(ewb.validUpto)}</td>
                       <td className="px-4 py-2.5 text-center">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${ewb.ewbNo ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                          {ewb.ewbNo ? (ewb.status || 'Filed') : 'Ready for portal'}
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                            ewb.status === 'Cancelled'
+                              ? 'bg-rose-100 text-rose-800'
+                              : ewb.ewbNo
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {ewb.status || (ewb.ewbNo ? 'Generated' : 'Ready')}
                         </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {(ewb.refId || ewb.salesId) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadPortalJson(ewb.refId || ewb.salesId)}
+                              title="Download NIC Bulk JSON for portal upload"
+                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-bold flex items-center gap-1"
+                            >
+                              <Download size={11} /> JSON
+                            </button>
+                          )}
+                          {ewb.status !== 'Cancelled' && (
+                            <button
+                              type="button"
+                              onClick={() => handleCancelEwb(ewb._id, ewb.ewbNo)}
+                              title="Cancel E-Way Bill"
+                              className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded text-[10px] font-bold"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -351,21 +442,36 @@ export default function EWayBillHub({ isOpen, onClose }) {
                 </div>
               </div>
 
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+              <div className="pt-4 flex items-center justify-between gap-3 border-t border-slate-100 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => setShowGenerateModal(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold"
+                  disabled={!selectedSaleId}
+                  onClick={() => handleDownloadPortalJson(selectedSaleId)}
+                  className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-40"
+                  title="Download Govt NIC format JSON to upload for free on ewaybillgst.gov.in"
                 >
-                  Cancel
+                  <Download size={14} /> Download Portal JSON (Free)
                 </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-5 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold flex items-center gap-2"
-                >
-                  {submitting ? 'Preparing...' : 'Prepare & open website'}
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowGenerateModal(false)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-colors"
+                  >
+                    <Zap size={14} />
+                    {submitting
+                      ? 'Generating...'
+                      : (configStatus?.mode === 'live' ? '⚡ Generate Live E-Way Bill' : '⚡ Generate E-Way Bill')}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

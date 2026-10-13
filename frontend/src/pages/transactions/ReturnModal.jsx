@@ -9,6 +9,7 @@ import { notifyError, notifySuccess } from '../../utils/notify';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import useConfigStore from '../../store/useConfigStore';
 import { money } from '../../utils/salesBillCalc';
+import { erpConfirmDeleteLine } from '../../utils/confirm';
 import { Trash2, Plus } from 'lucide-react';
 import { peekBillNo } from '../../utils/nextBillNo';
 
@@ -548,7 +549,10 @@ const ReturnModal = ({
     setGridItems(prev => [...prev, blankLine()]);
   };
 
-  const removeGridRow = (idx) => {
+  const removeGridRow = async (idx) => {
+    if (locked) return;
+    const ok = await erpConfirmDeleteLine();
+    if (!ok) return;
     if (gridItems.length <= 1) {
       setGridItems([blankLine()]);
       return;
@@ -937,8 +941,47 @@ const ReturnModal = ({
                 </thead>
                 <tbody>
                   {gridItems.map((row, idx) => (
-                    <tr key={row.id || idx}>
-                      <td className="col-sr text-center font-bold">{idx + 1}</td>
+                    <tr
+                      key={row.id || idx}
+                      onKeyDown={(e) => {
+                        if (locked) return;
+                        const isPlainDelete = e.key === 'Delete' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey;
+                        const isShortcutDelete =
+                          (e.shiftKey && e.key === 'Delete') ||
+                          (e.ctrlKey && e.key === 'Delete') ||
+                          (e.altKey && (e.key === 'd' || e.key === 'D'));
+
+                        if (isShortcutDelete) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          removeGridRow(idx);
+                          return;
+                        }
+
+                        if (isPlainDelete) {
+                          const el = e.target;
+                          const isInputOrTextarea = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+                          if (!isInputOrTextarea || !el.value?.trim()) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            removeGridRow(idx);
+                          }
+                        }
+                      }}
+                    >
+                      <td
+                        className="col-sr text-center font-bold select-none cursor-pointer"
+                        tabIndex={0}
+                        title="Click / focus to select line, press Delete to delete"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Delete') {
+                            e.preventDefault();
+                            removeGridRow(idx);
+                          }
+                        }}
+                      >
+                        {idx + 1}
+                      </td>
                       <td className="col-item" style={{ position: 'relative' }}>
                         <ERPCombobox
                           value={row.itemId}

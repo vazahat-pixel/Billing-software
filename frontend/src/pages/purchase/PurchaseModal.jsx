@@ -18,7 +18,7 @@ import { ERPCombobox } from '../../components/erp';
 import ErpWindowControls from '../../components/erp/ErpWindowControls';
 import ErpKeyboardHintBar, { FORM_KEYBOARD_HINTS } from '../../components/erp/ErpKeyboardHintBar';
 import useErpWindow from '../../hooks/useErpWindow';
-import { erpConfirm } from '../../utils/confirm';
+import { erpConfirm, erpConfirmDeleteLine } from '../../utils/confirm';
 import { resolveParty, buildWhatsAppMessage, openWhatsAppShare, shareInvoiceWhatsApp } from '../../utils/invoiceHelpers';
 import { getFocusableElements, focusNextField, handleFormEnterKeyDown, handleFormArrowKeyDown } from '../../utils/formEnterNavigation';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
@@ -43,6 +43,7 @@ const isFoldLessUnit = (unit) => String(unit || '').toUpperCase() !== 'NETQTY';
 
 const blankLine = () => ({
   id: Date.now(),
+  srNo: 1,
   itemId: '',
   itemName: '',
   desc: '',
@@ -320,8 +321,10 @@ const PurchaseModal = ({
     }
   };
 
-  const deleteRow = (idx) => {
+  const deleteRow = async (idx) => {
     if (locked) return;
+    const ok = await erpConfirmDeleteLine();
+    if (!ok) return;
     const updated = gridItems.filter((_, i) => i !== idx);
     const nextRows = updated.length ? updated : [blankLine()];
     setGridItems(nextRows);
@@ -340,7 +343,7 @@ const PurchaseModal = ({
       return;
     }
 
-    setGridItems((prev) => [...prev, blankLine()]);
+    setGridItems((prev) => [...prev, { ...blankLine(), id: prev.length + 1, srNo: prev.length + 1 }]);
     setTimeout(() => focusRowItem(idx + 1), 40);
   };
 
@@ -610,6 +613,9 @@ const PurchaseModal = ({
       } else {
         setSelectedPurchaseId('');
         setMode('View');
+        peekBillNo('purchase').then((no) => {
+          if (!cancelled) setHeader((h) => ({ ...h, vNo: no || '1', billNo: h.billNo || no || '1' }));
+        });
       }
     } else if (incomingId && openedOnceRef.current !== incomingId && Array.isArray(initialData?.items)) {
       openedOnceRef.current = incomingId;
@@ -641,15 +647,28 @@ const PurchaseModal = ({
     // Always fetch latest purchases on modal open
     fetchPurchases().catch(() => {});
 
+    const t = setTimeout(() => {
+      if (modalContainerRef.current) {
+        const focusables = getFocusableElements(modalContainerRef.current);
+        if (focusables.length > 0) {
+          focusables[0].focus();
+          if (typeof focusables[0].select === 'function') {
+            try { focusables[0].select(); } catch {}
+          }
+        }
+      }
+    }, 80);
+
     return () => {
       cancelled = true;
+      clearTimeout(t);
     };
   }, [isOpen, readOnly, selectedBook, fetchParties, fetchItems, fetchPurchases]);
 
   // When purchases load into store (e.g. from background fetch) and no bill is selected yet:
   useEffect(() => {
     if (!isOpen) return undefined;
-    if (initialData || readOnly || mode === 'Edit' || selectedPurchaseId) return undefined;
+    if (initialData || readOnly || mode === 'Add' || mode === 'Edit' || selectedPurchaseId) return undefined;
     if (!bookPurchases.length) return undefined;
     const last = bookPurchases[bookPurchases.length - 1];
     loadPurchaseData(last);
@@ -997,15 +1016,15 @@ const PurchaseModal = ({
 
   const focusPurchaseBillNo = () => {
     setTimeout(() => {
-      const bill = suppBillRef.current;
-      if (!bill) return;
-      bill.focus();
-      try { bill.select(); } catch { /* ignore */ }
-    }, 120);
+      const bill = suppBillRef.current || modalContainerRef.current?.querySelector('.erp-sales-bill-meta input:not([disabled])');
+      if (bill) {
+        bill.focus();
+        try { bill.select(); } catch { /* ignore */ }
+      }
+    }, 50);
   };
 
   const handleNew = async () => {
-    const vNo = await peekBillNo('purchase');
     setSelectedPurchaseId('');
     setMode('Add');
     setBillAttachment(null);
@@ -1016,8 +1035,8 @@ const PurchaseModal = ({
       book: selectedBook || 'PURCHASE BOOK',
       gstin: '',
       city: '',
-      vNo,
-      billNo: vNo,
+      vNo: '',
+      billNo: '',
       billDate: today(),
       challanNo: '',
       chDate: today(),
@@ -1045,8 +1064,14 @@ const PurchaseModal = ({
       rcmChargeSign: '+',
       remarks: ''
     });
-    setMode('Add');
     focusPurchaseBillNo();
+    toast.info('New Purchase Bill (Add mode)');
+
+    try {
+      let vNo = await peekBillNo('purchase');
+      if (!vNo || vNo === '0') vNo = '1';
+      setHeader((h) => ({ ...h, vNo, billNo: h.billNo || vNo }));
+    } catch {}
   };
 
   const handleNewRef = useRef(handleNew);
@@ -1162,7 +1187,8 @@ const PurchaseModal = ({
         roundOff: footer.roundOff,
         rcmCharge: footer.rcmCharge,
         rcmChargeSign: footer.rcmChargeSign,
-        items: validLines.map(i => ({
+        items: validLines.map((i, idx) => ({
+          srNo: idx + 1,
           itemId: i.itemId,
           desc: i.desc,
           fold: Number(i.fold || 0),
@@ -1368,13 +1394,51 @@ const PurchaseModal = ({
     }, 'itemId');
   };
 
+  const handleDirectSaleBill = () => {
+    const targetId = selectedPurchaseId || saveNextActions?.id;
+    const inv = purchases.find((p) => String(p._id || p.id) === String(targetId)) || saveNextActions?.invoice;
+    const pItems = Array.isArray(inv?.items) && inv.items.length > 0 ? inv.items : gridItems;
+    const validItems = pItems.filter((i) => i.itemId || i.desc);
+    if (!validItems.length) {
+      toast.warning('No items found in purchase to sell');
+      return;
+    }
+    const salesData = {
+      fromPurchase: true,
+      purchaseId: targetId || 'temp',
+      purchaseBillNo: header.vNo || header.billNo || inv?.invoiceNo,
+      brokerId: header.broker || undefined,
+      type: header.type || 'INVOICE IN STATE',
+      items: validItems.map((item) => {
+        const itemObj = items.find((it) => String(it._id || it.id) === String(item.itemId?._id || item.itemId));
+        return {
+          itemId: item.itemId?._id || item.itemId || '',
+          itemName: item.itemName || item.itemId?.itemName || item.itemId?.name || itemObj?.name || '',
+          desc: item.desc || '',
+          fold: Number(item.fold || 0),
+          cut: Number(item.cut || 0),
+          pcs: Number(item.pcs || 0),
+          mts: Number(item.mts || 0),
+          rate: Number(item.saleRate || itemObj?.salesRate || item.rate || 0),
+          saleRate: Number(item.saleRate || itemObj?.salesRate || item.rate || 0),
+          unit: String(item.unit || item.itemId?.unit || itemObj?.unit || 'MTRS').toUpperCase(),
+          amount: Number(item.amount || 0),
+          gstPer: Number(item.gstPer ?? itemObj?.gstRate ?? 0),
+          gstAmt: Number(item.gstAmt || 0),
+          pcsDetails: Array.isArray(item.pcsDetails) ? item.pcsDetails : [],
+        };
+      }),
+    };
+    onOpenSales?.(salesData);
+  };
+
   const nextStepActions = [
     onOpenSales && {
       key: 'sales',
-      label: '1. Open Sales Bill',
+      label: '1. Direct Sale Bill (from this purchase)',
       onClick: () => {
         setSaveNextActions(null);
-        onOpenSales();
+        handleDirectSaleBill();
       }
     },
     onOpenMillIssue && {
@@ -1514,8 +1578,8 @@ const PurchaseModal = ({
                   <div className="classic-erp-meta-grid erp-sales-ref-meta">
                     {billFields.header('vNo') && (
                       <div className="classic-erp-field">
-                        <span className="classic-erp-label">Voucher:</span>
-                        <input type="text" className="classic-erp-input" value={header.vNo} readOnly />
+                        <span className="classic-erp-label">SrNo:</span>
+                        <input type="text" className="classic-erp-input font-bold text-center" value={header.vNo || '1'} readOnly title="SrNo (Auto-increments starting from 1)" />
                       </div>
                     )}
                     <div className="classic-erp-field">
@@ -1634,7 +1698,7 @@ const PurchaseModal = ({
                 >
                   <thead>
                     <tr>
-                      <th className="col-sr text-center">Sr</th>
+                      <th className="col-sr text-center font-bold">SrNo</th>
                       <th className="col-item">Item Name *</th>
                       <th className="col-desc">Desc</th>
                       <th className="col-num text-center">Fold</th>
@@ -1658,14 +1722,43 @@ const PurchaseModal = ({
                         key={row.id || idx}
                         onKeyDown={(e) => {
                           if (locked) return;
-                          if ((e.shiftKey && e.key === 'Delete') || (e.ctrlKey && e.key === 'Delete') || (e.altKey && (e.key === 'd' || e.key === 'D'))) {
+                          const isPlainDelete = e.key === 'Delete' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey;
+                          const isShortcutDelete =
+                            (e.shiftKey && e.key === 'Delete') ||
+                            (e.ctrlKey && e.key === 'Delete') ||
+                            (e.altKey && (e.key === 'd' || e.key === 'D'));
+
+                          if (isShortcutDelete) {
                             e.preventDefault();
                             e.stopPropagation();
                             deleteRow(idx);
+                            return;
+                          }
+
+                          if (isPlainDelete) {
+                            const el = e.target;
+                            const isInputOrTextarea = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+                            if (!isInputOrTextarea || !el.value?.trim()) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              deleteRow(idx);
+                            }
                           }
                         }}
                       >
-                        <td className="col-sr text-center font-bold">{idx + 1}</td>
+                        <td
+                          className="col-sr text-center font-bold select-none cursor-pointer"
+                          tabIndex={0}
+                          title="Click / focus to select line, press Delete to delete"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Delete') {
+                              e.preventDefault();
+                              deleteRow(idx);
+                            }
+                          }}
+                        >
+                          {idx + 1}
+                        </td>
                         <td className="col-item" style={{ position: 'relative' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
                             <ERPCombobox
@@ -1954,6 +2047,9 @@ const PurchaseModal = ({
             <button className="classic-erp-btn" type="button" onClick={() => setMode('Edit')} disabled={readOnly || mode !== 'View' || !selectedPurchaseId || saving} title="Edit Bill (F2 / Alt+E)">Edit</button>
             <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || saving || !selectedPurchaseId}>Delete</button>
             <button className="classic-erp-btn btn-blue" type="button" onClick={() => selectedPurchaseId && setPrintInvoiceId(selectedPurchaseId)} disabled={!selectedPurchaseId}>PDF / Print</button>
+            {onOpenSales && selectedPurchaseId && (
+              <button className="classic-erp-btn font-bold bg-emerald-100 border-emerald-500 text-emerald-900 hover:bg-emerald-200" type="button" onClick={handleDirectSaleBill} disabled={saving} title="Direct Sale Bill from this purchase">Direct Sale</button>
+            )}
             <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
           </div>
         </div>

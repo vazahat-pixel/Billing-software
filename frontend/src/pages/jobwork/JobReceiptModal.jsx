@@ -4,6 +4,7 @@ import { ERPCombobox } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import useStore from '../../store/useStore';
 import { toast } from '../../store/useToastStore';
+import { erpConfirmDeleteLine } from '../../utils/confirm';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import { handleFormEnterKeyDown, handleFormArrowKeyDown } from '../../utils/formEnterNavigation';
 import JobWorkPrint from '../../components/print/JobWorkPrint';
@@ -214,20 +215,46 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
       return;
     }
     let cancelled = false;
-    setBootLoading(true);
-    Promise.all([fetchJobs(), fetchParties?.()])
+    const state = useStore.getState();
+    const hasMasters = (state.parties || []).length > 0;
+    if (!hasMasters) {
+      setBootLoading(true);
+    } else {
+      setBootLoading(false);
+    }
+
+    const existingJobs = state.jobWorkEntries || [];
+    const list = existingJobs
+      .filter((j) => j.status === 'Received' || j.status === 'Partial' || j.status === 'Issued')
+      .sort((a, b) => {
+        const numA = parseInt(String(a.billChNo || a.challanNo || a.jobCardNo || '').replace(/\D/g, ''), 10);
+        const numB = parseInt(String(b.billChNo || b.challanNo || b.jobCardNo || '').replace(/\D/g, ''), 10);
+        if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+        return new Date(a.receiveDate || a.issueDate || a.createdAt || 0) - new Date(b.receiveDate || b.issueDate || b.createdAt || 0);
+      });
+    const latest = list[list.length - 1];
+    if (latest) loadReceipt(latest._id || latest.id, 'View');
+
+    const backgroundTasks = [];
+    if (!hasMasters) backgroundTasks.push(fetchParties?.());
+    backgroundTasks.push(fetchJobs());
+
+    Promise.all(backgroundTasks)
       .then(() => {
         if (cancelled) return;
-        const list = (useStore.getState().jobWorkEntries || [])
-          .filter((j) => j.status === 'Received' || j.status === 'Partial' || j.status === 'Issued')
-          .sort((a, b) => {
-            const numA = parseInt(String(a.billChNo || a.challanNo || a.jobCardNo || '').replace(/\D/g, ''), 10);
-            const numB = parseInt(String(b.billChNo || b.challanNo || b.jobCardNo || '').replace(/\D/g, ''), 10);
-            if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
-            return new Date(a.receiveDate || a.issueDate || a.createdAt || 0) - new Date(b.receiveDate || b.issueDate || b.createdAt || 0);
-          });
-        const latest = list[list.length - 1];
-        if (latest) loadReceipt(latest._id || latest.id, 'View');
+        const freshState = useStore.getState();
+        if (!list.length && freshState.jobWorkEntries?.length) {
+          const freshList = freshState.jobWorkEntries
+            .filter((j) => j.status === 'Received' || j.status === 'Partial' || j.status === 'Issued')
+            .sort((a, b) => {
+              const numA = parseInt(String(a.billChNo || a.challanNo || a.jobCardNo || '').replace(/\D/g, ''), 10);
+              const numB = parseInt(String(b.billChNo || b.jobCardNo || b.challanNo || '').replace(/\D/g, ''), 10);
+              if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+              return new Date(a.receiveDate || a.issueDate || a.createdAt || 0) - new Date(b.receiveDate || b.issueDate || b.createdAt || 0);
+            });
+          const freshLatest = freshList[freshList.length - 1];
+          if (freshLatest) loadReceipt(freshLatest._id || freshLatest.id, 'View');
+        }
       })
       .catch(() => { })
       .finally(() => {
@@ -236,7 +263,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     return () => {
       cancelled = true;
     };
-  }, [isOpen, fetchJobs, fetchParties]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && selectedBook) {
@@ -354,9 +381,29 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     });
   }, []);
 
-  const addLine = () => setLines((prev) => [...prev, blankLine()]);
+  const getNextSerialNo = useCallback(() => {
+    const list = Array.isArray(jobWorkEntries) ? jobWorkEntries : [];
+    let max = 0;
+    list.forEach((j) => {
+      const num = parseInt(String(j.serialNo || j.billChNo || '').replace(/\D/g, ''), 10);
+      if (!isNaN(num) && num > max) max = num;
+    });
+    const receivedCount = list.filter((j) => j.status === 'Received' || j.status === 'Partial').length;
+    return String(Math.max(max, receivedCount) + 1);
+  }, [jobWorkEntries]);
 
-  const removeLine = (idx) => {
+  useEffect(() => {
+    if (isOpen && mode === 'Add' && (!header.partyId || header.serialNo === '1')) {
+      setHeader((h) => ({ ...h, serialNo: getNextSerialNo() }));
+    }
+  }, [isOpen, mode, getNextSerialNo]);
+
+  const addLine = () => setLines((prev) => [...prev, { ...blankLine(), srNo: prev.length + 1 }]);
+
+  const removeLine = async (idx) => {
+    if (locked) return;
+    const ok = await erpConfirmDeleteLine();
+    if (!ok) return;
     setLines((prev) => (prev.length <= 1 ? [blankLine()] : prev.filter((_, i) => i !== idx)));
   };
 
@@ -437,7 +484,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     setMode('Add');
     setSelectedReceiptId('');
     setFindOpen(false);
-    setHeader(emptyHeader(selectedBook));
+    setHeader({ ...emptyHeader(selectedBook), serialNo: getNextSerialNo() });
     setFooter(emptyFooter());
     setLines([blankLine()]);
     setTimeout(() => {
@@ -467,8 +514,10 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     if (!job) return;
     setSelectedReceiptId(jobId);
     setMode(targetMode);
+    const receiptIdx = sortedReceipts.findIndex((j) => String(j._id || j.id) === String(jobId));
+    const autoSr = String(receiptIdx >= 0 ? receiptIdx + 1 : '1');
     setHeader({
-      serialNo: '1',
+      serialNo: job.serialNo || autoSr,
       date: job.receiveDate ? String(job.receiveDate).split('T')[0] : (job.issueDate ? String(job.issueDate).split('T')[0] : today()),
       reverseCharge: 'No',
       billChNo: job.billChNo || job.challanNo || job.jobCardNo || '',
@@ -546,6 +595,8 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
           receivedPcs: recPcs,
           charges: Number(line.jobAmt) || 0,
           gstAmount: Number(gstShare.toFixed(2)) || 0,
+          serialNo: header.serialNo || getNextSerialNo(),
+          srNo: ok + 1,
           isFinal,
         });
         ok += 1;
@@ -691,13 +742,14 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                         />
                       </div>
                       <div className="classic-erp-field">
-                        <span className="classic-erp-label red-label">Serail No</span>
+                        <span className="classic-erp-label red-label">SrNo</span>
                         <input
                           type="text"
                           className="classic-erp-input text-center font-bold"
                           value={header.serialNo}
                           onChange={(e) => setHeader({ ...header, serialNo: e.target.value })}
                           disabled={locked}
+                          title="SrNo (Auto-increments starting from 1)"
                         />
                       </div>
                       <div className="classic-erp-field">
@@ -787,7 +839,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                   >
                     <thead>
                       <tr>
-                        <th className="w-8">SrNo</th>
+                        <th className="w-8 font-bold">SrNo</th>
                         {gridCols.map((c) => (
                           <th key={c.key} className={`${c.w} ${c.align === 'right' ? 'text-right' : ''}`}>
                             {c.label}
@@ -798,8 +850,48 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                     </thead>
                     <tbody>
                       {calc.linesWithAmt.map((line, idx) => (
-                        <tr key={line.id} data-row-idx={idx}>
-                          <td className="text-center text-slate-500">{idx + 1}</td>
+                        <tr
+                          key={line.id}
+                          data-row-idx={idx}
+                          onKeyDown={(e) => {
+                            if (locked) return;
+                            const isPlainDelete = e.key === 'Delete' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey;
+                            const isShortcutDelete =
+                              (e.shiftKey && e.key === 'Delete') ||
+                              (e.ctrlKey && e.key === 'Delete') ||
+                              (e.altKey && (e.key === 'd' || e.key === 'D'));
+
+                            if (isShortcutDelete) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              removeLine(idx);
+                              return;
+                            }
+
+                            if (isPlainDelete) {
+                              const el = e.target;
+                              const isInputOrTextarea = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+                              if (!isInputOrTextarea || !el.value?.trim()) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                removeLine(idx);
+                              }
+                            }
+                          }}
+                        >
+                          <td
+                            className="text-center font-bold text-slate-700 select-none cursor-pointer"
+                            tabIndex={0}
+                            title="Click / focus to select line, press Delete to remove"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Delete') {
+                                e.preventDefault();
+                                removeLine(idx);
+                              }
+                            }}
+                          >
+                            {idx + 1}
+                          </td>
                           {gridCols.map((c) => {
                             if (c.key === 'chlnNo') {
                               return (

@@ -57,12 +57,10 @@ export const markServerUnreachable = () => {
 
 export const markServerReachable = () => {
   if (!browserOnline && !useLocalApiAsSourceOfTruth()) return;
-  if (!serverReachable) {
-    serverReachable = true;
-    notify();
-  } else {
-    serverReachable = true;
-  }
+  const wasOffline = !serverReachable;
+  serverReachable = true;
+  // Only notify subscribers when transitioning from offline → online to avoid UI flicker
+  if (wasOffline) notify();
 };
 
 export const getApiOrigin = () => {
@@ -114,27 +112,36 @@ export const probeServerReachability = async () => {
   probing = true;
   try {
     const origin = getApiOrigin();
-    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const t = setTimeout(() => ctrl?.abort(), 3500);
-    
+    const TIMEOUT_MS = 5000;
+
+    const tryFetch = async (url) => {
+      const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const t = ctrl ? setTimeout(() => ctrl.abort(), TIMEOUT_MS) : null;
+      try {
+        const res = await fetch(url, {
+          method: 'GET',
+          cache: 'no-store',
+          signal: ctrl?.signal,
+        });
+        return res;
+      } finally {
+        if (t != null) clearTimeout(t);
+      }
+    };
+
     let res;
     try {
-      res = await fetch(`${origin}/api/health`, {
-        method: 'GET',
-        cache: 'no-store',
-        signal: ctrl?.signal,
-      });
+      res = await tryFetch(`${origin}/api/health`);
     } catch {
       /* try fallback */
     }
     if (!res || !res.ok) {
-      res = await fetch(`${origin}/health`, {
-        method: 'GET',
-        cache: 'no-store',
-        signal: ctrl?.signal,
-      });
+      try {
+        res = await tryFetch(`${origin}/health`);
+      } catch {
+        /* ignore */
+      }
     }
-    clearTimeout(t);
     if (res && (res.ok || (res.status >= 200 && res.status < 500))) {
       markServerReachable();
     } else {

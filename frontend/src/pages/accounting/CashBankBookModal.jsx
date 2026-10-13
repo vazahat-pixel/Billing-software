@@ -3,7 +3,7 @@ import useStore from '../../store/useStore';
 import { ERPCombobox, ErpKeyboardHintBar, FORM_KEYBOARD_HINTS } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import { notifySuccess, notifyWarning, notifyError } from '../../utils/notify';
-import { erpConfirm } from '../../utils/confirm';
+import { erpConfirm, erpConfirmDeleteLine } from '../../utils/confirm';
 import { Plus } from 'lucide-react';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import BillNoLookupModal from './BillNoLookupModal';
@@ -675,7 +675,10 @@ const CashBankBookModal = ({
     }
   }, [billRows]);
 
-  const removeBillRow = (idx) => {
+  const removeBillRow = async (idx) => {
+    if (locked) return;
+    const ok = await erpConfirmDeleteLine();
+    if (!ok) return;
     setBillRows((rows) => withPickerRow(rows.filter((_, i) => i !== idx)));
   };
 
@@ -1395,15 +1398,52 @@ const CashBankBookModal = ({
               </thead>
               <tbody>
                 {billRows.map((row, idx) => (
-                  <tr key={row.id || idx}>
-                    <td className="text-center text-blue-800 font-bold">
+                  <tr
+                    key={row.id || idx}
+                    onKeyDown={(e) => {
+                      if (locked) return;
+                      const isPlainDelete = e.key === 'Delete' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey;
+                      const isShortcutDelete =
+                        (e.shiftKey && e.key === 'Delete') ||
+                        (e.ctrlKey && e.key === 'Delete') ||
+                        (e.altKey && (e.key === 'd' || e.key === 'D'));
+
+                      if (isShortcutDelete) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        removeBillRow(idx);
+                        return;
+                      }
+
+                      if (isPlainDelete) {
+                        const el = e.target;
+                        const isInputOrTextarea = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+                        if (!isInputOrTextarea || !el.value?.trim()) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          removeBillRow(idx);
+                        }
+                      }
+                    }}
+                  >
+                    <td
+                      className="text-center text-blue-800 font-bold select-none cursor-pointer"
+                      tabIndex={locked ? -1 : 0}
+                      title="Click / focus to select line, press Delete to delete"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Delete') {
+                          e.preventDefault();
+                          removeBillRow(idx);
+                        }
+                      }}
+                    >
                       {locked ? (
                         idx === 0 ? '►' : ''
                       ) : (
                         <button
                           type="button"
                           tabIndex={-1}
-                          title="Remove this line (Ctrl+Del in BillNo)"
+                          title="Remove this line (Delete)"
                           onClick={() => removeBillRow(idx)}
                           style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#b91c1c', fontWeight: 700, lineHeight: 1 }}
                         >

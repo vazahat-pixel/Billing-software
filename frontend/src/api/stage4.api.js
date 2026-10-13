@@ -39,6 +39,9 @@ export const stage4Api = {
   einvoiceCancel: (id, body) => unwrap(post(`/stage4/einvoice/${id}/cancel`, body || {})),
   ewayList: (params) => unwrap(get('/stage4/eway', params)).then((d) => asArray(d)),
   ewayGenerate: (body) => unwrap(post('/stage4/eway/generate', body)),
+  ewayConfigStatus: () => unwrap(get('/stage4/eway/config-status')),
+  ewayPortalJson: (salesId) => unwrap(get(`/stage4/eway/portal-json/${salesId}`)),
+  ewayCancel: (id, body) => unwrap(post(`/stage4/eway/${id}/cancel`, body || {})),
 
   // CA Workspace
   caOverview: (params) => unwrap(get('/stage4/ca/overview', params)),

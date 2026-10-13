@@ -20,3 +20,15 @@ export function erpConfirmDelete(entityName = 'this record') {
     danger: true,
   });
 }
+
+export function erpConfirmDeleteLine(message = 'Do you want to delete this line?') {
+  return erpConfirm({
+    title: 'Delete Line',
+    message,
+    confirmLabel: 'Yes',
+    cancelLabel: 'No',
+    danger: true,
+    defaultFocus: 'confirm',
+  });
+}
+

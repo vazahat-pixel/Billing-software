@@ -252,14 +252,23 @@ export default function SuratBold({ data }) {
               </tr>
                 );
             })}
-            {/* Empty rows */}
-            {Array.from({ length: Math.max(0, 6 - (lines || []).length) }).map((_, i) => (
-              <tr key={`e-${i}`}>
+            {/* Single blank filler row */}
+            {(lines || []).length < 6 && (
+              <tr style={{ height: `${(6 - (lines || []).length) * 7}mm` }}>
                 {Array.from({ length: 11 }).map((__, j) => (
-                  <td key={j} style={{ height: '7mm' }}>&nbsp;</td>
+                  <td
+                    key={j}
+                    style={{
+                      height: `${(6 - (lines || []).length) * 7}mm`,
+                      padding: 0,
+                      background: '#fff',
+                    }}
+                  >
+                    &nbsp;
+                  </td>
                 ))}
               </tr>
-            ))}
+            )}
           </tbody>
           <tfoot>
             <tr>

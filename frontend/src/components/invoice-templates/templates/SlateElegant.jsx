@@ -177,11 +177,22 @@ export default function SlateElegant({ data }) {
               <td className="se-num" style={{ fontWeight: 700, color: SLATE }}>{money(line.amount)}</td>
             </tr>
           ))}
-          {Array.from({ length: Math.max(0, 5 - (lines || []).length) }).map((_, i) => (
-            <tr key={`e${i}`}>
-              {Array.from({ length: 10 }).map((__, j) => <td key={j} style={{ height: '7mm' }}>&nbsp;</td>)}
+          {(lines || []).length < 5 && (
+            <tr style={{ height: `${(5 - (lines || []).length) * 7}mm` }}>
+              {Array.from({ length: 10 }).map((__, j) => (
+                <td
+                  key={j}
+                  style={{
+                    height: `${(5 - (lines || []).length) * 7}mm`,
+                    padding: 0,
+                    background: '#fff',
+                  }}
+                >
+                  &nbsp;
+                </td>
+              ))}
             </tr>
-          ))}
+          )}
         </tbody>
         <tfoot>
           <tr>

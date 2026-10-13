@@ -15,7 +15,8 @@ export default function ConfirmDialogHost() {
   useEffect(() => {
     if (!dialog) return;
     const t = setTimeout(() => {
-      (dialog.danger ? cancelRef : confirmRef).current?.focus();
+      const focusConfirm = dialog.defaultFocus === 'confirm' || (!dialog.danger && dialog.defaultFocus !== 'cancel');
+      (focusConfirm ? confirmRef : cancelRef).current?.focus();
     }, 40);
     return () => clearTimeout(t);
   }, [dialog]);
@@ -26,10 +27,15 @@ export default function ConfirmDialogHost() {
       if (e.key === 'Escape' && !dialog.loading) {
         e.preventDefault();
         close(false);
+        return;
       }
       if (e.key === 'Enter' && !dialog.loading) {
         e.preventDefault();
-        close(true);
+        if (document.activeElement === cancelRef.current) {
+          close(false);
+        } else {
+          close(true);
+        }
       }
     };
     window.addEventListener('keydown', onKey);

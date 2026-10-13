@@ -91,6 +91,17 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
   const [saving, setSaving] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const fileRef = useRef(null);
+  const itemCodeRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'Add') {
+      const t = setTimeout(() => {
+        itemCodeRef.current?.focus();
+        try { itemCodeRef.current?.select(); } catch {}
+      }, 70);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen, activeTab]);
 
   useEffect(() => {
     if (isOpen) fetchItems();
@@ -337,12 +348,18 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
               )}
             </div>
             <FormField label="ItemCode" className="w-40">
-              <ERPInput value={formData.itemCode} onChange={(e) => setField('itemCode', e.target.value)} disabled={readOnly} />
+              <ERPInput
+                ref={itemCodeRef}
+                autoFocus={activeTab === 'Add'}
+                value={formData.itemCode}
+                onChange={(e) => setField('itemCode', e.target.value)}
+                disabled={readOnly}
+              />
             </FormField>
           </div>
 
           <FormField label="Item Name">
-            <ERPInput autoFocus={activeTab === 'Add'} value={formData.itemName} onChange={(e) => setField('itemName', e.target.value)} disabled={readOnly} />
+            <ERPInput value={formData.itemName} onChange={(e) => setField('itemName', e.target.value)} disabled={readOnly} />
           </FormField>
 
           <div className="erp-grid erp-grid-2">

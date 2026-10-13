@@ -68,6 +68,11 @@ export const classicGridStyles = `
     min-height: auto !important;
   }
 
+  .ipe-classic-grid tr.ipe-classic-blank-row td {
+    padding: 0 !important;
+    background: #fff;
+  }
+
   @media print {
     .invoice-engine-textile-pro.invoice-print-engine {
       padding: 0 !important;
@@ -78,6 +83,10 @@ export const classicGridStyles = `
     .ipe-classic-grid th,
     .ipe-classic-grid td {
       border: ${CLASSIC_BORDER} !important;
+    }
+    .ipe-classic-grid tr.ipe-classic-blank-row td {
+      padding: 0 !important;
+      background: #fff !important;
     }
   }
 `;

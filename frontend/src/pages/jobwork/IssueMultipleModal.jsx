@@ -25,13 +25,14 @@ const IssueMultipleModal = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     if (!isOpen) return;
-    setBootLoading(true);
+    const hasMasters = (useStore.getState().parties || []).length > 0;
+    if (!hasMasters) setBootLoading(true);
     Promise.all([fetchParties(), fetchInventory()]).finally(() => setBootLoading(false));
     setMillId('');
     setJobRate('');
     setSelected({});
     setProgress(null);
-  }, [isOpen, fetchParties, fetchInventory]);
+  }, [isOpen]);
 
   const mills = useMemo(
     () => (parties || []).filter((p) => ['Job Worker', 'Both'].includes(p.type) || (p.group || '').toUpperCase().includes('JOB')),

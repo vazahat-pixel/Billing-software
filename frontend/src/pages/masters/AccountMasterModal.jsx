@@ -35,8 +35,8 @@ const EMPTY_ACCOUNT = {
   updateInAllYear: 'N',
   aadharNo: '',
   gstin: '',
-  stateCode: '',
-  stateName: '',
+  stateCode: '24',
+  stateName: '24-GUJARAT',
   gstType: 'INVOICE (IN STATE)',
   udyamAadhar: '',
   msmeType: 'None',
@@ -206,7 +206,16 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
         }))
         .filter((b) => b.name);
 
-      const payload = { ...formData, name: formData.name.trim(), type, banks };
+      const finalStateCode = formData.stateCode || '24';
+      const finalStateName = formData.stateName || `${finalStateCode}-${GST_STATE_CODES[finalStateCode] || 'GUJARAT'}`;
+      const payload = {
+        ...formData,
+        name: formData.name.trim(),
+        stateCode: finalStateCode,
+        stateName: finalStateName,
+        type,
+        banks,
+      };
       
       let result;
       if (mode === 'Edit' && (formData._id || formData.id)) {
@@ -509,8 +518,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                         if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
                           e.preventDefault();
                           e.stopPropagation();
-                          gstinRef.current?.focus();
-                          try { gstinRef.current?.select?.(); } catch {}
+                          handleSave();
                         }
                       }}
                       disabled={locked}

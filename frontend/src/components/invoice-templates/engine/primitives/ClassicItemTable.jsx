@@ -60,13 +60,22 @@ export default function ClassicItemTable({ data, templateId = 'textile-pro', pay
             })}
           </tr>
         ))}
-        {Array.from({ length: emptyCount }).map((_, i) => (
-          <tr key={`empty-${i}`}>
+        {emptyCount > 0 && (
+          <tr className="ipe-classic-blank-row" style={{ height: `${emptyCount * 7}mm` }}>
             {columns.map((col) => (
-              <td key={col.id} style={{ height: '7mm' }}>&nbsp;</td>
+              <td
+                key={col.id}
+                style={{
+                  height: `${emptyCount * 7}mm`,
+                  padding: 0,
+                  background: '#fff',
+                }}
+              >
+                &nbsp;
+              </td>
             ))}
           </tr>
-        ))}
+        )}
       </tbody>
       <tfoot>
         <tr>

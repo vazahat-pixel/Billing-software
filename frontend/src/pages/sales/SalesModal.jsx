@@ -15,7 +15,7 @@ import { ERPCombobox } from '../../components/erp';
 import ErpWindowControls from '../../components/erp/ErpWindowControls';
 import ErpKeyboardHintBar, { FORM_KEYBOARD_HINTS } from '../../components/erp/ErpKeyboardHintBar';
 import useErpWindow from '../../hooks/useErpWindow';
-import { erpConfirm } from '../../utils/confirm';
+import { erpConfirm, erpConfirmDeleteLine } from '../../utils/confirm';
 import { resolveParty, buildWhatsAppMessage, openWhatsAppShare, shareInvoiceWhatsApp } from '../../utils/invoiceHelpers';
 import { getFocusableElements, focusPrevField } from '../../utils/formEnterNavigation';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
@@ -477,15 +477,24 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     }
 
     // Open the form immediately; only block if masters are missing from store.
-    const incomingId = String(initialData?._id || initialData?.id || '');
+    const isFromPurchase = !!initialData?.fromPurchase;
+    const incomingId = isFromPurchase
+      ? `from-purchase-${initialData.purchaseId || Date.now()}`
+      : String(initialData?._id || initialData?.id || '');
+
     if (!openedOnceRef.current) {
       openedOnceRef.current = incomingId || 'open';
       setSaveNextActions(null);
       setPrintInvoiceId(null);
       if (initialData && Array.isArray(initialData.items)) {
         loadInvoiceData(initialData);
-        setSelectedInvoiceId(incomingId);
-        setMode(readOnly ? 'View' : 'Edit');
+        if (isFromPurchase) {
+          setSelectedInvoiceId('');
+          setMode('Add');
+        } else {
+          setSelectedInvoiceId(incomingId);
+          setMode(readOnly ? 'View' : 'Edit');
+        }
       } else if (readOnly) {
         setMode('View');
       } else if (!readOnly) {
@@ -494,8 +503,13 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     } else if (incomingId && openedOnceRef.current !== incomingId && Array.isArray(initialData?.items)) {
       openedOnceRef.current = incomingId;
       loadInvoiceData(initialData);
-      setSelectedInvoiceId(incomingId);
-      setMode(readOnly ? 'View' : 'Edit');
+      if (isFromPurchase) {
+        setSelectedInvoiceId('');
+        setMode('Add');
+      } else {
+        setSelectedInvoiceId(incomingId);
+        setMode(readOnly ? 'View' : 'Edit');
+      }
     }
 
     let cancelled = false;
@@ -547,52 +561,77 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   }, [isOpen, selectedBook]);
 
   const loadInvoiceData = (inv) => {
-    const invId = inv._id || inv.id || '';
+    const isFromPurchase = !!inv?.fromPurchase;
+    const invId = isFromPurchase ? '' : (inv._id || inv.id || '');
     if (invId) setSelectedInvoiceId(invId);
+    else if (isFromPurchase) setSelectedInvoiceId('');
+
     setHeader({
-      party: inv.customerId?._id || inv.customerId || '',
-      add: inv.remarks || '',
+      party: isFromPurchase ? '' : (inv.customerId?._id || inv.customerId || ''),
+      add: isFromPurchase ? '' : (inv.remarks || ''),
       broker: inv.brokerId || '',
-      book: inv.bookId || 'SALES BOOK',
-      gstin: inv.customerId?.gstin || '',
-      city: inv.station || '',
-      haste: inv.haste || '',
-      billNo: inv.invoiceNo || '',
-      billDate: inv.date ? inv.date.split('T')[0] : today(),
-      challanNo: inv.challanNo || '',
+      book: inv.bookId || selectedBook || 'SALES BOOK',
+      gstin: isFromPurchase ? '' : (inv.customerId?.gstin || ''),
+      city: isFromPurchase ? '' : (inv.station || ''),
+      haste: isFromPurchase ? '' : (inv.haste || ''),
+      billNo: isFromPurchase ? '' : (inv.invoiceNo || ''),
+      billDate: inv.date && !isFromPurchase ? inv.date.split('T')[0] : today(),
+      challanNo: isFromPurchase ? (inv.purchaseBillNo ? `PUR#${inv.purchaseBillNo}` : '') : (inv.challanNo || ''),
       chDate: inv.chDate ? inv.chDate.split('T')[0] : today(),
       orderNo: inv.orderNo || '',
       orderDate: inv.orderDate ? inv.orderDate.split('T')[0] : today(),
-      type: inv.gstType === 'IGST' ? 'INVOICE OUT OF STATE' : 'INVOICE IN STATE',
+      type: inv.gstType === 'IGST' ? 'INVOICE OUT OF STATE' : (inv.type || 'INVOICE IN STATE'),
       gstType: inv.gstType || 'CGST+SGST'
     });
 
-    setGridItems((Array.isArray(inv.items) ? inv.items : []).map((item, idx) => recalcLine({
-      id: idx + 1,
-      itemId: item.itemId?._id || item.itemId || '',
-      itemName: item.itemName || item.itemId?.itemName || item.itemId?.name || '',
-      desc: item.desc || '',
-      fold: item.fold || 0,
-      cut: item.cut || 0,
-      pcs: item.pcs || 0,
-      mts: item.mts || 0,
-      saleRate: item.rate || 0,
-      unit: item.unit || item.itemId?.unit || 'MTRS',
-      mrp: item.mrp || 0,
-      rdPer: item.rdPer || 0,
-      amount: item.amount || 0,
-      foldDeductionAmt: item.foldDeductionAmt || 0,
-      foldLessAmt: item.foldLessAmt || 0,
-      foldAddAmt: item.foldAddAmt || 0,
-      dis1Per: item.dis1Per || 0,
-      dis1Amt: item.dis1Amt || 0,
-      dis2Per: item.dis2Per || 0,
-      dis2Amt: item.dis2Amt || 0,
-      addAmt: item.addAmt || 0,
-      gstPer: item.gstPer ?? item.itemId?.gstRate ?? 0,
-      gstAmt: item.gstAmt || 0,
-      pcsDetails: Array.isArray(item.pcsDetails) ? item.pcsDetails : [],
-    })));
+    if (isFromPurchase) {
+      peekBillNo('sales').then((nextNo) => {
+        setHeader((h) => ({ ...h, billNo: nextNo || '1' }));
+      });
+    }
+
+    setGridItems((Array.isArray(inv.items) ? inv.items : []).map((item, idx) => {
+      const masterItem = items.find((it) => String(it._id || it.id) === String(item.itemId?._id || item.itemId));
+      const effectiveRate = Number(item.saleRate || masterItem?.salesRate || item.rate || 0);
+      return recalcLine({
+        id: idx + 1,
+        srNo: idx + 1,
+        itemId: item.itemId?._id || item.itemId || '',
+        itemName: item.itemName || item.itemId?.itemName || item.itemId?.name || masterItem?.name || '',
+        desc: item.desc || '',
+        fold: Number(item.fold || 0),
+        cut: Number(item.cut || 0),
+        pcs: Number(item.pcs || 0),
+        mts: Number(item.mts || 0),
+        saleRate: effectiveRate,
+        unit: String(item.unit || item.itemId?.unit || masterItem?.unit || 'MTRS').toUpperCase(),
+        mrp: Number(item.mrp || 0),
+        rdPer: Number(item.rdPer || 0),
+        amount: Number(item.amount || 0),
+        foldDeductionAmt: Number(item.foldDeductionAmt || 0),
+        foldLessAmt: Number(item.foldLessAmt || 0),
+        foldAddAmt: Number(item.foldAddAmt || 0),
+        dis1Per: Number(item.dis1Per || 0),
+        dis1Amt: Number(item.dis1Amt || 0),
+        dis2Per: Number(item.dis2Per || 0),
+        dis2Amt: Number(item.dis2Amt || 0),
+        addAmt: Number(item.addAmt || 0),
+        gstPer: Number(item.gstPer ?? item.itemId?.gstRate ?? masterItem?.gstRate ?? 0),
+        gstAmt: Number(item.gstAmt || 0),
+        pcsDetails: Array.isArray(item.pcsDetails) ? item.pcsDetails : [],
+      });
+    }));
+
+    if (isFromPurchase) {
+      setTimeout(() => {
+        const partyInput = modalContainerRef.current?.querySelector('.classic-erp-header-party .erp-combobox-input, .classic-erp-header-party input, [data-recent-key="sales-party"] input, [data-erp-combobox-input]');
+        if (partyInput) {
+          partyInput.focus();
+          try { partyInput.select?.(); } catch {}
+        }
+      }, 150);
+      toast.info('Purchase items loaded! Select customer to complete Sale Bill.');
+    }
 
     setFooter({
       transport: inv.transport || '',
@@ -1355,8 +1394,10 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     try { input?.select?.(); } catch { /* ignore */ }
   };
 
-  const deleteRow = (idx) => {
+  const deleteRow = async (idx) => {
     if (locked) return;
+    const ok = await erpConfirmDeleteLine();
+    if (!ok) return;
     const updated = gridItems.filter((_, i) => i !== idx);
     const nextRows = updated.length ? updated : [blankLine()];
     setGridItems(nextRows);
@@ -1599,7 +1640,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             <table className="classic-erp-table">
               <thead>
                 <tr>
-                  <th className="col-sr text-center">Sr</th>
+                  <th className="col-sr text-center font-bold">SrNo</th>
                   <th className="col-item">Item Name *</th>
                   <th className="col-desc">Desc *</th>
                   <th className="col-num text-center">Fold</th>
@@ -1625,14 +1666,43 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                     key={row.id || idx}
                     onKeyDown={(e) => {
                       if (locked) return;
-                      if ((e.shiftKey && e.key === 'Delete') || (e.ctrlKey && e.key === 'Delete') || (e.altKey && (e.key === 'd' || e.key === 'D'))) {
+                      const isPlainDelete = e.key === 'Delete' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey;
+                      const isShortcutDelete =
+                        (e.shiftKey && e.key === 'Delete') ||
+                        (e.ctrlKey && e.key === 'Delete') ||
+                        (e.altKey && (e.key === 'd' || e.key === 'D'));
+
+                      if (isShortcutDelete) {
                         e.preventDefault();
                         e.stopPropagation();
                         deleteRow(idx);
+                        return;
+                      }
+
+                      if (isPlainDelete) {
+                        const el = e.target;
+                        const isInputOrTextarea = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+                        if (!isInputOrTextarea || !el.value?.trim()) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          deleteRow(idx);
+                        }
                       }
                     }}
                   >
-                    <td className="col-sr text-center font-bold">{idx + 1}</td>
+                    <td
+                      className="col-sr text-center font-bold select-none cursor-pointer"
+                      tabIndex={0}
+                      title="Click / focus to select line, press Delete to delete"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Delete') {
+                          e.preventDefault();
+                          deleteRow(idx);
+                        }
+                      }}
+                    >
+                      {idx + 1}
+                    </td>
                     <td className="col-item" style={{position:'relative'}}>
                       <div style={{display:'flex',alignItems:'center',gap:2,minWidth:0}}>
                         <ERPCombobox

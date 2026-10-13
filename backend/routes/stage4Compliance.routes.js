@@ -47,7 +47,10 @@ router.get('/einvoice/payload/:salesId', read, c.einvoicePayload);
 router.post('/einvoice/generate', write, c.einvoiceGenerate);
 router.post('/einvoice/:id/cancel', write, objectIdParam, c.einvoiceCancel);
 router.get('/eway', read, c.ewayList);
+router.get('/eway/config-status', read, c.ewayConfigStatus);
+router.get('/eway/portal-json/:salesId', read, objectIdParam, c.ewayPortalJson);
 router.post('/eway/generate', write, c.ewayGenerate);
+router.post('/eway/:id/cancel', write, objectIdParam, c.ewayCancel);
 
 // 4.7 CA Workspace
 router.get('/ca/overview', read, c.caOverview);

@@ -808,6 +808,8 @@ const Dashboard = () => {
       const onMenuKey = (e) => {
          if (e.altKey || e.ctrlKey || e.metaKey || e.isComposing) return;
          const el = e.target;
+         // If Book Selection modal is open, let IT handle arrow/enter/escape — don't steal keys
+         if (document.querySelector('[data-book-selection-modal]')) return;
          if (e.key === 'F9') {
             e.preventDefault();
             e.stopPropagation();
@@ -1165,10 +1167,11 @@ const Dashboard = () => {
 
    const coreModules = useMemo(() => {
       if (isCaUser) return ALL_CORE_MODULES.filter((mod) => mod.key === 'caDashboard');
-      const filtered = ALL_CORE_MODULES.filter(
-         mod => isModuleAllowed(mod.key) && (!mod.flag || isFlagEnabled(bundle, mod.flag, true))
-      );
-      return filtered.length > 0 ? filtered : ALL_CORE_MODULES;
+      // For regular company users: always show all core modules in the quick-access rail.
+      // Plan/permission gating is enforced inside each modal — the rail is just shortcuts.
+      // (Previously only showing filtered set caused rail to show only "GST Reports" when
+      //  plan/moduleConfig restricted other modules.)
+      return ALL_CORE_MODULES.filter((mod) => !mod.flag || isFlagEnabled(bundle, mod.flag, true));
    }, [moduleConfig, bundle, user?.role, isCaUser]);
 
    const openModalDirect = (key) => {
@@ -1793,7 +1796,13 @@ const Dashboard = () => {
             selectedBook={selectedBooks.purchase?.name} 
             readOnly={!permissions.canSave || mobileViewOnly} 
             onChangeBook={() => promptChangeBook('purchase')}
-            onOpenSales={() => { yieldOtherWindows('sales'); toggleModal('sales', true); }}
+            onOpenSales={(data) => {
+               setSalesInitialData(data || null);
+               minimizeErpWindow('purchase');
+               yieldOtherWindows('sales');
+               toggleModal('sales', true);
+               focusErpWindow('sales');
+            }}
             onOpenJobIssue={() => { yieldOtherWindows('jobIssue'); toggleModal('jobIssue', true); }}
             onOpenMillIssue={(data) => {
                setMillIssueInitialData(data || null);

@@ -428,50 +428,89 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       return undefined;
     }
     let cancelled = false;
-    setBootLoading(true);
-    Promise.all([fetchParties(), fetchItems(), fetchPurchases(), fetchInventory(), fetchJobs()])
-      .then((results) => {
+    const state = useStore.getState();
+    const partyList = state.parties || [];
+    const purchaseList = state.purchases || [];
+    const lots = state.inventoryLots || [];
+    const jobs = state.jobWorkEntries || [];
+
+    const hasBasicMasters = partyList.length > 0 && (state.items || []).length > 0;
+    if (!hasBasicMasters) {
+      setBootLoading(true);
+    } else {
+      setBootLoading(false);
+    }
+
+    // 1. INSTANT HYDRATION FROM STORE (0ms - no waiting for API roundtrips)
+    if (initialData) {
+      applyPurchasePrefill(initialData, lots, purchaseList, partyList);
+      getNextChallanNo().then((nextNo) => {
+        if (!cancelled) setField('challanNo', nextNo);
+      });
+      setMode('Add');
+      setTimeout(() => {
+        const millInput = document.querySelector('input[placeholder*="Search Mill"]');
+        millInput?.focus();
+      }, 100);
+    } else {
+      const sorted = [...jobs].sort((a, b) => {
+        const numA = parseInt(String(a.challanNo || a.jobCardNo || '').replace(/\D/g, ''), 10);
+        const numB = parseInt(String(b.challanNo || b.jobCardNo || '').replace(/\D/g, ''), 10);
+        if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+        return new Date(a.issueDate || a.createdAt || 0) - new Date(b.issueDate || b.createdAt || 0);
+      });
+      const latest = sorted[sorted.length - 1];
+      if (latest) {
+        loadJob(latest._id || latest.id, 'View');
+      } else {
+        setMode('Add');
+        getNextChallanNo().then((nextNo) => {
+          if (!cancelled) resetForm(nextNo);
+        });
+      }
+    }
+
+    // 2. BACKGROUND REFRESH: fetch fresh data without holding up the modal screen
+    const backgroundTasks = [];
+    if (!partyList.length) backgroundTasks.push(fetchParties());
+    if (!(state.items || []).length) backgroundTasks.push(fetchItems());
+    backgroundTasks.push(fetchInventory());
+    backgroundTasks.push(fetchJobs());
+    if (initialData?.purchaseId && !purchaseList.length) {
+      backgroundTasks.push(fetchPurchases());
+    }
+
+    Promise.all(backgroundTasks)
+      .then(() => {
         if (cancelled) return;
-        const partyList = results[0] || [];
-        const purchaseList = results[2] || [];
-        const lots = results[3] || [];
-        const jobs = results[4] || [];
+        const freshState = useStore.getState();
         if (initialData) {
-          applyPurchasePrefill(initialData, lots, purchaseList, partyList);
-          getNextChallanNo().then((nextNo) => {
-            if (!cancelled) setField('challanNo', nextNo);
-          });
-          setMode('Add');
-          setTimeout(() => {
-            const millInput = document.querySelector('input[placeholder*="Search Mill"]');
-            millInput?.focus();
-          }, 150);
-        } else {
-          const sorted = [...jobs].sort((a, b) => {
+          applyPurchasePrefill(
+            initialData,
+            freshState.inventoryLots || [],
+            freshState.purchases || [],
+            freshState.parties || []
+          );
+        } else if (!jobs.length && freshState.jobWorkEntries?.length && mode === 'View') {
+          const freshSorted = [...(freshState.jobWorkEntries || [])].sort((a, b) => {
             const numA = parseInt(String(a.challanNo || a.jobCardNo || '').replace(/\D/g, ''), 10);
             const numB = parseInt(String(b.challanNo || b.jobCardNo || '').replace(/\D/g, ''), 10);
             if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
             return new Date(a.issueDate || a.createdAt || 0) - new Date(b.issueDate || b.createdAt || 0);
           });
-          const latest = sorted[sorted.length - 1];
-          if (latest) {
-            loadJob(latest._id || latest.id, 'View');
-          } else {
-            setMode('Add');
-            getNextChallanNo().then((nextNo) => {
-              if (!cancelled) resetForm(nextNo);
-            });
-          }
+          const freshLatest = freshSorted[freshSorted.length - 1];
+          if (freshLatest) loadJob(freshLatest._id || freshLatest.id, 'View');
         }
       })
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setBootLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
-  }, [isOpen, selectedBook, initialData, applyPurchasePrefill, fetchParties, fetchItems, fetchPurchases, fetchInventory, fetchJobs, resetForm, getNextChallanNo]);
+  }, [isOpen, selectedBook, initialData]);
 
   const applyPuBillRow = (row) => {
     if (!row) return;
