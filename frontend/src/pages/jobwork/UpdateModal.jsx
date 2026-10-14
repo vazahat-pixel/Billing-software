@@ -42,7 +42,7 @@ const GST_TYPE_OPTIONS = [
   { value: 'EXEMPT', label: 'EXEMPT' },
 ];
 
-export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
+export default function UpdateModal({ isOpen, onClose, selectedBook = null, initialData = null }) {
   const {
     parties,
     items,
@@ -352,6 +352,45 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       });
   }, [jobWorkEntries, activeItemId]);
 
+  const focusJobDate = () => {
+    setTimeout(() => {
+      const el = document.querySelector('.erp-job-issue-date');
+      if (el && !el.disabled) {
+        el.focus();
+      }
+    }, 40);
+  };
+
+  const focusJobParty = () => {
+    setTimeout(() => {
+      const el = document.querySelector('.erp-job-issue-header [data-erp-combobox-input]');
+      if (el && !el.disabled) {
+        el.focus();
+        try { el.select(); } catch {}
+      }
+    }, 40);
+  };
+
+  const focusJobBroker = () => {
+    setTimeout(() => {
+      const el = document.querySelector('.erp-job-issue-header input[placeholder*="Broker"]');
+      if (el && !el.disabled) {
+        el.focus();
+        try { el.select(); } catch {}
+      }
+    }, 40);
+  };
+
+  const focusFirstItem = () => {
+    setTimeout(() => {
+      const el = document.querySelector('.erp-job-issue-table [data-erp-combobox-input]');
+      if (el && !el.disabled) {
+        el.focus();
+        try { el.select(); } catch {}
+      }
+    }, 50);
+  };
+
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
@@ -359,6 +398,28 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
     Promise.all([fetchParties(), fetchItems(), fetchPurchases(), fetchInventory(), fetchJobs()])
       .then(() => {
         if (cancelled) return;
+        if (initialData) {
+          handleNew();
+          if (initialData.supplierName) {
+            setHeader((h) => ({ ...h, broker: initialData.supplierName }));
+          }
+          if (initialData.partyName) {
+            const match = (useStore.getState().parties || []).find(
+              (p) => String(p.name || '').trim().toLowerCase() === String(initialData.partyName || '').trim().toLowerCase()
+            );
+            if (match) {
+              setHeader((h) => ({ ...h, partyId: match._id || match.id, gstin: match.gstin || '' }));
+            }
+          }
+          setTimeout(() => {
+            const el = document.querySelector('[data-erp-start="challan"]');
+            if (el && !el.disabled) {
+              el.focus();
+              try { el.select(); } catch {}
+            }
+          }, 100);
+          return;
+        }
         const list = [...(useStore.getState().jobWorkEntries || [])].sort((a, b) => {
           const numA = parseInt(String(a.challanNo || a.jobCardNo || '').replace(/\D/g, ''), 10);
           const numB = parseInt(String(b.challanNo || b.jobCardNo || '').replace(/\D/g, ''), 10);
@@ -372,7 +433,36 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       .catch(() => {})
       .finally(() => { if (!cancelled) setBootLoading(false); });
     return () => { cancelled = true; };
-  }, [isOpen, selectedBook]);
+  }, [isOpen, selectedBook, initialData]);
+
+  // Enter in View mode starts new entry; Ctrl+Enter / Alt+S saves in Add/Edit
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+        if (mode === 'View' && !saving) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleNew();
+          return;
+        }
+      }
+      if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'f')) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleOpenFindModal();
+        return;
+      }
+      if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || (e.altKey && e.key.toLowerCase() === 's')) {
+        if (!locked && !saving) {
+          e.preventDefault();
+          handleSave();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [isOpen, mode, saving, locked]);
 
   const handlePartyChange = (partyId) => {
     const party = partyOptions.find((p) => String(p.value) === String(partyId));
@@ -524,13 +614,18 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
     toast.success(`Loaded from Purchase ${row.billNo} · ${row.itemName}`);
   };
 
-  const handleNew = () => {
+  const handleNew = (override = {}) => {
     setMode('Add');
     setSelectedJobId('');
     setFindOpen(false);
     setActiveItemId('');
+    const maxChallan = (useStore.getState().jobWorkEntries || []).reduce((max, j) => {
+      const num = parseInt(String(j.challanNo || j.jobCardNo || '').replace(/\D/g, ''), 10);
+      return !isNaN(num) && num > max ? num : max;
+    }, 0);
+    const nextChallan = maxChallan > 0 ? String(maxChallan + 1) : '1';
     setHeader({
-      challanNo: '1',
+      challanNo: nextChallan,
       challanNoSuffix: '',
       date: today(),
       reFinish: '',
@@ -540,6 +635,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
       broker: '',
       hsnCd: '5407',
       book: selectedBook || 'JOBWORK BOOK',
+      ...override,
     });
     setFooter({
       remark: '',
@@ -854,8 +950,16 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                           style={{ width: 110, flex: '0 0 110px' }}
                           value={header.challanNo}
                           data-erp-start="challan"
+                          data-enter-order="1"
                           onChange={(e) => setHeader({ ...header, challanNo: e.target.value })}
                           disabled={locked}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              focusJobDate();
+                            }
+                          }}
                         />
                         <input
                           type="text"
@@ -864,6 +968,8 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                           value={header.challanNoSuffix}
                           onChange={(e) => setHeader({ ...header, challanNoSuffix: e.target.value })}
                           disabled={locked}
+                          tabIndex={-1}
+                          data-enter-skip="true"
                         />
                         <span className="text-slate-400 font-bold ml-1">-</span>
                       </div>
@@ -876,9 +982,17 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                           type="date"
                           className="classic-erp-input erp-job-issue-date"
                           value={header.date}
+                          data-enter-order="2"
                           onChange={(e) => setHeader({ ...header, date: e.target.value })}
                           disabled={locked}
                           required
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              focusJobParty();
+                            }
+                          }}
                         />
                         <span className="erp-job-issue-weekday">{weekday(header.date)}</span>
                         <span className="classic-erp-label !w-auto ml-3">ReFinish</span>
@@ -889,6 +1003,8 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                           value={header.reFinish}
                           onChange={(e) => setHeader({ ...header, reFinish: e.target.value })}
                           disabled={locked}
+                          tabIndex={-1}
+                          data-enter-skip="true"
                         />
                       </div>
                     </div>
@@ -897,7 +1013,11 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                       <span className="classic-erp-label red-label">Job Party</span>
                       <ERPCombobox
                         value={header.partyId}
-                        onChange={handlePartyChange}
+                        data-enter-order="3"
+                        onChange={(val) => {
+                          handlePartyChange(val);
+                          focusJobBroker();
+                        }}
                         disabled={locked}
                         options={partyOptions}
                         placeholder="Search job worker / mill…"
@@ -917,9 +1037,17 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                         type="text"
                         className="classic-erp-input font-bold"
                         value={header.broker}
+                        data-enter-order="4"
                         onChange={(e) => setHeader({ ...header, broker: e.target.value })}
                         disabled={locked}
                         placeholder="Search Broker…"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            focusFirstItem();
+                          }
+                        }}
                       />
                     </div>
 
@@ -932,6 +1060,8 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                           value={header.hsnCd}
                           onChange={(e) => setHeader({ ...header, hsnCd: e.target.value })}
                           disabled={locked}
+                          tabIndex={-1}
+                          data-enter-skip="true"
                         />
                       </div>
                     </div>
@@ -1004,7 +1134,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
               </div>
 
               {/* Grid */}
-              <div className="classic-erp-frame erp-job-issue-grid-wrap flex-none min-h-0 flex flex-col">
+              <div className="classic-erp-frame erp-job-issue-grid-wrap flex-1 min-h-0 flex flex-col">
                 <div className="classic-erp-table-container erp-job-issue-grid flex-1 overflow-auto">
                   <table className="classic-erp-table erp-job-issue-table w-full" data-line-grid>
                     <thead>
@@ -1030,7 +1160,18 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                                     <div className="flex-1 min-w-0">
                                       <ERPCombobox
                                         value={line.itemId}
-                                        onChange={(val) => handleLineItemChange(idx, val)}
+                                        data-enter-order={idx === 0 ? "5" : undefined}
+                                        onChange={(val) => {
+                                          handleLineItemChange(idx, val);
+                                          setTimeout(() => {
+                                            const trs = document.querySelectorAll('.erp-job-issue-table tbody tr');
+                                            const targetInput = trs[idx]?.querySelector('input[type="number"]:not([disabled])');
+                                            if (targetInput) {
+                                              targetInput.focus();
+                                              try { targetInput.select(); } catch {}
+                                            }
+                                          }, 60);
+                                        }}
                                         disabled={locked}
                                         options={itemOptions}
                                         placeholder="Select Item Name…"
@@ -1044,6 +1185,8 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                                         className="text-slate-400 hover:text-blue-600 shrink-0 px-0.5"
                                         onClick={() => openLotLookup(idx)}
                                         title="Advanced: pick a specific lot manually"
+                                        tabIndex={-1}
+                                        data-enter-skip="true"
                                       >
                                         <Search size={11} />
                                       </button>
@@ -1062,6 +1205,30 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                                   onChange={(e) => setLine(idx, { [c.key]: e.target.value })}
                                   readOnly={c.readOnly || locked}
                                   disabled={c.readOnly || locked}
+                                  tabIndex={c.readOnly ? -1 : undefined}
+                                  data-enter-skip={c.readOnly ? "true" : undefined}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !locked) {
+                                      if (c.key === 'narration') {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (idx < calc.linesWithAmt.length - 1) {
+                                          setTimeout(() => {
+                                            const trs = document.querySelectorAll('.erp-job-issue-table tbody tr');
+                                            const nextItem = trs[idx + 1]?.querySelector('[data-erp-combobox-input]');
+                                            if (nextItem) nextItem.focus();
+                                          }, 40);
+                                        } else {
+                                          addLine();
+                                          setTimeout(() => {
+                                            const trs = document.querySelectorAll('.erp-job-issue-table tbody tr');
+                                            const nextItem = trs[trs.length - 1]?.querySelector('[data-erp-combobox-input]');
+                                            if (nextItem) nextItem.focus();
+                                          }, 50);
+                                        }
+                                      }
+                                    }
+                                  }}
                                 />
                               </td>
                             );
@@ -1218,7 +1385,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null }) {
                 >
                   Edit
                 </button>
-                <button type="submit" className="classic-erp-btn btn-blue" disabled={saving || locked}>
+                <button type="submit" className="classic-erp-btn btn-blue" disabled={saving || locked} data-enter-save="true">
                   <SaveButtonLabel saving={saving} label="Save" />
                 </button>
                 <button type="button" className="classic-erp-btn" onClick={handleCancel} disabled={saving}>

@@ -380,6 +380,7 @@ const Dashboard = () => {
       return true;
    };
    const [millIssueInitialData, setMillIssueInitialData] = useState(null);
+   const [jobIssueInitialData, setJobIssueInitialData] = useState(null);
    const [purchaseInitialData, setPurchaseInitialData] = useState(null);
    const [salesInitialData, setSalesInitialData] = useState(null);
    const [voucherInitialId, setVoucherInitialId] = useState(null);
@@ -1803,7 +1804,12 @@ const Dashboard = () => {
                toggleModal('sales', true);
                focusErpWindow('sales');
             }}
-            onOpenJobIssue={() => { yieldOtherWindows('jobIssue'); toggleModal('jobIssue', true); }}
+            onOpenJobIssue={(data) => {
+               setJobIssueInitialData(data || { fromPurchase: true });
+               yieldOtherWindows('jobIssue');
+               toggleModal('jobIssue', true);
+               focusErpWindow('jobIssue');
+            }}
             onOpenMillIssue={(data) => {
                setMillIssueInitialData(data || null);
                yieldOtherWindows('millIssue');
@@ -1883,7 +1889,15 @@ const Dashboard = () => {
                openModalDirect('payment');
             }}
          />
-         <UpdateModal isOpen={modals.jobIssue} onClose={() => toggleModal('jobIssue', false)} selectedBook={selectedBooks.jobIssue?.name} />
+         <UpdateModal
+            isOpen={modals.jobIssue}
+            onClose={() => {
+               setJobIssueInitialData(null);
+               toggleModal('jobIssue', false);
+            }}
+            selectedBook={selectedBooks.jobIssue?.name}
+            initialData={jobIssueInitialData}
+         />
          <JobReceiptModal
             isOpen={modals.jobRec}
             onClose={() => toggleModal('jobRec', false)}

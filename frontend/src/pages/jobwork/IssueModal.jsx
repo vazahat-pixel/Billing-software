@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { ERPCombobox } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
@@ -113,8 +113,29 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   const [fromPurchase, setFromPurchase] = useState(null);
   const [puBillLookupOpen, setPuBillLookupOpen] = useState(false);
 
+  // Refs for Enter-key field navigation
+  const challanRef = useRef(null);
+  const dateRef = useRef(null);
+  const puBillNoRef = useRef(null);
+  const issPcsRef = useRef(null);
+  const issQtyRef = useRef(null);
+  const puRateRef = useRef(null);
+  const jobRateRef = useRef(null);
+
   const locked = mode === 'View';
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
+  // Focus helpers for Enter navigation
+  const focusIssueDate = () => setTimeout(() => { dateRef.current?.focus(); }, 40);
+  const focusMill = () => setTimeout(() => {
+    const el = document.querySelector('[data-erp-combobox-input][data-recentkey="mill-issue-mill"], .erp-job-issue-main [data-erp-combobox-input]');
+    el?.focus();
+  }, 60);
+  const focusPuBillNo = () => setTimeout(() => { puBillNoRef.current?.focus(); try { puBillNoRef.current?.select(); } catch {} }, 60);
+  const focusIssPcs = () => setTimeout(() => { issPcsRef.current?.focus(); try { issPcsRef.current?.select(); } catch {} }, 60);
+  const focusIssQty = () => setTimeout(() => { issQtyRef.current?.focus(); try { issQtyRef.current?.select(); } catch {} }, 60);
+  const focusPuRate = () => setTimeout(() => { puRateRef.current?.focus(); try { puRateRef.current?.select(); } catch {} }, 60);
+  const focusJobRate = () => setTimeout(() => { jobRateRef.current?.focus(); try { jobRateRef.current?.select(); } catch {} }, 60);
 
   // Sorted list of challans for Find
   const bookJobs = useMemo(() => {
@@ -619,7 +640,11 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     }));
   };
 
-  const handleMillChange = (id) => setField('millId', id);
+  const handleMillChange = (id) => {
+    setField('millId', id);
+    // After mill selected, move to Pu.BillNo
+    if (id) focusPuBillNo();
+  };
 
   const handleCreateMill = (search = '') => {
     setAccountModal({ open: true, initialData: { name: search || '', group: 'JOB WORKER' } });
@@ -964,7 +989,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
 
             <form
               onSubmit={(e) => handleSave(e)}
-              className="classic-erp-body erp-job-issue-body flex-1 overflow-hidden min-h-0 flex flex-col justify-between"
+              className="classic-erp-body erp-job-issue-body flex-1 overflow-hidden min-h-0 flex flex-col"
             >
               <div className="flex items-center justify-between px-3 py-1.5 bg-blue-50/90 border-b border-blue-200 text-xs shrink-0">
                 <div className="flex items-center gap-2">
@@ -1018,12 +1043,19 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                   <div className="classic-erp-field">
                     <span className="classic-erp-label red-label">Challan No</span>
                     <input
+                      ref={challanRef}
                       type="text"
                       className="classic-erp-input font-bold"
                       value={form.challanNo}
                       data-erp-start="challan"
                       onChange={(e) => setField('challanNo', e.target.value)}
                       disabled={locked}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !locked) {
+                          e.preventDefault(); e.stopPropagation();
+                          focusIssueDate();
+                        }
+                      }}
                     />
                   </div>
 
@@ -1031,12 +1063,19 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                     <span className="classic-erp-label red-label">Date</span>
                     <div className="classic-erp-control">
                       <input
+                        ref={dateRef}
                         type="date"
                         className="classic-erp-input erp-job-issue-date"
                         value={form.date}
                         onChange={(e) => setField('date', e.target.value)}
                         disabled={locked}
                         required
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !locked) {
+                            e.preventDefault(); e.stopPropagation();
+                            focusMill();
+                          }
+                        }}
                       />
                       <span className="erp-job-issue-weekday">{weekday(form.date)}</span>
                     </div>
@@ -1098,7 +1137,8 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                   <div className="classic-erp-field classic-erp-field--lg">
                     <span className="classic-erp-label red-label">Pu.BillNo</span>
                     <div className="classic-erp-control">
-                      <input
+                       <input
+                         ref={puBillNoRef}
                         type="text"
                         className="classic-erp-input font-bold uppercase"
                         value={form.puBillNo}
@@ -1112,6 +1152,12 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                         }}
                         disabled={locked}
                         placeholder="Enter or click 🔍 to select Purchase Bill…"
+                         onKeyDown={(e) => {
+                           if (e.key === 'Enter' && !locked) {
+                             e.preventDefault(); e.stopPropagation();
+                             focusIssPcs();
+                           }
+                         }}
                       />
                       {!locked && (
                         <button
@@ -1151,16 +1197,24 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                       <div className="classic-erp-field">
                         <span className="classic-erp-label">Iss Pcs</span>
                         <input
+                           ref={issPcsRef}
                           type="number"
                           className="classic-erp-input text-right font-bold"
                           value={form.issPcs}
                           onChange={(e) => setField('issPcs', e.target.value)}
                           disabled={locked}
+                           onKeyDown={(e) => {
+                             if (e.key === 'Enter' && !locked) {
+                               e.preventDefault(); e.stopPropagation();
+                               focusIssQty();
+                             }
+                           }}
                         />
                       </div>
                       <div className="classic-erp-field">
                         <span className="classic-erp-label red-label">Iss Qty</span>
                         <input
+                           ref={issQtyRef}
                           type="number"
                           step="0.001"
                           className="classic-erp-input text-right font-bold"
@@ -1168,6 +1222,12 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                           onChange={(e) => setField('issQty', e.target.value)}
                           disabled={locked}
                           required
+                           onKeyDown={(e) => {
+                             if (e.key === 'Enter' && !locked) {
+                               e.preventDefault(); e.stopPropagation();
+                               focusPuRate();
+                             }
+                           }}
                         />
                       </div>
                     </div>
@@ -1177,23 +1237,37 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                       <div className="classic-erp-field">
                         <span className="classic-erp-label">Pu.Rate</span>
                         <input
+                            ref={puRateRef}
                           type="number"
                           step="0.01"
                           className="classic-erp-input text-right"
                           value={form.puRate}
                           onChange={(e) => setField('puRate', e.target.value)}
                           disabled={locked}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !locked) {
+                                e.preventDefault(); e.stopPropagation();
+                                focusJobRate();
+                              }
+                            }}
                         />
                       </div>
                       <div className="classic-erp-field">
                         <span className="classic-erp-label">JobRate</span>
                         <input
+                            ref={jobRateRef}
                           type="number"
                           step="0.01"
                           className="classic-erp-input text-right font-bold"
                           value={form.jobRate}
                           onChange={(e) => setField('jobRate', e.target.value)}
                           disabled={locked}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !locked) {
+                                e.preventDefault(); e.stopPropagation();
+                                handleSave(null);
+                              }
+                            }}
                         />
                       </div>
                     </div>
@@ -1312,6 +1386,15 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                 </button>
                 <button type="submit" className="classic-erp-btn btn-blue" disabled={saving || locked}>
                   <SaveButtonLabel saving={saving} label="Save" />
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn btn-blue"
+                  disabled={saving || locked}
+                  onClick={() => handleSave(null, { keepOpen: true })}
+                  title="Save this challan and start a new one (Ctrl+Enter)"
+                >
+                  <SaveButtonLabel saving={saving} label="Save & New" />
                 </button>
                 <button type="button" className="classic-erp-btn" onClick={handleCancel} disabled={saving}>
                   Cancel

@@ -1402,6 +1402,8 @@ const PurchaseModal = ({
       city: p?.station || p?.city || '',
       ...(autoType ? { type: autoType } : {}),
     });
+    // After vendor selected, move focus to broker (or item list if broker hidden)
+    focusAfterParty();
   };
 
   // When vendor + company states are known, registered IN/OUT follows GSTIN (matches backend).
@@ -1501,8 +1503,19 @@ const PurchaseModal = ({
       key: 'jobIssue',
       label: '3. Job Issue (from purchased stock)',
       onClick: () => {
+        const inv = saveNextActions?.invoice || purchases.find((p) => String(p._id || p.id) === String(saveNextActions?.id));
+        const suppObj = parties.find((p) => String(p._id || p.id) === String(inv?.supplierId?._id || inv?.supplierId || header.party));
+        const sName = suppObj?.name || inv?.supplierName || inv?.partyName || '';
+        const ctx = {
+          purchaseId: saveNextActions?.id,
+          invoiceNo: saveNextActions?.invoiceNo || saveNextActions?.invoice?.invoiceNo || header.billNo,
+          supplierName: sName,
+          partyName: sName,
+          items: saveNextActions?.invoice?.items || gridItems || [],
+          fromPurchase: true,
+        };
         setSaveNextActions(null);
-        onOpenJobIssue();
+        onOpenJobIssue(ctx);
       }
     }
   ].filter(Boolean);
