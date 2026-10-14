@@ -314,8 +314,9 @@ const PurchaseModal = ({
     }
     const gridPanel = modalContainerRef.current?.querySelector('.erp-grid-panel') || table?.parentElement;
     if (gridPanel) gridPanel.scrollLeft = 0;
-    const input = targetRow.querySelector('[data-line-start]')
-      || targetRow.querySelector('[data-erp-combobox-input], input:not([disabled]):not([readonly])');
+    const input = targetRow.querySelector('[data-erp-combobox-input]')
+      || targetRow.querySelector('[data-line-start]')
+      || targetRow.querySelector('input:not([disabled]):not([readonly])');
     if (input) {
       input.focus();
       try { input.select?.(); } catch { /* ignore */ }
@@ -740,7 +741,13 @@ const PurchaseModal = ({
         if (mode === 'Add' && !inField && !readOnly) {
           e.preventDefault();
           e.stopPropagation();
-          focusPurchaseBillNo();
+          const sr = document.getElementById('purchase-srno');
+          if (sr) {
+            sr.focus();
+            try { sr.select?.(); } catch {}
+          } else {
+            focusPurchaseBillNo();
+          }
           return;
         }
       }
@@ -941,27 +948,65 @@ const PurchaseModal = ({
   const handleCreateBroker = (search) => setInlineModal({ type: 'account', target: 'broker', initialData: { name: search, group: 'BROKER' } });
   const handleCreateItem = (search, index) => setInlineModal({ type: 'item', initialData: { itemName: search }, rowIndex: index });
 
+  const focusPurchaseBillNo = () => {
+    setTimeout(() => {
+      const bill = suppBillRef.current || modalContainerRef.current?.querySelector('.erp-sales-bill-meta input:not([disabled])');
+      if (bill) {
+        bill.focus();
+        try { bill.select?.(); } catch { /* ignore */ }
+      }
+    }, 50);
+  };
+
+  const focusPurchaseDate = () => {
+    setTimeout(() => {
+      const dateEl = modalContainerRef.current?.querySelector('input[type="date"][data-enter-order="3"]');
+      if (dateEl) {
+        dateEl.focus();
+      }
+    }, 50);
+  };
+
+  const focusPurchaseVendor = () => {
+    setTimeout(() => {
+      const vendorEl = modalContainerRef.current?.querySelector('.classic-erp-header-party [data-erp-combobox-input]');
+      if (vendorEl) {
+        vendorEl.focus();
+        try { vendorEl.select?.(); } catch { /* ignore */ }
+      }
+    }, 50);
+  };
+
+  const focusPurchaseBroker = () => {
+    setTimeout(() => {
+      const brokerEl = modalContainerRef.current?.querySelector('.erp-sales-broker-row [data-erp-combobox-input]');
+      if (brokerEl) {
+        brokerEl.focus();
+        try { brokerEl.select?.(); } catch { /* ignore */ }
+      } else {
+        focusFirstItem();
+      }
+    }, 50);
+  };
+
+  const focusFirstItem = () => {
+    setTimeout(() => {
+      focusRowItem(0);
+    }, 80);
+  };
+
   const focusAfterParty = () => {
     setTimeout(() => {
-      const brokerInput = modalContainerRef.current?.querySelector('.erp-sales-broker-row [data-erp-combobox-input], .erp-sales-broker-row input, .erp-sales-broker-row select');
-      if (brokerInput) {
-        brokerInput.focus();
-        try { brokerInput.select?.(); } catch {}
+      if (showBroker) {
+        focusPurchaseBroker();
       } else {
-        focusPurchaseBillNo();
+        focusFirstItem();
       }
-    }, 120);
+    }, 80);
   };
 
   const focusAfterBroker = () => {
-    setTimeout(() => {
-      const nextEl = modalContainerRef.current?.querySelector('.erp-sales-broker-row select:not([disabled]), .erp-sales-bill-meta input:not([disabled])');
-      if (nextEl) {
-        nextEl.focus();
-      } else {
-        focusPurchaseBillNo();
-      }
-    }, 120);
+    focusFirstItem();
   };
 
   const handleAccountSuccess = (newAccount) => {
@@ -1013,16 +1058,6 @@ const PurchaseModal = ({
         }
       }
     }, 150);
-  };
-
-  const focusPurchaseBillNo = () => {
-    setTimeout(() => {
-      const bill = suppBillRef.current || modalContainerRef.current?.querySelector('.erp-sales-bill-meta input:not([disabled])');
-      if (bill) {
-        bill.focus();
-        try { bill.select(); } catch { /* ignore */ }
-      }
-    }, 50);
   };
 
   const handleNew = async () => {
@@ -1566,11 +1601,19 @@ const PurchaseModal = ({
                       <input
                         ref={suppBillRef}
                         type="text"
+                        data-enter-order="2"
                         className="classic-erp-input"
                         style={{ width: '100%', maxWidth: 'none' }}
                         value={header.billNo}
                         placeholder="Supp Bill No…"
                         onChange={e => setHeader({ ...header, billNo: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            focusPurchaseDate();
+                          }
+                        }}
                         disabled={locked}
                       />
                     </div>
@@ -1579,17 +1622,40 @@ const PurchaseModal = ({
                     {billFields.header('vNo') && (
                       <div className="classic-erp-field">
                         <span className="classic-erp-label">SrNo:</span>
-                        <input id="purchase-srno" data-enter-order="1" data-enter-include="" type="text" className="classic-erp-input font-bold text-center" value={header.vNo || '1'} readOnly title="Sr No — Enter moves to Date, then Party" />
+                        <input
+                          id="purchase-srno"
+                          data-enter-order="1"
+                          data-enter-include=""
+                          type="text"
+                          className="classic-erp-input font-bold text-center"
+                          value={header.vNo || '1'}
+                          readOnly
+                          title="Sr No — Enter moves to Supp. Bill No"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              focusPurchaseBillNo();
+                            }
+                          }}
+                        />
                       </div>
                     )}
                     <div className="classic-erp-field">
                       <span className="classic-erp-label red-label">Date *:</span>
                       <input
                         type="date"
-                        data-enter-order="2"
+                        data-enter-order="3"
                         className="classic-erp-input"
                         value={header.billDate}
                         onChange={e => setHeader({ ...header, billDate: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            focusPurchaseVendor();
+                          }
+                        }}
                         disabled={locked}
                       />
                     </div>
@@ -1602,7 +1668,7 @@ const PurchaseModal = ({
                     <div className="classic-erp-control" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <ERPCombobox
                         value={header.party}
-                        data-enter-order="3"
+                        data-enter-order="4"
                         onChange={onVendorSelect}
                         options={vendorOptions}
                         placeholder="Search vendor / supplier…"
@@ -1613,7 +1679,7 @@ const PurchaseModal = ({
                         inputClassName="border-0 flex-1"
                       />
                       {!locked && (
-                        <button type="button" title="Add new vendor" onClick={() => handleCreateAccount('')}
+                        <button type="button" tabIndex={-1} data-enter-skip="true" title="Add new vendor" onClick={() => handleCreateAccount('')}
                           style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 2, padding: '2px 6px', fontSize: 10, fontWeight: 700, color: '#fff', background: '#16a34a', border: 'none', borderRadius: 3, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                           <Plus size={10} /> Add
                         </button>
@@ -1623,11 +1689,11 @@ const PurchaseModal = ({
                   <div className="classic-erp-meta-grid erp-sales-party-meta">
                     <div className="classic-erp-field">
                       <span className="classic-erp-label">Gstin:</span>
-                      <input type="text" className="classic-erp-input" value={header.gstin} readOnly />
+                      <input type="text" className="classic-erp-input" value={header.gstin} readOnly tabIndex={-1} data-enter-skip="true" />
                     </div>
                     <div className="classic-erp-field">
                       <span className="classic-erp-label">City:</span>
-                      <input type="text" className="classic-erp-input" value={header.city} readOnly />
+                      <input type="text" className="classic-erp-input" value={header.city} readOnly tabIndex={-1} data-enter-skip="true" />
                     </div>
                   </div>
                   <div className="classic-erp-meta-grid--3 erp-sales-broker-row">
@@ -1637,7 +1703,11 @@ const PurchaseModal = ({
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
                           <ERPCombobox
                             value={header.broker}
-                            onChange={(val) => setHeader({ ...header, broker: val })}
+                            data-enter-order="5"
+                            onChange={(val) => {
+                              setHeader((prev) => ({ ...prev, broker: val }));
+                              focusFirstItem();
+                            }}
                             options={brokerOptions}
                             placeholder="Search broker / None…"
                             disabled={locked}
@@ -1647,7 +1717,7 @@ const PurchaseModal = ({
                             createLabel="Broker"
                           />
                           {!locked && (
-                            <button type="button" title="Add new broker" onClick={() => handleCreateBroker('')}
+                            <button type="button" tabIndex={-1} data-enter-skip="true" title="Add new broker" onClick={() => handleCreateBroker('')}
                               style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 2, padding: '2px 6px', fontSize: 10, fontWeight: 700, color: '#fff', background: '#16a34a', border: 'none', borderRadius: 3, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                               <Plus size={10} /> Add
                             </button>
@@ -1657,38 +1727,47 @@ const PurchaseModal = ({
                     ) : (
                       <div />
                     )}
-                    {billFields.header('reverseCharge') && <div className="classic-erp-field">
-                      <span className="classic-erp-label">RCM:</span>
-                      <select className="classic-erp-select" value={header.reverseCharge} onChange={e => setHeader({ ...header, reverseCharge: e.target.value })} disabled={locked}>
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </div>}
-                    {billFields.header('type') && <div className="classic-erp-field">
-                      <span className="classic-erp-label">Type *:</span>
-                      <select
-                        className="classic-erp-select"
-                        value={header.type}
-                        onChange={(e) => {
-                          let next = e.target.value;
-                          if (!next.includes('UNREGISTERED') && registeredSupplyAuto) {
-                            next = registeredSupplyAuto;
-                          }
-                          setHeader({ ...header, type: next });
-                        }}
-                        disabled={locked}
-                        title={registeredSupplyAuto ? 'Registered IN/OUT auto from party vs company GSTIN/state' : undefined}
-                      >
-                        <option value="INVOICE IN STATE">INVOICE IN STATE</option>
-                        <option value="INVOICE OUT OF STATE">INVOICE OUT OF STATE</option>
-                        {/* Unregistered supplier — no GST is charged on the bill. The
-                            calculations memo already zeroes GST for any type matching
-                            /UNREGISTERED/, but without these options that branch was
-                            unreachable from the UI. */}
-                        <option value="UNREGISTERED INVOICE (IN STATE)">UNREGISTERED INVOICE (IN STATE)</option>
-                        <option value="UNREGISTERED INVOICE (OUT OF STATE)">UNREGISTERED INVOICE (OUT OF STATE)</option>
-                      </select>
-                    </div>}
+                    {billFields.header('reverseCharge') && (
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label">RCM:</span>
+                        <select
+                          className="classic-erp-select"
+                          value={header.reverseCharge}
+                          onChange={e => setHeader({ ...header, reverseCharge: e.target.value })}
+                          disabled={locked}
+                          tabIndex={-1}
+                          data-enter-skip="true"
+                        >
+                          <option value="No">No</option>
+                          <option value="Yes">Yes</option>
+                        </select>
+                      </div>
+                    )}
+                    {billFields.header('type') && (
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label">Type *:</span>
+                        <select
+                          className="classic-erp-select"
+                          value={header.type}
+                          onChange={(e) => {
+                            let next = e.target.value;
+                            if (!next.includes('UNREGISTERED') && registeredSupplyAuto) {
+                              next = registeredSupplyAuto;
+                            }
+                            setHeader({ ...header, type: next });
+                          }}
+                          disabled={locked}
+                          tabIndex={-1}
+                          data-enter-skip="true"
+                          title={registeredSupplyAuto ? 'Registered IN/OUT auto from party vs company GSTIN/state' : undefined}
+                        >
+                          <option value="INVOICE IN STATE">INVOICE IN STATE</option>
+                          <option value="INVOICE OUT OF STATE">INVOICE OUT OF STATE</option>
+                          <option value="UNREGISTERED INVOICE (IN STATE)">UNREGISTERED INVOICE (IN STATE)</option>
+                          <option value="UNREGISTERED INVOICE (OUT OF STATE)">UNREGISTERED INVOICE (OUT OF STATE)</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1751,9 +1830,9 @@ const PurchaseModal = ({
                       >
                         <td
                           className="col-sr text-center font-bold select-none cursor-pointer"
-                          tabIndex={0}
-                          data-line-start
-                          title="Sr No — Enter moves forward. Delete removes this line"
+                          tabIndex={-1}
+                          data-enter-skip="true"
+                          title="Sr No — Click to select, Delete removes this line"
                           onKeyDown={(e) => {
                             if (e.key === 'Delete') {
                               e.preventDefault();
@@ -1768,6 +1847,7 @@ const PurchaseModal = ({
                             <ERPCombobox
                               value={row.itemId}
                               openOnEnter
+                              data-enter-order={idx === 0 ? "6" : undefined}
                               onChange={(val) => onPurchaseItemSelect(val, idx)}
                               options={itemOptions}
                               placeholder="Search item…"
@@ -1778,7 +1858,7 @@ const PurchaseModal = ({
                               inputClassName="border-0"
                             />
                             {!locked && (
-                              <button type="button" title="Add new item" onClick={() => handleCreateItem('', idx)}
+                              <button type="button" tabIndex={-1} data-enter-skip="true" title="Add new item" onClick={() => handleCreateItem('', idx)}
                                 style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', padding: '2px 5px', fontSize: 10, fontWeight: 700, color: '#16a34a', background: 'transparent', border: '1px solid #16a34a', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                                 <Plus size={10} />
                               </button>
