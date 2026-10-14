@@ -1,10 +1,10 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'billing-offline';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 const DATA_STORES = [
   'parties', 'items', 'sales', 'purchases', 'books',
-  'inventory', 'payments', 'receipts', 'syncQueue',
+  'inventory', 'payments', 'receipts', 'vouchers', 'syncQueue',
   'jobs', 'orders', 'returns', 'notes', 'visits', 'ledgers', 'subMasters'
 ];
 const AUTH_STORE = 'offlineAuth';
@@ -92,12 +92,6 @@ const withCompany = (entity, companyId) => ({
 
 export const cacheEntities = async (storeName, entities, companyId = getActiveCompanyId()) => {
   if (!companyId || !entities?.length) return;
-  try {
-    const { useLocalApiAsSourceOfTruth } = await import('./desktopMode');
-    if (useLocalApiAsSourceOfTruth()) return;
-  } catch {
-    /* continue */
-  }
   const db = await getDB();
   const cid = String(companyId);
 

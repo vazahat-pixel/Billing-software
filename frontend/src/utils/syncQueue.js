@@ -30,7 +30,9 @@ const ENDPOINTS = {
   parties: '/parties',
   items: '/items',
   payments: '/accounting/payments',
-  receipts: '/accounting/receipts'
+  receipts: '/accounting/receipts',
+  jobs: '/jobs/issue',
+  ledgers: '/accounting/ledgers'
 };
 
 const NORMALIZERS = {
@@ -39,10 +41,12 @@ const NORMALIZERS = {
   parties: normalizeParty,
   items: normalizeItem,
   payments: normalizeVoucher,
-  receipts: normalizeVoucher
+  receipts: normalizeVoucher,
+  jobs: (j) => j,
+  ledgers: (l) => l
 };
 
-const INVENTORY_AFFECTING = new Set(['sales', 'purchases']);
+const INVENTORY_AFFECTING = new Set(['sales', 'purchases', 'jobs']);
 
 const isDuplicateError = (err) => {
   const msg = (err?.response?.data?.message || err?.message || '').toLowerCase();
@@ -58,8 +62,15 @@ const renameInvoiceNo = (payload) => {
 };
 
 const runCreate = async (item) => {
-  const endpoint = ENDPOINTS[item.entityType];
+  let endpoint = ENDPOINTS[item.entityType];
   let payload = { ...item.payload };
+  if (item.entityType === 'jobs') {
+    if (item.action === 'receive' || item.action === 'updateReceive') {
+      endpoint = '/jobs/receive';
+    } else {
+      endpoint = '/jobs/issue';
+    }
+  }
   // Offline drafts use local-* ids — never send those as Mongo _id
   if (isLocalId(payload._id) || isLocalId(payload.id)) {
     const { _id, id, localId, ...rest } = payload;
@@ -80,6 +91,12 @@ const runCreate = async (item) => {
 };
 
 const runUpdate = async (item) => {
+  if (item.entityType === 'jobs') {
+    if (item.action === 'updateReceive') {
+      return api.put('/jobs/receive', item.payload, { forceNetwork: true });
+    }
+    return api.put('/jobs/process', item.payload, { forceNetwork: true });
+  }
   const endpoint = ENDPOINTS[item.entityType];
   const targetId = item.serverId || item.localId;
   if (item.payload?.status && Object.keys(item.payload).length === 1) {

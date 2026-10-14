@@ -59,6 +59,19 @@ import {
   handleNetworkFailure
 } from '../utils/offlineHelpers';
 import { updateOfflineSession } from '../utils/offlineAuth';
+import {
+  computeOfflineLedgerStatement,
+  computeOfflineOutstanding,
+  computeOfflineOutstandingFiltered,
+  computeOfflineOutstandingFilterOptions,
+  computeOfflineTrialBalance,
+  computeOfflineProfitLoss,
+  computeOfflineGstr1,
+  computeOfflineGstr2,
+  computeOfflineGstr3b,
+  computeOfflineStockReport,
+  computeOfflineReportBundle
+} from '../utils/offlineReportsEngine';
 
 const mergePending = async (storeName, serverList, normalize) => {
   const pending = (await getCachedEntities(storeName)).filter((r) => r.offlinePending);
@@ -1043,15 +1056,33 @@ const useStore = create((set, get) => ({
   },
 
   fetchGstr1: async (startDate, endDate) => {
-    const _g1 = await gstApi.gstr1({ startDate: startDate || '', endDate: endDate || '' });
-    const res = { data: { data: _g1 } };
-    return res.data.data;
+    const runOffline = async () => {
+      return computeOfflineGstr1(startDate, endDate, get());
+    };
+    if (isOffline()) return runOffline();
+    try {
+      const _g1 = await gstApi.gstr1({ startDate: startDate || '', endDate: endDate || '' });
+      const res = { data: { data: _g1 } };
+      return res.data.data;
+    } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) return runOffline();
+      throw err;
+    }
   },
 
   fetchGstr2: async (startDate, endDate) => {
-    const _g2 = await gstApi.gstr2({ startDate: startDate || '', endDate: endDate || '' });
-    const res = { data: { data: _g2 } };
-    return res.data.data;
+    const runOffline = async () => {
+      return computeOfflineGstr2(startDate, endDate, get());
+    };
+    if (isOffline()) return runOffline();
+    try {
+      const _g2 = await gstApi.gstr2({ startDate: startDate || '', endDate: endDate || '' });
+      const res = { data: { data: _g2 } };
+      return res.data.data;
+    } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) return runOffline();
+      throw err;
+    }
   },
 
   fetchCADashboard: async (startDate, endDate) => {
@@ -1117,19 +1148,72 @@ const useStore = create((set, get) => ({
   },
 
   issueToMill: async (issueData) => {
+    const saveLocal = async () => {
+      const localId = generateLocalId();
+      const jobCardNo = issueData.jobCardNo || `JC-OFF-${Date.now().toString().slice(-6)}`;
+      const localJob = {
+        ...issueData,
+        _id: localId,
+        id: localId,
+        jobCardNo,
+        issueDate: issueData.issueDate || new Date().toISOString().split('T')[0],
+        status: 'Issued',
+        offlinePending: true,
+      };
+      await saveOffline('jobs', localJob);
+      set((state) => {
+        const nextJobs = [localJob, ...state.jobWorkEntries];
+        const nextLots = (state.inventoryLots || []).map((l) => {
+          if (String(l._id || l.id) === String(issueData.lotId)) {
+            const bal = Number(l.balanceQty ?? l.qty ?? 0);
+            const deduct = Number(issueData.issueQty || issueData.meters || issueData.taka || 0);
+            const newBal = Math.max(0, bal - deduct);
+            return { ...l, balanceQty: newBal, qty: newBal };
+          }
+          return l;
+        });
+        cacheEntities('inventory', nextLots).catch(() => {});
+        return {
+          jobWorkEntries: nextJobs,
+          inventoryLots: nextLots,
+        };
+      });
+      return localJob;
+    };
+
+    if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
       const _ji = await jobsApi.issue(issueData);
-      // Reload from server so receipt lookup gets fully-populated entries
-      // (workerId.name, lotId.itemId.name, lotId.lotId, etc.)
       await get().fetchJobs();
       return _ji;
     } catch (err) {
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       throw err;
     }
   },
 
-
   receiveFromMill: async (receiveData) => {
+    const saveLocal = async () => {
+      const targetId = receiveData.jobId || receiveData._id || receiveData.id;
+      const localId = targetId || generateLocalId();
+      const updatedJob = {
+        ...receiveData,
+        _id: localId,
+        id: localId,
+        status: 'Received',
+        receivedDate: receiveData.receivedDate || new Date().toISOString().split('T')[0],
+        offlinePending: true,
+      };
+      await saveOffline('jobs', { ...updatedJob, action: 'updateReceive' });
+      set((state) => ({
+        jobWorkEntries: state.jobWorkEntries.map((j) =>
+          String(j._id || j.id) === String(targetId) ? { ...j, ...updatedJob } : j
+        ),
+      }));
+      return updatedJob;
+    };
+
+    if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
       const _jr = await jobsApi.receive(receiveData);
       const res = { data: { data: _jr } };
@@ -1137,11 +1221,28 @@ const useStore = create((set, get) => ({
       await get().fetchInventory();
       return res.data.data;
     } catch (err) {
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       throw err;
     }
   },
 
   updateJobReceive: async (receiveData) => {
+    const saveLocal = async () => {
+      const targetId = receiveData.jobId || receiveData._id || receiveData.id;
+      const updatedJob = {
+        ...receiveData,
+        offlinePending: true,
+      };
+      await saveOfflineUpdate('jobs', targetId, updatedJob);
+      set((state) => ({
+        jobWorkEntries: state.jobWorkEntries.map((j) =>
+          String(j._id || j.id) === String(targetId) ? { ...j, ...updatedJob } : j
+        ),
+      }));
+      return updatedJob;
+    };
+
+    if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
       const _jr = await jobsApi.updateReceive(receiveData);
       const res = { data: { data: _jr } };
@@ -1149,27 +1250,50 @@ const useStore = create((set, get) => ({
       await get().fetchInventory();
       return res.data.data;
     } catch (err) {
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       throw err;
     }
   },
 
   updateJobProcess: async (jobId, status) => {
+    const saveLocal = async () => {
+      await saveOfflineUpdate('jobs', jobId, { status });
+      set((state) => ({
+        jobWorkEntries: state.jobWorkEntries.map((j) =>
+          String(j._id || j.id) === String(jobId) ? { ...j, status, offlinePending: true } : j
+        ),
+      }));
+      return { _id: jobId, status };
+    };
+
+    if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
       const _jp = await jobsApi.process({ jobId, status });
       const res = { data: { data: _jp } };
       const updated = res.data.data;
       set((state) => ({
         jobWorkEntries: state.jobWorkEntries.map((j) =>
-          j._id === jobId ? { ...j, ...updated } : j
+          (j._id || j.id) === jobId ? { ...j, ...updated } : j
         )
       }));
       return updated;
     } catch (err) {
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       throw err;
     }
   },
 
   reverseJobReceive: async (jobId) => {
+    const saveLocal = async () => {
+      set((state) => ({
+        jobWorkEntries: state.jobWorkEntries.map((j) =>
+          (j._id || j.id) === jobId ? { ...j, status: 'Issued', offlinePending: true } : j
+        ),
+      }));
+      return { _id: jobId, status: 'Issued' };
+    };
+
+    if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
       const _jr = await jobsApi.reverseReceive({ jobId });
       const res = { data: { data: _jr } };
@@ -1182,6 +1306,7 @@ const useStore = create((set, get) => ({
       await get().fetchInventory();
       return updated;
     } catch (err) {
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       throw err;
     }
   },
@@ -1189,23 +1314,42 @@ const useStore = create((set, get) => ({
   // --- ACCOUNTING ---
   fetchLedger: async (partyId) => {
     set({ loading: true });
+    const runOffline = async () => {
+      const res = await computeOfflineLedgerStatement({
+        ledgerId: partyId,
+        state: get(),
+      });
+      set({ ledgerEntries: res.statement || [], loading: false });
+      return res.statement || [];
+    };
+
+    if (isOffline()) {
+      return runOffline();
+    }
     try {
       const _pl = await ledgerApi.partyLedger(partyId);
       const res = { data: { data: _pl } };
       set({ ledgerEntries: res.data.data || res.data, loading: false });
+      return res.data.data || res.data;
     } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) {
+        return runOffline();
+      }
       set({ error: err.message, loading: false });
+      return [];
     }
   },
 
   fetchLedgers: async (group = '', search = '') => {
-    if (isOffline()) {
+    const loadCached = async () => {
       const cached = await getCachedEntities('ledgers');
       set({ ledgers: cached });
       return cached;
+    };
+    if (isOffline()) {
+      return loadCached();
     }
     try {
-      const companyId = get().user?.companyId;
       const _ledgers = await accountingApi.listLedgers({ group, search });
       const res = { data: { data: _ledgers } };
       const data = res.data.data || [];
@@ -1213,10 +1357,8 @@ const useStore = create((set, get) => ({
       set({ ledgers: data });
       return data;
     } catch (err) {
-      if (isNetworkError(err)) {
-        const cached = await getCachedEntities('ledgers');
-        set({ ledgers: cached });
-        return cached;
+      if (isNetworkError(err) || !navigator.onLine) {
+        return loadCached();
       }
       console.error('Fetch ledgers failed:', err);
       return [];
@@ -1224,6 +1366,20 @@ const useStore = create((set, get) => ({
   },
 
   addLedger: async (ledgerData) => {
+    const saveLocal = async () => {
+      const localId = generateLocalId();
+      const localLedger = {
+        ...ledgerData,
+        _id: localId,
+        id: localId,
+        offlinePending: true,
+      };
+      await saveOffline('ledgers', localLedger);
+      set((state) => ({ ledgers: [...state.ledgers, localLedger] }));
+      return localLedger;
+    };
+
+    if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
       const _cl = await accountingApi.createLedger({
         ...ledgerData,
@@ -1234,6 +1390,7 @@ const useStore = create((set, get) => ({
       set(state => ({ ledgers: [...state.ledgers, newLedger] }));
       return newLedger;
     } catch (err) {
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       throw err;
     }
   },
@@ -1241,7 +1398,7 @@ const useStore = create((set, get) => ({
   addPayment: async (data) => {
     const saveLocal = async () => {
       const localId = generateLocalId();
-      const voucherNo = `OFF-PV-${Date.now()}`;
+      const voucherNo = `OFF-PV-${Date.now().toString().slice(-6)}`;
       const localVoucher = normalizeVoucher({
         ...data,
         _id: localId,
@@ -1252,12 +1409,28 @@ const useStore = create((set, get) => ({
         date: data.date || new Date().toISOString().split('T')[0]
       });
       await saveOffline('payments', { ...data, _id: localId, id: localId, type: 'Payment' });
+      // Apply payment to purchases if againstInvoices is provided
+      const against = Array.isArray(data.againstInvoices) ? data.againstInvoices : [];
+      let updatedPurchases = get().purchases;
+      if (against.length > 0) {
+        updatedPurchases = (get().purchases || []).map((pur) => {
+          const matched = against.find((a) => String(a.invoiceId) === String(pur._id || pur.id) || String(a.billNo) === String(pur.invoiceNo || pur.suppBillNo));
+          if (matched) {
+            const adj = Number(matched.adjustedAmount || matched.paidAmt || matched.amount || 0);
+            const currentPaid = Number(pur.paidAmount || 0);
+            return { ...pur, paidAmount: currentPaid + adj };
+          }
+          return pur;
+        });
+        cacheEntities('purchases', updatedPurchases.filter((p) => !p.offlinePending)).catch(() => {});
+      }
       set((state) => ({
         payments: [localVoucher, ...state.payments],
         vouchers: [localVoucher, ...state.vouchers],
+        purchases: updatedPurchases,
         loading: false
       }));
-      return localVoucher;
+      return { voucher: localVoucher, discountNotes: [] };
     };
 
     set({ loading: true });
@@ -1280,7 +1453,7 @@ const useStore = create((set, get) => ({
       return { voucher: newVoucher, discountNotes };
     } catch (err) {
       set({ loading: false });
-      if (isNetworkError(err) && canSaveOffline(get)) return saveLocal();
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       throw err;
     }
   },
@@ -1288,7 +1461,7 @@ const useStore = create((set, get) => ({
   addReceipt: async (data) => {
     const saveLocal = async () => {
       const localId = generateLocalId();
-      const voucherNo = `OFF-RV-${Date.now()}`;
+      const voucherNo = `OFF-RV-${Date.now().toString().slice(-6)}`;
       const localVoucher = normalizeVoucher({
         ...data,
         _id: localId,
@@ -1299,12 +1472,28 @@ const useStore = create((set, get) => ({
         date: data.date || new Date().toISOString().split('T')[0]
       });
       await saveOffline('receipts', { ...data, _id: localId, id: localId, type: 'Receipt' });
+      // Apply receipt to sales if againstInvoices is provided
+      const against = Array.isArray(data.againstInvoices) ? data.againstInvoices : [];
+      let updatedSales = get().sales;
+      if (against.length > 0) {
+        updatedSales = (get().sales || []).map((sale) => {
+          const matched = against.find((a) => String(a.invoiceId) === String(sale._id || sale.id) || String(a.billNo) === String(sale.invoiceNo));
+          if (matched) {
+            const adj = Number(matched.adjustedAmount || matched.paidAmt || matched.amount || 0);
+            const currentPaid = Number(sale.paidAmount || 0);
+            return { ...sale, paidAmount: currentPaid + adj };
+          }
+          return sale;
+        });
+        cacheEntities('sales', updatedSales.filter((s) => !s.offlinePending)).catch(() => {});
+      }
       set((state) => ({
         receipts: [localVoucher, ...state.receipts],
         vouchers: [localVoucher, ...state.vouchers],
+        sales: updatedSales,
         loading: false
       }));
-      return localVoucher;
+      return { voucher: localVoucher, discountNotes: [] };
     };
 
     set({ loading: true });
@@ -1327,14 +1516,27 @@ const useStore = create((set, get) => ({
       return { voucher: newVoucher, discountNotes };
     } catch (err) {
       set({ loading: false });
-      if (isNetworkError(err) && canSaveOffline(get)) return saveLocal();
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       throw err;
     }
   },
 
   /** Edit posted payment/receipt — backend reverses the old impact and re-posts atomically */
   updateVoucher: async (id, data) => {
+    const saveLocal = async () => {
+      const updated = normalizeVoucher({ ...data, _id: id, id, offlinePending: true });
+      await saveOfflineUpdate('payments', id, updated);
+      set((state) => ({
+        vouchers: state.vouchers.map((v) => ((v._id || v.id) === id ? updated : v)),
+        payments: state.payments.map((v) => ((v._id || v.id) === id ? updated : v)),
+        receipts: state.receipts.map((v) => ((v._id || v.id) === id ? updated : v)),
+        loading: false,
+      }));
+      return { voucher: updated, discountNotes: [] };
+    };
+
     set({ loading: true });
+    if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
       const env = await accountingApi.updateVoucher(id, data);
       const updated = normalizeVoucher(env.data);
@@ -1351,13 +1553,32 @@ const useStore = create((set, get) => ({
       return { voucher: updated, discountNotes };
     } catch (err) {
       set({ loading: false });
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       throw err;
     }
   },
 
   /** Reverse posted payment/receipt — ledger + bill paidAmount rolled back */
   reverseVoucher: async (id, reason = '') => {
+    const saveLocal = async () => {
+      set((state) => ({
+        vouchers: state.vouchers.map((v) =>
+          (v._id || v.id) === id ? { ...v, status: 'Reversed', reverseReason: reason, offlinePending: true } : v
+        ),
+        payments: state.payments.map((v) =>
+          (v._id || v.id) === id ? { ...v, status: 'Reversed', reverseReason: reason, offlinePending: true } : v
+        ),
+        receipts: state.receipts.map((v) =>
+          (v._id || v.id) === id ? { ...v, status: 'Reversed', reverseReason: reason, offlinePending: true } : v
+        ),
+        loading: false,
+      }));
+      await saveOfflineDelete('payments', id);
+      return { _id: id, status: 'Reversed' };
+    };
+
     set({ loading: true });
+    if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
       const data = await accountingApi.reverseVoucher(id, { reason });
       const reversed = normalizeVoucher(data);
@@ -1373,17 +1594,35 @@ const useStore = create((set, get) => ({
       return reversed;
     } catch (err) {
       set({ loading: false });
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       throw err;
     }
   },
 
   fetchLedgerStatement: async ({ ledgerId, from, to }) => {
     set({ loading: true, error: null });
+    const runOffline = async () => {
+      const data = await computeOfflineLedgerStatement({
+        ledgerId,
+        from,
+        to,
+        state: get(),
+      });
+      set({ currentLedgerStatement: data, loading: false });
+      return data;
+    };
+
+    if (isOffline()) {
+      return runOffline();
+    }
     try {
       const data = await accountingApi.statement(ledgerId, { from: from || '', to: to || '' });
       set({ currentLedgerStatement: data, loading: false });
       return data;
     } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) {
+        return runOffline();
+      }
       set({ error: err.message, loading: false, currentLedgerStatement: null });
       throw err;
     }
@@ -1391,23 +1630,35 @@ const useStore = create((set, get) => ({
 
   fetchTrialBalance: async (asOn) => {
     set({ loading: true });
+    const runOffline = async () => {
+      const data = await computeOfflineTrialBalance(asOn, get());
+      set({ trialBalance: data, loading: false });
+      return data;
+    };
+    if (isOffline()) return runOffline();
     try {
-      const companyId = get().user?.companyId;
       const _tb = await accountingApi.trialBalance({ asOn: asOn || '' });
       const res = { data: { data: _tb } };
       const data = res.data.data || [];
       set({ trialBalance: data, loading: false });
       return data;
     } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) return runOffline();
       set({ error: err.message, loading: false });
       return [];
     }
   },
 
   fetchGroupedTrialBalance: async ({ asOn, withZeroBalance } = {}) => {
+    const runOffline = async () => {
+      const rows = await computeOfflineTrialBalance(asOn, get());
+      return { rows, grandDebit: rows.reduce((s, r) => s + (r.debit || 0), 0), grandCredit: rows.reduce((s, r) => s + (r.credit || 0), 0) };
+    };
+    if (isOffline()) return runOffline();
     try {
       return await accountingApi.groupedTrialBalance({ asOn: asOn || '', withZeroBalance: !!withZeroBalance });
     } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) return runOffline();
       console.error('Fetch grouped trial balance failed:', err);
       return null;
     }
@@ -1415,25 +1666,38 @@ const useStore = create((set, get) => ({
 
   fetchProfitLoss: async (from, to) => {
     set({ loading: true });
+    const runOffline = async () => {
+      const data = await computeOfflineProfitLoss(from, to, get());
+      set({ profitLoss: data, loading: false });
+      return data;
+    };
+    if (isOffline()) return runOffline();
     try {
-      const companyId = get().user?.companyId;
       const _pl = await accountingApi.profitLoss({ from: from || '', to: to || '' });
       const res = { data: { data: _pl } };
       set({ profitLoss: res.data.data, loading: false });
+      return res.data.data;
     } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) return runOffline();
       set({ error: err.message, loading: false });
     }
   },
 
   fetchOutstanding: async (type, asOn) => {
     set({ loading: true });
+    const runOffline = async () => {
+      const data = await computeOfflineOutstanding(type, asOn, get());
+      set({ outstandingReport: data, loading: false });
+      return data;
+    };
+    if (isOffline()) return runOffline();
     try {
-      const companyId = get().user?.companyId;
       const _os = await accountingApi.outstanding({ type, asOn: asOn || '' });
       const res = { data: { data: _os } };
       set({ outstandingReport: res.data.data || [], loading: false });
       return res.data.data;
     } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) return runOffline();
       set({ error: err.message, loading: false });
       return [];
     }
@@ -1441,6 +1705,10 @@ const useStore = create((set, get) => ({
 
   /** Full filterable Outstanding report — Bill Date range, Party/Broker/Station/Haste/Book/State/MSME multi-select. */
   fetchOutstandingReportFiltered: async (type, filters = {}) => {
+    const runOffline = async () => {
+      return computeOfflineOutstandingFiltered(type, filters, get());
+    };
+    if (isOffline()) return runOffline();
     try {
       const params = { type, ...filters };
       Object.keys(params).forEach((k) => {
@@ -1450,12 +1718,17 @@ const useStore = create((set, get) => ({
       const data = await reportsApi.outstanding(params);
       return data || [];
     } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) return runOffline();
       set({ error: err.message });
       return [];
     }
   },
 
   fetchOutstandingFilterOptions: async (type) => {
+    const runOffline = async () => {
+      return computeOfflineOutstandingFilterOptions(type, get());
+    };
+    if (isOffline()) return runOffline();
     try {
       const data = await reportsApi.outstandingFilterOptions({ type });
       return (
@@ -1464,26 +1737,41 @@ const useStore = create((set, get) => ({
         }
       );
     } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) return runOffline();
       set({ error: err.message });
-      return { parties: [], brokers: [], stations: [], hastes: [], books: [], states: [], msmeTypes: [] };
+      return runOffline();
     }
   },
 
   fetchReportsBundle: async (startDate, endDate) => {
+    const runOffline = async () => {
+      return computeOfflineReportBundle(startDate, endDate, get());
+    };
+    if (isOffline()) return runOffline();
     try {
       const _rb = await reportsApi.bundle({ startDate: startDate || '', endDate: endDate || '' });
       const res = { data: { data: _rb } };
       return res.data.data;
     } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) return runOffline();
       console.error('Reports bundle failed:', err);
-      throw err;
+      return runOffline();
     }
   },
 
   fetchStockReport: async () => {
-    const _st = await reportsApi.stock();
-    const res = { data: { data: _st } };
-    return res.data.data;
+    const runOffline = async () => {
+      return computeOfflineStockReport(get());
+    };
+    if (isOffline()) return runOffline();
+    try {
+      const _st = await reportsApi.stock();
+      const res = { data: { data: _st } };
+      return res.data.data;
+    } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) return runOffline();
+      return [];
+    }
   },
 
   fetchBooks: async () => {
@@ -1779,6 +2067,20 @@ const useStore = create((set, get) => ({
   },
 
   addNote: async (data) => {
+    const saveLocal = async () => {
+      const localId = generateLocalId();
+      const localNote = {
+        ...data,
+        _id: localId,
+        id: localId,
+        noteNo: data.noteNo || `OFF-NT-${Date.now().toString().slice(-6)}`,
+        offlinePending: true,
+      };
+      await saveOffline('notes', localNote);
+      set((state) => ({ notes: [localNote, ...state.notes] }));
+      return localNote;
+    };
+    if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
       const _nc = await notesApi.create(data);
       const res = { data: { data: _nc } };
@@ -1786,6 +2088,7 @@ const useStore = create((set, get) => ({
       set(state => ({ notes: [newNote, ...state.notes] }));
       return newNote;
     } catch (err) {
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       console.error('Add note failed:', err);
       throw err;
     }
@@ -1811,9 +2114,28 @@ const useStore = create((set, get) => ({
 
   /** Contra voucher — transfer between two Cash/Bank ledgers (Stage 3 financial engine). */
   postContra: async ({ fromLedgerId, toLedgerId, amount, entryDate, narration }) => {
+    const saveLocal = async () => {
+      const localId = generateLocalId();
+      const localContra = {
+        _id: localId,
+        id: localId,
+        fromLedgerId,
+        toLedgerId,
+        amount,
+        entryDate: entryDate || new Date().toISOString().split('T')[0],
+        narration: narration || 'Contra Voucher',
+        voucherType: 'Contra',
+        offlinePending: true,
+      };
+      await saveOffline('payments', localContra);
+      set((state) => ({ vouchers: [localContra, ...state.vouchers] }));
+      return localContra;
+    };
+    if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
       return await accountingApi.stage3.contra({ fromLedgerId, toLedgerId, amount, entryDate, narration });
     } catch (err) {
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       console.error('Contra voucher failed:', err);
       throw err;
     }
@@ -1867,11 +2189,16 @@ const useStore = create((set, get) => ({
 
   // --- GST Compliance (Stage 4 engine) ---
   fetchGstr3b: async (period) => {
+    const runOffline = async () => {
+      return computeOfflineGstr3b(period, get());
+    };
+    if (isOffline()) return runOffline();
     try {
       return await stage4Api.gstr3b({ period });
     } catch (err) {
+      if (isNetworkError(err) || !navigator.onLine) return runOffline();
       console.error('Fetch GSTR-3B failed:', err);
-      return null;
+      return runOffline();
     }
   },
 
@@ -2022,14 +2349,25 @@ const useStore = create((set, get) => ({
 
   // --- VOUCHERS (Receipts & Payments) ---
   fetchVouchers: async (type = '') => {
-    if (isOffline()) {
-      const payments = (await getCachedEntities('payments')).map(normalizeVoucher);
-      const receipts = (await getCachedEntities('receipts')).map(normalizeVoucher);
-      const vouchers = [...payments, ...receipts];
-      if (type === 'Payment') return payments;
-      if (type === 'Receipt') return receipts;
-      set({ vouchers, payments, receipts });
+    const loadCached = async () => {
+      const cachedPayments = (await getCachedEntities('payments')).map(normalizeVoucher);
+      const cachedReceipts = (await getCachedEntities('receipts')).map(normalizeVoucher);
+      const statePayments = (get().payments || []).filter((p) => p.offlinePending);
+      const stateReceipts = (get().receipts || []).filter((r) => r.offlinePending);
+      const allPayments = [...statePayments, ...cachedPayments].filter(
+        (v, i, arr) => arr.findIndex((x) => (x._id || x.id) === (v._id || v.id)) === i
+      );
+      const allReceipts = [...stateReceipts, ...cachedReceipts].filter(
+        (v, i, arr) => arr.findIndex((x) => (x._id || x.id) === (v._id || v.id)) === i
+      );
+      const vouchers = [...allPayments, ...allReceipts];
+      if (type === 'Payment') return allPayments;
+      if (type === 'Receipt') return allReceipts;
+      set({ vouchers, payments: allPayments, receipts: allReceipts });
       return vouchers;
+    };
+    if (isOffline()) {
+      return loadCached();
     }
     try {
       const query = type ? `?type=${type}` : '';
@@ -2045,12 +2383,8 @@ const useStore = create((set, get) => ({
       set({ vouchers, payments, receipts });
       return vouchers;
     } catch (err) {
-      if (isNetworkError(err)) {
-        const payments = (await getCachedEntities('payments')).map(normalizeVoucher);
-        const receipts = (await getCachedEntities('receipts')).map(normalizeVoucher);
-        const vouchers = [...payments, ...receipts];
-        set({ vouchers, payments, receipts });
-        return type === 'Payment' ? payments : type === 'Receipt' ? receipts : vouchers;
+      if (isNetworkError(err) || !navigator.onLine) {
+        return loadCached();
       }
       console.error('Fetch vouchers failed:', err);
       return [];
@@ -2059,11 +2393,26 @@ const useStore = create((set, get) => ({
 
   // --- MANUAL JOURNAL ---
   addJournalEntry: async (entryData) => {
+    const saveLocal = async () => {
+      const localId = generateLocalId();
+      const localVoucher = {
+        ...entryData,
+        _id: localId,
+        id: localId,
+        voucherType: 'Journal',
+        offlinePending: true,
+      };
+      await saveOffline('payments', localVoucher);
+      set((state) => ({ vouchers: [localVoucher, ...state.vouchers] }));
+      return localVoucher;
+    };
+    if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
       const _je = await accountingApi.journal(entryData);
       const res = { data: { data: _je } };
       return res.data.data;
     } catch (err) {
+      if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       console.error('Add journal entry failed:', err);
       throw err;
     }
@@ -2115,6 +2464,55 @@ const useStore = create((set, get) => ({
   fetchDashboardSummary: async () => {
     const started = Date.now();
     set({ dashboardLoading: true });
+
+    const computeLocalSummary = () => {
+      const state = get();
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const monthStartStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+
+      const sales = state.sales || [];
+      const purchases = state.purchases || [];
+      const lots = state.inventoryLots || [];
+      const jobs = state.jobWorkEntries || [];
+      const parties = state.parties || [];
+
+      const salesToday = sales.filter((s) => (s.date || '').slice(0, 10) === todayStr);
+      const purchaseToday = purchases.filter((p) => (p.date || '').slice(0, 10) === todayStr);
+      const salesMonth = sales.filter((s) => (s.date || '').slice(0, 10) >= monthStartStr);
+      const purchaseMonth = purchases.filter((p) => (p.date || '').slice(0, 10) >= monthStartStr);
+
+      const salesMonthAmount = salesMonth.reduce((s, x) => s + Number(x.netAmount || x.totalAmount || 0), 0);
+      const purchaseMonthAmount = purchaseMonth.reduce((s, x) => s + Number(x.netAmount || x.totalAmount || 0), 0);
+
+      const receivable = sales.reduce((s, x) => s + Math.max(0, Number(x.netAmount || x.totalAmount || 0) - Number(x.paidAmount || 0)), 0);
+      const payable = purchases.reduce((s, x) => s + Math.max(0, Number(x.netAmount || x.totalAmount || 0) - Number(x.paidAmount || 0)), 0);
+
+      return {
+        asOf: new Date().toISOString(),
+        salesToday: { count: salesToday.length, amount: salesToday.reduce((s, x) => s + Number(x.netAmount || x.totalAmount || 0), 0) },
+        purchaseToday: { count: purchaseToday.length, amount: purchaseToday.reduce((s, x) => s + Number(x.netAmount || x.totalAmount || 0), 0) },
+        salesMonthAmount,
+        purchaseMonthAmount,
+        profitProxy: salesMonthAmount - purchaseMonthAmount,
+        cashToday: 0,
+        receivable,
+        payable,
+        outstandingNet: receivable - payable,
+        lowStockLots: lots.filter((l) => Number(l.balanceQty ?? l.qty ?? 0) > 0 && Number(l.balanceQty ?? l.qty ?? 0) < 50).length,
+        availableLots: lots.filter((l) => Number(l.balanceQty ?? l.qty ?? 0) > 0).length,
+        openJobs: jobs.filter((j) => j.status === 'Issued' || j.status === 'In-Process').length,
+        partiesCount: parties.length,
+        topCustomers: [],
+        topSuppliers: [],
+      };
+    };
+
+    if (isOffline()) {
+      const data = computeLocalSummary();
+      set({ dashboardSummary: data, dashboardLoading: false });
+      return data;
+    }
+
     try {
       const data = await dashboardApi.summary();
       const elapsed = Date.now() - started;
@@ -2123,11 +2521,9 @@ const useStore = create((set, get) => ({
       set({ dashboardSummary: data, dashboardLoading: false });
       return data;
     } catch (err) {
-      const elapsed = Date.now() - started;
-      const wait = Math.max(0, 450 - elapsed);
-      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-      set({ dashboardLoading: false, error: err.message });
-      return null;
+      const data = computeLocalSummary();
+      set({ dashboardSummary: data, dashboardLoading: false });
+      return data;
     }
   },
 }));

@@ -17,8 +17,14 @@ const AccountingPage = () => {
   }, []);
 
   const resolveLedgerForParty = async (partyId) => {
-    const ledgers = await accountingApi.listLedgers({ partyId });
-    return ledgers?.[0] || null;
+    try {
+      const ledgers = await accountingApi.listLedgers({ partyId });
+      if (ledgers?.[0]) return ledgers[0];
+    } catch {
+      /* ignore and fallback to local */
+    }
+    const local = (useStore.getState().ledgers || []).find((l) => String(l.linkedPartyId) === String(partyId));
+    return local || { _id: `party:${partyId}` };
   };
 
   // Fetch the ledger statement when selected party changes

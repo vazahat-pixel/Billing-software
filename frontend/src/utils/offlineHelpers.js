@@ -47,6 +47,9 @@ export const readOfflineEnabled = () =>
  */
 export const canSaveOffline = (get) => {
   const { user, token } = get();
-  if (!user || !token) return false;
-  return true;
+  if (user && token) return true;
+  if (typeof window !== 'undefined' && (window.textileDesktop || localStorage.getItem('user'))) {
+    return true;
+  }
+  return false;
 };
