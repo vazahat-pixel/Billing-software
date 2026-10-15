@@ -956,6 +956,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   useEffect(() => {
     if (!isOpen || showFindModal) return undefined;
     const onKey = (e) => {
+      if (document.querySelector('[data-erp-confirm-dialog]')) return;
       if (e.key === 'F3') {
         e.preventDefault();
         e.stopPropagation();

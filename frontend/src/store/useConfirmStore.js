@@ -16,6 +16,7 @@ const useConfirmStore = create((set, get) => ({
           confirmLabel: options.confirmLabel || 'Confirm',
           cancelLabel: options.cancelLabel || 'Cancel',
           danger: !!options.danger,
+          defaultFocus: options.defaultFocus || (options.danger ? 'confirm' : 'confirm'),
           loading: false,
           resolve,
         },

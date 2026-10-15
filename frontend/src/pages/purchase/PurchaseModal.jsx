@@ -688,6 +688,7 @@ const PurchaseModal = ({
     if (!isOpen) return undefined;
 
     const onKeyDown = (e) => {
+      if (document.querySelector('[data-erp-confirm-dialog]')) return;
       // F3 or Alt+F: Open Find Bill dialog
       if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'f')) {
         e.preventDefault();

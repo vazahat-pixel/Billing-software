@@ -21,6 +21,7 @@ export function useFormEnterNavigation(enabled = true) {
     if (!enabled) return undefined;
 
     const onKeyDown = (e) => {
+      if (document.querySelector('[data-erp-confirm-dialog]')) return;
       if (e.key === 'Tab' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
         if (focusFormFooter(e.target)) {
           e.preventDefault();
