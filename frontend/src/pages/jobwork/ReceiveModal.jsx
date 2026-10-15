@@ -136,10 +136,10 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const sortedReceivedJobs = useMemo(() => {
       const list = (jobWorkEntries || []).filter(j => j.status === 'Received' || j.status === 'Partial');
       return list.sort((a, b) => {
-         const numA = parseInt(String(a.serialNo || a.billGpNo || a.jobCardNo || a.challanNo || '').replace(/\D/g, ''), 10);
-         const numB = parseInt(String(b.serialNo || b.billGpNo || b.jobCardNo || b.challanNo || '').replace(/\D/g, ''), 10);
+         const numA = parseInt(String(a.serialNo || '').replace(/\D/g, ''), 10);
+         const numB = parseInt(String(b.serialNo || '').replace(/\D/g, ''), 10);
          if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
-         return new Date(a.receiveDate || a.updatedAt || 0) - new Date(b.receiveDate || b.updatedAt || 0);
+         return new Date(a.receiveDate || a.updatedAt || a.createdAt || 0) - new Date(b.receiveDate || b.updatedAt || b.createdAt || 0);
       });
    }, [jobWorkEntries]);
 
@@ -188,8 +188,14 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       const workerParty = (parties || []).find(p => String(p._id || p.id) === String(workerId));
       setGstin(job.workerId?.gstin || workerParty?.gstin || '');
       setBillGpNo(job.billGpNo || '');
-      const loadedSerial = String(job.serialNo || job.billGpNo || '').replace(/\D/g, '');
-      if (loadedSerial) setSerialNo(loadedSerial);
+      const rawSerial = String(job.serialNo || '').replace(/\D/g, '');
+      let loadedSerial = rawSerial;
+      const billNoClean = String(job.billGpNo || '').replace(/\D/g, '');
+      if (!loadedSerial || (loadedSerial === billNoClean && Number(loadedSerial) > 50 && receiptBills.length < 50)) {
+         const idx = receiptBills.findIndex(b => receiptKeyOf(b) === receiptKeyOf(job));
+         loadedSerial = idx >= 0 ? String(idx + 1) : '1';
+      }
+      setSerialNo(loadedSerial);
       setReceiveDate(job.receiveDate ? String(job.receiveDate).slice(0, 10) : today());
       setBillType(job.billType || 'Process');
 
@@ -348,10 +354,10 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       const list = existingJobs
          .filter((j) => j.status === 'Received' || j.status === 'Partial')
          .sort((a, b) => {
-            const numA = parseInt(String(a.billGpNo || a.jobCardNo || a.challanNo || '').replace(/\D/g, ''), 10);
-            const numB = parseInt(String(b.billGpNo || b.jobCardNo || b.challanNo || '').replace(/\D/g, ''), 10);
+            const numA = parseInt(String(a.serialNo || '').replace(/\D/g, ''), 10);
+            const numB = parseInt(String(b.serialNo || '').replace(/\D/g, ''), 10);
             if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
-            return new Date(a.receiveDate || a.updatedAt || 0) - new Date(b.receiveDate || b.updatedAt || 0);
+            return new Date(a.receiveDate || a.updatedAt || a.createdAt || 0) - new Date(b.receiveDate || b.updatedAt || b.createdAt || 0);
          });
       const latest = list[list.length - 1];
       if (latest) {
@@ -376,10 +382,10 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                const freshList = freshState.jobWorkEntries
                   .filter((j) => j.status === 'Received' || j.status === 'Partial')
                   .sort((a, b) => {
-                     const numA = parseInt(String(a.billGpNo || a.jobCardNo || a.challanNo || '').replace(/\D/g, ''), 10);
-                     const numB = parseInt(String(b.billGpNo || b.jobCardNo || b.challanNo || '').replace(/\D/g, ''), 10);
+                     const numA = parseInt(String(a.serialNo || '').replace(/\D/g, ''), 10);
+                     const numB = parseInt(String(b.serialNo || '').replace(/\D/g, ''), 10);
                      if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
-                     return new Date(a.receiveDate || a.updatedAt || 0) - new Date(b.receiveDate || b.updatedAt || 0);
+                     return new Date(a.receiveDate || a.updatedAt || a.createdAt || 0) - new Date(b.receiveDate || b.updatedAt || b.createdAt || 0);
                   });
                const freshLatest = freshList[freshList.length - 1];
                if (freshLatest) handleLoadReceivedJob(freshLatest, { asView: true });
@@ -647,17 +653,13 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       let maxNo = 0;
       list.forEach((j) => {
          const num = parseInt(String(j.serialNo || '').replace(/\D/g, ''), 10);
-         if (!isNaN(num) && num > maxNo) {
+         const bNum = parseInt(String(j.billGpNo || '').replace(/\D/g, ''), 10);
+         if (!isNaN(num) && num > maxNo && num < 100000 && !(num === bNum && num > 50)) {
             maxNo = num;
          }
-         if (j.status === 'Received' || j.status === 'Partial') {
-            const bNum = parseInt(String(j.billGpNo || '').replace(/\D/g, ''), 10);
-            if (!isNaN(bNum) && bNum > maxNo) {
-               maxNo = bNum;
-            }
-         }
       });
-      const distinctCount = (receiptBills && receiptBills.length) || list.filter((j) => j.status === 'Received' || j.status === 'Partial').length;
+      const validReceipts = (receiptBills || []).filter(b => b.billGpNo || b.status === 'Received');
+      const distinctCount = validReceipts.length || 0;
       const nextVal = Math.max(maxNo, distinctCount) + 1;
       return String(nextVal > 0 ? nextVal : 1);
    }, [jobWorkEntries, receiptBills]);
@@ -1140,14 +1142,31 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             }
             ok += 1;
          }
-         notifySuccess(isEditMode ? `Receipt #${billGpNo} updated successfully!` : `Challan(s) received — ${ok} finished lot(s) added to stock!`);
-         setBillGpNo('');
-         setLines([blankLine()]);
-         setIsEditMode(false);
-         setActiveTab('View Mill Rec');
+         const savedBillGpNo = billGpNo.trim();
+         const savedSerial = serialNo || getNextSerialNo();
+         notifySuccess(isEditMode ? `Receipt #${savedBillGpNo} updated successfully!` : `Receipt #${savedBillGpNo} saved successfully!`);
+
+         // Stay on Mill Receive form in VIEW mode showing the saved receipt
          await fetchJobs();
-         await fetchInventory();
-         setSerialNo(getNextSerialNo());
+         await fetchInventory?.();
+
+         setActiveTab('Mill Receive');
+         setIsEditMode(false);
+         setMode('View');
+         kbRef.current.isEditMode = false;
+         kbRef.current.mode = 'View';
+
+         const freshState = useStore.getState();
+         const freshJobs = (freshState.jobWorkEntries || []).filter(j => j.status === 'Received' || j.status === 'Partial');
+         const matchedJob = (freshJobs || []).slice().reverse().find(j =>
+            (savedBillGpNo && String(j.billGpNo || '').trim() === savedBillGpNo) ||
+            (savedSerial && String(j.serialNo || '').trim() === String(savedSerial).trim())
+         ) || freshJobs[freshJobs.length - 1];
+
+         if (matchedJob) {
+            handleLoadReceivedJob(matchedJob, { asView: true });
+         }
+         focusSerialNo();
       } catch (err) {
          notifyError(err, { fallback: ok > 0 ? `Partial save: ${ok} processed, then failed` : 'Failed to save job receipt' });
       } finally {
@@ -1172,7 +1191,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                <div className="classic-erp-header shrink-0 flex justify-between items-center bg-[#858178] px-2 py-1 text-white border-b border-[#5e5a52]">
                   <span className="erp-window-title truncate font-bold text-xs flex items-center gap-1.5">
                      Mill Receipt [ {selectedBook || 'PROCESS CHARGE'} ]
-                     {mode === 'View' && billGpNo && (
+                     {mode === 'View' && (
                         <span className="bg-sky-200 text-sky-950 px-1.5 py-0.5 rounded text-[9px] font-extrabold border border-sky-600">
                            RECENT RECEIPT (VIEW) · Press Enter for New Entry
                         </span>
@@ -1966,7 +1985,11 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                             </div>
                             <div className="mill-rec-nav-row">
                                <div className="mill-rec-status">
-                                  {mode === 'View' ? `Recent #${billGpNo || serialNo} · Press + / - to browse · Enter for New Entry` : mode === 'Edit' ? `Editing #${billGpNo || serialNo}` : `New Entry #${serialNo}`}
+                                  {mode === 'View'
+                                     ? `Recent #${serialNo || '1'}${billGpNo ? ` (Bill: ${billGpNo})` : ''} · Press + / - to browse · Enter for New Entry`
+                                     : mode === 'Edit'
+                                        ? `Editing #${serialNo || ''}${billGpNo ? ` (Bill: ${billGpNo})` : ''}`
+                                        : `New Entry #${serialNo}`}
                                </div>
                                <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt('first')} title="First Receipt">First</button>
                                <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(1)} title="Next Receipt (+)">Next (+)</button>

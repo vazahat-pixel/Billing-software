@@ -91,6 +91,7 @@ const JobSchema = new mongoose.Schema({
   weaver: { type: String, default: '' },
   purchaseBillNo: { type: String, default: '' },
   billGpNo: { type: String, default: '' },
+  serialNo: { type: String, default: '', index: true },
   purchaseRate: { type: Number, default: 0, min: 0 },
   jobRate: { type: Number, default: 0, min: 0 },
   finish: { type: String, default: '' },

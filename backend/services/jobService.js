@@ -349,6 +349,7 @@ class JobService {
       job.status = isFinal ? 'Received' : 'Partial';
       job.receiveDate = new Date();
       job.billGpNo = billGpNo || job.billGpNo || '';
+      if (receiveData.serialNo) job.serialNo = String(receiveData.serialNo).trim();
 
       if (isChainJob) {
         const idx = job.currentStepIndex ?? 0;
@@ -773,6 +774,7 @@ class JobService {
       job.processCharges = newCharges;
       job.processGstAmount = newGst;
       if (billGpNo != null) job.billGpNo = String(billGpNo).trim();
+      if (receiveData.serialNo != null) job.serialNo = String(receiveData.serialNo).trim();
       if (workerId) job.workerId = workerId;
       if (billType) job.billType = billType;
       job.receiveDate = newDate;
