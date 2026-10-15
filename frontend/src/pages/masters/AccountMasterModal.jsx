@@ -300,7 +300,16 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-5xl">
-      <div className="classic-erp-window erp-master-form">
+      <div
+        className="classic-erp-window erp-master-form"
+        onKeyDown={(e) => {
+          if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || (e.altKey && e.key.toLowerCase() === 's')) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!locked && !saving && !bootLoading) handleSave();
+          }
+        }}
+      >
         <ErpBusyOverlay show={bootLoading} message="Loading accounts…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving account…" />
         <div className="classic-erp-header">
@@ -363,8 +372,12 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
                         e.preventDefault();
                         e.stopPropagation();
-                        cityRef.current?.focus();
-                        try { cityRef.current?.select(); } catch { /* ignore */ }
+                        if (onSuccess && formData.name?.trim()) {
+                          handleSave();
+                        } else {
+                          cityRef.current?.focus();
+                          try { cityRef.current?.select(); } catch { /* ignore */ }
+                        }
                       }
                     }}
                   />

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { ERPCombobox } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
@@ -638,6 +638,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       puBillNo: f.puBillNo || lot.invoiceNo || lot.purchaseInvoiceNo || '',
       weaver: supplierName || f.weaver || '',
     }));
+    setTimeout(() => focusIssPcs(), 80);
   };
 
   const handleMillChange = (id) => {
@@ -652,9 +653,14 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
 
   const handleMillSuccess = (party) => {
     fetchParties();
-    setField('millId', party._id || party.id);
+    const newId = party?._id || party?.id;
+    if (newId) setField('millId', newId);
     setAccountModal({ open: false, initialData: null });
-    toast.success(`Mill "${party.name}" added`);
+    toast.success(`Mill "${party?.name || 'New Mill'}" added`);
+    // Immediately move focus forward to Pu.BillNo so user can continue via keyboard
+    setTimeout(() => {
+      focusPuBillNo();
+    }, 80);
   };
 
   const handleNew = async () => {
@@ -756,6 +762,17 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
           setMode('Edit');
           toast.info('Switched to Edit mode');
         }
+        return;
+      }
+
+      // Ctrl+Enter or Alt+S: Save challan from keyboard
+      if (((e.ctrlKey || e.metaKey) && e.key === 'Enter') || (e.altKey && e.key.toLowerCase() === 's')) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!locked && !saving) {
+          handleSave(null);
+        }
+        return;
       }
     };
 
@@ -1094,11 +1111,18 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                         recentKey="mill-issue-mill"
                         onCreateNew={!locked ? handleCreateMill : undefined}
                         createLabel="Mill"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !locked && form.millId) {
+                            focusPuBillNo();
+                          }
+                        }}
                         allowClear
                       />
                       {!locked && (
                         <button
                           type="button"
+                          tabIndex={-1}
+                          data-enter-skip="true"
                           title="Add Mill"
                           onClick={() => handleCreateMill('')}
                           className="erp-job-issue-add-btn"
@@ -1155,13 +1179,21 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                          onKeyDown={(e) => {
                            if (e.key === 'Enter' && !locked) {
                              e.preventDefault(); e.stopPropagation();
-                             focusIssPcs();
+                             if (!form.puBillNo) {
+                               fetchPurchases();
+                               fetchInventory();
+                               setPuBillLookupOpen(true);
+                             } else {
+                               focusIssPcs();
+                             }
                            }
                          }}
                       />
                       {!locked && (
                         <button
                           type="button"
+                          tabIndex={-1}
+                          data-enter-skip="true"
                           title="Browse Purchase Bills"
                           onClick={() => {
                             fetchPurchases();

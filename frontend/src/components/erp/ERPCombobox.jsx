@@ -29,6 +29,7 @@ export default function ERPCombobox({
   emptyMessage = 'No matches',
   allowClear = false,
   openOnEnter = false,
+  onKeyDown: onKeyDownProp = null,
   id: inputIdProp,
   'data-enter-nav': enterNav,
   'data-enter-skip': enterSkip,
@@ -164,6 +165,10 @@ export default function ERPCombobox({
 
   const handleInputKeyDown = (e) => {
     if (disabled || readOnly) return;
+    if (onKeyDownProp) {
+      onKeyDownProp(e);
+      if (e.defaultPrevented) return;
+    }
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -228,7 +233,10 @@ export default function ERPCombobox({
         setQuery('');
         return;
       }
-      /* closed: let global Enter-nav move to next field */
+      /* closed: let global Enter-nav or custom onKeyDown move to next field */
+      if (!open && onKeyDownProp) {
+        onKeyDownProp(e);
+      }
     }
 
     if (e.key === 'Tab') {
