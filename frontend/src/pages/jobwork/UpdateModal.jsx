@@ -8,6 +8,7 @@ import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import { Trash2, Plus, Search } from 'lucide-react';
 import PuBillLookupModal from './PuBillLookupModal';
 import JobWorkPrint from '../../components/print/JobWorkPrint';
+import AccountMasterModal from '../masters/AccountMasterModal';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -97,6 +98,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
   const [lotLookupOpen, setLotLookupOpen] = useState(false);
   const [lotLookupTargetIdx, setLotLookupTargetIdx] = useState(null);
   const [activeItemId, setActiveItemId] = useState('');
+  const [accountModal, setAccountModal] = useState(null);
 
   const locked = mode === 'View';
 
@@ -389,6 +391,38 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
         try { el.select(); } catch {}
       }
     }, 50);
+  };
+
+  const focusHsnCode = () => {
+    setTimeout(() => {
+      const el = document.getElementById('job-issue-hsn');
+      if (el && !el.disabled) {
+        el.focus();
+        try { el.select(); } catch {}
+      } else {
+        focusFirstItem();
+      }
+    }, 40);
+  };
+
+  const openNewParty = (search = '') => {
+    setAccountModal({ name: search || '', group: 'JOB WORKER' });
+  };
+
+  const handleAccountSuccess = (newAccount) => {
+    const id = newAccount?._id || newAccount?.id || '';
+    if (id) {
+      setHeader((h) => ({
+        ...h,
+        partyId: id,
+        gstin: newAccount?.gstin || '',
+      }));
+    }
+    setAccountModal(null);
+    fetchParties?.();
+    setTimeout(() => {
+      focusJobBroker();
+    }, 120);
   };
 
   useEffect(() => {
@@ -1011,19 +1045,46 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
 
                     <div className="classic-erp-field classic-erp-field--lg">
                       <span className="classic-erp-label red-label">Job Party</span>
-                      <ERPCombobox
-                        value={header.partyId}
-                        data-enter-order="3"
-                        onChange={(val) => {
-                          handlePartyChange(val);
-                          focusJobBroker();
-                        }}
-                        disabled={locked}
-                        options={partyOptions}
-                        placeholder="Search job worker / mill…"
-                        recentKey="job-issue-party"
-                        allowClear
-                      />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
+                        <ERPCombobox
+                          value={header.partyId}
+                          data-enter-order="3"
+                          onChange={(val) => {
+                            handlePartyChange(val);
+                            focusJobBroker();
+                          }}
+                          disabled={locked}
+                          options={partyOptions}
+                          placeholder="Search job worker / mill…"
+                          recentKey="job-issue-party"
+                          allowClear
+                          onCreateNew={(q) => openNewParty(q)}
+                          createLabel="Party"
+                        />
+                        <button
+                          type="button"
+                          title="Add new job party"
+                          onClick={() => openNewParty('')}
+                          style={{
+                            flexShrink: 0,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 2,
+                            height: 20,
+                            padding: '0 6px',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: '#fff',
+                            background: '#16a34a',
+                            border: 'none',
+                            borderRadius: 2,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <Plus size={10} /> Add
+                        </button>
+                      </div>
                     </div>
 
                     <div className="classic-erp-field classic-erp-field--lg">
@@ -1045,7 +1106,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                           if (e.key === 'Enter') {
                             e.preventDefault();
                             e.stopPropagation();
-                            focusFirstItem();
+                            focusHsnCode();
                           }
                         }}
                       />
@@ -1055,13 +1116,20 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                       <div className="classic-erp-field">
                         <span className="classic-erp-label">HSN CODE</span>
                         <input
+                          id="job-issue-hsn"
                           type="text"
                           className="classic-erp-input text-center font-mono"
                           value={header.hsnCd}
                           onChange={(e) => setHeader({ ...header, hsnCd: e.target.value })}
                           disabled={locked}
-                          tabIndex={-1}
-                          data-enter-skip="true"
+                          data-enter-order="5"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              focusFirstItem();
+                            }
+                          }}
                         />
                       </div>
                     </div>
@@ -1198,6 +1266,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                             return (
                               <td key={c.key} className={c.w}>
                                 <input
+                                  data-col={c.key}
                                   type={c.align === 'right' ? 'number' : 'text'}
                                   step={c.key === 'cut' ? '0.001' : c.key === 'qty' ? '0.01' : undefined}
                                   className={`classic-erp-input w-full ${c.align === 'right' ? 'text-right font-mono' : ''} ${c.readOnly ? 'bg-slate-100 cursor-not-allowed' : ''}`}
@@ -1209,9 +1278,21 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                                   data-enter-skip={c.readOnly ? "true" : undefined}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !locked) {
-                                      if (c.key === 'narration') {
-                                        e.preventDefault();
-                                        e.stopPropagation();
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const fieldKeys = ['pcs', 'cut', 'qty', 'rate', 'fabRate', 'narration'];
+                                      if (c.key !== 'narration') {
+                                        const nextKeyIdx = fieldKeys.indexOf(c.key) + 1;
+                                        if (nextKeyIdx < fieldKeys.length) {
+                                          const nextKey = fieldKeys[nextKeyIdx];
+                                          const trs = document.querySelectorAll('.erp-job-issue-table tbody tr');
+                                          const nextIn = trs[idx]?.querySelector(`[data-col="${nextKey}"]`);
+                                          if (nextIn) {
+                                            nextIn.focus();
+                                            try { nextIn.select(); } catch {}
+                                          }
+                                        }
+                                      } else {
                                         if (idx < calc.linesWithAmt.length - 1) {
                                           setTimeout(() => {
                                             const trs = document.querySelectorAll('.erp-job-issue-table tbody tr');
@@ -1219,12 +1300,16 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                                             if (nextItem) nextItem.focus();
                                           }, 40);
                                         } else {
-                                          addLine();
-                                          setTimeout(() => {
-                                            const trs = document.querySelectorAll('.erp-job-issue-table tbody tr');
-                                            const nextItem = trs[trs.length - 1]?.querySelector('[data-erp-combobox-input]');
-                                            if (nextItem) nextItem.focus();
-                                          }, 50);
+                                          if (line.itemId || Number(line.qty) > 0) {
+                                            addLine();
+                                            setTimeout(() => {
+                                              const trs = document.querySelectorAll('.erp-job-issue-table tbody tr');
+                                              const nextItem = trs[trs.length - 1]?.querySelector('[data-erp-combobox-input]');
+                                              if (nextItem) nextItem.focus();
+                                            }, 50);
+                                          } else {
+                                            document.getElementById('job-issue-remark')?.focus();
+                                          }
                                         }
                                       }
                                     }
@@ -1323,51 +1408,86 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Remark</span>
                   <input
+                    id="job-issue-remark"
                     type="text"
                     className="classic-erp-input"
                     value={footer.remark}
                     onChange={(e) => setFooter({ ...footer, remark: e.target.value })}
                     disabled={locked}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        document.getElementById('job-issue-note')?.focus();
+                      }
+                    }}
                   />
                 </div>
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Note</span>
                   <input
+                    id="job-issue-note"
                     type="text"
                     className="classic-erp-input"
                     value={footer.note}
                     onChange={(e) => setFooter({ ...footer, note: e.target.value })}
                     disabled={locked}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        document.getElementById('job-issue-transport')?.focus();
+                      }
+                    }}
                   />
                 </div>
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Transport</span>
                   <input
+                    id="job-issue-transport"
                     type="text"
                     className="classic-erp-input"
                     value={footer.transport}
                     onChange={(e) => setFooter({ ...footer, transport: e.target.value })}
                     disabled={locked}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        document.getElementById('job-issue-lrno')?.focus();
+                      }
+                    }}
                   />
                 </div>
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">LrNo</span>
                   <input
+                    id="job-issue-lrno"
                     type="text"
                     className="classic-erp-input"
                     value={footer.lrNo}
                     onChange={(e) => setFooter({ ...footer, lrNo: e.target.value })}
                     disabled={locked}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        document.getElementById('job-issue-baleno')?.focus();
+                      }
+                    }}
                   />
                 </div>
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">BaleNo</span>
                   <input
+                    id="job-issue-baleno"
                     type="text"
                     className="classic-erp-input text-center font-bold"
                     value={footer.baleNo}
                     onChange={(e) => setFooter({ ...footer, baleNo: e.target.value })}
                     disabled={locked}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        document.getElementById('job-issue-save-btn')?.focus();
+                      }
+                    }}
                   />
                 </div>
               </div>
@@ -1385,7 +1505,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                 >
                   Edit
                 </button>
-                <button type="submit" className="classic-erp-btn btn-blue" disabled={saving || locked} data-enter-save="true">
+                <button id="job-issue-save-btn" type="submit" className="classic-erp-btn btn-blue" disabled={saving || locked} data-enter-save="true">
                   <SaveButtonLabel saving={saving} label="Save" />
                 </button>
                 <button type="button" className="classic-erp-btn" onClick={handleCancel} disabled={saving}>
@@ -1596,6 +1716,13 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
       {printOpen && (
         <JobWorkPrint variant="jobIssue" data={printData} onClose={() => setPrintOpen(false)} />
       )}
+
+      <AccountMasterModal
+        isOpen={!!accountModal}
+        onClose={() => setAccountModal(null)}
+        initialData={accountModal}
+        onSuccess={handleAccountSuccess}
+      />
     </>
   );
 }
