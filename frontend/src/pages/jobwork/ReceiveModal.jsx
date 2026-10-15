@@ -77,6 +77,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const [activeTab, setActiveTab] = useState('Mill Receive');
    const [saving, setSaving] = useState(false);
    const [bootLoading, setBootLoading] = useState(false);
+   const [mode, setMode] = useState('View'); // 'View' | 'Add' | 'Edit'
    const [isEditMode, setIsEditMode] = useState(false);
    const [activeReceiptKey, setActiveReceiptKey] = useState('');
 
@@ -130,7 +131,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const [findSearchText, setFindSearchText] = useState('');
    const [findActiveIdx, setFindActiveIdx] = useState(0);
    const findInputRef = useRef(null);
-   const kbRef = useRef({ isEditMode: false });
+   const kbRef = useRef({ isEditMode: false, mode: 'View' });
 
    const sortedReceivedJobs = useMemo(() => {
       const list = (jobWorkEntries || []).filter(j => j.status === 'Received' || j.status === 'Partial');
@@ -178,8 +179,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
 
    const receiptKeyOf = (job) => String(job?.billGpNo || '').trim() || String(job?._id || job?.id || '');
 
-   const handleLoadReceivedJob = (job) => {
+   const handleLoadReceivedJob = (job, options = {}) => {
       if (!job) return;
+      const asView = options.asView !== false;
       setActiveReceiptKey(receiptKeyOf(job));
       const workerId = job.workerId?._id || job.workerId || '';
       setSelectedJobPartyId(workerId);
@@ -243,8 +245,17 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       setCgstPercent((rawGst / 2).toString());
       setIgstPercent('0');
 
-      setIsEditMode(true);
-      kbRef.current.isEditMode = true;
+      if (asView) {
+         setMode('View');
+         setIsEditMode(false);
+         kbRef.current.isEditMode = false;
+         kbRef.current.mode = 'View';
+      } else {
+         setMode('Edit');
+         setIsEditMode(true);
+         kbRef.current.isEditMode = true;
+         kbRef.current.mode = 'Edit';
+      }
       setShowFindDialog(false);
       setActiveTab('Mill Receive');
    };
@@ -334,11 +345,10 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             return new Date(a.receiveDate || a.updatedAt || 0) - new Date(b.receiveDate || b.updatedAt || 0);
          });
       const latest = list[list.length - 1];
-      if (latest) handleLoadReceivedJob(latest);
-      else {
-         setIsEditMode(false);
-         kbRef.current.isEditMode = false;
-         setSerialNo(getNextSerialNo());
+      if (latest) {
+         handleLoadReceivedJob(latest, { asView: true });
+      } else {
+         handleNew();
       }
       focusSerialNo();
 
@@ -363,7 +373,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                      return new Date(a.receiveDate || a.updatedAt || 0) - new Date(b.receiveDate || b.updatedAt || 0);
                   });
                const freshLatest = freshList[freshList.length - 1];
-               if (freshLatest) handleLoadReceivedJob(freshLatest);
+               if (freshLatest) handleLoadReceivedJob(freshLatest, { asView: true });
             }
          })
          .catch(() => { })
@@ -390,9 +400,16 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             return;
          }
 
+         if ((e.altKey && e.key.toLowerCase() === 'e') || e.key === 'F2') {
+            e.preventDefault();
+            e.stopPropagation();
+            kb.handleEdit?.();
+            return;
+         }
+
          const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
          const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
-         if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && kb.isEditMode) {
+         if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && (kb.isEditMode || kb.mode === 'View')) {
             e.preventDefault();
             e.stopPropagation();
             kb.navigate?.(prevKey ? -1 : 1);
@@ -414,14 +431,17 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          // Enter in View / Browse mode starts a new entry with next Sr No
          if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
             const el = e.target;
-            const inField = el && (
-               el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
-               || el.closest?.('[data-erp-combobox]') || el.closest?.('.classic-erp-table')
-            );
-            if (kb.isEditMode && !inField) {
+            const inCombobox = el?.closest?.('[data-erp-combobox]');
+            const inGrid = el?.closest?.('.classic-erp-table');
+            if (kb.mode === 'View' && !inCombobox && !inGrid) {
                e.preventDefault();
                e.stopPropagation();
                kb.handleNew?.();
+               setTimeout(() => {
+                  const d = document.getElementById('mill-rec-date');
+                  d?.focus();
+                  try { d?.select(); } catch {}
+               }, 60);
                return;
             }
          }
@@ -981,8 +1001,10 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
 
    const handleNew = () => {
       setActiveTab('Mill Receive');
+      setMode('Add');
       setIsEditMode(false);
       kbRef.current.isEditMode = false;
+      kbRef.current.mode = 'Add';
       setLines([blankLine()]);
       setSelectedJobPartyId('');
       setGstin('');
@@ -994,10 +1016,30 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       setActiveReceiptKey('');
       const nextSr = getNextSerialNo();
       setSerialNo(nextSr);
+      notifySuccess(`New Receive Entry — Sr No ${nextSr}`);
       focusSerialNo();
    };
 
+   const handleEditCurrent = () => {
+      if (activeReceiptKey || billGpNo || lines.some(l => l.jobId || l.itemName)) {
+         setMode('Edit');
+         setIsEditMode(true);
+         kbRef.current.isEditMode = true;
+         kbRef.current.mode = 'Edit';
+         notifySuccess(`Editing receipt #${billGpNo || serialNo}`);
+         setTimeout(() => {
+            const el = document.getElementById('mill-rec-date');
+            el?.focus();
+            try { el?.select(); } catch {}
+         }, 50);
+      } else {
+         setActiveTab('View Mill Rec');
+         notifySuccess('Select any receipt from the list below to edit');
+      }
+   };
+
    kbRef.current = {
+      mode,
       isEditMode,
       showFindDialog,
       showLotDropdown,
@@ -1005,6 +1047,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       openLot: openLotLookup,
       navigate: navigateReceipt,
       handleNew,
+      handleEdit: handleEditCurrent,
    };
 
    const handleLoadRecord = (record) => {
@@ -1113,9 +1156,19 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                <div className="classic-erp-header shrink-0 flex justify-between items-center bg-[#858178] px-2 py-1 text-white border-b border-[#5e5a52]">
                   <span className="erp-window-title truncate font-bold text-xs flex items-center gap-1.5">
                      Mill Receipt [ {selectedBook || 'PROCESS CHARGE'} ]
-                     {isEditMode && (
+                     {mode === 'View' && billGpNo && (
+                        <span className="bg-sky-200 text-sky-950 px-1.5 py-0.5 rounded text-[9px] font-extrabold border border-sky-600">
+                           RECENT RECEIPT (VIEW) · Press Enter for New Entry
+                        </span>
+                     )}
+                     {mode === 'Edit' && (
                         <span className="bg-amber-300 text-amber-950 px-1.5 py-0.5 rounded text-[9px] font-extrabold border border-amber-600 animate-pulse">
                            EDITING #{billGpNo || 'RECEIPT'}
+                        </span>
+                     )}
+                     {mode === 'Add' && (
+                        <span className="bg-emerald-300 text-emerald-950 px-1.5 py-0.5 rounded text-[9px] font-extrabold border border-emerald-600">
+                           NEW RECEIPT #{serialNo || ''}
                         </span>
                      )}
                   </span>
@@ -1192,11 +1245,20 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                               className="classic-erp-input mill-rec-in text-center bg-white font-bold"
                               value={serialNo || '1'}
                               onChange={(e) => setSerialNo(e.target.value)}
-                              title="Sr No — Enter goes to Date, then Job Party"
+                              title={mode === 'View' ? "Press Enter to start New Entry" : "Sr No — Enter goes to Date"}
                               onKeyDown={(e) => {
                                  if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
                                  e.preventDefault();
                                  e.stopPropagation();
+                                 if (mode === 'View') {
+                                    handleNew();
+                                    setTimeout(() => {
+                                       const d = document.getElementById('mill-rec-date');
+                                       d?.focus();
+                                       try { d?.select(); } catch {}
+                                    }, 60);
+                                    return;
+                                 }
                                  const next = document.getElementById('mill-rec-date');
                                  next?.focus();
                               }}
@@ -1233,17 +1295,26 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
 
                            <span className="mill-rec-lab" style={{ gridArea: 'blab' }}>Bill/Gp No</span>
                            <input
+                              id="mill-rec-billgp"
                               data-enter-order="5"
                               style={{ gridArea: 'bill' }}
                               type="text"
                               className="classic-erp-input mill-rec-in bg-white"
                               value={billGpNo}
                               onChange={(e) => setBillGpNo(e.target.value)}
+                              onKeyDown={(e) => {
+                                 if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    openLotLookup(lines.length - 1 >= 0 ? lines.length - 1 : 0);
+                                 }
+                              }}
                            />
                            <button
                               type="button"
+                              style={{ gridArea: 'altl' }}
                               onClick={() => openLotLookup(lines.length - 1 >= 0 ? lines.length - 1 : 0)}
-                              className="mill-rec-altl cursor-pointer hover:opacity-90 active:scale-[0.99] transition-all text-center w-full border-none"
+                              className="mill-rec-altl cursor-pointer hover:opacity-90 active:scale-[0.99] transition-all text-center border-none"
                               title="Press Alt+L or Click to open Lot No lookup"
                            >
                               Press (ALT+L) To LotNo Entry
@@ -1834,12 +1905,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                </button>
                                <button
                                   type="button"
-                                  onClick={() => {
-                                     setActiveTab('View Mill Rec');
-                                     notifySuccess('Select any receipt from the list below to edit');
-                                  }}
-                                  className="mill-rec-btn"
-                                  title="View and select a receipt to edit"
+                                  onClick={handleEditCurrent}
+                                  className={`mill-rec-btn ${mode === 'Edit' ? 'bg-amber-300 font-bold' : ''}`}
+                                  title="Edit current receipt (Alt+E / F2)"
                                >
                                   Edit
                                </button>
@@ -1850,7 +1918,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                   data-enter-save="true"
                                   className="mill-rec-btn"
                                >
-                                  <SaveButtonLabel saving={saving} idle={isEditMode ? 'Update' : 'Save'} busy={isEditMode ? 'Updating…' : 'Saving…'} />
+                                  <SaveButtonLabel saving={saving} idle={mode === 'Edit' ? 'Update' : 'Save'} busy={mode === 'Edit' ? 'Updating…' : 'Saving…'} />
                                </button>
                                <button type="button" onClick={onClose} className="mill-rec-btn">Cancel</button>
                                <button type="button" onClick={handleOpenFindModal} className="mill-rec-btn" title="Find (F3)">Find</button>
@@ -1873,7 +1941,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                <button type="button" onClick={handlePrint} className="mill-rec-btn">Print</button>
                             </div>
                             <div className="mill-rec-nav-row">
-                               <div className="mill-rec-status">{isEditMode ? `Editing #${billGpNo || ''}` : 'Pending'}</div>
+                               <div className="mill-rec-status">
+                                  {mode === 'View' ? `Recent #${billGpNo || serialNo} · Press Enter for New Entry` : mode === 'Edit' ? `Editing #${billGpNo || serialNo}` : `New Entry #${serialNo}`}
+                               </div>
                                <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt('first')}>First</button>
                                <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(1)}>Next</button>
                                <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(-1)}>Prv</button>
