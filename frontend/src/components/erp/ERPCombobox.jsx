@@ -29,6 +29,8 @@ export default function ERPCombobox({
   emptyMessage = 'No matches',
   allowClear = false,
   openOnEnter = false,
+  autoFocusNext = true,
+  tabIndex,
   onKeyDown: onKeyDownProp = null,
   id: inputIdProp,
   'data-enter-nav': enterNav,
@@ -156,11 +158,13 @@ export default function ERPCombobox({
     setOpen(false);
     setQuery('');
     setActiveIdx(0);
-    requestAnimationFrame(() => {
-      if (inputRef.current) {
-        focusNextField(inputRef.current);
-      }
-    });
+    if (autoFocusNext !== false) {
+      requestAnimationFrame(() => {
+        if (inputRef.current) {
+          focusNextField(inputRef.current);
+        }
+      });
+    }
   };
 
   const handleInputKeyDown = (e) => {
@@ -339,9 +343,11 @@ export default function ERPCombobox({
           placeholder={selected ? selected.label : placeholder}
           disabled={disabled}
           readOnly={readOnly}
+          tabIndex={tabIndex ?? (enterSkip === 'true' || enterSkip === true ? -1 : undefined)}
           autoComplete="off"
           data-erp-combobox-input="true"
           data-enter-nav={enterNav}
+          data-enter-skip={enterSkip || undefined}
           data-enter-order={enterOrder || undefined}
           data-autofocus={autoFocusProp}
           aria-expanded={open}

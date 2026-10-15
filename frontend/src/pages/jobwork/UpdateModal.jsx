@@ -94,6 +94,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
   const [findSearch, setFindSearch] = useState('');
   const [findActiveIdx, setFindActiveIdx] = useState(0);
   const findInputRef = useRef(null);
+  const kbRef = useRef({});
   const [printOpen, setPrintOpen] = useState(false);
   const [lotLookupOpen, setLotLookupOpen] = useState(false);
   const [lotLookupTargetIdx, setLotLookupTargetIdx] = useState(null);
@@ -103,13 +104,21 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
   const locked = mode === 'View';
 
   const bookJobs = useMemo(() => {
-    const list = [...(jobWorkEntries || [])];
-    return list.sort((a, b) => {
+    const list = [...(jobWorkEntries || [])].sort((a, b) => {
       const numA = parseInt(String(a.challanNo || a.jobCardNo || '').replace(/\D/g, ''), 10);
       const numB = parseInt(String(b.challanNo || b.jobCardNo || '').replace(/\D/g, ''), 10);
-      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
       return new Date(a.issueDate || a.createdAt || 0) - new Date(b.issueDate || b.createdAt || 0);
     });
+    const seen = new Set();
+    const unique = [];
+    for (const job of list) {
+      const key = String(job.challanNo || job.jobCardNo || job._id || job.id || '').trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      unique.push(job);
+    }
+    return unique;
   }, [jobWorkEntries]);
 
   const filteredChallans = useMemo(() => {
@@ -126,7 +135,10 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
 
   const handleOpenFindModal = () => {
     setFindSearch('');
-    const currentIdx = bookJobs.findIndex((j) => String(j._id || j.id) === String(selectedJobId));
+    const currentIdx = bookJobs.findIndex((j) =>
+      String(j._id || j.id) === String(selectedJobId) ||
+      String(j.challanNo || j.jobCardNo || '').trim() === String(header.challanNo || '').trim()
+    );
     setFindActiveIdx(currentIdx >= 0 ? currentIdx : Math.max(0, bookJobs.length - 1));
     setFindOpen(true);
     setTimeout(() => {
@@ -170,9 +182,10 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
       e.preventDefault();
       const job = filteredChallans[findActiveIdx];
       if (job) {
-        loadJob(job._id || job.id, 'Edit');
+        loadJob(job._id || job.id, 'View');
         setFindOpen(false);
-        notifySuccess(`Challan #${job.challanNo || job.jobCardNo} loaded in Edit mode`);
+        notifySuccess(`Challan #${job.challanNo || job.jobCardNo} loaded (View mode)`);
+        focusChallanNo();
       }
     }
   };
@@ -354,6 +367,16 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
       });
   }, [jobWorkEntries, activeItemId]);
 
+  const focusChallanNo = () => {
+    setTimeout(() => {
+      const el = document.querySelector('[data-erp-start="challan"]');
+      if (el) {
+        el.focus();
+        try { el.select(); } catch {}
+      }
+    }, 40);
+  };
+
   const focusJobDate = () => {
     setTimeout(() => {
       const el = document.querySelector('.erp-job-issue-date');
@@ -468,35 +491,6 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
       .finally(() => { if (!cancelled) setBootLoading(false); });
     return () => { cancelled = true; };
   }, [isOpen, selectedBook, initialData]);
-
-  // Enter in View mode starts new entry; Ctrl+Enter / Alt+S saves in Add/Edit
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKeyDown = (e) => {
-      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
-        if (mode === 'View' && !saving) {
-          e.preventDefault();
-          e.stopPropagation();
-          handleNew();
-          return;
-        }
-      }
-      if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'f')) {
-        e.preventDefault();
-        e.stopPropagation();
-        handleOpenFindModal();
-        return;
-      }
-      if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || (e.altKey && e.key.toLowerCase() === 's')) {
-        if (!locked && !saving) {
-          e.preventDefault();
-          handleSave();
-        }
-      }
-    };
-    window.addEventListener('keydown', onKeyDown, true);
-    return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [isOpen, mode, saving, locked]);
 
   const handlePartyChange = (partyId) => {
     const party = partyOptions.find((p) => String(p.value) === String(partyId));
@@ -702,10 +696,10 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
     }
   };
 
-  const loadJob = (id, targetMode = 'Edit') => {
+  const loadJob = (id, targetMode = 'View') => {
     setSelectedJobId(id);
     if (!id) return;
-    const job = jobWorkEntries.find((j) => String(j._id || j.id) === String(id));
+    const job = (jobWorkEntries || []).find((j) => String(j._id || j.id) === String(id));
     if (!job) return;
 
     setMode(targetMode);
@@ -723,24 +717,38 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
       book: job.book || 'JOBWORK BOOK',
     });
 
-    const lineItemId = job.lotId?.itemId?._id || job.lotId?.itemId || '';
-    const itemLine = {
-      id: Math.random().toString(),
-      itemId: lineItemId ? String(lineItemId) : '',
-      lotId: job.lotId?._id || job.lotId || '',
-      lotNo: job.lotId?.lotId || '',
-      chlnNo: job.purchaseBillNo || '',
-      itemName: job.lotId?.itemName || job.lotId?.itemId?.name || '',
-      pcs: String(job.issuePcs || 0),
-      cut: job.issuePcs > 0 ? String((job.issueQty / job.issuePcs).toFixed(3)) : '',
-      qty: String(job.issueQty || 0),
-      rate: String(job.jobRate || 0),
-      fabRate: String(job.purchaseRate || 0),
-      narration: remarks,
-      jobId: job._id,
-    };
-    setLines([itemLine]);
-    setActiveItemId(lineItemId ? String(lineItemId) : '');
+    const baseCh = String(job.challanNo || '').trim();
+    const siblingJobs = baseCh
+      ? (jobWorkEntries || []).filter(
+          (j) =>
+            String(j.challanNo || '').trim() === baseCh &&
+            String(j.workerId?._id || j.workerId || '') === String(job.workerId?._id || job.workerId || '')
+        )
+      : [job];
+    const jobsToLoad = siblingJobs.length > 0 ? siblingJobs : [job];
+
+    const loadedLines = jobsToLoad.map((j) => {
+      const lineItemId = j.lotId?.itemId?._id || j.lotId?.itemId || j.itemId || '';
+      return {
+        id: `line-${j._id || Math.random().toString(36).slice(2, 7)}`,
+        itemId: lineItemId ? String(lineItemId) : '',
+        lotId: j.lotId?._id || j.lotId || '',
+        lotNo: j.lotId?.lotId || '',
+        chlnNo: j.purchaseBillNo || '',
+        itemName: j.lotId?.itemName || j.lotId?.itemId?.name || j.itemName || '',
+        pcs: String(j.issuePcs || 0),
+        cut: j.issuePcs > 0 ? String((j.issueQty / j.issuePcs).toFixed(3)) : '',
+        qty: String(j.issueQty || 0),
+        rate: String(j.jobRate || 0),
+        fabRate: String(j.purchaseRate || 0),
+        narration: String(j.remark || j.remarks || ''),
+        jobId: j._id,
+      };
+    });
+
+    setLines(loadedLines.length > 0 ? loadedLines : [blankLine()]);
+    const firstLineItemId = loadedLines[0]?.itemId || '';
+    setActiveItemId(firstLineItemId ? String(firstLineItemId) : '');
 
     setFooter({
       remark: remarks,
@@ -752,55 +760,112 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
     });
   };
 
+  const navigateChallan = (dir) => {
+    const list = bookJobs;
+    if (!list.length) {
+      notifyWarning('No saved challans to browse');
+      return;
+    }
+    if (dir === 'first') {
+      loadJob(list[0]._id || list[0].id, 'View');
+      focusChallanNo();
+      return;
+    }
+    if (dir === 'last') {
+      loadJob(list[list.length - 1]._id || list[list.length - 1].id, 'View');
+      focusChallanNo();
+      return;
+    }
+    const currentIdx = list.findIndex(
+      (j) =>
+        String(j._id || j.id) === String(selectedJobId) ||
+        String(j.challanNo || j.jobCardNo || '').trim() === String(header.challanNo || '').trim()
+    );
+    let nextIdx = currentIdx + dir;
+    if (currentIdx === -1) nextIdx = dir > 0 ? 0 : list.length - 1;
+    if (nextIdx >= 0 && nextIdx < list.length && nextIdx !== currentIdx) {
+      loadJob(list[nextIdx]._id || list[nextIdx].id, 'View');
+      focusChallanNo();
+    } else if (nextIdx >= list.length && dir > 0) {
+      notifyInfo('Reached latest challan. Press Enter for New Entry.');
+      focusChallanNo();
+    } else if (nextIdx < 0 && dir < 0) {
+      notifyWarning('Already at the first challan');
+      focusChallanNo();
+    }
+  };
+
   useEffect(() => {
     if (!isOpen) return undefined;
 
     const onKeyDown = (e) => {
+      const kb = kbRef.current;
+      if (kb.findOpen) return;
+      if (e.target instanceof Element && e.target.closest('[data-account-modal], .erp-confirm-dialog')) return;
+
       if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'f')) {
         e.preventDefault();
         e.stopPropagation();
-        handleOpenFindModal();
-        return;
-      }
-
-      const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus';
-      const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal';
-      if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && mode === 'View' && !findOpen) {
-        e.preventDefault();
-        e.stopPropagation();
-        const list = bookJobs || [];
-        if (!list.length) return;
-        const currentIdx = list.findIndex((j) => String(j._id || j.id) === String(selectedJobId));
-        let nextIdx = currentIdx + (prevKey ? -1 : 1);
-        if (currentIdx === -1) nextIdx = prevKey ? list.length - 1 : 0;
-        if (nextIdx >= 0 && nextIdx < list.length) loadJob(list[nextIdx]._id || list[nextIdx].id, 'View');
-        return;
-      }
-      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !findOpen && mode === 'View') {
-        if (e.target?.closest?.('[data-find-modal], [data-book-selection-modal], [data-command-palette]')) return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        handleNew();
-        return;
-      }
-      if (e.altKey && e.key.toLowerCase() === 'n') {
-        e.preventDefault();
-        handleNew();
+        kb.handleOpenFindModal?.();
         return;
       }
 
       if ((e.altKey && e.key.toLowerCase() === 'e') || e.key === 'F2') {
-        if (selectedJobId && mode === 'View') {
+        if (kb.selectedJobId && kb.mode === 'View') {
           e.preventDefault();
-          setMode('Edit');
-          notifyInfo('Switched to Edit mode');
+          e.stopPropagation();
+          kb.handleEdit?.();
+          return;
+        }
+      }
+
+      const isMinus = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
+      const isPlus = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
+      if ((isMinus || isPlus) && !e.ctrlKey && !e.altKey) {
+        const el = e.target;
+        const isChallanInput = el && el.getAttribute?.('data-erp-start') === 'challan';
+        const inTextEdit = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && !isChallanInput && kb.mode !== 'View';
+
+        if (isChallanInput || kb.mode === 'View' || !inTextEdit) {
+          e.preventDefault();
+          e.stopPropagation();
+          kb.navigateChallan?.(isMinus ? -1 : 1);
+          return;
+        }
+      }
+
+      // Enter in View mode starts new entry
+      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const el = e.target;
+        const inCombobox = el?.closest?.('[data-erp-combobox]');
+        const inGrid = el?.closest?.('.erp-job-issue-table');
+        if (kb.mode === 'View' && !inCombobox && !inGrid) {
+          e.preventDefault();
+          e.stopPropagation();
+          kb.handleNew?.();
+          return;
+        }
+      }
+
+      if (e.altKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        e.stopPropagation();
+        kb.handleNew?.();
+        return;
+      }
+
+      if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || (e.altKey && e.key.toLowerCase() === 's')) {
+        if (!kb.locked && !kb.saving) {
+          e.preventDefault();
+          e.stopPropagation();
+          kb.handleSave?.();
         }
       }
     };
 
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [isOpen, selectedJobId, mode, findOpen, bookJobs]);
+  }, [isOpen]);
 
   const handleSave = async (e) => {
     e?.preventDefault?.();
@@ -878,9 +943,24 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
         ok += 1;
       }
       notifySuccess(`Job Issue saved — ${ok} challan(s) issued`);
-      handleNew();
-      setMode('View');
       await Promise.all([fetchJobs(), fetchInventory()]);
+      const savedChallanNo = header.challanNo;
+      const freshList = (useStore.getState().jobWorkEntries || []).sort((a, b) => {
+        const numA = parseInt(String(a.challanNo || a.jobCardNo || '').replace(/\D/g, ''), 10);
+        const numB = parseInt(String(b.challanNo || b.jobCardNo || '').replace(/\D/g, ''), 10);
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+        return new Date(a.issueDate || a.createdAt || 0) - new Date(b.issueDate || b.createdAt || 0);
+      });
+      const matched = freshList.slice().reverse().find((j) =>
+        savedChallanNo && String(j.challanNo || j.jobCardNo || '').trim() === String(savedChallanNo).trim()
+      ) || freshList[freshList.length - 1];
+
+      if (matched) {
+        loadJob(matched._id || matched.id, 'View');
+      } else {
+        setMode('View');
+      }
+      focusChallanNo();
     } catch (err) {
       notifyError(err, ok > 0 ? `Partial save: ${ok} issued, then failed` : 'Failed to save job issue');
     } finally {
@@ -917,6 +997,19 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
 
   const titleBook = selectedBook || header.book || 'JOBWORK BOOK';
 
+  kbRef.current = {
+    mode,
+    saving,
+    locked,
+    selectedJobId,
+    findOpen,
+    handleOpenFindModal,
+    handleNew,
+    handleEdit,
+    handleSave,
+    navigateChallan,
+  };
+
   const gridCols = [
     { key: 'cno', label: 'CNo', w: 'w-14', readOnly: true },
     { key: 'chlnNo', label: 'ChlnNo', w: 'w-24', readOnly: true },
@@ -944,10 +1037,27 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
             <ErpBusyOverlay show={bootLoading} message="Loading job issue registry…" />
             <ErpBusyOverlay show={!bootLoading && saving} message="Saving job issue entries…" />
 
-            <div className="classic-erp-header shrink-0">
-              <span className="erp-window-title truncate">
-                Additional Job Issue [ {titleBook} ]
-              </span>
+            <div className="classic-erp-header shrink-0 flex items-center justify-between">
+              <div className="flex items-center gap-2 overflow-hidden">
+                <span className="erp-window-title truncate">
+                  Additional Job Issue [ {titleBook} ]
+                </span>
+                {mode === 'View' && (
+                  <span className="bg-emerald-100 text-emerald-900 border border-emerald-500 font-extrabold px-2 py-0.5 rounded text-[10px] tracking-wide">
+                    RECENT CHALLAN #{header.challanNo} (VIEW) · Press Enter for New Entry · +/- to browse
+                  </span>
+                )}
+                {mode === 'Edit' && (
+                  <span className="bg-amber-300 text-amber-950 px-2 py-0.5 rounded text-[10px] font-extrabold border border-amber-600 animate-pulse">
+                    EDITING CHALLAN #{header.challanNo}
+                  </span>
+                )}
+                {mode === 'Add' && (
+                  <span className="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-extrabold">
+                    NEW CHALLAN #{header.challanNo}
+                  </span>
+                )}
+              </div>
               <WindowControls />
             </div>
 
@@ -955,22 +1065,6 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
               onSubmit={handleSave}
               className="classic-erp-body erp-job-issue-body flex-1 overflow-hidden min-h-0 flex flex-col justify-between"
             >
-              {findOpen && (
-                <div className="classic-erp-frame erp-job-issue-find shrink-0">
-                  <div className="classic-erp-field classic-erp-field--lg">
-                    <span className="classic-erp-label blue-label">Find</span>
-                    <ERPSelect
-                      className="classic-erp-select"
-                      value={selectedJobId}
-                      onChange={(e) => loadJob(e.target.value)}
-                      options={jobOptions}
-                      placeholder="- Select Job Issue Challan -"
-                      recentKey="job-issue-find"
-                    />
-                  </div>
-                </div>
-              )}
-
               {/* Header */}
               <div className="classic-erp-frame erp-job-issue-header shrink-0">
                 <div className="erp-job-issue-header-grid">
@@ -986,11 +1080,24 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                           data-erp-start="challan"
                           data-enter-order="1"
                           onChange={(e) => setHeader({ ...header, challanNo: e.target.value })}
-                          disabled={locked}
+                          readOnly={mode === 'View'}
+                          title={mode === 'View' ? "Press Enter for New Entry · Press + / - to browse challans" : "Challan No — Enter goes to Date · + / - browse challans"}
                           onKeyDown={(e) => {
+                            const isMinus = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
+                            const isPlus = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
+                            if ((isMinus || isPlus) && !e.ctrlKey && !e.altKey) {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              navigateChallan(isMinus ? -1 : 1);
+                              return;
+                            }
                             if (e.key === 'Enter') {
                               e.preventDefault();
                               e.stopPropagation();
+                              if (mode === 'View') {
+                                handleNew();
+                                return;
+                              }
                               focusJobDate();
                             }
                           }}
@@ -1153,6 +1260,9 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                           onChange={(e) => setHeader({ ...header, gstType: e.target.value })}
                           options={GST_TYPE_OPTIONS}
                           disabled={locked}
+                          tabIndex={-1}
+                          data-enter-skip="true"
+                          autoFocusNext={false}
                         />
                       </div>
                       <span className="erp-job-issue-gstin-badge">GSTIN:-{header.gstin || '—'}</span>
@@ -1228,17 +1338,17 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                                     <div className="flex-1 min-w-0">
                                       <ERPCombobox
                                         value={line.itemId}
-                                        data-enter-order={idx === 0 ? "5" : undefined}
+                                        autoFocusNext={false}
                                         onChange={(val) => {
                                           handleLineItemChange(idx, val);
-                                          setTimeout(() => {
+                                          requestAnimationFrame(() => {
                                             const trs = document.querySelectorAll('.erp-job-issue-table tbody tr');
-                                            const targetInput = trs[idx]?.querySelector('input[type="number"]:not([disabled])');
-                                            if (targetInput) {
-                                              targetInput.focus();
-                                              try { targetInput.select(); } catch {}
+                                            const pcsInput = trs[idx]?.querySelector('input[data-col="pcs"]');
+                                            if (pcsInput) {
+                                              pcsInput.focus();
+                                              try { pcsInput.select(); } catch {}
                                             }
-                                          }, 60);
+                                          });
                                         }}
                                         disabled={locked}
                                         options={itemOptions}
@@ -1520,6 +1630,42 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                 >
                   Find (F3)
                 </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => navigateChallan('first')}
+                  disabled={saving}
+                  title="Go to First Challan"
+                >
+                  First
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn font-bold"
+                  onClick={() => navigateChallan(-1)}
+                  disabled={saving}
+                  title="Previous Challan (-)"
+                >
+                  Prev (-)
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn font-bold"
+                  onClick={() => navigateChallan(1)}
+                  disabled={saving}
+                  title="Next Challan (+)"
+                >
+                  Next (+)
+                </button>
+                <button
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={() => navigateChallan('last')}
+                  disabled={saving}
+                  title="Go to Last Challan"
+                >
+                  Last
+                </button>
                 <button type="button" className="classic-erp-btn btn-red" disabled={saving || locked || !selectedJobId}>
                   Delete
                 </button>
@@ -1591,11 +1737,11 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
             {/* Header */}
             <div className="bg-[#1a3353] text-white px-4 py-2.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="bg-amber-400 text-slate-900 font-black px-1.5 py-0.5 rounded text-[11px]">FIND CHALLAN</span>
-                <h3 className="font-bold text-xs uppercase tracking-wider">Quick Process Selector</h3>
+                <span className="bg-amber-400 text-slate-900 font-black px-1.5 py-0.5 rounded text-[11px]">FIND CHALLAN (F3)</span>
+                <h3 className="font-bold text-xs uppercase tracking-wider">Quick Challan Selector</h3>
               </div>
               <span className="text-[10px] text-slate-300">
-                <kbd className="bg-slate-700 px-1 py-0.5 rounded font-mono font-bold">+</kbd> / <kbd className="bg-slate-700 px-1 py-0.5 rounded font-mono font-bold">-</kbd> change · <kbd className="bg-slate-700 px-1 py-0.5 rounded font-mono font-bold">Enter</kbd> Edit
+                <kbd className="bg-slate-700 px-1 py-0.5 rounded font-mono font-bold">+</kbd> / <kbd className="bg-slate-700 px-1 py-0.5 rounded font-mono font-bold">-</kbd> change · <kbd className="bg-slate-700 px-1 py-0.5 rounded font-mono font-bold">Enter</kbd> View
               </span>
             </div>
 
@@ -1632,9 +1778,10 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                     <div
                       key={j._id || j.id || idx}
                       onClick={() => {
-                        loadJob(j._id || j.id, 'Edit');
+                        loadJob(j._id || j.id, 'View');
                         setFindOpen(false);
-                        notifySuccess(`Challan #${cleanNo} loaded in Edit mode`);
+                        notifySuccess(`Challan #${cleanNo} loaded (View mode)`);
+                        focusChallanNo();
                       }}
                       className={`px-3 py-2 rounded flex items-center justify-between cursor-pointer text-xs transition-all ${
                         isSelected

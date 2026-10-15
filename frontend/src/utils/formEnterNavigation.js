@@ -2,7 +2,7 @@ const FOCUSABLE_SELECTOR = [
   'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([disabled]):not([readonly]):not([tabindex="-1"])',
   'input[data-enter-include]:not([disabled]):not([tabindex="-1"])',
   '[data-line-start]:not([disabled]):not([tabindex="-1"])',
-  'input[data-erp-combobox-input]:not([disabled]):not([readonly])',
+  'input[data-erp-combobox-input]:not([disabled]):not([readonly]):not([tabindex="-1"])',
   'select:not([disabled]):not([tabindex="-1"])',
   'textarea:not([disabled]):not([readonly]):not([tabindex="-1"])',
   'button[data-enter-action="true"]:not([disabled]):not([tabindex="-1"])',
@@ -40,11 +40,18 @@ export function getFocusableElements(container) {
   if (!container) return [];
   const list = Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter((el) => {
     if (!isVisible(el)) return false;
+    if (el.tabIndex === -1 || el.getAttribute('tabindex') === '-1') return false;
+    if (el.getAttribute('data-enter-skip') === 'true') return false;
     const offHost = el.closest('[data-enter-nav="off"]');
     if (offHost && offHost !== el) return false;
     const skipEl = el.closest('[data-enter-skip]');
-    const keepCombobox = el.hasAttribute('data-erp-combobox-input');
-    if (!keepCombobox && skipEl && skipEl.getAttribute('data-enter-skip') !== 'false') return false;
+    if (skipEl && skipEl.getAttribute('data-enter-skip') !== 'false') {
+      const explicitSkip = el.getAttribute('data-enter-skip') === 'true' ||
+        (skipEl && !skipEl.classList.contains('erp-combobox') && skipEl.getAttribute('data-enter-skip') === 'true');
+      if (explicitSkip) return false;
+      const keepCombobox = el.hasAttribute('data-erp-combobox-input');
+      if (!keepCombobox) return false;
+    }
     return true;
   });
   return list
