@@ -53,11 +53,37 @@ async function bootLocalStack(ctx) {
   const exampleCfg = ctx.desktopRoot ? readJson(path.join(ctx.desktopRoot, 'config.example.json')) : null;
   const cfg = { ...(exampleCfg || {}), ...(desktopCfg || {}), ...(readJson(cfgPath) || {}) };
 
-  // If user config had 'remote' written from an old run, heal it back to 'hybrid' for offline capability
-  let mode = String(cfg.mode || process.env.ERP_DESKTOP_MODE || 'hybrid').toLowerCase();
-  if (mode === 'remote' && !process.env.ERP_FORCE_REMOTE) {
-    console.log('[localRuntime] Healing legacy remote setting to hybrid for offline ERP capability');
-    mode = 'hybrid';
+  const centralApiBaseUrl = cfg.centralApiBaseUrl
+    ? String(cfg.centralApiBaseUrl).replace(/\/$/, '')
+    : process.env.CENTRAL_API_BASE_URL || 'https://app.dealingindia.com/api';
+
+  let mode = String(cfg.mode || process.env.ERP_DESKTOP_MODE || 'remote').toLowerCase();
+
+  // If user config had localhost/5050 written from an old run, heal it to remote cloud
+  if (cfg.apiBaseUrl && (cfg.apiBaseUrl.includes('127.0.0.1') || cfg.apiBaseUrl.includes('localhost'))) {
+    console.log('[localRuntime] Healing legacy local 5050 config to live cloud API');
+    mode = 'remote';
+  }
+
+  // Remote mode: UI connects directly to Central Cloud API (no embedded mongod / express)
+  if (mode === 'remote') {
+    const apiBaseUrl = centralApiBaseUrl;
+    const nextCfg = {
+      ...cfg,
+      mode: 'remote',
+      apiBaseUrl,
+      centralApiBaseUrl,
+      note: 'Remote API mode: UI connects directly to live cloud API at https://app.dealingindia.com/api.',
+    };
+    writeJson(cfgPath, nextCfg);
+    return {
+      mode: 'remote',
+      apiBaseUrl,
+      centralApiBaseUrl,
+      configPath: cfgPath,
+      api: null,
+      mongo: null,
+    };
   }
 
   const isHybrid = mode === 'hybrid';
@@ -74,9 +100,6 @@ async function bootLocalStack(ctx) {
   const mongoPort = await findFreePort(Number(cfg.mongoPort || 27028));
   const jwtSecret = ensureJwtSecret(userData);
 
-  const centralApiBaseUrl = cfg.centralApiBaseUrl
-    ? String(cfg.centralApiBaseUrl).replace(/\/$/, '')
-    : process.env.CENTRAL_API_BASE_URL || 'https://app.dealingindia.com/api';
 
   // Hybrid + local: single-node replica set for ACID withTransaction; fallback to standalone
   let mongo = null;

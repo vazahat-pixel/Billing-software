@@ -38,7 +38,7 @@ function resolveApiBaseUrl() {
     const cfg = readJsonSafe(file);
     if (cfg?.apiBaseUrl) return String(cfg.apiBaseUrl).replace(/\/$/, '');
   }
-  return process.env.VITE_API_URL || 'http://127.0.0.1:5050/api';
+  return process.env.VITE_API_URL || 'https://app.dealingindia.com/api';
 }
 
 function resolveStartUrl() {
@@ -355,6 +355,10 @@ app.whenReady().then(async () => {
   const userData = app.getPath('userData');
   fs.mkdirSync(userData, { recursive: true });
 
+  const userCfg = readJsonSafe(path.join(userData, 'config.json')) || readJsonSafe(path.join(__dirname, 'config.json'));
+  const isRemote = (userCfg?.mode || 'remote').toLowerCase() === 'remote';
+  const splashText = isRemote ? 'Connecting to Dealing India Cloud…' : 'Starting local database…';
+
   const splash = new BrowserWindow({
     width: 420,
     height: 180,
@@ -370,7 +374,7 @@ app.whenReady().then(async () => {
       encodeURIComponent(
         `<html><body style="margin:0;font-family:Segoe UI,sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;height:100vh">
         <div style="text-align:center"><div style="font-size:18px;font-weight:600">Textile ERP</div>
-        <div style="margin-top:12px;opacity:.7;font-size:13px">Starting local database…</div></div></body></html>`
+        <div style="margin-top:12px;opacity:.7;font-size:13px">${splashText}</div></div></body></html>`
       )
   );
 
