@@ -265,6 +265,8 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       if (currentIdx === -1) nextIdx = dir > 0 ? 0 : list.length - 1;
       if (nextIdx >= 0 && nextIdx < list.length && nextIdx !== currentIdx) {
          handleLoadReceivedJob(list[nextIdx]);
+      } else if (nextIdx >= list.length && dir > 0) {
+         handleNew();
       }
    };
 
@@ -336,7 +338,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       else {
          setIsEditMode(false);
          kbRef.current.isEditMode = false;
-         setSerialNo('1');
+         setSerialNo(getNextSerialNo());
       }
       focusSerialNo();
 
@@ -406,6 +408,22 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             e.preventDefault();
             e.stopImmediatePropagation();
             kb.handleNew?.();
+            return;
+         }
+
+         // Enter in View / Browse mode starts a new entry with next Sr No
+         if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+            const el = e.target;
+            const inField = el && (
+               el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
+               || el.closest?.('[data-erp-combobox]') || el.closest?.('.classic-erp-table')
+            );
+            if (kb.isEditMode && !inField) {
+               e.preventDefault();
+               e.stopPropagation();
+               kb.handleNew?.();
+               return;
+            }
          }
       };
 
@@ -592,14 +610,21 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       const list = Array.isArray(jobWorkEntries) ? jobWorkEntries : [];
       let maxNo = 0;
       list.forEach((j) => {
-         const num = parseInt(String(j.serialNo || j.billGpNo || '').replace(/\D/g, ''), 10);
+         const num = parseInt(String(j.serialNo || '').replace(/\D/g, ''), 10);
          if (!isNaN(num) && num > maxNo) {
             maxNo = num;
          }
+         if (j.status === 'Received' || j.status === 'Partial') {
+            const bNum = parseInt(String(j.billGpNo || '').replace(/\D/g, ''), 10);
+            if (!isNaN(bNum) && bNum > maxNo) {
+               maxNo = bNum;
+            }
+         }
       });
-      const receivedCount = list.filter((j) => j.status === 'Received' || j.status === 'Partial').length;
-      return String(Math.max(maxNo, receivedCount) + 1);
-   }, [jobWorkEntries]);
+      const distinctCount = (receiptBills && receiptBills.length) || list.filter((j) => j.status === 'Received' || j.status === 'Partial').length;
+      const nextVal = Math.max(maxNo, distinctCount) + 1;
+      return String(nextVal > 0 ? nextVal : 1);
+   }, [jobWorkEntries, receiptBills]);
 
    const addLine = () => setLines(prev => [...prev, { ...blankLine(), srNo: prev.length + 1 }]);
 
@@ -612,6 +637,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const openLotLookup = (idx) => {
       if (!selectedJobPartyId) {
          notifyWarning('Please select a Job Party first');
+         setTimeout(() => {
+            document.getElementById('mill-rec-party')?.focus();
+         }, 80);
          return;
       }
       setLookupTargetIdx(idx);
@@ -630,7 +658,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             jobId: job._id,
             lotNo: job.lotId?.lotId || '',
             chlnNo: job.challanNo || job.jobCardNo || '',
-            itemName: job.lotId?.itemId?.name || job.lotId?.itemName || '',
+            itemName: job.lotId?.itemId?.name || job.lotId?.itemName || job.itemName || '',
             cp: 'C',
             cuttingPending: 'P',
             procType: 'Finish',
@@ -667,19 +695,23 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       setCgstPercent(rawGst > 0 ? (rawGst / 2).toString() : '2.5');
       setIgstPercent('0');
 
-      const focusFieldId = options.focusField || `grid-gpcs-${idx}`;
+      // Move forward directly to Item Name (or custom focus field) so user can edit or Enter-navigate
+      const focusFieldId = options.focusField || `grid-item-${idx}`;
       setTimeout(() => {
          const el = document.getElementById(focusFieldId);
          if (el) {
             el.focus();
-            el.select?.();
+            try { el.select(); } catch {}
          }
-      }, 100);
+      }, 80);
    };
 
    const handleChlnNoEnter = (e, idx) => {
       if (!selectedJobPartyId) {
          notifyWarning('Please select a Job Party first');
+         setTimeout(() => {
+            document.getElementById('mill-rec-party')?.focus();
+         }, 80);
          return;
       }
       const typedChln = String(lines[idx]?.chlnNo || '').trim();
@@ -704,7 +736,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       if (matches.length === 1) {
          e.preventDefault();
          e.stopPropagation();
-         handleSelectLot(matches[0], idx, { focusField: `grid-finish-mts-${idx}` });
+         handleSelectLot(matches[0], idx, { focusField: `grid-item-${idx}` });
          notifySuccess(`Loaded Challan ${matches[0].challanNo || matches[0].jobCardNo}`);
       } else if (matches.length > 1) {
          e.preventDefault();
@@ -723,28 +755,44 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    useEffect(() => {
       if (showLotDropdown) {
          setDropdownSelectIdx(0);
-         setTimeout(() => {
+         const timer = setTimeout(() => {
             dropdownRef.current?.focus();
-         }, 50);
+         }, 40);
+         return () => clearTimeout(timer);
       }
    }, [showLotDropdown]);
 
    const handleDropdownKeyDown = (e) => {
       if (e.key === 'ArrowDown') {
          e.preventDefault();
-         setDropdownSelectIdx((prev) => Math.min(prev + 1, Math.max(0, associatedLots.length - 1)));
+         e.stopPropagation();
+         setDropdownSelectIdx((prev) => {
+            const nextIdx = Math.min(prev + 1, Math.max(0, associatedLots.length - 1));
+            document.getElementById(`lot-item-row-${nextIdx}`)?.scrollIntoView({ block: 'nearest' });
+            return nextIdx;
+         });
       } else if (e.key === 'ArrowUp') {
          e.preventDefault();
-         setDropdownSelectIdx((prev) => Math.max(prev - 1, 0));
+         e.stopPropagation();
+         setDropdownSelectIdx((prev) => {
+            const nextIdx = Math.max(prev - 1, 0);
+            document.getElementById(`lot-item-row-${nextIdx}`)?.scrollIntoView({ block: 'nearest' });
+            return nextIdx;
+         });
       } else if (e.key === 'Enter') {
          e.preventDefault();
+         e.stopPropagation();
          if (associatedLots[dropdownSelectIdx] && lookupTargetIdx != null) {
-            handleSelectLot(associatedLots[dropdownSelectIdx], lookupTargetIdx);
+            handleSelectLot(associatedLots[dropdownSelectIdx], lookupTargetIdx, { focusField: `grid-item-${lookupTargetIdx}` });
             setShowLotDropdown(false);
          }
       } else if (e.key === 'Escape') {
          e.preventDefault();
+         e.stopPropagation();
          setShowLotDropdown(false);
+         setTimeout(() => {
+            document.getElementById(`grid-lot-${lookupTargetIdx}`)?.focus();
+         }, 50);
       }
    };
 
@@ -932,6 +980,8 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    };
 
    const handleNew = () => {
+      setActiveTab('Mill Receive');
+      setIsEditMode(false);
       kbRef.current.isEditMode = false;
       setLines([blankLine()]);
       setSelectedJobPartyId('');
@@ -941,9 +991,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       setBill2A('');
       setReceiveDate(today());
       setRemark('');
-      setIsEditMode(false);
       setActiveReceiptKey('');
-      setSerialNo('1');
+      const nextSr = getNextSerialNo();
+      setSerialNo(nextSr);
       focusSerialNo();
    };
 
@@ -1034,11 +1084,11 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          notifySuccess(isEditMode ? `Receipt #${billGpNo} updated successfully!` : `Challan(s) received — ${ok} finished lot(s) added to stock!`);
          setBillGpNo('');
          setLines([blankLine()]);
-         setSerialNo(String(Number(serialNo || 1) + 1));
          setIsEditMode(false);
          setActiveTab('View Mill Rec');
          await fetchJobs();
          await fetchInventory();
+         setSerialNo(getNextSerialNo());
       } catch (err) {
          notifyError(err, { fallback: ok > 0 ? `Partial save: ${ok} processed, then failed` : 'Failed to save job receipt' });
       } finally {
@@ -1190,7 +1240,14 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                               value={billGpNo}
                               onChange={(e) => setBillGpNo(e.target.value)}
                            />
-                           <div className="mill-rec-altl" style={{ gridArea: 'altl' }}>Press (ALT+L) To LotNo Entry</div>
+                           <button
+                              type="button"
+                              onClick={() => openLotLookup(lines.length - 1 >= 0 ? lines.length - 1 : 0)}
+                              className="mill-rec-altl cursor-pointer hover:opacity-90 active:scale-[0.99] transition-all text-center w-full border-none"
+                              title="Press Alt+L or Click to open Lot No lookup"
+                           >
+                              Press (ALT+L) To LotNo Entry
+                           </button>
                            <span className="mill-rec-lab" style={{ gridArea: 'revlab' }}>Reverse Charge</span>
                            <select
                               data-enter-order="6"
@@ -1311,17 +1368,18 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                              type="text"
                                              data-enter-include=""
                                              data-enter-nav="off"
-                                             className="w-full h-6 px-1 border-none bg-slate-100 text-slate-500 font-mono cursor-pointer"
+                                             className="w-full h-6 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 bg-slate-100 text-slate-800 font-mono cursor-pointer font-bold"
                                              value={line.lotNo}
                                              readOnly
-                                             placeholder="Auto"
+                                             placeholder="Press Enter..."
                                              title="Enter opens Select Challan. Click or Alt+L also opens it"
                                              onClick={() => openLotLookup(idx)}
                                              onKeyDown={(e) => {
-                                                if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                openLotLookup(idx);
+                                                if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+                                                   e.preventDefault();
+                                                   e.stopPropagation();
+                                                   openLotLookup(idx);
+                                                }
                                              }}
                                           />
                                        </td>
@@ -1329,10 +1387,15 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                           <input
                                              id={`grid-chln-no-${idx}`}
                                              type="text"
-                                             className="w-full h-6 px-1 border-none focus:outline-none focus:ring-1 focus:ring-blue-500 bg-sky-100 font-mono cursor-pointer"
+                                             className="w-full h-6 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 bg-sky-100 font-mono cursor-pointer"
                                              value={line.chlnNo}
                                              onChange={(e) => setLineField(idx, 'chlnNo', e.target.value)}
                                              onClick={() => openLotLookup(idx)}
+                                             onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+                                                   handleChlnNoEnter(e, idx);
+                                                }
+                                             }}
                                              placeholder="Press Enter or Click..."
                                           />
                                        </td>
@@ -1341,9 +1404,22 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                              id={`grid-item-${idx}`}
                                              type="text"
                                              data-enter-include=""
-                                             className="w-full h-6 px-1 border-none bg-slate-100 text-slate-700"
+                                             className="w-full h-6 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 bg-white text-slate-800 font-medium"
                                              value={line.itemName}
-                                             readOnly
+                                             onChange={(e) => setLineField(idx, 'itemName', e.target.value)}
+                                             placeholder="Item Name"
+                                             title="Item Name — Press Enter to move to G.Pcs"
+                                             onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+                                                   e.preventDefault();
+                                                   e.stopPropagation();
+                                                   const next = document.getElementById(`grid-gpcs-${idx}`);
+                                                   if (next) {
+                                                      next.focus();
+                                                      try { next.select(); } catch {}
+                                                   }
+                                                }
+                                             }}
                                           />
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
@@ -1922,12 +1998,13 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                        associatedLots.map((job, i) => (
                                           <tr
                                              key={job._id}
+                                             id={`lot-item-row-${i}`}
                                              onClick={() => {
-                                                if (lookupTargetIdx != null) handleSelectLot(job, lookupTargetIdx);
+                                                if (lookupTargetIdx != null) handleSelectLot(job, lookupTargetIdx, { focusField: `grid-item-${lookupTargetIdx}` });
                                                 setShowLotDropdown(false);
                                              }}
                                              onMouseEnter={() => setDropdownSelectIdx(i)}
-                                             className={`border-b border-slate-200 cursor-pointer ${i === dropdownSelectIdx ? 'bg-blue-600 text-white' : 'hover:bg-sky-100 text-slate-900'}`}
+                                             className={`border-b border-slate-200 cursor-pointer ${i === dropdownSelectIdx ? 'bg-blue-600 text-white font-bold' : 'hover:bg-sky-100 text-slate-900'}`}
                                           >
                                              <td className={`p-1.5 border-r border-slate-200 font-bold ${i === dropdownSelectIdx ? 'text-white' : 'text-blue-900'}`}>{job.challanNo || job.jobCardNo}</td>
                                              <td className="p-1.5 border-r border-slate-200">{job.lotId?.lotId || job.lotId || 'N/A'}</td>
@@ -1939,7 +2016,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                        ))
                                     ) : (
                                        <tr>
-                                          <td colSpan="4" className="p-4 text-center text-slate-400 italic">No associated lots found.</td>
+                                          <td colSpan="6" className="p-4 text-center text-slate-400 italic">No associated lots found.</td>
                                        </tr>
                                     )}
                                  </tbody>

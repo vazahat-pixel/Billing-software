@@ -615,7 +615,7 @@ const PurchaseModal = ({
       } else {
         setSelectedPurchaseId('');
         setMode('View');
-        peekBillNo('purchase').then((no) => {
+        getNextVNo().then((no) => {
           if (!cancelled) setHeader((h) => ({ ...h, vNo: no || '1', billNo: h.billNo || no || '1' }));
         });
       }
@@ -1061,7 +1061,30 @@ const PurchaseModal = ({
     }, 150);
   };
 
+  const getNextVNo = React.useCallback(async () => {
+    let maxNum = 0;
+    (purchases || []).forEach((p) => {
+      const val = parseInt(String(p.vNo || p.invoiceNo || p.supplierInvoiceNo || p.billNo || '').replace(/\D/g, ''), 10);
+      if (!isNaN(val) && val > maxNum) maxNum = val;
+    });
+    (bookPurchases || []).forEach((p) => {
+      const val = parseInt(String(p.vNo || p.invoiceNo || p.supplierInvoiceNo || p.billNo || '').replace(/\D/g, ''), 10);
+      if (!isNaN(val) && val > maxNum) maxNum = val;
+    });
+    let peekedNum = 0;
+    try {
+      const peeked = await peekBillNo('purchase');
+      const parsed = parseInt(String(peeked || '').replace(/\D/g, ''), 10);
+      if (!isNaN(parsed)) peekedNum = parsed;
+    } catch {
+      peekedNum = 0;
+    }
+    const nextVal = Math.max(peekedNum, maxNum + 1, (bookPurchases?.length || 0) + 1);
+    return String(nextVal > 0 ? nextVal : 1);
+  }, [purchases, bookPurchases]);
+
   const handleNew = async () => {
+    const nextNo = await getNextVNo();
     setSelectedPurchaseId('');
     setMode('Add');
     setBillAttachment(null);
@@ -1072,7 +1095,7 @@ const PurchaseModal = ({
       book: selectedBook || 'PURCHASE BOOK',
       gstin: '',
       city: '',
-      vNo: '1',
+      vNo: nextNo,
       billNo: '',
       billDate: today(),
       challanNo: '',
@@ -1101,7 +1124,7 @@ const PurchaseModal = ({
       rcmChargeSign: '+',
       remarks: ''
     });
-    toast.info('New Purchase Bill — Sr No 1');
+    toast.info(`New Purchase Bill — Sr No ${nextNo}`);
     setTimeout(() => {
       const sr = document.getElementById('purchase-srno');
       if (!sr) return;
