@@ -136,9 +136,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const sortedReceivedJobs = useMemo(() => {
       const list = (jobWorkEntries || []).filter(j => j.status === 'Received' || j.status === 'Partial');
       return list.sort((a, b) => {
-         const numA = parseInt(String(a.billGpNo || a.jobCardNo || a.challanNo || '').replace(/\D/g, ''), 10);
-         const numB = parseInt(String(b.billGpNo || b.jobCardNo || b.challanNo || '').replace(/\D/g, ''), 10);
-         if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+         const numA = parseInt(String(a.serialNo || a.billGpNo || a.jobCardNo || a.challanNo || '').replace(/\D/g, ''), 10);
+         const numB = parseInt(String(b.serialNo || b.billGpNo || b.jobCardNo || b.challanNo || '').replace(/\D/g, ''), 10);
+         if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
          return new Date(a.receiveDate || a.updatedAt || 0) - new Date(b.receiveDate || b.updatedAt || 0);
       });
    }, [jobWorkEntries]);
@@ -262,22 +262,31 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
 
    const navigateReceipt = (dir) => {
       const list = receiptBills;
-      if (!list.length) return;
+      if (!list.length) {
+         notifyWarning('No saved receipts to browse');
+         return;
+      }
       if (dir === 'first') {
-         handleLoadReceivedJob(list[0]);
+         handleLoadReceivedJob(list[0], { asView: true });
+         focusSerialNo();
          return;
       }
       if (dir === 'last') {
-         handleLoadReceivedJob(list[list.length - 1]);
+         handleLoadReceivedJob(list[list.length - 1], { asView: true });
+         focusSerialNo();
          return;
       }
       const currentIdx = list.findIndex((j) => receiptKeyOf(j) === activeReceiptKey);
       let nextIdx = currentIdx + dir;
       if (currentIdx === -1) nextIdx = dir > 0 ? 0 : list.length - 1;
       if (nextIdx >= 0 && nextIdx < list.length && nextIdx !== currentIdx) {
-         handleLoadReceivedJob(list[nextIdx]);
+         handleLoadReceivedJob(list[nextIdx], { asView: true });
+         focusSerialNo();
       } else if (nextIdx >= list.length && dir > 0) {
          handleNew();
+      } else if (nextIdx < 0 && dir < 0) {
+         notifyWarning('Already at the first receipt');
+         focusSerialNo();
       }
    };
 
@@ -391,7 +400,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       const onKeyDown = (e) => {
          const kb = kbRef.current;
          if (kb.showFindDialog || kb.showLotDropdown) return;
-         if (e.target instanceof Element && e.target.closest('[data-erp-dialog], [data-book-selection-modal]')) return;
+         if (e.target instanceof Element && e.target.closest('[data-book-selection-modal], [data-account-modal], .erp-confirm-dialog')) return;
 
          if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'f')) {
             e.preventDefault();
@@ -407,13 +416,20 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             return;
          }
 
-         const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
-         const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
-         if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && (kb.isEditMode || kb.mode === 'View')) {
-            e.preventDefault();
-            e.stopPropagation();
-            kb.navigate?.(prevKey ? -1 : 1);
-            return;
+         const isMinus = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
+         const isPlus = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
+         if ((isMinus || isPlus) && !e.ctrlKey && !e.altKey) {
+            const el = e.target;
+            const isSerialInput = el && el.id === 'mill-rec-serial';
+            const inTextEdit = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') && !isSerialInput && kb.mode !== 'View';
+
+            // Navigate if on Serial No, or in View mode, or outside text editing fields
+            if (isSerialInput || kb.mode === 'View' || !inTextEdit) {
+               e.preventDefault();
+               e.stopPropagation();
+               kb.navigate?.(isMinus ? -1 : 1);
+               return;
+            }
          }
          if (e.altKey && e.key.toLowerCase() === 'l') {
             e.preventDefault();
@@ -1245,8 +1261,16 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                               className="classic-erp-input mill-rec-in text-center bg-white font-bold"
                               value={serialNo || '1'}
                               onChange={(e) => setSerialNo(e.target.value)}
-                              title={mode === 'View' ? "Press Enter to start New Entry" : "Sr No — Enter goes to Date"}
+                              title={mode === 'View' ? "Press Enter for New Entry · Press + / - to browse receipts" : "Sr No — Enter goes to Date · + / - browse receipts"}
                               onKeyDown={(e) => {
+                                 const isMinus = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
+                                 const isPlus = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
+                                 if ((isMinus || isPlus) && !e.ctrlKey && !e.altKey) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    navigateReceipt(isMinus ? -1 : 1);
+                                    return;
+                                 }
                                  if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
                                  e.preventDefault();
                                  e.stopPropagation();
@@ -1942,12 +1966,12 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                             </div>
                             <div className="mill-rec-nav-row">
                                <div className="mill-rec-status">
-                                  {mode === 'View' ? `Recent #${billGpNo || serialNo} · Press Enter for New Entry` : mode === 'Edit' ? `Editing #${billGpNo || serialNo}` : `New Entry #${serialNo}`}
+                                  {mode === 'View' ? `Recent #${billGpNo || serialNo} · Press + / - to browse · Enter for New Entry` : mode === 'Edit' ? `Editing #${billGpNo || serialNo}` : `New Entry #${serialNo}`}
                                </div>
-                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt('first')}>First</button>
-                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(1)}>Next</button>
-                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(-1)}>Prv</button>
-                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt('last')}>Last</button>
+                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt('first')} title="First Receipt">First</button>
+                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(1)} title="Next Receipt (+)">Next (+)</button>
+                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(-1)} title="Previous Receipt (-)">Prv (-)</button>
+                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt('last')} title="Last Receipt">Last</button>
                             </div>
                          </div>
 
