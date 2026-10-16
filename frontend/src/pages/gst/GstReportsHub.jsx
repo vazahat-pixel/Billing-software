@@ -298,8 +298,8 @@ export default function GstReportsHub({ isOpen, onClose }) {
     }
     if (tab === 'offline_tool') {
       return (
-        <div className="pt-2">
-          <GSTReportsTab />
+        <div style={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <GSTReportsTab onClose={onClose} defaultFrom={from} defaultTo={to} />
         </div>
       );
     }
@@ -460,53 +460,62 @@ export default function GstReportsHub({ isOpen, onClose }) {
 
   return (
     <>
-      <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[96vw] w-[96vw] h-[92vh] p-0">
-        <div className="flex flex-col h-full bg-[var(--bg-card)] rounded-2xl overflow-hidden">
+      <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[98vw] w-[98vw] h-[95vh] p-0">
+        <div className="flex flex-col h-full bg-[var(--bg-card)] rounded-xl overflow-hidden shadow-2xl border border-[var(--border)]">
           {/* Header */}
-          <div className="shrink-0 px-5 py-4 border-b border-[var(--border)] flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <h4 className="text-[15px] font-semibold text-[var(--text-primary)]">GST Reports</h4>
-              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+          <div className="shrink-0 px-3.5 py-1.5 border-b border-[var(--border)] bg-[var(--bg-card)] flex items-center justify-between gap-2.5 flex-wrap">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <h4 className="text-[13px] font-bold text-[var(--text-primary)] tracking-tight whitespace-nowrap">GST Reports</h4>
+              <span className="text-[11px] text-[var(--text-muted)] truncate hidden md:inline">
                 {data?.company?.name || ''}{data?.company?.gstin ? ` · GSTIN ${data.company.gstin}` : ''}
                 {data?.period?.fp ? ` · Filing period ${data.period.fp}` : ''}
-              </p>
+              </span>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">From</label>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">From</span>
               <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-                className="h-8 px-2 rounded-lg border border-[var(--border)] text-[12px] outline-none focus:border-[var(--accent)]" />
-              <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">To</label>
+                className="h-6.5 px-2 rounded border border-[var(--border)] text-[11px] bg-[var(--bg-card)] text-[var(--text-primary)] outline-none focus:border-blue-500" />
+              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">To</span>
               <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-                className="h-8 px-2 rounded-lg border border-[var(--border)] text-[12px] outline-none focus:border-[var(--accent)]" />
-              <button type="button" onClick={load} disabled={loading} className="erp-btn erp-btn-secondary h-8 px-3 text-[11px] flex items-center gap-1.5">
-                <FontAwesomeIcon icon={faSync} className={`text-[10px] ${loading ? 'animate-spin' : ''}`} /> Refresh
+                className="h-6.5 px-2 rounded border border-[var(--border)] text-[11px] bg-[var(--bg-card)] text-[var(--text-primary)] outline-none focus:border-blue-500" />
+              <button type="button" onClick={load} disabled={loading} title="Refresh Data"
+                className="h-6.5 px-2 rounded border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-[11px] font-medium text-[var(--text-secondary)] flex items-center gap-1 cursor-pointer transition-colors">
+                <FontAwesomeIcon icon={faSync} className={`text-[9px] ${loading ? 'animate-spin' : ''}`} /> Refresh
               </button>
-              <button type="button" onClick={activePrint} disabled={loading || !data} className="erp-btn erp-btn-secondary h-8 px-3 text-[11px] flex items-center gap-1.5">
-                <FontAwesomeIcon icon={faPrint} className="text-[10px]" /> Print
+              <button type="button" onClick={activePrint} disabled={loading || !data}
+                className="h-6.5 px-2 rounded border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-[11px] font-medium text-[var(--text-secondary)] flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-40">
+                <FontAwesomeIcon icon={faPrint} className="text-[9px]" /> Print
               </button>
-              <button type="button" onClick={exportExcel} disabled={loading || !data} className="erp-btn erp-btn-primary h-8 px-3 text-[11px] flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white">
-                <FontAwesomeIcon icon={faFileExcel} className="text-[10px]" /> Export Excel (.csv)
+              <button type="button" onClick={exportExcel} disabled={loading || !data}
+                className="h-6.5 px-2.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-xs disabled:opacity-40">
+                <FontAwesomeIcon icon={faFileExcel} className="text-[9px]" /> Export CSV
               </button>
-              <button type="button" onClick={exportJson} disabled={loading || !data} className="erp-btn erp-btn-secondary h-8 px-3 text-[11px] flex items-center gap-1.5">
-                <FontAwesomeIcon icon={faDownload} className="text-[10px]" /> GSTR-1 JSON (Govt)
+              <button type="button" onClick={exportJson} disabled={loading || !data}
+                className="h-6.5 px-2 rounded border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-[11px] font-medium text-[var(--text-secondary)] flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-40">
+                <FontAwesomeIcon icon={faDownload} className="text-[9px]" /> JSON
               </button>
-              <button type="button" onClick={onClose} className="erp-btn erp-btn-secondary h-8 px-3 text-[11px]">Close</button>
+              <button type="button" onClick={onClose}
+                className="h-6.5 px-2.5 rounded border border-[var(--border)] bg-[var(--bg-card)] hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-[11px] font-medium text-[var(--text-secondary)] flex items-center gap-1 cursor-pointer transition-colors">
+                Close
+              </button>
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="shrink-0 flex gap-1 px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-base)] overflow-x-auto">
+          {/* Navigation Tabs */}
+          <div className="shrink-0 flex gap-0.5 px-3 py-1 border-b border-[var(--border)] bg-[var(--bg-base)] overflow-x-auto scrollbar-none">
             {TABS.map((t) => (
               <button key={t.id} type="button" onClick={() => setTab(t.id)}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap flex items-center gap-1.5 transition-colors ${
-                  tab === t.id ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                className={`px-2.5 py-1 rounded text-[11px] whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
+                  tab === t.id
+                    ? 'bg-[var(--bg-card)] text-blue-700 font-bold shadow-xs border border-[var(--border)]'
+                    : 'text-[var(--text-secondary)] font-medium hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/60'
                 }`}>
-                <FontAwesomeIcon icon={t.icon} className="text-[10px]" /> {t.label}
+                <FontAwesomeIcon icon={t.icon} className={`text-[10px] ${tab === t.id ? 'text-blue-600' : 'text-[var(--text-muted)]'}`} /> {t.label}
               </button>
             ))}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5">{body()}</div>
+          <div className={`flex-1 overflow-y-auto flex flex-col ${tab === 'offline_tool' ? 'p-0' : 'p-3'}`} style={{ minHeight: 0 }}>{body()}</div>
         </div>
       </Modal>
 

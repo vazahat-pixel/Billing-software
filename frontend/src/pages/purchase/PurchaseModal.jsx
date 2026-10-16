@@ -23,6 +23,7 @@ import { resolveParty, buildWhatsAppMessage, openWhatsAppShare, shareInvoiceWhat
 import { getFocusableElements, focusNextField, handleFormEnterKeyDown, handleFormArrowKeyDown } from '../../utils/formEnterNavigation';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import useConfigStore from '../../store/useConfigStore';
+import { cleanVNo } from '../../utils/normalizers';
 import { resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
 import { money, lineTaxable } from '../../utils/salesBillCalc';
 import PcsBreakdownModal from '../sales/PcsBreakdownModal';
@@ -141,11 +142,14 @@ const PurchaseModal = ({
     }
 
     return [...list].sort((a, b) => {
-      const noA = a.vNo || a.invoiceNo || a.supplierInvoiceNo || a.billNo || '';
-      const noB = b.vNo || b.invoiceNo || b.supplierInvoiceNo || b.billNo || '';
-      const numA = parseInt(String(noA).replace(/\D/g, ''), 10);
-      const numB = parseInt(String(noB).replace(/\D/g, ''), 10);
-      if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+      const getSeq = (p) => {
+        const raw = cleanVNo(p.vNo || p.invoiceNo);
+        const n = parseInt(String(raw).replace(/\D/g, ''), 10);
+        return isNaN(n) ? 0 : n;
+      };
+      const numA = getSeq(a);
+      const numB = getSeq(b);
+      if (numA && numB && numA !== numB) return numA - numB;
       return new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0);
     });
   }, [purchases, header.book]);
@@ -496,8 +500,8 @@ const PurchaseModal = ({
       book: pur.bookId || selectedBook || 'PURCHASE BOOK',
       gstin: pur.supplierId?.gstin || '',
       city: pur.station || '',
-      vNo: pur.invoiceNo || pur.vNo || '',
-      billNo: pur.supplierInvoiceNo || pur.billNo || pur.invoiceNo || '',
+      vNo: cleanVNo(pur.vNo || pur.invoiceNo) || '1',
+      billNo: pur.supplierInvoiceNo || pur.billNo || '',
       billDate: pur.date ? String(pur.date).split('T')[0] : today(),
       challanNo: pur.challanNo || '',
       chDate: pur.challanDate ? String(pur.challanDate).split('T')[0] : today(),
@@ -563,12 +567,12 @@ const PurchaseModal = ({
         const lastBill = bookPurchases[bookPurchases.length - 1];
         loadPurchaseData(lastBill);
         setMode('View');
-        toast.info(`Bill #${lastBill.invoiceNo || lastBill.vNo || lastBill.supplierInvoiceNo || ''} (${bookPurchases.length}/${bookPurchases.length})`);
+        toast.info(`Bill #${cleanVNo(lastBill.vNo || lastBill.invoiceNo) || lastBill.supplierInvoiceNo || ''} (${bookPurchases.length}/${bookPurchases.length})`);
       } else {
         const firstBill = bookPurchases[0];
         loadPurchaseData(firstBill);
         setMode('View');
-        toast.info(`Bill #${firstBill.invoiceNo || firstBill.vNo || firstBill.supplierInvoiceNo || ''} (1/${bookPurchases.length})`);
+        toast.info(`Bill #${cleanVNo(firstBill.vNo || firstBill.invoiceNo) || firstBill.supplierInvoiceNo || ''} (1/${bookPurchases.length})`);
       }
       return;
     }
@@ -578,7 +582,7 @@ const PurchaseModal = ({
       const nextBill = bookPurchases[nextIdx];
       loadPurchaseData(nextBill);
       setMode('View');
-      toast.info(`Bill #${nextBill.invoiceNo || nextBill.vNo || nextBill.supplierInvoiceNo || ''} (${nextIdx + 1}/${bookPurchases.length})`);
+      toast.info(`Bill #${cleanVNo(nextBill.vNo || nextBill.invoiceNo) || nextBill.supplierInvoiceNo || ''} (${nextIdx + 1}/${bookPurchases.length})`);
     } else if (nextIdx >= bookPurchases.length && dir > 0) {
       handleNew();
       toast.info('New Purchase Bill (Add mode)');
@@ -616,7 +620,7 @@ const PurchaseModal = ({
         setSelectedPurchaseId('');
         setMode('View');
         getNextVNo().then((no) => {
-          if (!cancelled) setHeader((h) => ({ ...h, vNo: no || '1', billNo: h.billNo || no || '1' }));
+          if (!cancelled) setHeader((h) => ({ ...h, vNo: cleanVNo(no) || '1', billNo: h.billNo || '' }));
         });
       }
     } else if (incomingId && openedOnceRef.current !== incomingId && Array.isArray(initialData?.items)) {
@@ -1063,18 +1067,26 @@ const PurchaseModal = ({
 
   const getNextVNo = React.useCallback(async () => {
     let maxNum = 0;
+    const getSeq = (p) => {
+      // ONLY internal voucher sequence — NEVER supplier bill numbers!
+      const raw = cleanVNo(p.vNo || p.invoiceNo);
+      const n = parseInt(String(raw).replace(/\D/g, ''), 10);
+      return isNaN(n) ? 0 : n;
+    };
+
     (purchases || []).forEach((p) => {
-      const val = parseInt(String(p.vNo || p.invoiceNo || p.supplierInvoiceNo || p.billNo || '').replace(/\D/g, ''), 10);
-      if (!isNaN(val) && val > maxNum) maxNum = val;
+      const val = getSeq(p);
+      if (val > maxNum) maxNum = val;
     });
     (bookPurchases || []).forEach((p) => {
-      const val = parseInt(String(p.vNo || p.invoiceNo || p.supplierInvoiceNo || p.billNo || '').replace(/\D/g, ''), 10);
-      if (!isNaN(val) && val > maxNum) maxNum = val;
+      const val = getSeq(p);
+      if (val > maxNum) maxNum = val;
     });
     let peekedNum = 0;
     try {
       const peeked = await peekBillNo('purchase');
-      const parsed = parseInt(String(peeked || '').replace(/\D/g, ''), 10);
+      const cleanPeek = cleanVNo(peeked);
+      const parsed = parseInt(String(cleanPeek || '').replace(/\D/g, ''), 10);
       if (!isNaN(parsed)) peekedNum = parsed;
     } catch {
       peekedNum = 0;

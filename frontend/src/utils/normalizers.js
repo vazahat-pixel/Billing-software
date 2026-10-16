@@ -73,6 +73,17 @@ export const normalizeSale = (sale) => {
   };
 };
 
+export const cleanVNo = (val) => {
+  if (val == null || val === '') return '';
+  const str = String(val).trim();
+  const num = parseInt(str.replace(/\D/g, ''), 10);
+  if (!isNaN(num) && num >= 2000000000 && num <= 2099999999) {
+    const seq = num % 10000;
+    return String(seq > 0 ? seq : num);
+  }
+  return str;
+};
+
 export const normalizePurchase = (purchase) => {
   if (!purchase) return purchase;
   const id = purchase._id || purchase.id;
@@ -80,10 +91,12 @@ export const normalizePurchase = (purchase) => {
   const gst = purchase.gstAmount ?? 0;
   const net = purchase.netAmount ?? purchase.totals?.total ?? taxable + gst;
   const halfGst = gst / 2;
+  const vNo = cleanVNo(purchase.vNo || purchase.invoiceNo);
   return {
     ...purchase,
     _id: id,
     id,
+    vNo: vNo || purchase.vNo,
     status: purchase.status || 'active',
     totals: purchase.totals || {
       subtotal: taxable,

@@ -60,6 +60,18 @@ async function peekNext(companyId, module) {
   assertBillModule(module);
   const row = await Counter.findById(plainCounterId(companyId, module)).lean();
   let next = (Number(row?.seq) || 0) + 1;
+  // Guard against 10-digit FY composite numbers (e.g. 2026270058) poisoning the counter
+  if (next >= 2000000000 && next <= 2099999999) {
+    next = (next % 10000) || 1;
+    try {
+      await Counter.findByIdAndUpdate(
+        plainCounterId(companyId, module),
+        { $set: { seq: next - 1 } }
+      );
+    } catch {
+      /* ignore */
+    }
+  }
   if (module === 'job') {
     try {
       const Job = require('../models/Job');
@@ -128,8 +140,11 @@ async function reserveNumber(companyId, module, requested, session = null) {
     const allocated = await allocateNext(companyId, module, { session });
     return allocated.number;
   }
-  const n = Number(raw);
+  let n = Number(raw);
   if (Number.isInteger(n) && n > 0 && String(n) === raw) {
+    if (n >= 2000000000 && n <= 2099999999) {
+      n = (n % 10000) || 1;
+    }
     const opts = { upsert: true };
     if (session) opts.session = session;
     await Counter.findOneAndUpdate(
@@ -174,7 +189,10 @@ async function allocateNext(companyId, module, { session = null } = {}) {
         /* ignore */
       }
     }
-    const seq = await Counter.nextSeq(plainCounterId(companyId, module), session);
+    let seq = await Counter.nextSeq(plainCounterId(companyId, module), session);
+    if (seq >= 2000000000 && seq <= 2099999999) {
+      seq = (seq % 10000) || 1;
+    }
     return {
       number: String(seq),
       prefix: '',
