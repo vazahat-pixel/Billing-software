@@ -141,10 +141,26 @@ function filingPeriodFp(period) {
   return `${m}${y}`;
 }
 
+/**
+ * CBIC Notification No. 12/2024 - Central Tax (dated 10th July 2024, effective August 2024 return period)
+ * amended Rule 59(4)(b), reducing the threshold for invoice-wise reporting of inter-state supplies
+ * to unregistered persons in Table 5 (B2CL) of GSTR-1 from Rs. 2.5 Lakh to Rs. 1 Lakh.
+ */
+const B2CL_REVISED_DATE = new Date('2024-08-01T00:00:00.000Z');
+
+function b2clThreshold(date) {
+  if (!date) return 100000;
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return 100000;
+  return d >= B2CL_REVISED_DATE ? 100000 : 250000;
+}
+
 module.exports = {
   STATE_CODES,
   GSTIN_REGEX,
   SPECIAL_GST_TYPES,
+  B2CL_REVISED_DATE,
+  b2clThreshold,
   normalizeGstin,
   validateGstin,
   stateCodeFromGstin,
@@ -157,3 +173,4 @@ module.exports = {
   periodBounds,
   filingPeriodFp,
 };
+

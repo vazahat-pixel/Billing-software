@@ -68,6 +68,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   const [formData, setFormData] = useState({ ...EMPTY_ACCOUNT });
   const nameInputRef = useRef(null);
   const cityRef = useRef(null);
+  const stateCodeRef = useRef(null);
   const stateRef = useRef(null);
   const gstinRef = useRef(null);
   const saveBtnRef = useRef(null);
@@ -368,16 +369,11 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                     autoFocus={mode === 'Add'}
                     data-enter-nav={mode === 'Add' ? 'off' : undefined}
                     onKeyDown={(e) => {
-                      if (mode !== 'Add') return;
                       if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (onSuccess && formData.name?.trim()) {
-                          handleSave();
-                        } else {
-                          cityRef.current?.focus();
-                          try { cityRef.current?.select(); } catch { /* ignore */ }
-                        }
+                        cityRef.current?.focus();
+                        try { cityRef.current?.select(); } catch { /* ignore */ }
                       }
                     }}
                   />
@@ -441,7 +437,8 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                         if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
                           e.preventDefault();
                           e.stopPropagation();
-                          stateRef.current?.focus();
+                          stateCodeRef.current?.focus();
+                          try { stateCodeRef.current?.select(); } catch { /* ignore */ }
                         }
                       }}
                     />
@@ -525,6 +522,34 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
 
                   <div className="classic-erp-field-row">
                     <span className="classic-erp-label classic-erp-label--fixed-sm">State</span>
+                    <input
+                      ref={stateCodeRef}
+                      type="text"
+                      data-enter-nav="off"
+                      className="classic-erp-input w-14 font-mono font-bold text-center"
+                      value={formData.stateCode || '24'}
+                      maxLength={2}
+                      title="State Code (e.g. 24 for Gujarat, 27 for Maharashtra) — Press Enter to Save"
+                      onChange={(e) => {
+                        const code = e.target.value.replace(/\D/g, '').slice(0, 2);
+                        const name = GST_STATE_CODES[code] || (code ? `${code}-State` : '');
+                        const gstType = code === '24' ? 'INVOICE (IN STATE)' : 'INVOICE (OUT OF STATE)';
+                        setFormData(prev => ({
+                          ...prev,
+                          stateCode: code,
+                          stateName: name ? `${code}-${name}` : prev.stateName,
+                          gstType,
+                        }));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleSave();
+                        }
+                      }}
+                      disabled={locked}
+                    />
                     <select
                       ref={stateRef}
                       data-enter-nav="off"

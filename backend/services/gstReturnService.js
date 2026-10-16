@@ -8,7 +8,7 @@ const Item = require('../models/Item');
 const Company = require('../models/Company');
 const gstConfigService = require('./gstConfigService');
 const {
-  placeOfSupply, filingPeriodFp, periodBounds, stateCodeFromGstin,
+  placeOfSupply, filingPeriodFp, periodBounds, stateCodeFromGstin, b2clThreshold,
 } = require('../utils/gstDetermination');
 const auditService = require('./auditService');
 
@@ -251,7 +251,10 @@ class GstReturnService {
       const sgst = round2(s.sgst);
       const igst = round2(s.igst);
       const cess = round2(s.cess || 0);
-      const invVal = round2(s.netAmount || taxable + cgst + sgst + igst + cess);
+      const tcs = Number(s.tcsAmount || s.tcs || 0);
+      const rawNet = Number(s.netAmount);
+      const fallbackVal = taxable + cgst + sgst + igst + cess + Number(s.roundOff || 0);
+      const invVal = round2(Number.isFinite(rawNet) && rawNet > 0 ? Math.max(0, rawNet - tcs) : fallbackVal);
       const posCode = placeOfSupply({
         partyGstin: gstin,
         partyStateCode: s.customerId?.stateCode,
@@ -331,7 +334,7 @@ class GstReturnService {
           igst,
           cess,
         });
-      } else if (invVal > 250000 && isInterState) {
+      } else if (invVal > b2clThreshold(s.date) && isInterState) {
         // B2CL — large interstate unregistered
         b2cl.push({ ...inv, val: invVal });
         b2clRows.push({
@@ -473,7 +476,7 @@ class GstReturnService {
         });
       } else {
         cdnuRows.push({
-          type: noteVal > 250000 ? 'B2CL' : 'B2CS',
+          type: noteVal > b2clThreshold(n.date) ? 'B2CL' : 'B2CS',
           noteNo: n.noteNo,
           noteDate,
           noteType,
@@ -497,8 +500,11 @@ class GstReturnService {
       const posCode = r.stateCode || companyPos;
       const stateName = stateNameFromCode(posCode) || '';
       const posFullName = `${posCode}${stateName ? `-${stateName}` : ''}`;
-      const retVal = round2(r.netAmount);
+      const retTcs = Number(r.tcsAmount || r.tcs || 0);
+      const rawRetNet = Number(r.netAmount);
       const retTaxable = round2(r.taxableAmount);
+      const fallbackRetVal = retTaxable + Number(r.cgst || 0) + Number(r.sgst || 0) + Number(r.igst || 0) + Number(r.roundOff || 0);
+      const retVal = round2(Number.isFinite(rawRetNet) && rawRetNet > 0 ? Math.max(0, rawRetNet - retTcs) : fallbackRetVal);
       const taxRate = retTaxable ? round2((((r.cgst || 0) + (r.sgst || 0) + (r.igst || 0)) / retTaxable) * 100) : 0;
 
       if (ctin && ctin.length === 15) {
@@ -537,7 +543,7 @@ class GstReturnService {
         });
       } else {
         cdnuRows.push({
-          type: retVal > 250000 ? 'B2CL' : 'B2CS',
+          type: retVal > b2clThreshold(r.date) ? 'B2CL' : 'B2CS',
           noteNo: r.invoiceNo || r.returnNo,
           noteDate: retDate,
           noteType: 'C',

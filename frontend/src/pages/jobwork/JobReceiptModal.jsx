@@ -161,11 +161,15 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     }
   };
 
+  const newBtnRef = useRef(null);
+
   useEffect(() => {
     if (!isOpen) return undefined;
 
     const onKeyDown = (e) => {
-      if (!(e.target instanceof Element) || !e.target.closest('.erp-job-receipt-window')) return;
+      if (accountModal || lotLookupOpen || findOpen) return;
+      if (e.target?.closest?.('[data-find-modal], [data-book-selection-modal], [data-command-palette], .erp-combobox-dropdown, [data-account-master-modal]')) return;
+
       if (e.key === 'F3' || (e.altKey && e.key.toLowerCase() === 'f')) {
         e.preventDefault();
         e.stopPropagation();
@@ -175,7 +179,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
 
       const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus';
       const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal';
-      if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && mode === 'View' && !findOpen) {
+      if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && mode === 'View') {
         e.preventDefault();
         e.stopPropagation();
         const list = sortedReceipts || [];
@@ -186,15 +190,15 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
         if (nextIdx >= 0 && nextIdx < list.length) loadReceipt(list[nextIdx]._id || list[nextIdx].id, 'View');
         return;
       }
-      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !findOpen && mode === 'View') {
-        if (e.target?.closest?.('[data-find-modal], [data-book-selection-modal], [data-command-palette]')) return;
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && mode === 'View') {
         e.preventDefault();
-        e.stopImmediatePropagation();
+        e.stopPropagation();
         handleNew();
         return;
       }
       if (e.altKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
+        e.stopPropagation();
         handleNew();
         return;
       }
@@ -202,15 +206,28 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
       if ((e.altKey && e.key.toLowerCase() === 'e') || e.key === 'F2') {
         if (selectedReceiptId && mode === 'View') {
           e.preventDefault();
+          e.stopPropagation();
           setMode('Edit');
           toast.info('Switched to Edit mode');
         }
+        return;
       }
     };
 
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [isOpen, selectedReceiptId, mode, findOpen, sortedReceipts]);
+  }, [isOpen, selectedReceiptId, mode, findOpen, lotLookupOpen, accountModal, sortedReceipts]);
+
+  useEffect(() => {
+    if (isOpen && mode === 'View') {
+      const t = setTimeout(() => {
+        if (newBtnRef.current && !newBtnRef.current.disabled) {
+          newBtnRef.current.focus();
+        }
+      }, 60);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen, mode]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -500,15 +517,17 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     setMode('Add');
     setSelectedReceiptId('');
     setFindOpen(false);
-    setHeader({ ...emptyHeader(selectedBook), serialNo: '1' });
+    const nextSr = getNextSerialNo();
+    setHeader({ ...emptyHeader(selectedBook), serialNo: nextSr || '1' });
     setFooter(emptyFooter());
     setLines([blankLine()]);
     setTimeout(() => {
       const el = document.getElementById('job-rec-serial');
-      if (!el || el.disabled) return;
-      el.focus();
-      try { el.select(); } catch { /* ignore */ }
-    }, 80);
+      if (el && !el.disabled) {
+        el.focus();
+        try { el.select(); } catch { /* ignore */ }
+      }
+    }, 60);
   };
 
   const handleEdit = () => {
@@ -778,7 +797,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                         <span className="classic-erp-label red-label">SrNo</span>
                         <input
                           id="job-rec-serial"
-                          data-autofocus="true"
+                          data-autofocus={mode !== 'View' ? 'true' : undefined}
                           data-enter-order="1"
                           type="text"
                           className="classic-erp-input text-center font-bold"
@@ -1285,7 +1304,14 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
               </div>
 
               <div className="classic-erp-form-footer erp-job-receipt-footer shrink-0">
-                <button type="button" className="classic-erp-btn" onClick={handleNew} disabled={saving}>
+                <button
+                  ref={newBtnRef}
+                  type="button"
+                  className="classic-erp-btn"
+                  onClick={handleNew}
+                  disabled={saving}
+                  data-autofocus={mode === 'View' ? 'true' : undefined}
+                >
                   New
                 </button>
                 <button
