@@ -75,11 +75,25 @@ export const normalizeSale = (sale) => {
 
 export const cleanVNo = (val) => {
   if (val == null || val === '') return '';
-  const str = String(val).trim();
+  let str = String(val).trim();
+  // Strip offline suffix (e.g. "68-OFF4402" -> "68")
+  if (str.includes('-OFF')) {
+    str = str.replace(/-OFF.*$/i, '').trim();
+  }
   const num = parseInt(str.replace(/\D/g, ''), 10);
-  if (!isNaN(num) && num >= 2000000000 && num <= 2099999999) {
-    const seq = num % 10000;
-    return String(seq > 0 ? seq : num);
+  if (!isNaN(num)) {
+    if (num >= 2000000000 && num <= 2099999999) {
+      const seq = num % 10000;
+      return String(seq > 0 ? seq : num);
+    }
+    // Prevent giant concatenated numbers > 100000
+    if (num >= 100000) {
+      const match = str.match(/(\d+)$/);
+      if (match) {
+        const trail = parseInt(match[1], 10);
+        if (!isNaN(trail) && trail < 100000) return String(trail);
+      }
+    }
   }
   return str;
 };

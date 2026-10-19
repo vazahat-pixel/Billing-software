@@ -13,7 +13,7 @@ const frontendRoot = path.join(desktopRoot, '..', 'frontend');
 const env = {
   ...process.env,
   VITE_DESKTOP: '1',
-  VITE_API_URL: process.env.ERP_API_URL || process.env.VITE_API_URL || '',
+  VITE_API_URL: process.env.ERP_API_URL || process.env.VITE_API_URL || 'https://app.dealingindia.com/api',
 };
 
 console.log('[desktop] Building frontend for Electron…');

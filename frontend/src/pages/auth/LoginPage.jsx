@@ -62,8 +62,8 @@ const DealingIndiaLogo = () => (
 );
 
 const LoginPage = () => {
-    const [email, setEmail] = useState(() => localStorage.getItem('last_login_email') || (isDev ? DEMO_USERS[0].email : ''));
-    const [password, setPassword] = useState(() => (isDev ? DEMO_USERS[0].password : ''));
+    const [email, setEmail] = useState(() => localStorage.getItem('last_login_email') || DEMO_USERS[0].email);
+    const [password, setPassword] = useState(() => (localStorage.getItem('last_login_email') ? '' : DEMO_USERS[0].password));
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(true);
     const [loading, setLoading] = useState(false);
@@ -122,7 +122,7 @@ const LoginPage = () => {
             if (savedProfiles[0].password) {
                 setPassword(savedProfiles[0].password);
             }
-        } else if (isDev) {
+        } else {
             fillDemo(DEMO_USERS[0]);
         }
     };
@@ -297,22 +297,23 @@ const LoginPage = () => {
                         <ChevronRight size={15} className="text-slate-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                     </button>
 
-                    {/* Quick Dev Demo Access Pills */}
-                    {isDev && (
-                        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 text-[10px]">
-                            <span className="font-bold text-slate-400">⚡ Demo:</span>
-                            {DEMO_USERS.map((u) => (
-                                <button
-                                    key={u.email}
-                                    type="button"
-                                    onClick={() => fillDemo(u)}
-                                    className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-600 font-semibold transition-colors cursor-pointer"
-                                >
-                                    {u.label.split(' ')[0]}
-                                </button>
-                            ))}
+                    {/* Quick Demo Access Card */}
+                    <div className="flex items-center justify-between gap-2 mt-2.5 p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] shadow-2xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-6 h-6 rounded-md bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">⚡</span>
+                            <div className="min-w-0">
+                                <span className="font-bold text-slate-800 block leading-tight">Surat Demo Account</span>
+                                <span className="text-[10px] text-slate-500 font-mono">user@textileerp.com</span>
+                            </div>
                         </div>
-                    )}
+                        <button
+                            type="button"
+                            onClick={() => fillDemo(DEMO_USERS[0])}
+                            className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10.5px] transition-colors cursor-pointer shadow-xs shrink-0"
+                        >
+                            1-Click Fill
+                        </button>
+                    </div>
 
                     {/* Trust Badges Row */}
                     <div className="grid grid-cols-3 gap-2 pt-3 mt-2 border-t border-slate-100 text-center">

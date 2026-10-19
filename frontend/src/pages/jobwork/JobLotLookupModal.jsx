@@ -55,23 +55,44 @@ export default function JobLotLookupModal({ isOpen, onClose, jobs = [], partyNam
     onClose?.();
   };
 
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIdx((i) => {
+          const nextIdx = Math.min(i + 1, Math.max(0, rows.length - 1));
+          document.getElementById(`job-lot-row-${nextIdx}`)?.scrollIntoView({ block: 'nearest' });
+          return nextIdx;
+        });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIdx((i) => {
+          const nextIdx = Math.max(i - 1, 0);
+          document.getElementById(`job-lot-row-${nextIdx}`)?.scrollIntoView({ block: 'nearest' });
+          return nextIdx;
+        });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (rows[idx]) {
+          pick(rows[idx]);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose?.();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
+  }, [isOpen, rows, idx]);
+
   const onKeyDown = (e) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      e.stopPropagation();
-      setIdx((i) => Math.min(i + 1, Math.max(0, rows.length - 1)));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      e.stopPropagation();
-      setIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' && rows[idx]) {
-      e.preventDefault();
-      e.stopPropagation();
-      pick(rows[idx]);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      onClose?.();
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+      return;
     }
   };
 
@@ -123,7 +144,9 @@ export default function JobLotLookupModal({ isOpen, onClose, jobs = [], partyNam
                 rows.map((r, i) => (
                   <tr
                     key={r.job._id}
+                    id={`job-lot-row-${i}`}
                     className={`cursor-pointer ${i === idx ? 'bg-blue-600 text-white' : 'hover:bg-blue-50'}`}
+                    onClick={() => pick(r)}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       pick(r);

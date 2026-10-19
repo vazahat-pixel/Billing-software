@@ -65,10 +65,10 @@ class OutstandingEngineService {
         billDate: sale.date || sale.createdAt,
         billAmount,
         settledAmount: paid,
-        outstandingAmount: outstanding,
+        outstandingAmount: outstanding < 0.99 ? 0 : outstanding,
         dueDate,
         creditDays,
-        status: outstanding < 0.01 ? 'Settled' : paid > 0 ? 'Partial' : 'Open',
+        status: outstanding < 0.99 ? 'Settled' : paid > 0 ? 'Partial' : 'Open',
       },
       opts
     );
@@ -114,10 +114,10 @@ class OutstandingEngineService {
         billDate: bill.date || bill.createdAt,
         billAmount,
         settledAmount: paid,
-        outstandingAmount: outstanding,
+        outstandingAmount: outstanding < 0.99 ? 0 : outstanding,
         dueDate,
         creditDays,
-        status: outstanding < 0.01 ? 'Settled' : paid > 0 ? 'Partial' : 'Open',
+        status: outstanding < 0.99 ? 'Settled' : paid > 0 ? 'Partial' : 'Open',
       },
       opts
     );
@@ -298,8 +298,9 @@ class OutstandingEngineService {
       narration: narration || '',
     });
     doc.settledAmount = round2(doc.settledAmount + amt);
-    doc.outstandingAmount = round2(Math.max(0, doc.billAmount - doc.settledAmount));
-    doc.status = doc.outstandingAmount < 0.01 ? 'Settled' : 'Partial';
+    const os = round2(Math.max(0, doc.billAmount - doc.settledAmount));
+    doc.status = os < 0.99 ? 'Settled' : 'Partial';
+    doc.outstandingAmount = doc.status === 'Settled' ? 0 : os;
     doc.updatedBy = userId;
     await doc.save();
 

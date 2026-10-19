@@ -308,17 +308,27 @@ ipcMain.handle('desktop:api-url', () => resolveApiBaseUrl());
 ipcMain.on('desktop:api-url-sync', (event) => {
   event.returnValue = resolveApiBaseUrl();
 });
+function getEffectiveDesktopMode() {
+  if (localStack?.mode) return localStack.mode;
+  try {
+    const cfg = readJsonSafe(path.join(app.getPath('userData'), 'config.json')) || readJsonSafe(path.join(__dirname, 'config.json'));
+    return (cfg?.mode || 'remote').toLowerCase();
+  } catch {
+    return 'remote';
+  }
+}
+
 ipcMain.handle('desktop:is-local', () => {
-  const mode = localStack?.mode || 'local';
+  const mode = getEffectiveDesktopMode();
   return mode === 'local' || mode === 'hybrid';
 });
 ipcMain.on('desktop:is-local-sync', (event) => {
-  const mode = localStack?.mode || 'local';
+  const mode = getEffectiveDesktopMode();
   event.returnValue = mode === 'local' || mode === 'hybrid';
 });
-ipcMain.handle('desktop:mode', () => localStack?.mode || 'local');
+ipcMain.handle('desktop:mode', () => getEffectiveDesktopMode());
 ipcMain.on('desktop:mode-sync', (event) => {
-  event.returnValue = localStack?.mode || 'local';
+  event.returnValue = getEffectiveDesktopMode();
 });
 ipcMain.handle('desktop:sync-status', () => {
   try {

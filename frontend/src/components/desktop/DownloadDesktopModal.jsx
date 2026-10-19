@@ -21,10 +21,10 @@ export default function DownloadDesktopModal({ isOpen, onClose }) {
   const [downloadInfo, setDownloadInfo] = useState({
     fileName: 'BillingSoftware-Setup.exe',
     version: '1.0.0',
-    sizeMB: '238.9 MB',
+    sizeMB: '85.8 MB',
     releaseDate: 'October 2026',
     os: 'Windows 10 / 11 (64-bit)',
-    downloadUrl: 'https://github.com/vazahat-pixel/Billing-software/releases/download/v1.0.0/BillingSoftware-Setup.exe',
+    downloadUrl: '/downloads/BillingSoftware-Setup.exe',
   });
   const [downloading, setDownloading] = useState(false);
   const [copied, setCopied] = useState(false);

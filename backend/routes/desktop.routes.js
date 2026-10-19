@@ -90,26 +90,26 @@ function getInstallerPath() {
   return found[0];
 }
 
-const getExternalUrl = () => process.env.DESKTOP_DOWNLOAD_URL || process.env.DESKTOP_INSTALLER_URL || null;
+const getExternalUrl = () => {
+  const url = process.env.DESKTOP_DOWNLOAD_URL || process.env.DESKTOP_INSTALLER_URL || null;
+  if (url && url.includes('v1.0.0/BillingSoftware-Setup.exe')) {
+    return null;
+  }
+  return url;
+};
 
 /** Public metadata about latest desktop build */
 router.get('/download-info', (req, res) => {
   const installer = getInstallerPath();
   const externalUrl = getExternalUrl();
 
-  if (!installer && !externalUrl) {
-    return res.status(404).json({
-      success: false,
-      message: 'Desktop installer is currently being built or unavailable.',
-      data: { available: false },
-    });
-  }
-
-  const sizeBytes = installer ? installer.size : 250518424;
+  const sizeBytes = installer ? installer.size : 89968640;
   const sizeMB = (sizeBytes / (1024 * 1024)).toFixed(1) + ' MB';
   const releaseDate = installer
     ? new Date(installer.mtime).toISOString().slice(0, 10)
     : new Date().toISOString().slice(0, 10);
+
+  const directPath = '/downloads/BillingSoftware-Setup.exe';
 
   return res.json({
     success: true,
@@ -122,7 +122,7 @@ router.get('/download-info', (req, res) => {
       releaseDate,
       os: 'Windows 10 / 11 (64-bit)',
       downloadUrl: '/api/desktop/download',
-      directUrl: externalUrl || '/downloads/BillingSoftware-Setup.exe',
+      directUrl: installer ? directPath : (externalUrl || directPath),
       sha256: '5FD407ABFB0C37CA7BC51DB4BC126F1C179ACE9781C2728153A385A2B1BE8D5E',
     },
   });

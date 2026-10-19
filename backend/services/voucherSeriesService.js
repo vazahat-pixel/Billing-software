@@ -99,6 +99,35 @@ async function peekNext(companyId, module) {
       /* ignore */
     }
   }
+  if (module === 'purchase') {
+    try {
+      const Purchase = require('../models/Purchase');
+      const purchases = await Purchase.find({ companyId }).select('invoiceNo vNo').lean();
+      let max = 0;
+      for (const p of purchases) {
+        const raw = String(p.vNo || p.invoiceNo || '').replace(/-OFF.*$/i, '').trim();
+        let val = parseInt(raw.replace(/\D/g, ''), 10);
+        if (!isNaN(val)) {
+          if (val >= 2000000000 && val <= 2099999999) {
+            val = val % 10000;
+          }
+          if (val < 100000 && val > max) {
+            max = val;
+          }
+        }
+      }
+      if (max >= next) {
+        next = max + 1;
+        await Counter.findByIdAndUpdate(
+          plainCounterId(companyId, module),
+          { $max: { seq: max } },
+          { upsert: true }
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }
   return next;
 }
 
@@ -135,7 +164,10 @@ async function resetAll(companyId, next = 1) {
  */
 async function reserveNumber(companyId, module, requested, session = null) {
   assertBillModule(module);
-  const raw = String(requested ?? '').trim();
+  let raw = String(requested ?? '').trim();
+  if (raw.includes('-OFF')) {
+    raw = raw.replace(/-OFF.*$/i, '').trim();
+  }
   if (!raw || raw.toUpperCase() === 'AUTO') {
     const allocated = await allocateNext(companyId, module, { session });
     return allocated.number;
@@ -145,13 +177,15 @@ async function reserveNumber(companyId, module, requested, session = null) {
     if (n >= 2000000000 && n <= 2099999999) {
       n = (n % 10000) || 1;
     }
-    const opts = { upsert: true };
-    if (session) opts.session = session;
-    await Counter.findOneAndUpdate(
-      { _id: plainCounterId(companyId, module) },
-      { $max: { seq: n } },
-      opts
-    );
+    if (n < 100000) {
+      const opts = { upsert: true };
+      if (session) opts.session = session;
+      await Counter.findOneAndUpdate(
+        { _id: plainCounterId(companyId, module) },
+        { $max: { seq: n } },
+        opts
+      );
+    }
     return String(n);
   }
   return raw;
@@ -189,9 +223,44 @@ async function allocateNext(companyId, module, { session = null } = {}) {
         /* ignore */
       }
     }
+    if (module === 'purchase') {
+      try {
+        const Purchase = require('../models/Purchase');
+        const query = Purchase.find({ companyId }).select('invoiceNo vNo');
+        if (session) query.session(session);
+        const purchases = await query.lean();
+        let max = 0;
+        for (const p of purchases) {
+          const raw = String(p.vNo || p.invoiceNo || '').replace(/-OFF.*$/i, '').trim();
+          let val = parseInt(raw.replace(/\D/g, ''), 10);
+          if (!isNaN(val)) {
+            if (val >= 2000000000 && val <= 2099999999) {
+              val = val % 10000;
+            }
+            if (val < 100000 && val > max) {
+              max = val;
+            }
+          }
+        }
+        if (max > 0) {
+          const opts = { upsert: true };
+          if (session) opts.session = session;
+          await Counter.findOneAndUpdate(
+            { _id: plainCounterId(companyId, module) },
+            { $max: { seq: max } },
+            opts
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     let seq = await Counter.nextSeq(plainCounterId(companyId, module), session);
     if (seq >= 2000000000 && seq <= 2099999999) {
       seq = (seq % 10000) || 1;
+    }
+    if (seq >= 100000 && seq < 2000000000) {
+      seq = 1;
     }
     return {
       number: String(seq),

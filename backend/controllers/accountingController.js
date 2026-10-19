@@ -224,7 +224,7 @@ async function buildAllocationPlan(companyId, { partyLedger, accBill, againstInv
       : round2(doc.netAmount || 0);
     const paidSoFar = kind === 'job' ? round2(doc.chargesPaidAmount || 0) : round2(doc.paidAmount || 0);
     const outstanding = round2(billAmount - paidSoFar);
-    if (paidNow > outstanding + 0.01) {
+    if (paidNow > outstanding + 1.00) {
       throw new Error(
         `Bill ${doc.invoiceNo || doc.jobCardNo || key}: allocating ₹${paidNow.toFixed(2)} exceeds its outstanding ₹${outstanding.toFixed(2)}`
       );
@@ -307,12 +307,14 @@ async function applyAllocationPlan(companyId, plan, session) {
   const outstandingEngine = require('../services/outstandingEngineService');
   for (const { doc, kind, paidNow } of plan) {
     if (kind === 'job') {
-      doc.chargesPaidAmount = round2((doc.chargesPaidAmount || 0) + paidNow);
+      const jobTotal = round2((doc.processCharges || 0) + (doc.processGstAmount || 0) + (doc.roundOff || 0));
+      doc.chargesPaidAmount = round2(Math.min(jobTotal, (doc.chargesPaidAmount || 0) + paidNow));
       await doc.save({ session });
       continue;
     }
-    doc.paidAmount = round2((doc.paidAmount || 0) + paidNow);
-    if (doc.paidAmount >= round2(doc.netAmount || 0) - 0.99) doc.status = 'paid';
+    const net = round2(doc.netAmount || 0);
+    doc.paidAmount = round2(Math.min(net, (doc.paidAmount || 0) + paidNow));
+    if (doc.paidAmount >= net - 0.99) doc.status = 'paid';
     else if (doc.paidAmount > 0) doc.status = 'partial';
     await doc.save({ session });
     if (kind === 'sales') await outstandingEngine.syncBillFromSales(companyId, doc, session);

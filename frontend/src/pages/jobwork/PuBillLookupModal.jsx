@@ -56,18 +56,44 @@ export default function PuBillLookupModal({
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIdx((i) => {
+          const nextIdx = Math.min(i + 1, Math.max(0, rows.length - 1));
+          document.getElementById(`pu-bill-row-${nextIdx}`)?.scrollIntoView({ block: 'nearest' });
+          return nextIdx;
+        });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIdx((i) => {
+          const nextIdx = Math.max(i - 1, 0);
+          document.getElementById(`pu-bill-row-${nextIdx}`)?.scrollIntoView({ block: 'nearest' });
+          return nextIdx;
+        });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (rows[idx]) {
+          pick(rows[idx]);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose?.();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
+  }, [isOpen, rows, idx]);
+
   const onKeyDown = (e) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setIdx((i) => Math.min(i + 1, Math.max(0, rows.length - 1)));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' && rows[idx]) {
-      e.preventDefault();
-      pick(rows[idx]);
-    } else if (e.key === 'Escape') {
-      onClose?.();
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+      return;
     }
   };
 
@@ -126,6 +152,7 @@ export default function PuBillLookupModal({
                 rows.map((r, i) => (
                   <tr
                     key={r.id || `${r.purchaseId}_${r.billNo}_${r.srNo}_${i}`}
+                    id={`pu-bill-row-${i}`}
                     className={`cursor-pointer ${i === idx ? 'bg-blue-600 text-white' : 'hover:bg-blue-50'}`}
                     onClick={() => pick(r)}
                     onDoubleClick={() => pick(r)}

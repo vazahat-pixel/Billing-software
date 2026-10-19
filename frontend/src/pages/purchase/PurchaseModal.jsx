@@ -955,7 +955,7 @@ const PurchaseModal = ({
 
   const focusPurchaseBillNo = () => {
     setTimeout(() => {
-      const bill = suppBillRef.current || modalContainerRef.current?.querySelector('.erp-sales-bill-meta input:not([disabled])');
+      const bill = suppBillRef.current || modalContainerRef.current?.querySelector('input[data-enter-order="2"]') || modalContainerRef.current?.querySelector('.erp-sales-ref-meta input:not([disabled])') || modalContainerRef.current?.querySelector('.erp-sales-bill-meta input:not([disabled])');
       if (bill) {
         bill.focus();
         try { bill.select?.(); } catch { /* ignore */ }
@@ -1070,8 +1070,19 @@ const PurchaseModal = ({
     const getSeq = (p) => {
       // ONLY internal voucher sequence — NEVER supplier bill numbers!
       const raw = cleanVNo(p.vNo || p.invoiceNo);
-      const n = parseInt(String(raw).replace(/\D/g, ''), 10);
-      return isNaN(n) ? 0 : n;
+      const clean = String(raw || '').replace(/-OFF.*$/i, '').trim();
+      const n = parseInt(clean.replace(/\D/g, ''), 10);
+      if (isNaN(n)) return 0;
+      if (n >= 2000000000 && n <= 2099999999) return (n % 10000) || 0;
+      if (n >= 100000) {
+        const match = clean.match(/(\d+)$/);
+        if (match) {
+          const trail = parseInt(match[1], 10);
+          if (!isNaN(trail) && trail < 100000) return trail;
+        }
+        return 0;
+      }
+      return n;
     };
 
     (purchases || []).forEach((p) => {
@@ -1086,8 +1097,15 @@ const PurchaseModal = ({
     try {
       const peeked = await peekBillNo('purchase');
       const cleanPeek = cleanVNo(peeked);
-      const parsed = parseInt(String(cleanPeek || '').replace(/\D/g, ''), 10);
-      if (!isNaN(parsed)) peekedNum = parsed;
+      const cleanStr = String(cleanPeek || '').replace(/-OFF.*$/i, '').trim();
+      const parsed = parseInt(cleanStr.replace(/\D/g, ''), 10);
+      if (!isNaN(parsed)) {
+        if (parsed >= 2000000000 && parsed <= 2099999999) {
+          peekedNum = (parsed % 10000) || 0;
+        } else if (parsed < 100000) {
+          peekedNum = parsed;
+        }
+      }
     } catch {
       peekedNum = 0;
     }
@@ -1645,31 +1663,8 @@ const PurchaseModal = ({
               <div className="classic-erp-frame classic-erp-header-split erp-sales-top shrink-0">
                 <div className="classic-erp-stack classic-erp-header-bill">
                   <div className="classic-erp-meta-grid erp-sales-bill-meta">
-                    <div className="classic-erp-field" style={{ gridColumn: 'span 2' }}>
-                      <span className="classic-erp-label red-label">Supp. Bill *:</span>
-                      <input
-                        ref={suppBillRef}
-                        type="text"
-                        data-enter-order="2"
-                        className="classic-erp-input"
-                        style={{ width: '100%', maxWidth: 'none' }}
-                        value={header.billNo}
-                        placeholder="Supp Bill No…"
-                        onChange={e => setHeader({ ...header, billNo: e.target.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            focusPurchaseDate();
-                          }
-                        }}
-                        disabled={locked}
-                      />
-                    </div>
-                  </div>
-                  <div className="classic-erp-meta-grid erp-sales-ref-meta">
                     {billFields.header('vNo') && (
-                      <div className="classic-erp-field">
+                      <div className="classic-erp-field" style={{ gridColumn: 'span 2' }}>
                         <span className="classic-erp-label">SrNo:</span>
                         <input
                           id="purchase-srno"
@@ -1677,6 +1672,7 @@ const PurchaseModal = ({
                           data-enter-include=""
                           type="text"
                           className="classic-erp-input font-bold text-center"
+                          style={{ width: '100%', maxWidth: 'none' }}
                           value={header.vNo || '1'}
                           readOnly
                           title="Sr No — Enter moves to Supp. Bill No"
@@ -1690,6 +1686,28 @@ const PurchaseModal = ({
                         />
                       </div>
                     )}
+                  </div>
+                  <div className="classic-erp-meta-grid erp-sales-ref-meta">
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label red-label">Supp. Bill *:</span>
+                      <input
+                        ref={suppBillRef}
+                        type="text"
+                        data-enter-order="2"
+                        className="classic-erp-input"
+                        value={header.billNo}
+                        placeholder="Supp Bill No…"
+                        onChange={e => setHeader({ ...header, billNo: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            focusPurchaseDate();
+                          }
+                        }}
+                        disabled={locked}
+                      />
+                    </div>
                     <div className="classic-erp-field">
                       <span className="classic-erp-label red-label">Date *:</span>
                       <input

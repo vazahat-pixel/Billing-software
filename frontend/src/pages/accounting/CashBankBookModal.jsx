@@ -251,13 +251,11 @@ const CashBankBookModal = ({
         return String(pid || '') === String(header.partyId) && doc.status !== 'cancelled';
       })
       .map((doc) => {
-        // Enforce round-off on invoice amounts so paise fractions (< ₹1) are rounded to nearest whole rupee
         const rawTotal = Number(doc.netAmount || doc.totalAmount || 0);
-        const total = Math.round(rawTotal);
-        const paid = Math.round(Number(doc.paidAmount || 0));
+        const total = round2(rawTotal);
+        const paid = round2(Number(doc.paidAmount || 0));
         const rawOs = Math.max(0, total - paid);
-        // Business round-off rule: residual paise (< ₹1) is considered 0 (fully settled)
-        const outstanding = rawOs < 1.00 ? 0 : Math.round(rawOs);
+        const outstanding = rawOs < 0.01 ? 0 : round2(rawOs);
         const billDt = doc.date ? new Date(doc.date).toISOString().split('T')[0] : '';
         const osDy = billDt
           ? Math.max(0, Math.floor((Date.now() - new Date(billDt).getTime()) / 86400000))
@@ -273,7 +271,7 @@ const CashBankBookModal = ({
           billType: doc.invoiceType || (voucherType === 'Receipt' ? 'SL' : 'PU'),
         };
       })
-      .filter((inv) => inv.osAmt >= 1.00);
+      .filter((inv) => inv.osAmt >= 0.01);
 
     // Job Workers don't have Sales/Purchase invoices — what they're owed is the Job Work
     // Charges posted on Job Receive (job.processCharges + processGstAmount + roundOff). Fold those in
@@ -282,12 +280,11 @@ const CashBankBookModal = ({
       .filter((j) => String(j.workerId?._id || j.workerId || '') === String(header.partyId))
       .filter((j) => j.status === 'Received' && (Number(j.processCharges || 0) + Number(j.processGstAmount || 0)) > 0)
       .map((j) => {
-        // Job work billing round-off rule: round to whole rupee
         const rawBillAmt = Number(j.processCharges || 0) + Number(j.processGstAmount || 0) + Number(j.roundOff || 0);
-        const billAmt = Math.round(rawBillAmt);
-        const paid = Math.round(Number(j.chargesPaidAmount || 0));
+        const billAmt = round2(rawBillAmt);
+        const paid = round2(Number(j.chargesPaidAmount || 0));
         const rawOs = Math.max(0, billAmt - paid);
-        const outstanding = rawOs < 1.00 ? 0 : Math.round(rawOs);
+        const outstanding = rawOs < 0.01 ? 0 : round2(rawOs);
         const billDt = j.receiveDate ? new Date(j.receiveDate).toISOString().split('T')[0] : '';
         const osDy = billDt
           ? Math.max(0, Math.floor((Date.now() - new Date(billDt).getTime()) / 86400000))
@@ -303,7 +300,7 @@ const CashBankBookModal = ({
           billType: 'JWC',
         };
       })
-      .filter((inv) => inv.osAmt >= 1.00);
+      .filter((inv) => inv.osAmt >= 0.01);
 
     return [...regularBills, ...jobBills];
   }, [header.partyId, voucherType, sales, purchases, jobWorkEntries]);
@@ -367,9 +364,9 @@ const CashBankBookModal = ({
       const recv = Number(selectedParty.outstandingReceivable || 0);
       const pay = Number(selectedParty.outstandingPayable || 0);
       const raw = voucherType === 'Receipt' ? (recv || billsOutstandingTotal) : (pay || billsOutstandingTotal);
-      return Math.round(raw);
+      return round2(raw);
     }
-    return Math.round(billsOutstandingTotal);
+    return round2(billsOutstandingTotal);
   }, [selectedParty, billsOutstandingTotal, voucherType]);
 
   const viewList = useMemo(() => {

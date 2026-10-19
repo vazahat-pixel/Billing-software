@@ -791,46 +791,58 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    };
 
    useEffect(() => {
-      if (showLotDropdown) {
-         setDropdownSelectIdx(0);
-         const timer = setTimeout(() => {
-            dropdownRef.current?.focus();
-         }, 40);
-         return () => clearTimeout(timer);
-      }
-   }, [showLotDropdown]);
+      if (!showLotDropdown) return undefined;
+      setDropdownSelectIdx(0);
+      const timer = setTimeout(() => {
+         dropdownRef.current?.focus();
+      }, 40);
+
+      const onLotDropdownKeyDown = (e) => {
+         if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            e.stopPropagation();
+            setDropdownSelectIdx((prev) => {
+               const nextIdx = Math.min(prev + 1, Math.max(0, associatedLots.length - 1));
+               document.getElementById(`lot-item-row-${nextIdx}`)?.scrollIntoView({ block: 'nearest' });
+               return nextIdx;
+            });
+         } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            e.stopPropagation();
+            setDropdownSelectIdx((prev) => {
+               const nextIdx = Math.max(prev - 1, 0);
+               document.getElementById(`lot-item-row-${nextIdx}`)?.scrollIntoView({ block: 'nearest' });
+               return nextIdx;
+            });
+         } else if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            const picked = associatedLots[dropdownSelectIdx];
+            if (picked && lookupTargetIdx != null) {
+               handleSelectLot(picked, lookupTargetIdx, { focusField: `grid-item-${lookupTargetIdx}` });
+               setShowLotDropdown(false);
+            }
+         } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            setShowLotDropdown(false);
+            setTimeout(() => {
+               document.getElementById(`grid-lot-${lookupTargetIdx}`)?.focus();
+            }, 50);
+         }
+      };
+
+      window.addEventListener('keydown', onLotDropdownKeyDown, true);
+      return () => {
+         clearTimeout(timer);
+         window.removeEventListener('keydown', onLotDropdownKeyDown, true);
+      };
+   }, [showLotDropdown, associatedLots, dropdownSelectIdx, lookupTargetIdx]);
 
    const handleDropdownKeyDown = (e) => {
-      if (e.key === 'ArrowDown') {
-         e.preventDefault();
-         e.stopPropagation();
-         setDropdownSelectIdx((prev) => {
-            const nextIdx = Math.min(prev + 1, Math.max(0, associatedLots.length - 1));
-            document.getElementById(`lot-item-row-${nextIdx}`)?.scrollIntoView({ block: 'nearest' });
-            return nextIdx;
-         });
-      } else if (e.key === 'ArrowUp') {
-         e.preventDefault();
-         e.stopPropagation();
-         setDropdownSelectIdx((prev) => {
-            const nextIdx = Math.max(prev - 1, 0);
-            document.getElementById(`lot-item-row-${nextIdx}`)?.scrollIntoView({ block: 'nearest' });
-            return nextIdx;
-         });
-      } else if (e.key === 'Enter') {
-         e.preventDefault();
-         e.stopPropagation();
-         if (associatedLots[dropdownSelectIdx] && lookupTargetIdx != null) {
-            handleSelectLot(associatedLots[dropdownSelectIdx], lookupTargetIdx, { focusField: `grid-item-${lookupTargetIdx}` });
-            setShowLotDropdown(false);
-         }
-      } else if (e.key === 'Escape') {
-         e.preventDefault();
-         e.stopPropagation();
-         setShowLotDropdown(false);
-         setTimeout(() => {
-            document.getElementById(`grid-lot-${lookupTargetIdx}`)?.focus();
-         }, 50);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+         // Handled cleanly by capture-phase window listener above
+         return;
       }
    };
 
