@@ -110,7 +110,11 @@ const LoginPage = () => {
             await setAuth({ token, user });
             navigate('/');
         } catch (err) {
-            setError(err.message || 'Login failed. Please check your credentials.');
+            let msg = err.message || 'Login failed. Please check your credentials.';
+            if (msg.includes('Internal error opening backing store') || msg.includes('backing store') || msg.includes('indexedDB')) {
+                msg = 'Device storage was temporarily locked by another running instance. Please restart Textile ERP and try again.';
+            }
+            setError(msg);
         } finally {
             setLoading(false);
         }

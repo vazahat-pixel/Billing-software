@@ -67,7 +67,12 @@ export const updateOfflineSession = async (email, { token, user }) => {
 
 export const tryOfflineLogin = async (email, password, { adminOnly = false } = {}) => {
   const emailNorm = email.trim().toLowerCase();
-  const record = await getOfflineAuth(emailNorm);
+  let record = null;
+  try {
+    record = await getOfflineAuth(emailNorm);
+  } catch (err) {
+    console.warn('[offlineAuth] getOfflineAuth error:', err?.message || err);
+  }
 
   if (!record) {
     throw new Error(

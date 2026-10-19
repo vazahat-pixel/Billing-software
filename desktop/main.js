@@ -6,10 +6,27 @@ const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, Notificatio
 const path = require('path');
 const fs = require('fs');
 
+// Ensure only a single instance of Textile ERP runs at any time.
+// Prevents duplicate processes from locking or corrupting the IndexedDB backing store (%APPDATA%/Textile ERP/IndexedDB).
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  console.log('[desktop] Another instance of Textile ERP is already running. Quitting duplicate instance.');
+  app.quit();
+  process.exit(0);
+}
+
 let mainWindow = null;
 let tray = null;
 let localStack = null;
 const isDev = !app.isPackaged;
+
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isVisible()) mainWindow.show();
+    mainWindow.focus();
+  }
+});
 
 function readJsonSafe(file) {
   try {
