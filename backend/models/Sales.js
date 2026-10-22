@@ -67,6 +67,7 @@ const SalesSchema = new mongoose.Schema({
       ref: 'InventoryLot',
       default: null
     },
+    lotNo: { type: String, trim: true, default: '' },
     pcs: { type: Number, default: 0 },
     mts: { type: Number, default: 0 },
     rate: { type: Number, default: 0 },
@@ -79,6 +80,10 @@ const SalesSchema = new mongoose.Schema({
     dis1Amt: { type: Number, default: 0 },
     dis2Per: { type: Number, default: 0 },
     dis2Amt: { type: Number, default: 0 },
+    grossKgs: { type: Number, default: 0 },
+    tareKgs: { type: Number, default: 0 },
+    netKgs: { type: Number, default: 0 },
+    baleNo: { type: String, trim: true, default: '' },
     mrp: { type: Number, default: 0 },
     rdPer: { type: Number, default: 0 },
     addAmt: { type: Number, default: 0 },

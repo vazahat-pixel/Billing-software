@@ -60,9 +60,15 @@ export function buildPuBillRows({ inventoryLots = [], purchases = [], items = []
           (lotCode ? lotMap.get(lotCode) : null) ||
           (itemId ? lotMap.get(itemId) : null);
 
+        const origPcs = Number(li.pcs ?? (lot ? (lot.totalPcs || lot.pcs || 0) : 0));
+        const origMts = Number(li.mts ?? (lot ? (lot.totalMtrs || lot.mts || 0) : 0));
+
         const balPcs = lot ? Number(lot.remainingPcs ?? 0) : Number(li.pcs ?? 0);
         const balMts = lot ? Number(lot.remainingMtrs ?? 0) : Number(li.mts ?? 0);
         const balKgs = lot ? Number(lot.remainingKgs ?? lot.totalKgs ?? 0) : Number(li.kgs ?? 0);
+
+        const issuedPcs = Math.max(0, origPcs - balPcs);
+        const issuedMts = Math.max(0, Number((origMts - balMts).toFixed(3)));
 
         const puRate = Number(lot?.rate ?? li.rate ?? li.purchaseRate ?? p.rate ?? 0);
         const resolvedItemId = itemId || lot?.itemId?._id || lot?.itemId || '';
@@ -78,12 +84,18 @@ export function buildPuBillRows({ inventoryLots = [], purchases = [], items = []
           srNo: idx + 1,
           itemId: resolvedItemId,
           itemName: resolvedItemName,
+          origPcs,
+          issuedPcs,
+          availPcs: balPcs,
+          origMts,
+          issuedMts,
+          availMts: balMts,
           balPcs,
           balMts,
           balKgs,
           puRate,
-          pcs: Number(li.pcs || 0),
-          mts: Number(li.mts || 0),
+          pcs: origPcs,
+          mts: origMts,
           lrNo: p.lrNo || '',
           transport: p.transport || '',
           lotId: lot?._id || lot?.id || '',
@@ -135,9 +147,15 @@ export function buildPuBillRows({ inventoryLots = [], purchases = [], items = []
 
     const billNo = lot.invoiceNo || lot.purchaseInvoiceNo || lot.supplierInvoiceNo || lot.lotId || '';
 
+    const origPcs = Number(lot.totalPcs || lot.pcs || 0);
+    const origMts = Number(lot.totalMtrs || lot.mts || 0);
+
     const balPcs = Number(lot.remainingPcs ?? 0);
     const balMts = Number(lot.remainingMtrs ?? 0);
     const balKgs = Number(lot.remainingKgs ?? lot.totalKgs ?? 0);
+
+    const issuedPcs = Math.max(0, origPcs - balPcs);
+    const issuedMts = Math.max(0, Number((origMts - balMts).toFixed(3)));
 
     const puRate = Number(lot.rate || lot.purchaseRate || lot.avgRate || 0);
     const resolvedItemId = String(lot.itemId?._id || lot.itemId || '');
@@ -151,12 +169,18 @@ export function buildPuBillRows({ inventoryLots = [], purchases = [], items = []
       srNo: 1,
       itemId: resolvedItemId,
       itemName: resolvedItemName,
+      origPcs,
+      issuedPcs,
+      availPcs: balPcs,
+      origMts,
+      issuedMts,
+      availMts: balMts,
       balPcs,
       balMts,
       balKgs,
       puRate,
-      pcs: Number(lot.totalPcs || lot.pcs || 0),
-      mts: Number(lot.totalMtrs || lot.mts || 0),
+      pcs: origPcs,
+      mts: origMts,
       lrNo: lot.lrNo || '',
       transport: lot.transport || '',
       lotId: lotIdStr,

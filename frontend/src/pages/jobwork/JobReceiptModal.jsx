@@ -57,6 +57,8 @@ const emptyFooter = () => ({
   otherLess2Label: '',
   tdsOnAmount: '',
   tdsPercent: '',
+  dueDays: '',
+  dueDate: '',
   remark: '',
   taxRate: '5',
   roundOff: '',
@@ -319,6 +321,11 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     () => (parties || []).find((p) => String(p._id || p.id) === String(header.partyId)),
     [parties, header.partyId]
   );
+
+  const partyBal = useMemo(() => {
+    if (!selectedPartyObj) return null;
+    return Number(selectedPartyObj.closingBalance ?? selectedPartyObj.balance ?? 0);
+  }, [selectedPartyObj]);
 
   const pendingJobs = useMemo(
     () => (jobWorkEntries || []).filter((j) => {
@@ -685,16 +692,18 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
 
   const gridCols = [
     { key: 'chlnNo', label: 'ChInNo', w: 'w-[9%]', lookup: true },
-    { key: 'itemName', label: 'ItemName', w: 'w-[21%]', readOnly: true },
-    { key: 'finishItem', label: 'FinishItem', w: 'w-[11%]' },
-    { key: 'cut', label: 'Cut', w: 'w-[6%]', align: 'right' },
-    { key: 'recPcs', label: 'RecPcs', w: 'w-[6%]', align: 'right' },
-    { key: 'recMts', label: 'RecMts', w: 'w-[8%]', align: 'right' },
-    { key: 'jRate', label: 'J.Rate', w: 'w-[7%]', align: 'right' },
-    { key: 'pqk', label: 'PQK', w: 'w-[6%]' },
-    { key: 'jobAmt', label: 'JobAmt', w: 'w-[11%]', align: 'right', readOnly: true },
-    { key: 'cp', label: 'CP', w: 'w-[5%]' },
-    { key: 'jobcardNo', label: 'JobcardNo', w: 'w-[10%]' },
+    { key: 'itemName', label: 'ItemName', w: 'w-[18%]', readOnly: true },
+    { key: 'finishItem', label: 'FinishItem', w: 'w-[10%]' },
+    { key: 'cut', label: 'Cut', w: 'w-[5%]', align: 'right' },
+    { key: 'recPcs', label: 'RecPcs', w: 'w-[5%]', align: 'right' },
+    { key: 'recMts', label: 'RecMts', w: 'w-[7%]', align: 'right' },
+    { key: 'chadti', label: 'Chadti', w: 'w-[6%]', align: 'right', computed: true },
+    { key: 'dmgPcs', label: 'DmgPcs', w: 'w-[5%]', align: 'right' },
+    { key: 'jRate', label: 'J.Rate', w: 'w-[6%]', align: 'right' },
+    { key: 'pqk', label: 'PQK', w: 'w-[5%]' },
+    { key: 'jobAmt', label: 'JobAmt', w: 'w-[10%]', align: 'right', readOnly: true },
+    { key: 'cp', label: 'CP', w: 'w-[4%]' },
+    { key: 'jobcardNo', label: 'JobcardNo', w: 'w-[8%]' },
   ];
 
   return (
@@ -776,8 +785,16 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                       </div>
                       <span className="erp-job-receipt-gstin-badge">GSTIN:-{header.gstin || '24AAAGM0289C1ZP'}</span>
                     </div>
-                    <div className="erp-job-receipt-address-box">
-                      {selectedPartyObj?.address || selectedPartyObj?.city ? `${selectedPartyObj.address || ''}${selectedPartyObj.city ? ', ' + selectedPartyObj.city : ''}` : ','}
+                    <div className="erp-job-receipt-address-box flex justify-between items-center">
+                      <span className="truncate">{selectedPartyObj?.address || selectedPartyObj?.city ? `${selectedPartyObj.address || ''}${selectedPartyObj.city ? ', ' + selectedPartyObj.city : ''}` : ','}</span>
+                      {partyBal !== null && !isNaN(partyBal) && (
+                        <span
+                          className="font-mono text-emerald-800 font-bold text-[11px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0 ml-2"
+                          title="Job Worker Closing Balance (_lbl_balance)"
+                        >
+                          Bal: ₹{partyBal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1001,6 +1018,16 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                                 </td>
                               );
                             }
+                            if (c.computed && c.key === 'chadti') {
+                              const recM = Number(line.recMts) || 0;
+                              const issM = Number(line.issueMtsRef) || 0;
+                              const chadtiVal = recM > issM && issM > 0 ? (recM - issM).toFixed(2) : '0.00';
+                              return (
+                                <td key={c.key} className="text-right font-mono text-emerald-800 font-bold px-1" title="Process Gain / Chadti Mts (_col_chadti)">
+                                  {chadtiVal}
+                                </td>
+                              );
+                            }
                             if (c.key === 'jobAmt') {
                               return (
                                 <td key={c.key} className="p-0">
@@ -1177,15 +1204,47 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
                     </div>
                   </div>
 
-                  <div className="classic-erp-field">
-                    <span className="classic-erp-label">Remark</span>
-                    <input
-                      type="text"
-                      className="classic-erp-input"
-                      value={footer.remark}
-                      onChange={(e) => setFooter({ ...footer, remark: e.target.value })}
-                      disabled={locked}
-                    />
+                  <div className="flex items-center gap-3">
+                    <div className="classic-erp-field flex-1">
+                      <span className="classic-erp-label">Remark</span>
+                      <input
+                        type="text"
+                        className="classic-erp-input"
+                        value={footer.remark}
+                        onChange={(e) => setFooter({ ...footer, remark: e.target.value })}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field" title="Credit / Due Days (_txt_ddays)">
+                      <span className="classic-erp-label text-xs">Due Days</span>
+                      <input
+                        type="number"
+                        className="classic-erp-input w-16 text-center font-bold"
+                        value={footer.dueDays || ''}
+                        onChange={(e) => {
+                          const days = parseInt(e.target.value, 10);
+                          let dDate = '';
+                          if (!isNaN(days) && days > 0) {
+                            const dt = new Date(header.date || new Date());
+                            dt.setDate(dt.getDate() + days);
+                            dDate = dt.toISOString().split('T')[0];
+                          }
+                          setFooter({ ...footer, dueDays: e.target.value, dueDate: dDate });
+                        }}
+                        placeholder="0"
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field" title="Payment Due Date (_txt_ddate)">
+                      <span className="classic-erp-label text-xs">Due Date</span>
+                      <input
+                        type="date"
+                        className="classic-erp-input w-28 text-center text-xs"
+                        value={footer.dueDate || ''}
+                        onChange={(e) => setFooter({ ...footer, dueDate: e.target.value })}
+                        disabled={locked}
+                      />
+                    </div>
                   </div>
 
                   <div className="erp-job-receipt-tax-panel">

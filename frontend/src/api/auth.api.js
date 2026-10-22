@@ -14,6 +14,8 @@ export const authApi = {
     return unwrap(post('/auth/login', { ...payload, ...identity }));
   },
   register: (payload) => unwrap(post('/auth/register', payload)),
+  sendRegistrationOtp: (payload) => unwrap(post('/auth/send-registration-otp', payload)),
+  verifyRegistrationOtp: (payload) => unwrap(post('/auth/verify-registration-otp', payload)),
   // /auth/me returns { user }, not the usual { data } envelope. unwrap()
   // therefore hands back the wrapper; callers need the inner profile.
   me: async () => {

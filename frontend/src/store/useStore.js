@@ -162,12 +162,30 @@ const useStore = create((set, get) => ({
     try {
       useConfigStore.getState().hydrateFromAuth(user, plan);
     } catch { /* config store optional during early boot */ }
+    const prevCompanyId = get().user?.companyId;
+    const isCompanySwitch = prevCompanyId && user.companyId && String(prevCompanyId) !== String(user.companyId);
+
     set({ 
       token: data.token, 
       user: { ...user, role: platformRole }, 
       role: platformRole, 
       plan,
-      sessionReady: true
+      sessionReady: true,
+      ...(isCompanySwitch ? {
+        sales: [],
+        purchases: [],
+        parties: [],
+        items: [],
+        inventoryLots: [],
+        books: [],
+        orders: [],
+        jobs: [],
+        returns: [],
+        notes: [],
+        visits: [],
+        vouchers: [],
+        ledgers: [],
+      } : {})
     });
     queueMicrotask(() => {
       if (isOffline()) {

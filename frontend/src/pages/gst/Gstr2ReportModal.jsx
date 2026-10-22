@@ -76,6 +76,8 @@ export default function Gstr2ReportModal({ isOpen, onClose }) {
       { key: 'date', label: 'Invoice Date', render: (r) => dt(r.date) },
       { key: 'partyName', label: 'Supplier Name' },
       { key: 'gstin', label: 'Supplier GSTIN' },
+      { key: 'pos', label: 'Place of Supply', render: (r) => r.pos || r.state || '—' },
+      { key: 'itcEligibility', label: 'ITC Eligibility', render: (r) => r.itcEligibility || 'Inputs' },
       { key: 'taxable', label: 'Taxable Amount' },
       { key: 'cgst', label: 'CGST' },
       { key: 'sgst', label: 'SGST' },
@@ -96,6 +98,7 @@ export default function Gstr2ReportModal({ isOpen, onClose }) {
         { key: 'date', label: 'Date', render: (r) => dt(r.date) },
         { key: 'partyName', label: 'Supplier' },
         { key: 'gstin', label: 'GSTIN' },
+        { key: 'itcEligibility', label: 'ITC', render: (r) => r.itcEligibility || 'Inputs' },
         { key: 'taxable', label: 'Taxable (₹)', align: 'right', render: (r) => money(r.taxable) },
         { key: 'cgst', label: 'CGST (₹)', align: 'right', render: (r) => money(r.cgst) },
         { key: 'sgst', label: 'SGST (₹)', align: 'right', render: (r) => money(r.sgst) },
@@ -180,6 +183,7 @@ export default function Gstr2ReportModal({ isOpen, onClose }) {
                     <th className="px-3 py-2">Date</th>
                     <th className="px-3 py-2">Supplier</th>
                     <th className="px-3 py-2">GSTIN</th>
+                    <th className="px-3 py-2">ITC</th>
                     <th className="px-3 py-2 text-right">Taxable</th>
                     <th className="px-3 py-2 text-right">CGST</th>
                     <th className="px-3 py-2 text-right">SGST</th>
@@ -190,9 +194,9 @@ export default function Gstr2ReportModal({ isOpen, onClose }) {
                 </thead>
                 <tbody className="divide-y divide-[var(--border-subtle)]">
                   {loading ? (
-                    <tr><td colSpan={11} className="py-12 text-center text-[var(--text-muted)]">Loading…</td></tr>
+                    <tr><td colSpan={12} className="py-12 text-center text-[var(--text-muted)]">Loading…</td></tr>
                   ) : !filteredRows.length ? (
-                    <tr><td colSpan={11} className="py-12 text-center text-[var(--text-muted)]">No purchases for this period.</td></tr>
+                    <tr><td colSpan={12} className="py-12 text-center text-[var(--text-muted)]">No purchases for this period.</td></tr>
                   ) : filteredRows.map((r, i) => (
                     <tr key={i} className="hover:bg-[var(--bg-base)]">
                       <td className="px-3 py-2 text-[var(--text-muted)]">{i + 1}</td>
@@ -200,6 +204,7 @@ export default function Gstr2ReportModal({ isOpen, onClose }) {
                       <td className="px-3 py-2">{dt(r.date)}</td>
                       <td className="px-3 py-2">{r.partyName || '—'}</td>
                       <td className="px-3 py-2 font-mono text-[10px]">{r.gstin || 'Unregistered'}</td>
+                      <td className="px-3 py-2 text-[10px] font-medium text-[var(--text-muted)]">{r.itcEligibility || 'Inputs'}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{money(r.taxable)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{money(r.cgst)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{money(r.sgst)}</td>

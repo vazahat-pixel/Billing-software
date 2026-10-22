@@ -406,14 +406,52 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     addAmt: 0,
     gstPer: 0,
     gstAmt: 0,
+    lotId: null,
+    lotNo: '',
     pcsDetails: [],
   });
 
   const [gridItems, setGridItems] = useState([
-    { id: 1, itemId: '', itemName: '', desc: '', fold: 0, cut: 0, pcs: 0, mts: 0, saleRate: 0, unit: 'MTRS', mrp: 0, rdPer: 0, amount: 0, foldDeductionAmt: 0, foldLessAmt: 0, foldAddAmt: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0, addAmt: 0, gstPer: 0, gstAmt: 0, pcsDetails: [] }
+    { id: 1, itemId: '', itemName: '', desc: '', fold: 0, cut: 0, pcs: 0, mts: 0, saleRate: 0, unit: 'MTRS', mrp: 0, rdPer: 0, amount: 0, foldDeductionAmt: 0, foldLessAmt: 0, foldAddAmt: 0, dis1Per: 0, dis1Amt: 0, dis2Per: 0, dis2Amt: 0, addAmt: 0, gstPer: 0, gstAmt: 0, lotId: null, lotNo: '', grossKgs: 0, tareKgs: 0, netKgs: 0, baleNo: '', pcsDetails: [] }
   ]);
   const [extraUnits, setExtraUnits] = useState([]);
   const [pcsBreakdown, setPcsBreakdown] = useState({ open: false, lineIdx: -1, calcType: 'Mts' });
+
+  // Configurable Grid Columns (Session & LocalStorage persisted)
+  const DEFAULT_SALES_COLS = {
+    desc: true,
+    fold: true,
+    cut: true,
+    weight: false,
+    bale: false,
+    dis1: true,
+    dis2: true,
+    addAmt: true,
+  };
+  const [salesCols, setSalesCols] = useState(() => {
+    try {
+      const saved = localStorage.getItem('erp_sales_grid_cols');
+      return saved ? { ...DEFAULT_SALES_COLS, ...JSON.parse(saved) } : DEFAULT_SALES_COLS;
+    } catch {
+      return DEFAULT_SALES_COLS;
+    }
+  });
+  const [showColMenu, setShowColMenu] = useState(false);
+  const toggleSalesCol = (key) => {
+    setSalesCols((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem('erp_sales_grid_cols', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+  const resetSalesCols = () => {
+    setSalesCols(DEFAULT_SALES_COLS);
+    try {
+      localStorage.removeItem('erp_sales_grid_cols');
+    } catch {}
+  };
 
   const [footer, setFooter] = useState({
     transport: '',
@@ -597,6 +635,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         id: idx + 1,
         srNo: idx + 1,
         itemId: item.itemId?._id || item.itemId || '',
+        lotId: item.lotId?._id || item.lotId || null,
+        lotNo: item.lotNo || '',
         itemName: item.itemName || item.itemId?.itemName || item.itemId?.name || masterItem?.name || '',
         desc: item.desc || '',
         fold: Number(item.fold || 0),
@@ -618,6 +658,10 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         addAmt: Number(item.addAmt || 0),
         gstPer: Number(item.gstPer ?? item.itemId?.gstRate ?? masterItem?.gstRate ?? 0),
         gstAmt: Number(item.gstAmt || 0),
+        grossKgs: Number(item.grossKgs || 0),
+        tareKgs: Number(item.tareKgs || 0),
+        netKgs: Number(item.netKgs || 0),
+        baleNo: item.baleNo || '',
         pcsDetails: Array.isArray(item.pcsDetails) ? item.pcsDetails : [],
       });
     }));
@@ -1046,6 +1090,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         totalLess: calculations.totalLess,
         items: validLines.map(i => ({
           itemId: i.itemId,
+          lotId: i.lotId || null,
+          lotNo: i.lotNo || '',
           desc: i.desc,
           fold: Number(i.fold || 0),
           cut: Number(i.cut || 0),
@@ -1066,6 +1112,10 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           addAmt: Number(i.addAmt || 0),
           gstPer: Number(i.gstPer || 0),
           gstAmt: Number(i.gstAmt || 0),
+          grossKgs: Number(i.grossKgs || 0),
+          tareKgs: Number(i.tareKgs || 0),
+          netKgs: Number(i.netKgs || 0),
+          baleNo: i.baleNo || '',
           pcsDetails: Array.isArray(i.pcsDetails) ? i.pcsDetails : [],
         })),
         taxableAmount: calculations.taxable,
@@ -1214,17 +1264,44 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     setMode('View');
   };
 
+  const itemStockMap = useMemo(() => {
+    const map = {};
+    (inventoryLots || []).forEach((lot) => {
+      const lotItemId = String(lot.itemId?._id || lot.itemId || lot.item_id || '');
+      if (!lotItemId) return;
+      const status = String(lot.status || 'Available').toLowerCase();
+      if (status === 'closed' || status === 'exhausted' || status === 'reserved') return;
+      const mts = Number(lot.remainingMtrs ?? lot.mts ?? lot.qty ?? 0);
+      const pcs = Number(lot.remainingPcs ?? lot.pcs ?? 0);
+      if (!map[lotItemId]) map[lotItemId] = { mts: 0, pcs: 0, lots: 0 };
+      map[lotItemId].mts += mts;
+      map[lotItemId].pcs += pcs;
+      map[lotItemId].lots += 1;
+    });
+    return map;
+  }, [inventoryLots]);
+
   // Sales is billed to Customers only — Suppliers/Job Workers/Employees etc. showing up
   // here was the exact confusion this list is meant to prevent.
   const partyOptions = useMemo(
     () =>
       parties
         .filter((p) => ['Customer', 'Both'].includes(p.type) || !p.type)
-        .map((p) => ({
-          value: p._id || p.id,
-          label: p.name,
-          meta: [p.gstin, p.station || p.city].filter(Boolean).join(' · '),
-        })),
+        .map((p) => {
+          let badge = null;
+          const bal = Number(p.outstandingReceivable || 0);
+          if (bal > 0) {
+            badge = { text: `₹${bal.toFixed(0)} Dr`, tone: 'warn' };
+          } else if (Number(p.openingBalance || 0) > 0) {
+            badge = { text: `₹${Number(p.openingBalance).toFixed(0)} ${p.openingBalanceType || 'Dr'}`, tone: 'default' };
+          }
+          return {
+            value: p._id || p.id,
+            label: p.name,
+            meta: [p.gstin, p.station || p.city].filter(Boolean).join(' · '),
+            badge,
+          };
+        }),
     [parties]
   );
 
@@ -1247,12 +1324,26 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
   const itemOptions = useMemo(
     () =>
-      items.map((i) => ({
-        value: i._id || i.id,
-        label: i.itemName || i.name,
-        meta: i.hsnCode ? `HSN ${i.hsnCode}` : '',
-      })),
-    [items]
+      items.map((i) => {
+        const iId = String(i._id || i.id);
+        const live = itemStockMap[iId];
+        let badge = null;
+        if (live && (live.mts > 0 || live.pcs > 0)) {
+          const qtyText = live.mts > 0 ? `${Number(live.mts.toFixed(1))} ${i.unit || 'MTR'}` : `${live.pcs} PCS`;
+          badge = { text: `${qtyText} (${live.lots} lot${live.lots > 1 ? 's' : ''})`, tone: 'ok' };
+        } else if (Number(i.openingStock || i.openingQty || 0) > 0) {
+          badge = { text: `${Number(i.openingStock || i.openingQty)} ${i.unit || 'MTR'}`, tone: 'default' };
+        } else {
+          badge = { text: `0 ${i.unit || 'MTR'}`, tone: 'warn' };
+        }
+        return {
+          value: iId,
+          label: i.itemName || i.name,
+          meta: i.hsnCode ? `HSN ${i.hsnCode}` : '',
+          badge,
+        };
+      }),
+    [items, itemStockMap]
   );
 
   const unitOptions = useMemo(() => {
@@ -1292,6 +1383,23 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       city: p?.station || p?.city || '',
       ...(autoType ? { type: autoType } : {}),
     });
+
+    const partyDueDays = Number(p?.dueDays || 0);
+    const partyTransport = p?.transport || '';
+    const partyStation = p?.station || p?.city || '';
+    if (partyDueDays > 0 || partyTransport || partyStation) {
+      setFooter((prev) => {
+        const dDate = new Date(header.billDate || Date.now());
+        if (partyDueDays > 0) dDate.setDate(dDate.getDate() + partyDueDays);
+        return {
+          ...prev,
+          dueDays: partyDueDays || prev.dueDays,
+          dueDate: partyDueDays > 0 ? dDate.toISOString().split('T')[0] : prev.dueDate,
+          transport: partyTransport || prev.transport,
+          station: partyStation || prev.station,
+        };
+      });
+    }
   };
 
   // When party + company states are known, IN/OUT is GSTIN-derived (matches backend).
@@ -1413,6 +1521,12 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     const gstPer = Number(item?.gstRate ?? gridItems[idx].gstPer ?? 0);
     const unit = String(item?.unit || gridItems[idx].unit || 'MTRS').toUpperCase();
     const cut = Number(item?.cut ?? gridItems[idx].cut ?? 0);
+    const matchedLot = (inventoryLots || []).find((lot) => {
+      const lotItemId = lot.itemId?._id || lot.itemId || lot.item_id || '';
+      if (String(lotItemId) !== String(val)) return false;
+      const status = String(lot.status || 'Available').toLowerCase();
+      return status !== 'closed' && status !== 'exhausted' && (Number(lot.remainingMtrs ?? lot.mts ?? lot.qty ?? 0) > 0 || Number(lot.remainingPcs ?? lot.pcs ?? 0) > 0);
+    });
     patchLine(idx, {
       itemId: val,
       itemName: item?.itemName || item?.name || '',
@@ -1420,6 +1534,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       gstPer,
       unit,
       cut,
+      lotId: matchedLot?._id || gridItems[idx].lotId || null,
+      lotNo: matchedLot?.lotNo || gridItems[idx].lotNo || '',
     }, 'itemId');
     setActiveItemId(val);
   };
@@ -1522,34 +1638,44 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 </div>
               </div>
 
-              {(showChallan || billFields.header('orderNo') || billFields.header('orderDate')) ? (
-                <div className="classic-erp-meta-grid erp-sales-ref-meta">
-                  {showChallan ? (
-                    <>
-                      <div className="classic-erp-field">
-                        <span className="classic-erp-label">Challan:</span>
-                        <input type="text" className="classic-erp-input" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
-                      </div>
-                      <div className="classic-erp-field">
-                        <span className="classic-erp-label">Ch Date:</span>
-                        <input type="date" className="classic-erp-input" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
-                      </div>
-                    </>
-                  ) : null}
-                  {billFields.header('orderNo') ? (
+              <div className="classic-erp-meta-grid erp-sales-ref-meta">
+                {showChallan ? (
+                  <>
                     <div className="classic-erp-field">
-                      <span className="classic-erp-label">Order No:</span>
-                      <input type="text" className="classic-erp-input" value={header.orderNo} onChange={e => setHeader({ ...header, orderNo: e.target.value })} disabled={locked} />
+                      <span className="classic-erp-label">Challan:</span>
+                      <input type="text" className="classic-erp-input" value={header.challanNo} onChange={e => setHeader({ ...header, challanNo: e.target.value })} disabled={locked} />
                     </div>
-                  ) : null}
-                  {billFields.header('orderDate') ? (
                     <div className="classic-erp-field">
-                      <span className="classic-erp-label">Ord Date:</span>
-                      <input type="date" className="classic-erp-input" value={header.orderDate} onChange={e => setHeader({ ...header, orderDate: e.target.value })} disabled={locked} />
+                      <span className="classic-erp-label">Ch Date:</span>
+                      <input type="date" className="classic-erp-input" value={header.chDate} onChange={e => setHeader({ ...header, chDate: e.target.value })} disabled={locked} />
                     </div>
-                  ) : null}
+                  </>
+                ) : null}
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Order No:</span>
+                  <input type="text" className="classic-erp-input" value={header.orderNo} onChange={e => setHeader({ ...header, orderNo: e.target.value })} disabled={locked} placeholder="Order Ref" />
                 </div>
-              ) : null}
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Ord Date:</span>
+                  <input type="date" className="classic-erp-input" value={header.orderDate} onChange={e => setHeader({ ...header, orderDate: e.target.value })} disabled={locked} />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Due Days:</span>
+                  <input
+                    type="number"
+                    className="classic-erp-input text-right font-bold"
+                    value={footer.dueDays || 0}
+                    onChange={e => {
+                      const days = Math.max(0, parseInt(e.target.value, 10) || 0);
+                      const d = new Date(header.billDate || Date.now());
+                      d.setDate(d.getDate() + days);
+                      setFooter(f => ({ ...f, dueDays: days, dueDate: d.toISOString().split('T')[0] }));
+                    }}
+                    disabled={locked}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="classic-erp-stack classic-erp-header-party">
@@ -1583,6 +1709,40 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 <div className="classic-erp-field">
                   <span className="classic-erp-label red-label">City *:</span>
                   <input type="text" className="classic-erp-input" value={header.city} onChange={e => setHeader({ ...header, city: e.target.value })} disabled={locked} />
+                </div>
+              </div>
+              <div className="classic-erp-meta-grid--3 erp-sales-party-meta" style={{ marginTop: 2 }}>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">Transport:</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input"
+                    value={footer.transport || ''}
+                    onChange={e => setFooter(prev => ({ ...prev, transport: e.target.value }))}
+                    disabled={locked}
+                    placeholder="Transport name"
+                  />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">LR No:</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input"
+                    value={footer.lrNo || ''}
+                    onChange={e => setFooter(prev => ({ ...prev, lrNo: e.target.value }))}
+                    disabled={locked}
+                    placeholder="LR No"
+                  />
+                </div>
+                <div className="classic-erp-field">
+                  <span className="classic-erp-label">LR Date:</span>
+                  <input
+                    type="date"
+                    className="classic-erp-input"
+                    value={footer.lrDate || ''}
+                    onChange={e => setFooter(prev => ({ ...prev, lrDate: e.target.value }))}
+                    disabled={locked}
+                  />
                 </div>
               </div>
               <div className="classic-erp-meta-grid--3 erp-sales-broker-row">
@@ -1638,25 +1798,104 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           </div>
 
           {/* Item Grid Table */}
+          <div className="flex items-center justify-between px-2 py-1 bg-slate-100 dark:bg-slate-800 border-x border-t border-slate-300 text-xs shrink-0">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">Line Items Grid</span>
+            <div className="relative">
+              <button
+                type="button"
+                className="px-2 py-0.5 text-[10px] font-bold bg-white dark:bg-slate-700 hover:bg-slate-50 border border-slate-300 rounded shadow-xs flex items-center gap-1 cursor-pointer"
+                onClick={() => setShowColMenu((v) => !v)}
+                title="Configure visible columns"
+              >
+                <span>⚙ Columns</span>
+                <span className="text-[9px]">▾</span>
+              </button>
+              {showColMenu && (
+                <div
+                  className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded shadow-lg p-2 z-50 text-[11px]"
+                  onMouseLeave={() => setShowColMenu(false)}
+                >
+                  <div className="font-bold text-slate-700 dark:text-slate-200 border-b border-slate-200 dark:border-slate-700 pb-1 mb-1.5 flex justify-between items-center">
+                    <span>Column Visibility</span>
+                    <button
+                      type="button"
+                      onClick={resetSalesCols}
+                      className="text-[9px] text-blue-600 hover:underline cursor-pointer"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                  <label className="flex items-center gap-1.5 py-0.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 px-1 rounded">
+                    <input type="checkbox" checked={salesCols.desc} onChange={() => toggleSalesCol('desc')} />
+                    <span>Description (Desc)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 py-0.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 px-1 rounded">
+                    <input type="checkbox" checked={salesCols.fold} onChange={() => toggleSalesCol('fold')} />
+                    <span>Fold Less/Add</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 py-0.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 px-1 rounded">
+                    <input type="checkbox" checked={salesCols.cut} onChange={() => toggleSalesCol('cut')} />
+                    <span>Cut</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 py-0.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 px-1 rounded">
+                    <input type="checkbox" checked={salesCols.dis1} onChange={() => toggleSalesCol('dis1')} />
+                    <span>Discount 1 (%, Amt)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 py-0.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 px-1 rounded">
+                    <input type="checkbox" checked={salesCols.dis2} onChange={() => toggleSalesCol('dis2')} />
+                    <span>Discount 2 (%, Amt)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 py-0.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 px-1 rounded">
+                    <input type="checkbox" checked={salesCols.addAmt} onChange={() => toggleSalesCol('addAmt')} />
+                    <span>Add Amount</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 py-0.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 px-1 rounded">
+                    <input type="checkbox" checked={salesCols.weight} onChange={() => toggleSalesCol('weight')} />
+                    <span>Weight (Gross / Tare / Net Kgs)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 py-0.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 px-1 rounded">
+                    <input type="checkbox" checked={salesCols.bale} onChange={() => toggleSalesCol('bale')} />
+                    <span>Bale No</span>
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
           <div className="classic-erp-table-container erp-grid-panel erp-sales-grid">
             <table className="classic-erp-table" data-line-grid>
               <thead>
                 <tr>
                   <th className="col-sr text-center font-bold">SrNo</th>
                   <th className="col-item">Item Name *</th>
-                  <th className="col-desc">Desc *</th>
-                  <th className="col-num text-center">Fold</th>
-                  <th className="col-num text-center">Cut</th>
+                  {salesCols.desc && <th className="col-desc">Desc *</th>}
+                  {salesCols.fold && <th className="col-num text-center">Fold</th>}
+                  {salesCols.cut && <th className="col-num text-center">Cut</th>}
+                  {salesCols.weight && (
+                    <>
+                      <th className="col-num text-center" title="Gross Weight (Kgs)">Gross</th>
+                      <th className="col-num text-center" title="Tare / Less Weight (Kgs)">Tare</th>
+                      <th className="col-num text-center font-bold" title="Net Weight (Kgs)">Net Kgs</th>
+                    </>
+                  )}
+                  {salesCols.bale && <th className="col-num text-center" title="Bale / Package No">Bale No</th>}
                   <th className="col-num text-center">Pcs *</th>
                   <th className="col-qty text-center" title="Meters (Auto = Cut × Pcs or manual entry)">Mts *</th>
                   <th className="col-qty text-right">Rate *</th>
                   <th className="col-unit text-center">Per/Unit</th>
                   <th className="col-amt text-right">Amount</th>
-                  <th className="col-pct text-center">DIS1%</th>
-                  <th className="col-amt text-right">DISAMT</th>
-                  <th className="col-pct text-center">DIS2%</th>
-                  <th className="col-amt text-right">DISAMT.</th>
-                  <th className="col-amt text-right">AddAmt</th>
+                  {salesCols.dis1 && (
+                    <>
+                      <th className="col-pct text-center">DIS1%</th>
+                      <th className="col-amt text-right">DISAMT</th>
+                    </>
+                  )}
+                  {salesCols.dis2 && (
+                    <>
+                      <th className="col-pct text-center">DIS2%</th>
+                      <th className="col-amt text-right">DISAMT.</th>
+                    </>
+                  )}
+                  {salesCols.addAmt && <th className="col-amt text-right">AddAmt</th>}
                   <th className="col-pct text-center">GST%</th>
                   <th className="col-amt text-right">GSTAmt</th>
                   <th className="col-del"></th>
@@ -1727,44 +1966,113 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                         )}
                       </div>
                     </td>
-                    <td className="col-desc">
-                      <input type="text" className="classic-erp-input w-full border-0" value={row.desc} onChange={e => {
-                        patchLine(idx, { desc: e.target.value });
-                      }} disabled={locked} />
-                    </td>
-                    <td className="col-num">
-                      <input type="number" className="classic-erp-input w-full text-center border-0" value={row.fold || ''} onChange={e => {
-                        patchLine(idx, { fold: Number(e.target.value) });
-                      }} disabled={locked} />
-                      {String(row.unit || '').toUpperCase() !== 'NETQTY' && (row.foldLessAmt || 0) > 0 && (
-                        <span
-                          className="block text-center font-mono leading-none"
-                          style={{ fontSize: 9, color: '#c2410c', paddingTop: 1 }}
-                          title={`Fold Less: ${(row.foldLessAmt || 0).toFixed(2)} deducted from Taxable`}
-                        >
-                          less {(row.foldLessAmt || 0).toFixed(2)}
-                        </span>
-                      )}
-                      {String(row.unit || '').toUpperCase() !== 'NETQTY' && (row.foldAddAmt || 0) > 0 && (
-                        <span
-                          className="block text-center font-mono leading-none"
-                          style={{ fontSize: 9, color: '#16a34a', paddingTop: 1 }}
-                          title={`Fold Add: ${(row.foldAddAmt || 0).toFixed(2)} added to Taxable`}
-                        >
-                          add {(row.foldAddAmt || 0).toFixed(2)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="col-num">
-                      <input
-                        type="number"
-                        className="classic-erp-input w-full text-center border-0"
-                        value={row.cut || ''}
-                        onChange={e => patchLine(idx, { cut: Number(e.target.value) || 0, _mtsManual: false }, 'cut')}
-                        disabled={locked}
-                        placeholder="0"
-                      />
-                    </td>
+                    {salesCols.desc && (
+                      <td className="col-desc">
+                        <input type="text" className="classic-erp-input w-full border-0" value={row.desc} onChange={e => {
+                          patchLine(idx, { desc: e.target.value });
+                        }} disabled={locked} />
+                      </td>
+                    )}
+                    {salesCols.fold && (
+                      <td className="col-num">
+                        <input type="number" className="classic-erp-input w-full text-center border-0" value={row.fold || ''} onChange={e => {
+                          patchLine(idx, { fold: Number(e.target.value) });
+                        }} disabled={locked} />
+                        {String(row.unit || '').toUpperCase() !== 'NETQTY' && (row.foldLessAmt || 0) > 0 && (
+                          <span
+                            className="block text-center font-mono leading-none"
+                            style={{ fontSize: 9, color: '#c2410c', paddingTop: 1 }}
+                            title={`Fold Less: ${(row.foldLessAmt || 0).toFixed(2)} deducted from Taxable`}
+                          >
+                            less {(row.foldLessAmt || 0).toFixed(2)}
+                          </span>
+                        )}
+                        {String(row.unit || '').toUpperCase() !== 'NETQTY' && (row.foldAddAmt || 0) > 0 && (
+                          <span
+                            className="block text-center font-mono leading-none"
+                            style={{ fontSize: 9, color: '#16a34a', paddingTop: 1 }}
+                            title={`Fold Add: ${(row.foldAddAmt || 0).toFixed(2)} added to Taxable`}
+                          >
+                            add {(row.foldAddAmt || 0).toFixed(2)}
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    {salesCols.cut && (
+                      <td className="col-num">
+                        <input
+                          type="number"
+                          className="classic-erp-input w-full text-center border-0"
+                          value={row.cut || ''}
+                          onChange={e => patchLine(idx, { cut: Number(e.target.value) || 0, _mtsManual: false }, 'cut')}
+                          disabled={locked}
+                          placeholder="0"
+                        />
+                      </td>
+                    )}
+                    {salesCols.weight && (
+                      <>
+                        <td className="col-num">
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="classic-erp-input w-full text-right border-0"
+                            value={row.grossKgs || ''}
+                            onChange={(e) => {
+                              const gross = parseFloat(e.target.value) || 0;
+                              const tare = parseFloat(row.tareKgs) || 0;
+                              const net = Math.max(0, Number((gross - tare).toFixed(3)));
+                              patchLine(idx, { grossKgs: gross, netKgs: net }, 'grossKgs');
+                            }}
+                            placeholder="0.00"
+                            title="Gross Weight in Kgs"
+                            disabled={locked}
+                          />
+                        </td>
+                        <td className="col-num">
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="classic-erp-input w-full text-right border-0"
+                            value={row.tareKgs || ''}
+                            onChange={(e) => {
+                              const tare = parseFloat(e.target.value) || 0;
+                              const gross = parseFloat(row.grossKgs) || 0;
+                              const net = Math.max(0, Number((gross - tare).toFixed(3)));
+                              patchLine(idx, { tareKgs: tare, netKgs: net }, 'tareKgs');
+                            }}
+                            placeholder="0.00"
+                            title="Tare / Less Weight in Kgs"
+                            disabled={locked}
+                          />
+                        </td>
+                        <td className="col-num">
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="classic-erp-input w-full text-right border-0 font-bold bg-slate-50"
+                            value={row.netKgs || ''}
+                            onChange={(e) => patchLine(idx, { netKgs: parseFloat(e.target.value) || 0 }, 'netKgs')}
+                            placeholder="0.00"
+                            title="Net Weight in Kgs (Gross - Tare)"
+                            disabled={locked}
+                          />
+                        </td>
+                      </>
+                    )}
+                    {salesCols.bale && (
+                      <td className="col-num">
+                        <input
+                          type="text"
+                          className="classic-erp-input w-full text-center border-0 font-mono"
+                          value={row.baleNo || ''}
+                          onChange={(e) => patchLine(idx, { baleNo: e.target.value }, 'baleNo')}
+                          placeholder="Bale#"
+                          title="Bale / Package Number"
+                          disabled={locked}
+                        />
+                      </td>
+                    )}
                     <td className="col-num">
                       <div className="flex items-center w-full relative">
                         <input
@@ -1853,21 +2161,31 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                         </span>
                       )}
                     </td>
-                    <td className="col-pct">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.dis1Per || ''} onChange={e => patchLine(idx, { dis1Per: Number(e.target.value) || 0, _dis1Manual: false })} disabled={locked} placeholder="%" />
-                    </td>
-                    <td className="col-amt">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis1Amt || ''} onChange={e => patchLine(idx, { dis1Amt: Number(e.target.value) || 0, _dis1Manual: true })} disabled={locked} />
-                    </td>
-                    <td className="col-pct">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.dis2Per || ''} onChange={e => patchLine(idx, { dis2Per: Number(e.target.value) || 0, _dis2Manual: false })} disabled={locked} placeholder="%" />
-                    </td>
-                    <td className="col-amt">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis2Amt || ''} onChange={e => patchLine(idx, { dis2Amt: Number(e.target.value) || 0, _dis2Manual: true })} disabled={locked} />
-                    </td>
-                    <td className="col-amt">
-                      <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0" value={row.addAmt || ''} onChange={e => patchLine(idx, { addAmt: Number(e.target.value) || 0 })} disabled={locked} />
-                    </td>
+                    {salesCols.dis1 && (
+                      <>
+                        <td className="col-pct">
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.dis1Per || ''} onChange={e => patchLine(idx, { dis1Per: Number(e.target.value) || 0, _dis1Manual: false })} disabled={locked} placeholder="%" />
+                        </td>
+                        <td className="col-amt">
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis1Amt || ''} onChange={e => patchLine(idx, { dis1Amt: Number(e.target.value) || 0, _dis1Manual: true })} disabled={locked} />
+                        </td>
+                      </>
+                    )}
+                    {salesCols.dis2 && (
+                      <>
+                        <td className="col-pct">
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.dis2Per || ''} onChange={e => patchLine(idx, { dis2Per: Number(e.target.value) || 0, _dis2Manual: false })} disabled={locked} placeholder="%" />
+                        </td>
+                        <td className="col-amt">
+                          <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0 font-mono text-red-700 font-bold" value={row.dis2Amt || ''} onChange={e => patchLine(idx, { dis2Amt: Number(e.target.value) || 0, _dis2Manual: true })} disabled={locked} />
+                        </td>
+                      </>
+                    )}
+                    {salesCols.addAmt && (
+                      <td className="col-amt">
+                        <input type="number" step="0.01" className="classic-erp-input w-full text-right border-0" value={row.addAmt || ''} onChange={e => patchLine(idx, { addAmt: Number(e.target.value) || 0 })} disabled={locked} />
+                      </td>
+                    )}
                     <td className="col-pct">
                       <input type="number" step="0.01" className="classic-erp-input w-full text-center border-0" value={row.gstPer || ''} onChange={e => {
                         patchLine(idx, { gstPer: Number(e.target.value) });

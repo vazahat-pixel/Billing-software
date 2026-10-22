@@ -1,5 +1,27 @@
 const authService = require('../services/auth.service');
 
+exports.sendRegistrationOtp = async (req, res) => {
+    try {
+        const otpService = require('../services/otpService');
+        const { email, username } = req.body || {};
+        const result = await otpService.sendRegistrationOtp(email, { username });
+        res.status(200).json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+};
+
+exports.verifyRegistrationOtp = async (req, res) => {
+    try {
+        const otpService = require('../services/otpService');
+        const { email, otp } = req.body || {};
+        const result = await otpService.verifyRegistrationOtp(email, otp);
+        res.status(200).json(result);
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+};
+
 exports.register = async (req, res) => {
     try {
         // Desktop offline clients must activate a Super-Admin provisioning pack — never self-create a company.
@@ -10,20 +32,21 @@ exports.register = async (req, res) => {
             });
         }
         const envFlag = String(process.env.ALLOW_PUBLIC_REGISTER || '').toLowerCase();
-        const allow =
-            envFlag === 'true' ||
-            (envFlag !== 'false' && process.env.NODE_ENV === 'test');
-        if (!allow) {
+        // Allow public self-service unless explicitly set to 'false'
+        if (envFlag === 'false') {
             return res.status(403).json({
                 message: 'Public signup is disabled. Ask your platform administrator to create your company.',
                 code: 'PUBLIC_REGISTER_DISABLED',
             });
         }
-        const { name, email, password, companyName, planId, billingCycle } = req.body;
+        const { name, email, password, companyName, mobile, username, verificationToken, planId, billingCycle } = req.body;
         if (!name || !email || !password || !companyName) {
             return res.status(400).json({ message: 'Name, email, password and company name are required' });
         }
         const result = await authService.register(name, email, password, companyName, {
+            mobile: mobile || '',
+            username: username || '',
+            verificationToken: verificationToken || null,
             planId: planId || null,
             billingCycle: billingCycle || 'monthly',
         });

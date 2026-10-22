@@ -33,6 +33,20 @@ exports.register = async (name, email, password, companyName, options = {}) => {
     const existingUser = await User.findOne({ email });
     if (existingUser) throw new Error('Email already registered');
 
+    // 1b. Check username uniqueness if provided
+    let normalizedUsername = undefined;
+    if (options.username) {
+        normalizedUsername = String(options.username).toLowerCase().trim();
+        const existingUsername = await User.findOne({ username: normalizedUsername });
+        if (existingUsername) throw new Error('Username is already taken');
+    }
+
+    // 1c. Consume email verification token if provided or required
+    if (options.verificationToken) {
+        const otpService = require('./otpService');
+        await otpService.consumeVerificationToken(email, options.verificationToken);
+    }
+
     // 2. Resolve plan — prefer caller planId, else public Basic/first active public plan
     let plan = null;
     if (options.planId) {
@@ -52,7 +66,7 @@ exports.register = async (name, email, password, companyName, options = {}) => {
             description: 'Starter plan',
             priceMonthly: 29,
             priceYearly: 290,
-            trialDays: 14,
+            trialDays: 10,
             isPublic: true,
             features: {
                 offlineMode: true,
@@ -72,8 +86,23 @@ exports.register = async (name, email, password, companyName, options = {}) => {
     }
 
     // 3. Create User (Role: user, CompanyRole: owner)
-    const user = new User({ name, email, password, role: 'user', companyRole: 'owner' });
+    const user = new User({
+        name,
+        email,
+        password,
+        role: 'user',
+        companyRole: 'owner',
+        username: normalizedUsername,
+        mobile: options.mobile ? String(options.mobile).trim() : '',
+        emailVerified: Boolean(options.verificationToken),
+        emailVerifiedAt: options.verificationToken ? new Date() : null,
+    });
     await user.save();
+
+    // 10-day free demo with explicit start and expiry timestamps
+    const trialDays = 10;
+    const trialStart = new Date();
+    const trialEnd = new Date(trialStart.getTime() + trialDays * 24 * 60 * 60 * 1000);
 
     // 4. Create Company — self-serve SaaS tenant (web only; desktop uses provisioning packs)
     const company = new Company({
@@ -81,6 +110,10 @@ exports.register = async (name, email, password, companyName, options = {}) => {
         ownerId: user._id,
         planId: plan._id,
         commercialPolicy: 'saas_enforced',
+        status: 'active',
+        lifecycleState: 'DEMO_ACTIVE',
+        demoStartedAt: trialStart,
+        demoExpiresAt: trialEnd,
     });
     await company.save();
 
@@ -95,12 +128,6 @@ exports.register = async (name, email, password, companyName, options = {}) => {
     // 6. Update User with companyId
     user.companyId = company._id;
     await user.save();
-
-    // 7. Trial subscription from plan.trialDays
-    const trialDays = Number(plan.trialDays ?? 14) || 14;
-    const trialStart = new Date();
-    const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + trialDays);
 
     await Subscription.create({
         companyId: company._id,

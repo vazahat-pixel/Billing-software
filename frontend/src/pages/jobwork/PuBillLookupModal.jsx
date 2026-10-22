@@ -98,10 +98,10 @@ export default function PuBillLookupModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} className="max-w-[920px] w-full">
+    <Modal isOpen={isOpen} onClose={onClose} className="max-w-[1180px] w-full">
       <div className="flex flex-col bg-white overflow-hidden" onKeyDown={onKeyDown}>
         <div className="bg-[#374151] text-white px-3 py-1.5 text-[12px] font-bold flex justify-between items-center">
-          <span>Select Purchase Bill {weaver ? `— Weaver: ${weaver}` : '(All Weavers)'}</span>
+          <span>Select Purchase Bill / Inventory Lot {weaver ? `— Weaver: ${weaver}` : '(All Weavers)'}</span>
           <span className="text-[10px] font-normal opacity-80">{rows.length} line(s)</span>
         </div>
 
@@ -110,7 +110,7 @@ export default function PuBillLookupModal({
             autoFocus
             type="text"
             className="flex-1 h-7 px-2 text-[12px] border border-slate-300 rounded-sm outline-none focus:border-blue-500"
-            placeholder="Filter Bill No, Item, LR, Transport…"
+            placeholder="Filter Bill No, Item, LR, Transport, Weaver…"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -124,53 +124,65 @@ export default function PuBillLookupModal({
           )}
         </div>
 
-        <div className="max-h-[280px] overflow-auto">
+        <div className="max-h-[340px] overflow-auto">
           <table className="w-full border-collapse text-[11px]" style={{ tableLayout: 'fixed' }}>
-            <thead className="sticky top-0 bg-slate-200">
+            <thead className="sticky top-0 bg-slate-200 text-slate-700 select-none">
               <tr>
-                <th className="px-1 py-1 border w-10">SralNo</th>
-                <th className="px-1 py-1 border w-16">BillNo</th>
+                <th className="px-1 py-1 border w-10">Sral</th>
+                <th className="px-1 py-1 border w-20">Bill No</th>
                 <th className="px-1 py-1 border w-20">Date</th>
-                <th className="px-1 py-1 border w-10">SrNo</th>
-                <th className="px-1 py-1 border">ItemName</th>
-                <th className="px-1 py-1 border w-12 text-right">BalPcs</th>
-                <th className="px-1 py-1 border w-16 text-right">BalMts</th>
-                <th className="px-1 py-1 border w-16 text-right">BalKgs</th>
-                <th className="px-1 py-1 border w-16 text-right">PuRate</th>
-                <th className="px-1 py-1 border w-14">LrNo</th>
+                <th className="px-1 py-1 border">Item Name</th>
+                <th className="px-1 py-1 border w-14 text-right bg-blue-50" title="Original Pieces in Bill/Lot">Orig Pcs</th>
+                <th className="px-1 py-1 border w-14 text-right bg-amber-50" title="Already Issued Pieces">Iss Pcs</th>
+                <th className="px-1 py-1 border w-14 text-right bg-emerald-50 text-emerald-800 font-bold" title="Available Remaining Pieces">Avail Pcs</th>
+                <th className="px-1 py-1 border w-16 text-right bg-blue-50" title="Original Meters in Bill/Lot">Orig Mtr</th>
+                <th className="px-1 py-1 border w-16 text-right bg-amber-50" title="Already Issued Meters">Iss Mtr</th>
+                <th className="px-1 py-1 border w-16 text-right bg-emerald-50 text-emerald-800 font-bold" title="Available Remaining Meters">Avail Mtr</th>
+                <th className="px-1 py-1 border w-14 text-right">PuRate</th>
+                <th className="px-1 py-1 border w-14">LR No</th>
                 <th className="px-1 py-1 border w-20">Transport</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-center py-6 text-slate-400">
+                  <td colSpan={13} className="text-center py-6 text-slate-400">
                     {weaver ? 'No open stock for this weaver' : 'Select weaver first or no stock available'}
                   </td>
                 </tr>
               ) : (
-                rows.map((r, i) => (
-                  <tr
-                    key={r.id || `${r.purchaseId}_${r.billNo}_${r.srNo}_${i}`}
-                    id={`pu-bill-row-${i}`}
-                    className={`cursor-pointer ${i === idx ? 'bg-blue-600 text-white' : 'hover:bg-blue-50'}`}
-                    onClick={() => pick(r)}
-                    onDoubleClick={() => pick(r)}
-                    onMouseEnter={() => setIdx(i)}
-                  >
-                    <td className="px-1 py-0.5 border text-center">{r.sralNo}</td>
-                    <td className="px-1 py-0.5 border font-bold">{r.billNo}</td>
-                    <td className="px-1 py-0.5 border">{fmtBillDate(r.billDt)}</td>
-                    <td className="px-1 py-0.5 border text-center">{r.srNo}</td>
-                    <td className="px-1 py-0.5 border truncate">{r.itemName}</td>
-                    <td className="px-1 py-0.5 border text-right font-mono">{r.balPcs || ''}</td>
-                    <td className="px-1 py-0.5 border text-right font-mono">{num(r.balMts, 3)}</td>
-                    <td className="px-1 py-0.5 border text-right font-mono">{num(r.balKgs, 3)}</td>
-                    <td className="px-1 py-0.5 border text-right font-mono">{num(r.puRate, 2)}</td>
-                    <td className="px-1 py-0.5 border">{r.lrNo || ''}</td>
-                    <td className="px-1 py-0.5 border truncate">{r.transport || ''}</td>
-                  </tr>
-                ))
+                rows.map((r, i) => {
+                  const hasPcs = (r.origPcs > 0) || (r.availPcs > 0);
+                  const hasMts = (r.origMts > 0) || (r.availMts > 0);
+                  return (
+                    <tr
+                      key={r.id || `${r.purchaseId}_${r.billNo}_${r.srNo}_${i}`}
+                      id={`pu-bill-row-${i}`}
+                      className={`cursor-pointer ${i === idx ? 'bg-blue-600 text-white' : 'hover:bg-blue-50'}`}
+                      onClick={() => pick(r)}
+                      onDoubleClick={() => pick(r)}
+                      onMouseEnter={() => setIdx(i)}
+                    >
+                      <td className="px-1 py-0.5 border text-center">{r.sralNo}</td>
+                      <td className="px-1 py-0.5 border font-bold">{r.billNo}</td>
+                      <td className="px-1 py-0.5 border">{fmtBillDate(r.billDt)}</td>
+                      <td className="px-1 py-0.5 border truncate" title={r.itemName}>{r.itemName}</td>
+                      <td className="px-1 py-0.5 border text-right font-mono">{hasPcs ? (r.origPcs || '-') : '-'}</td>
+                      <td className="px-1 py-0.5 border text-right font-mono">{hasPcs && r.issuedPcs > 0 ? r.issuedPcs : (hasPcs ? '0' : '-')}</td>
+                      <td className={`px-1 py-0.5 border text-right font-mono font-bold ${i === idx ? 'text-white' : 'text-emerald-700'}`}>
+                        {hasPcs ? (r.availPcs ?? '-') : '-'}
+                      </td>
+                      <td className="px-1 py-0.5 border text-right font-mono">{hasMts ? num(r.origMts, 3) : '-'}</td>
+                      <td className="px-1 py-0.5 border text-right font-mono">{hasMts && r.issuedMts > 0 ? num(r.issuedMts, 3) : (hasMts ? '0.000' : '-')}</td>
+                      <td className={`px-1 py-0.5 border text-right font-mono font-bold ${i === idx ? 'text-white' : 'text-emerald-700'}`}>
+                        {hasMts ? num(r.availMts, 3) : '-'}
+                      </td>
+                      <td className="px-1 py-0.5 border text-right font-mono">{r.puRate ? num(r.puRate, 2) : '-'}</td>
+                      <td className="px-1 py-0.5 border truncate">{r.lrNo || ''}</td>
+                      <td className="px-1 py-0.5 border truncate">{r.transport || ''}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

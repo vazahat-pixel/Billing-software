@@ -13,9 +13,24 @@ import Modal from '../../components/ui/Modal';
 const WarehouseStockDashboard = ({ isOpen, onClose, warehouseData = {}, inventory = [] }) => {
   const [expandedWarehouse, setExpandedWarehouse] = useState(null);
   const [sortBy, setSortBy] = useState('quantity');
+  const [stageFilter, setStageFilter] = useState('ALL'); // 'ALL' | 'GREY_SHOP' | 'GREY_MILL' | 'FINISH_SHOP'
+
+  // Filter inventory by textile stage (Grey at Shop, Grey at Mill, Finish at Shop - JSM STP_REPORT MR_04)
+  const filteredInventory = React.useMemo(() => {
+    const list = Array.isArray(inventory) ? inventory : [];
+    if (stageFilter === 'ALL') return list;
+    return list.filter((lot) => {
+      const isJob = Boolean(lot.sourceJobId || lot.jobWorkerName || lot.status === 'In-Process' || lot.type === 'job');
+      const isFinish = Boolean(lot.stage === 'FINISH' || lot.stage === 'FINISHED' || lot.finishItem || String(lot.procType || '').toLowerCase().includes('finish'));
+      if (stageFilter === 'GREY_MILL') return isJob;
+      if (stageFilter === 'FINISH_SHOP') return isFinish && !isJob;
+      if (stageFilter === 'GREY_SHOP') return !isJob && !isFinish;
+      return true;
+    });
+  }, [inventory, stageFilter]);
 
   // Group inventory by warehouse/location
-  const groupedInventory = (inventory || []).reduce((acc, lot) => {
+  const groupedInventory = filteredInventory.reduce((acc, lot) => {
     const location = lot.warehouseId ? 'warehouse' : lot.sourceJobId ? 'job' : 'warehouse';
     const key = lot.warehouseId || lot.sourceJobId || 'main';
 
@@ -59,32 +74,57 @@ const WarehouseStockDashboard = ({ isOpen, onClose, warehouseData = {}, inventor
             </div>
             <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
               <p className="text-xs text-amber-600 uppercase tracking-tight font-semibold mb-1">Stock Items</p>
-              <p className="text-2xl font-black text-amber-900">{inventory.length}</p>
+              <p className="text-2xl font-black text-amber-900">{filteredInventory.length}</p>
             </div>
           </div>
 
-          {/* Sort Controls */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setSortBy('quantity')}
-              className={`px-3 py-2 rounded-lg font-semibold text-sm transition-all ${
-                sortBy === 'quantity'
-                  ? 'bg-indigo-100 text-indigo-700'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              Sort by Quantity
-            </button>
-            <button
-              onClick={() => setSortBy('name')}
-              className={`px-3 py-2 rounded-lg font-semibold text-sm transition-all ${
-                sortBy === 'name'
-                  ? 'bg-indigo-100 text-indigo-700'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              Sort by Name
-            </button>
+          {/* Textile Stage Three-Way Balance Tabs (JSM STP_REPORT MR_04) */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex gap-1.5 p-1 bg-slate-100 rounded-lg border border-slate-200">
+              {[
+                { id: 'ALL', label: 'All Stock' },
+                { id: 'GREY_SHOP', label: 'Grey At Shop' },
+                { id: 'GREY_MILL', label: 'Grey At Mill' },
+                { id: 'FINISH_SHOP', label: 'Finish At Shop' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setStageFilter(tab.id)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                    stageFilter === tab.id
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Sort Controls */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSortBy('quantity')}
+                className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all ${
+                  sortBy === 'quantity'
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                Sort by Quantity
+              </button>
+              <button
+                onClick={() => setSortBy('name')}
+                className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all ${
+                  sortBy === 'name'
+                    ? 'bg-indigo-100 text-indigo-700'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                Sort by Name
+              </button>
+            </div>
           </div>
         </div>
 

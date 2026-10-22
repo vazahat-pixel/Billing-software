@@ -12,6 +12,8 @@ const authMiddleware = async (req, res, next) => {
     const publicAuth = [
       '/auth/login',
       '/auth/register',
+      '/auth/send-registration-otp',
+      '/auth/verify-registration-otp',
       '/auth/forgot-password',
       '/auth/reset-password',
       '/auth/refresh',
@@ -117,8 +119,16 @@ const authMiddleware = async (req, res, next) => {
         req.companyStatus = company.status;
         const onAdminSurface = /\/admin(\/|$)/.test(req.originalUrl || req.path || '');
         const platformAdmin = user.role === 'super_admin' && (req.superAdminFallback || onAdminSurface);
-        if (!platformAdmin && (company.status === 'suspended' || company.status === 'expired' || company.isActive === false)) {
-          return next(AppError.forbidden('Your company account is locked or inactive. Please contact support.'));
+        if (!platformAdmin) {
+          if (company.status === 'suspended' || company.status === 'expired' || company.isActive === false) {
+            return next(AppError.forbidden('Your company account is locked or inactive. Please contact support.'));
+          }
+          if (company.masterCompanyId) {
+            const master = await Company.findById(company.masterCompanyId).select('status isActive').lean();
+            if (master && (master.status === 'suspended' || master.status === 'expired' || master.isActive === false)) {
+              return next(AppError.forbidden('The parent main company account has been suspended by administrator. Access to all sub-companies is locked.'));
+            }
+          }
         }
       }
     }

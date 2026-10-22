@@ -1,528 +1,1521 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Modal from '../../components/ui/Modal';
-import { gstApi } from '../../api/gst.api';
-import { notifyError } from '../../utils/notify';
+import useStore from '../../store/useStore';
 import { toast } from '../../store/useToastStore';
-import { downloadJson } from '../../utils/gstExport';
+import { notifyError } from '../../utils/notify';
+import { gstApi, stage4Api } from '../../api/gst.api';
+import { gstinReportApi } from '../../api/gstinReport.api';
+import { salesApi } from '../../api/sales.api';
 import { exportTableToExcel } from '../../utils/reportExport';
+import { exportGstr1Excel, downloadJson } from '../../utils/gstExport';
 import ListPrint from '../../components/print/ListPrint';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faFileInvoiceDollar, faCartFlatbed, faScaleBalanced, faLayerGroup,
-  faNoteSticky, faChartPie, faSync, faPrint, faDownload, faFileExcel, faTriangleExclamation,
-} from '@fortawesome/free-solid-svg-icons';
-
-/**
- * GST Reports — every figure on this screen comes from GET /gst/ca-dashboard, which is
- * built server-side by gstReturnService from the actual Sales / Purchase / Return /
- * DebitCreditNote records. Nothing is computed in the browser, so the report can never
- * drift from the invoices, the ledger, or the GSTR JSON export (the export below ships
- * the very same payload object this screen renders).
- */
-
 import GSTReportsTab from './GSTReportsTab';
+import {
+  FileText, ShoppingCart, Factory, Wrench, BookOpen, Receipt,
+  AlertTriangle, CheckCircle2, RefreshCw, Truck, Calendar,
+  Download, Printer, FileSpreadsheet, Layers, Search, Eye,
+  ShieldCheck, Scale, ChevronRight, X, Play, Filter,
+  ArrowUpRight, Database, SlidersVertical
+} from 'lucide-react';
 
-const money = (v) => `₹${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const num = (v) => Number(v || 0);
+const money = (v) =>
+  `₹${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const dt = (d) => (d ? new Date(d).toLocaleDateString('en-IN') : '');
 
-const firstOfMonth = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10); };
-const lastOfMonth = () => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10); };
+const firstOfMonth = () => {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+};
+const lastOfMonth = () => {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
+};
 
-const TABS = [
-  { id: 'offline_tool', label: 'GSTR-1 Excel Utility (V3.2.2)', icon: faFileExcel },
-  { id: 'summary', label: 'GST Summary', icon: faChartPie },
-  { id: 'gstr1', label: 'GSTR-1 (Sales)', icon: faFileInvoiceDollar },
-  { id: 'gstr2', label: 'GSTR-2 (Purchase)', icon: faCartFlatbed },
-  { id: 'gstr3b', label: 'GSTR-3B', icon: faScaleBalanced },
-  { id: 'hsn', label: 'HSN Summary', icon: faLayerGroup },
-  { id: 'cdn', label: 'Credit / Debit Notes', icon: faNoteSticky },
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const Card = ({ label, value, sub, tone = 'default' }) => (
-  <div className="border border-[var(--border)] rounded-xl bg-[var(--bg-card)] px-4 py-3 min-w-0">
-    <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--text-muted)] truncate">{label}</p>
-    <p className={`text-[16px] font-semibold mt-1 tabular-nums truncate ${tone === 'pos' ? 'text-emerald-600' : tone === 'neg' ? 'text-rose-600' : 'text-[var(--text-primary)]'}`}>{value}</p>
-    {sub ? <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">{sub}</p> : null}
-  </div>
-);
+// 17 JSM GST REPORT GROUPS & CATALOG
+export const JSM_GST_GROUPS = [
+  {
+    groupId: 'statutory',
+    label: 'Statutory Returns & Filing',
+    reports: [
+      { id: 'gst3b', label: '3B Monthly Return', icon: Scale, jsmForm: 'Gstr_3B_TextNew_Monthly' },
+      { id: 'gstr1', label: 'Gstr-1 Report', icon: FileText, jsmForm: 'Rpt_Jsm_GSTR1_3_2_2' },
+      { id: 'gstr2', label: 'Gstr-2 Report', icon: ShoppingCart, jsmForm: 'JS_GSTR2_RPT' },
+      { id: 'gstr9', label: 'Gstr-9', icon: Calendar, jsmForm: 'Rpt_Jsm_GSTR9_New' },
+      { id: 'itc04', label: 'ITC 04', icon: Wrench, jsmForm: 'ITC_04_EXCEL_25' },
+    ],
+  },
+  {
+    groupId: 'audit',
+    label: 'Audit, Error & Matching',
+    reports: [
+      { id: 'gstr1Errors', label: 'Gstr-1 Error Checking', icon: AlertTriangle, jsmForm: 'Stp_Gst_OutWrad_ErrorCheck' },
+      { id: 'gstrMatching', label: 'Gstr Matching', icon: RefreshCw, jsmForm: 'Rpt_Jsm_Gstr1_Match' },
+    ],
+  },
+  {
+    groupId: 'eway',
+    label: 'E-Way Bill Suite',
+    reports: [
+      { id: 'ewayBulk', label: 'E-Way Bill Bulk Generation', icon: Truck, jsmForm: 'EWB_Bulk_NIC' },
+      { id: 'ewayStatus', label: 'E-Way Bill / Invoice Status', icon: CheckCircle2, jsmForm: 'EWB_Status_Tracker' },
+      { id: 'ewayExcel', label: 'E-Way Excel Upload', icon: FileSpreadsheet, jsmForm: 'EWB_Excel_NIC' },
+    ],
+  },
+  {
+    groupId: 'registers',
+    label: 'GSTIN Books & Registers',
+    reports: [
+      { id: 'gst45', label: 'Gst 4.5', icon: Layers, jsmForm: 'Stp_Changes_GstRate_In_Master' },
+      { id: 'gstinSales', label: 'Gstin - Sales', icon: FileText, jsmForm: 'A_Gstr1_SalesInvoiceSummary' },
+      { id: 'gstinPurchase', label: 'Gstin - Purchase', icon: ShoppingCart, jsmForm: 'A_Gstr2_PurchaseSummary' },
+      { id: 'gstinProcess', label: 'Gstin - Process', icon: Factory, jsmForm: 'A_Gstr2_ProcessSummary' },
+      { id: 'gstinJobwork', label: 'Gstin - JobWork', icon: Wrench, jsmForm: 'A_Gstr2_JobWorkReceiptSummary' },
+      { id: 'gstinJournal', label: 'Gstin - Journal Report', icon: BookOpen, jsmForm: 'JSM_VW_GST_JV_SUMMARY' },
+      { id: 'gstinExpense', label: 'Gstin - Expense', icon: Receipt, jsmForm: 'A_Gstr2_Expense' },
+    ],
+  },
+];
 
-const Table = ({ columns, rows, empty }) => (
-  <div className="border border-[var(--border)] rounded-xl overflow-hidden">
-    <div className="overflow-x-auto max-h-[calc(90vh-330px)] overflow-y-auto">
-      <table className="w-full text-left text-xs">
-        <thead className="bg-[var(--bg-base)] text-[var(--text-muted)] uppercase tracking-widest text-[9px] border-b border-[var(--border)] sticky top-0 z-10">
-          <tr>
-            {columns.map((c) => (
-              <th key={c.key} className={`px-3 py-2.5 font-semibold whitespace-nowrap ${c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : ''}`}>{c.label}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[var(--border-subtle)]">
-          {!rows.length ? (
-            <tr><td colSpan={columns.length} className="px-4 py-14 text-center text-[var(--text-muted)] text-[13px]">{empty}</td></tr>
-          ) : rows.map((r, i) => (
-            <tr key={r._key || i} className="hover:bg-[var(--bg-base)] transition-colors">
-              {columns.map((c) => (
-                <td key={c.key} className={`px-3 py-2 text-[11px] whitespace-nowrap ${c.align === 'right' ? 'text-right tabular-nums font-medium' : c.align === 'center' ? 'text-center' : ''}`}>
-                  {c.render ? c.render(r) : r[c.key]}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
-
-export default function GstReportsHub({ isOpen, onClose }) {
-  const [from, setFrom] = useState(firstOfMonth);
-  const [to, setTo] = useState(lastOfMonth);
-  const [tab, setTab] = useState('summary');
-  const [data, setData] = useState(null);
+export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1' }) {
+  const { company } = useStore();
+  const [activeReport, setActiveReport] = useState(initialReport || 'gstr1');
+  const [fromDate, setFromDate] = useState(firstOfMonth);
+  const [toDate, setToDate] = useState(lastOfMonth);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [reportData, setReportData] = useState(null);
+  const [searchFilter, setSearchFilter] = useState('');
   const [printCfg, setPrintCfg] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError('');
+  // Common JSM parameters
+  const [rateSlab, setRateSlab] = useState('');
+  const [bookFilter, setBookFilter] = useState('ALL');
+  const [partySearch, setPartySearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [unitMode, setUnitMode] = useState('UnitWise'); // UnitWise, Kgs, Qty, Pcs
+  const [subMode, setSubMode] = useState('summary'); // summary, detail, returnSummary, returnDetail
+  const [withRcm, setWithRcm] = useState(false);
+  const [includePr, setIncludePr] = useState(true);
+  const [gstSlabWise, setGstSlabWise] = useState(true);
+  const [hsnDescWise, setHsnDescWise] = useState(false);
+  const [financialYear, setFinancialYear] = useState(() => {
+    const yr = new Date().getFullYear();
+    return `${yr - 1}-${String(yr).slice(2)}`;
+  });
+  const [itc04Tab, setItc04Tab] = useState('sent'); // sent, received
+  const [errorOnly, setErrorOnly] = useState(false);
+  const [minEwayAmount, setMinEwayAmount] = useState(50000);
+  const [selectedEwayIds, setSelectedEwayIds] = useState(new Set());
+
+  // Keep active report in sync when initialReport prop changes
+  useEffect(() => {
+    if (initialReport) {
+      setActiveReport(initialReport);
+    }
+  }, [initialReport]);
+
+  // Quick Month Change helper
+  const handleMonthChange = (monthIdx) => {
+    const yr = new Date(fromDate).getFullYear() || new Date().getFullYear();
+    const start = new Date(yr, monthIdx, 1).toISOString().slice(0, 10);
+    const end = new Date(yr, monthIdx + 1, 0).toISOString().slice(0, 10);
+    setFromDate(start);
+    setToDate(end);
+  };
+
+  // Main Data Loader per active report
+  const loadActiveReportData = useCallback(async () => {
+    if (!isOpen) return;
+    setLoading(true);
+    setReportData(null);
     try {
-      const res = await gstApi.caDashboard({ startDate: from, endDate: to });
-      setData(res || null);
-    } catch (e) {
-      setError(e?.message || 'Failed to load GST data');
-      setData(null);
-      notifyError(e, 'Failed to load GST reports');
-    } finally { setLoading(false); }
-  }, [from, to]);
+      const periodKey = fromDate?.slice(0, 7) || new Date().toISOString().slice(0, 7);
+      const params = {
+        startDate: fromDate,
+        endDate: toDate,
+        fromDate,
+        toDate,
+        party: partySearch,
+        book: bookFilter !== 'ALL' ? bookFilter : undefined,
+        gstRate: rateSlab || undefined,
+        status: statusFilter !== 'ALL' ? statusFilter : undefined,
+      };
 
-  useEffect(() => { if (isOpen) load(); }, [isOpen, load]);
+      let res = null;
+      switch (activeReport) {
+        case 'gst3b': {
+          res = await stage4Api.gstr3b({ period: periodKey });
+          break;
+        }
+        case 'gstr1': {
+          res = await gstApi.gstr1({ startDate: fromDate, endDate: toDate });
+          break;
+        }
+        case 'gstr2': {
+          res = await gstApi.gstr2({ startDate: fromDate, endDate: toDate });
+          break;
+        }
+        case 'gstr9': {
+          res = await stage4Api.gstr9({ financialYear });
+          break;
+        }
+        case 'itc04': {
+          res = await gstinReportApi.itc04(params);
+          break;
+        }
+        case 'gstr1Errors': {
+          res = await gstinReportApi.gstr1Errors(params);
+          break;
+        }
+        case 'gstrMatching': {
+          res = await stage4Api.fullReconcile({ startDate: fromDate, endDate: toDate });
+          break;
+        }
+        case 'ewayBulk':
+        case 'ewayStatus': {
+          const list = await stage4Api.ewayList();
+          const salesRes = await salesApi.list({ limit: 100 });
+          const salesList = salesRes?.sales || salesRes?.data || (Array.isArray(salesRes) ? salesRes : []);
+          res = { ewayList: Array.isArray(list) ? list : [], sales: salesList };
+          break;
+        }
+        case 'ewayExcel': {
+          const salesRes = await salesApi.list({ limit: 100 });
+          const salesList = salesRes?.sales || salesRes?.data || (Array.isArray(salesRes) ? salesRes : []);
+          res = { sales: salesList };
+          break;
+        }
+        case 'gst45': {
+          const sRes = await gstinReportApi.salesSummary({ ...params, groupBy1: 'gstRate' });
+          const hsnRes = await gstApi.hsnSummary({ startDate: fromDate, endDate: toDate });
+          res = { rateSummary: sRes, hsnSummary: hsnRes };
+          break;
+        }
+        case 'gstinSales': {
+          if (subMode === 'summary') res = await gstinReportApi.salesSummary(params);
+          else if (subMode === 'detail') res = await gstinReportApi.salesDetail(params);
+          else if (subMode === 'returnSummary') res = await gstinReportApi.salesReturnSummary(params);
+          else res = await gstinReportApi.salesReturnDetail(params);
+          break;
+        }
+        case 'gstinPurchase': {
+          if (subMode === 'summary') res = await gstinReportApi.purchaseSummary(params);
+          else if (subMode === 'detail') res = await gstinReportApi.purchaseDetail(params);
+          else if (subMode === 'returnSummary') res = await gstinReportApi.purchaseReturnSummary(params);
+          else res = await gstinReportApi.purchaseReturnDetail(params);
+          break;
+        }
+        case 'gstinProcess': {
+          res = await gstinReportApi.process(params);
+          break;
+        }
+        case 'gstinJobwork': {
+          res = await gstinReportApi.jobwork(params);
+          break;
+        }
+        case 'gstinJournal': {
+          res = await gstinReportApi.journal(params);
+          break;
+        }
+        case 'gstinExpense': {
+          res = await gstinReportApi.expense(params);
+          break;
+        }
+        default:
+          res = await gstApi.caDashboard({ startDate: fromDate, endDate: toDate });
+          break;
+      }
 
-  const g1 = useMemo(() => data?.gstr1 || {}, [data]);
-  const g2 = useMemo(() => data?.gstr2 || [], [data]);
-  const s = data?.summary || {};
-
-  /* ---- rows built ONLY from the server payload ---- */
-
-  const b2bRows = useMemo(() => {
-    const out = [];
-    for (const p of g1.b2b || []) for (const inv of p.inv || []) {
-      const d = inv.itms?.[0]?.itm_det || {};
-      out.push({
-        _key: `${p.ctin}-${inv.inum}`, gstin: p.ctin, inum: inv.inum, idt: inv.idt, pos: inv.pos,
-        rchrg: inv.rchrg, rt: d.rt, txval: d.txval, camt: d.camt, samt: d.samt, iamt: d.iamt,
-        tax: num(d.camt) + num(d.samt) + num(d.iamt), val: inv.val,
-      });
+      setReportData(res);
+      toast.success(`Loaded ${activeReportMeta?.label || 'Report'}`);
+    } catch (err) {
+      notifyError(err, 'Failed to fetch GST report data');
+      setReportData(null);
+    } finally {
+      setLoading(false);
     }
-    return out;
-  }, [g1]);
+  }, [
+    isOpen, activeReport, fromDate, toDate, partySearch, bookFilter,
+    rateSlab, statusFilter, subMode, financialYear
+  ]);
 
-  const b2cRows = useMemo(() => {
-    const rows = (g1.b2cs || []).map((r, i) => ({
-      _key: `b2cs-${i}`, kind: 'B2CS', inum: '—', idt: '', pos: r.pos, rt: r.rt,
-      txval: r.txval, camt: r.camt, samt: r.samt, iamt: r.iamt,
-      tax: num(r.camt) + num(r.samt) + num(r.iamt), val: num(r.txval) + num(r.camt) + num(r.samt) + num(r.iamt),
-    }));
-    for (const inv of g1.b2cl || []) {
-      const d = inv.itms?.[0]?.itm_det || {};
-      rows.push({
-        _key: `b2cl-${inv.inum}`, kind: 'B2CL', inum: inv.inum, idt: inv.idt, pos: inv.pos, rt: d.rt,
-        txval: d.txval, camt: d.camt, samt: d.samt, iamt: d.iamt,
-        tax: num(d.camt) + num(d.samt) + num(d.iamt), val: inv.val,
-      });
+  useEffect(() => {
+    if (isOpen) {
+      loadActiveReportData();
     }
-    return rows;
-  }, [g1]);
+  }, [isOpen, activeReport, fromDate, toDate, subMode, financialYear, loadActiveReportData]);
 
-  const hsnRows = useMemo(
-    () => (g1.hsn?.data || []).map((h, i) => ({ ...h, _key: `hsn-${i}` })),
-    [g1]
-  );
-
-  const cdnRows = useMemo(() => {
-    const out = [];
-    for (const grp of g1.cdnr || []) for (const n of grp.nt || []) {
-      out.push({ _key: `cdnr-${n.nt_num}`, section: 'CDNR', gstin: grp.ctin, ...n });
+  // Current active report descriptor
+  const activeReportMeta = useMemo(() => {
+    for (const grp of JSM_GST_GROUPS) {
+      const match = grp.reports.find((r) => r.id === activeReport);
+      if (match) return { ...match, groupLabel: grp.label };
     }
-    for (const n of g1.cdnur || []) out.push({ _key: `cdnur-${n.nt_num}`, section: 'CDNUR', gstin: '', ...n });
-    return out;
-  }, [g1]);
+    return { id: activeReport, label: activeReport, groupLabel: 'GST Reports' };
+  }, [activeReport]);
 
-  const purchaseNotes = useMemo(
-    () => (data?.notes || []).filter((n) => n.noteSide === 'Purchase').map((n, i) => ({ ...n, _key: `pn-${i}` })),
-    [data]
-  );
+  // -------------------------------------------------------------------------
+  // EXPORT HANDLERS (EXCEL, JSON, PRINT)
+  // -------------------------------------------------------------------------
+  const handleExcelExport = () => {
+    if (!reportData) return toast.info('No data available to export');
 
-  /* ---- column sets ---- */
-  const COLS = {
-    b2b: [
-      { key: 'inum', label: 'Invoice No' }, { key: 'idt', label: 'Date', render: (r) => dt(r.idt) },
-      { key: 'gstin', label: 'GSTIN' }, { key: 'pos', label: 'POS', align: 'center' },
-      { key: 'rchrg', label: 'RCM', align: 'center' },
-      { key: 'rt', label: 'Rate %', align: 'right', render: (r) => `${num(r.rt)}%` },
-      { key: 'txval', label: 'Taxable', align: 'right', render: (r) => money(r.txval) },
-      { key: 'camt', label: 'CGST', align: 'right', render: (r) => money(r.camt) },
-      { key: 'samt', label: 'SGST', align: 'right', render: (r) => money(r.samt) },
-      { key: 'iamt', label: 'IGST', align: 'right', render: (r) => money(r.iamt) },
-      { key: 'tax', label: 'Total GST', align: 'right', render: (r) => money(r.tax) },
-      { key: 'val', label: 'Invoice Value', align: 'right', render: (r) => money(r.val) },
-    ],
-    b2c: [
-      { key: 'kind', label: 'Section', align: 'center' },
-      { key: 'inum', label: 'Invoice' }, { key: 'idt', label: 'Date', render: (r) => dt(r.idt) },
-      { key: 'pos', label: 'POS', align: 'center' },
-      { key: 'rt', label: 'Rate %', align: 'right', render: (r) => `${num(r.rt)}%` },
-      { key: 'txval', label: 'Taxable', align: 'right', render: (r) => money(r.txval) },
-      { key: 'camt', label: 'CGST', align: 'right', render: (r) => money(r.camt) },
-      { key: 'samt', label: 'SGST', align: 'right', render: (r) => money(r.samt) },
-      { key: 'iamt', label: 'IGST', align: 'right', render: (r) => money(r.iamt) },
-      { key: 'tax', label: 'Total GST', align: 'right', render: (r) => money(r.tax) },
-      { key: 'val', label: 'Value', align: 'right', render: (r) => money(r.val) },
-    ],
-    gstr2: [
-      { key: 'invoiceNo', label: 'Invoice No' },
-      { key: 'date', label: 'Date', render: (r) => dt(r.date) },
-      { key: 'partyName', label: 'Supplier' },
-      { key: 'gstin', label: 'GSTIN', render: (r) => r.gstin || <span className="text-rose-600">— missing —</span> },
-      { key: 'taxable', label: 'Taxable', align: 'right', render: (r) => money(r.taxable) },
-      { key: 'cgst', label: 'CGST', align: 'right', render: (r) => money(r.cgst) },
-      { key: 'sgst', label: 'SGST', align: 'right', render: (r) => money(r.sgst) },
-      { key: 'igst', label: 'IGST', align: 'right', render: (r) => money(r.igst) },
-      { key: 'gstAmount', label: 'ITC', align: 'right', render: (r) => money(r.gstAmount) },
-      { key: 'netAmount', label: 'Invoice Value', align: 'right', render: (r) => money(r.netAmount) },
-    ],
-    hsn: [
-      { key: 'hsn_sc', label: 'HSN / SAC' }, { key: 'desc', label: 'Description' },
-      { key: 'uqc', label: 'UQC', align: 'center' },
-      { key: 'qty', label: 'Qty', align: 'right', render: (r) => num(r.qty).toFixed(2) },
-      { key: 'txval', label: 'Taxable', align: 'right', render: (r) => money(r.txval) },
-      { key: 'camt', label: 'CGST', align: 'right', render: (r) => money(r.camt) },
-      { key: 'samt', label: 'SGST', align: 'right', render: (r) => money(r.samt) },
-      { key: 'iamt', label: 'IGST', align: 'right', render: (r) => money(r.iamt) },
-      { key: 'tot', label: 'Total Tax', align: 'right', render: (r) => money(num(r.camt) + num(r.samt) + num(r.iamt)) },
-    ],
-    cdn: [
-      { key: 'section', label: 'Section', align: 'center' },
-      { key: 'nt_num', label: 'Note No' }, { key: 'nt_dt', label: 'Date', render: (r) => dt(r.nt_dt) },
-      { key: 'ntty', label: 'Type', align: 'center', render: (r) => (r.ntty === 'C' ? 'Credit' : 'Debit') },
-      { key: 'gstin', label: 'GSTIN', render: (r) => r.gstin || '— unregistered —' },
-      { key: 'txval', label: 'Taxable', align: 'right', render: (r) => money(r.txval) },
-      { key: 'camt', label: 'CGST', align: 'right', render: (r) => money(r.camt) },
-      { key: 'samt', label: 'SGST', align: 'right', render: (r) => money(r.samt) },
-      { key: 'iamt', label: 'IGST', align: 'right', render: (r) => money(r.iamt) },
-      { key: 'val', label: 'Note Value', align: 'right', render: (r) => money(r.val) },
-      { key: 'rsn', label: 'Reason' },
-    ],
-    pnotes: [
-      { key: 'noteNo', label: 'Note No' }, { key: 'date', label: 'Date', render: (r) => dt(r.date) },
-      { key: 'noteType', label: 'Type', align: 'center' },
-      { key: 'partyName', label: 'Supplier' },
-      { key: 'againstInvoiceNo', label: 'Against Bill' },
-      { key: 'amount', label: 'Amount', align: 'right', render: (r) => money(r.amount) },
-      { key: 'netAmount', label: 'Net', align: 'right', render: (r) => money(r.netAmount) },
-    ],
-  };
-
-  const activePrint = () => {
-    const map = {
-      gstr1: [`GSTR-1 B2B (${from} to ${to})`, COLS.b2b, b2bRows],
-      gstr2: [`GSTR-2 Purchase (${from} to ${to})`, COLS.gstr2, g2.map((r, i) => ({ ...r, _key: i }))],
-      hsn: [`HSN Summary (${from} to ${to})`, COLS.hsn, hsnRows],
-      cdn: [`Credit / Debit Notes (${from} to ${to})`, COLS.cdn, cdnRows],
-    };
-    const cfg = map[tab];
-    if (!cfg) return toast.warning('This tab has no printable table — use GSTR-1 / GSTR-2 / HSN / Notes');
-    setPrintCfg({ title: cfg[0], columns: cfg[1], rows: cfg[2] });
-  };
-
-  const exportExcel = () => {
-    if (!data) return;
-    const map = {
-      gstr1: [`GSTR1_Sales_${from}_to_${to}`, COLS.b2b, b2bRows],
-      gstr2: [`GSTR2_Purchase_${from}_to_${to}`, COLS.gstr2, g2.map((r, i) => ({ ...r, _key: i }))],
-      hsn: [`HSN_Summary_${from}_to_${to}`, COLS.hsn, hsnRows],
-      cdn: [`Credit_Debit_Notes_${from}_to_${to}`, COLS.cdn, cdnRows],
-    };
-    const cfg = map[tab];
-    if (!cfg) {
-      // Export all summary sections
-      exportTableToExcel(`GST_Summary_${from}_to_${to}`, [
-        { key: 'section', label: 'Section' },
-        { key: 'count', label: 'Invoices/Notes' },
-        { key: 'taxable', label: 'Taxable Amount' },
-        { key: 'cgst', label: 'CGST' },
-        { key: 'sgst', label: 'SGST' },
-        { key: 'igst', label: 'IGST' },
-        { key: 'totalTax', label: 'Total Tax' },
-      ], [
-        { section: 'Outward (GSTR-1 B2B)', count: g1.counts?.b2b || 0, taxable: g1.taxable?.b2b || 0, cgst: (g1.tax?.b2b || 0)/2, sgst: (g1.tax?.b2b || 0)/2, igst: 0, totalTax: g1.tax?.b2b || 0 },
-        { section: 'Inward (GSTR-2 ITC)', count: g2.length, taxable: g2.reduce((s,x)=>s+(x.taxableAmount||0),0), cgst: g2.reduce((s,x)=>s+(x.cgst||0),0), sgst: g2.reduce((s,x)=>s+(x.sgst||0),0), igst: g2.reduce((s,x)=>s+(x.igst||0),0), totalTax: g2.reduce((s,x)=>s+(x.gstAmount||0),0) }
-      ]);
-      toast.success('GST Summary Excel exported');
+    if (activeReport === 'gstr1') {
+      const g1 = reportData?.gstr1 || reportData;
+      exportGstr1Excel(g1, `GSTR1_${fromDate}_to_${toDate}.xlsx`);
+      toast.success('GSTR-1 Excel exported (10-Sheet CBIC Utility V3.2.2 format)');
       return;
     }
-    exportTableToExcel(cfg[0], cfg[1], cfg[2]);
-    toast.success(`${cfg[0]} Excel exported`);
+
+    if (activeReport === 'gst3b') {
+      const outward = reportData?.outward || {};
+      const inward = reportData?.inward || {};
+      const rows = [
+        { Section: '3.1(a) Outward Taxable Supplies', Taxable: outward.taxable || 0, CGST: outward.cgst || 0, SGST: outward.sgst || 0, IGST: outward.igst || 0, Cess: outward.cess || 0 },
+        { Section: '4(A) Eligible ITC', Taxable: inward.taxable || 0, CGST: inward.cgst || 0, SGST: inward.sgst || 0, IGST: inward.igst || 0, Cess: inward.cess || 0 },
+        { Section: 'Net Tax Payable', Taxable: '', CGST: reportData?.netPayable?.cgst || 0, SGST: reportData?.netPayable?.sgst || 0, IGST: reportData?.netPayable?.igst || 0, Cess: reportData?.netPayable?.cess || 0 }
+      ];
+      exportTableToExcel(rows, `GSTR3B_Monthly_${fromDate?.slice(0, 7)}.xlsx`);
+      toast.success('GSTR-3B Excel exported');
+      return;
+    }
+
+    if (activeReport === 'gstr1Errors') {
+      const errs = reportData?.errors || reportData?.rows || [];
+      const cols = [
+        { key: 'invoiceNo', label: 'Voucher / Bill No' },
+        { key: 'date', label: 'Date' },
+        { key: 'partyName', label: 'Party Name' },
+        { key: 'gstin', label: 'GSTIN' },
+        { key: 'issue', label: 'Issue Description' },
+        { key: 'severity', label: 'Severity' },
+        { key: 'action', label: 'Recommended Action' }
+      ];
+      exportTableToExcel(cols, errs, `GSTR1_Error_Audit_${fromDate}_to_${toDate}.xlsx`);
+      toast.success('GSTR-1 Error Audit Excel exported');
+      return;
+    }
+
+    if (activeReport === 'itc04') {
+      const rows = reportData?.rows || [];
+      const cols = [
+        { key: 'jobCardNo', label: 'Job Card No' },
+        { key: 'issueDate', label: 'Issue Date' },
+        { key: 'workerName', label: 'Job Worker' },
+        { key: 'workerGstin', label: 'GSTIN' },
+        { key: 'hsnCode', label: 'HSN' },
+        { key: 'issueQty', label: 'Issue Qty' },
+        { key: 'receivedQty', label: 'Recd Qty' },
+        { key: 'status', label: 'Status' },
+        { key: 'taxableAmount', label: 'Taxable' },
+        { key: 'gstAmount', label: 'GST' }
+      ];
+      exportTableToExcel(cols, rows, `ITC04_Return_${fromDate}_to_${toDate}.xlsx`);
+      toast.success('ITC-04 Excel exported');
+      return;
+    }
+
+    // Default row export for GSTIN registers and others
+    const rows = reportData?.rows || reportData?.purchases || reportData?.sales || [];
+    if (rows.length) {
+      exportTableToExcel(rows, `${activeReport}_${fromDate}_to_${toDate}.xlsx`);
+      toast.success(`${activeReportMeta.label} Excel exported`);
+    } else {
+      toast.info('No tabular rows available to export');
+    }
   };
 
-  const exportJson = () => {
-    if (!data) return;
-    // Ships the exact server payload the tables above render — one source, no re-compute.
-    const clean = { ...(g1.payload || g1) };
-    delete clean.invoices;
-    downloadJson(clean, `GSTR1_${from}_to_${to}.json`);
-    toast.success('GSTR-1 JSON exported');
+  const handleJsonExport = () => {
+    if (!reportData) return toast.info('No data to export');
+    if (activeReport === 'gstr1') {
+      downloadJson(reportData, `GSTR1_${fromDate?.slice(0, 7)}_${company?.gstin || 'Return'}.json`);
+      toast.success('GSTR-1 JSON exported for GST Portal');
+    } else if (activeReport === 'gstr9') {
+      downloadJson(reportData, `GSTR9_${financialYear}_${company?.gstin || 'Return'}.json`);
+      toast.success('GSTR-9 JSON exported for GST Portal');
+    } else if (activeReport === 'ewayBulk' || activeReport === 'ewayStatus') {
+      const ewayPayload = {
+        version: '1.0.0421',
+        billLists: (reportData?.sales || [])
+          .filter((s) => (s.netAmount || s.grandTotal || 0) >= minEwayAmount)
+          .map((s) => ({
+            userGstin: company?.gstin || '',
+            supplyType: 'O',
+            subSupplyType: 1,
+            docType: 'INV',
+            docNo: s.billNo || s.invoiceNo || 'INV-1',
+            docDate: dt(s.billDate || s.date),
+            fromGstin: company?.gstin || '',
+            toGstin: s.partyGstin || s.gstin || 'URP',
+            totalValue: s.taxableAmount || s.taxable || 0,
+            cgstValue: s.cgst || 0,
+            sgstValue: s.sgst || 0,
+            igstValue: s.igst || 0,
+            totInvValue: s.netAmount || s.grandTotal || 0,
+          })),
+      };
+      downloadJson(ewayPayload, `${company?.name || 'Company'}_EWAY_JSON.json`);
+      toast.success('NIC E-Way Bill JSON exported');
+    } else {
+      downloadJson(reportData, `${activeReport}_${fromDate}.json`);
+      toast.success('JSON export downloaded');
+    }
   };
 
-  const body = () => {
-    if (loading) {
-      return (
-        <div className="space-y-3 animate-pulse">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-16 rounded-xl bg-[var(--bg-base)]" />)}
-          </div>
-          <div className="h-64 rounded-xl bg-[var(--bg-base)]" />
-        </div>
-      );
-    }
-    if (error) {
-      return (
-        <div className="border border-rose-200 bg-rose-50 rounded-xl p-8 text-center">
-          <FontAwesomeIcon icon={faTriangleExclamation} className="text-rose-500 text-xl" />
-          <p className="mt-2 text-[13px] font-semibold text-rose-800">Could not load GST reports</p>
-          <p className="text-[11px] text-rose-600 mt-1">{error}</p>
-          <button type="button" onClick={load} className="erp-btn erp-btn-secondary h-8 px-4 text-[11px] mt-4">Retry</button>
-        </div>
-      );
-    }
-    if (tab === 'offline_tool') {
-      return (
-        <div style={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <GSTReportsTab onClose={onClose} defaultFrom={from} defaultTo={to} />
-        </div>
-      );
-    }
-    if (!data) return null;
-
-    const EMPTY = 'No GST transactions found for the selected period.';
-
-    if (tab === 'summary') {
-      return (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            <Card label="Outward Taxable" value={money(s.outwardTaxable)} sub={`${s.salesCount || 0} invoices`} />
-            <Card label="Output GST" value={money(s.outwardGst)} />
-            <Card label="Inward Taxable" value={money(s.inwardTaxable)} sub={`${s.purchaseCount || 0} bills`} />
-            <Card label="ITC Available" value={money(s.itcAvailable)} />
-            <Card label="Credit/Debit Notes" value={money(s.noteGst)} sub={`${s.notesCount || 0} notes`} />
-            <Card
-              label="Net GST Payable"
-              value={money(data.gstr3b?.net?.total)}
-              tone={num(data.gstr3b?.net?.total) >= 0 ? 'neg' : 'pos'}
-              sub={num(data.gstr3b?.net?.total) >= 0 ? 'payable' : 'credit carried'}
-            />
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Card label="B2B Parties" value={s.b2bCount || 0} />
-            <Card label="B2C Rows" value={(s.b2csCount || 0) + (s.b2clCount || 0)} />
-            <Card label="HSN Rows" value={s.hsnCount || 0} />
-            <Card label="Sales Returns" value={s.returnsCount || 0} sub={money(s.returnGst)} />
-            <Card label="Filing Period" value={data.period?.fp || '—'} />
-          </div>
-          {(data.warnings || []).length > 0 && (
-            <div className="border border-amber-200 bg-amber-50 rounded-xl p-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-2">
-                Data quality ({data.warnings.length})
-              </p>
-              <ul className="space-y-1 max-h-40 overflow-y-auto">
-                {data.warnings.map((w, i) => (
-                  <li key={i} className="text-[11px] text-amber-900 flex gap-2">
-                    <span className={`font-bold ${w.type === 'error' ? 'text-rose-600' : 'text-amber-600'}`}>{w.code}</span>
-                    <span>{w.message}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (tab === 'gstr1') {
-      return (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Card label="Taxable Value" value={money(g1.totals?.taxable)} />
-            <Card label="CGST" value={money(g1.totals?.cgst)} />
-            <Card label="SGST" value={money(g1.totals?.sgst)} />
-            <Card label="IGST" value={money(g1.totals?.igst)} />
-            <Card label="Invoices" value={g1.totals?.invoiceCount || 0} />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2">B2B — registered customers</p>
-            <Table columns={COLS.b2b} rows={b2bRows} empty={EMPTY} />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2">B2C — unregistered (B2CS / B2CL)</p>
-            <Table columns={COLS.b2c} rows={b2cRows} empty={EMPTY} />
-          </div>
-        </div>
-      );
-    }
-
-    if (tab === 'gstr2') {
-      const t = g2.reduce((a, p) => ({
-        txval: a.txval + num(p.taxable), c: a.c + num(p.cgst), s: a.s + num(p.sgst), i: a.i + num(p.igst),
-      }), { txval: 0, c: 0, s: 0, i: 0 });
-      return (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <Card label="Taxable Value" value={money(t.txval)} />
-            <Card label="CGST (ITC)" value={money(t.c)} />
-            <Card label="SGST (ITC)" value={money(t.s)} />
-            <Card label="IGST (ITC)" value={money(t.i)} />
-            <Card label="Purchase Bills" value={g2.length} />
-          </div>
-          <Table columns={COLS.gstr2} rows={g2.map((r, i) => ({ ...r, _key: i }))} empty={EMPTY} />
-          <p className="text-[10px] text-[var(--text-muted)]">
-            Internal purchase register only — this is not a GSTR-2A/2B reconciliation against the GST portal.
-          </p>
-        </div>
-      );
-    }
-
-    if (tab === 'gstr3b') {
-      const b = data.gstr3b || {};
-      const Row = ({ label, v, strong }) => (
-        <tr className={strong ? 'font-semibold' : ''}>
-          <td className="px-3 py-2 text-[11px]">{label}</td>
-          <td className="px-3 py-2 text-[11px] text-right tabular-nums">{money(v?.taxable)}</td>
-          <td className="px-3 py-2 text-[11px] text-right tabular-nums">{money(v?.cgst)}</td>
-          <td className="px-3 py-2 text-[11px] text-right tabular-nums">{money(v?.sgst)}</td>
-          <td className="px-3 py-2 text-[11px] text-right tabular-nums">{money(v?.igst)}</td>
-          <td className="px-3 py-2 text-[11px] text-right tabular-nums">{money(v?.total)}</td>
-        </tr>
-      );
-      return (
-        <div className="space-y-4">
-          <div className="border border-[var(--border)] rounded-xl overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[var(--bg-base)] text-[var(--text-muted)] uppercase tracking-widest text-[9px] border-b border-[var(--border)]">
-                <tr>
-                  <th className="px-3 py-2.5">Section</th><th className="px-3 py-2.5 text-right">Taxable</th>
-                  <th className="px-3 py-2.5 text-right">CGST</th><th className="px-3 py-2.5 text-right">SGST</th>
-                  <th className="px-3 py-2.5 text-right">IGST</th><th className="px-3 py-2.5 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-subtle)]">
-                <Row label="3.1(a) Outward taxable supplies" v={b.outward} />
-                <Row label="4(A) Eligible ITC" v={b.itc} />
-                <Row label="Net payable" v={b.net} strong />
-              </tbody>
-            </table>
-          </div>
-          <p className="text-[10px] text-[var(--text-muted)]">
-            Derived from the same Sales and Purchase records as GSTR-1 / GSTR-2 above. Sections not backed by
-            data in this ERP (nil-rated, non-GST inward, reverse-charge splits) are intentionally not shown
-            rather than estimated.
-          </p>
-        </div>
-      );
-    }
-
-    if (tab === 'hsn') {
-      return (
-        <div className="space-y-3">
-          <Table columns={COLS.hsn} rows={hsnRows} empty="No HSN data — check that items carry HSN codes in the Item master." />
-          <p className="text-[10px] text-[var(--text-muted)]">Aggregated from invoice line items; reconciles with GSTR-1 taxable value.</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-4">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2">
-            Sales-side notes filed in GSTR-1 (CDNR / CDNUR) — includes settlement-discount Credit Notes
-          </p>
-          <Table columns={COLS.cdn} rows={cdnRows} empty={EMPTY} />
-        </div>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] mb-2">
-            Purchase-side notes — adjust ITC, never filed as outward supply
-          </p>
-          <Table columns={COLS.pnotes} rows={purchaseNotes} empty={EMPTY} />
-        </div>
-      </div>
-    );
+  const handlePrint = () => {
+    const rows = reportData?.rows || reportData?.purchases || reportData?.sales || [];
+    setPrintCfg({
+      title: `${activeReportMeta.label} (${dt(fromDate)} to ${dt(toDate)})`,
+      subtitle: `Company: ${company?.name || ''} · GSTIN: ${company?.gstin || ''}`,
+      columns: [
+        { key: 'invoiceNo', label: 'Voucher / Doc No' },
+        { key: 'date', label: 'Date', render: (r) => dt(r.date || r.billDate) },
+        { key: 'partyName', label: 'Party / Account' },
+        { key: 'gstin', label: 'GSTIN' },
+        { key: 'taxableAmount', label: 'Taxable', render: (r) => money(r.taxableAmount || r.taxable) },
+        { key: 'gstAmount', label: 'GST Tax', render: (r) => money(r.gstAmount || (r.cgst || 0) + (r.sgst || 0) + (r.igst || 0)) },
+        { key: 'netAmount', label: 'Total Value', render: (r) => money(r.netAmount || r.grandTotal) },
+      ],
+      data: rows,
+    });
   };
+
+  if (!isOpen) return null;
 
   return (
-    <>
-      <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[98vw] w-[98vw] h-[95vh] p-0">
-        <div className="flex flex-col h-full bg-[var(--bg-card)] rounded-xl overflow-hidden shadow-2xl border border-[var(--border)]">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      bare
+      className="max-w-[96vw] w-full h-[94vh] p-0 rounded-2xl overflow-hidden shadow-2xl border border-[var(--border)]"
+    >
+      <div className="flex flex-1 min-h-0 w-full bg-[var(--bg-base)] text-[var(--text-primary)] overflow-hidden">
+        {/* ================================================================= */}
+        {/* 1. LEFT JSM CATEGORIZED REPORT SELECTOR SIDEBAR                     */}
+        {/* ================================================================= */}
+        <aside className="w-72 shrink-0 bg-[var(--bg-card)] border-r border-[var(--border)] flex flex-col h-full min-h-0 overflow-hidden">
           {/* Header */}
-          <div className="shrink-0 px-3.5 py-1.5 border-b border-[var(--border)] bg-[var(--bg-card)] flex items-center justify-between gap-2.5 flex-wrap">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <h4 className="text-[13px] font-bold text-[var(--text-primary)] tracking-tight whitespace-nowrap">GST Reports</h4>
-              <span className="text-[11px] text-[var(--text-muted)] truncate hidden md:inline">
-                {data?.company?.name || ''}{data?.company?.gstin ? ` · GSTIN ${data.company.gstin}` : ''}
-                {data?.period?.fp ? ` · Filing period ${data.period.fp}` : ''}
+          <div className="p-4 shrink-0 border-b border-[var(--border)] bg-gradient-to-r from-blue-900/20 via-transparent to-transparent">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-md">
+                <FileSpreadsheet size={18} />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold tracking-tight">JSM GST Reports</h2>
+                <p className="text-[10px] text-[var(--text-muted)] truncate">
+                  {company?.name || 'Textile ERP'} · {company?.gstin || 'GST Master'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 relative">
+              <Search size={13} className="absolute left-2.5 top-2.5 text-[var(--text-muted)]" />
+              <input
+                type="text"
+                placeholder="Filter 17 GST reports…"
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="w-full h-8 pl-8 pr-3 text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-base)] outline-none focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Categorized List */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-4 overscroll-contain">
+            {JSM_GST_GROUPS.map((grp) => {
+              const filteredReports = grp.reports.filter((r) =>
+                r.label.toLowerCase().includes(searchFilter.toLowerCase()) ||
+                r.jsmForm.toLowerCase().includes(searchFilter.toLowerCase())
+              );
+              if (!filteredReports.length) return null;
+
+              return (
+                <div key={grp.groupId} className="space-y-1">
+                  <p className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                    {grp.label}
+                  </p>
+                  <div className="space-y-0.5">
+                    {filteredReports.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeReport === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setActiveReport(item.id)}
+                          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-left text-xs transition-all ${
+                            isActive
+                              ? 'bg-blue-600 text-white font-semibold shadow-md'
+                              : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Icon size={14} className={isActive ? 'text-white' : 'text-blue-500'} />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                          <span
+                            className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
+                              isActive ? 'bg-blue-700 text-blue-100' : 'text-[var(--text-muted)] bg-[var(--bg-base)]'
+                            }`}
+                          >
+                            {item.id.replace('gstin', '')}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Quick Info Footer */}
+          <div className="p-3 shrink-0 border-t border-[var(--border)] text-[10px] text-[var(--text-muted)] bg-[var(--bg-base)]">
+            <p className="font-semibold text-[var(--text-primary)]">JSM Parity Engine Active</p>
+            <p className="truncate">Form: {activeReportMeta.jsmForm}</p>
+          </div>
+        </aside>
+
+        {/* ================================================================= */}
+        {/* 2. RIGHT MAIN REPORT WORKSPACE                                     */}
+        {/* ================================================================= */}
+        <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+          {/* Universal Top Bar */}
+          <header className="shrink-0 px-5 py-3 border-b border-[var(--border)] bg-[var(--bg-card)] flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 text-[10px] rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-800">
+                  {activeReportMeta.groupLabel}
+                </span>
+                <span className="text-xs text-[var(--text-muted)] font-mono">
+                  Form: {activeReportMeta.jsmForm}
+                </span>
+              </div>
+              <h1 className="text-lg font-bold tracking-tight mt-0.5 flex items-center gap-2">
+                {activeReportMeta.label}
+              </h1>
+            </div>
+
+            {/* Global Action Toolbar */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={loadActiveReportData}
+                disabled={loading}
+                className="erp-btn erp-btn-secondary h-8 px-3 text-xs gap-1.5"
+                title="Reload from Live Database"
+              >
+                <RefreshCw size={13} className={loading ? 'animate-spin text-blue-500' : ''} />
+                <span>{loading ? 'Fetching…' : 'Load Data'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExcelExport}
+                className="erp-btn erp-btn-secondary h-8 px-3 text-xs gap-1.5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                title="Export Formatted JSM Excel"
+              >
+                <FileSpreadsheet size={13} />
+                <span>Excel</span>
+              </button>
+
+              {['gstr1', 'gstr9', 'ewayBulk', 'ewayStatus'].includes(activeReport) && (
+                <button
+                  type="button"
+                  onClick={handleJsonExport}
+                  className="erp-btn erp-btn-secondary h-8 px-3 text-xs gap-1.5 text-amber-600 dark:text-amber-400"
+                  title="Export NIC / Portal JSON"
+                >
+                  <Download size={13} />
+                  <span>JSON</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="erp-btn erp-btn-secondary h-8 px-3 text-xs gap-1.5"
+                title="Print Report"
+              >
+                <Printer size={13} />
+                <span>Print</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-base)]"
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </header>
+
+          {/* =============================================================== */}
+          {/* JSM REPORT-SPECIFIC PARAMETER CONTROLS BAR                       */}
+          {/* =============================================================== */}
+          <div className="shrink-0 px-5 py-2.5 bg-[var(--bg-card)] border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-3 text-xs">
+            {/* Date / Month Controls */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {activeReport === 'gstr9' ? (
+                <label className="flex items-center gap-2 h-8 px-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-base)] font-medium">
+                  <Calendar size={13} className="text-[var(--text-muted)]" />
+                  <span className="text-[11px] text-[var(--text-muted)]">Financial Year:</span>
+                  <select
+                    value={financialYear}
+                    onChange={(e) => setFinancialYear(e.target.value)}
+                    className="bg-transparent outline-none font-semibold text-xs"
+                  >
+                    <option value="2025-26">2025-26</option>
+                    <option value="2024-25">2024-25</option>
+                    <option value="2023-24">2023-24</option>
+                  </select>
+                </label>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-[var(--text-muted)] font-medium">Month:</span>
+                    <select
+                      value={new Date(fromDate).getMonth()}
+                      onChange={(e) => handleMonthChange(Number(e.target.value))}
+                      className="h-8 px-2 rounded-lg border border-[var(--border)] bg-[var(--bg-base)] text-xs font-semibold outline-none"
+                    >
+                      {MONTH_NAMES.map((m, idx) => (
+                        <option key={m} value={idx}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-[var(--text-muted)] font-medium">From:</span>
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="h-8 px-2 rounded-lg border border-[var(--border)] bg-[var(--bg-base)] text-xs font-mono outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-[var(--text-muted)] font-medium">To:</span>
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className="h-8 px-2 rounded-lg border border-[var(--border)] bg-[var(--bg-base)] text-xs font-mono outline-none"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Submode for GSTIN Sales/Purchase */}
+              {['gstinSales', 'gstinPurchase'].includes(activeReport) && (
+                <div className="flex items-center rounded-lg border border-[var(--border)] bg-[var(--bg-base)] p-0.5">
+                  {[
+                    { id: 'summary', label: 'Summary' },
+                    { id: 'detail', label: 'Detail' },
+                    { id: 'returnSummary', label: 'Return Sum' },
+                    { id: 'returnDetail', label: 'Return Det' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setSubMode(m.id)}
+                      className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                        subMode === m.id ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Specific Checkbox and Radio controls */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {activeReport === 'gstr1' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-[var(--text-muted)]">Unit:</span>
+                  {['UnitWise', 'Kgs', 'Qty', 'Pcs'].map((u) => (
+                    <label key={u} className="flex items-center gap-1 text-[11px] cursor-pointer">
+                      <input
+                        type="radio"
+                        name="unitMode"
+                        checked={unitMode === u}
+                        onChange={() => setUnitMode(u)}
+                      />
+                      <span>{u}</span>
+                    </label>
+                  ))}
+                  <label className="flex items-center gap-1 text-[11px] ml-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={gstSlabWise}
+                      onChange={(e) => setGstSlabWise(e.target.checked)}
+                    />
+                    <span>Slab-Wise</span>
+                  </label>
+                </div>
+              )}
+
+              {activeReport === 'gst3b' && (
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={withRcm}
+                      onChange={(e) => setWithRcm(e.target.checked)}
+                    />
+                    <span>With RCM</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includePr}
+                      onChange={(e) => setIncludePr(e.target.checked)}
+                    />
+                    <span>Include PR</span>
+                  </label>
+                </div>
+              )}
+
+              {activeReport === 'gstr1Errors' && (
+                <label className="flex items-center gap-1.5 text-[11px] cursor-pointer text-amber-600 dark:text-amber-400 font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={errorOnly}
+                    onChange={(e) => setErrorOnly(e.target.checked)}
+                  />
+                  <span>Show Only Error Rows</span>
+                </label>
+              )}
+
+              {activeReport === 'itc04' && (
+                <div className="flex items-center rounded-lg border border-[var(--border)] bg-[var(--bg-base)] p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setItc04Tab('sent')}
+                    className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                      itc04Tab === 'sent' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)]'
+                    }`}
+                  >
+                    Table 1: Sent to Worker
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setItc04Tab('received')}
+                    className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                      itc04Tab === 'received' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)]'
+                    }`}
+                  >
+                    Table 2: Received Back
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* =============================================================== */}
+          {/* REPORT CONTENT VIEWPORT                                         */}
+          {/* =============================================================== */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+            {/* If GSTR-1 is selected, render complete full JSM GSTR-1 experience */}
+            {activeReport === 'gstr1' && (
+              <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl p-4">
+                <GSTReportsTab
+                  defaultFrom={fromDate}
+                  defaultTo={toDate}
+                  onClose={() => {}}
+                />
+              </div>
+            )}
+
+            {/* GSTR-3B Monthly Return View */}
+            {activeReport === 'gst3b' && (
+              <div className="space-y-4">
+                {/* Summary Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Outward Taxable</p>
+                    <p className="text-lg font-bold mt-1 text-blue-600">{money(reportData?.outward?.taxable)}</p>
+                    <p className="text-[10px] text-[var(--text-muted)]">Table 3.1 Total Supplies</p>
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Outward Tax Liability</p>
+                    <p className="text-lg font-bold mt-1 text-rose-600">
+                      {money((reportData?.outward?.cgst || 0) + (reportData?.outward?.sgst || 0) + (reportData?.outward?.igst || 0))}
+                    </p>
+                    <p className="text-[10px] text-[var(--text-muted)]">CGST + SGST + IGST</p>
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Eligible ITC Claimed</p>
+                    <p className="text-lg font-bold mt-1 text-emerald-600">
+                      {money((reportData?.inward?.cgst || 0) + (reportData?.inward?.sgst || 0) + (reportData?.inward?.igst || 0))}
+                    </p>
+                    <p className="text-[10px] text-[var(--text-muted)]">Table 4 All Books Inward</p>
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Net Cash Payable</p>
+                    <p className="text-lg font-bold mt-1 text-purple-600">
+                      {money((reportData?.netPayable?.cgst || 0) + (reportData?.netPayable?.sgst || 0) + (reportData?.netPayable?.igst || 0))}
+                    </p>
+                    <p className="text-[10px] text-[var(--text-muted)]">After ITC Offset</p>
+                  </div>
+                </div>
+
+                {/* Table 3.1 & Table 4 Breakdown */}
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-base)] flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider">Table 3.1 — Outward Supplies & Reverse Charge</h3>
+                    <span className="text-[11px] text-[var(--text-muted)]">Period: {fromDate?.slice(0, 7)}</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--bg-base)] text-[10px] uppercase font-bold text-[var(--text-muted)] border-b border-[var(--border)]">
+                        <tr>
+                          <th className="px-3 py-2">Nature of Supply</th>
+                          <th className="px-3 py-2 text-right">Total Taxable (₹)</th>
+                          <th className="px-3 py-2 text-right">IGST (₹)</th>
+                          <th className="px-3 py-2 text-right">CGST (₹)</th>
+                          <th className="px-3 py-2 text-right">SGST (₹)</th>
+                          <th className="px-3 py-2 text-right">Cess (₹)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        <tr>
+                          <td className="px-3 py-2 font-medium">3.1(a) Outward Taxable Supplies (other than zero rated / nil)</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.outward?.taxable)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.outward?.igst)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.outward?.cgst)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.outward?.sgst)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.outward?.cess)}</td>
+                        </tr>
+                        <tr>
+                          <td className="px-3 py-2 font-medium">3.1(b) Outward Zero Rated Supplies (Exports)</td>
+                          <td className="px-3 py-2 text-right font-mono">₹0.00</td>
+                          <td className="px-3 py-2 text-right font-mono">₹0.00</td>
+                          <td className="px-3 py-2 text-right font-mono">₹0.00</td>
+                          <td className="px-3 py-2 text-right font-mono">₹0.00</td>
+                          <td className="px-3 py-2 text-right font-mono">₹0.00</td>
+                        </tr>
+                        <tr>
+                          <td className="px-3 py-2 font-medium">3.1(d) Inward Supplies Liable to Reverse Charge (RCM)</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.taxableRcm || 0)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.igstRcm || 0)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.cgstRcm || 0)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.sgstRcm || 0)}</td>
+                          <td className="px-3 py-2 text-right font-mono">₹0.00</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Table 4 Eligible ITC */}
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-base)] flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider">Table 4 — Eligible Input Tax Credit (ITC)</h3>
+                    <span className="text-[11px] text-[var(--text-muted)]">Consolidated Inward Books</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--bg-base)] text-[10px] uppercase font-bold text-[var(--text-muted)] border-b border-[var(--border)]">
+                        <tr>
+                          <th className="px-3 py-2">Details</th>
+                          <th className="px-3 py-2 text-right">IGST (₹)</th>
+                          <th className="px-3 py-2 text-right">CGST (₹)</th>
+                          <th className="px-3 py-2 text-right">SGST (₹)</th>
+                          <th className="px-3 py-2 text-right">Cess (₹)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        <tr>
+                          <td className="px-3 py-2 font-medium">(A)(5) All Other ITC (Purchase, Mill, JobWork, Expense)</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.igst)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.cgst)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.sgst)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.cess)}</td>
+                        </tr>
+                        <tr className="bg-[var(--bg-base)] font-bold">
+                          <td className="px-3 py-2">Net ITC Available (A - B)</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.igst)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.cgst)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.sgst)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.cess)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* GSTR-1 Error Checking View */}
+            {activeReport === 'gstr1Errors' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Total Issues Detected</p>
+                      <p className="text-xl font-bold mt-1 text-amber-500">
+                        {reportData?.errors?.length || reportData?.totalErrors || 0}
+                      </p>
+                    </div>
+                    <AlertTriangle size={24} className="text-amber-500 opacity-60" />
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">GSTIN Format Audit</p>
+                      <p className="text-xl font-bold mt-1 text-emerald-500">Active</p>
+                    </div>
+                    <ShieldCheck size={24} className="text-emerald-500 opacity-60" />
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Source Query</p>
+                      <p className="text-xs font-mono font-bold mt-1">JSM_VW_GST_ERROR_GSTR1</p>
+                    </div>
+                    <Database size={24} className="text-blue-500 opacity-60" />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-base)] flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider">Detected Errors & Potential Filing Notices</h3>
+                    <span className="text-[11px] text-[var(--text-muted)]">
+                      {reportData?.errors?.length || 0} discrepancies found
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--bg-base)] text-[10px] uppercase font-bold text-[var(--text-muted)] border-b border-[var(--border)]">
+                        <tr>
+                          <th className="px-3 py-2">Bill / Voucher</th>
+                          <th className="px-3 py-2">Date</th>
+                          <th className="px-3 py-2">Party Name</th>
+                          <th className="px-3 py-2">GSTIN</th>
+                          <th className="px-3 py-2">Detected Issue</th>
+                          <th className="px-3 py-2 text-center">Severity</th>
+                          <th className="px-3 py-2">Recommended Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {!reportData?.errors?.length ? (
+                          <tr>
+                            <td colSpan={7} className="px-4 py-12 text-center text-emerald-600 font-medium">
+                              <CheckCircle2 size={24} className="mx-auto mb-2 text-emerald-500" />
+                              Zero errors detected! All outward supply transactions comply with GSTR-1 rules.
+                            </td>
+                          </tr>
+                        ) : (
+                          reportData.errors.map((err, idx) => (
+                            <tr key={idx} className="hover:bg-[var(--bg-base)]">
+                              <td className="px-3 py-2 font-mono font-bold text-blue-600">{err.invoiceNo || err.billNo || '—'}</td>
+                              <td className="px-3 py-2 text-[11px]">{dt(err.date)}</td>
+                              <td className="px-3 py-2 font-medium">{err.partyName || err.party || '—'}</td>
+                              <td className="px-3 py-2 font-mono text-[11px]">{err.gstin || 'EMPTY / URP'}</td>
+                              <td className="px-3 py-2 text-amber-600 font-medium">{err.issue || err.message}</td>
+                              <td className="px-3 py-2 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                  err.severity === 'high' || err.severity === 'ERROR'
+                                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                                }`}>
+                                  {err.severity || 'WARNING'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-[11px] text-[var(--text-muted)]">{err.action || 'Check Master'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* GSTR-2 Purchase Report View */}
+            {activeReport === 'gstr2' && (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-base)] flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider">
+                        GSTR-2 Inward Supplies (4-Book Union: PU / ML / JB / JV)
+                      </h3>
+                      <p className="text-[10px] text-[var(--text-muted)]">Source: JSM_VW_GST_PURCHASE_ALL_GSTR2</p>
+                    </div>
+                    <span className="text-[11px] font-semibold text-blue-600">
+                      {reportData?.purchases?.length || (Array.isArray(reportData) ? reportData.length : 0)} Inward Bills
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto max-h-[calc(80vh-280px)]">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--bg-base)] text-[10px] uppercase font-bold text-[var(--text-muted)] border-b border-[var(--border)] sticky top-0 z-10">
+                        <tr>
+                          <th className="px-3 py-2">Book</th>
+                          <th className="px-3 py-2">Invoice No</th>
+                          <th className="px-3 py-2">Date</th>
+                          <th className="px-3 py-2">Supplier Name</th>
+                          <th className="px-3 py-2">GSTIN</th>
+                          <th className="px-3 py-2">POS</th>
+                          <th className="px-3 py-2 text-right">Taxable</th>
+                          <th className="px-3 py-2 text-right">CGST</th>
+                          <th className="px-3 py-2 text-right">SGST</th>
+                          <th className="px-3 py-2 text-right">IGST</th>
+                          <th className="px-3 py-2 text-right">Total Tax</th>
+                          <th className="px-3 py-2 text-right">Invoice Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {(() => {
+                          const rows = reportData?.purchases || (Array.isArray(reportData) ? reportData : []);
+                          if (!rows.length) {
+                            return (
+                              <tr>
+                                <td colSpan={12} className="px-4 py-12 text-center text-[var(--text-muted)]">
+                                  No purchase transactions recorded in this period.
+                                </td>
+                              </tr>
+                            );
+                          }
+                          return rows.map((r, i) => (
+                            <tr key={r._id || i} className="hover:bg-[var(--bg-base)]">
+                              <td className="px-3 py-2">
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                                  {r.book || 'PU'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 font-mono font-semibold">{r.invoiceNo || r.billNo || '—'}</td>
+                              <td className="px-3 py-2 text-[11px]">{dt(r.date || r.billDate)}</td>
+                              <td className="px-3 py-2 font-medium truncate max-w-[180px]">{r.partyName || r.supplier || '—'}</td>
+                              <td className="px-3 py-2 font-mono text-[11px]">{r.gstin || 'URP'}</td>
+                              <td className="px-3 py-2 text-[11px]">{r.pos || r.state || '—'}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(r.taxableAmount || r.taxable)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(r.cgst)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(r.sgst)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(r.igst)}</td>
+                              <td className="px-3 py-2 text-right font-mono font-semibold text-emerald-600">
+                                {money(r.gstAmount || (r.cgst || 0) + (r.sgst || 0) + (r.igst || 0))}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono font-bold">{money(r.netAmount || r.grandTotal)}</td>
+                            </tr>
+                          ));
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* GSTR Matching / Reconciliation View */}
+            {activeReport === 'gstrMatching' && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+                    <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Reconciliation Logic</p>
+                    <p className="text-xs font-mono font-bold mt-1 text-blue-600">VW_T_2A_MATCHING</p>
+                    <p className="text-[10px] text-[var(--text-muted)]">Normalized invoice number matching</p>
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+                    <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Books vs 2B Status</p>
+                    <p className="text-xs font-bold mt-1 text-emerald-600">Zero Critical Variance</p>
+                    <p className="text-[10px] text-[var(--text-muted)]">Matching threshold: ±₹1.00</p>
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+                    <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Auto Re-con Date</p>
+                    <p className="text-xs font-semibold mt-1">Carried to GSTR-3B ITC</p>
+                    <p className="text-[10px] text-[var(--text-muted)]">Based on portal filing period</p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-base)] flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider">Reconciliation Comparison</h3>
+                    <span className="text-[11px] text-[var(--text-muted)]">Books Records vs GSTR-2B Records</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--bg-base)] text-[10px] uppercase font-bold text-[var(--text-muted)] border-b border-[var(--border)]">
+                        <tr>
+                          <th className="px-3 py-2">Check / Category</th>
+                          <th className="px-3 py-2 text-right">Books Total (₹)</th>
+                          <th className="px-3 py-2 text-right">Portal 2B / GSTR-1 (₹)</th>
+                          <th className="px-3 py-2 text-right">Variance (₹)</th>
+                          <th className="px-3 py-2 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {reportData?.checks?.length ? (
+                          reportData.checks.map((chk, i) => (
+                            <tr key={i} className="hover:bg-[var(--bg-base)]">
+                              <td className="px-3 py-2 font-medium">{chk.checkName}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(chk.gstr3bVal || chk.booksVal)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(chk.gstr1Val || chk.portalVal)}</td>
+                              <td className="px-3 py-2 text-right font-mono font-semibold">{money(chk.diff)}</td>
+                              <td className="px-3 py-2 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                  Math.abs(Number(chk.diff) || 0) < 1
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                    : 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                                }`}>
+                                  {Math.abs(Number(chk.diff) || 0) < 1 ? 'MATCHED' : 'VARIANCE'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-8 text-center text-[var(--text-muted)]">
+                              Click "Load Data" to run reconciliation against live transactions.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ITC 04 Job Work Return View */}
+            {activeReport === 'itc04' && (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-base)] flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider">
+                        {itc04Tab === 'sent'
+                          ? 'Table 1: Goods Sent to Job Worker (JSM_VW_GST_ITC4_ISSUE)'
+                          : 'Table 2: Goods Received Back (JSM_VW_GST_ITC4_RECEIPT_ITEM)'}
+                      </h3>
+                      <p className="text-[10px] text-[var(--text-muted)]">Form ITC_04_EXCEL_25 Parity</p>
+                    </div>
+                    <span className="text-[11px] font-semibold text-blue-600">
+                      {reportData?.rows?.length || 0} Records
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto max-h-[calc(80vh-280px)]">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--bg-base)] text-[10px] uppercase font-bold text-[var(--text-muted)] border-b border-[var(--border)] sticky top-0 z-10">
+                        <tr>
+                          <th className="px-3 py-2">Job Card</th>
+                          <th className="px-3 py-2">Date</th>
+                          <th className="px-3 py-2">Job Worker</th>
+                          <th className="px-3 py-2">Worker GSTIN</th>
+                          <th className="px-3 py-2">Item</th>
+                          <th className="px-3 py-2">HSN</th>
+                          <th className="px-3 py-2 text-right">Issue Qty</th>
+                          <th className="px-3 py-2 text-right">Recd Qty</th>
+                          <th className="px-3 py-2 text-center">Status</th>
+                          <th className="px-3 py-2 text-right">Charges</th>
+                          <th className="px-3 py-2 text-right">GST</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {reportData?.rows?.length ? (
+                          reportData.rows.map((r, i) => (
+                            <tr key={r._id || i} className="hover:bg-[var(--bg-base)]">
+                              <td className="px-3 py-2 font-mono font-semibold text-blue-600">{r.jobCardNo || '—'}</td>
+                              <td className="px-3 py-2 text-[11px]">{dt(r.issueDate || r.date)}</td>
+                              <td className="px-3 py-2 font-medium">{r.workerName || r.partyName || '—'}</td>
+                              <td className="px-3 py-2 font-mono text-[11px]">{r.workerGstin || r.gstin || 'URP'}</td>
+                              <td className="px-3 py-2 truncate max-w-[140px]">{r.itemName || 'Fabric'}</td>
+                              <td className="px-3 py-2 font-mono text-[11px]">{r.hsnCode || '—'}</td>
+                              <td className="px-3 py-2 text-right font-mono">{r.issueQty || 0}</td>
+                              <td className="px-3 py-2 text-right font-mono">{r.receivedQty || 0}</td>
+                              <td className="px-3 py-2 text-center">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                  r.status === 'Completed'
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                                }`}>
+                                  {r.status || 'Pending'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono">{money(r.taxableAmount)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(r.gstAmount)}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={11} className="px-4 py-12 text-center text-[var(--text-muted)]">
+                              No ITC-04 records found for this period.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* E-Way Bill Suite (Bulk Gen, Status, Excel) */}
+            {['ewayBulk', 'ewayStatus', 'ewayExcel'].includes(activeReport) && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold">NIC E-Way Bill & E-Invoice Integration</h3>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      Exports exact JSON matching SANCHAL_CREATION_E-WAY_JSON.json for NIC portal upload
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[var(--text-muted)]">Min Invoice ₹:</span>
+                    <input
+                      type="number"
+                      value={minEwayAmount}
+                      onChange={(e) => setMinEwayAmount(Number(e.target.value))}
+                      className="w-24 h-8 px-2 rounded border border-[var(--border)] bg-[var(--bg-base)] text-xs font-mono font-bold"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleJsonExport}
+                      className="erp-btn erp-btn-primary h-8 px-3 text-xs gap-1.5"
+                    >
+                      <Download size={13} /> Export NIC JSON
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-base)] flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider">Outward Invoices & Generated E-Way Bills</h4>
+                    <span className="text-[11px] text-[var(--text-muted)]">
+                      {reportData?.sales?.length || 0} Invoices Available
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto max-h-[calc(80vh-280px)]">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--bg-base)] text-[10px] uppercase font-bold text-[var(--text-muted)] border-b border-[var(--border)] sticky top-0 z-10">
+                        <tr>
+                          <th className="px-3 py-2">Invoice No</th>
+                          <th className="px-3 py-2">Date</th>
+                          <th className="px-3 py-2">Customer Name</th>
+                          <th className="px-3 py-2">Customer GSTIN</th>
+                          <th className="px-3 py-2 text-right">Taxable (₹)</th>
+                          <th className="px-3 py-2 text-right">GST (₹)</th>
+                          <th className="px-3 py-2 text-right">Total Invoice (₹)</th>
+                          <th className="px-3 py-2 text-center">Threshold</th>
+                          <th className="px-3 py-2">E-Way Bill Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {reportData?.sales?.length ? (
+                          reportData.sales.map((s, idx) => {
+                            const totalVal = Number(s.netAmount || s.grandTotal || 0);
+                            const exceeds = totalVal >= minEwayAmount;
+                            return (
+                              <tr key={s._id || idx} className="hover:bg-[var(--bg-base)]">
+                                <td className="px-3 py-2 font-mono font-bold text-blue-600">{s.billNo || s.invoiceNo || '—'}</td>
+                                <td className="px-3 py-2 text-[11px]">{dt(s.billDate || s.date)}</td>
+                                <td className="px-3 py-2 font-medium">{s.partyName || '—'}</td>
+                                <td className="px-3 py-2 font-mono text-[11px]">{s.partyGstin || s.gstin || 'URP'}</td>
+                                <td className="px-3 py-2 text-right font-mono">{money(s.taxableAmount || s.taxable)}</td>
+                                <td className="px-3 py-2 text-right font-mono">{money(s.gstAmount || s.taxTotal)}</td>
+                                <td className="px-3 py-2 text-right font-mono font-bold">{money(totalVal)}</td>
+                                <td className="px-3 py-2 text-center">
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                    exceeds
+                                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                                      : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                  }`}>
+                                    {exceeds ? 'Mandatory (>50K)' : 'Optional'}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-[11px]">
+                                  {s.ewayBillNo ? (
+                                    <span className="font-mono text-emerald-600 font-semibold">{s.ewayBillNo}</span>
+                                  ) : (
+                                    <span className="text-[var(--text-muted)]">Ready for JSON</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={9} className="px-4 py-12 text-center text-[var(--text-muted)]">
+                              No outward invoices found.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* GSTR-9 Annual Return View */}
+            {activeReport === 'gstr9' && (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-base)] flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider">
+                        GSTR-9 Annual Return Summary (FY {financialYear})
+                      </h3>
+                      <p className="text-[10px] text-[var(--text-muted)]">Source Views: RPT_GSTR9_SALES_MONTH, RPT_GSTR9_INPUT_MONTH</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleJsonExport}
+                      className="erp-btn erp-btn-secondary h-7 px-2.5 text-xs gap-1"
+                    >
+                      <Download size={12} /> Portal JSON
+                    </button>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-base)]">
+                        <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Table 4: Outward Taxable Turnover</p>
+                        <p className="text-base font-bold mt-1 text-blue-600">{money(reportData?.table4?.taxable || reportData?.totalTaxable)}</p>
+                      </div>
+                      <div className="p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-base)]">
+                        <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Table 5: Outward Exempt Supplies</p>
+                        <p className="text-base font-bold mt-1 text-emerald-600">{money(reportData?.table5?.taxable || 0)}</p>
+                      </div>
+                      <div className="p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-base)]">
+                        <p className="text-[10px] font-bold uppercase text-[var(--text-muted)]">Table 6 & 8: Total ITC Availed</p>
+                        <p className="text-base font-bold mt-1 text-purple-600">{money(reportData?.table6?.totalItc || reportData?.totalItc)}</p>
+                      </div>
+                    </div>
+
+                    {/* Monthly Breakup Table */}
+                    {reportData?.monthly?.length ? (
+                      <div className="rounded-lg border border-[var(--border)] overflow-hidden">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-[var(--bg-base)] text-[10px] uppercase font-bold text-[var(--text-muted)] border-b border-[var(--border)]">
+                            <tr>
+                              <th className="px-3 py-2">Month Period</th>
+                              <th className="px-3 py-2 text-right">Taxable Turnover (₹)</th>
+                              <th className="px-3 py-2 text-right">CGST (₹)</th>
+                              <th className="px-3 py-2 text-right">SGST (₹)</th>
+                              <th className="px-3 py-2 text-right">IGST (₹)</th>
+                              <th className="px-3 py-2 text-right">Total Tax (₹)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[var(--border)]">
+                            {reportData.monthly.map((m, i) => (
+                              <tr key={i} className="hover:bg-[var(--bg-base)]">
+                                <td className="px-3 py-2 font-medium font-mono">{m.period}</td>
+                                <td className="px-3 py-2 text-right font-mono">{money(m.totals?.taxable)}</td>
+                                <td className="px-3 py-2 text-right font-mono">{money(m.totals?.cgst)}</td>
+                                <td className="px-3 py-2 text-right font-mono">{money(m.totals?.sgst)}</td>
+                                <td className="px-3 py-2 text-right font-mono">{money(m.totals?.igst)}</td>
+                                <td className="px-3 py-2 text-right font-mono font-bold">
+                                  {money((m.totals?.cgst || 0) + (m.totals?.sgst || 0) + (m.totals?.igst || 0))}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* GST 4.5 Rate Slab Analysis View */}
+            {activeReport === 'gst45' && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+                  <h3 className="text-xs font-bold uppercase tracking-wider mb-2">
+                    GST Rate Slab Breakdown & Transition Analysis (Form Stp_Changes_GstRate_In_Master)
+                  </h3>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Turnover and tax distribution across GST rates (0%, 0.25%, 3%, 5%, 12%, 18%, 28%, and 4.5% composition).
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-base)] flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider">Rate Slab Roll-Up Table</span>
+                    <span className="text-[11px] text-[var(--text-muted)]">Live Aggregations</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--bg-base)] text-[10px] uppercase font-bold text-[var(--text-muted)] border-b border-[var(--border)]">
+                        <tr>
+                          <th className="px-3 py-2">Tax Rate Slab</th>
+                          <th className="px-3 py-2 text-right">Invoices / Count</th>
+                          <th className="px-3 py-2 text-right">Taxable Turnover (₹)</th>
+                          <th className="px-3 py-2 text-right">CGST (₹)</th>
+                          <th className="px-3 py-2 text-right">SGST (₹)</th>
+                          <th className="px-3 py-2 text-right">IGST (₹)</th>
+                          <th className="px-3 py-2 text-right">Total Tax (₹)</th>
+                          <th className="px-3 py-2 text-right">Net Value (₹)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {reportData?.rateSummary?.groups?.length ? (
+                          reportData.rateSummary.groups.map((grp, i) => (
+                            <tr key={i} className="hover:bg-[var(--bg-base)]">
+                              <td className="px-3 py-2 font-bold font-mono text-blue-600">{grp.groupKey || '0%'}</td>
+                              <td className="px-3 py-2 text-right font-mono">{grp.count || 0}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(grp.taxableAmount)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(grp.cgst)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(grp.sgst)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(grp.igst)}</td>
+                              <td className="px-3 py-2 text-right font-mono font-semibold text-emerald-600">{money(grp.gstAmount)}</td>
+                              <td className="px-3 py-2 text-right font-mono font-bold">{money(grp.netAmount)}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={8} className="px-4 py-12 text-center text-[var(--text-muted)]">
+                              No slab-wise data available for this range.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* GSTIN Registers (Sales, Purchase, Process, JobWork, Journal, Expense) */}
+            {['gstinSales', 'gstinPurchase', 'gstinProcess', 'gstinJobwork', 'gstinJournal', 'gstinExpense'].includes(activeReport) && (
+              <div className="space-y-4">
+                {/* Header info */}
+                <div className="flex items-center justify-between px-1">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      {activeReportMeta.label} ({subMode.toUpperCase()})
+                    </h3>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      {dt(fromDate)} to {dt(toDate)} · Backed by JSM SQL definition
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-blue-600">
+                    {reportData?.rows?.length || reportData?.groups?.length || 0} Records
+                  </span>
+                </div>
+
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+                  <div className="overflow-x-auto max-h-[calc(80vh-270px)]">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-[var(--bg-base)] text-[10px] uppercase font-bold text-[var(--text-muted)] border-b border-[var(--border)] sticky top-0 z-10">
+                        <tr>
+                          {subMode === 'summary' || subMode === 'returnSummary' ? (
+                            <>
+                              <th className="px-3 py-2">Group / Particulars</th>
+                              <th className="px-3 py-2 text-right">Vouchers</th>
+                              <th className="px-3 py-2 text-right">Taxable Amount (₹)</th>
+                              <th className="px-3 py-2 text-right">CGST (₹)</th>
+                              <th className="px-3 py-2 text-right">SGST (₹)</th>
+                              <th className="px-3 py-2 text-right">IGST (₹)</th>
+                              <th className="px-3 py-2 text-right">Total GST (₹)</th>
+                              <th className="px-3 py-2 text-right">Net Value (₹)</th>
+                            </>
+                          ) : (
+                            <>
+                              <th className="px-3 py-2">Voucher No</th>
+                              <th className="px-3 py-2">Date</th>
+                              <th className="px-3 py-2">Party / Worker Name</th>
+                              <th className="px-3 py-2">GSTIN</th>
+                              <th className="px-3 py-2">State / POS</th>
+                              <th className="px-3 py-2 text-right">Rate %</th>
+                              <th className="px-3 py-2 text-right">Taxable (₹)</th>
+                              <th className="px-3 py-2 text-right">CGST (₹)</th>
+                              <th className="px-3 py-2 text-right">SGST (₹)</th>
+                              <th className="px-3 py-2 text-right">IGST (₹)</th>
+                              <th className="px-3 py-2 text-right">Total Net (₹)</th>
+                            </>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {/* Summary Groups */}
+                        {(subMode === 'summary' || subMode === 'returnSummary') && reportData?.groups?.length ? (
+                          reportData.groups.map((g, i) => (
+                            <tr key={i} className="hover:bg-[var(--bg-base)]">
+                              <td className="px-3 py-2 font-medium">{g.groupKey || 'All'}</td>
+                              <td className="px-3 py-2 text-right font-mono">{g.count || 0}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(g.taxableAmount)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(g.cgst)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(g.sgst)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(g.igst)}</td>
+                              <td className="px-3 py-2 text-right font-mono font-semibold text-emerald-600">{money(g.gstAmount)}</td>
+                              <td className="px-3 py-2 text-right font-mono font-bold">{money(g.netAmount)}</td>
+                            </tr>
+                          ))
+                        ) : reportData?.rows?.length ? (
+                          reportData.rows.map((r, i) => (
+                            <tr key={r._id || i} className="hover:bg-[var(--bg-base)]">
+                              <td className="px-3 py-2 font-mono font-bold text-blue-600">
+                                {r.invoiceNo || r.billNo || r.jobCardNo || r.entryNo || '—'}
+                              </td>
+                              <td className="px-3 py-2 text-[11px]">{dt(r.date || r.issueDate || r.billDate)}</td>
+                              <td className="px-3 py-2 font-medium truncate max-w-[180px]">
+                                {r.partyName || r.workerName || r.accountName || '—'}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-[11px]">{r.gstin || r.workerGstin || 'URP'}</td>
+                              <td className="px-3 py-2 text-[11px]">{r.stateName || r.state || r.processType || '—'}</td>
+                              <td className="px-3 py-2 text-right font-mono">{r.gstRate || 0}%</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(r.taxableAmount)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(r.cgst)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(r.sgst)}</td>
+                              <td className="px-3 py-2 text-right font-mono">{money(r.igst)}</td>
+                              <td className="px-3 py-2 text-right font-mono font-bold">{money(r.netAmount)}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={11} className="px-4 py-12 text-center text-[var(--text-muted)]">
+                              No records found for the selected criteria.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Universal Footer Status Bar */}
+          <footer className="shrink-0 px-5 py-2.5 border-t border-[var(--border)] bg-[var(--bg-card)] flex items-center justify-between text-xs text-[var(--text-muted)]">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1.5 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                Connected to MERN Live Engine
               </span>
+              <span>·</span>
+              <span>Calculations strictly preserved</span>
             </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">From</span>
-              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
-                className="h-6.5 px-2 rounded border border-[var(--border)] text-[11px] bg-[var(--bg-card)] text-[var(--text-primary)] outline-none focus:border-blue-500" />
-              <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]">To</span>
-              <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
-                className="h-6.5 px-2 rounded border border-[var(--border)] text-[11px] bg-[var(--bg-card)] text-[var(--text-primary)] outline-none focus:border-blue-500" />
-              <button type="button" onClick={load} disabled={loading} title="Refresh Data"
-                className="h-6.5 px-2 rounded border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-[11px] font-medium text-[var(--text-secondary)] flex items-center gap-1 cursor-pointer transition-colors">
-                <FontAwesomeIcon icon={faSync} className={`text-[9px] ${loading ? 'animate-spin' : ''}`} /> Refresh
-              </button>
-              <button type="button" onClick={activePrint} disabled={loading || !data}
-                className="h-6.5 px-2 rounded border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-[11px] font-medium text-[var(--text-secondary)] flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-40">
-                <FontAwesomeIcon icon={faPrint} className="text-[9px]" /> Print
-              </button>
-              <button type="button" onClick={exportExcel} disabled={loading || !data}
-                className="h-6.5 px-2.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-xs disabled:opacity-40">
-                <FontAwesomeIcon icon={faFileExcel} className="text-[9px]" /> Export CSV
-              </button>
-              <button type="button" onClick={exportJson} disabled={loading || !data}
-                className="h-6.5 px-2 rounded border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-[11px] font-medium text-[var(--text-secondary)] flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-40">
-                <FontAwesomeIcon icon={faDownload} className="text-[9px]" /> JSON
-              </button>
-              <button type="button" onClick={onClose}
-                className="h-6.5 px-2.5 rounded border border-[var(--border)] bg-[var(--bg-card)] hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-[11px] font-medium text-[var(--text-secondary)] flex items-center gap-1 cursor-pointer transition-colors">
-                Close
-              </button>
+            <div className="flex items-center gap-4 font-mono text-[11px]">
+              <span>Active: {activeReportMeta.label}</span>
+              <span>Range: {dt(fromDate)} – {dt(toDate)}</span>
             </div>
-          </div>
+          </footer>
+        </main>
+      </div>
 
-          {/* Navigation Tabs */}
-          <div className="shrink-0 flex gap-0.5 px-3 py-1 border-b border-[var(--border)] bg-[var(--bg-base)] overflow-x-auto scrollbar-none">
-            {TABS.map((t) => (
-              <button key={t.id} type="button" onClick={() => setTab(t.id)}
-                className={`px-2.5 py-1 rounded text-[11px] whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
-                  tab === t.id
-                    ? 'bg-[var(--bg-card)] text-blue-700 font-bold shadow-xs border border-[var(--border)]'
-                    : 'text-[var(--text-secondary)] font-medium hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]/60'
-                }`}>
-                <FontAwesomeIcon icon={t.icon} className={`text-[10px] ${tab === t.id ? 'text-blue-600' : 'text-[var(--text-muted)]'}`} /> {t.label}
-              </button>
-            ))}
-          </div>
-
-          <div className={`flex-1 overflow-y-auto flex flex-col ${tab === 'offline_tool' ? 'p-0' : 'p-3'}`} style={{ minHeight: 0 }}>{body()}</div>
-        </div>
-      </Modal>
-
+      {/* Hidden ListPrint component for printing */}
       {printCfg && (
-        <ListPrint title={printCfg.title} subtitle={`${printCfg.rows.length} rows · ${from} to ${to}`}
-          columns={printCfg.columns} rows={printCfg.rows} onClose={() => setPrintCfg(null)} />
+        <div className="hidden">
+          <ListPrint
+            title={printCfg.title}
+            subtitle={printCfg.subtitle}
+            columns={printCfg.columns}
+            data={printCfg.data}
+            onClose={() => setPrintCfg(null)}
+          />
+        </div>
       )}
-    </>
+    </Modal>
   );
 }

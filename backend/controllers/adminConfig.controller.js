@@ -158,13 +158,18 @@ exports.lockCompany = async (req, res) => {
   try {
     const company = await Company.findByIdAndUpdate(
       req.params.id,
-      { status: 'suspended' },
+      { status: 'suspended', isActive: false },
       { new: true }
     );
-    await CompanySettings.findOneAndUpdate(
-      { companyId: req.params.id },
-      { isLocked: true, lockReason: req.body.reason || 'Suspended by admin' },
-      { upsert: true }
+    // Cascade suspension to child companies
+    await Company.updateMany(
+      { masterCompanyId: req.params.id },
+      { status: 'suspended', isActive: false }
+    );
+    const childIds = await Company.find({ masterCompanyId: req.params.id }).distinct('_id');
+    await CompanySettings.updateMany(
+      { companyId: { $in: [req.params.id, ...childIds] } },
+      { isLocked: true, lockReason: req.body.reason || 'Suspended by admin (Parent company locked)' }
     );
     res.json({ success: true, data: company });
   } catch (err) {
@@ -176,13 +181,18 @@ exports.unlockCompany = async (req, res) => {
   try {
     const company = await Company.findByIdAndUpdate(
       req.params.id,
-      { status: 'active' },
+      { status: 'active', isActive: true },
       { new: true }
     );
-    await CompanySettings.findOneAndUpdate(
-      { companyId: req.params.id },
-      { isLocked: false, lockReason: '' },
-      { upsert: true }
+    // Cascade activation to child companies
+    await Company.updateMany(
+      { masterCompanyId: req.params.id },
+      { status: 'active', isActive: true }
+    );
+    const childIds = await Company.find({ masterCompanyId: req.params.id }).distinct('_id');
+    await CompanySettings.updateMany(
+      { companyId: { $in: [req.params.id, ...childIds] } },
+      { isLocked: false, lockReason: '' }
     );
     res.json({ success: true, data: company });
   } catch (err) {

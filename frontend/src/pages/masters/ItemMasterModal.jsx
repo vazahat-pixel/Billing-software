@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import Modal from '../../components/ui/Modal';
 import { ERPInput, ERPSelect, FormField } from '../../components/forms/FormElements';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
@@ -50,6 +50,15 @@ const emptyForm = () => ({
   opQty: '0',
   opRate: '0',
   opValue: '0',
+  fold: '0',
+  reed: '',
+  pick: '',
+  warpCount: '',
+  weftCount: '',
+  denier: '',
+  quality: '',
+  widthPanna: '',
+  reorderLevel: '0',
   ewayBillProductName: '',
   description: '',
   imageUrl: '',
@@ -77,6 +86,15 @@ const toForm = (item) => {
     opQty: String(item.openingQty ?? item.opQty ?? item.openingStock ?? item.opStock ?? 0),
     opRate: String(item.openingRate ?? item.opRate ?? 0),
     opValue: String(item.openingValue ?? item.opValue ?? 0),
+    fold: String(item.fold ?? 0),
+    reed: item.reed || '',
+    pick: item.pick || '',
+    warpCount: item.warpCount || item.warp || '',
+    weftCount: item.weftCount || item.weft || '',
+    denier: item.denier || '',
+    quality: item.quality || '',
+    widthPanna: item.widthPanna || '',
+    reorderLevel: String(item.reorderLevel ?? 0),
     ewayBillProductName: item.ewayBillProductName || '',
     description: item.description || '',
     imageUrl: item.imageUrl || '',
@@ -92,6 +110,37 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
   const [showImport, setShowImport] = useState(false);
   const fileRef = useRef(null);
   const itemCodeRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const [itemSearch, setItemSearch] = useState('');
+  const [focusedItemIndex, setFocusedItemIndex] = useState(0);
+
+  const filteredItems = useMemo(() => {
+    const q = itemSearch.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (it) =>
+        (it.itemName || it.name || '').toLowerCase().includes(q) ||
+        (it.itemCode || '').toLowerCase().includes(q) ||
+        (it.categoryLabel || it.group || it.category || '').toLowerCase().includes(q) ||
+        (it.hsnCode || '').toLowerCase().includes(q)
+    );
+  }, [items, itemSearch]);
+
+  const handleItemListKeyDown = (e) => {
+    if (!filteredItems.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocusedItemIndex((prev) => Math.min(prev + 1, filteredItems.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusedItemIndex((prev) => Math.max(prev - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filteredItems[focusedItemIndex]) {
+        loadForEdit(filteredItems[focusedItemIndex]);
+      }
+    }
+  };
 
   useEffect(() => {
     if (isOpen && activeTab === 'Add') {
@@ -185,6 +234,15 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
         opPcs: Number(formData.opPcs),
         openingPcs: Number(formData.opPcs),
         cut: Number(formData.cut),
+        fold: Number(formData.fold || 0),
+        reed: formData.reed || '',
+        pick: formData.pick || '',
+        warpCount: formData.warpCount || '',
+        weftCount: formData.weftCount || '',
+        denier: formData.denier || '',
+        quality: formData.quality || '',
+        widthPanna: formData.widthPanna || '',
+        reorderLevel: Number(formData.reorderLevel || 0),
         opQty: Number(formData.opQty),
         openingQty: Number(formData.opQty),
         opStock: Number(formData.opQty),
@@ -242,14 +300,27 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
       className="max-w-4xl"
       footer={activeTab === 'Add' && !readOnly && (
         <>
-          <button type="button" className="erp-btn erp-btn-secondary" disabled={saving} onClick={() => { setEditId(null); setFormData(emptyForm()); }}>Clear</button>
-          <button type="button" className="erp-btn erp-btn-secondary" disabled={saving} onClick={onClose}>Cancel</button>
-          <button type="button" className="erp-btn erp-btn-primary" disabled={saving} data-enter-save="true" onClick={handleSave}>
+          <button type="button" className="erp-btn erp-btn-secondary" data-action="new" disabled={saving} onClick={() => { setEditId(null); setFormData(emptyForm()); }}>Clear</button>
+          <button type="button" className="erp-btn erp-btn-secondary" data-action="cancel" disabled={saving} onClick={onClose}>Cancel</button>
+          <button type="button" className="erp-btn erp-btn-primary" data-action="save" disabled={saving} data-enter-save="true" onClick={handleSave}>
             {saving ? 'Saving…' : (editId ? 'Update item' : 'Save item')}
           </button>
         </>
       )}
     >
+      <div
+        data-form-enter-nav="true"
+        onKeyDown={(e) => {
+          if (e.key === 'F3') {
+            e.preventDefault();
+            setActiveTab('View');
+            setTimeout(() => {
+              searchInputRef.current?.focus();
+              try { searchInputRef.current?.select(); } catch {}
+            }, 60);
+          }
+        }}
+      >
       <div className="flex items-center justify-between border-b border-[var(--border)] px-4 pt-2 gap-1 shrink-0">
         <div className="flex gap-1">
           {['Add', 'View'].map((tab) => (
@@ -275,7 +346,22 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
       </div>
 
       {activeTab === 'View' ? (
-        <div className="erp-modal-body max-h-[60vh] overflow-y-auto">
+        <div className="erp-modal-body max-h-[60vh] overflow-y-auto" tabIndex={0} onKeyDown={handleItemListKeyDown}>
+          <div className="relative mb-2">
+            <input
+              ref={searchInputRef}
+              type="text"
+              data-master-find="true"
+              value={itemSearch}
+              onChange={(e) => {
+                setItemSearch(e.target.value);
+                setFocusedItemIndex(0);
+              }}
+              onKeyDown={handleItemListKeyDown}
+              placeholder="Find (F3) — Type item name, code, category, HSN..."
+              className="w-full px-3 py-1.5 text-xs bg-white border border-[var(--border)] rounded-md focus:border-blue-600 outline-none"
+            />
+          </div>
           <table className="w-full text-xs text-left">
             <thead className="text-[9px] uppercase tracking-widest text-[var(--text-muted)] border-b border-[var(--border)]">
               <tr>
@@ -291,8 +377,15 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border-subtle)]">
-              {items.map((item) => (
-                <tr key={item._id} className="hover:bg-[var(--bg-base)]">
+              {filteredItems.map((item, index) => {
+                const isSelected = index === focusedItemIndex;
+                return (
+                <tr
+                  key={item._id}
+                  onClick={() => setFocusedItemIndex(index)}
+                  onDoubleClick={() => loadForEdit(item)}
+                  className={isSelected ? 'bg-blue-100 font-semibold cursor-pointer' : 'hover:bg-[var(--bg-base)] cursor-pointer'}
+                >
                   <td className="py-2 pr-3">{item.itemCode || '—'}</td>
                   <td className="py-2 pr-3 font-semibold uppercase">{item.itemName || item.name}</td>
                   <td className="py-2 pr-3">{item.categoryLabel || item.group || item.category}</td>
@@ -312,9 +405,9 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                     </button>
                   </td>
                 </tr>
-              ))}
-              {items.length === 0 && (
-                <tr><td colSpan={9} className="py-8 text-center text-[var(--text-muted)]">No items yet</td></tr>
+              )})}
+              {filteredItems.length === 0 && (
+                <tr><td colSpan={9} className="py-8 text-center text-[var(--text-muted)]">No items found</td></tr>
               )}
             </tbody>
           </table>
@@ -417,6 +510,41 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
             </FormField>
           </div>
 
+          <div className="rounded border border-[var(--border)] p-2.5 bg-[var(--bg-card)] space-y-2">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
+              Textile Technical Specifications
+            </div>
+            <div className="erp-grid erp-grid-3">
+              <FormField label="Fold Less %">
+                <ERPInput type="number" step="0.01" value={formData.fold} onChange={(e) => setField('fold', e.target.value)} disabled={readOnly} placeholder="0.00" />
+              </FormField>
+              <FormField label="Reed">
+                <ERPInput value={formData.reed} onChange={(e) => setField('reed', e.target.value)} disabled={readOnly} placeholder="e.g. 64" />
+              </FormField>
+              <FormField label="Pick">
+                <ERPInput value={formData.pick} onChange={(e) => setField('pick', e.target.value)} disabled={readOnly} placeholder="e.g. 56" />
+              </FormField>
+              <FormField label="Warp Count">
+                <ERPInput value={formData.warpCount} onChange={(e) => setField('warpCount', e.target.value)} disabled={readOnly} placeholder="e.g. 40s" />
+              </FormField>
+              <FormField label="Weft Count">
+                <ERPInput value={formData.weftCount} onChange={(e) => setField('weftCount', e.target.value)} disabled={readOnly} placeholder="e.g. 40s" />
+              </FormField>
+              <FormField label="Denier">
+                <ERPInput value={formData.denier} onChange={(e) => setField('denier', e.target.value)} disabled={readOnly} placeholder="e.g. 80D" />
+              </FormField>
+              <FormField label="Fabric Quality">
+                <ERPInput value={formData.quality} onChange={(e) => setField('quality', e.target.value)} disabled={readOnly} placeholder="e.g. 60x60 Cambric" />
+              </FormField>
+              <FormField label="Width / Panna (Inches)">
+                <ERPInput value={formData.widthPanna} onChange={(e) => setField('widthPanna', e.target.value)} disabled={readOnly} placeholder="e.g. 44 / 58" />
+              </FormField>
+              <FormField label="Reorder Level">
+                <ERPInput type="number" step="0.01" value={formData.reorderLevel} onChange={(e) => setField('reorderLevel', e.target.value)} disabled={readOnly} placeholder="0.00" />
+              </FormField>
+            </div>
+          </div>
+
           <FormField label="Eway Bill Prod.Name">
             <ERPInput value={formData.ewayBillProductName} onChange={(e) => setField('ewayBillProductName', e.target.value)} disabled={readOnly} />
           </FormField>
@@ -435,6 +563,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
           </FormField>
         </div>
       )}
+      </div>
       <DataImportModal
         isOpen={showImport}
         onClose={() => {

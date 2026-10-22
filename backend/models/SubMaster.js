@@ -25,6 +25,9 @@ const SUB_MASTER_TYPES = [
   'Department',
   'PaymentTerms',
   'Currency',
+  'Size',
+  'Area',
+  'PartyBank',
 ];
 
 const SubMasterSchema = new mongoose.Schema({

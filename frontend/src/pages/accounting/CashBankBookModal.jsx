@@ -13,6 +13,7 @@ import LedgerModal from '../LedgerModal';
 import { peekBillNo } from '../../utils/nextBillNo';
 import useErpBookKeys from '../../hooks/useErpBookKeys';
 import ErpFindOverlay from '../../components/erp/ErpFindOverlay';
+import { focusNextField } from '../../utils/formEnterNavigation';
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 
@@ -158,6 +159,7 @@ const CashBankBookModal = ({
     accBill: 'B',
     bankLedgerId: '',
     scCode: 'SC27',
+    chequePayee: '',
   });
 
   const [billRows, setBillRows] = useState(() => [emptyBillRow()]);
@@ -222,6 +224,15 @@ const CashBankBookModal = ({
     const want = isBank ? 'Bank' : 'Cash';
     return ledgers.filter((l) => l.accountType === want && l.isActive !== false);
   }, [ledgers, isBank]);
+
+  const selectedBankLedger = useMemo(() => {
+    return bankCashLedgers.find((l) => String(l._id || l.id) === String(header.bankLedgerId));
+  }, [bankCashLedgers, header.bankLedgerId]);
+
+  const bankLedgerBal = useMemo(() => {
+    if (!selectedBankLedger) return null;
+    return Number(selectedBankLedger.closingBalance ?? selectedBankLedger.balance ?? 0);
+  }, [selectedBankLedger]);
 
   const noBookLedger = !bootLoading && bankCashLedgers.length === 0;
 
@@ -417,6 +428,7 @@ const CashBankBookModal = ({
       accBill: 'B',
       bankLedgerId: bankCashLedgers[0]?._id || bankCashLedgers[0]?.id || '',
       scCode: 'SC27',
+      chequePayee: '',
     });
     setBillRows([emptyBillRow()]);
     setFooter({ remark1: '', remark2: '', financeFlag: false, finance: 0 });
@@ -560,6 +572,16 @@ const CashBankBookModal = ({
     setBillRows([emptyBillRow()]);
   }, [header.partyId, header.accBill]);
 
+  const handlePartyChange = (val) => {
+    setHeader((h) => ({ ...h, partyId: val, partyBank: '' }));
+    if (val && !locked && voucherType === 'Receipt' && String(header.accBill || 'B').toUpperCase() === 'B') {
+      setTimeout(() => {
+        setBillLookupTargetIdx(null);
+        setBillLookupOpen(true);
+      }, 150);
+    }
+  };
+
   /** BillNo Entry — click, Enter, Space, or F4 on a row's BillNo cell opens the bill picker. */
   const openBillLookup = (idx) => {
     if (locked) return;
@@ -592,23 +614,22 @@ const CashBankBookModal = ({
    * Enter alone — the loop described in the spec's §4.
    */
   const handleBillSelect = (inv) => {
-    const idx = billLookupTargetIdx;
-    if (idx == null) return;
+    if (!inv) return;
     setBillRows((rows) => {
       const next = [...rows];
+      const emptyIdx = next.findIndex((r) => !r.billNo && !r.invoiceId);
+      const targetIdx = billLookupTargetIdx != null ? billLookupTargetIdx : (emptyIdx >= 0 ? emptyIdx : next.length);
       const spentElsewhere = next.reduce(
-        (s, r, i) => (i === idx ? s : s + (Number(r.adjust) || 0)),
+        (s, r, i) => (i === targetIdx ? s : s + (Number(r.adjust) || 0)),
         0
       );
-      // With an Amount typed, spend only what is left of it; with Amount blank the
-      // operator is building the total up from the bills, so take the bill in full.
       const received = Number(header.amount) || 0;
       const stillUnallocated = received > 0
         ? Math.max(0, round2(received - spentElsewhere))
         : inv.osAmt;
       const autoAdjust = round2(Math.min(stillUnallocated, inv.osAmt));
-      next[idx] = {
-        ...next[idx],
+      const newRow = {
+        ...(next[targetIdx] || emptyBillRow()),
         invoiceId: inv._id,
         billNo: inv.invoiceNo,
         billDt: inv.billDt,
@@ -620,10 +641,48 @@ const CashBankBookModal = ({
         adjust: autoAdjust,
         netOs: round2(inv.osAmt - autoAdjust),
       };
+      if (targetIdx < next.length) {
+        next[targetIdx] = newRow;
+      } else {
+        next.push(newRow);
+      }
+      pendingFocusAdjustRef.current = targetIdx;
       return next;
     });
-    // Immediately queue focus on Adjust for this row so user can verify or press Enter
-    pendingFocusAdjustRef.current = idx;
+  };
+
+  /**
+   * Multi-bill allocation: applies multiple selected bills and their individual
+   * allocation amounts in a single operation.
+   */
+  const handleMultiBillSelect = (allocations) => {
+    if (!allocations || !allocations.length) return;
+    const newRows = allocations.map((item) => {
+      const inv = item.invoice;
+      const adjust = round2(item.allocatedAmt);
+      return {
+        ...emptyBillRow(),
+        id: inv._id,
+        invoiceId: inv._id,
+        billNo: inv.invoiceNo,
+        billDt: inv.billDt,
+        billAmt: inv.billAmt,
+        partRc: inv.paidAmt || 0,
+        osAmt: inv.osAmt,
+        osDy: inv.osDy,
+        billType: inv.billType || '',
+        adjust,
+        netOs: round2(Math.max(0, inv.osAmt - adjust)),
+      };
+    });
+    setBillRows(dedupLines(newRows));
+
+    const totalAllocated = round2(allocations.reduce((sum, item) => sum + (Number(item.allocatedAmt) || 0), 0));
+    const currentAmt = Number(header.amount) || 0;
+    if (currentAmt <= 0 && totalAllocated > 0) {
+      setHeader((h) => ({ ...h, amount: String(totalAllocated) }));
+    }
+    setBillLookupOpen(false);
   };
 
   const advanceToNextBillRow = (currentIdx) => {
@@ -768,6 +827,7 @@ const CashBankBookModal = ({
       accBill: v.accBill || 'B',
       bankLedgerId: v.bankLedgerId?._id || v.bankLedgerId || '',
       scCode: 'SC27',
+      chequePayee: v.chequePayee || v.chqPayName || '',
     });
     const rows = (v.againstInvoices || []).map((a, i) => ({
       ...emptyBillRow(),
@@ -1081,6 +1141,8 @@ const CashBankBookModal = ({
         intBillNo: header.intBillNo || '',
         intBillFlag: header.intBillFlag || 'N',
         partyBank: isBank ? (header.partyBank || '') : '',
+        chequePayee: isBank ? (header.chequePayee || undefined) : undefined,
+        chqPayName: isBank ? (header.chequePayee || undefined) : undefined,
         accBill: header.accBill || 'B',
         finance: Number(footer.finance) || 0,
         financeFlag: !!footer.financeFlag,
@@ -1212,6 +1274,19 @@ const CashBankBookModal = ({
                     <span className="classic-erp-label">Clear Dt:</span>
                     <input type="date" className="classic-erp-input" value={header.clearDate} onChange={setH('clearDate')} disabled={locked} title="Date the cheque/transfer cleared the bank" />
                   </div>
+                  {voucherType === 'Payment' && (
+                    <div className="classic-erp-field cb-f-payee" title="Cheque Payee / In Favour Of (_txt_chqPayName)">
+                      <span className="classic-erp-label">In Favour:</span>
+                      <input
+                        type="text"
+                        className="classic-erp-input"
+                        placeholder="Payee name on cheque"
+                        value={header.chequePayee || ''}
+                        onChange={setH('chequePayee')}
+                        disabled={locked}
+                      />
+                    </div>
+                  )}
                 </>
               )}
               <div className="cash-bank-meta-right">
@@ -1226,7 +1301,7 @@ const CashBankBookModal = ({
                 <span className="classic-erp-label">Party:</span>
                 <ERPCombobox
                   value={header.partyId}
-                  onChange={(val) => setHeader((h) => ({ ...h, partyId: val, partyBank: '' }))}
+                  onChange={handlePartyChange}
                   options={partyOptions}
                   placeholder="Search party…"
                   disabled={locked}
@@ -1234,7 +1309,7 @@ const CashBankBookModal = ({
                 />
               </div>
 
-              {isBankReceipt && (
+              {isBank && (
                 <div className="classic-erp-field cb-f-pbank">
                   <span className="classic-erp-label">P.Bank:</span>
                   <div className="classic-erp-control">
@@ -1246,8 +1321,8 @@ const CashBankBookModal = ({
                         !header.partyId
                           ? 'Select Party first…'
                           : partyBankOptions.length
-                            ? 'Select party bank…'
-                            : 'No party bank — type & Add'
+                            ? 'Select party bank (optional)…'
+                            : 'No party bank (optional) — type & Add'
                       }
                       disabled={locked || !header.partyId}
                       recentKey="cash-bank-pbank"
@@ -1255,10 +1330,19 @@ const CashBankBookModal = ({
                       createLabel="P.Bank"
                       emptyMessage="No party bank. Type name & Add"
                       allowClear
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          focusNextField(e.target);
+                        }
+                      }}
                     />
                     {!locked && (
                       <button
                         type="button"
+                        tabIndex={-1}
+                        data-enter-skip="true"
                         title={header.partyId ? 'Add P.Bank to party' : 'Select a Party first — a bank needs a party to belong to'}
                         onClick={() => handleAddPartyBank(header.partyBank)}
                         disabled={!header.partyId}
@@ -1293,6 +1377,15 @@ const CashBankBookModal = ({
                     recentKey={`cash-bank-ledger-${settlementKind}`}
                     emptyMessage={`No ledger with account type "${isBank ? 'Bank' : 'Cash'}"`}
                   />
+                  {bankLedgerBal !== null && !isNaN(bankLedgerBal) && (
+                    <span
+                      className="cash-bank-book-bal"
+                      title="Bank/Cash Book Closing Balance (_lbl_clbal_Book)"
+                      style={{ fontSize: 11, fontWeight: 600, color: '#0369a1', padding: '0 4px', whiteSpace: 'nowrap' }}
+                    >
+                      Bal: ₹{fmtAmt(bankLedgerBal)}
+                    </span>
+                  )}
                   {header.bankLedgerId && (
                     <button
                       type="button"
@@ -1581,30 +1674,26 @@ const CashBankBookModal = ({
               <button type="button" className="classic-erp-btn" onClick={() => setBillRows((r) => [...r, emptyBillRow()])}>+ Add Bill Row</button>
               <button
                 type="button"
-                className="classic-erp-btn"
+                className="classic-erp-btn font-semibold text-blue-900 bg-blue-50 border-blue-300 hover:bg-blue-100"
                 disabled={!header.partyId}
                 onClick={() => {
-                  if (!header.partyId || header.accBill !== 'B') {
-                    setBillRows([emptyBillRow()]);
+                  if (!header.partyId) {
+                    notifyWarning('Select Party first');
                     return;
                   }
-                  const rows = partyInvoices.map((inv) => ({
-                    ...emptyBillRow(),
-                    id: inv._id,
-                    invoiceId: inv._id,
-                    billNo: inv.invoiceNo,
-                    billDt: inv.billDt,
-                    billAmt: inv.billAmt,
-                    partRc: inv.paidAmt || 0,
-                    osAmt: inv.osAmt,
-                    osDy: inv.osDy,
-                    netOs: inv.osAmt,
-                    adjust: 0,
-                  }));
-                  setBillRows(withPickerRow(rows));
+                  if (header.accBill !== 'B') {
+                    notifyWarning('Acc/Bill is "A" (on-account). Switch to "B" to allocate against bills.');
+                    return;
+                  }
+                  if (!partyInvoices.length) {
+                    notifyWarning('No outstanding bills found for this party.');
+                    return;
+                  }
+                  setBillLookupTargetIdx(null);
+                  setBillLookupOpen(true);
                 }}
               >
-                Load Outstanding Bills
+                Load Outstanding Bills {partyInvoices.length ? `(${partyInvoices.length})` : ''}
               </button>
               <span className="text-[10px] text-slate-500 self-center ml-2">
                 Enter / SpaceBar / F4 ⇒ Open O/S Bill · auto-allocates &amp; moves to next line · Del ⇒ Delete Row
@@ -1756,7 +1845,9 @@ const CashBankBookModal = ({
       onClose={closeBillLookup}
       invoices={billLookupInvoices}
       partyName={selectedParty?.name || ''}
+      receiptAmount={Number(header.amount) || 0}
       onSelect={handleBillSelect}
+      onSelectMulti={handleMultiBillSelect}
     />
 
     <AccountMasterModal

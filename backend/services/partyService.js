@@ -85,11 +85,13 @@ class PartyService {
       disc1: Number(partyData.disc1 || 0),
       disc2: Number(partyData.disc2 || 0),
       addPer: Number(partyData.addPer || 0),
+      dharaPer: Number(partyData.dharaPer || partyData.dharaPercent || 0),
       intPer: Number(partyData.intPer || 0),
       commi: Number(partyData.commi || 0),
       maxLevel: Number(partyData.maxLevel || 0),
       minLevel: Number(partyData.minLevel || 0),
       tdsPer: Number(partyData.tdsPer || 0),
+      tdsSection: String(partyData.tdsSection || '').trim(),
       tcsPer: Number(partyData.tcsPer || 0),
       paymentTermsId: partyData.paymentTermsId || null,
       isFavorite: !!partyData.isFavorite,
@@ -215,8 +217,8 @@ class PartyService {
       'accd', 'mainGroup', 'mainGroupId', 'phoneO', 'phoneR', 'contactPerson',
       'tinCstNo', 'tinGstNo', 'status', 'updateInAllFirm', 'updateInAllYear',
       'aadharNo', 'stateCode', 'stateName', 'gstType', 'udyamAadhar', 'msmeType',
-      'dueDays', 'rdRate', 'disc1', 'disc2', 'addPer', 'intPer', 'commi',
-      'maxLevel', 'minLevel', 'tdsPer', 'tcsPer', 'paymentTermsId', 'isFavorite', 'lastUsedAt',
+      'dueDays', 'rdRate', 'disc1', 'disc2', 'addPer', 'dharaPer', 'intPer', 'commi',
+      'maxLevel', 'minLevel', 'tdsPer', 'tdsSection', 'tcsPer', 'paymentTermsId', 'isFavorite', 'lastUsedAt',
       'banks'
     ];
     const patch = {};

@@ -30,6 +30,8 @@ const TrialBalanceModal = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
 
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'double'
+
   const runReport = async (overrideTo) => {
     setLoading(true);
     try {
@@ -66,6 +68,32 @@ const TrialBalanceModal = ({ isOpen, onClose }) => {
     return { value: Math.abs(signed), type: signed >= 0 ? 'Dr' : 'Cr' };
   }, [data]);
 
+  // Separate Debit and Credit accounts for Double-Sided T-Format
+  const { debitLines, creditLines, debitTotal, creditTotal } = useMemo(() => {
+    if (!data?.groups) return { debitLines: [], creditLines: [], debitTotal: 0, creditTotal: 0 };
+    const debits = [];
+    const credits = [];
+    let dTot = 0;
+    let cTot = 0;
+
+    data.groups.forEach((g) => {
+      g.lines.forEach((l) => {
+        const net = Number(l.debit || 0) - Number(l.credit || 0);
+        if (net > 0 || (net === 0 && Number(l.debit || 0) > 0)) {
+          debits.push({ ...l, group: g.name, amount: Math.abs(net) });
+          dTot += Math.abs(net);
+        } else if (net < 0 || (net === 0 && Number(l.credit || 0) > 0)) {
+          credits.push({ ...l, group: g.name, amount: Math.abs(net) });
+          cTot += Math.abs(net);
+        } else if (withZeroBalance) {
+          debits.push({ ...l, group: g.name, amount: 0 });
+        }
+      });
+    });
+
+    return { debitLines: debits, creditLines: credits, debitTotal: dTot, creditTotal: cTot };
+  }, [data, withZeroBalance]);
+
   if (!isOpen) return null;
 
   return (
@@ -90,13 +118,94 @@ const TrialBalanceModal = ({ isOpen, onClose }) => {
             <label className="classic-erp-label flex items-center gap-1">
               <input type="checkbox" checked={withZeroBalance} onChange={(e) => setWithZeroBalance(e.target.checked)} /> With Zero Balance
             </label>
+            <div className="flex items-center gap-1 bg-white/70 p-0.5 rounded border border-slate-300">
+              <button
+                type="button"
+                className={`px-2 py-0.5 text-xs font-bold rounded ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-200'}`}
+                onClick={() => setViewMode('list')}
+              >
+                List View
+              </button>
+              <button
+                type="button"
+                className={`px-2 py-0.5 text-xs font-bold rounded ${viewMode === 'double' ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-200'}`}
+                onClick={() => setViewMode('double')}
+                title="Classic Double-Sided T-Format (Debit / Credit Side-by-Side)"
+              >
+                Double-Sided T-Format
+              </button>
+            </div>
             <button type="button" className="classic-erp-btn btn-blue" onClick={() => runReport()} disabled={loading}>Ok</button>
             <button type="button" className="classic-erp-btn" onClick={onClose}>Close</button>
-            <span className="classic-erp-btn" title="Column customization — not implemented">Columns(5)</span>
             <button type="button" className="classic-erp-btn ml-auto" onClick={exportCsv} disabled={!data}>PDF / CSV</button>
           </div>
 
           <div className="flex-1 overflow-auto min-h-0">
+            {viewMode === 'double' ? (
+              <div className="grid grid-cols-2 divide-x divide-slate-300 min-h-full h-auto bg-white">
+                {/* Debit Side */}
+                <div className="overflow-auto flex flex-col">
+                  <div className="bg-blue-100 font-bold px-2 py-1 text-blue-900 border-b border-blue-200 flex justify-between sticky top-0 z-10">
+                    <span>DEBIT (Dr) PARTICULARS</span>
+                    <span>AMOUNT (₹)</span>
+                  </div>
+                  <table className="w-full text-[12px] border-collapse flex-1">
+                    <tbody>
+                      {debitLines.map((l, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 border-b border-slate-100">
+                          <td className="px-2 py-0.5">
+                            <span className="text-[10px] text-slate-400 mr-1 font-semibold">[{l.group}]</span>
+                            {l.name}
+                            {l.station ? <span className="text-[10px] text-slate-400 ml-1">({l.station})</span> : null}
+                          </td>
+                          <td className="px-2 py-0.5 text-right font-mono font-medium">{fmtAmt(l.amount)}</td>
+                        </tr>
+                      ))}
+                      {debitLines.length === 0 && (
+                        <tr><td colSpan={2} className="text-center py-6 text-slate-400">No debit balances</td></tr>
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr className="font-bold text-blue-900 border-t border-blue-300" style={{ background: '#e8f0fe' }}>
+                        <td className="px-2 py-1">TOTAL DEBIT:</td>
+                        <td className="px-2 py-1 text-right font-mono">{fmtAmt(debitTotal)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Credit Side */}
+                <div className="overflow-auto flex flex-col">
+                  <div className="bg-amber-100 font-bold px-2 py-1 text-amber-900 border-b border-amber-200 flex justify-between sticky top-0 z-10">
+                    <span>CREDIT (Cr) PARTICULARS</span>
+                    <span>AMOUNT (₹)</span>
+                  </div>
+                  <table className="w-full text-[12px] border-collapse flex-1">
+                    <tbody>
+                      {creditLines.map((l, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 border-b border-slate-100">
+                          <td className="px-2 py-0.5">
+                            <span className="text-[10px] text-slate-400 mr-1 font-semibold">[{l.group}]</span>
+                            {l.name}
+                            {l.station ? <span className="text-[10px] text-slate-400 ml-1">({l.station})</span> : null}
+                          </td>
+                          <td className="px-2 py-0.5 text-right font-mono font-medium">{fmtAmt(l.amount)}</td>
+                        </tr>
+                      ))}
+                      {creditLines.length === 0 && (
+                        <tr><td colSpan={2} className="text-center py-6 text-slate-400">No credit balances</td></tr>
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr className="font-bold text-amber-900 border-t border-amber-300" style={{ background: '#fef3c7' }}>
+                        <td className="px-2 py-1">TOTAL CREDIT:</td>
+                        <td className="px-2 py-1 text-right font-mono">{fmtAmt(creditTotal)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            ) : (
             <table className="w-full text-[12px] border-collapse">
               <thead className="sticky top-0 bg-slate-100 z-10">
                 <tr>
@@ -138,6 +247,7 @@ const TrialBalanceModal = ({ isOpen, onClose }) => {
                 )}
               </tbody>
             </table>
+            )}
           </div>
 
           <div className="flex items-center gap-4 px-2 py-2 border-t border-slate-300" style={{ background: '#ffd8b0' }}>

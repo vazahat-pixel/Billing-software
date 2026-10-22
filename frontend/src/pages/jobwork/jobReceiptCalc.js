@@ -29,6 +29,8 @@ export const blankLine = () => ({
   issueMtsRef: '',
   recPcs: '',
   recMts: '',
+  chadti: '0.00',
+  dmgPcs: '',
   jRate: '',
   pqk: 'Q',
   jobAmt: 0,

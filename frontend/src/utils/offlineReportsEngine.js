@@ -304,6 +304,51 @@ export async function computeOfflineOutstanding(type = 'receivable', asOn, state
   const asOnStr = toDateStr(asOn) || new Date().toISOString().slice(0, 10);
 
   const isReceivable = type === 'receivable' || type === 'customer' || type === 'sales';
+  const isProcess = type === 'process' || type === 'mill';
+  const isJobWork = type === 'jobwork';
+
+  if (isProcess || isJobWork) {
+    const jobs = await resolveData(state.jobWorkEntries || state.jobs, 'jobs');
+    const rows = [];
+    for (const j of jobs) {
+      if (j.offlineDeleted || j.status === 'Cancelled') continue;
+      const jDate = toDateStr(j.issueDate || j.date || j.createdAt);
+      if (asOnStr && jDate > asOnStr) continue;
+
+      const charges = round2((j.processCharges || 0) + (j.processGstAmount || 0));
+      const billAmt = charges > 0 ? charges : round2(j.issueQty || 0);
+      const paidAmt = round2(j.chargesPaidAmount || 0);
+      const pending = round2(Math.max(0, billAmt - paidAmt));
+
+      if (pending > 0.01) {
+        const days = Math.max(0, Math.floor((Date.now() - new Date(j.issueDate || j.createdAt || Date.now()).getTime()) / (1000 * 60 * 60 * 24)));
+        rows.push({
+          id: j._id || j.id,
+          invoiceId: j._id || j.id,
+          invoiceNo: j.challanNo || j.jobCardNo || 'JC',
+          billNo: j.challanNo || j.jobCardNo || 'JC',
+          date: jDate,
+          billDate: jDate,
+          partyId: j.workerId?._id || j.workerId?.id || j.workerId || j.partyId,
+          partyName: j.workerId?.name || j.workerName || j.partyName || (isProcess ? 'Mill House' : 'Job Worker'),
+          billAmount: billAmt,
+          billAmt,
+          paidAmount: paidAmt,
+          paidAmt,
+          pendingAmount: pending,
+          balance: pending,
+          netAmt: pending,
+          broker: '',
+          brokerName: '',
+          station: j.workerId?.city || j.city || '',
+          city: j.workerId?.city || j.city || '',
+          daysOverdue: days,
+          days,
+        });
+      }
+    }
+    return rows;
+  }
 
   if (isReceivable) {
     const rows = [];
@@ -416,27 +461,67 @@ export async function computeOfflineOutstandingFilterOptions(type = 'receivable'
   const sales = await resolveData(state.sales, 'sales');
   const purchases = await resolveData(state.purchases, 'purchases');
 
-  const pSet = new Set();
+  const partyMap = new Map();
   const bSet = new Set();
   const sSet = new Set();
 
   for (const p of parties) {
-    if (p.name) pSet.add(p.name);
+    if (p.name) {
+      partyMap.set(p.name, {
+        _id: p._id || p.id || p.name,
+        name: p.name,
+        address: p.address || '',
+        city: p.city || p.station || '',
+        state: p.state || '',
+        accd: p.accd != null ? p.accd : (partyMap.size + 1) * 2
+      });
+    }
     if (p.city) sSet.add(p.city);
   }
   const isRec = type === 'receivable' || type === 'sales';
-  const list = isRec ? sales : purchases;
-  for (const item of list) {
-    const name = item.customerName || item.supplierName || item.partyName;
-    if (name) pSet.add(name);
-    const broker = item.brokerName || item.brokerId?.name;
-    if (broker) bSet.add(broker);
-    const station = item.city || item.station;
-    if (station) sSet.add(station);
+  const isProcess = type === 'process' || type === 'mill';
+  const isJobWork = type === 'jobwork';
+
+  if (isProcess || isJobWork) {
+    const jobs = await resolveData(state.jobWorkEntries || state.jobs, 'jobs');
+    for (const j of jobs) {
+      const name = j.workerId?.name || j.workerName || j.partyName;
+      if (name && !partyMap.has(name)) {
+        partyMap.set(name, {
+          _id: j.workerId?._id || j.workerId || name,
+          name,
+          address: j.workerId?.address || j.address || '',
+          city: j.workerId?.city || j.city || '',
+          state: j.workerId?.state || j.state || '',
+          accd: (partyMap.size + 1) * 2,
+        });
+      }
+      const st = j.workerId?.city || j.city;
+      if (st) sSet.add(st);
+    }
+  } else {
+    const list = isRec ? sales : purchases;
+    for (const item of list) {
+      const name = item.customerName || item.supplierName || item.partyName;
+      if (name && !partyMap.has(name)) {
+        partyMap.set(name, {
+          _id: item.partyId || name,
+          name,
+          address: item.address || '',
+          city: item.city || item.station || '',
+          state: item.state || '',
+          accd: (partyMap.size + 1) * 2
+        });
+      }
+      const broker = item.brokerName || item.brokerId?.name;
+      if (broker) bSet.add(broker);
+      const station = item.city || item.station;
+      if (station) sSet.add(station);
+    }
   }
 
   return {
-    parties: [...pSet].sort(),
+    parties: [...partyMap.values()].sort((a,b) => a.name.localeCompare(b.name)),
     brokers: [...bSet].sort(),
     stations: [...sSet].sort(),
     hastes: [],

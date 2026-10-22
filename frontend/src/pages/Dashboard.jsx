@@ -63,6 +63,7 @@ import UpdateModal from './jobwork/UpdateModal';
 import JobReceiptModal from './jobwork/JobReceiptModal';
 import ProcessUpdateModal from './jobwork/ProcessUpdateModal';
 import AccountMasterModal from './masters/AccountMasterModal';
+import AccountGroupMasterModal from './masters/AccountGroupMasterModal';
 import ItemMasterModal from './masters/ItemMasterModal';
 import BookMasterModal from './masters/BookMasterModal';
 import PartyModal from './masters/PartyModal';
@@ -233,6 +234,47 @@ async function resolveNoteDoc(notes, refId, docNo, hint) {
    } catch {
       return null;
    }
+}
+
+function AnimatedCounter({ value, isCurrency = true, duration = 750 }) {
+   const [displayVal, setDisplayVal] = useState(0);
+   const numTarget = typeof value === 'number' ? value : (parseFloat(value) || 0);
+
+   useEffect(() => {
+      if (numTarget === 0) {
+         setDisplayVal(0);
+         return;
+      }
+      let startTimestamp = null;
+      let animFrameId;
+
+      const step = (timestamp) => {
+         if (!startTimestamp) startTimestamp = timestamp;
+         const elapsed = timestamp - startTimestamp;
+         const progress = Math.min(elapsed / duration, 1);
+         const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+         const current = Math.round(numTarget * ease);
+         setDisplayVal(current);
+
+         if (progress < 1) {
+            animFrameId = requestAnimationFrame(step);
+         } else {
+            setDisplayVal(numTarget);
+         }
+      };
+
+      animFrameId = requestAnimationFrame(step);
+      return () => {
+         if (animFrameId) cancelAnimationFrame(animFrameId);
+      };
+   }, [numTarget, duration]);
+
+   if (value === null || value === undefined) {
+      return <span>—</span>;
+   }
+
+   const formatted = Number(displayVal).toLocaleString('en-IN');
+   return <span>{isCurrency ? `₹ ${formatted}` : formatted}</span>;
 }
 
 const Dashboard = () => {
@@ -408,6 +450,7 @@ const Dashboard = () => {
       partyOsReport: false,
       ledger: false,
       accountMaster: false,
+      accountGroupMaster: false,
       itemMaster: false,
       gst3bMonthly: false,
       gstr1: false,
@@ -430,6 +473,8 @@ const Dashboard = () => {
       purchaseEngine: false,
       outstandingSalesFull: false,
       outstandingPurchaseFull: false,
+      outstandingProcessFull: false,
+      outstandingJobworkFull: false,
       contraVoucher: false,
       tdsEntry: false,
       gstComplianceReports: false,
@@ -493,6 +538,25 @@ const Dashboard = () => {
    const [openFlyoutPath, setOpenFlyoutPath] = useState(null);
    const [isRefreshing, setIsRefreshing] = useState(false);
    const menuBarRef = useRef(null);
+
+   // Floating Company Setup Alert: slides open on load for 2.5s, then retracts into the round bubble
+   const [setupAlertOpen, setSetupAlertOpen] = useState(false);
+   const setupTimerRef = useRef(null);
+
+   useEffect(() => {
+      if (setupGaps.length > 0) {
+         setSetupAlertOpen(true);
+         if (setupTimerRef.current) clearTimeout(setupTimerRef.current);
+         setupTimerRef.current = setTimeout(() => {
+            setSetupAlertOpen(false);
+         }, 2500);
+      } else {
+         setSetupAlertOpen(false);
+      }
+      return () => {
+         if (setupTimerRef.current) clearTimeout(setupTimerRef.current);
+      };
+   }, [setupGaps.length]);
 
    // Soft refresh: keep existing KPIs visible; only full skeleton on first empty load.
    const hasDashboardData = Boolean(dashboardSummary);
@@ -877,12 +941,25 @@ const Dashboard = () => {
       return () => window.removeEventListener('keydown', onMenuKey, true);
    }, []);
 
+   const [gstHubInitialReport, setGstHubInitialReport] = useState('gstr1');
+   const openGstReport = (reportKey = 'gstr1') => {
+      setGstHubInitialReport(reportKey);
+      setModals(prev => ({ ...prev, gstReports: true }));
+   };
+
    const openGstinReports = (section = 'sales') => {
-      setModals(prev => ({
-         ...prev,
-         gstinReports: true,
-         gstinReportsSection: section
-      }));
+      const map = {
+         sales: 'gstinSales',
+         purchase: 'gstinPurchase',
+         process: 'gstinProcess',
+         jobwork: 'gstinJobwork',
+         journal: 'gstinJournal',
+         expense: 'gstinExpense',
+         itc04: 'itc04',
+         reconciliation: 'gstrMatching',
+         gstr1errors: 'gstr1Errors',
+      };
+      openGstReport(map[section] || 'gstinSales');
    };
 
    const recentActivity = useMemo(() => {
@@ -943,8 +1020,8 @@ const Dashboard = () => {
    const menuData = {
       Master: [
          { label: 'Account', key: 'accountMaster' },
-         { label: 'Account Main Group', action: () => openGenericMaster('AccountGroup') },
-         { label: 'Account Head', action: () => openGenericMaster('AccountHead') },
+         { label: 'Account Main Group', action: () => toggleModal('accountGroupMaster', true) },
+         { label: 'Account Head', action: () => toggleModal('accountGroupMaster', true) },
          { label: 'Book Master', key: 'bookMaster' },
          { label: 'Book Type', action: () => openGenericMaster('BookType') },
          { label: 'Item', key: 'itemMaster' },
@@ -964,6 +1041,9 @@ const Dashboard = () => {
          { label: 'Department', action: () => openGenericMaster('Department') },
          { label: 'Payment Terms', action: () => openGenericMaster('PaymentTerms') },
          { label: 'Currency', action: () => openGenericMaster('Currency') },
+         { label: 'Size Master', action: () => openGenericMaster('Size') },
+         { label: 'Area Master', action: () => openGenericMaster('Area') },
+         { label: 'Party Bank', action: () => openGenericMaster('PartyBank') },
          { label: 'Warehouse', action: () => setModals(prev => ({ ...prev, warehouseMaster: true })) },
          { label: 'Type', action: () => openGenericMaster('Type') },
          { label: 'OtherMaster', action: () => openGenericMaster('OtherMaster') },
@@ -1009,24 +1089,23 @@ const Dashboard = () => {
          { label: 'Stock Ledger', key: 'inventoryPage' },
       ],
       'GST / Tax': [
-         { label: 'GSTIN Sales Report', action: () => openGstinReports('sales') },
-         { label: 'GSTIN Purchase Report', action: () => openGstinReports('purchase') },
-         { label: 'GSTIN Process Report', action: () => openGstinReports('process') },
-         { label: 'GSTIN JobWork Report', action: () => openGstinReports('jobwork') },
-         { label: 'GSTIN Journal Report', action: () => openGstinReports('journal') },
-         { label: 'GSTIN Expense Report', action: () => openGstinReports('expense') },
-         { label: 'GSTR-1 Outward Return', key: 'gstr1' },
-         { label: 'GSTR-1 Error Checking', key: 'gstr1Errorchek' },
-         { label: 'GSTR-2 Purchase Report', action: () => setModals(prev => ({ ...prev, gstr2: true })) },
-         { label: 'GSTR-2B Matching / Reconcile', key: 'gst2bMatching' },
-         { label: 'GSTR-3B Monthly Return', key: 'gst3bMonthly' },
-         { label: 'GSTR-3B Detailed Breakdown', key: 'gst3bDetail' },
-         { label: 'GSTR-9 Annual Return', action: () => setModals(prev => ({ ...prev, gstr9: true })) },
-         { label: 'ITC-04 Job Work Return', action: () => openGstinReports('itc04') },
-         { label: 'GST Reconciliation Dashboard', action: () => openGstinReports('reconciliation') },
-         { label: 'E-Way Bill Hub', action: () => setModals(prev => ({ ...prev, ewayBill: true })) },
-         { label: 'CA Audit Desk', key: 'caDashboard' },
-         { label: 'GST Reports Hub', action: () => toggleModal('gstReports', true) },
+         { label: '3B Monthly Return', action: () => openGstReport('gst3b') },
+         { label: 'Gstr-1 Error Checking', action: () => openGstReport('gstr1Errors') },
+         { label: 'Gstr-1 Report', action: () => openGstReport('gstr1') },
+         { label: 'Gstr Matching', action: () => openGstReport('gstrMatching') },
+         { label: 'Gstr-2 Report', action: () => openGstReport('gstr2') },
+         { label: 'Gstr-9', action: () => openGstReport('gstr9') },
+         { label: 'ITC 04', action: () => openGstReport('itc04') },
+         { label: 'E-Way Bill Bulk Generation', action: () => openGstReport('ewayBulk') },
+         { label: 'E-Way Bill / Invoice Status', action: () => openGstReport('ewayStatus') },
+         { label: 'E-Way Excel Upload', action: () => openGstReport('ewayExcel') },
+         { label: 'Gst 4.5', action: () => openGstReport('gst45') },
+         { label: 'Gstin - Sales', action: () => openGstReport('gstinSales') },
+         { label: 'Gstin - Purchase', action: () => openGstReport('gstinPurchase') },
+         { label: 'Gstin - Process', action: () => openGstReport('gstinProcess') },
+         { label: 'Gstin - JobWork', action: () => openGstReport('gstinJobwork') },
+         { label: 'Gstin - Journal Report', action: () => openGstReport('gstinJournal') },
+         { label: 'Gstin - Expense', action: () => openGstReport('gstinExpense') },
       ],
       Reports: [
          ...buildReportsMenuItems({
@@ -1034,8 +1113,8 @@ const Dashboard = () => {
             openHub: openReportsHub,
             openExternal: (node) => {
                const ext = typeof node === 'string' ? node : node?.external;
-               if (ext === 'gstReports') toggleModal('gstReports', true);
-               else if (ext === 'gstr1') toggleModal('gstr1', true);
+               if (ext === 'gstReports') openGstReport(node?.reportKind || 'gstr1');
+               else if (ext === 'gstr1') openGstReport('gstr1');
                else if (ext === 'finalReport') {
                   setFinalReportKind(node.reportKind || 'groupList');
                   setModals((prev) => ({ ...prev, finalReport: true }));
@@ -1048,13 +1127,46 @@ const Dashboard = () => {
                } else if (ext) toggleModal(ext, true);
             },
          }),
-         { label: 'Outstanding Report (Sales)', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
-         { label: 'Outstanding Report (Purchase)', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
+         {
+            label: 'Outstanding Zoom',
+            children: [
+               { label: 'Debitors', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
+               { label: 'Creditors', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
+               { label: 'Process', action: () => setModals(prev => ({ ...prev, outstandingProcessFull: true })) },
+               { label: 'JobWork', action: () => setModals(prev => ({ ...prev, outstandingJobworkFull: true })) },
+               { label: 'Age Analysis', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
+               { label: 'Os New Format Testing', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
+            ],
+         },
+         {
+            label: 'Outstanding',
+            children: [
+               { label: 'Debitors', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
+               { label: 'Creditors', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
+               { label: 'Process (Mill)', action: () => setModals(prev => ({ ...prev, outstandingProcessFull: true })) },
+               { label: 'JobWork', action: () => setModals(prev => ({ ...prev, outstandingJobworkFull: true })) },
+            ],
+         },
+         { label: 'Brokreg Statment', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
+         { label: 'Daily Transaction', action: () => openReportsHub('daily') },
+         { label: 'Master List', action: () => openReportsHub('masters') },
+         { label: 'Letter Pad', action: () => openReportsHub('general') },
+         { label: 'Zoom Item Ledger', action: () => openReportsHub('stockItem') },
          { label: 'CA Desk', key: 'caDashboard' },
          { label: 'Z Trial (Trial Balance)', action: () => setModals(prev => ({ ...prev, zTrial: true })) },
       ],
       'Others Reports': [
-         { label: 'Outstanding Zoom', key: 'outstanding' },
+         {
+            label: 'Outstanding Zoom',
+            children: [
+               { label: 'Debitors', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
+               { label: 'Creditors', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
+               { label: 'Process', action: () => setModals(prev => ({ ...prev, outstandingProcessFull: true })) },
+               { label: 'JobWork', action: () => setModals(prev => ({ ...prev, outstandingJobworkFull: true })) },
+               { label: 'Age Analysis', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
+               { label: 'Os New Format Testing', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
+            ],
+         },
          { label: 'Daily Transaction', action: () => openReportsHub('daily') },
          { label: 'Master List', action: () => openReportsHub('masters') },
          { label: 'Item Ledger', action: () => openReportsHub('stockItem') },
@@ -1491,24 +1603,7 @@ const Dashboard = () => {
                   </div>
                )}
                {!isCaUser && (<>
-               {setupGaps.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-3 px-3 py-2.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-950">
-                     <FontAwesomeIcon icon={faTriangleExclamation} className="text-amber-600 text-[12px] shrink-0" />
-                     <div className="flex-1 min-w-[200px]">
-                        <p className="text-[12px] font-semibold">Complete Company Setup before live billing</p>
-                        <p className="text-[11px] text-amber-800/90 mt-0.5">
-                           Missing: {setupGaps.join(' · ')}. Fill these so invoices & ledger look correct.
-                        </p>
-                     </div>
-                     <button
-                        type="button"
-                        className="erp-btn erp-btn-primary h-7 px-3 text-[11px] shrink-0"
-                        onClick={() => openSettings('company')}
-                     >
-                        Open Settings
-                     </button>
-                  </div>
-               )}
+               
                {user?.company?.status === 'suspended' && (
                   <div className="flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl border border-rose-300 bg-rose-50 text-rose-950 shadow-sm">
                      <FontAwesomeIcon icon={faTriangleExclamation} className="text-rose-600 text-base shrink-0" />
@@ -1583,196 +1678,367 @@ const Dashboard = () => {
                   <CardGridLoader count={6} />
                ) : (
                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 erp-motion-stagger">
-                  {[
-                     { 
-                        label: 'Sales Today', 
-                        value: dashboardSummary?.salesToday?.amount, 
-                        sub: dashboardSummary?.salesToday?.count != null ? `${dashboardSummary.salesToday.count} bills` : null,
-                        iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
-                        icon: faChartPie
-                     },
-                     { 
-                        label: 'Purchase Today', 
-                        value: dashboardSummary?.purchaseToday?.amount, 
-                        sub: dashboardSummary?.purchaseToday?.count != null ? `${dashboardSummary.purchaseToday.count} bills` : null,
-                        iconBg: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20',
-                        icon: faCartFlatbed
-                     },
-                     { 
-                        label: 'Cash / Receipts', 
-                        value: dashboardSummary?.cashToday,
-                        iconBg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20',
-                        icon: faMoneyCheckDollar
-                     },
-                     { 
-                        label: 'Receivable', 
-                        value: dashboardSummary?.receivable,
-                        iconBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
-                        icon: faUserTie
-                     },
-                     { 
-                        label: 'Payable', 
-                        value: dashboardSummary?.payable,
-                        iconBg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20',
-                        icon: faFileInvoiceDollar
-                     },
-                     { 
-                        label: 'Low Stock Lots', 
-                        value: dashboardSummary?.lowStockLots, 
-                        raw: true,
-                        iconBg: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20',
-                        icon: faWarehouse
-                     },
-                  ].map((card) => (
-                     <div key={card.label} className="erp-card p-2 sm:p-2.5 flex items-center justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                           <p className="text-[9px] uppercase tracking-wide text-[var(--text-muted)] font-semibold">{card.label}</p>
-                           <p className="text-[13px] sm:text-[14px] font-bold text-[var(--text-primary)] mt-0.5 tabular-nums truncate">
-                             {card.raw
-                                 ? (card.value ?? '—')
-                                 : `₹ ${Number(card.value || 0).toLocaleString('en-IN')}`}
-                           </p>
-                           {card.sub && <p className="text-[9px] text-[var(--text-muted)] mt-0.5 font-medium">{card.sub}</p>}
-                        </div>
-                        <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0 ${card.iconBg}`}>
-                           <FontAwesomeIcon icon={card.icon} className="text-[11px]" />
-                        </div>
-                     </div>
-                  ))}
-               </div>
-               )}
+                   {[
+                      { 
+                         label: 'Sales Today', 
+                         value: dashboardSummary?.salesToday?.amount, 
+                         sub: dashboardSummary?.salesToday?.count != null ? `${dashboardSummary.salesToday.count} bills` : null,
+                         iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+                         svg: (
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                               <path d="M22 7L13.5 15.5L8.5 10.5L2 17" />
+                               <polyline points="16 7 22 7 22 13" />
+                            </svg>
+                         )
+                      },
+                      { 
+                         label: 'Purchase Today', 
+                         value: dashboardSummary?.purchaseToday?.amount, 
+                         sub: dashboardSummary?.purchaseToday?.count != null ? `${dashboardSummary.purchaseToday.count} bills` : null,
+                         iconBg: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20',
+                         svg: (
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                               <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                               <line x1="3" y1="6" x2="21" y2="6" />
+                               <path d="M16 10a4 4 0 0 1-8 0" />
+                            </svg>
+                         )
+                      },
+                      { 
+                         label: 'Cash / Receipts', 
+                         value: dashboardSummary?.cashToday,
+                         iconBg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20',
+                         svg: (
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                               <rect x="2" y="6" width="20" height="12" rx="2" />
+                               <circle cx="12" cy="12" r="3" />
+                               <path d="M6 12h.01M18 12h.01" />
+                            </svg>
+                         )
+                      },
+                      { 
+                         label: 'Receivable', 
+                         value: dashboardSummary?.receivable,
+                         iconBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+                         svg: (
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                            </svg>
+                         )
+                      },
+                      { 
+                         label: 'Payable', 
+                         value: dashboardSummary?.payable,
+                         iconBg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20',
+                         svg: (
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                               <polyline points="14 2 14 8 20 8" />
+                               <line x1="16" y1="13" x2="8" y2="13" />
+                               <line x1="16" y1="17" x2="8" y2="17" />
+                               <polyline points="10 9 9 9 8 9" />
+                            </svg>
+                         )
+                      },
+                      { 
+                         label: 'Low Stock Lots', 
+                         value: dashboardSummary?.lowStockLots, 
+                         raw: true,
+                         iconBg: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20',
+                         svg: (
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                               <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                               <line x1="12" y1="22.08" x2="12" y2="12" />
+                            </svg>
+                         )
+                      },
+                   ].map((card) => (
+                      <div key={card.label} className="erp-card p-2 sm:p-2.5 flex items-center justify-between gap-2 group hover:border-slate-300 dark:hover:border-slate-600 transition-all hover:shadow-xs">
+                         <div className="min-w-0 flex-1">
+                            <p className="text-[9px] uppercase tracking-wide text-[var(--text-muted)] font-semibold">{card.label}</p>
+                            <p className="text-[13px] sm:text-[14px] font-bold text-[var(--text-primary)] mt-0.5 tabular-nums truncate">
+                               <AnimatedCounter value={card.value} isCurrency={!card.raw} />
+                            </p>
+                            {card.sub && <p className="text-[9px] text-[var(--text-muted)] mt-0.5 font-medium">{card.sub}</p>}
+                         </div>
+                         <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0 ${card.iconBg} group-hover:scale-105 transition-transform`}>
+                            {card.svg}
+                         </div>
+                      </div>
+                   ))}
+                </div>
+                )}
 
-               {/* Appzeto SaaS 3D Hero Showcase & Recent Activity Layout — Seamless Background Fit (Zero Squashing, Pristine Proportions) */}
-               <div 
-                  className="flex-1 w-full min-h-[380px] lg:min-h-[420px] relative rounded-2xl overflow-hidden border border-slate-200/70 dark:border-[var(--border)] shadow-sm flex flex-col lg:flex-row items-stretch select-none bg-[#F6FAFE] dark:bg-[var(--bg-card)]"
-                  style={{
-                     backgroundImage: "url('/assets/dashboard-hero-bg-clean.png')",
-                     backgroundRepeat: 'no-repeat',
-                     backgroundPosition: 'right center',
-                     backgroundSize: 'cover'
-                  }}
-               >
-                  {/* Floating Live Recent Activity Card (Left side) */}
-                  <div className="w-full lg:w-[320px] xl:w-[335px] shrink-0 bg-white/95 dark:bg-[var(--bg-card)]/95 backdrop-blur-sm rounded-2xl border border-slate-200/80 dark:border-[var(--border)] p-3 sm:p-3.5 shadow-sm relative flex flex-col justify-between my-2 ml-2 sm:ml-2.5 z-10 max-h-[380px] lg:max-h-none">
-                     {showDashboardSkeleton && (
-                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 dark:bg-[var(--bg-card)]/80 rounded-[inherit]">
-                           <InlineLoader message="Loading activity…" />
-                        </div>
-                     )}
-                     {showSoftSync && !showDashboardSkeleton && (
-                        <div className="absolute top-2.5 right-3 z-10">
-                           <InlineLoader message="Updating…" />
-                        </div>
-                     )}
-                     <div>
-                        <h3 className="text-[12px] font-bold text-slate-800 dark:text-[var(--text-primary)] mb-2.5">
-                           Recent Activity
-                        </h3>
+                {/* Modern ERP Operations Command Hub & Live Recent Activity */}
+                <div className="flex-1 w-full min-h-[380px] lg:min-h-[420px] relative rounded-2xl overflow-hidden border border-slate-200/80 dark:border-[var(--border)] shadow-sm flex flex-col lg:flex-row items-stretch select-none bg-white dark:bg-[var(--bg-card)]">
+                   {/* Live Recent Activity Card (Left side) */}
+                   <div className="w-full lg:w-[320px] xl:w-[335px] shrink-0 bg-slate-50/70 dark:bg-[var(--bg-card)] border-b lg:border-b-0 lg:border-r border-slate-200/80 dark:border-[var(--border)] p-3 sm:p-3.5 shadow-none relative flex flex-col justify-between z-10 max-h-[380px] lg:max-h-none">
+                      {showDashboardSkeleton && (
+                         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 dark:bg-[var(--bg-card)]/80 rounded-[inherit]">
+                            <InlineLoader message="Loading activity…" />
+                         </div>
+                      )}
+                      {showSoftSync && !showDashboardSkeleton && (
+                         <div className="absolute top-2.5 right-3 z-10">
+                            <InlineLoader message="Updating…" />
+                         </div>
+                      )}
+                      <div>
+                         <div className="flex items-center justify-between mb-2.5">
+                            <h3 className="text-[12px] font-bold text-slate-800 dark:text-[var(--text-primary)] flex items-center gap-1.5">
+                               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                               Recent Activity
+                            </h3>
+                            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">Live Feed</span>
+                         </div>
 
-                        {recentActivity.length > 0 ? (
-                           <div className="space-y-2.5">
-                              {recentActivity.slice(0, 6).map((act, i) => (
-                                 <div key={i} className="flex items-start justify-between gap-2">
-                                    <div className="flex items-start gap-2 min-w-0 flex-1">
-                                       <span className="w-2 h-2 rounded-full bg-blue-600 dark:bg-[var(--accent)] mt-1 shrink-0" />
-                                       <div className="min-w-0 flex-1">
-                                          <div className="text-[11px] font-semibold text-slate-800 dark:text-[var(--text-primary)] leading-tight truncate">
-                                             {act.text}
-                                          </div>
-                                          <div className="text-[9px] text-slate-400 dark:text-[var(--text-muted)] mt-0.5 font-medium">
-                                             {act.time}
-                                          </div>
-                                       </div>
-                                    </div>
+                         {recentActivity.length > 0 ? (
+                            <div className="space-y-2">
+                               {recentActivity.slice(0, 6).map((act, i) => (
+                                  <div key={i} className="flex items-start justify-between gap-2 p-1.5 rounded-lg hover:bg-white/90 dark:hover:bg-slate-800/40 transition-colors">
+                                     <div className="flex items-start gap-2 min-w-0 flex-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-[var(--accent)] mt-1.5 shrink-0" />
+                                        <div className="min-w-0 flex-1">
+                                           <div className="text-[11px] font-semibold text-slate-800 dark:text-[var(--text-primary)] leading-tight truncate">
+                                              {act.text}
+                                           </div>
+                                           <div className="text-[9px] text-slate-400 dark:text-[var(--text-muted)] mt-0.5 font-medium">
+                                              {act.time}
+                                           </div>
+                                        </div>
+                                     </div>
 
-                                    {act.type && (
-                                       <span className={`px-2 py-0.5 rounded-md text-[9px] font-semibold shrink-0 ${
-                                          act.type === 'sales'
-                                             ? 'bg-[#E6F8F0] text-[#059669] dark:bg-emerald-500/15 dark:text-emerald-400'
-                                             : act.type === 'purchase'
-                                             ? 'bg-[#E6F4FE] text-[#0284C7] dark:bg-sky-500/15 dark:text-sky-400'
-                                             : act.type === 'job'
-                                             ? 'bg-[#EEF2FF] text-[#4F46E5] dark:bg-indigo-500/15 dark:text-indigo-400'
-                                             : 'bg-slate-50 text-slate-600 dark:bg-slate-500/15 dark:text-slate-400'
-                                       }`}>
-                                          {act.type === 'sales' ? 'Sales' : act.type === 'purchase' ? 'Purchase' : act.type === 'job' ? 'Mill / Job' : 'General'}
-                                       </span>
-                                    )}
-                                 </div>
-                              ))}
-                           </div>
-                        ) : (
-                           <div className="flex flex-col items-center justify-center py-6 text-center">
-                              <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">No recent transactions yet</p>
-                              <p className="text-[10px] text-slate-400 mt-0.5">Your recent sales, purchases and mill chalan entries will appear here live</p>
-                           </div>
-                        )}
-                     </div>
+                                     {act.type && (
+                                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold shrink-0 ${
+                                           act.type === 'sales'
+                                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border border-emerald-200/50'
+                                              : act.type === 'purchase'
+                                              ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-400 border border-sky-200/50'
+                                              : act.type === 'job'
+                                              ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400 border border-indigo-200/50'
+                                              : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                                        }`}>
+                                           {act.type === 'sales' ? 'Sales' : act.type === 'purchase' ? 'Purchase' : act.type === 'job' ? 'Mill / Job' : 'General'}
+                                        </span>
+                                     )}
+                                  </div>
+                               ))}
+                            </div>
+                         ) : (
+                            <div className="flex flex-col items-center justify-center py-8 text-center">
+                               <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">No recent transactions yet</p>
+                               <p className="text-[10px] text-slate-400 mt-0.5">Your sales, purchases and mill chalans will appear here live</p>
+                            </div>
+                         )}
+                      </div>
 
-                     {showRecordsHub && (
-                        <div className="pt-2 mt-2 border-t border-slate-100 dark:border-[var(--border)]">
-                           <button
-                              type="button"
-                              onClick={() => openRecordsHub('sales')}
-                              className="text-[11px] font-bold text-blue-600 dark:text-[var(--accent)] hover:underline flex items-center gap-1"
-                           >
-                              <span>View all records</span>
-                              <span>→</span>
-                           </button>
-                        </div>
-                     )}
-                  </div>
+                      {showRecordsHub && (
+                         <div className="pt-2 mt-2 border-t border-slate-200/60 dark:border-[var(--border)]">
+                            <button
+                               type="button"
+                               onClick={() => openRecordsHub('sales')}
+                               className="text-[11px] font-bold text-blue-600 dark:text-[var(--accent)] hover:underline flex items-center gap-1.5"
+                            >
+                               <span>View all records</span>
+                               <span>→</span>
+                            </button>
+                         </div>
+                      )}
+                   </div>
 
-                  {/* Right side: Seamless Appzeto 3D Showcase (No box, no border, interactive hotspots over background) */}
-                  <div className="flex-1 relative min-h-[260px] lg:min-h-0">
-                     {/* Interactive Clickable Hotspots for 4 Modules */}
-                     <div 
-                        onClick={() => toggleModal('cashBook', true)}
-                        title="Accounting: Cash & Bank Book"
-                        className="absolute left-[2%] top-[45%] w-[18%] h-[18%] cursor-pointer hover:bg-emerald-500/10 rounded-xl transition-colors"
-                     />
-                     <div 
-                        onClick={() => toggleModal('inventoryPage', true)}
-                        title="Inventory: Stock & Lots"
-                        className="absolute left-[21%] top-[45%] w-[18%] h-[18%] cursor-pointer hover:bg-blue-500/10 rounded-xl transition-colors"
-                     />
-                     <div 
-                        onClick={() => toggleModal('caDashboard', true)}
-                        title="GST / Tax: Compliance Ready"
-                        className="absolute left-[40%] top-[45%] w-[18%] h-[18%] cursor-pointer hover:bg-amber-500/10 rounded-xl transition-colors"
-                     />
-                     <div 
-                        onClick={() => openReportsHub('summary')}
-                        title="Reports: Insightful Analytics"
-                        className="absolute left-[59%] top-[45%] w-[18%] h-[18%] cursor-pointer hover:bg-purple-500/10 rounded-xl transition-colors"
-                     />
+                   {/* Right Side: Dealing India Billing Software Showcase (Ultra Crisp, High Contrast & Compact) */}
+                   <div 
+                      className="flex-1 p-5 sm:p-6 flex flex-col justify-between select-none"
+                      style={{ backgroundColor: 'var(--bg-card, #ffffff)' }}
+                   >
+                      
+                      {/* Main Brand Showcase: Focused, Bold & Ultra Visible */}
+                      <div className="flex-1 flex flex-col justify-center items-center text-center py-4">
+                         {/* Refined Brand Logo Icon */}
+                         <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white font-black text-2xl flex items-center justify-center shadow-md mb-3 shrink-0">
+                            DI
+                         </div>
 
-                     {/* Interactive Clickable Hotspots for 4 Bottom Pedestals */}
-                     <div 
-                        onClick={() => toggleModal('sales', true)}
-                        title="Grow Your Business: Create Invoice"
-                        className="absolute left-[17%] bottom-[2%] w-[19%] h-[24%] cursor-pointer hover:bg-blue-500/10 rounded-xl transition-colors"
-                     />
-                     <div 
-                        onClick={() => setModals(prev => ({ ...prev, downloadDesktop: true }))}
-                        title="Secure & Reliable: Download Windows Offline App"
-                        className="absolute left-[38%] bottom-[2%] w-[19%] h-[24%] cursor-pointer hover:bg-blue-500/10 rounded-xl transition-colors"
-                     />
-                     <div 
-                        onClick={() => handleSync()}
-                        title="Cloud Technology: Sync Data"
-                        className="absolute left-[59%] bottom-[2%] w-[19%] h-[24%] cursor-pointer hover:bg-blue-500/10 rounded-xl transition-colors"
-                     />
-                     <div 
-                        onClick={() => openRecordsHub('sales')}
-                        title="Trusted by Businesses: View Records"
-                        className="absolute left-[80%] bottom-[2%] w-[19%] h-[24%] cursor-pointer hover:bg-blue-500/10 rounded-xl transition-colors"
-                     />
-                  </div>
-               </div>
-               </>)}
+                         {/* Main Title: Dealing India Billing Software */}
+                         <h2 
+                            className="text-2xl sm:text-3xl font-black tracking-tight"
+                            style={{ color: 'var(--text-primary, #0f172a)' }}
+                         >
+                            Dealing India Billing Software
+                         </h2>
+                         <p 
+                            className="text-[13px] sm:text-[14px] mt-1.5 font-semibold max-w-lg"
+                            style={{ color: 'var(--text-secondary, #475569)' }}
+                         >
+                            Complete Textile Billing, Grey & Finished Stock, Mill Jobwork & GST Solution
+                         </p>
+
+                         {/* High-Contrast Compact Feature Badges */}
+                         <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+                            <span 
+                               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border"
+                               style={{ backgroundColor: '#ecfdf5', color: '#065f46', borderColor: '#a7f3d0' }}
+                            >
+                               <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                               100% Offline + Cloud Sync
+                            </span>
+                            <span 
+                               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border"
+                               style={{ backgroundColor: '#f0f9ff', color: '#075985', borderColor: '#bae6fd' }}
+                            >
+                               ✓ GST & E-Way Ready
+                            </span>
+                            <span 
+                               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border"
+                               style={{ backgroundColor: '#eef2ff', color: '#3730a3', borderColor: '#c7d2fe' }}
+                            >
+                               ✓ Mill Issue & Rec Challan
+                            </span>
+                            <span 
+                               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border"
+                               style={{ backgroundColor: '#fffbeb', color: '#92400e', borderColor: '#fde68a' }}
+                            >
+                               ✓ Fast Keyboard Entries
+                            </span>
+                         </div>
+                      </div>
+
+                      {/* Compact Helpline & Support Bar (Ultra Crisp, High Contrast & Clean) */}
+                      <div className="mt-auto pt-3 border-t border-[var(--border, #e2e8f0)]">
+                         <div 
+                            className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl border"
+                            style={{ backgroundColor: 'var(--bg-subtle, #f8fafc)', borderColor: 'var(--border, #e2e8f0)' }}
+                         >
+                            <div className="flex items-center gap-3">
+                               <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                  </svg>
+                               </div>
+                               <div>
+                                  <p 
+                                     className="text-[10px] uppercase font-extrabold tracking-wider"
+                                     style={{ color: 'var(--text-secondary, #475569)' }}
+                                  >
+                                     Customer Support & Helpline
+                                  </p>
+                                  <a 
+                                     href="tel:+919876543210" 
+                                     className="text-[14px] font-black hover:underline flex items-center gap-1.5"
+                                     style={{ color: '#1d4ed8' }}
+                                  >
+                                     <span>📞 +91 98765 43210</span>
+                                     <span className="text-[11px] font-normal text-slate-500">• Surat, Gujarat</span>
+                                  </a>
+                               </div>
+                            </div>
+
+                            {/* Compact Action Buttons */}
+                            <div className="flex items-center gap-2">
+                               <a
+                                  href="https://wa.me/919876543210"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="h-7 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-xs transition-colors"
+                               >
+                                  <span>💬 WhatsApp</span>
+                               </a>
+                               <button
+                                  type="button"
+                                  onClick={() => setModals((prev) => ({ ...prev, downloadDesktop: true }))}
+                                  className="h-7 px-3.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-xs transition-colors"
+                               >
+                                  <span>💻 Desktop .EXE</span>
+                               </button>
+                            </div>
+                         </div>
+                      </div>
+
+                   </div>
+                </div>
+                </>)}
                </div>
             </div>
+         
+         {/* Floating Modern Round Notification Pill for Complete Company Setup */}
+         {!isCaUser && setupGaps.length > 0 && (
+            <div 
+               className="fixed bottom-9 right-5 z-40 flex items-center justify-end select-none pointer-events-auto"
+               onMouseEnter={() => {
+                  if (setupTimerRef.current) clearTimeout(setupTimerRef.current);
+               }}
+               onMouseLeave={() => {
+                  if (setupAlertOpen) {
+                     if (setupTimerRef.current) clearTimeout(setupTimerRef.current);
+                     setupTimerRef.current = setTimeout(() => setSetupAlertOpen(false), 2000);
+                  }
+               }}
+            >
+               {/* Slide-out / Pop Notification Pill (2-3 seconds auto show, then tucks back) */}
+               <div
+                  className={`transition-all duration-500 ease-in-out flex items-center overflow-hidden shadow-2xl rounded-full border border-amber-300/80 dark:border-amber-500/40 bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 text-white ${
+                     setupAlertOpen
+                        ? 'max-w-[480px] opacity-100 px-3.5 py-1.5 mr-2 translate-x-0'
+                        : 'max-w-0 opacity-0 px-0 py-0 mr-0 translate-x-6 pointer-events-none'
+                  }`}
+               >
+                  <div className="flex items-center gap-2.5 min-w-[270px] sm:min-w-[310px]">
+                     <span className="relative flex h-2.5 w-2.5 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+                     </span>
+                     <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-bold tracking-tight text-white leading-tight truncate">
+                           Complete Company Setup
+                        </p>
+                        <p className="text-[10px] text-amber-100 font-medium truncate">
+                           Missing: {setupGaps.join(' · ')}
+                        </p>
+                     </div>
+                     <button
+                        type="button"
+                        onClick={() => {
+                           setSetupAlertOpen(false);
+                           openSettings('company');
+                        }}
+                        className="h-6 px-2.5 rounded-full bg-white text-amber-800 text-[10px] font-bold hover:bg-amber-50 active:scale-95 shadow-xs shrink-0 transition-transform"
+                     >
+                        Setup Now
+                     </button>
+                     <button
+                        type="button"
+                        onClick={() => setSetupAlertOpen(false)}
+                        title="Tuck inside"
+                        className="text-amber-200 hover:text-white text-xs px-1 py-0.5 ml-0.5 shrink-0"
+                     >
+                        ✕
+                     </button>
+                  </div>
+               </div>
+
+               {/* Sleek Glowing Circular Pop Notification Trigger */}
+               <button
+                  type="button"
+                  onClick={() => setSetupAlertOpen((prev) => !prev)}
+                  title={`Company Setup Incomplete (${setupGaps.length} missing). Click to configure.`}
+                  className="group relative w-11 h-11 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/35 border-2 border-white dark:border-slate-800 flex items-center justify-center cursor-pointer hover:scale-108 active:scale-95 transition-all duration-200 shrink-0"
+               >
+                  {/* Glowing Animated Ping Badge */}
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                     <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500 text-[9px] font-bold text-white items-center justify-center shadow-xs">
+                        {setupGaps.length}
+                     </span>
+                  </span>
+
+                  <svg className="w-5 h-5 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+               </button>
+            </div>
+         )}
+
          </main>
 
          {/* Modals — daily path is eager; rare screens stay in Suspense */}
@@ -2016,6 +2282,7 @@ const Dashboard = () => {
             }}
          />
          <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters || mobileViewOnly} />
+         <AccountGroupMasterModal isOpen={modals.accountGroupMaster} onClose={() => toggleModal('accountGroupMaster', false)} readOnly={permissions.readOnlyMasters || mobileViewOnly} />
          <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} readOnly={permissions.readOnlyMasters || mobileViewOnly} />
          {modals.outstandingSalesFull && (
             <OutstandingReportModal
@@ -2029,6 +2296,20 @@ const Dashboard = () => {
                isOpen={modals.outstandingPurchaseFull}
                onClose={() => setModals(prev => ({ ...prev, outstandingPurchaseFull: false }))}
                type="payable"
+            />
+         )}
+         {modals.outstandingProcessFull && (
+            <OutstandingReportModal
+               isOpen={modals.outstandingProcessFull}
+               onClose={() => setModals(prev => ({ ...prev, outstandingProcessFull: false }))}
+               type="process"
+            />
+         )}
+         {modals.outstandingJobworkFull && (
+            <OutstandingReportModal
+               isOpen={modals.outstandingJobworkFull}
+               onClose={() => setModals(prev => ({ ...prev, outstandingJobworkFull: false }))}
+               type="jobwork"
             />
          )}
          {modals.systemUtilities && (
@@ -2087,11 +2368,11 @@ const Dashboard = () => {
          {/* Lazy-only island — must NOT wrap Sales/Purchase or clicks go blank */}
          <Suspense fallback={null}>
             {modals.outstanding && (
-               <SalesOutstanding
+               <OutstandingReportModal
                   isOpen={modals.outstanding}
-                  initialPartyId={outstandingSeed?.partyId || ''}
-                  initialType={outstandingSeed?.osType || 'receivable'}
-                  autoRun={!!outstandingSeed?.partyId}
+                  type={outstandingSeed?.osType || 'receivable'}
+                  directPartyId={outstandingSeed?.partyId || ''}
+                  directPartyName={outstandingSeed?.partyName || ''}
                   onClose={() => {
                      setOutstandingSeed(null);
                      toggleModal('outstanding', false);
@@ -2144,7 +2425,13 @@ const Dashboard = () => {
             )}
             {modals.gst3bMonthly && <Gst3bMonthlyModal isOpen onClose={() => toggleModal('gst3bMonthly', false)} />}
             {modals.gstr1 && <Gstr1Modal isOpen onClose={() => toggleModal('gstr1', false)} />}
-            {modals.gstReports && <GstReportsHub isOpen onClose={() => toggleModal('gstReports', false)} />}
+            {modals.gstReports && (
+               <GstReportsHub
+                  isOpen
+                  onClose={() => toggleModal('gstReports', false)}
+                  initialReport={gstHubInitialReport || 'gstr1'}
+               />
+            )}
             {modals.gst2bMatching && <Gst2bMatchingModal isOpen onClose={() => toggleModal('gst2bMatching', false)} />}
             {modals.gst3bDetail && <Gst3bDetailModal isOpen onClose={() => toggleModal('gst3bDetail', false)} />}
             {modals.gstr1Errorchek && <Gstr1ErrorChekModal isOpen onClose={() => toggleModal('gstr1Errorchek', false)} />}

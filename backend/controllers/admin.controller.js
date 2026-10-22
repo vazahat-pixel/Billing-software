@@ -121,18 +121,82 @@ exports.getAllCompanies = async (req, res) => {
     try {
         const CompanySettings = require('../models/CompanySettings');
         const companies = await Company.find()
-            .populate('ownerId', 'name email')
+            .populate('ownerId', 'name email username mobile emailVerified createdAt')
             .populate('planId')
+            .sort({ createdAt: -1 })
             .lean();
-        const settings = await CompanySettings.find({
-            companyId: { $in: companies.map((c) => c._id) },
-        }).select('companyId state city district gstin').lean();
+
+        const companyIds = companies.map((c) => c._id);
+        const [settings, subscriptions] = await Promise.all([
+            CompanySettings.find({ companyId: { $in: companyIds } }).select('companyId state city district gstin').lean(),
+            Subscription.find({ companyId: { $in: companyIds } }).populate('planId', 'name priceMonthly trialDays').lean(),
+        ]);
+
         const byCompany = new Map(settings.map((s) => [String(s.companyId), s]));
+        const subByCompany = new Map(subscriptions.map((s) => [String(s.companyId), s]));
+
+        // Group child companies by their masterCompanyId
+        const childMap = new Map();
+        companies.forEach((c) => {
+            if (c.masterCompanyId) {
+                const rootId = String(c.masterCompanyId);
+                if (!childMap.has(rootId)) childMap.set(rootId, []);
+                childMap.get(rootId).push({
+                    id: c._id,
+                    name: c.name,
+                    coCode: c.coCode,
+                    status: c.status,
+                    isActive: c.isActive,
+                });
+            }
+        });
+
+        const now = new Date();
         const rows = companies.map((c) => {
             const saved = byCompany.get(String(c._id)) || {};
+            const sub = subByCompany.get(String(c._id)) || null;
             const meta = c.meta || {};
+            const isChild = !!c.masterCompanyId;
+            const children = childMap.get(String(c._id)) || [];
+
+            let demoRemainingDays = null;
+            const effectiveExpiry = sub?.endDate || c.demoExpiresAt;
+            if (effectiveExpiry) {
+                const diffMs = new Date(effectiveExpiry).getTime() - now.getTime();
+                demoRemainingDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            }
+
+            let effectiveLifecycle = c.lifecycleState || 'ACTIVE';
+            if (c.status === 'suspended') {
+                effectiveLifecycle = 'SUSPENDED';
+            } else if (c.status === 'expired' || (sub?.status === 'trial' && demoRemainingDays !== null && demoRemainingDays <= 0)) {
+                effectiveLifecycle = 'DEMO_EXPIRED';
+            } else if (sub?.status === 'trial') {
+                effectiveLifecycle = 'DEMO_ACTIVE';
+            } else if (c.status === 'active') {
+                effectiveLifecycle = 'ACTIVE';
+            }
+
             return {
                 ...c,
+                isRoot: !isChild,
+                masterCompanyId: c.masterCompanyId ? String(c.masterCompanyId) : null,
+                childCompanies: children,
+                childCount: children.length,
+                subscription: sub ? {
+                    id: sub._id,
+                    status: sub.status,
+                    startDate: sub.startDate,
+                    endDate: sub.endDate,
+                    billingCycle: sub.billingCycle,
+                    planName: sub.planId?.name || c.planId?.name || 'Basic',
+                } : null,
+                demo: {
+                    startedAt: c.demoStartedAt || sub?.startDate || c.createdAt,
+                    expiresAt: effectiveExpiry,
+                    remainingDays: demoRemainingDays,
+                    lifecycleState: effectiveLifecycle,
+                },
                 location: {
                     state: saved.state || meta.state || '',
                     city: saved.city || meta.city || '',
@@ -331,6 +395,29 @@ exports.updateCompany = async (req, res) => {
         }
         if (Object.keys(sets).length) {
             await Company.findByIdAndUpdate(id, { $set: sets }, { new: true });
+            if (sets.status === 'suspended') {
+                await Company.updateMany(
+                    { masterCompanyId: id },
+                    { status: 'suspended', isActive: false }
+                );
+                const CompanySettings = require('../models/CompanySettings');
+                const childIds = await Company.find({ masterCompanyId: id }).distinct('_id');
+                await CompanySettings.updateMany(
+                    { companyId: { $in: [id, ...childIds] } },
+                    { isLocked: true, lockReason: 'Suspended by admin (Parent company locked)' }
+                );
+            } else if (sets.status === 'active') {
+                await Company.updateMany(
+                    { masterCompanyId: id },
+                    { status: 'active', isActive: true }
+                );
+                const CompanySettings = require('../models/CompanySettings');
+                const childIds = await Company.find({ masterCompanyId: id }).distinct('_id');
+                await CompanySettings.updateMany(
+                    { companyId: { $in: [id, ...childIds] } },
+                    { isLocked: false, lockReason: '' }
+                );
+            }
         }
         if (Object.keys(location).length) {
             const CompanySettings = require('../models/CompanySettings');
@@ -352,7 +439,20 @@ exports.updateCompany = async (req, res) => {
 
 exports.lockCompany = async (req, res) => {
     try {
-        const company = await Company.findByIdAndUpdate(req.params.id, { status: 'suspended' }, { new: true });
+        const company = await Company.findByIdAndUpdate(req.params.id, { status: 'suspended', isActive: false }, { new: true });
+        if (company) {
+            // Cascade suspension to all child companies if this is a parent/master
+            await Company.updateMany(
+                { masterCompanyId: company._id },
+                { status: 'suspended', isActive: false }
+            );
+            const CompanySettings = require('../models/CompanySettings');
+            const childIds = await Company.find({ masterCompanyId: company._id }).distinct('_id');
+            await CompanySettings.updateMany(
+                { companyId: { $in: [company._id, ...childIds] } },
+                { isLocked: true, lockReason: 'Suspended by admin (Parent company locked)' }
+            );
+        }
         const auditService = require('../services/auditService');
         await auditService.log(req, 'lock', 'company', req.params.id, null, { status: 'suspended' }, 'admin_lock');
         res.status(200).json(company);
@@ -363,7 +463,20 @@ exports.lockCompany = async (req, res) => {
 
 exports.unlockCompany = async (req, res) => {
     try {
-        const company = await Company.findByIdAndUpdate(req.params.id, { status: 'active' }, { new: true });
+        const company = await Company.findByIdAndUpdate(req.params.id, { status: 'active', isActive: true }, { new: true });
+        if (company) {
+            // Cascade activation to all child companies
+            await Company.updateMany(
+                { masterCompanyId: company._id },
+                { status: 'active', isActive: true }
+            );
+            const CompanySettings = require('../models/CompanySettings');
+            const childIds = await Company.find({ masterCompanyId: company._id }).distinct('_id');
+            await CompanySettings.updateMany(
+                { companyId: { $in: [company._id, ...childIds] } },
+                { isLocked: false, lockReason: '' }
+            );
+        }
         const auditService = require('../services/auditService');
         await auditService.log(req, 'unlock', 'company', req.params.id, null, { status: 'active' }, 'admin_unlock');
         try {

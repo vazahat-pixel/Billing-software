@@ -40,10 +40,10 @@ const TABS = [
   { key: 'city', label: 'City', live: true },
   { key: 'book', label: 'Book', live: true },
   { key: 'haste', label: 'Haste', live: false },
-  { key: 'transport', label: 'Transport', live: false },
-  { key: 'item', label: 'Item', live: false },
+  { key: 'transport', label: 'Transport', live: true },
+  { key: 'item', label: 'Item', live: true },
   { key: 'salesman', label: 'SalesMan', live: false },
-  { key: 'area', label: 'Area', live: false },
+  { key: 'area', label: 'Area', live: true },
 ];
 
 /** Summary Columns matching client's Screenshot 1 */
@@ -114,6 +114,18 @@ export default function JsmReportPane({
       const cities = [...new Set(list.map((p) => p.city || p.station).filter(Boolean))].sort();
       return cities.map((name) => ({ _id: `city:${name}`, name, city: name }));
     }
+    if (tab === 'transport') {
+      const transports = [...new Set(list.map((p) => p.transport).filter(Boolean))].sort();
+      return transports.map((name) => ({ _id: `transport:${name}`, name, city: name }));
+    }
+    if (tab === 'area') {
+      const areas = [...new Set(list.map((p) => p.area).filter(Boolean))].sort();
+      return areas.map((name) => ({ _id: `area:${name}`, name, city: name }));
+    }
+    if (tab === 'item') {
+      const itemsList = [...new Set((Array.isArray(salesRows) ? salesRows : []).flatMap((r) => (r.items || []).map((it) => it.name || it.itemName)).filter(Boolean))].sort();
+      return itemsList.map((name) => ({ _id: `item:${name}`, name, city: 'Item' }));
+    }
     if (tab === 'book') {
       return [{ _id: 'book:SALES BOOK', name: 'SALES BOOK' }, { _id: 'book:PURCHASE BOOK', name: 'PURCHASE BOOK' }];
     }
@@ -121,7 +133,7 @@ export default function JsmReportPane({
       return list.filter((p) => !/broker/i.test(String(p.type || '')));
     }
     return [];
-  }, [parties, tab]);
+  }, [parties, tab, salesRows]);
 
   const visible = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -145,6 +157,9 @@ export default function JsmReportPane({
     });
     picked.forEach((id) => {
       if (String(id).startsWith('city:')) names.add(String(id).slice(5).toLowerCase());
+      if (String(id).startsWith('transport:')) names.add(String(id).slice(10).toLowerCase());
+      if (String(id).startsWith('area:')) names.add(String(id).slice(5).toLowerCase());
+      if (String(id).startsWith('item:')) names.add(String(id).slice(5).toLowerCase());
     });
     return names;
   }, [picked, parties]);
@@ -185,7 +200,10 @@ export default function JsmReportPane({
       bills = bills.filter((r) => {
         const party = String(r.partyName || '').toLowerCase();
         const city = String(r.city || '').toLowerCase();
-        return selectedNames.has(party) || selectedNames.has(city);
+        const transport = String(r.transport || r.transporterId || '').toLowerCase();
+        const area = String(r.area || '').toLowerCase();
+        const hasItem = (r.items || []).some((it) => selectedNames.has(String(it.name || it.itemName || '').toLowerCase()));
+        return selectedNames.has(party) || selectedNames.has(city) || selectedNames.has(transport) || selectedNames.has(area) || hasItem;
       });
     }
     if (status === 'Pending') bills = bills.filter((r) => Number(r.balance || 0) > 0.01);

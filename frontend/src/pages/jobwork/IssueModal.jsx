@@ -58,6 +58,10 @@ const emptyForm = (book) => ({
   lotId: '',
   remark1: '',
   remark2: '',
+  transport: '',
+  lrNo: '',
+  markaNo: '',
+  hsnCd: '',
   procType: 'Process Charge',
   finish: '',
   book: book || 'PROCESS ISSUE BOOK',
@@ -233,6 +237,27 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     () => mills.map((m) => ({ value: m._id || m.id, label: m.name })),
     [mills]
   );
+
+  const selectedMill = useMemo(() => {
+    return mills.find((m) => String(m._id || m.id) === String(form.millId));
+  }, [mills, form.millId]);
+
+  const millBalance = useMemo(() => {
+    if (!selectedMill) return null;
+    return Number(selectedMill.closingBalance ?? selectedMill.balance ?? 0);
+  }, [selectedMill]);
+
+  const estJobAmt = useMemo(() => {
+    const qty = Number(form.issQty) || 0;
+    const rate = Number(form.jobRate) || 0;
+    return Number((qty * rate).toFixed(2));
+  }, [form.issQty, form.jobRate]);
+
+  const estGoodsVal = useMemo(() => {
+    const qty = Number(form.issQty) || 0;
+    const rate = Number(form.puRate) || 0;
+    return Number((qty * rate).toFixed(2));
+  }, [form.issQty, form.puRate]);
 
   const weaverOptions = useMemo(() => {
     const weaverNames = new Set();
@@ -713,6 +738,10 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       lotId: job.lotId?._id || job.lotId || '',
       remark1: r1 || '',
       remark2: rest.join(' ') || '',
+      transport: job.transport || '',
+      lrNo: job.lrNo || '',
+      markaNo: job.markaNo || '',
+      hsnCd: job.hsnCode || job.hsnCd || '',
       procType: job.processType || 'Process Charge',
       finish: job.finish || '',
       book: selectedBook || 'PROCESS ISSUE BOOK',
@@ -832,6 +861,10 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         toast.error(`Iss Qty exceeds stock (${Number(selectedLot.remainingMtrs || 0).toFixed(2)})`);
         return false;
       }
+      if (selectedLot && pcs > 0 && Number(selectedLot.remainingPcs || 0) > 0 && pcs > Number(selectedLot.remainingPcs || 0) + 0.0001) {
+        toast.error(`Iss Pcs exceeds available stock (${Number(selectedLot.remainingPcs || 0)})`);
+        return false;
+      }
     } else {
       if (!pcs || pcs <= 0) {
         toast.error('Enter Iss Pcs');
@@ -854,7 +887,13 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
 
     setSaving(true);
     try {
-      const remark = [form.remark1, form.remark2].filter(Boolean).join('\n');
+      const dispatchNotes = [
+        form.transport ? `Transport: ${form.transport}` : '',
+        form.lrNo ? `LR No: ${form.lrNo}` : '',
+        form.markaNo ? `Bale/Marka: ${form.markaNo}` : '',
+        form.hsnCd ? `HSN: ${form.hsnCd}` : '',
+      ].filter(Boolean).join(' | ');
+      const remark = [form.remark1, form.remark2, dispatchNotes].filter(Boolean).join('\n');
       const { millId, procType, finish, jobRate } = form;
       await issueToMill({
         jobCardNo: form.challanNo,
@@ -873,6 +912,10 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         jobRate: Number(form.jobRate) || 0,
         processCharges: Number(form.jobRate) || 0,
         chargesRate: Number(form.jobRate) || 0,
+        transport: form.transport || undefined,
+        lrNo: form.lrNo || undefined,
+        markaNo: form.markaNo || undefined,
+        hsnCode: form.hsnCd || undefined,
         remark,
         remarks: remark,
       });
@@ -1118,6 +1161,14 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                         }}
                         allowClear
                       />
+                      {millBalance !== null && !isNaN(millBalance) && (
+                        <span
+                          className="font-mono text-emerald-800 font-bold text-[11px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0 ml-1"
+                          title="Mill / Worker Closing Balance (_lbl_clbal_Book)"
+                        >
+                          Bal: ₹{millBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      )}
                       {!locked && (
                         <button
                           type="button"
@@ -1321,7 +1372,66 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                     </div>
                   </div>
 
-                  <div className="classic-erp-field classic-erp-field--lg mt-4">
+                  {/* On-screen live calculation badges matching JSM _lbl_Purchase_Amt & _lbl_job_amt */}
+                  <div className="flex items-center gap-3 mt-2 px-2 py-1 bg-slate-100 rounded border border-slate-300 text-[11px] font-semibold">
+                    <span className="text-slate-700">
+                      Est. Goods Val: <b className="text-amber-800 font-mono">₹{estGoodsVal.toFixed(2)}</b>
+                    </span>
+                    <span className="text-slate-400">|</span>
+                    <span className="text-slate-700">
+                      Est. Job Charges: <b className="text-emerald-800 font-mono">₹{estJobAmt.toFixed(2)}</b>
+                    </span>
+                  </div>
+
+                  {/* Dispatch Details — matching JSM _txt_transportname, _txt_lrno, _txt_markano, _txt_hsncode */}
+                  <div className="grid grid-cols-4 gap-2 mt-3 pt-2 border-t border-slate-200">
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label text-[11px]">Transport</span>
+                      <input
+                        type="text"
+                        className="classic-erp-input text-xs"
+                        placeholder="Transport Name"
+                        value={form.transport || ''}
+                        onChange={(e) => setField('transport', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label text-[11px]">LR No</span>
+                      <input
+                        type="text"
+                        className="classic-erp-input text-xs"
+                        placeholder="LR Number"
+                        value={form.lrNo || ''}
+                        onChange={(e) => setField('lrNo', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label text-[11px]">Bale/Marka</span>
+                      <input
+                        type="text"
+                        className="classic-erp-input text-xs"
+                        placeholder="Bale / Marka"
+                        value={form.markaNo || ''}
+                        onChange={(e) => setField('markaNo', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label text-[11px]">HSN Code</span>
+                      <input
+                        type="text"
+                        className="classic-erp-input text-xs text-center font-mono"
+                        placeholder="5407"
+                        value={form.hsnCd || ''}
+                        onChange={(e) => setField('hsnCd', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="classic-erp-field classic-erp-field--lg mt-3">
                     <span className="classic-erp-label">Remark</span>
                     <div className="classic-erp-control classic-erp-control--stack">
                       <input

@@ -25,6 +25,14 @@ const companySchema = new mongoose.Schema({
         enum: ['active', 'suspended', 'expired'],
         default: 'active'
     },
+    lifecycleState: {
+        type: String,
+        enum: ['EMAIL_VERIFICATION_PENDING', 'DEMO_ACTIVE', 'DEMO_EXPIRED', 'PLAN_PENDING', 'APPROVAL_PENDING', 'ACTIVE'],
+        default: 'DEMO_ACTIVE',
+        index: true,
+    },
+    demoStartedAt: { type: Date, default: null },
+    demoExpiresAt: { type: Date, default: null },
     isActive: { type: Boolean, default: true },
     meta: {
         type: mongoose.Schema.Types.Mixed,

@@ -10,6 +10,26 @@ const userSchema = new mongoose.Schema({
         lowercase: true,
         trim: true
     },
+    username: {
+        type: String,
+        unique: true,
+        sparse: true,
+        lowercase: true,
+        trim: true
+    },
+    mobile: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    emailVerified: {
+        type: Boolean,
+        default: false
+    },
+    emailVerifiedAt: {
+        type: Date,
+        default: null
+    },
     password: {
         type: String,
         required: true,

@@ -266,6 +266,17 @@ async function assertInGroup(user, companyId) {
     err.statusCode = 403;
     throw err;
   }
+  const rootComp = await Company.findById(root).select('status isActive').lean();
+  if (rootComp && (rootComp.status === 'suspended' || rootComp.isActive === false)) {
+    const err = new Error('The parent main company is suspended by administrator. Access to all sub-companies is locked.');
+    err.statusCode = 403;
+    throw err;
+  }
+  if (target.status === 'suspended' || target.isActive === false) {
+    const err = new Error('This company is suspended or inactive');
+    err.statusCode = 403;
+    throw err;
+  }
   return { home, target, root };
 }
 

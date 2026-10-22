@@ -92,8 +92,16 @@ export function findEnterSaveButton(container) {
   if (!container) return null;
   const host = container.parentElement || container;
   return host.querySelector('[data-enter-save]:not([disabled])')
+    || host.querySelector('button[data-action="save"]:not([disabled])')
+    || host.querySelector('.classic-erp-btn.btn-save:not([disabled])')
+    || host.querySelector('.classic-erp-btn.btn-green:not([disabled])')
+    || container.querySelector('[data-enter-save]:not([disabled])')
+    || container.querySelector('button[data-action="save"]:not([disabled])')
+    || container.querySelector('.classic-erp-btn.btn-save:not([disabled])')
+    || container.querySelector('.classic-erp-btn.btn-green:not([disabled])')
     || container.querySelector('.classic-erp-form-footer button.btn-blue:not([disabled])')
-    || container.querySelector('.erp-bill-action-bar button.btn-blue:not([disabled])');
+    || container.querySelector('.erp-bill-action-bar button.btn-blue:not([disabled])')
+    || container.querySelector('button[type="submit"]:not([disabled])');
 }
 
 export function focusNextField(currentEl) {
@@ -111,12 +119,9 @@ export function focusNextField(currentEl) {
     return false;
   }
 
+  // When reaching the end of the form fields, focus the Save button!
   const saveBtn = findEnterSaveButton(container);
   if (saveBtn && saveBtn !== currentEl) {
-    if (saveBtn.hasAttribute('data-enter-save')) {
-      saveBtn.click();
-      return true;
-    }
     saveBtn.focus();
     return true;
   }
@@ -296,6 +301,12 @@ export function shouldHandleFormNavigation(e) {
 
 export function handleFormEnterKeyDown(e) {
   if (e.key !== 'Enter') return;
+
+  // Preserve normal multiline newline behavior in textarea unless explicitly configured
+  if (e.target?.tagName === 'TEXTAREA' && e.target.dataset?.enterNext !== 'true') {
+    return;
+  }
+
   if (e.shiftKey) {
     // Shift+Enter -> Go backwards to previous field
     if (e.target?.tagName === 'TEXTAREA') return;
@@ -332,8 +343,13 @@ export function handleFormArrowKeyDown(e) {
   const isSelect = target.tagName === 'SELECT';
   const isTextarea = target.tagName === 'TEXTAREA';
 
-  // Do not hijack arrows inside textarea with multiline text unless at extreme edge
+  // Do not hijack arrows inside textarea with multiline text
   if (isTextarea) return;
+
+  // Do not hijack arrows inside native date/time inputs
+  if (isInput && ['date', 'datetime-local', 'time', 'month', 'week'].includes(target.type)) {
+    return;
+  }
 
   // Arrow Up / Down in Table Grids (e.g. Sales / Purchase line items)
   if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {

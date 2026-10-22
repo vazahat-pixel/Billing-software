@@ -68,12 +68,32 @@ const subscriptionMiddleware = async (req, res, next) => {
     }
 
     const company = await Company.findById(req.user.companyId);
-    if (!company || !company.isActive || company.status === 'suspended' || company.status === 'expired') {
+    if (!company || !company.isActive || company.status === 'suspended') {
       return next(AppError.forbidden('Account locked or inactive. Please contact support.'));
     }
 
     const subscription = await Subscription.findOne({ companyId: req.user.companyId });
     const license = await License.findOne({ companyId: req.user.companyId, isActive: true });
+
+    const isDemoExpired =
+      company.status === 'expired' ||
+      company.lifecycleState === 'DEMO_EXPIRED' ||
+      (subscription?.status === 'trial' && new Date() > subscription?.endDate);
+
+    if (isDemoExpired) {
+      if (company.lifecycleState !== 'DEMO_EXPIRED') {
+        company.lifecycleState = 'DEMO_EXPIRED';
+        await company.save().catch(() => {});
+      }
+      const supportEmail = process.env.SUPPORT_EMAIL || 'support@billing-software.local';
+      const supportPhone = process.env.SUPPORT_PHONE || '+91 98765 43210';
+      const err = new AppError('Your 10-day free demo has expired. Please contact the administrator to activate a plan.', {
+        statusCode: 402,
+        errorCode: 'DEMO_EXPIRED',
+        meta: { supportEmail, supportPhone, expiredAt: subscription?.endDate || company.demoExpiresAt },
+      });
+      return next(err);
+    }
 
     // Grace period: for graceDays after expiry the account stays readable so the
     // customer can still see, print and export their own data while they renew.

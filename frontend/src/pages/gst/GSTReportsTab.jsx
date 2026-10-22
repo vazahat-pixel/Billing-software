@@ -118,6 +118,9 @@ const GSTReportsTab = ({ onClose, defaultFrom, defaultTo }) => {
       const taxable = Number(s.taxableAmount || s.netAmount || 0);
       const cgst = Number(s.cgst || 0), sgst = Number(s.sgst || 0), igst = Number(s.igst || 0), cess = Number(s.cess || 0);
       const net = Number(s.netAmount || taxable + cgst + sgst + igst + cess);
+      const tcs = Number(s.tcs || s.tcsAmt || 0);
+      // JSM & Statutory CBIC circular 76/50/2018: GSTR-1 Invoice value excludes TCS (A.NET_TOT - A.TCS_AMT)
+      const invoiceValue = Math.max(0, net - tcs);
       const state = s.customerId?.stateCode ? `${s.customerId.stateCode}-${s.customerId.state || 'State'}` : (s.customerId?.state || '—');
       const rate = Number(s.gstRate || (taxable ? (((cgst + sgst + igst) / taxable) * 100).toFixed(2) : 18));
       const invDate = s.date?.split('T')[0] || '';
@@ -127,15 +130,19 @@ const GSTReportsTab = ({ onClose, defaultFrom, defaultTo }) => {
       totalSgst += sgst;
       totalIgst += igst;
 
+      // Statutory B2CL Threshold: Rs 1,00,000 post-Aug 2024 (Notification 12/2024-CT), Rs 2,50,000 prior
+      const saleDate = new Date(s.date || Date.now());
+      const b2clThreshold = (!isNaN(saleDate) && saleDate >= new Date('2024-08-01')) ? 100000 : 250000;
+
       if (isReg) {
         b2bRows.push({
           gstin, partyName: s.customerId?.name || 'Customer', invoiceNo: s.invoiceNo || 'INV-001',
-          date: invDate, netAmount: net, stateName: state, reverseCharge: s.reverseCharge ? 'Y' : 'N',
+          date: invDate, netAmount: invoiceValue, stateName: state, reverseCharge: s.reverseCharge ? 'Y' : 'N',
           taxRate: `${rate.toFixed(2)}%`, invType: 'Regular', taxableAmount: taxable, cgst, sgst, igst, cess
         });
-      } else if (net > 250000 && igst > 0) {
+      } else if (invoiceValue > b2clThreshold && igst > 0) {
         b2clRows.push({
-          invoiceNo: s.invoiceNo, date: invDate, netAmount: net, stateName: state,
+          invoiceNo: s.invoiceNo, date: invDate, netAmount: invoiceValue, stateName: state,
           taxRate: rate.toFixed(2), taxableAmount: taxable, cess, ecomm: '', igst
         });
       } else {

@@ -144,7 +144,7 @@ export const exportGstr1Excel = (data, filename = 'GSTR1_V3_2_2.xlsx') => {
     'Cess Amount': Number(r.csamt || 0),
   }));
   const hsnSheet = XLSX.utils.json_to_sheet(hsnRows.length ? hsnRows : [{ 'HSN': '' }]);
-  XLSX.utils.book_append_sheet(wb, hsnSheet, 'hsn');
+  XLSX.utils.book_append_sheet(wb, hsnSheet, 'hsn(b2b)');
 
   // 8. hsn_b2c sheet
   const hsnB2cRows = (data.hsnB2cRows || []).map((r) => ({
@@ -160,7 +160,7 @@ export const exportGstr1Excel = (data, filename = 'GSTR1_V3_2_2.xlsx') => {
     'Cess Amount': Number(r.csamt || 0),
   }));
   const hsnB2cSheet = XLSX.utils.json_to_sheet(hsnB2cRows.length ? hsnB2cRows : [{ 'HSN': '' }]);
-  XLSX.utils.book_append_sheet(wb, hsnB2cSheet, 'hsn_b2c');
+  XLSX.utils.book_append_sheet(wb, hsnB2cSheet, 'hsn(b2c)');
 
   // 9. exemp sheet
   const exempRows = (data.exempRows || []).map((r) => ({

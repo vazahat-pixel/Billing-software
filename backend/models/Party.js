@@ -63,6 +63,11 @@ const PartySchema = new mongoose.Schema({
     type: Number,
     default: null
   },
+  connectedCode: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   mainGroup: {
     type: Boolean,
     default: false
@@ -149,6 +154,10 @@ const PartySchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  dharaPer: {
+    type: Number,
+    default: 0
+  },
   intPer: {
     type: Number,
     default: 0
@@ -168,6 +177,11 @@ const PartySchema = new mongoose.Schema({
   tdsPer: {
     type: Number,
     default: 0
+  },
+  tdsSection: {
+    type: String,
+    trim: true,
+    default: ''
   },
   tcsPer: {
     type: Number,

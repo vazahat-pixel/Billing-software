@@ -35,22 +35,22 @@ const useAdminStore = create((set, get) => ({
   lockCompany: async (id) => {
     try {
       const updated = await adminApi.lockCompany(id);
-      set((state) => ({
-        companies: state.companies.map((c) => (c._id === id ? updated : c)),
-      }));
+      await get().fetchCompanies();
+      return updated;
     } catch (err) {
       console.error('Failed to lock company', err);
+      throw err;
     }
   },
 
   unlockCompany: async (id) => {
     try {
       const updated = await adminApi.unlockCompany(id);
-      set((state) => ({
-        companies: state.companies.map((c) => (c._id === id ? updated : c)),
-      }));
+      await get().fetchCompanies();
+      return updated;
     } catch (err) {
       console.error('Failed to unlock company', err);
+      throw err;
     }
   },
 

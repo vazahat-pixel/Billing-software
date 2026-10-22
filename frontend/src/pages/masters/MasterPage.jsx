@@ -307,7 +307,7 @@ const MasterPage = () => {
       <ItemModal isOpen={modals.item} onClose={() => setModals({ ...modals, item: false })} />
       <AccountMasterModal isOpen={modals.ledger} onClose={() => { setModals({ ...modals, ledger: false }); fetchLedgers(); }} />
       <BookMasterModal isOpen={modals.book} onClose={() => { setModals({ ...modals, book: false }); fetchBooks(); }} />
-      <GenericMasterModal isOpen={modals.general} onClose={() => { setModals({ ...modals, general: false }); fetchSubMasters(); }} />
+      <GenericMasterModal isOpen={modals.general} onClose={() => { setModals({ ...modals, general: false }); fetchSubMasters(); }} type={modals.generalType || 'ItemTaxSlab'} />
     </div>
   );
 };

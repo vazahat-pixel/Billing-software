@@ -203,11 +203,19 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
   );
 
   /** Address block shown under Job Party, matching the classic two-line party box. */
-  const partyAddress = useMemo(() => {
-    const p = (parties || []).find((x) => String(x._id || x.id) === String(header.partyId));
-    if (!p) return '';
-    return [p.address, p.city, p.state].filter(Boolean).join(', ');
+  const selectedParty = useMemo(() => {
+    return (parties || []).find((x) => String(x._id || x.id) === String(header.partyId));
   }, [parties, header.partyId]);
+
+  const partyAddress = useMemo(() => {
+    if (!selectedParty) return '';
+    return [selectedParty.address, selectedParty.city, selectedParty.state].filter(Boolean).join(', ');
+  }, [selectedParty]);
+
+  const partyBalance = useMemo(() => {
+    if (!selectedParty) return null;
+    return Number(selectedParty.closingBalance ?? selectedParty.balance ?? 0);
+  }, [selectedParty]);
 
   const jobOptions = useMemo(() => {
     const list = [...(jobWorkEntries || [])];
@@ -242,6 +250,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
     });
 
     const gross = linesWithAmt.reduce((sum, l) => sum + l.jobAmt, 0);
+    const totalGoodsValue = linesWithAmt.reduce((sum, l) => sum + ((Number(l.qty) || 0) * (Number(l.rate) || 0)), 0);
     const taxRate = Number(footer.taxRate || 0);
 
     let cgstPct = 0;
@@ -268,6 +277,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
     return {
       linesWithAmt,
       gross,
+      totalGoodsValue,
       cgstPct,
       cgstAmt,
       sgstPct,
@@ -887,18 +897,30 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
     // Two lines can legally draw from the SAME lot (e.g. same item split across rows) —
     // check the combined draw per lot against its real remaining stock, not line-by-line.
     const qtyByLot = new Map();
+    const pcsByLot = new Map();
     activeLines.forEach((l) => {
       const key = String(l.lotId);
       qtyByLot.set(key, (qtyByLot.get(key) || 0) + Number(l.qty || 0));
+      pcsByLot.set(key, (pcsByLot.get(key) || 0) + Number(l.pcs || 0));
     });
     const overIssued = [...qtyByLot.entries()].find(([lotId, totalQty]) => {
       const lot = (inventoryLots || []).find((iv) => String(iv._id || iv.id) === lotId);
-      return lot && totalQty > Number(lot.remainingMtrs || 0) + 0.0001;
+      return lot && Number(lot.remainingMtrs || 0) > 0 && totalQty > Number(lot.remainingMtrs || 0) + 0.0001;
     });
     if (overIssued) {
       const [lotId, totalQty] = overIssued;
       const lot = (inventoryLots || []).find((iv) => String(iv._id || iv.id) === lotId);
       notifyWarning(`Lot ${lot?.lotId || lotId} — combined Qty ${totalQty.toFixed(2)} exceeds available stock (${Number(lot?.remainingMtrs || 0).toFixed(2)})`);
+      return;
+    }
+    const overIssuedPcs = [...pcsByLot.entries()].find(([lotId, totalPcs]) => {
+      const lot = (inventoryLots || []).find((iv) => String(iv._id || iv.id) === lotId);
+      return lot && Number(lot.remainingPcs || 0) > 0 && totalPcs > Number(lot.remainingPcs || 0) + 0.0001;
+    });
+    if (overIssuedPcs) {
+      const [lotId, totalPcs] = overIssuedPcs;
+      const lot = (inventoryLots || []).find((iv) => String(iv._id || iv.id) === lotId);
+      notifyWarning(`Lot ${lot?.lotId || lotId} — combined Pcs ${totalPcs} exceeds available stock (${Number(lot?.remainingPcs || 0)})`);
       return;
     }
 
@@ -1196,7 +1218,17 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
 
                     <div className="classic-erp-field classic-erp-field--lg">
                       <span className="classic-erp-label" />
-                      <div className="erp-job-issue-party-address">{partyAddress || ','}</div>
+                      <div className="erp-job-issue-party-address flex justify-between items-center">
+                        <span className="truncate">{partyAddress || ','}</span>
+                        {partyBalance !== null && !isNaN(partyBalance) && (
+                          <span
+                            className="font-mono text-emerald-800 font-bold text-[11px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0 ml-2"
+                            title="Job Worker Closing Balance (_lbl_total)"
+                          >
+                            Bal: ₹{partyBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="classic-erp-field classic-erp-field--lg">
@@ -1453,6 +1485,14 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                   <span>Qty : {calc.totalQty.toFixed(2)}</span>
                   <span>/</span>
                   <span>Kgs : {calc.totalKgs.toFixed(2)}</span>
+                  <span>/</span>
+                  <span className="text-amber-200" title="Total Fabric / Goods Value (_txt_p_Amt)">
+                    Goods Val : ₹{calc.totalGoodsValue.toFixed(2)}
+                  </span>
+                  <span>/</span>
+                  <span className="text-emerald-200" title="Total Job Work Charges (_lbl_job_amt)">
+                    Job Chgs : ₹{calc.gross.toFixed(2)}
+                  </span>
                 </div>
               </div>
 
@@ -1584,10 +1624,11 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
                   />
                 </div>
                 <div className="classic-erp-field">
-                  <span className="classic-erp-label">BaleNo</span>
+                  <span className="classic-erp-label">Bale/Marka No</span>
                   <input
                     id="job-issue-baleno"
                     type="text"
+                    placeholder="Bale or Marka No"
                     className="classic-erp-input text-center font-bold"
                     value={footer.baleNo}
                     onChange={(e) => setFooter({ ...footer, baleNo: e.target.value })}

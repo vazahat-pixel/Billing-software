@@ -53,6 +53,12 @@ const lineShortagePct = (line) => {
    return isNaN(pct) ? '0.0' : pct.toFixed(1);
 };
 
+const lineChadtiMts = (line) => {
+   const grey = Number(line.greyMts) || 0;
+   const finish = Number(line.finishMts) || 0;
+   return finish > grey && grey > 0 ? (finish - grey).toFixed(2) : '0.00';
+};
+
 const lineJobAmt = (line) => {
    const finalVal = Number(line.finalMts) || 0;
    const finish = Number(line.finishMts) || 0;
@@ -89,7 +95,8 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const [reverseCharge, setReverseCharge] = useState('No');
    const [hsnCd, setHsnCd] = useState('');
    const [billType, setBillType] = useState('Process');
-   const [totalProcessAmt] = useState('1164');
+   const [dueDays, setDueDays] = useState('');
+   const [dueDate, setDueDate] = useState('');
    const [serialNo, setSerialNo] = useState('1');
    const [receiveDate, setReceiveDate] = useState(today());
    const [rConDt, setRConDt] = useState('');
@@ -532,6 +539,11 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    );
    const partyAddress = [selectedParty?.address, selectedParty?.address2, selectedParty?.city].filter(Boolean).join(', ');
 
+   const millBalance = useMemo(() => {
+      if (!selectedParty) return null;
+      return Number(selectedParty.closingBalance ?? selectedParty.balance ?? 0);
+   }, [selectedParty]);
+
    const openNewParty = (search = '') => {
       setAccountModal({ name: search || '', group: 'JOB WORKER' });
    };
@@ -856,6 +868,13 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       () => linesWithAmt.reduce((s, l) => s + (Number(l.jobAmt) || 0), 0),
       [linesWithAmt]
    );
+
+   const totalProcessAmt = useMemo(() => {
+      if (millBalance !== null && !isNaN(millBalance)) {
+         return millBalance.toFixed(2);
+      }
+      return computedGrossAmt.toFixed(2);
+   }, [millBalance, computedGrossAmt]);
 
    const computedTaxableAmt = useMemo(() => {
       const gross = computedGrossAmt;
@@ -1276,6 +1295,14 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                               >
                                  <Plus size={10} /> Add
                               </button>
+                              {millBalance !== null && !isNaN(millBalance) && (
+                                 <span
+                                    className="font-mono text-emerald-800 font-bold text-[11px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0"
+                                    title="Mill / Worker Closing Balance (_lbl_balance)"
+                                 >
+                                    Bal: ₹{millBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                 </span>
+                              )}
                            </div>
                            <span className="mill-rec-lab" style={{ gridArea: 'gstlab' }}>GSTIN:-</span>
                            <input style={{ gridArea: 'gstin' }} type="text" className="classic-erp-input mill-rec-in bg-white font-mono" value={gstin} readOnly tabIndex={-1} />
@@ -1432,6 +1459,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                     <th className="border-r border-[#808080] p-1 w-24 text-right">Finish.Mts</th>
                                     <th className="border-r border-[#808080] p-1 w-24 text-right">Final.Mts</th>
                                     <th className="border-r border-[#808080] p-1 w-20 text-right">Shtg%</th>
+                                    <th className="border-r border-[#808080] p-1 w-20 text-right" title="Process Gain / Chadti Mts (_col_s_chadti)">Chadti</th>
                                     <th className="border-r border-[#808080] p-1 w-24 text-right">Job.Rate</th>
                                     <th className="border-r border-[#808080] p-1 w-28 text-right">Job Amount</th>
                                     <th className="border-r border-[#808080] p-1 w-16 text-center">CP</th>
@@ -1589,6 +1617,16 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                              className="w-full h-6 px-1 border-none text-right bg-slate-100"
                                              value={lineShortagePct(line)}
                                              readOnly
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="text"
+                                             data-enter-include=""
+                                             className="w-full h-6 px-1 border-none text-right bg-slate-100 font-mono text-emerald-800 font-bold"
+                                             value={lineChadtiMts(line)}
+                                             readOnly
+                                             title="Process Gain / Chadti Mts (_col_s_chadti)"
                                           />
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
@@ -1778,6 +1816,31 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                     className="classic-erp-input flex-1 bg-white"
                                     value={remark}
                                     onChange={(e) => setRemark(e.target.value)}
+                                 />
+                              </div>
+                              <div className="flex items-center gap-1">
+                                 <span className="w-20 text-slate-800 font-semibold text-right" title="Credit / Due Days (_txt_ddays)">Due Days:</span>
+                                 <input
+                                    type="number"
+                                    className="classic-erp-input w-12 text-center bg-white font-bold"
+                                    value={dueDays}
+                                    onChange={(e) => {
+                                       const d = parseInt(e.target.value, 10);
+                                       setDueDays(e.target.value);
+                                       if (!isNaN(d) && d > 0) {
+                                          const dt = new Date(receiveDate || new Date());
+                                          dt.setDate(dt.getDate() + d);
+                                          setDueDate(dt.toISOString().substring(0, 10));
+                                       }
+                                    }}
+                                    placeholder="0"
+                                 />
+                                 <input
+                                    type="date"
+                                    className="classic-erp-input flex-1 text-center bg-white text-[10px]"
+                                    value={dueDate}
+                                    onChange={(e) => setDueDate(e.target.value)}
+                                    title="Payment Due Date (_txt_ddate)"
                                  />
                               </div>
                            </div>

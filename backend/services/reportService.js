@@ -433,10 +433,18 @@ class ReportService {
       withLedgerBalance = false,
     } = filters;
 
-    const partyGroup = isReceivable ? 'Customer' : 'Supplier';
+    const isReceivable = type === 'receivable' || type === 'customer' || type === 'sales';
+    const isProcess = type === 'process' || type === 'mill';
+    const isJobWork = type === 'jobwork';
+    const isJob = isProcess || isJobWork;
+
+    let partyTypes = isReceivable ? ['Customer', 'Both'] : ['Supplier', 'Both'];
+    if (isProcess) partyTypes = ['Mill', 'Supplier', 'Both'];
+    else if (isJobWork) partyTypes = ['JobWorker', 'Supplier', 'Both'];
+
     const companyGroupService = require('./companyGroupService');
     const masterCompanyId = await companyGroupService.masterId(companyId);
-    const partyFilter = { companyId: masterCompanyId, type: { $in: [partyGroup, 'Both'] } };
+    const partyFilter = { companyId: masterCompanyId, type: { $in: partyTypes } };
     if (partyIds.length) partyFilter._id = { $in: partyIds };
     if (states.length) partyFilter.state = { $in: states };
     if (msmeTypes.length) partyFilter.msmeType = { $in: msmeTypes };
@@ -446,6 +454,95 @@ class ReportService {
     if (!parties.length) return [];
     const asOnDate = asOn ? new Date(asOn) : new Date();
     const selectedPartyIds = parties.map((p) => p._id);
+
+    // If Job Work or Mill Process, source facts from Job collection
+    if (isJob) {
+      const jobFilter = { companyId, status: { $ne: 'Cancelled' } };
+      jobFilter.workerId = { $in: selectedPartyIds };
+      const dateQuery = buildDateQuery(billDateFrom, billDateTo, 'issueDate');
+      Object.assign(jobFilter, dateQuery);
+      const jobs = await Job.find(jobFilter).lean();
+
+      const byParty = new Map();
+      for (const p of parties) {
+        byParty.set(String(p._id), {
+          party: p,
+          invoices: [],
+          partyTotal: 0,
+          totals: { billAmt: 0, paid: 0, goodsRtn: 0, addLess: 0 },
+          aging: { bucket30: 0, bucket60: 0, bucket90: 0, bucket90Plus: 0 }
+        });
+      }
+
+      for (const j of jobs) {
+        const pid = String(j.workerId);
+        const bucket = byParty.get(pid);
+        if (!bucket) continue;
+
+        const charges = round2((j.processCharges || 0) + (j.processGstAmount || 0));
+        const total = charges > 0 ? charges : round2(j.issueQty || 0);
+        const paid = round2(j.chargesPaidAmount || 0);
+        const outstanding = round2(total - paid);
+
+        if (status === 'Pending' && outstanding <= 0.01) continue;
+        if (status === 'Paid' && outstanding > 0.01) continue;
+
+        const ageInDays = Math.max(0, Math.floor((asOnDate - new Date(j.issueDate || j.createdAt || Date.now())) / 86400000));
+        if (dueDaysMin != null && ageInDays < Number(dueDaysMin)) continue;
+
+        bucket.partyTotal = round2(bucket.partyTotal + outstanding);
+        bucket.totals.billAmt = round2(bucket.totals.billAmt + total);
+        bucket.totals.paid = round2(bucket.totals.paid + paid);
+
+        if (ageInDays <= 30) bucket.aging.bucket30 = round2(bucket.aging.bucket30 + outstanding);
+        else if (ageInDays <= 60) bucket.aging.bucket60 = round2(bucket.aging.bucket60 + outstanding);
+        else if (ageInDays <= 90) bucket.aging.bucket90 = round2(bucket.aging.bucket90 + outstanding);
+        else bucket.aging.bucket90Plus = round2(bucket.aging.bucket90Plus + outstanding);
+
+        bucket.invoices.push({
+          billId: j._id,
+          docNo: j.challanNo || j.jobCardNo || 'JC',
+          date: j.issueDate || j.createdAt,
+          dueDate: null,
+          creditDays: 0,
+          total,
+          paid,
+          paidDate: j.receiveDate || null,
+          goodsRtn: 0,
+          addLess: round2(j.roundOff || 0),
+          outstanding,
+          ageDays: ageInDays,
+          billPaidAmount: paid,
+          broker: null,
+          station: bucket.party?.city || bucket.party?.station || '',
+          haste: '',
+          bookId: isProcess ? 'MILL' : 'JOB',
+          remarks: j.remark || j.processType || '',
+        });
+      }
+
+      const lines = [];
+      for (const { party, invoices, partyTotal, totals, aging } of byParty.values()) {
+        if (!invoices.length) continue;
+        if (status === 'Pending' && partyTotal <= 0.01) continue;
+        lines.push({
+          partyId: party._id,
+          partyName: party.name,
+          phone: party.mobile || party.phone || party.whatsapp || '',
+          email: party.email || '',
+          address: party.address || '',
+          city: party.city || party.station || '',
+          state: party.state || '',
+          msmeType: party.msmeType || 'None',
+          gstin: party.gstin || '',
+          totalOutstanding: partyTotal,
+          totals,
+          aging,
+          invoices,
+        });
+      }
+      return lines;
+    }
 
     // Every bill for every selected party in ONE query, instead of one query per party.
     const docFilter = { companyId, status: { $ne: 'cancelled' } };
@@ -614,29 +711,43 @@ class ReportService {
   /** Real, distinct dimension values for the Outstanding report's filter tabs — no fabricated data. */
   async getOutstandingFilterOptions(companyId, type = 'receivable') {
     const isReceivable = type === 'receivable';
-    const partyGroup = isReceivable ? 'Customer' : 'Supplier';
+    const isProcess = type === 'process' || type === 'mill';
+    const isJobWork = type === 'jobwork';
+    const isJob = isProcess || isJobWork;
+
+    let partyTypes = isReceivable ? ['Customer', 'Both'] : ['Supplier', 'Both'];
+    if (isProcess) partyTypes = ['Mill', 'Supplier', 'Both'];
+    else if (isJobWork) partyTypes = ['JobWorker', 'Supplier', 'Both'];
+
     const DocModel = isReceivable ? Sales : Purchase;
 
     const companyGroupService = require('./companyGroupService');
     const masterCompanyId = await companyGroupService.masterId(companyId);
     const [parties, brokers, stations, hastes, bookIds, states, mainGroups] = await Promise.all([
-      Party.find({ companyId: masterCompanyId, type: { $in: [partyGroup, 'Both'] } })
-        .select('name address city state msmeType')
+      Party.find({ companyId: masterCompanyId, type: { $in: partyTypes } })
+        .select('name address city state msmeType accd')
         .sort({ name: 1 })
         .lean(),
       Party.find({ companyId: masterCompanyId, type: { $in: ['Broker', 'Both'] } })
         .select('name')
         .sort({ name: 1 })
         .lean(),
-      isReceivable ? DocModel.distinct('station', { companyId, station: { $nin: [null, ''] } }) : [],
+      Party.distinct('city', { companyId: masterCompanyId, type: { $in: partyTypes }, city: { $nin: [null, ''] } }),
       isReceivable ? DocModel.distinct('haste', { companyId, haste: { $nin: [null, ''] } }) : [],
-      DocModel.distinct('bookId', { companyId, bookId: { $nin: [null, ''] } }),
-      Party.distinct('state', { companyId: masterCompanyId, type: { $in: [partyGroup, 'Both'] }, state: { $nin: [null, ''] } }),
-      Party.distinct('mainGroupId', { companyId: masterCompanyId, type: { $in: [partyGroup, 'Both'] }, mainGroupId: { $nin: [null, ''] } }),
+      isJob ? ['MILL', 'JOB'] : DocModel.distinct('bookId', { companyId, bookId: { $nin: [null, ''] } }),
+      Party.distinct('state', { companyId: masterCompanyId, type: { $in: partyTypes }, state: { $nin: [null, ''] } }),
+      Party.distinct('mainGroupId', { companyId: masterCompanyId, type: { $in: partyTypes }, mainGroupId: { $nin: [null, ''] } }),
     ]);
 
     return {
-      parties: parties.map((p) => ({ _id: p._id, name: p.name, address: p.address || '', state: p.state || '' })),
+      parties: parties.map((p, idx) => ({ 
+        _id: p._id, 
+        name: p.name, 
+        address: p.address || '', 
+        city: p.city || '', 
+        state: p.state || '', 
+        accd: p.accd != null ? p.accd : (idx + 1) * 2 
+      })),
       brokers: brokers.map((b) => ({ _id: b._id, name: b.name })),
       stations: stations.sort(),
       hastes: hastes.sort(),

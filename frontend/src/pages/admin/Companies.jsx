@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Building2, Lock, Unlock, ShieldCheck, Edit3, Plus, X, Search, Filter, Users, ArrowUpRight, Globe, Download, Trash2, UserRoundSearch, Package } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Building2, Lock, Unlock, ShieldCheck, Edit3, Plus, X, Search, Filter, Users, ArrowUpRight, Globe, Download, Trash2, UserRoundSearch, Package, ChevronDown, ChevronRight, CornerDownRight, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
 import { adminApi } from '../../api';
@@ -322,13 +322,37 @@ const Companies = () => {
             .map((c) => locOf(c).city)
     );
 
-    const filtered = companies.filter((c) => {
+    // 1. Build map of all companies by ID
+    const compMap = useMemo(() => new Map(companies.map(c => [String(c._id), c])), [companies]);
+
+    // 2. Group into Root (Parent) companies and their Child sub-companies
+    const { rootCompanies, childrenByParent } = useMemo(() => {
+        const childrenMap = new Map();
+        const roots = [];
+
+        companies.forEach((c) => {
+            const pId = c.masterCompanyId ? String(c.masterCompanyId) : null;
+            if (pId && compMap.has(pId)) {
+                if (!childrenMap.has(pId)) childrenMap.set(pId, []);
+                childrenMap.get(pId).push(c);
+            } else {
+                roots.push(c);
+            }
+        });
+
+        return { rootCompanies: roots, childrenByParent: childrenMap };
+    }, [companies, compMap]);
+
+    // 3. Search & Filter predicate
+    const matchesFilter = useCallback((c) => {
         const loc = locOf(c);
         const q = search.trim().toLowerCase();
         const hay = [
             c.name,
+            c.coCode,
             c.ownerId?.name,
             c.ownerId?.email,
+            c.ownerId?.username,
             c.planId?.name,
             loc.state,
             loc.district,
@@ -341,13 +365,133 @@ const Companies = () => {
         if (filterCity && loc.city !== filterCity) return false;
         if (filterPlan && String(c.planId?._id || c.planId) !== filterPlan) return false;
         return true;
-    });
+    }, [search, filterState, filterDistrict, filterCity, filterPlan]);
+
+    // 4. A Root matches if it matches directly OR any of its child companies match
+    const filteredRoots = useMemo(() => {
+        return rootCompanies.filter((root) => {
+            const rootMatches = matchesFilter(root);
+            const children = childrenByParent.get(String(root._id)) || [];
+            const anyChildMatches = children.some((ch) => matchesFilter(ch));
+            return rootMatches || anyChildMatches;
+        });
+    }, [rootCompanies, childrenByParent, matchesFilter]);
+
+    // 5. Expand / Collapse State for Sub-Companies Dropdown
+    const [expandedParents, setExpandedParents] = useState(new Set());
+
+    // When searching or filtering, automatically expand parents that contain matching children
+    useEffect(() => {
+        if (search.trim() || filterState || filterDistrict || filterCity || filterPlan) {
+            const toExpand = new Set();
+            filteredRoots.forEach((root) => {
+                const children = childrenByParent.get(String(root._id)) || [];
+                if (children.some((ch) => matchesFilter(ch))) {
+                    toExpand.add(String(root._id));
+                }
+            });
+            setExpandedParents(toExpand);
+        }
+    }, [search, filterState, filterDistrict, filterCity, filterPlan, filteredRoots, childrenByParent, matchesFilter]);
+
+    const toggleExpand = (id) => {
+        const sId = String(id);
+        setExpandedParents((prev) => {
+            const next = new Set(prev);
+            if (next.has(sId)) next.delete(sId);
+            else next.add(sId);
+            return next;
+        });
+    };
+
+    const expandAll = () => {
+        setExpandedParents(new Set(rootCompanies.map((r) => String(r._id))));
+    };
+
+    const collapseAll = () => {
+        setExpandedParents(new Set());
+    };
+
+    const totalChildren = useMemo(() => {
+        let count = 0;
+        childrenByParent.forEach((list) => { count += list.length; });
+        return count;
+    }, [childrenByParent]);
+
+    // Suspend Parent with Cascade Confirmation
+    const handleRootLock = async (company, childCount = 0) => {
+        if (childCount > 0) {
+            const ok = await erpConfirm({
+                title: 'Suspend Main Company & Child Firms',
+                message: `Suspending "${company.name}" will automatically suspend all ${childCount} child firm(s). Their users will not be able to log in or operate. Continue?`,
+                confirmLabel: 'Suspend All',
+                danger: true,
+            });
+            if (!ok) return;
+        } else {
+            const ok = await erpConfirm({
+                title: 'Suspend Company',
+                message: `Suspend "${company.name}"? Users from this company will not be able to log in.`,
+                confirmLabel: 'Suspend',
+                danger: true,
+            });
+            if (!ok) return;
+        }
+        try {
+            await lockCompany(company._id);
+            notifySuccess(`"${company.name}" ${childCount > 0 ? `and ${childCount} child firm(s) ` : ''}suspended`);
+        } catch (err) {
+            notifyError(err, 'Failed to suspend');
+        }
+    };
+
+    // Activate Parent with Cascade Confirmation
+    const handleRootUnlock = async (company, childCount = 0) => {
+        if (childCount > 0) {
+            const ok = await erpConfirm({
+                title: 'Activate Main Company & Child Firms',
+                message: `Activating "${company.name}" will also reactivate all ${childCount} child firm(s). Continue?`,
+                confirmLabel: 'Activate All',
+            });
+            if (!ok) return;
+        }
+        try {
+            await unlockCompany(company._id);
+            notifySuccess(`"${company.name}" ${childCount > 0 ? `and ${childCount} child firm(s) ` : ''}activated`);
+        } catch (err) {
+            notifyError(err, 'Failed to activate');
+        }
+    };
+
+    const handleChildLock = async (child, parent) => {
+        if (parent?.status === 'suspended') {
+            return notifyWarning(`Parent company "${parent.name}" is already suspended. All child firms are locked.`);
+        }
+        try {
+            await lockCompany(child._id);
+            notifySuccess(`Child firm "${child.name}" suspended`);
+        } catch (err) {
+            notifyError(err, 'Failed to suspend child firm');
+        }
+    };
+
+    const handleChildUnlock = async (child, parent) => {
+        if (parent?.status === 'suspended') {
+            return notifyWarning(`Parent company "${parent.name}" is suspended. Activate the parent company first.`);
+        }
+        try {
+            await unlockCompany(child._id);
+            notifySuccess(`Child firm "${child.name}" activated`);
+        } catch (err) {
+            notifyError(err, 'Failed to activate child firm');
+        }
+    };
 
     return (
         <div className="space-y-5">
             <AdminPageHeader
                 title="Managed Companies"
-                subtitle={`${companies.length} registered clients on the platform`}
+                subtitle={`${rootCompanies.length} main clients ${totalChildren > 0 ? `· ${totalChildren} child firms` : ''} on the platform`}
                 actions={
                     <AdminButton icon={Plus} onClick={() => setIsCreateOpen(true)}>
                         Add Company
@@ -390,9 +534,20 @@ const Companies = () => {
                     options={plans.map((p) => ({ value: p._id, label: `${p.name}${p.features?.mobileView ? ' · Mobile' : ''}` }))}
                     onChange={setFilterPlan}
                 />
-                <div className="flex items-center gap-2 text-xs text-slate-500 px-2">
-                    <Filter size={13} />
-                    <span className="font-bold">{filtered.length} results</span>
+                <div className="flex items-center gap-2 text-xs px-2 ml-auto">
+                    <Filter size={13} className="text-slate-600" />
+                    <span className="font-extrabold text-slate-800">
+                        {filteredRoots.length} main {filteredRoots.length === 1 ? 'client' : 'clients'}
+                    </span>
+                    {totalChildren > 0 && (
+                        <button
+                            type="button"
+                            onClick={expandedParents.size > 0 ? collapseAll : expandAll}
+                            className="text-[11px] font-extrabold px-2.5 py-1 rounded border border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700 transition-colors cursor-pointer ml-1 shadow-xs"
+                        >
+                            {expandedParents.size > 0 ? 'Collapse All' : 'Expand All'}
+                        </button>
+                    )}
                 </div>
             </motion.div>
 
@@ -402,88 +557,323 @@ const Companies = () => {
                     <table className="admin-table">
                         <thead>
                             <tr>
-                                {['Company', 'Owner', 'Place', 'Plan', 'Status', 'Actions'].map(h => (
-                                    <th key={h}>{h}</th>
+                                {['Company & Sub-Cos', 'Customer / Owner', 'Mobile & Contact', 'Demo & Plan Status', 'Location', 'Status', 'Actions'].map(h => (
+                                    <th key={h} className="text-slate-700 font-extrabold text-[10px] tracking-wider">{h}</th>
                                 ))}
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((company, idx) => (
-                                <motion.tr
-                                    key={company._id}
-                                    initial={{ opacity: 0, y: 8 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: idx * 0.04 }}
-                                >
-                                    <td>
-                                        <div className="flex items-center gap-3">
-                                            <div className="company-avatar">
-                                                <span>{company.name.charAt(0).toUpperCase()}</span>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-200">{company.name}</p>
-                                                <p className="text-[10px] text-slate-600 font-mono truncate max-w-[120px]">ID: {company._id?.slice(-8)}</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <p className="text-sm font-semibold text-slate-300">{company.ownerId?.name || 'N/A'}</p>
-                                        <p className="text-[10px] text-slate-600">{company.ownerId?.email || ''}</p>
-                                    </td>
-                                    <td>
-                                        {(() => {
-                                            const loc = locOf(company);
-                                            const place = [loc.city, loc.district, loc.state].filter(Boolean).join(', ');
-                                            return <p className="text-xs font-semibold text-slate-400">{place || '—'}</p>;
-                                        })()}
-                                    </td>
-                                    <td>
-                                        <span className="plan-badge">{company.planId?.name || 'No Plan'}</span>
-                                        {company.planId?.features?.mobileView && (
-                                            <p className="text-[10px] font-bold text-teal-700 mt-1">Mobile · view only</p>
-                                        )}
-                                    </td>
-                                    <td>
-                                        <AdminBadge variant={company.status === 'active' ? 'success' : company.status === 'suspended' ? 'danger' : 'warning'} dot>
-                                            {company.status || 'unknown'}
-                                        </AdminBadge>
-                                    </td>
-                                    <td>
-                                        <div className="flex items-center gap-1">
-                                            {company.status === 'active' ? (
-                                                <button onClick={() => lockCompany(company._id)} className="icon-btn icon-btn--danger" title="Suspend">
-                                                    <Lock size={14} />
-                                                </button>
-                                            ) : (
-                                                <button onClick={() => unlockCompany(company._id)} className="icon-btn icon-btn--success" title="Activate">
-                                                    <Unlock size={14} />
-                                                </button>
-                                            )}
-                                            <button onClick={() => setLicenseCompany(company)} className="icon-btn icon-btn--info" title="Issue License">
-                                                <ShieldCheck size={14} />
-                                            </button>
-                                            <button onClick={() => handleProvisioningPack(company)} className="icon-btn icon-btn--success" title="Download desktop provisioning pack">
-                                                <Package size={14} />
-                                            </button>
-                                            <button onClick={() => handleExport(company)} className="icon-btn icon-btn--info" title="Export data">
-                                                <Download size={14} />
-                                            </button>
-                                            <button onClick={() => handleImpersonate(company)} className="icon-btn" title="Impersonate owner (support)">
-                                                <UserRoundSearch size={14} />
-                                            </button>
-                                            <button onClick={() => handlePurge(company)} className="icon-btn icon-btn--danger" title="Hard delete">
-                                                <Trash2 size={14} />
-                                            </button>
-                                            <button onClick={() => startEdit(company)} className="icon-btn icon-btn--warn" title="Edit">
-                                                <Edit3 size={14} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </motion.tr>
-                            ))}
-                            {filtered.length === 0 && (
+                            {filteredRoots.map((company, idx) => {
+                                const rootId = String(company._id);
+                                const children = childrenByParent.get(rootId) || [];
+                                const isExpanded = expandedParents.has(rootId);
+                                const visibleChildren = (search.trim() || filterState || filterDistrict || filterCity || filterPlan)
+                                    ? children.filter(ch => matchesFilter(ch))
+                                    : children;
+
+                                return (
+                                    <React.Fragment key={company._id}>
+                                        {/* Main Parent Company Row */}
+                                        <motion.tr
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: idx * 0.03 }}
+                                            className={`transition-colors border-b border-slate-200 ${
+                                                isExpanded && children.length > 0 ? 'bg-slate-50/90' : 'bg-white hover:bg-slate-50/80'
+                                            }`}
+                                        >
+                                            <td className="py-2.5 px-3">
+                                                <div className="flex items-start gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                                                        <span>{company.name.charAt(0).toUpperCase()}</span>
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <p className="text-xs font-black text-slate-900 tracking-tight">{company.name}</p>
+                                                            {company.isRoot !== false ? (
+                                                                <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300 uppercase">
+                                                                    Root
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-slate-100 text-slate-800 border border-slate-300">
+                                                                    Child ({company.coCode || 'Co'})
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[10px] text-slate-600 font-bold font-mono mt-0.5">
+                                                            ID: <span className="text-slate-800 font-extrabold">{company._id?.slice(-8)}</span>
+                                                            {company.createdAt && ` · Reg: ${new Date(company.createdAt).toLocaleDateString('en-IN')}`}
+                                                        </p>
+
+                                                        {/* Sub-Companies Accordion / Dropdown Toggle */}
+                                                        {children.length > 0 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => toggleExpand(rootId)}
+                                                                className={`mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-extrabold rounded-md border transition-all cursor-pointer shadow-xs ${
+                                                                    isExpanded
+                                                                        ? 'bg-emerald-700 text-white border-emerald-800'
+                                                                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
+                                                                }`}
+                                                                title={isExpanded ? 'Click to hide child firms' : 'Click to show child firms in dropdown'}
+                                                            >
+                                                                {isExpanded ? <ChevronDown size={12} className={isExpanded ? "text-white" : "text-emerald-800"} /> : <ChevronRight size={12} className="text-emerald-800" />}
+                                                                <span>{children.length} Sub-compan{children.length === 1 ? 'y' : 'ies'}</span>
+                                                                <span className="text-[9px] font-semibold opacity-90">({isExpanded ? 'Hide' : 'View'})</span>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="py-2.5 px-3">
+                                                <div className="space-y-0.5">
+                                                    <p className="text-xs font-black text-slate-900">{company.ownerId?.name || 'N/A'}</p>
+                                                    {company.ownerId?.username && (
+                                                        <p className="text-[11px] font-bold font-mono text-teal-700">@{company.ownerId.username}</p>
+                                                    )}
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="text-[11px] font-semibold text-slate-700">{company.ownerId?.email || ''}</span>
+                                                        {company.ownerId?.emailVerified ? (
+                                                            <span className="text-[9px] font-black text-emerald-800 bg-emerald-100 px-1 rounded border border-emerald-300" title="Email verified via OTP">
+                                                                ✓ Verified
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[9px] font-black text-amber-800 bg-amber-100 px-1 rounded border border-amber-300" title="Email not verified">
+                                                                Unverified
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="py-2.5 px-3">
+                                                <p className="text-xs font-mono font-black text-slate-900">{company.ownerId?.mobile || company.meta?.phone || '—'}</p>
+                                                <p className="text-[10px] font-semibold text-slate-600">{company.meta?.email || ''}</p>
+                                            </td>
+                                            <td className="py-2.5 px-3">
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-300 uppercase">
+                                                            {company.subscription?.planName || company.planId?.name || 'Basic'}
+                                                        </span>
+                                                        {company.demo?.lifecycleState && (
+                                                            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${
+                                                                company.demo.lifecycleState === 'DEMO_ACTIVE'
+                                                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                                                    : company.demo.lifecycleState === 'DEMO_EXPIRED'
+                                                                    ? 'bg-rose-100 text-rose-900 border-rose-300'
+                                                                    : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                                            }`}>
+                                                                {company.demo.lifecycleState}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {company.demo?.remainingDays !== null && company.demo?.remainingDays !== undefined && (
+                                                        <p className={`text-[10px] font-black font-mono ${
+                                                            company.demo.remainingDays > 3
+                                                                ? 'text-amber-800'
+                                                                : company.demo.remainingDays > 0
+                                                                ? 'text-orange-800'
+                                                                : 'text-rose-800'
+                                                        }`}>
+                                                            {company.demo.remainingDays > 0
+                                                                ? `⏳ ${company.demo.remainingDays} day(s) remaining`
+                                                                : '⚠ Demo Expired'}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="py-2.5 px-3">
+                                                {(() => {
+                                                    const loc = locOf(company);
+                                                    const place = [loc.city, loc.district, loc.state].filter(Boolean).join(', ');
+                                                    return <p className="text-xs font-bold text-slate-800">{place || '—'}</p>;
+                                                })()}
+                                            </td>
+                                            <td className="py-2.5 px-3">
+                                                {company.status === 'suspended' ? (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded bg-rose-100 text-rose-900 border border-rose-300">
+                                                        <Lock size={10} className="stroke-[3]" /> SUSPENDED
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> ACTIVE
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="py-2.5 px-3">
+                                                <div className="flex items-center gap-1 flex-wrap">
+                                                    {company.status === 'active' ? (
+                                                        <button onClick={() => handleRootLock(company, children.length)} className="w-7 h-7 rounded flex items-center justify-center bg-white border border-rose-300 text-rose-700 hover:bg-rose-50 shadow-2xs" title={children.length > 0 ? `Suspend main company and all ${children.length} child firm(s)` : 'Suspend'}>
+                                                            <Lock size={13} className="stroke-[2.5]" />
+                                                        </button>
+                                                    ) : (
+                                                        <button onClick={() => handleRootUnlock(company, children.length)} className="w-7 h-7 rounded flex items-center justify-center bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 shadow-2xs" title={children.length > 0 ? `Activate main company and all ${children.length} child firm(s)` : 'Activate'}>
+                                                            <Unlock size={13} className="stroke-[2.5]" />
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => setLicenseCompany(company)} className="w-7 h-7 rounded flex items-center justify-center bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 shadow-2xs" title="Issue License">
+                                                        <ShieldCheck size={13} />
+                                                    </button>
+                                                    <button onClick={() => handleProvisioningPack(company)} className="w-7 h-7 rounded flex items-center justify-center bg-white border border-teal-300 text-teal-700 hover:bg-teal-50 shadow-2xs" title="Download desktop provisioning pack">
+                                                        <Package size={13} />
+                                                    </button>
+                                                    <button onClick={() => handleExport(company)} className="w-7 h-7 rounded flex items-center justify-center bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 shadow-2xs" title="Export data">
+                                                        <Download size={13} />
+                                                    </button>
+                                                    <button onClick={() => handleImpersonate(company)} className="w-7 h-7 rounded flex items-center justify-center bg-white border border-purple-300 text-purple-700 hover:bg-purple-50 shadow-2xs" title="Impersonate owner (support)">
+                                                        <UserRoundSearch size={13} />
+                                                    </button>
+                                                    <button onClick={() => handlePurge(company)} className="w-7 h-7 rounded flex items-center justify-center bg-white border border-rose-300 text-rose-700 hover:bg-rose-50 shadow-2xs" title="Hard delete">
+                                                        <Trash2 size={13} />
+                                                    </button>
+                                                    <button onClick={() => startEdit(company)} className="w-7 h-7 rounded flex items-center justify-center bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 shadow-2xs" title="Edit">
+                                                        <Edit3 size={13} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </motion.tr>
+
+                                        {/* Child Company Nested Sub-Rows (Light, High-Contrast & Compact) */}
+                                        {isExpanded && visibleChildren.map((child) => {
+                                            const parentSuspended = company.status === 'suspended';
+                                            const effectiveChildStatus = parentSuspended ? 'suspended' : (child.status || 'active');
+
+                                            return (
+                                                <tr
+                                                    key={child._id}
+                                                    className="bg-emerald-50/40 border-l-[4px] border-l-emerald-600 border-b border-emerald-100 hover:bg-emerald-50/70 transition-colors"
+                                                >
+                                                    <td className="py-2 pl-6 pr-3">
+                                                        <div className="flex items-start gap-2">
+                                                            <CornerDownRight size={14} className="text-emerald-700 shrink-0 mt-1 stroke-[3]" />
+                                                            <div className="w-6 h-6 rounded bg-teal-100 border border-teal-400 text-teal-900 font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                                                                <span>{child.name.charAt(0).toUpperCase()}</span>
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <p className="text-xs font-black text-slate-900 tracking-tight">{child.name}</p>
+                                                                    <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-teal-100 text-teal-900 border border-teal-300">
+                                                                        Child ({child.coCode || 'Co'})
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-[10px] text-slate-600 font-bold font-mono">
+                                                                    ID: <span className="text-slate-800 font-extrabold">{child._id?.slice(-8)}</span>
+                                                                    {child.createdAt && ` · Reg: ${new Date(child.createdAt).toLocaleDateString('en-IN')}`}
+                                                                </p>
+                                                                <p className="text-[10px] font-extrabold text-emerald-800 font-mono mt-0.5">
+                                                                    ↳ Sub-firm of {company.name}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-2 px-3">
+                                                        <div className="space-y-0.5">
+                                                            <p className="text-xs font-bold text-slate-900">
+                                                                {child.ownerId?.name || company.ownerId?.name || 'Same as Root'}
+                                                            </p>
+                                                            {(child.ownerId?.username || company.ownerId?.username) && (
+                                                                <p className="text-[10px] font-bold font-mono text-teal-700">
+                                                                    @{child.ownerId?.username || company.ownerId?.username}
+                                                                </p>
+                                                            )}
+                                                            <span className="text-[10px] font-semibold text-slate-600">
+                                                                {child.ownerId?.email || company.ownerId?.email || ''}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-2 px-3">
+                                                        <p className="text-xs font-mono font-black text-slate-900">
+                                                            {child.ownerId?.mobile || child.meta?.phone || company.ownerId?.mobile || '—'}
+                                                        </p>
+                                                        <p className="text-[10px] font-semibold text-slate-600">{child.meta?.email || ''}</p>
+                                                    </td>
+                                                    <td className="py-2 px-3">
+                                                        <div className="space-y-1">
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-slate-100 text-slate-800 border border-slate-300 uppercase">
+                                                                    {child.subscription?.planName || child.planId?.name || company.subscription?.planName || 'Basic'}
+                                                                </span>
+                                                                {child.demo?.lifecycleState && (
+                                                                    <span className={`text-[9px] font-black px-1.5 py-0.2 rounded border ${
+                                                                        child.demo.lifecycleState === 'DEMO_ACTIVE'
+                                                                            ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                                                            : child.demo.lifecycleState === 'DEMO_EXPIRED'
+                                                                            ? 'bg-rose-100 text-rose-900 border-rose-300'
+                                                                            : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                                                    }`}>
+                                                                        {child.demo.lifecycleState}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {child.demo?.remainingDays !== null && child.demo?.remainingDays !== undefined && (
+                                                                <p className="text-[10px] font-black font-mono text-amber-900">
+                                                                    ⏳ {child.demo.remainingDays}d remaining
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-2 px-3">
+                                                        {(() => {
+                                                            const loc = locOf(child);
+                                                            const place = [loc.city, loc.district, loc.state].filter(Boolean).join(', ');
+                                                            return <p className="text-xs font-bold text-slate-800">{place || locOf(company).city || '—'}</p>;
+                                                        })()}
+                                                    </td>
+                                                    <td className="py-2 px-3">
+                                                        {parentSuspended ? (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded bg-rose-100 text-rose-900 border border-rose-300 shadow-2xs" title="Parent company is suspended, so this child firm is suspended automatically">
+                                                                <Lock size={10} className="stroke-[3]" /> SUSPENDED (via Parent)
+                                                            </span>
+                                                        ) : effectiveChildStatus === 'active' ? (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> ACTIVE
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded bg-rose-100 text-rose-900 border border-rose-300">
+                                                                <Lock size={10} className="stroke-[3]" /> SUSPENDED
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 px-3">
+                                                        <div className="flex items-center gap-1 flex-wrap">
+                                                            {effectiveChildStatus === 'active' ? (
+                                                                <button onClick={() => handleChildLock(child, company)} className="w-6 h-6 rounded flex items-center justify-center bg-white border border-rose-300 text-rose-700 hover:bg-rose-50 shadow-2xs" title="Suspend child firm">
+                                                                    <Lock size={12} className="stroke-[2.5]" />
+                                                                </button>
+                                                            ) : (
+                                                                <button onClick={() => handleChildUnlock(child, company)} className="w-6 h-6 rounded flex items-center justify-center bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50 shadow-2xs" title="Activate child firm">
+                                                                    <Unlock size={12} className="stroke-[2.5]" />
+                                                                </button>
+                                                            )}
+                                                            <button onClick={() => setLicenseCompany(child)} className="w-6 h-6 rounded flex items-center justify-center bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 shadow-2xs" title="Issue License">
+                                                                <ShieldCheck size={12} />
+                                                            </button>
+                                                            <button onClick={() => handleProvisioningPack(child)} className="w-6 h-6 rounded flex items-center justify-center bg-white border border-teal-300 text-teal-700 hover:bg-teal-50 shadow-2xs" title="Download provisioning pack">
+                                                                <Package size={12} />
+                                                            </button>
+                                                            <button onClick={() => handleExport(child)} className="w-6 h-6 rounded flex items-center justify-center bg-white border border-indigo-300 text-indigo-700 hover:bg-indigo-50 shadow-2xs" title="Export data">
+                                                                <Download size={12} />
+                                                            </button>
+                                                            <button onClick={() => handleImpersonate(child)} className="w-6 h-6 rounded flex items-center justify-center bg-white border border-purple-300 text-purple-700 hover:bg-purple-50 shadow-2xs" title="Impersonate owner">
+                                                                <UserRoundSearch size={12} />
+                                                            </button>
+                                                            <button onClick={() => handlePurge(child)} className="w-6 h-6 rounded flex items-center justify-center bg-white border border-rose-300 text-rose-700 hover:bg-rose-50 shadow-2xs" title="Hard delete">
+                                                                <Trash2 size={12} />
+                                                            </button>
+                                                            <button onClick={() => startEdit(child)} className="w-6 h-6 rounded flex items-center justify-center bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 shadow-2xs" title="Edit">
+                                                                <Edit3 size={12} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </React.Fragment>
+                                );
+                            })}
+                            {filteredRoots.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="px-5 py-16 text-center">
+                                    <td colSpan={7} className="px-5 py-16 text-center">
                                         <Globe size={32} className="mx-auto mb-3 text-slate-700" />
                                         <p className="text-slate-600 font-bold text-sm">No companies found</p>
                                     </td>

@@ -11,6 +11,7 @@ import { GST_STATE_CODES } from '../../utils/gstStateCodes';
 const EMPTY_ACCOUNT = {
   name: '',
   accd: '',
+  connectedCode: '',
   group: 'SUNDRY DEBTORS',
   openingBalance: 0,
   openingBalanceType: 'Dr',
@@ -41,10 +42,13 @@ const EMPTY_ACCOUNT = {
   udyamAadhar: '',
   msmeType: 'None',
   dueDays: 0,
+  creditLimit: 0,
+  tdsSection: '',
   rdRate: 0,
   disc1: 0,
   disc2: 0,
   addPer: 0,
+  dharaPer: 0,
   intPer: 0,
   commi: 0,
   maxLevel: 0,
@@ -57,7 +61,7 @@ const EMPTY_ACCOUNT = {
 const emptyBankRow = () => ({ name: '', accountNo: '', ifsc: '' });
 
 const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null, readOnly = false, initialTab = 'Account', prefillBankName = '' }) => {
-  const { addParty, updateParty, deleteParty, parties, fetchParties } = useStore();
+  const { addParty, updateParty, deleteParty, parties, fetchParties, subMasters, fetchSubMasters } = useStore();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [mode, setMode] = useState('View'); // 'View', 'Add', 'Edit'
   const [selectedPartyId, setSelectedPartyId] = useState('');
@@ -67,10 +71,6 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   
   const [formData, setFormData] = useState({ ...EMPTY_ACCOUNT });
   const nameInputRef = useRef(null);
-  const cityRef = useRef(null);
-  const stateCodeRef = useRef(null);
-  const stateRef = useRef(null);
-  const gstinRef = useRef(null);
   const saveBtnRef = useRef(null);
 
   // Auto-focus Party Name when opened in Add mode
@@ -84,10 +84,6 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
     }
   }, [isOpen, mode]);
 
-  // Fetch once per open — NOT keyed on `initialData` (an object). fetchParties() always
-  // returns a fresh array/object references even when the data is unchanged, so keying
-  // this effect on the object itself would refire → refetch → new reference → refire …
-  // forever, which is exactly what made "Loading accounts…" spin indefinitely.
   useEffect(() => {
     if (!isOpen) {
       setBootLoading(false);
@@ -95,7 +91,11 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
     }
     let cancelled = false;
     setBootLoading(true);
-    Promise.resolve(fetchParties())
+    Promise.all([
+      Promise.resolve(fetchParties()),
+      fetchSubMasters ? Promise.resolve(fetchSubMasters('City')) : Promise.resolve(),
+      fetchSubMasters ? Promise.resolve(fetchSubMasters('AccountGroup')) : Promise.resolve(),
+    ])
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setBootLoading(false);
@@ -103,7 +103,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
     return () => {
       cancelled = true;
     };
-  }, [isOpen, fetchParties]);
+  }, [isOpen, fetchParties, fetchSubMasters]);
 
   // Populate the form keyed on the PARTY ID, not the initialData object reference —
   // a caller re-rendering with a re-memoized (but same-party) object must not reset the form.
@@ -268,6 +268,23 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
     [parties]
   );
 
+  const cityOptions = useMemo(() => {
+    const list = new Set(['SURAT', 'AHMEDABAD', 'MUMBAI', 'DELHI', 'JAIPUR', 'KOLKATA', 'LUDHIANA', 'CHENNAI']);
+    (subMasters || [])
+      .filter((sm) => sm.type === 'City')
+      .forEach((sm) => { if (sm.name) list.add(sm.name.toUpperCase()); });
+    parties.forEach((p) => { if (p.city) list.add(p.city.toUpperCase()); });
+    return Array.from(list).sort();
+  }, [subMasters, parties]);
+
+  const groupOptions = useMemo(() => {
+    const list = new Set(['SUNDRY DEBTORS', 'SUNDRY CREDITORS', 'EXPENCES', 'INCOME', 'BANK ACCOUNTS', 'BROKER', 'JOB WORKER', 'CASH-IN-HAND', 'CAPITAL ACCOUNT']);
+    (subMasters || [])
+      .filter((sm) => sm.type === 'AccountGroup')
+      .forEach((sm) => { if (sm.name) list.add(sm.name.toUpperCase()); });
+    return Array.from(list);
+  }, [subMasters]);
+
   const brokerOptions = useMemo(
     () => [
       { value: '', label: '- Direct/No Broker -' },
@@ -303,18 +320,28 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
     <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-5xl">
       <div
         className="classic-erp-window erp-master-form"
+        data-form-enter-nav="true"
         onKeyDown={(e) => {
           if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || (e.altKey && e.key.toLowerCase() === 's')) {
             e.preventDefault();
             e.stopPropagation();
             if (!locked && !saving && !bootLoading) handleSave();
           }
+          if (e.key === 'F3') {
+            e.preventDefault();
+            setMode('View');
+            setTimeout(() => {
+              const inp = document.querySelector('.classic-erp-select input');
+              inp?.focus();
+              try { inp?.select(); } catch {}
+            }, 60);
+          }
         }}
       >
         <ErpBusyOverlay show={bootLoading} message="Loading accounts…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving account…" />
         <div className="classic-erp-header">
-          <span>Account Master — {formData.group || 'SUNDRY DEBTORS'}</span>
+          <span>Main Account Master</span>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -324,7 +351,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
               📥 Import (Excel)
             </button>
             <span style={{ fontSize: 10, opacity: 0.85, fontWeight: 500 }}>{mode} Mode</span>
-            <button type="button" className="classic-erp-close-btn" onClick={onClose}>×</button>
+            <button type="button" className="classic-erp-close-btn" onClick={onClose} data-action="exit" title="Exit (Alt+X / Esc)">×</button>
           </div>
         </div>
 
@@ -340,7 +367,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
           {mode === 'View' && (
             <div className="classic-erp-frame mb-3">
               <div className="classic-erp-field-row">
-                <span className="classic-erp-label blue-label classic-erp-label--fixed">Find Party</span>
+                <span className="classic-erp-label blue-label classic-erp-label--fixed">Find Party (F3)</span>
                 <ERPSelect
                   className="classic-erp-select flex-1"
                   value={selectedPartyId}
@@ -354,8 +381,24 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
           )}
 
           {activeTab === 'Account' && (
-            <div className="space-y-3">
-              <div className="classic-erp-frame">
+            <div className="relative space-y-2">
+              {/* Option Box in Top-Right corner matching JSM Screenshot 1 */}
+              <div className="absolute right-2 top-0 border border-[#9aa4b8] bg-[#f8f9fa] p-2 rounded-sm shadow-sm w-36 text-center select-none z-10">
+                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Option</div>
+                <div className="text-[11px] font-bold text-gray-700 mb-1">Conected Code</div>
+                <input
+                  type="text"
+                  className="classic-erp-input w-full text-center font-mono font-bold"
+                  value={formData.connectedCode || ''}
+                  onChange={setField('connectedCode')}
+                  disabled={locked}
+                  placeholder="Code"
+                />
+              </div>
+
+              {/* JSM Screenshot 1 Exact Fields Stack */}
+              <div className="classic-erp-frame space-y-2 pr-40">
+                {/* 1. Account */}
                 <div className="classic-erp-field-row">
                   <span className="classic-erp-label red-label classic-erp-label--fixed">Account</span>
                   <input
@@ -365,286 +408,193 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                     value={formData.name}
                     onChange={setField('name')}
                     disabled={locked}
-                    placeholder="Party / account name"
+                    placeholder="Party / Account Name"
                     autoFocus={mode === 'Add'}
-                    data-enter-nav={mode === 'Add' ? 'off' : undefined}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        cityRef.current?.focus();
-                        try { cityRef.current?.select(); } catch { /* ignore */ }
-                      }
-                    }}
                   />
                   <span className="classic-erp-label classic-erp-label--fixed-sm">Accd</span>
-                  <input type="text" className="classic-erp-input w-20" value={formData.accd || ''} readOnly placeholder="Auto" />
+                  <input type="text" className="classic-erp-input w-20 text-center font-mono" value={formData.accd || ''} readOnly placeholder="Auto" />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <div className="classic-erp-frame space-y-2">
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label red-label classic-erp-label--fixed">A/c Head</span>
-                    <select className="classic-erp-select flex-1" value={formData.group} onChange={setField('group')} disabled={locked}>
-                      <option value="SUNDRY DEBTORS">SUNDRY DEBTORS</option>
-                      <option value="SUNDRY CREDITORS">SUNDRY CREDITORS</option>
-                      <option value="BROKER">BROKER</option>
-                      <option value="JOB WORKER">JOB WORKER</option>
-                      <option value="BANK ACCOUNTS">BANK ACCOUNTS</option>
-                    </select>
-                  </div>
+                {/* 2. A/c. Head */}
+                <div className="classic-erp-field-row">
+                  <span className="classic-erp-label red-label classic-erp-label--fixed">A/c. Head</span>
+                  <select
+                    className="classic-erp-select flex-1 font-bold"
+                    value={formData.group}
+                    onChange={setField('group')}
+                    disabled={locked}
+                  >
+                    {groupOptions.map((grp) => (
+                      <option key={grp} value={grp}>{grp}</option>
+                    ))}
+                  </select>
+                </div>
 
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Op. Balance</span>
-                    <input type="number" className="classic-erp-input flex-1" value={formData.openingBalance} onChange={setField('openingBalance')} disabled={locked} />
-                    <select className="classic-erp-select w-16" value={formData.openingBalanceType} onChange={setField('openingBalanceType')} disabled={locked}>
-                      <option value="Dr">DR</option>
-                      <option value="Cr">CR</option>
-                    </select>
-                  </div>
+                {/* 3. Address Line 1 */}
+                <div className="classic-erp-field-row">
+                  <span className="classic-erp-label classic-erp-label--fixed">Address</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input flex-1"
+                    value={formData.address}
+                    onChange={setField('address')}
+                    disabled={locked}
+                    placeholder="Address Line 1"
+                  />
+                </div>
 
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Main Group</span>
-                    <input type="checkbox" checked={formData.mainGroup} onChange={setField('mainGroup')} disabled={locked} />
-                    <select className="classic-erp-select flex-1" value={formData.mainGroupId} onChange={setField('mainGroupId')} disabled={locked || !formData.mainGroup}>
-                      <option value="">- Select Head Group -</option>
-                      <option value="DEBTORS">DEBTORS</option>
-                      <option value="CREDITORS">CREDITORS</option>
-                    </select>
-                  </div>
+                {/* 4. Address Line 2 */}
+                <div className="classic-erp-field-row">
+                  <span className="classic-erp-label classic-erp-label--fixed"></span>
+                  <input
+                    type="text"
+                    className="classic-erp-input flex-1"
+                    value={formData.address2}
+                    onChange={setField('address2')}
+                    disabled={locked}
+                    placeholder="Address Line 2 (Area, Landmark)"
+                  />
+                </div>
 
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Address 1</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.address} onChange={setField('address')} disabled={locked} />
-                  </div>
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Address 2</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.address2} onChange={setField('address2')} disabled={locked} />
-                  </div>
-
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed-sm">City</span>
+                {/* 5. City */}
+                <div className="classic-erp-field-row">
+                  <span className="classic-erp-label classic-erp-label--fixed">City</span>
+                  <div className="flex-1 flex gap-2">
                     <input
-                      ref={cityRef}
                       type="text"
-                      className="classic-erp-input flex-1"
+                      list="city-options-list"
+                      className="classic-erp-input flex-1 uppercase"
                       value={formData.city}
                       onChange={setField('city')}
                       disabled={locked}
-                      data-enter-nav="off"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          stateCodeRef.current?.focus();
-                          try { stateCodeRef.current?.select(); } catch { /* ignore */ }
-                        }
-                      }}
+                      placeholder="Select or type City"
                     />
+                    <datalist id="city-options-list">
+                      {cityOptions.map((c) => (
+                        <option key={c} value={c} />
+                      ))}
+                    </datalist>
                     <span className="classic-erp-label classic-erp-label--fixed-sm">Pin</span>
                     <input
                       type="text"
-                      className="classic-erp-input w-24"
+                      className="classic-erp-input w-24 font-mono"
                       value={formData.pincode}
                       onChange={setField('pincode')}
                       disabled={locked}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          stateRef.current?.focus();
-                        }
-                      }}
+                      placeholder="Pincode"
                     />
-                  </div>
-
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Phone (O)</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.phoneO} onChange={setField('phoneO')} disabled={locked} />
-                  </div>
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Phone (R)</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.phoneR} onChange={setField('phoneR')} disabled={locked} />
-                  </div>
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Mobile</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.mobile} onChange={setField('mobile')} disabled={locked} />
-                  </div>
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Contact</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.contactPerson} onChange={setField('contactPerson')} disabled={locked} />
-                  </div>
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Broker</span>
-                    <ERPSelect
-                      className="classic-erp-select flex-1"
-                      value={formData.brokerId}
-                      onChange={setField('brokerId')}
-                      disabled={locked}
-                      options={brokerOptions}
-                      placeholder="- Direct/No Broker -"
-                      recentKey="account-broker"
-                    />
-                  </div>
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Transport</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.transport} onChange={setField('transport')} disabled={locked} />
                   </div>
                 </div>
 
-                <div className="classic-erp-frame space-y-2">
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Status</span>
-                    <select className="classic-erp-select flex-1" value={formData.status} onChange={setField('status')} disabled={locked}>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
+                {/* 6. Phone (O) */}
+                <div className="classic-erp-field-row">
+                  <span className="classic-erp-label classic-erp-label--fixed">Phone (O)</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input flex-1 font-mono"
+                    value={formData.phoneO}
+                    onChange={setField('phoneO')}
+                    disabled={locked}
+                    placeholder="Office Phone"
+                  />
+                </div>
+
+                {/* 7. Phone (R) */}
+                <div className="classic-erp-field-row">
+                  <span className="classic-erp-label classic-erp-label--fixed">Phone (R)</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input flex-1 font-mono"
+                    value={formData.phoneR}
+                    onChange={setField('phoneR')}
+                    disabled={locked}
+                    placeholder="Residence Phone"
+                  />
+                </div>
+
+                {/* 8. Mobile */}
+                <div className="classic-erp-field-row">
+                  <span className="classic-erp-label classic-erp-label--fixed">Mobile</span>
+                  <input
+                    type="text"
+                    className="classic-erp-input flex-1 font-mono font-bold"
+                    value={formData.mobile}
+                    onChange={setField('mobile')}
+                    disabled={locked}
+                    placeholder="Mobile Number"
+                  />
+                </div>
+              </div>
+
+              {/* Additional Account Details & Tax Section */}
+              <div className="classic-erp-frame bg-[#f8f9fa] p-2 mt-2">
+                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 border-b border-gray-200 pb-1">
+                  Additional Details & Tax
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs">
+                  <div className="space-y-1.5">
+                    <div className="classic-erp-field-row">
+                      <span className="classic-erp-label classic-erp-label--fixed">Op. Balance</span>
+                      <input type="number" className="classic-erp-input flex-1 text-right" value={formData.openingBalance} onChange={setField('openingBalance')} disabled={locked} />
+                      <select className="classic-erp-select w-16 font-bold" value={formData.openingBalanceType} onChange={setField('openingBalanceType')} disabled={locked}>
+                        <option value="Dr">DR</option>
+                        <option value="Cr">CR</option>
+                      </select>
+                    </div>
+
+                    <div className="classic-erp-field-row">
+                      <span className="classic-erp-label classic-erp-label--fixed">GSTIN</span>
+                      <input
+                        type="text"
+                        className="classic-erp-input flex-1 font-mono uppercase font-bold"
+                        maxLength={15}
+                        value={formData.gstin}
+                        onChange={setField('gstin')}
+                        disabled={locked}
+                        placeholder="GSTIN (15 Digits)"
+                      />
+                    </div>
+
+                    <div className="classic-erp-field-row">
+                      <span className="classic-erp-label classic-erp-label--fixed">PAN</span>
+                      <input
+                        type="text"
+                        className="classic-erp-input flex-1 font-mono uppercase"
+                        maxLength={10}
+                        value={formData.pan}
+                        onChange={setField('pan')}
+                        disabled={locked}
+                        placeholder="PAN (10 digits)"
+                      />
+                    </div>
                   </div>
 
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">All Firm</span>
-                    <select className="classic-erp-select w-20" value={formData.updateInAllFirm} onChange={setField('updateInAllFirm')} disabled={locked}>
-                      <option value="Y">Y</option>
-                      <option value="N">N</option>
-                    </select>
-                    <span className="classic-erp-label classic-erp-label--fixed-sm">Year</span>
-                    <select className="classic-erp-select w-20" value={formData.updateInAllYear} onChange={setField('updateInAllYear')} disabled={locked}>
-                      <option value="Y">Y</option>
-                      <option value="N">N</option>
-                    </select>
-                  </div>
+                  <div className="space-y-1.5">
+                    <div className="classic-erp-field-row">
+                      <span className="classic-erp-label classic-erp-label--fixed">Broker</span>
+                      <ERPSelect
+                        className="classic-erp-select flex-1"
+                        value={formData.brokerId}
+                        onChange={setField('brokerId')}
+                        disabled={locked}
+                        options={brokerOptions}
+                        placeholder="- Direct/No Broker -"
+                        recentKey="account-broker"
+                      />
+                    </div>
 
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Aadhar No</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.aadharNo} onChange={setField('aadharNo')} disabled={locked} />
-                  </div>
+                    <div className="classic-erp-field-row">
+                      <span className="classic-erp-label classic-erp-label--fixed">Transport</span>
+                      <input type="text" className="classic-erp-input flex-1" value={formData.transport} onChange={setField('transport')} disabled={locked} placeholder="Transport Name" />
+                    </div>
 
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed-sm">State</span>
-                    <input
-                      ref={stateCodeRef}
-                      type="text"
-                      data-enter-nav="off"
-                      className="classic-erp-input w-14 font-mono font-bold text-center"
-                      value={formData.stateCode || '24'}
-                      maxLength={2}
-                      title="State Code (e.g. 24 for Gujarat, 27 for Maharashtra) — Press Enter to Save"
-                      onChange={(e) => {
-                        const code = e.target.value.replace(/\D/g, '').slice(0, 2);
-                        const name = GST_STATE_CODES[code] || (code ? `${code}-State` : '');
-                        const gstType = code === '24' ? 'INVOICE (IN STATE)' : 'INVOICE (OUT OF STATE)';
-                        setFormData(prev => ({
-                          ...prev,
-                          stateCode: code,
-                          stateName: name ? `${code}-${name}` : prev.stateName,
-                          gstType,
-                        }));
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleSave();
-                        }
-                      }}
-                      disabled={locked}
-                    />
-                    <select
-                      ref={stateRef}
-                      data-enter-nav="off"
-                      className="classic-erp-select flex-1 font-bold"
-                      value={formData.stateCode || '24'}
-                      onChange={(e) => {
-                        const code = e.target.value;
-                        const name = GST_STATE_CODES[code] || `${code}-State`;
-                        const gstType = code === '24' ? 'INVOICE (IN STATE)' : 'INVOICE (OUT OF STATE)';
-                        setFormData(prev => ({
-                          ...prev,
-                          stateCode: code,
-                          stateName: `${code}-${name}`,
-                          gstType,
-                        }));
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleSave();
-                        }
-                      }}
-                      disabled={locked}
-                    >
-                      {Object.entries(GST_STATE_CODES).map(([code, sName]) => (
-                        <option key={code} value={code}>
-                          {code} - {sName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label red-label classic-erp-label--fixed">GSTIN</span>
-                    <input
-                      ref={gstinRef}
-                      type="text"
-                      className="classic-erp-input flex-1 font-mono uppercase"
-                      value={formData.gstin}
-                      onChange={setField('gstin')}
-                      disabled={locked}
-                      maxLength={15}
-                      placeholder="15 char GSTIN (Optional)"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleSave();
-                        }
-                      }}
-                    />
-                  </div>
-
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">GST Type</span>
-                    <select className="classic-erp-select flex-1" value={formData.gstType} onChange={setField('gstType')} disabled={locked}>
-                      <option value="INVOICE (IN STATE)">INVOICE (IN STATE)</option>
-                      <option value="INVOICE (OUT OF STATE)">INVOICE (OUT OF STATE)</option>
-                    </select>
-                  </div>
-
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Udyam</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.udyamAadhar} onChange={setField('udyamAadhar')} disabled={locked} />
-                  </div>
-
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">MSME Type</span>
-                    <select className="classic-erp-select flex-1" value={formData.msmeType} onChange={setField('msmeType')} disabled={locked}>
-                      <option value="None">None</option>
-                      <option value="Micro">Micro</option>
-                      <option value="Small">Small</option>
-                      <option value="Medium">Medium</option>
-                    </select>
-                  </div>
-
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">TIN CST</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.tinCstNo} onChange={setField('tinCstNo')} disabled={locked} />
-                  </div>
-
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">TIN GST</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.tinGstNo} onChange={setField('tinGstNo')} disabled={locked} />
-                  </div>
-
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">PAN</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.pan} onChange={setField('pan')} disabled={locked} />
-                  </div>
-
-                  <div className="classic-erp-field-row">
-                    <span className="classic-erp-label classic-erp-label--fixed">Email</span>
-                    <input type="text" className="classic-erp-input flex-1" value={formData.email} onChange={setField('email')} disabled={locked} />
+                    <div className="classic-erp-field-row">
+                      <span className="classic-erp-label classic-erp-label--fixed">Status</span>
+                      <select className="classic-erp-select flex-1" value={formData.status} onChange={setField('status')} disabled={locked}>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -760,17 +710,88 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
           )}
         </div>
 
-        {/* Action Button Bar */}
-        <div className="classic-erp-form-footer">
-          <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving}>New</button>
-          <button className="classic-erp-btn" type="button" onClick={handleEdit} disabled={readOnly || mode !== 'View' || saving}>Edit</button>
-          <button ref={saveBtnRef} className="classic-erp-btn btn-blue" type="button" data-enter-save="true" onClick={handleSave} disabled={locked || saving || bootLoading}>
+        {/* Action Button Bar matching JSM Screenshot 1 */}
+        <div className="classic-erp-form-footer select-none">
+          <button
+            className={`classic-erp-btn ${mode === 'Add' ? 'bg-[#0000d0] text-white ring-2 ring-blue-400 font-bold' : ''}`}
+            type="button"
+            data-action="new"
+            onClick={handleNew}
+            disabled={readOnly || saving}
+            title="New Account (Alt+N / F2)"
+          >
+            New
+          </button>
+          <button
+            className={`classic-erp-btn ${mode === 'Edit' ? 'bg-[#0000d0] text-white ring-2 ring-blue-400 font-bold' : ''}`}
+            type="button"
+            data-action="edit"
+            onClick={handleEdit}
+            disabled={readOnly || saving}
+            title="Edit Account (Alt+E)"
+          >
+            Edit
+          </button>
+          <button
+            ref={saveBtnRef}
+            className="classic-erp-btn btn-blue font-bold"
+            type="button"
+            data-action="save"
+            data-enter-save="true"
+            onClick={handleSave}
+            disabled={locked || saving || bootLoading}
+            title="Save Account (Alt+S / Enter on Save)"
+          >
             <SaveButtonLabel saving={saving} />
           </button>
-          <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked || saving}>Cancel</button>
-          <button className="classic-erp-btn" type="button" onClick={() => setMode('View')} disabled={readOnly || mode === 'View' || saving}>Find</button>
-          <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || locked || saving || !(formData._id || formData.id)}>Delete</button>
-          <button className="classic-erp-btn" type="button" onClick={onClose} disabled={saving}>Exit</button>
+          <button
+            className="classic-erp-btn"
+            type="button"
+            data-action="cancel"
+            onClick={handleCancel}
+            disabled={locked || saving}
+            title="Cancel (Alt+C)"
+          >
+            Cancel
+          </button>
+          <button
+            className="classic-erp-btn"
+            type="button"
+            data-action="find"
+            data-master-find="true"
+            onClick={() => {
+              setMode('View');
+              setTimeout(() => {
+                const inp = document.querySelector('.classic-erp-select input');
+                inp?.focus();
+                try { inp?.select(); } catch {}
+              }, 50);
+            }}
+            disabled={saving}
+            title="Find Party (F3)"
+          >
+            Find
+          </button>
+          <button
+            className="classic-erp-btn btn-red"
+            type="button"
+            data-action="delete"
+            onClick={handleDelete}
+            disabled={readOnly || locked || saving || !(formData._id || formData.id)}
+            title="Delete Account (Alt+D)"
+          >
+            Delete
+          </button>
+          <button
+            className="classic-erp-btn"
+            type="button"
+            data-action="exit"
+            onClick={onClose}
+            disabled={saving}
+            title="Exit (Alt+X / Esc)"
+          >
+            Exit
+          </button>
         </div>
       </div>
       <DataImportModal
