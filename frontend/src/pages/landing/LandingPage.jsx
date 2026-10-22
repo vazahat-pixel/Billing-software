@@ -104,6 +104,7 @@ export default function LandingPage() {
   const CANONICAL_RELEASE_URL = '/downloads/BillingSoftware-Setup.exe';
   const [downloadUrl, setDownloadUrl] = useState(CANONICAL_RELEASE_URL);
   const [downloadAltUrl, setDownloadAltUrl] = useState('/api/desktop/download');
+  const [installerSize, setInstallerSize] = useState('85.8 MB');
 
   useEffect(() => {
     fetch('/api/desktop/download-info')
@@ -114,6 +115,9 @@ export default function LandingPage() {
             setDownloadUrl(res.data.directUrl);
           } else if (res.data.downloadUrl) {
             setDownloadUrl(res.data.downloadUrl);
+          }
+          if (res.data.sizeMB) {
+            setInstallerSize(res.data.sizeMB);
           }
         }
       })
@@ -504,7 +508,7 @@ export default function LandingPage() {
               <Download size={18} />
               <span>Download for Windows (.EXE)</span>
               <span className="text-[11px] bg-blue-900/60 px-2 py-0.5 rounded text-blue-100 font-mono font-normal hidden sm:inline">
-                v2.4.0
+                v2.4.0 • {installerSize}
               </span>
             </a>
 
@@ -1108,7 +1112,7 @@ export default function LandingPage() {
                     <Download size={18} />
                     <span>Download Installer (.EXE)</span>
                     <span className="text-[11px] bg-emerald-950/40 px-2 py-0.5 rounded text-emerald-100 font-mono">
-                      ~238 MB
+                      {installerSize}
                     </span>
                   </a>
 
