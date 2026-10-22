@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { Building2, Lock, Unlock, ShieldCheck, Edit3, Plus, X, Search, Filter, Users, ArrowUpRight, Globe, Download, Trash2, UserRoundSearch, Package, ChevronDown, ChevronRight, CornerDownRight, Layers } from 'lucide-react';
+import { Building2, Lock, Unlock, ShieldCheck, Edit3, Plus, X, Search, Filter, Users, ArrowUpRight, Globe, Download, Trash2, UserRoundSearch, Package, ChevronDown, ChevronRight, CornerDownRight, Layers, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAdminStore from '../../store/useAdminStore';
 import { adminApi } from '../../api';
@@ -157,6 +157,9 @@ const Companies = () => {
     const [createForm, setCreateForm] = useState({ name: '', ownerName: '', ownerEmail: '', ownerPassword: '', planId: '', groupCode: '' });
     const [editForm, setEditForm] = useState({ name: '', planId: '', status: '', state: '', district: '', city: '' });
     const [expiryDate, setExpiryDate] = useState('');
+    const [purgeCompany, setPurgeCompany] = useState(null);
+    const [purgeConfirmInput, setPurgeConfirmInput] = useState('');
+    const [isPurging, setIsPurging] = useState(false);
 
     useEffect(() => {
         fetchCompanies();
@@ -235,22 +238,29 @@ const Companies = () => {
         }
     };
 
-    const handlePurge = async (company) => {
-        const ok = await erpConfirm({
-            title: 'Hard delete company',
-            message: `Permanently delete "${company.name}" and all tenant data? This cannot be undone.`,
-            confirmLabel: 'Continue',
-            danger: true,
-        });
-        if (!ok) return;
-        const confirmName = window.prompt(`Type company name exactly to confirm delete:\n${company.name}`);
-        if (confirmName == null) return;
+    const handlePurge = (company) => {
+        setPurgeCompany(company);
+        setPurgeConfirmInput('');
+    };
+
+    const executePurge = async (e) => {
+        if (e) e.preventDefault();
+        if (!purgeCompany) return;
+        if (purgeConfirmInput.trim() !== purgeCompany.name.trim()) {
+            notifyWarning('Company name does not match. Please type it exactly as shown.');
+            return;
+        }
+        setIsPurging(true);
         try {
-            await adminApi.deleteCompany(company._id, { confirmName });
-            notifySuccess('Company deleted');
+            await adminApi.deleteCompany(purgeCompany._id, { confirmName: purgeConfirmInput.trim() });
+            notifySuccess(`Company "${purgeCompany.name}" and all tenant data deleted.`);
+            setPurgeCompany(null);
+            setPurgeConfirmInput('');
             fetchCompanies();
         } catch (err) {
             notifyError(err, 'Delete failed');
+        } finally {
+            setIsPurging(false);
         }
     };
 
@@ -937,6 +947,91 @@ const Companies = () => {
                         <ShieldCheck size={15} /> Generate & Apply Key
                     </button>
                 </form>
+            </DarkModal>
+
+            {/* HARD DELETE / PURGE IN-APP MODAL */}
+            <DarkModal
+                isOpen={!!purgeCompany}
+                onClose={() => { if (!isPurging) setPurgeCompany(null); }}
+                title="Hard Delete Company"
+                subtitle={purgeCompany ? `Permanent deletion for "${purgeCompany.name}"` : ''}
+            >
+                {purgeCompany && (
+                    <form onSubmit={executePurge} className="space-y-4">
+                        <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl space-y-2.5">
+                            <div className="flex items-center gap-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
+                                <AlertTriangle size={16} className="text-rose-400 shrink-0" />
+                                <span>Danger: Irreversible Action</span>
+                            </div>
+                            <p className="text-xs text-rose-200/90 leading-relaxed">
+                                This will <strong className="text-white underline">permanently delete</strong> the company{' '}
+                                <strong className="text-rose-300 font-mono">"{purgeCompany.name}"</strong> and cascade delete all tenant data:
+                                sales, purchases, vouchers, ledgers, inventory, user accounts, and licenses.
+                            </p>
+                            <p className="text-[11px] text-rose-300/80 font-medium">
+                                Once deleted, this company and its records cannot be recovered.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="dark-input__label text-slate-300 text-xs">
+                                To confirm, please type <span className="text-rose-400 font-mono select-all bg-rose-500/20 px-1.5 py-0.5 rounded border border-rose-500/30 font-bold">{purgeCompany.name}</span> below:
+                            </label>
+                            <input
+                                type="text"
+                                value={purgeConfirmInput}
+                                onChange={(e) => setPurgeConfirmInput(e.target.value)}
+                                placeholder={purgeCompany.name}
+                                autoFocus
+                                disabled={isPurging}
+                                className="dark-input w-full"
+                                style={{
+                                    borderColor: purgeConfirmInput.trim() === purgeCompany.name.trim() ? '#10b981' : purgeConfirmInput.length > 0 ? '#f43f5e' : undefined
+                                }}
+                            />
+                            <div className="flex justify-between items-center text-[11px] pt-0.5">
+                                {purgeConfirmInput.trim() === purgeCompany.name.trim() ? (
+                                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                                        ✓ Name matches. Click delete below.
+                                    </span>
+                                ) : purgeConfirmInput.length > 0 ? (
+                                    <span className="text-rose-400 font-medium">
+                                        Name does not match yet
+                                    </span>
+                                ) : (
+                                    <span className="text-slate-400">
+                                        Exact company name required
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/[0.08]">
+                            <button
+                                type="button"
+                                disabled={isPurging}
+                                onClick={() => setPurgeCompany(null)}
+                                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/[0.06] transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isPurging || purgeConfirmInput.trim() !== purgeCompany.name.trim()}
+                                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all flex items-center gap-2"
+                                style={{
+                                    background: purgeConfirmInput.trim() === purgeCompany.name.trim() && !isPurging ? '#dc2626' : '#475569',
+                                    cursor: purgeConfirmInput.trim() === purgeCompany.name.trim() && !isPurging ? 'pointer' : 'not-allowed',
+                                    opacity: purgeConfirmInput.trim() === purgeCompany.name.trim() && !isPurging ? 1 : 0.6,
+                                    boxShadow: purgeConfirmInput.trim() === purgeCompany.name.trim() && !isPurging ? '0 4px 14px rgba(220, 38, 38, 0.4)' : 'none',
+                                }}
+                            >
+                                <Trash2 size={14} className={isPurging ? 'animate-spin' : ''} />
+                                {isPurging ? 'Deleting Company...' : 'Permanently Delete'}
+                            </button>
+                        </div>
+                    </form>
+                )}
             </DarkModal>
         </div>
     );

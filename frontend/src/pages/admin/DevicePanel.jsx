@@ -48,20 +48,24 @@ export default function DevicePanel({ company, onClose }) {
     }
   };
 
-  const changeMax = async () => {
-    const input = window.prompt(
-      'How many computers may this licence run on?\n\n1 = the standard single-computer licence.',
-      String(data?.maxDevices ?? 1)
-    );
-    if (input === null) return;
-    const n = Number(input);
+  const [editingLimit, setEditingLimit] = useState(false);
+  const [limitInput, setLimitInput] = useState('1');
+  const [savingLimit, setSavingLimit] = useState(false);
+
+  const saveMax = async (e) => {
+    if (e) e.preventDefault();
+    const n = Number(limitInput);
     if (!Number.isInteger(n) || n < 1) return notifyWarning('Enter a whole number of 1 or more');
 
+    setSavingLimit(true);
     try {
       setData(await adminApi.setMaxDevices(company._id, n));
       notifySuccess(`Licence now allows ${n} computer${n === 1 ? '' : 's'}`);
+      setEditingLimit(false);
     } catch (err) {
       notifyError(err, 'Could not change the device limit');
+    } finally {
+      setSavingLimit(false);
     }
   };
 
@@ -101,12 +105,44 @@ export default function DevicePanel({ company, onClose }) {
                 <span className="px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-black uppercase tracking-widest">
                   {data.slotsFree} free
                 </span>
-                <button
-                  onClick={changeMax}
-                  className="px-3 py-2 bg-black text-white rounded-xl text-[11px] font-black uppercase tracking-widest"
-                >
-                  Change limit
-                </button>
+                {editingLimit ? (
+                  <form onSubmit={saveMax} className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={limitInput}
+                      onChange={(e) => setLimitInput(e.target.value)}
+                      className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-center"
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      disabled={savingLimit}
+                      className="px-2.5 py-1 bg-black text-white rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      {savingLimit ? '...' : 'Save'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingLimit}
+                      onClick={() => setEditingLimit(false)}
+                      className="px-2 py-1 text-slate-500 hover:text-slate-800 text-[10px] font-bold uppercase"
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setLimitInput(String(data?.maxDevices ?? 1));
+                      setEditingLimit(true);
+                    }}
+                    className="px-3 py-2 bg-black text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-800 transition-colors"
+                  >
+                    Change limit
+                  </button>
+                )}
               </div>
 
               {!data.enforcing && (
