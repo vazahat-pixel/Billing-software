@@ -157,7 +157,7 @@ export const REPORT_TREE = [
       { id: 'gst-jobwork', label: 'Gstin - JobWork', external: 'gstReports', reportKind: 'gstinJobwork' },
       { id: 'gst-journal', label: 'Gstin - Journal Report', external: 'gstReports', reportKind: 'gstinJournal' },
       { id: 'gst-expense', label: 'Gstin - Expense', external: 'gstReports', reportKind: 'gstinExpense' },
-      { id: 'gst-outstanding', label: 'Outstanding', reportKey: 'outstanding' },
+      { id: 'gst-outstanding', label: 'Outstanding', external: 'outstanding', reportKind: 'receivable' },
     ],
   },
   {

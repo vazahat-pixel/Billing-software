@@ -1124,6 +1124,9 @@ const Dashboard = () => {
                } else if (ext === 'stockLedger') {
                   setStockLedgerKind(node.reportKind || 'stockMts');
                   setModals((prev) => ({ ...prev, stockLedger: true }));
+               } else if (ext === 'outstanding' || ext === 'outstandingSalesFull') {
+                  yieldOtherWindows('outstanding');
+                  setModals((prev) => ({ ...prev, outstanding: true, outstandingSalesFull: true }));
                } else if (ext) toggleModal(ext, true);
             },
          }),
@@ -1316,6 +1319,10 @@ const Dashboard = () => {
                      setActiveMenuKey(mod.key);
                      if (mod.key === 'salesReturn') openReturn('Sales');
                      else if (mod.key === 'purchaseReturn') openReturn('Purchase');
+                     else if (mod.key === 'outstanding') {
+                        yieldOtherWindows('outstanding');
+                        setModals(prev => ({ ...prev, outstanding: true, outstandingSalesFull: true }));
+                     }
                      else toggleModal(mod.key, true);
                   }}
                   className={`mx-1.5 flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer ${
@@ -1497,7 +1504,10 @@ const Dashboard = () => {
                                           return (
                                              <React.Fragment key={keyPrefix}>
                                                 {needsSeparator && <div className="erp-menu-separator" />}
-                                                <div className="erp-menu-item-row">
+                                                <div
+                                                   className="erp-menu-item-row"
+                                                   onMouseEnter={() => setOpenFlyoutPath(keyPrefix)}
+                                                >
                                                    <button
                                                       type="button"
                                                       className={`erp-menu-item erp-menu-item--parent ${openFlyoutPath === keyPrefix ? 'erp-menu-trigger--open' : ''}`}
@@ -2284,11 +2294,28 @@ const Dashboard = () => {
          <AccountMasterModal isOpen={modals.accountMaster} onClose={() => toggleModal('accountMaster', false)} readOnly={permissions.readOnlyMasters || mobileViewOnly} />
          <AccountGroupMasterModal isOpen={modals.accountGroupMaster} onClose={() => toggleModal('accountGroupMaster', false)} readOnly={permissions.readOnlyMasters || mobileViewOnly} />
          <ItemMasterModal isOpen={modals.itemMaster} onClose={() => toggleModal('itemMaster', false)} readOnly={permissions.readOnlyMasters || mobileViewOnly} />
-         {modals.outstandingSalesFull && (
+         {(modals.outstanding || modals.outstandingSalesFull) && (
             <OutstandingReportModal
-               isOpen={modals.outstandingSalesFull}
-               onClose={() => setModals(prev => ({ ...prev, outstandingSalesFull: false }))}
-               type="receivable"
+               isOpen={Boolean(modals.outstanding || modals.outstandingSalesFull)}
+               onClose={() => {
+                  setOutstandingSeed(null);
+                  setModals(prev => ({ ...prev, outstanding: false, outstandingSalesFull: false }));
+               }}
+               type={outstandingSeed?.osType || 'receivable'}
+               directPartyId={outstandingSeed?.partyId || ''}
+               directPartyName={outstandingSeed?.partyName || ''}
+            />
+         )}
+         {modals.partyOsReport && outstandingSeed?.partyId && (
+            <OutstandingReportModal
+               isOpen
+               type={outstandingSeed.osType || 'receivable'}
+               directPartyId={outstandingSeed.partyId}
+               directPartyName={outstandingSeed.partyName || ''}
+               onClose={() => {
+                  setOutstandingSeed(null);
+                  setModals((prev) => ({ ...prev, partyOsReport: false }));
+               }}
             />
          )}
          {modals.outstandingPurchaseFull && (
@@ -2367,30 +2394,6 @@ const Dashboard = () => {
 
          {/* Lazy-only island — must NOT wrap Sales/Purchase or clicks go blank */}
          <Suspense fallback={null}>
-            {modals.outstanding && (
-               <OutstandingReportModal
-                  isOpen={modals.outstanding}
-                  type={outstandingSeed?.osType || 'receivable'}
-                  directPartyId={outstandingSeed?.partyId || ''}
-                  directPartyName={outstandingSeed?.partyName || ''}
-                  onClose={() => {
-                     setOutstandingSeed(null);
-                     toggleModal('outstanding', false);
-                  }}
-               />
-            )}
-            {modals.partyOsReport && outstandingSeed?.partyId && (
-               <OutstandingReportModal
-                  isOpen
-                  type={outstandingSeed.osType || 'receivable'}
-                  directPartyId={outstandingSeed.partyId}
-                  directPartyName={outstandingSeed.partyName || ''}
-                  onClose={() => {
-                     setOutstandingSeed(null);
-                     setModals((prev) => ({ ...prev, partyOsReport: false }));
-                  }}
-               />
-            )}
             {modals.gstComplianceReports && (
                <GstComplianceReportsModal
                   isOpen={modals.gstComplianceReports}

@@ -574,12 +574,6 @@ const CashBankBookModal = ({
 
   const handlePartyChange = (val) => {
     setHeader((h) => ({ ...h, partyId: val, partyBank: '' }));
-    if (val && !locked && voucherType === 'Receipt' && String(header.accBill || 'B').toUpperCase() === 'B') {
-      setTimeout(() => {
-        setBillLookupTargetIdx(null);
-        setBillLookupOpen(true);
-      }, 150);
-    }
   };
 
   /** BillNo Entry — click, Enter, Space, or F4 on a row's BillNo cell opens the bill picker. */
@@ -1550,12 +1544,9 @@ const CashBankBookModal = ({
                         data-enter-action="true"
                         onChange={(e) => updateRow(idx, 'billNo', e.target.value)}
                         onFocus={() => {
-                          if (locked || String(row.billNo || '').length) return;
                           if (suppressLookupRef.current) {
                             suppressLookupRef.current = false;
-                            return;
                           }
-                          openBillLookup(idx);
                         }}
                         onClick={() => {
                           // Only steal the click on an empty cell — clicking to position the
@@ -1572,12 +1563,7 @@ const CashBankBookModal = ({
                             e.preventDefault();
                             e.stopPropagation();
                             if (cellEmpty) {
-                              if (suppressLookupRef.current) {
-                                suppressLookupRef.current = false;
-                                document.querySelector('.cash-bank-footer-grid input')?.focus();
-                              } else {
-                                openBillLookup(idx);
-                              }
+                              openBillLookup(idx);
                             } else {
                               adjustRefs.current[idx]?.focus();
                               adjustRefs.current[idx]?.select?.();

@@ -131,7 +131,7 @@ const Modal = ({
               </div>
             )}
 
-            <div ref={contentRef} className="flex-1 min-h-0 overflow-hidden flex flex-col" data-form-enter-nav>
+            <div ref={contentRef} className="flex-1 min-h-0 h-full overflow-hidden flex flex-col" data-form-enter-nav>
               {children}
             </div>
 

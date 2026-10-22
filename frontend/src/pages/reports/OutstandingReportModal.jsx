@@ -539,7 +539,7 @@ const OutstandingReportModal = ({
   if (!isOpen) return null;
 
   return (
-    <ErpWindowedModal isOpen onClose={onClose} title={title} windowId={`os-${curType}`} bare>
+    <ErpWindowedModal isOpen onClose={onClose} title={title} windowId="outstanding-report" bare>
       {({ WindowControls }) => (
         <div className="jsm-os-window">
           <ErpBusyOverlay show={bootLoading || loading} message={loading ? 'Generating…' : 'Loading…'} />

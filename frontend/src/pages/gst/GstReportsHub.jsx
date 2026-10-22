@@ -118,6 +118,18 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
     }
   }, [initialReport]);
 
+  // Ensure active report button in the sidebar is visible/scrolled into view
+  useEffect(() => {
+    if (!isOpen || !activeReport) return;
+    const t = setTimeout(() => {
+      const btn = document.getElementById(`gst-report-btn-${activeReport}`);
+      if (btn) {
+        btn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }, 50);
+    return () => clearTimeout(t);
+  }, [isOpen, activeReport]);
+
   // Quick Month Change helper
   const handleMonthChange = (monthIdx) => {
     const yr = new Date(fromDate).getFullYear() || new Date().getFullYear();
@@ -393,11 +405,11 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
       bare
       className="max-w-[96vw] w-full h-[94vh] p-0 rounded-2xl overflow-hidden shadow-2xl border border-[var(--border)]"
     >
-      <div className="flex flex-1 min-h-0 w-full bg-[var(--bg-base)] text-[var(--text-primary)] overflow-hidden">
+      <div className="flex flex-1 min-h-0 h-full max-h-full w-full bg-[var(--bg-base)] text-[var(--text-primary)] overflow-hidden">
         {/* ================================================================= */}
         {/* 1. LEFT JSM CATEGORIZED REPORT SELECTOR SIDEBAR                     */}
         {/* ================================================================= */}
-        <aside className="w-72 shrink-0 bg-[var(--bg-card)] border-r border-[var(--border)] flex flex-col h-full min-h-0 overflow-hidden">
+        <aside className="w-72 shrink-0 bg-[var(--bg-card)] border-r border-[var(--border)] flex flex-col h-full max-h-full min-h-0 overflow-hidden select-none">
           {/* Header */}
           <div className="p-4 shrink-0 border-b border-[var(--border)] bg-gradient-to-r from-blue-900/20 via-transparent to-transparent">
             <div className="flex items-center gap-2">
@@ -423,8 +435,11 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
             </div>
           </div>
 
-          {/* Categorized List */}
-          <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-4 overscroll-contain">
+          {/* Categorized List with guaranteed scrolling */}
+          <div
+            className="flex-1 min-h-0 overflow-y-auto p-2 space-y-3 custom-scrollbar"
+            style={{ maxHeight: 'calc(100% - 130px)', scrollbarGutter: 'stable' }}
+          >
             {JSM_GST_GROUPS.map((grp) => {
               const filteredReports = grp.reports.filter((r) =>
                 r.label.toLowerCase().includes(searchFilter.toLowerCase()) ||
@@ -434,9 +449,14 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
 
               return (
                 <div key={grp.groupId} className="space-y-1">
-                  <p className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    {grp.label}
-                  </p>
+                  <div className="flex items-center justify-between px-2.5 py-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      {grp.label}
+                    </p>
+                    <span className="text-[9px] font-mono text-[var(--text-muted)] opacity-70">
+                      ({filteredReports.length})
+                    </span>
+                  </div>
                   <div className="space-y-0.5">
                     {filteredReports.map((item) => {
                       const Icon = item.icon;
@@ -444,9 +464,10 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
                       return (
                         <button
                           key={item.id}
+                          id={`gst-report-btn-${item.id}`}
                           type="button"
                           onClick={() => setActiveReport(item.id)}
-                          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-left text-xs transition-all ${
+                          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-left text-xs transition-all cursor-pointer ${
                             isActive
                               ? 'bg-blue-600 text-white font-semibold shadow-md'
                               : 'hover:bg-[var(--bg-base)] text-[var(--text-primary)]'
