@@ -395,7 +395,11 @@ class ReportService {
    *   fyStartDate, status ('Pending'|'All') }
    */
   async getOutstanding(companyId, type = 'receivable', asOnOrFilters) {
-    const isReceivable = type === 'receivable';
+    const isReceivable = type === 'receivable' || type === 'customer' || type === 'sales';
+    const isProcess = type === 'process' || type === 'mill';
+    const isJobWork = type === 'jobwork';
+    const isJob = isProcess || isJobWork;
+
     const filters =
       asOnOrFilters && typeof asOnOrFilters === 'object' && !(asOnOrFilters instanceof Date)
         ? asOnOrFilters
@@ -432,11 +436,6 @@ class ReportService {
       /** Attach each party's ledger closing balance for side-by-side reconciliation. */
       withLedgerBalance = false,
     } = filters;
-
-    const isReceivable = type === 'receivable' || type === 'customer' || type === 'sales';
-    const isProcess = type === 'process' || type === 'mill';
-    const isJobWork = type === 'jobwork';
-    const isJob = isProcess || isJobWork;
 
     let partyTypes = isReceivable ? ['Customer', 'Both'] : ['Supplier', 'Both'];
     if (isProcess) partyTypes = ['Mill', 'Supplier', 'Both'];
