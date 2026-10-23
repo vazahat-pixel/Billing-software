@@ -1,0 +1,1433 @@
+[
+ {
+  "caption": "Reports",
+  "id": "MN_REPROTS",
+  "items": [
+   {
+    "caption": "Fas Reports",
+    "id": "SUBH_FAS",
+    "items": [
+     {
+      "caption": "Bank / Cash Book",
+      "id": "SUBH_FAS_CB",
+      "items": [
+       {
+        "caption": "Bank Book",
+        "id": "SUBH_FAS_CB_BANKBOOK",
+        "form": "Rpt_cashbank1"
+       },
+       {
+        "caption": "Cash Book",
+        "id": "SUBH_FAS_CB_CASHBOOK",
+        "form": "Rpt_cashbank1"
+       },
+       {
+        "caption": "Reconciliation",
+        "id": "SUBH_FAS_CB_RECON_NEW",
+        "form": "Rpt_CB1_Reconsilation"
+       },
+       {
+        "caption": "Recon.Test",
+        "id": "ToolStripMenuItem18",
+        "form": "Rpt_CB1_Reconsilation"
+       },
+       {
+        "caption": "Bank OD Intrest",
+        "id": "SUBH_FAS_CB_OD_INTREST",
+        "form": "A_CashBankLedgerSingleSide"
+       },
+       {
+        "caption": "Cash/Bank Register",
+        "id": "SUBH_FAS_CB_REGISTER",
+        "form": "A_All_CashBank_Report"
+       },
+       {
+        "caption": "Cheq In Hand",
+        "id": "SUBH_CHEQ_IN_HAND",
+        "form": "Rpt_BankStockInHandCheq"
+       },
+       {
+        "caption": "Bank Voucher Print",
+        "id": "SUBH_FAS_CB_VOU",
+        "form": "A_Bank_Receipt_Bill_Os_Details"
+       }
+      ]
+     },
+     {
+      "caption": "Ledger",
+      "id": "SUBH_FAS_LED_SINGLE",
+      "form": "A_AccountLedgerSingleSide"
+     },
+     {
+      "caption": "Ledger T-Format",
+      "id": "SUBH_FAS_LED_T_FORMAT",
+      "form": "A_AccountLedgerDoubleSide"
+     },
+     {
+      "caption": "Ledger Interest",
+      "id": "SUBH_FAS_LED_INTEREST",
+      "form": "A_AccountLedgerDoubleSide"
+     },
+     {
+      "caption": "Confirmation",
+      "id": "SUBH_FAS_LED_CONFIRMATION",
+      "form": "A_AccountLedgerDoubleSide"
+     },
+     {
+      "caption": "Above Below Rs.",
+      "id": "SUBH_FAS_ABOVE_BELOW",
+      "form": "Rpt_Above_Below"
+     },
+     {
+      "caption": "Voucher Book",
+      "id": "SUBH_FAS_VOU",
+      "form": "Rpt_JvBook1"
+     },
+     {
+      "caption": "Import Bank",
+      "id": "ImportBankToolStripMenuItem",
+      "form": "Tran_ImportCashBank"
+     }
+    ]
+   },
+   {
+    "caption": "Final Reports",
+    "id": "SUBH_FINAL",
+    "items": [
+     {
+      "caption": "Group List",
+      "id": "SUBH_FNL_GRP_BAL",
+      "form": "Rpt_Group_Balance"
+     },
+     {
+      "caption": "Trail Balance",
+      "id": "SUBH_FNL_TRAIL",
+      "form": "Rpt_Trail_Bal_101"
+     },
+     {
+      "caption": "Profit & Loss Account",
+      "id": "SUBH_FNL_PL",
+      "form": "A_Final_ProfitAndLoss"
+     },
+     {
+      "caption": "BalanceSheet",
+      "id": "SUBH_FNL_BLSH",
+      "form": "A_Final_BalanceSheet"
+     },
+     {
+      "caption": "Chek Diff Os.Bill/Op.Balance",
+      "id": "SUBH_DIFF_CHEK_OPENING",
+      "form": "Mst1_Check_Diff"
+     },
+     {
+      "caption": "CashBank Finance",
+      "id": "SUBH_CB_FINANCE",
+      "form": "Rpt_Cash_Bank_Finance_Report"
+     },
+     {
+      "caption": "Check Diff Os/Ledger Cur.Year",
+      "id": "SUBH_DIFF_CHEK_CURRENT",
+      "form": "Rpt_Jsm_Ledger_os_Diff_Check"
+     }
+    ]
+   },
+   {
+    "caption": "Sales",
+    "id": "SUBH_SALES_MN",
+    "items": [
+     {
+      "caption": "Sales Bill",
+      "id": "SUBH_FAS_SALES",
+      "items": [
+       {
+        "caption": "Sales Summary",
+        "id": "SalesNewToolStripMenuItem",
+        "form": "Rpt_SalesRegisterSummary_Report"
+       },
+       {
+        "caption": "Sales ItemDetail",
+        "id": "DetailWiseToolStripMenuItem",
+        "form": "Rpt_SalesRegisterDetailDigital_Report",
+        "alternatives": [
+         "Rpt_SalesRegisterDetail_Report"
+        ]
+       },
+       {
+        "caption": "Item Wise Summary",
+        "id": "SUBH_SALES_ITEMWISE_SUMMARY",
+        "form": "Rpt_Jsm_Sales_ItemSummary"
+       },
+       {
+        "caption": "Haste/Transport",
+        "id": "SUBH_SALES_HASTE_PACKER",
+        "form": "Rpt_Sales_Haste"
+       },
+       {
+        "caption": "Sales Order Register",
+        "id": "SUBH_SALES_RPT_ORDER",
+        "form": "Rpt_Sales_Order_Detail_Report"
+       },
+       {
+        "caption": "Rg Pending",
+        "id": "SUBH_SALES_RG_PENDING",
+        "form": "Rpt_Sales_Rg_Pend"
+       },
+       {
+        "caption": "Profit Register",
+        "id": "SUBH_SALES_PROFIT",
+        "form": "Rpt_Sales_Pump_Profit"
+       },
+       {
+        "caption": "Slip Register",
+        "id": "SUBH_SALES_SLIP",
+        "form": "Rpt_Sales_Slip_Register"
+       },
+       {
+        "caption": "Slip (New) Register",
+        "id": "SUBH_SALES_SLIPNEW",
+        "form": "Rpt_SalesSlipDetail_Report"
+       },
+       {
+        "caption": "Sales Challan",
+        "id": "SUBH_SALES_CHALLAN_RPT",
+        "form": "Rpt_Sales_Challan_Detail_Report"
+       },
+       {
+        "caption": "Interest Bill Wise (Old)",
+        "id": "SUBH_SALES_INTEREST",
+        "form": "Rpt_Sales_Interest"
+       },
+       {
+        "caption": "Interest Bill Wise New",
+        "id": "SUBH_SALES_INT_ZOOM",
+        "form": "New_Rpt_Sales_Intrest_ZoomIn_New"
+       }
+      ]
+     },
+     {
+      "caption": "Sales Return",
+      "id": "SUBH_FAS_SALES_RETURN",
+      "items": [
+       {
+        "caption": "SalesReturn Summary",
+        "id": "SalesReturnSummaryNEWToolStripMenuItem",
+        "form": "Rpt_SalesRtnRegisterSummary_Report"
+       },
+       {
+        "caption": "SalesReturn Detail",
+        "id": "SalesReturnDetailNewToolStripMenuItem",
+        "form": "Rpt_SalesRtnRegisterDetail_Report"
+       },
+       {
+        "caption": "Summary",
+        "id": "SUBH_SALES_RETURN_SUMMARY",
+        "form": "Rpt_Jsm_Sales_Return"
+       },
+       {
+        "caption": "Detail",
+        "id": "SUBH_SALES_RETURN_DETAIL",
+        "form": "Rpt_Jsm_Sales_Return"
+       },
+       {
+        "caption": "SalesReturn Summary New",
+        "id": "SummaryRegisterToolStripMenuItem",
+        "form": "OldRpt_SalesRTNRegisterSummary_Report"
+       },
+       {
+        "caption": "SalesReturn ItemDetail New",
+        "id": "DetailRegisterToolStripMenuItem",
+        "form": "OldRpt_SalesRTNRegisterDetail_Report"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "caption": "Purchase",
+    "id": "SUBH_PURCHASE_MN",
+    "items": [
+     {
+      "caption": "Purchase Bill",
+      "id": "SUBH_FAS_PURCHASE",
+      "items": [
+       {
+        "caption": "Purchase Summary",
+        "id": "SUBH_PURCHASE_NEWSUMMARY",
+        "form": "Rpt_PurchaseRegisterSummary_Report"
+       },
+       {
+        "caption": "Purchase ItemDetail",
+        "id": "SUBH_PURCHASE_NEWDETAIL",
+        "form": "Rpt_PurchaseRegisterDetail_Report"
+       },
+       {
+        "caption": "Item Wise Summary",
+        "id": "SUBH_PURCHASE_ITEMWISE_SUMMARY",
+        "form": "Rpt_Jsm_Purchase_ItemSummary"
+       },
+       {
+        "caption": "Summary",
+        "id": "SUBH_PURCHASE_SUMMARY",
+        "form": "Rpt_Jsm_Purchase"
+       },
+       {
+        "caption": "Detail",
+        "id": "SUBH_PURCHASE_DETAIL",
+        "form": "Rpt_Jsm_Purchase"
+       },
+       {
+        "caption": "Purchase Order",
+        "id": "SUBH_PURCHASE_RPT_ORDER",
+        "form": "Rpt_Purchase_Order_Detail_Rpt"
+       },
+       {
+        "caption": "Purchase Bill Wise Interest",
+        "id": "SUBH_PURCHASE_INT_ZOOM",
+        "form": "New_Rpt_Sales_Intrest_ZoomIn_New"
+       }
+      ]
+     },
+     {
+      "caption": "Purchase Return",
+      "id": "SUBH_FAS_PURCHASE_RETURN",
+      "items": [
+       {
+        "caption": "PurchReturn Summary",
+        "id": "SUBH_PURCHASE_RETURN_SUMMARY",
+        "form": "Rpt_PurchaseRtnRegisterSummary_Report"
+       },
+       {
+        "caption": "PurchReturn ItemDetail",
+        "id": "SUBH_PURCHASE_RETURN_DETAIL",
+        "form": "Rpt_PurchaseRtnRegisterDetail_Report"
+       },
+       {
+        "caption": "Summary",
+        "id": "SUBH_PURCHASE_RETURN_OLD_SUMMARY",
+        "form": "Rpt_Jsm_Purchase_Return"
+       },
+       {
+        "caption": "Detail",
+        "id": "SUBH_SALES_RETURN_OLD_DETAIL",
+        "form": "Rpt_Jsm_Purchase_Return"
+       }
+      ]
+     },
+     {
+      "caption": "Purchase Stock",
+      "id": "SUBH_FAS_PURCHASE_STOCK",
+      "form": "Rpt_Purchase_Stock_LRWiseReport",
+      "alternatives": [
+       "Rpt_Purchase_StockReport"
+      ]
+     },
+     {
+      "caption": "Purchase Stock(Godown)",
+      "id": "SUBH_PURCHASE_STOCK_GODOWN",
+      "form": "Rpt_Purchase_Stock_Godown_Report"
+     },
+     {
+      "caption": "Purchase Stock(Old)",
+      "id": "PurchaseStockToolStripMenuItem",
+      "form": "Rpt_Purchase_Stock"
+     },
+     {
+      "caption": "Mill Return To Send",
+      "id": "MillRetrurnToSendToolStripMenuItem",
+      "form": "Rpt_1StockSubItemAcc_DetailReport"
+     }
+    ]
+   },
+   {
+    "caption": "Process Reports",
+    "id": "SUBH_PROCESS",
+    "items": [
+     {
+      "caption": "Send",
+      "id": "SUBH_PROCESS_SEND",
+      "form": "Rpt_Process_Issue_Report"
+     },
+     {
+      "caption": "Receipt Summary",
+      "id": "SUBH_PROCESS_RECEIPT_SUMMARY",
+      "form": "Rpt_Process_Receipt_Summary"
+     },
+     {
+      "caption": "Receipt Detail",
+      "id": "SUBH_PROCESS_RECEIPT_DETAIL",
+      "form": "Rpt_Process_Receipt_Detail"
+     },
+     {
+      "caption": "Process Stock",
+      "id": "SUBH_PROCESS_STOCK",
+      "form": "Rpt_Process_Stock_New_Gst",
+      "alternatives": [
+       "Rpt_Jsm_Process_Stock",
+       "Rpt_Process_Stock_TakaDetail"
+      ]
+     },
+     {
+      "caption": "Process Stock Zoom",
+      "id": "SUBH_PROCESS_STOCK_NEW",
+      "form": "Rpt_Process_Stock_New_Gst"
+     },
+     {
+      "caption": "Item Wise Summary",
+      "id": "SUBH_PROCESS_ITEMWISE_SUMMARY",
+      "form": "Rpt_Jsm_Process_ItemSummary"
+     },
+     {
+      "caption": "TakaWise Stock Detail",
+      "id": "SUBH_PROCESS_STOCK_TAKAWISE",
+      "form": "Rpt_Process_Stock_TakaDetail"
+     },
+     {
+      "caption": "Lot Wise Costing",
+      "id": "SUBH_LOT_W_COSTING",
+      "form": "Rpt_Lot_Costing"
+     },
+     {
+      "caption": "Cutting Reports",
+      "id": "SUBH_CUTTING_REPORTS",
+      "form": "Rpt_Cutting_Report"
+     },
+     {
+      "caption": "Cutting Stock Reports",
+      "id": "SUBH_CUTTING_STK_REPORTS",
+      "form": "Rpt_Stk_Cutting_At_Shop"
+     },
+     {
+      "caption": "Update Lot Status",
+      "id": "SUBH_PROCESS_JOB_UPDATE_STATUS",
+      "form": "Rpt_Update_Lot_Status"
+     },
+     {
+      "caption": "Process Bill Wise Interest",
+      "id": "ProcessBillWiseInterestToolStripMenuItem",
+      "form": "New_Rpt_Sales_Intrest_ZoomIn"
+     }
+    ]
+   },
+   {
+    "caption": "JobWork Reports",
+    "id": "SUBH_JOBWORK",
+    "items": [
+     {
+      "caption": "Send",
+      "id": "SUBH_JOBWORK_SEND",
+      "form": "Rpt_Job_IssueReport"
+     },
+     {
+      "caption": "Receipt Summary",
+      "id": "SUBH_JOBWORK_RECEIPT_SUMMARY",
+      "form": "Rpt_JobWork_Receipt_Summary"
+     },
+     {
+      "caption": "Receipt Detail",
+      "id": "SUBH_JOBWORK_RECEIPT_DETAIL",
+      "form": "Rpt_JobWork_Receipt_Detail"
+     },
+     {
+      "caption": "Jobwork Stock/Pending Report",
+      "id": "SUBH_JOBWORK_STOCK",
+      "form": "Rpt_JobWork_Stock_Report"
+     },
+     {
+      "caption": "Challan Status",
+      "id": "SUBH_JOBWORK_CHLN_STATUS",
+      "form": "Rpt_Additional_Job_Bill"
+     },
+     {
+      "caption": "Job P & L",
+      "id": "JobPLToolStripMenuItem",
+      "form": "Tran_WorkChallan_PL_Repo"
+     }
+    ]
+   },
+   {
+    "caption": "Monthly Reports",
+    "id": "SUBH_MONTH",
+    "items": [
+     {
+      "caption": "Sales",
+      "id": "SUBH_MONTH_SL",
+      "form": "Rpt_SalesRegisterSummary_Report"
+     },
+     {
+      "caption": "Purchase",
+      "id": "SUBH_MONTH_PU",
+      "form": "Rpt_PurchaseRegisterSummary_Report"
+     },
+     {
+      "caption": "Process",
+      "id": "SUBH_MONTH_PROCESS",
+      "form": "Rpt_Process_Receipt_Summary"
+     },
+     {
+      "caption": "JobWork",
+      "id": "SUBH_MONTH_JOBWORK",
+      "form": "Rpt_JobWork_Receipt_Summary"
+     },
+     {
+      "caption": "Sales G/F",
+      "id": "SUBH_SL_GREY_FNS",
+      "form": "Rpt_Stk_Grey_Finish_Summary"
+     },
+     {
+      "caption": "Sales Return",
+      "id": "SUBH_MONTH_SLRETURN",
+      "form": "A_Gstr1_SalesReturnSummary"
+     },
+     {
+      "caption": "Purchase Return",
+      "id": "PurchaseReturnToolStripMenuItem",
+      "form": "A_Gstr1_PurchaseRtn_Report"
+     },
+     {
+      "caption": "Bank Rec. Payment",
+      "id": "BankRecPaymentToolStripMenuItem",
+      "form": "Rpt_BankBookRec_GstMonthWise"
+     }
+    ]
+   },
+   {
+    "caption": "Tds Reports",
+    "id": "SUBH_TDS_MENU",
+    "items": [
+     {
+      "caption": "Head Wise Report",
+      "id": "SUBH_TDS_HEAD",
+      "form": "Rpt_TdsReports",
+      "alternatives": [
+       "Rpt_Tds1_Head_Wise"
+      ]
+     },
+     {
+      "caption": "Party Wise Report",
+      "id": "SUBH_TDS_PARTY",
+      "form": "Rpt_Tds2_Prty_Mnth_Wise"
+     },
+     {
+      "caption": "Party Wise Monthly Report",
+      "id": "SUBH_TDS_MONTH",
+      "form": "Rpt_Tds2_Prty_Mnth_Wise"
+     },
+     {
+      "caption": "Address/Acknowledge",
+      "id": "SUBH_TDS_ADDR_ACK",
+      "form": "Rpt_Tds3_Add_Ackn"
+     },
+     {
+      "caption": "Tax Challan",
+      "id": "SUBH_TDS_CHALLAN",
+      "form": "Rpt_Tds4_Challan"
+     },
+     {
+      "caption": "Certificate",
+      "id": "SUBH_TDS_CERTI",
+      "form": "Rpt_Tds5_Certi"
+     },
+     {
+      "caption": "Tds Register",
+      "id": "SUBH_TDS_HEAD_REGISTER",
+      "form": "Rpt_TdsReports"
+     }
+    ]
+   },
+   {
+    "caption": "Tcs Reports",
+    "id": "SUBH_TCS_MENU",
+    "items": [
+     {
+      "caption": "Tcs Rec/Pay Report",
+      "id": "SUBH_TCS_REC_PAY",
+      "form": "Rpt_Tcs"
+     },
+     {
+      "caption": "Tcs Sales Register",
+      "id": "SUBH_TCS_SALES_REG",
+      "form": "Rpt_TcsReports"
+     },
+     {
+      "caption": "Tcs Purchase Register",
+      "id": "SUBH_TCS_PURCHASE_REG",
+      "form": "Rpt_TcsReports"
+     }
+    ]
+   },
+   {
+    "caption": "Gst Reports",
+    "id": "SUBH_GST_REPORTS",
+    "items": [
+     {
+      "caption": "3B Monthly Return",
+      "id": "SHUBH_3B_FORM_TEXT",
+      "items": [
+       {
+        "caption": "3B - Monthly Return",
+        "id": "ThreeeBMonthlyReToolStripMenuItem",
+        "form": "Gstr_3B_TextNew_Monthly"
+       },
+       {
+        "caption": "3B - Inward & Outward Supply",
+        "id": "THREE_B_Detail_InwardOutward",
+        "form": "Gstr_3B_Detail_Inward_Outwardard_supply"
+       },
+       {
+        "caption": "3B - Inward Supply",
+        "id": "BToolStripMenuItem",
+        "form": "A_All_Inward_Supply_Purchase"
+       },
+       {
+        "caption": "3B - Outward Supply",
+        "id": "BOutwardSupplyToolStripMenuItem",
+        "form": "A_All_Outward_Supply_Sales"
+       },
+       {
+        "caption": "3B - Freeze DataEntry",
+        "id": "SHUBH_3B_LOCK_DATAENTRY",
+        "form": "GstFilingFreezeData"
+       }
+      ]
+     },
+     {
+      "caption": "Gstr-1 Error Checking",
+      "id": "SHUBH_ERROR_GSTR1_CHECK",
+      "form": "Stp_Gst_OutWrad_ErrorCheck"
+     },
+     {
+      "caption": "Gstr-1 Report",
+      "id": "ToolStripMenuItem16",
+      "items": [
+       {
+        "caption": "Gstr 1 Excel v3.2.2",
+        "id": "SHUBH_GSTR1_V_NEW",
+        "form": "Rpt_Jsm_GSTR1_3_2_2"
+       },
+       {
+        "caption": "Gstr 1 Excel v2.0",
+        "id": "SHUBH_GSTR1_V2_0",
+        "form": "Rpt_Jsm_GSTR1_Old2_0_GovAllExcel"
+       },
+       {
+        "caption": "Gstr 1 Excel v1.9",
+        "id": "SHUBH_GSTR1_V1_8",
+        "form": "Rpt_Jsm_GSTR1_1_8_GovAllExcel"
+       },
+       {
+        "caption": "Gstr 1 Excel v1.7",
+        "id": "SHUBH_GSTR1_V1_7",
+        "form": "Rpt_Jsm_GSTR1_7_GovAllExcel"
+       }
+      ]
+     },
+     {
+      "caption": "Gstr Matching",
+      "id": "SHUBH_GSTR_MATCHING",
+      "items": [
+       {
+        "caption": "Gstr-2B Matching Reconcial",
+        "id": "SHUBH_GSTR2_MATCHING_TEJAS",
+        "form": "Rpt_Match2B_Report_Tejas"
+       },
+       {
+        "caption": "Gstr-2A Matching Reconcial",
+        "id": "SHUBH_GSTR2_MATCHING_RECON",
+        "form": "Rpt_Match2A"
+       },
+       {
+        "caption": "Gstr-1 Matching Reconcial",
+        "id": "SHUBH_GSTR1_MATCHING_REC",
+        "form": "Rpt_Jsm_Gstr1_Match"
+       },
+       {
+        "caption": "Gstr-8 Match",
+        "id": "SHUBH_GSTR8_MATCH",
+        "form": "Rpt_Match8A_Report"
+       },
+       {
+        "caption": "Gstr-4A Matching",
+        "id": "SHUBH_GSTR4A_MATCHING",
+        "form": "Rpt_Match4A_Report_New"
+       },
+       {
+        "caption": "Gstr-2B Matching Reconcial (Old)",
+        "id": "SHUBH_GSTR2_MATCHING_OLD",
+        "form": "Rpt_Match2B_Report"
+       },
+       {
+        "caption": "match 1 test",
+        "id": "Match1TestToolStripMenuItem",
+        "form": "Rpt_Jsm_GSTR1_Json_Match"
+       }
+      ]
+     },
+     {
+      "caption": "Gstr-9",
+      "id": "SHUBH_GSTR9",
+      "items": [
+       {
+        "caption": "Gstr-9 & 9C",
+        "id": "SHUBH_GSTR9_NEW",
+        "form": "Rpt_Jsm_GSTR9_New"
+       },
+       {
+        "caption": "Gstr-9C Old",
+        "id": "SHUBH_GSTR9c_EXCEL",
+        "form": "xOld_Rpt_Jsm_GSTR9_All_Excel_Report"
+       },
+       {
+        "caption": "Gstr-9 Old",
+        "id": "SHUBH_GSTR9_EXCEL",
+        "form": "Rpt_Jsm_GSTR9_Excel"
+       }
+      ]
+     },
+     {
+      "caption": "ITC 04",
+      "id": "SHUBH_ITC_04",
+      "items": [
+       {
+        "caption": "ITC 04 (V 2.10)",
+        "id": "ToolStripMenuItem2",
+        "form": "A_Brokreg_Main_Rpt_Zoom_Column",
+        "alternatives": [
+         "ITC_04_EXCEL_25"
+        ]
+       }
+      ]
+     },
+     {
+      "caption": "E-Way Bill Bulk Generation",
+      "id": "SHUBH_EWAY_NEW",
+      "form": "Eway_Billing_Bulk"
+     },
+     {
+      "caption": "E-Way Bill / Invoice Status",
+      "id": "SHUBH_EWAY_STATUS",
+      "form": "A_All_Ewb_Einv_Rpt"
+     },
+     {
+      "caption": "3B Form - Monthly Excel",
+      "id": "SHUBH_3B_FORM_EXCEL",
+      "form": "Gstr_3BB_TextNew_Excel_Monthly"
+     },
+     {
+      "caption": "Hsn Wise Reports",
+      "id": "SHUBH_HSN",
+      "form": "Hsn_Wise_Report_All"
+     },
+     {
+      "caption": "Gst 4.5",
+      "id": "ToolStripMenuItem19",
+      "items": [
+       {
+        "caption": "Gstr1",
+        "id": "Gstr1ToolStripMenuItem",
+        "form": "Rpt_Jsm_GSTR1_1x_8_GovAllExcel_Old"
+       },
+       {
+        "caption": "2B",
+        "id": "BToolStripMenuItem1",
+        "form": "Rpt_Match2B_x1_ReportNew"
+       }
+      ]
+     },
+     {
+      "caption": "Gstin - Sales",
+      "id": "SHUBH_GST_SALES",
+      "items": [
+       {
+        "caption": "Sales Summary",
+        "id": "SHUBH_GST_SALES_SMRY",
+        "form": "A_Gstr1_SalesInvoiceSummary"
+       },
+       {
+        "caption": "Sales Detail (Item)",
+        "id": "SHUBH_GST_SALES_WITH_ITEM",
+        "form": "A_Gstr1_SalesInvoiceDetail"
+       },
+       {
+        "caption": "Sales Rtn (Summary)",
+        "id": "SHUBH_GST_SALES_RTN_SMRY",
+        "form": "A_Gstr1_SalesReturnSummary"
+       },
+       {
+        "caption": "Sales Rtn Detail (Item)",
+        "id": "SHUBH_GST_SALES_RTN_WITH_ITEM",
+        "form": "A_Gstr1_SalesReturnDetails"
+       }
+      ]
+     },
+     {
+      "caption": "Gstin - Purchase",
+      "id": "SHUBH_GST_PURCHASE",
+      "items": [
+       {
+        "caption": "Purchase Summary",
+        "id": "SHUBH_GST_PURCHASE_SMRY",
+        "form": "A_Gstr2_PurchaseSummary"
+       },
+       {
+        "caption": "Purchase Detail ( Item )",
+        "id": "SHUBH_GST_PURCHASE_WITH_ITEM",
+        "form": "A_Gstr2_PurchaseDetail"
+       },
+       {
+        "caption": "Purchase Rtn (Summary)",
+        "id": "SHUBH_GST_PURCHASE_RTN_SMRY",
+        "form": "A_Gstr1_PurchaseRtn_Report"
+       },
+       {
+        "caption": "Purchase Rtn Detail  (Item)",
+        "id": "SHUBH_GST_PURCHASE_RTN_WITH_ITEM",
+        "form": "A_Gstr2_PurchaseReturnDetails"
+       }
+      ]
+     },
+     {
+      "caption": "Gstin - Process",
+      "id": "Gstr2ProcessToolStripMenuItem",
+      "form": "A_Gstr2_ProcessSummary"
+     },
+     {
+      "caption": "Gstin - JobWork",
+      "id": "Gstr2JobWorkToolStripMenuItem",
+      "form": "A_Gstr2_JobWorkReceiptSummary"
+     },
+     {
+      "caption": "Gstin - Journal Report",
+      "id": "SHUBH_JV_GST_REPORT",
+      "form": "Rpt_Journal_Details_Report"
+     },
+     {
+      "caption": "Gstin - Expense",
+      "id": "Gstr2ExpenseToolStripMenuItem",
+      "form": "A_Gstr2_Expense"
+     },
+     {
+      "caption": "Extra",
+      "id": "ExtraToolStripMenuItem",
+      "items": [
+       {
+        "caption": "1Sales",
+        "id": "SalesToolStripMenuItem1",
+        "form": "JS_GSTR1_RPT"
+       },
+       {
+        "caption": "2Purchase",
+        "id": "PurchaseToolStripMenuItem",
+        "form": "JS_GSTR2_RPT"
+       },
+       {
+        "caption": "3Summary",
+        "id": "SummaryToolStripMenuItem1",
+        "form": "JS_GSTR3_SMRY"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "caption": "Acc Stock Reports",
+    "id": "SUBH_ACC_STOCK",
+    "items": [
+     {
+      "caption": "Stock Ledger",
+      "id": "SUBH_STK_ACC",
+      "form": "Rpt_Stk_Acc_Finish_Summary",
+      "alternatives": [
+       "Rpt_Stk_Acc_Finish_Summary_Value"
+      ]
+     },
+     {
+      "caption": "Stock With Value Report",
+      "id": "SUBH_STK_ACC_VALUE",
+      "form": "Rpt_Stk_Acc_Finish_Summary_Value"
+     },
+     {
+      "caption": "Stock SubItem Wise",
+      "id": "SUBH_STK_SUBITEM",
+      "form": "Rpt_StockSubItemAccReport"
+     },
+     {
+      "caption": "Stock SubItem(Detail) Wise",
+      "id": "SUBH_STK_DETAIL_SUBITEM",
+      "form": "Rpt_StockSubItemAcc_DetailReport"
+     },
+     {
+      "caption": "Stock Register",
+      "id": "SUBH_STK_REGISTER",
+      "form": "Rpt_StockSubItemAcc_DetailReport_Online"
+     },
+     {
+      "caption": "Stock Ledger New",
+      "id": "StockLedgerNewToolStripMenuItem",
+      "form": "Rpt_Stock_Acc_Finish_Summary"
+     }
+    ]
+   },
+   {
+    "caption": "Inv Stock Ledger",
+    "id": "SUBH_INV_STOCK",
+    "items": [
+     {
+      "caption": "Stock Mts Reports",
+      "id": "SUBH_INV_STOCK_MONTHLY",
+      "form": "Rpt_Stk_Meter_TanusKgs",
+      "alternatives": [
+       "Rpt_Stk_Meter"
+      ]
+     },
+     {
+      "caption": "Stock Mts Reports(Kgs)",
+      "id": "SUBH_INV_STOCK_MONTHLY_KGS",
+      "form": "Rpt_Stk_Meter_TanusKgs"
+     },
+     {
+      "caption": "Stock Mts New Reports",
+      "id": "SUBH_INV_STOCK_NEW_MONTHLY",
+      "form": "Rpt_Monthly_Stk_Qty_Value_Report"
+     },
+     {
+      "caption": "Finish At Shop Stock",
+      "id": "SUBH_INV_STOCK_FINISH_AT_SHOP",
+      "form": "Rpt_Jsm_Stock_Finish_New1",
+      "alternatives": [
+       "Rpt_Stk_Finish_At_Shop",
+       "ZOld_Rpt1_Stk_Finish_At_Shop"
+      ]
+     },
+     {
+      "caption": "Grey   At Shop Stock",
+      "id": "SUBH_INV_STOCK_ROW_AT_SHOP",
+      "form": "Rpt_Stk_Grey_At_Shop",
+      "alternatives": [
+       "Rpt_Jsm_Stock_Grey_At_Shop"
+      ]
+     },
+     {
+      "caption": "Grey   At Mill Stock - Format 1",
+      "id": "SUBH_INV_STOCK_ROW_AT_MILL",
+      "form": "Rpt_Jsm_Stock_Grey_At_Mill",
+      "alternatives": [
+       "Rpt1_Stk_Grey_At_Mill"
+      ]
+     },
+     {
+      "caption": "Grey   At Mill Stock - Format 2",
+      "id": "SUBH_INV_STOCK_ROW_AT_MILL_X",
+      "form": "Rpt1_Stk_Grey_At_Mill"
+     },
+     {
+      "caption": "Finish Stock Excel",
+      "id": "FinishStockExcelToolStripMenuItem",
+      "form": "Rpt_FinishStockReport"
+     },
+     {
+      "caption": "Finish At Shop Stock(Book-Acc)",
+      "id": "SUBH_INV_STOCK_FINISH_AT_BOOK_SHOP",
+      "form": "Rpt_Stock_Acc_Finish_Summary"
+     },
+     {
+      "caption": "Stock Value Reports",
+      "id": "SUBH_INV_STOCK_VALUE",
+      "form": "A_StockValueReport"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "caption": "Others Reports",
+  "id": "MN_OTH_REPORTS",
+  "items": [
+   {
+    "caption": "Outstanding Zoom",
+    "id": "SUBH_ZOOM_OS",
+    "items": [
+     {
+      "caption": "Debitors",
+      "id": "ZoomOS_Debitors",
+      "form": "Rpt_Outstating_Report"
+     },
+     {
+      "caption": "Creditors",
+      "id": "NewOsCRToolStripMenuItem",
+      "form": "Rpt_Outstating_Report"
+     },
+     {
+      "caption": "Process",
+      "id": "ToolStripMenuItem4",
+      "form": "Rpt_Outstating_Report"
+     },
+     {
+      "caption": "JobWork",
+      "id": "NewOsJOBWORKToolStripMenuItem",
+      "form": "Rpt_Outstating_Report"
+     },
+     {
+      "caption": "Age Analysis",
+      "id": "SUBH_DEB_OS_AGE",
+      "items": [
+       {
+        "caption": "Debitors Age",
+        "id": "DebitorsAgeToolStripMenuItem",
+        "form": "Rpt_Outstating_Age_Report"
+       },
+       {
+        "caption": "Debitors Excel Age Analysis",
+        "id": "DebitorsExcelAgeAnalysisToolStripMenuItem",
+        "form": "A_Jsm_Os_Sales_Age_Analysys_Updated"
+       }
+      ]
+     },
+     {
+      "caption": "Os New Format Testing",
+      "id": "ZoomOS_DebitorsDEV",
+      "form": "Rpt_Outstating_ReportSales"
+     }
+    ]
+   },
+   {
+    "caption": "Outstanding",
+    "id": "SUBH_OS",
+    "items": [
+     {
+      "caption": "Debitors",
+      "id": "SUBH_OS_DB_MAIN",
+      "items": [
+       {
+        "caption": "Normal",
+        "id": "SUBH_OS_DB_MAIN_NORMAL",
+        "form": "Rpt_Jsm_Os_Sales"
+       },
+       {
+        "caption": "AgeAnalysis",
+        "id": "SUBH_OS_DB_MAIN_AGE",
+        "form": "Rpt_Jsm_Os_Sales_AgeAnalysis"
+       },
+       {
+        "caption": "Detail",
+        "id": "SUBH_OS_DB_MAIN_DETAIL",
+        "form": "Rpt_Jsm_Os_Sales_Detail"
+       },
+       {
+        "caption": "90 Days",
+        "id": "SUBH_OS_DB_MAIN_90DAYS",
+        "form": "Rpt_Os_90Days_Eklvya"
+       }
+      ]
+     },
+     {
+      "caption": "Creditors",
+      "id": "SUBH_OS_CR_MAIN",
+      "items": [
+       {
+        "caption": "Normal",
+        "id": "SUBH_OS_CR_MAIN_NORMAL",
+        "form": "Rpt_Jsm_Os_Purchase"
+       },
+       {
+        "caption": "AgeAnalysis",
+        "id": "SUBH_OS_CR_MAIN_AGE",
+        "form": "Rpt_Jsm_Os_Purchase_AgeAnalysis"
+       },
+       {
+        "caption": "Detail",
+        "id": "SUBH_OS_CR_MAIN_DETAIL",
+        "form": "Rpt_Jsm_Os_Purchase_Detail"
+       }
+      ]
+     },
+     {
+      "caption": "Process",
+      "id": "SUBH_OS_PROCESS_MAIN",
+      "items": [
+       {
+        "caption": "Normal",
+        "id": "SUBH_OS_PROCESS_MAIN_NORMAL",
+        "form": "Rpt_Jsm_Os_Process"
+       },
+       {
+        "caption": "AgeAnalysis",
+        "id": "SUBH_OS_PROCESS_MAIN_AGE",
+        "form": "Rpt_Jsm_Os_Process_AgeAnalysis"
+       }
+      ]
+     },
+     {
+      "caption": "JobWork",
+      "id": "SUBH_OS_JOBWORK_MAIN",
+      "items": [
+       {
+        "caption": "Normal",
+        "id": "SUBH_OS_JOBWORK_MAIN_NORMAL",
+        "form": "Rpt_Jsm_Os_Jobwork"
+       },
+       {
+        "caption": "AgeAnalysis",
+        "id": "SUBH_OS_JOBWORK_MAIN_AGE",
+        "form": "Rpt_Jsm_Os_Jobwork_AgeAnalysis"
+       }
+      ]
+     },
+     {
+      "caption": "Update O/s. Bill",
+      "id": "SUBH_OS_UPDATE_STATUS",
+      "form": "Rpt_Jsm_Os_Update"
+     },
+     {
+      "caption": "UnAdjust Setup",
+      "id": "SUBH_EXTRA_UNADJUST_SETUP",
+      "form": "Zoom_SelectDate_List"
+     },
+     {
+      "caption": "Sms Days Wise",
+      "id": "SmsDaysWiseToolStripMenuItem",
+      "form": "Rpt_Sms_OsReports"
+     },
+     {
+      "caption": "Month O/s.",
+      "id": "SUBH_OS_MONTH",
+      "items": [
+       {
+        "caption": "Sales",
+        "id": "SUBH_OS_MONTH_SL",
+        "form": "A_Textiles_Outstanding_MonthWise"
+       },
+       {
+        "caption": "Purchase",
+        "id": "SUBH_OS_MONTH_PU",
+        "form": "A_Textiles_Outstanding_MonthWise"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "caption": "Brokreg Statment",
+    "id": "SUBH_BROKER_STATMENT",
+    "items": [
+     {
+      "caption": "Sales",
+      "id": "SUBH_BRK_STAT_SALES",
+      "items": [
+       {
+        "caption": "Rec.Date Wise",
+        "id": "SUBH_BRK_STAT_SALES_RECDATE",
+        "form": "A_BrokregStatment"
+       },
+       {
+        "caption": "Bill Date Wise",
+        "id": "SUBH_BRK_STAT_SALES_BILLDATE",
+        "form": "A_BrokregStatment"
+       }
+      ]
+     },
+     {
+      "caption": "Purchase",
+      "id": "SUBH_BRK_STAT_PURCHASE",
+      "items": [
+       {
+        "caption": "Bill Date Wise",
+        "id": "SUBH_BRK_STAT_PURCHASE_BILLDATE",
+        "form": "A_BrokregStatment"
+       },
+       {
+        "caption": "Paid Date Wise",
+        "id": "SUBH_BRK_STAT_PURCHASE_PAIDDATE",
+        "form": "A_BrokregStatment"
+       }
+      ]
+     },
+     {
+      "caption": "JobWork",
+      "id": "SUBH_JOBWORK_BROKERAGE",
+      "form": "Rpt_Job_Brokerage"
+     },
+     {
+      "caption": "SalesBrokreg Entry",
+      "id": "SUBH_SALE_BRK_ENTRY",
+      "form": "Tran_TradingBrokregEntry"
+     },
+     {
+      "caption": "Brokreg Os (Rec/Pay)",
+      "id": "BrokregOsRecPayToolStripMenuItem",
+      "form": "Rpt_BrokregReport"
+     }
+    ]
+   },
+   {
+    "caption": "Daily Transaction",
+    "id": "SUBH_DAILY_TRANSACTION",
+    "form": "Rpt_Daily_TransactionNew"
+   },
+   {
+    "caption": "Master List",
+    "id": "SUBH_MASTERLIST",
+    "items": [
+     {
+      "caption": "Envelope",
+      "id": "SUBH_MASTERLIST_ENVELOPE",
+      "form": "Rpt_Account_List_Print"
+     },
+     {
+      "caption": "Label Printing",
+      "id": "SUBH_MASTERLIST_LABEL",
+      "form": "Rpt_Account_List_Print"
+     },
+     {
+      "caption": "Account",
+      "id": "SUBH_MASTERLIST_ACCOUNT",
+      "form": "Rpt_Account_ReportRpt"
+     },
+     {
+      "caption": "Item",
+      "id": "SUBH_MASTERLIST_ITEM",
+      "form": "Rpt_Item_Mst_Report"
+     }
+    ]
+   },
+   {
+    "caption": "Zoom Item Ledger",
+    "id": "ToolStripMenuItem12",
+    "form": "Zoom_SelectDate_List_Item"
+   },
+   {
+    "caption": "Others Reports",
+    "id": "SUBH_OTHER_REPORTS",
+    "items": [
+     {
+      "caption": "YarnKgsStock",
+      "id": "YarnKgsStockToolStripMenuItem",
+      "form": "A_ReportYarnStock"
+     },
+     {
+      "caption": "Finish At Shp Kgs",
+      "id": "FinishStockReportsToolStripMenuItem",
+      "form": "Rpt_StkKgsFinishAtShop"
+     },
+     {
+      "caption": "Grey At Mill Kgs",
+      "id": "GreyAtShopKgsToolStripMenuItem",
+      "form": "Rpt_StkKgsGreyAtMill"
+     },
+     {
+      "caption": "Grey At Shop Kgs",
+      "id": "GreyAtShopKgs1ToolStripMenuItem",
+      "form": "Rpt_StkKgsGreyAtshop"
+     },
+     {
+      "caption": "Box Stock",
+      "id": "SHUBH_BOX_STK",
+      "form": "Rpt_Box_Stock_ItemDesc"
+     },
+     {
+      "caption": "Brokreg",
+      "id": "BrokregToolStripMenuItem",
+      "form": "A_Jsm_Brokreg_Statement_Report"
+     },
+     {
+      "caption": "OutStanding PurchaseAll",
+      "id": "OutStandingPurchaseAllToolStripMenuItem",
+      "form": "Rpt_OutstatingAllPurchase_Report"
+     }
+    ]
+   },
+   {
+    "caption": "MissingReport(Query)",
+    "id": "SHUBH_MISSING_QUERY",
+    "items": [
+     {
+      "caption": "BillAgainst PaidDetail",
+      "id": "SHUBH_BILLAG_PAID",
+      "form": "Frm_BillAgistPaidDetail"
+     }
+    ]
+   },
+   {
+    "caption": "Jsm Testingfor",
+    "id": "SHUBH_TESTING",
+    "items": [
+     {
+      "caption": "DataBase Repair",
+      "id": "DataBaseRepairToolStripMenuItem",
+      "form": "Stp_DataBaseFromTo"
+     }
+    ]
+   },
+   {
+    "caption": "Old Reports",
+    "id": "SUBH_OLD_REPORT",
+    "items": [
+     {
+      "caption": "Extra Reports",
+      "id": "ToolStripMenuItem6",
+      "items": [
+       {
+        "caption": "3B Cess",
+        "id": "BCessToolStripMenuItem",
+        "form": "Gstr_3B_TextNew_Monthly_Cess"
+       },
+       {
+        "caption": "3B Excel",
+        "id": "BExcelToolStripMenuItem",
+        "form": "Gstr_3BB_TextNew_Excel_Monthly"
+       },
+       {
+        "caption": "3B Zoom",
+        "id": "BZoomToolStripMenuItem",
+        "form": "Gstr_3BB_Zoomin_Rpt"
+       },
+       {
+        "caption": "Brif Cash",
+        "id": "ToolStripMenuItem11",
+        "form": "Eway_No_Upload_Offline",
+        "alternatives": [
+         "Rpt_Brife_Cash_Mix_New_Gst"
+        ]
+       },
+       {
+        "caption": "Brokreg Entry",
+        "id": "SHUBH_BROK_ENTRY",
+        "form": "Broker_commision_check"
+       },
+       {
+        "caption": "Reminder",
+        "id": "SHUBH_REMINDER",
+        "form": "FrmReminder_All_Details"
+       },
+       {
+        "caption": "CB Bal",
+        "id": "ToolStripMenuItem17",
+        "form": "Frm_TabReport"
+       },
+       {
+        "caption": "Import Sales",
+        "id": "SHUBH_IMPORT_SALES",
+        "form": "Frm_Import_SalesJsm"
+       },
+       {
+        "caption": "Cash Bank Flow",
+        "id": "ToolStripMenuItem9",
+        "form": "Tran_BankDetail"
+       },
+       {
+        "caption": "Share Stock",
+        "id": "SUBH_SHARE_STOCK",
+        "form": "Rpt_Stock_Share"
+       },
+       {
+        "caption": "Stock(Old) Detail SizeWise",
+        "id": "SUBH_STOCK_SIZEWISE",
+        "form": "Rpt_StockSizeWise"
+       }
+      ]
+     },
+     {
+      "caption": "Old FinalReports",
+      "id": "SHUBH_OLD_FINAL_REPORT",
+      "items": [
+       {
+        "caption": "Book Printing",
+        "id": "SUBH_BOOK_PRINTING",
+        "form": "Rpt_Jsm_SalesPurchaseVat"
+       }
+      ]
+     },
+     {
+      "caption": "Old Stock Reports",
+      "id": "SHUBH_OLD_Stock",
+      "items": [
+       {
+        "caption": "GreyAtShop-DateWise",
+        "id": "SUBH_INV_STOCK_GREY_AT_SHOP_DATE",
+        "form": "Rpt_Stk_Grey_At_Shop_DateWise"
+       },
+       {
+        "caption": "GreyAtShop",
+        "id": "SUBH_INV_STOCK_ROW_AT_SHOP_X",
+        "form": "Rpt_Stk_Grey_At_Shop"
+       }
+      ]
+     },
+     {
+      "caption": "Rec/Pay Register",
+      "id": "SUBH_REC_PAY_REG",
+      "items": [
+       {
+        "caption": "Sales",
+        "id": "SUBH_SALES_RECEIPT_REGISTER",
+        "form": "Rpt_1Sales_Receipt_Reg"
+       },
+       {
+        "caption": "Purchase",
+        "id": "SUBH_PURCHASE_PAY_REGISTER",
+        "form": "Rpt_1Purchase_Payment_Reg"
+       },
+       {
+        "caption": "Process",
+        "id": "SUBH_PROCESS_PAY_REGISTER",
+        "form": "Rpt_1Process_Payment_Reg"
+       },
+       {
+        "caption": "JobWork",
+        "id": "SUBH_JOBWORK_PAY_REGISTER",
+        "form": "Rpt_1Job_Payment_Reg"
+       },
+       {
+        "caption": "Debitors.,",
+        "id": "SUBH_OS_DB_MAIN1",
+        "form": "ZOld_Rpt_Os_Sales"
+       }
+      ]
+     },
+     {
+      "caption": "Sales",
+      "id": "SalesToolStripMenuItem",
+      "items": [
+       {
+        "caption": "SalesSummary",
+        "id": "SummaryToolStripMenuItem",
+        "form": "Rpt_Jsm_Sales"
+       },
+       {
+        "caption": "SalesDetail",
+        "id": "SalesDetailToolStripMenuItem",
+        "form": "Rpt_Jsm_Sales"
+       }
+      ]
+     },
+     {
+      "caption": "List Printing OLD",
+      "id": "ListPrintingOLDToolStripMenuItem",
+      "form": "Rpt_Account_List_Print_Old"
+     }
+    ]
+   },
+   {
+    "caption": "Extra RajuBhai",
+    "id": "SUBH_EXTRA_RAJU_BHAI",
+    "items": [
+     {
+      "caption": "Inv Report",
+      "id": "SHUBH_A1",
+      "form": "Frm_Investment_Raju"
+     }
+    ]
+   },
+   {
+    "caption": "Extra Report",
+    "id": "SHUBH_EXTRA_REPORTS",
+    "items": [
+     {
+      "caption": "Balance",
+      "id": "SHUBH_BALANCE",
+      "form": "Frm_TabReport"
+     }
+    ]
+   }
+  ]
+ }
+]

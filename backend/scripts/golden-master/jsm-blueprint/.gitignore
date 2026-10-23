@@ -1,0 +1,2 @@
+# JSM method strings: contain JSM vendor credentials; never commit.
+.spec-local/
