@@ -3,6 +3,7 @@
 /** JSM-identical reports, keyed by the JSM form that defines them. */
 const REPORTS = {
   Rpt_Process_Issue_Report: require('./reports/processSend'),
+  Rpt_Job_IssueReport: require('./reports/jobSend'),
 };
 
 function get(reportId) {

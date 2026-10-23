@@ -18,16 +18,16 @@ function splitRemark(remark) {
   return [lines[0] || '', lines[1] || ''];
 }
 
-async function loadMillIssueRows(companyId) {
+async function loadMillIssueRows(companyId, bookModule = 'millIssue') {
   const [jobs, book, company] = await Promise.all([
     Job.find({ companyId, status: { $ne: 'Cancelled' } })
       .populate('workerId', 'name')
       .populate({ path: 'lotId', select: 'lotId itemId rate', populate: { path: 'itemId', select: 'name' } })
       .lean(),
-    Book.findOne({ companyId, module: 'millIssue' }).sort({ createdAt: 1 }).lean(),
+    Book.findOne({ companyId, module: bookModule }).sort({ createdAt: 1 }).lean(),
     Company.findById(companyId).select('name coCode').lean(),
   ]);
-  const bookName = book?.name || 'MILL ISSUE';
+  const bookName = book?.name || (bookModule === 'jobIssue' ? 'JOB ISSUE' : 'MILL ISSUE');
   const coShort = company?.coCode || '';
 
   return jobs.map((j) => {
@@ -45,6 +45,10 @@ async function loadMillIssueRows(companyId) {
       BOOK: bookName,
       REGISTER: bookName,
       MILL: j.workerId?.name || '',
+      PARTY: j.workerId?.name || '',
+      BROKER: '',
+      PU_PARTY: j.weaver || '',
+      JOB_RATE: Number(j.jobRate || 0),
       PURPARTY: j.weaver || '',
       ITEM: j.lotId?.itemId?.name || '',
       MONTH: date ? MONTHS[date.getUTCMonth()] : '',

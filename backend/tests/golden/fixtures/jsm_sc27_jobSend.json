@@ -1,0 +1,563 @@
+{
+ "report": "jobSend",
+ "key": [
+  "NCCHLN_NO",
+  "CHLN_DATE",
+  "PARTY",
+  "ITEM",
+  "ISS_QTY"
+ ],
+ "dateField": "CHLN_DATE",
+ "rows": [
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "NCCHLN_NO": "1",
+   "CHLN_NO": "1",
+   "CHLN_DATE": "2026-08-05",
+   "ISS_PCS": "200",
+   "ISS_QTY": "4400.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "NCCHLN_NO": "120",
+   "CHLN_NO": "120",
+   "CHLN_DATE": "2026-08-05",
+   "ISS_PCS": "100",
+   "ISS_QTY": "100.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "NCCHLN_NO": "121",
+   "CHLN_NO": "121",
+   "CHLN_DATE": "2026-08-11",
+   "ISS_PCS": "20",
+   "ISS_QTY": "200.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "DOBBY",
+   "NCCHLN_NO": "122",
+   "CHLN_NO": "122",
+   "CHLN_DATE": "2026-08-11",
+   "ISS_PCS": "3",
+   "ISS_QTY": "33.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "NCCHLN_NO": "123",
+   "CHLN_NO": "123",
+   "CHLN_DATE": "2026-08-11",
+   "ISS_PCS": "4",
+   "ISS_QTY": "44.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "NCCHLN_NO": "124",
+   "CHLN_NO": "124",
+   "CHLN_DATE": "2026-08-12",
+   "ISS_PCS": "4",
+   "ISS_QTY": "45.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "NCCHLN_NO": "125",
+   "CHLN_NO": "125",
+   "CHLN_DATE": "2026-08-12",
+   "ISS_PCS": "2",
+   "ISS_QTY": "20.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "NCCHLN_NO": "125/1",
+   "CHLN_NO": "125",
+   "CHLN_DATE": "2026-08-12",
+   "ISS_PCS": "5",
+   "ISS_QTY": "60.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "NCCHLN_NO": "125/2",
+   "CHLN_NO": "125",
+   "CHLN_DATE": "2026-08-12",
+   "ISS_PCS": "3",
+   "ISS_QTY": "50.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "DOBBY",
+   "NCCHLN_NO": "125/3",
+   "CHLN_NO": "125",
+   "CHLN_DATE": "2026-08-12",
+   "ISS_PCS": "1",
+   "ISS_QTY": "20.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "GRAY MICRO",
+   "NCCHLN_NO": "125/4",
+   "CHLN_NO": "125",
+   "CHLN_DATE": "2026-08-12",
+   "ISS_PCS": "2",
+   "ISS_QTY": "40.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "GRAY MICRO",
+   "NCCHLN_NO": "126",
+   "CHLN_NO": "126",
+   "CHLN_DATE": "2026-08-12",
+   "ISS_PCS": "2",
+   "ISS_QTY": "30.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "NCCHLN_NO": "127",
+   "CHLN_NO": "127",
+   "CHLN_DATE": "2026-08-12",
+   "ISS_PCS": "20",
+   "ISS_QTY": "20.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "DOBBY",
+   "NCCHLN_NO": "128",
+   "CHLN_NO": "128",
+   "CHLN_DATE": "2026-08-12",
+   "ISS_PCS": "8",
+   "ISS_QTY": "9.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "NCCHLN_NO": "129",
+   "CHLN_NO": "129",
+   "CHLN_DATE": "2026-08-14",
+   "ISS_PCS": "2",
+   "ISS_QTY": "20.000"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "DOBBY",
+   "NCCHLN_NO": "130",
+   "CHLN_NO": "130",
+   "CHLN_DATE": "2026-08-21",
+   "ISS_PCS": "2",
+   "ISS_QTY": "20.000"
+  }
+ ],
+ "scenarios": [
+  {
+   "name": "register",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "None",
+    "orderBy1": "Register"
+   },
+   "expected": [
+    {
+     "NCCHLN_NO": "1",
+     "CHLN_DATE": "2026-08-05",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "4400.000"
+    },
+    {
+     "NCCHLN_NO": "120",
+     "CHLN_DATE": "2026-08-05",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "121",
+     "CHLN_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "200.000"
+    },
+    {
+     "NCCHLN_NO": "122",
+     "CHLN_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "ISS_QTY": "33.000"
+    },
+    {
+     "NCCHLN_NO": "123",
+     "CHLN_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "44.000"
+    },
+    {
+     "NCCHLN_NO": "124",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "45.000"
+    },
+    {
+     "NCCHLN_NO": "125",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "125/1",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "60.000"
+    },
+    {
+     "NCCHLN_NO": "125/2",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "50.000"
+    },
+    {
+     "NCCHLN_NO": "125/3",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "125/4",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "GRAY MICRO",
+     "ISS_QTY": "40.000"
+    },
+    {
+     "NCCHLN_NO": "126",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "GRAY MICRO",
+     "ISS_QTY": "30.000"
+    },
+    {
+     "NCCHLN_NO": "127",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "128",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "ISS_QTY": "9.000"
+    },
+    {
+     "NCCHLN_NO": "129",
+     "CHLN_DATE": "2026-08-14",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "130",
+     "CHLN_DATE": "2026-08-21",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "ISS_QTY": "20.000"
+    }
+   ]
+  },
+  {
+   "name": "party + item",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "Item",
+    "orderBy1": "Party"
+   },
+   "expected": [
+    {
+     "NCCHLN_NO": "1",
+     "CHLN_DATE": "2026-08-05",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "4400.000"
+    },
+    {
+     "NCCHLN_NO": "120",
+     "CHLN_DATE": "2026-08-05",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "121",
+     "CHLN_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "200.000"
+    },
+    {
+     "NCCHLN_NO": "123",
+     "CHLN_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "44.000"
+    },
+    {
+     "NCCHLN_NO": "124",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "45.000"
+    },
+    {
+     "NCCHLN_NO": "125",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "125/1",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "60.000"
+    },
+    {
+     "NCCHLN_NO": "125/2",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "50.000"
+    },
+    {
+     "NCCHLN_NO": "127",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "129",
+     "CHLN_DATE": "2026-08-14",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "122",
+     "CHLN_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "ISS_QTY": "33.000"
+    },
+    {
+     "NCCHLN_NO": "125/3",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "128",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "ISS_QTY": "9.000"
+    },
+    {
+     "NCCHLN_NO": "130",
+     "CHLN_DATE": "2026-08-21",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "125/4",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "GRAY MICRO",
+     "ISS_QTY": "40.000"
+    },
+    {
+     "NCCHLN_NO": "126",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "GRAY MICRO",
+     "ISS_QTY": "30.000"
+    }
+   ]
+  },
+  {
+   "name": "item, one party",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "None",
+    "orderBy1": "Item",
+    "parties": [
+     "BROKER"
+    ]
+   },
+   "expected": [
+    {
+     "NCCHLN_NO": "1",
+     "CHLN_DATE": "2026-08-05",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "4400.000"
+    },
+    {
+     "NCCHLN_NO": "120",
+     "CHLN_DATE": "2026-08-05",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "121",
+     "CHLN_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "200.000"
+    },
+    {
+     "NCCHLN_NO": "123",
+     "CHLN_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "44.000"
+    },
+    {
+     "NCCHLN_NO": "124",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "45.000"
+    },
+    {
+     "NCCHLN_NO": "125",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "125/1",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "60.000"
+    },
+    {
+     "NCCHLN_NO": "125/2",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "50.000"
+    },
+    {
+     "NCCHLN_NO": "127",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "129",
+     "CHLN_DATE": "2026-08-14",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "122",
+     "CHLN_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "ISS_QTY": "33.000"
+    },
+    {
+     "NCCHLN_NO": "125/3",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "128",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "ISS_QTY": "9.000"
+    },
+    {
+     "NCCHLN_NO": "130",
+     "CHLN_DATE": "2026-08-21",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "ISS_QTY": "20.000"
+    },
+    {
+     "NCCHLN_NO": "125/4",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "GRAY MICRO",
+     "ISS_QTY": "40.000"
+    },
+    {
+     "NCCHLN_NO": "126",
+     "CHLN_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "GRAY MICRO",
+     "ISS_QTY": "30.000"
+    }
+   ]
+  }
+ ]
+}
