@@ -6,6 +6,7 @@ const REPORTS = {
   Rpt_Job_IssueReport: require('./reports/jobSend'),
   Rpt_Process_Receipt_Detail: require('./reports/processReceiptDetail'),
   Rpt_Process_Receipt_Summary: require('./reports/processReceiptSummary'),
+  Rpt_JobWork_Receipt_Summary: require('./reports/jobReceiptSummary'),
   Rpt_JobWork_Receipt_Detail: require('./reports/jobReceiptDetail'),
 };
 

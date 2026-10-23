@@ -1,0 +1,311 @@
+{
+ "report": "jobReceiptSummary",
+ "key": [
+  "NCBILL_NO",
+  "BILL_DATE",
+  "PARTY",
+  "TO_REC_QTY",
+  "NET_TOT"
+ ],
+ "dateField": "BILL_DATE",
+ "rows": [
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SRAL_NO": "1",
+   "NCBILL_NO": "2",
+   "BILL_DATE": "2026-08-05",
+   "TO_REC_QTY": "0.000",
+   "NET_TOT": "0.00"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SRAL_NO": "2",
+   "NCBILL_NO": "8",
+   "BILL_DATE": "2026-08-10",
+   "TO_REC_QTY": "4400.000",
+   "NET_TOT": "18480.00"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SRAL_NO": "3",
+   "NCBILL_NO": "999",
+   "BILL_DATE": "2026-08-11",
+   "TO_REC_QTY": "44.000",
+   "NET_TOT": "2033.00"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SRAL_NO": "4",
+   "NCBILL_NO": "23",
+   "BILL_DATE": "2026-08-12",
+   "TO_REC_QTY": "45.000",
+   "NET_TOT": "189.00"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SRAL_NO": "5",
+   "NCBILL_NO": "3",
+   "BILL_DATE": "2026-08-12",
+   "TO_REC_QTY": "30.000",
+   "NET_TOT": "6300.00"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SRAL_NO": "6",
+   "NCBILL_NO": "333",
+   "BILL_DATE": "2026-08-21",
+   "TO_REC_QTY": "20.000",
+   "NET_TOT": "4200.00"
+  }
+ ],
+ "scenarios": [
+  {
+   "name": "register",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "None",
+    "orderBy1": "Register"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "2",
+     "BILL_DATE": "2026-08-05",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "8",
+     "BILL_DATE": "2026-08-10",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "4400.000",
+     "NET_TOT": "18480.00"
+    },
+    {
+     "NCBILL_NO": "999",
+     "BILL_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "44.000",
+     "NET_TOT": "2033.00"
+    },
+    {
+     "NCBILL_NO": "23",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "45.000",
+     "NET_TOT": "189.00"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "30.000",
+     "NET_TOT": "6300.00"
+    },
+    {
+     "NCBILL_NO": "333",
+     "BILL_DATE": "2026-08-21",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "20.000",
+     "NET_TOT": "4200.00"
+    }
+   ]
+  },
+  {
+   "name": "party + month",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "Month",
+    "orderBy1": "Party"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "2",
+     "BILL_DATE": "2026-08-05",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "8",
+     "BILL_DATE": "2026-08-10",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "4400.000",
+     "NET_TOT": "18480.00"
+    },
+    {
+     "NCBILL_NO": "999",
+     "BILL_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "44.000",
+     "NET_TOT": "2033.00"
+    },
+    {
+     "NCBILL_NO": "23",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "45.000",
+     "NET_TOT": "189.00"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "30.000",
+     "NET_TOT": "6300.00"
+    },
+    {
+     "NCBILL_NO": "333",
+     "BILL_DATE": "2026-08-21",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "20.000",
+     "NET_TOT": "4200.00"
+    }
+   ]
+  },
+  {
+   "name": "month + party",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "Party",
+    "orderBy1": "Month"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "2",
+     "BILL_DATE": "2026-08-05",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "8",
+     "BILL_DATE": "2026-08-10",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "4400.000",
+     "NET_TOT": "18480.00"
+    },
+    {
+     "NCBILL_NO": "999",
+     "BILL_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "44.000",
+     "NET_TOT": "2033.00"
+    },
+    {
+     "NCBILL_NO": "23",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "45.000",
+     "NET_TOT": "189.00"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "30.000",
+     "NET_TOT": "6300.00"
+    },
+    {
+     "NCBILL_NO": "333",
+     "BILL_DATE": "2026-08-21",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "20.000",
+     "NET_TOT": "4200.00"
+    }
+   ]
+  },
+  {
+   "name": "broker + datewise",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "DateWise",
+    "orderBy1": "Broker"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "2",
+     "BILL_DATE": "2026-08-05",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "8",
+     "BILL_DATE": "2026-08-10",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "4400.000",
+     "NET_TOT": "18480.00"
+    },
+    {
+     "NCBILL_NO": "999",
+     "BILL_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "44.000",
+     "NET_TOT": "2033.00"
+    },
+    {
+     "NCBILL_NO": "23",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "45.000",
+     "NET_TOT": "189.00"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "30.000",
+     "NET_TOT": "6300.00"
+    },
+    {
+     "NCBILL_NO": "333",
+     "BILL_DATE": "2026-08-21",
+     "PARTY": "BROKER",
+     "TO_REC_QTY": "20.000",
+     "NET_TOT": "4200.00"
+    }
+   ]
+  }
+ ]
+}

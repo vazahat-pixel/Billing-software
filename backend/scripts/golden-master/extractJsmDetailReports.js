@@ -15,6 +15,23 @@ const SEP = '\u0001';
 if (!/^[A-Za-z0-9_]+$/.test(CO)) throw new Error('--co must be alphanumeric');
 
 const REPORTS = {
+  jobReceiptSummary: {
+    view: 'JSM_VW_JOBWORK_RECEIPT_SUMMARY',
+    date: 'BILL_DATE',
+    cols: ['BOOK', 'PARTY', 'BROKER', 'MSME_TYPE', 'MONTH', 'MONTH_NO', 'YEAR_NO', 'SRAL_NO', 'NCBILL_NO', 'BILL_DATE', 'TO_REC_QTY', 'NET_TOT'],
+    key: ['NCBILL_NO', 'BILL_DATE', 'PARTY', 'TO_REC_QTY', 'NET_TOT'],
+    fix: 'BOOK AS XBOOK, PARTY AS XPARTY, BROKER AS XBROKER, MSME_TYPE AS XMSME_TYPE, BOOK AS XREGISTER, MONTH AS XMONTH, CONVERT(date, BILL_dATE) AS XDateWise',
+    filters: { parties: 'PARTY', brokers: 'BROKER', books: 'BOOK', msmeTypes: 'MSME_TYPE' },
+    x: { Register: 'XREGISTER', Party: 'XPARTY', Broker: 'XBROKER', MSME_Type: 'XMSME_TYPE', Month: 'XMONTH', DateWise: 'XDateWise' },
+    orderFn: (o1, o2, x1, x2) => (o1 === 'Month' ? ['YEAR_NO,MONTH_NO ASC', x1, x2] : o2 === 'Month' ? [x1, 'YEAR_NO,MONTH_NO ASC', x2] : [x1, x2]),
+    tieBreak: 'BILL_DATE,SRAL_NO,NCBILL_NO',
+    scenarios: [
+      { name: 'register', params: { orderBy1: 'Register' } },
+      { name: 'party + month', params: { orderBy1: 'Party', orderBy2: 'Month' } },
+      { name: 'month + party', params: { orderBy1: 'Month', orderBy2: 'Party' } },
+      { name: 'broker + datewise', params: { orderBy1: 'Broker', orderBy2: 'DateWise' } },
+    ],
+  },
   processReceiptSummary: {
     view: 'JSM_VW_PROCESS_RECEIPT_SUMMARY',
     date: 'BILL_DATE',

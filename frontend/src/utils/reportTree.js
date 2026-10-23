@@ -113,7 +113,7 @@ export const REPORT_TREE = [
     label: 'JobWork Reports',
     children: [
       { id: 'jw-send', label: 'Send', reportKey: 'jobwork', view: 'send', external: 'jsmReport', jsmForm: 'Rpt_Job_IssueReport' },
-      { id: 'jw-receipt-sum', label: 'Receipt Summary', reportKey: 'jobwork', view: 'receiptSummary' },
+      { id: 'jw-receipt-sum', label: 'Receipt Summary', reportKey: 'jobwork', view: 'receiptSummary', external: 'jsmReport', jsmForm: 'Rpt_JobWork_Receipt_Summary' },
       { id: 'jw-receipt-det', label: 'Receipt Detail', reportKey: 'jobwork', view: 'receiptDetail', external: 'jsmReport', jsmForm: 'Rpt_JobWork_Receipt_Detail' },
       { id: 'jw-pending', label: 'Jobwork Stock/Pending Report', reportKey: 'jobworkPending', view: 'stock' },
       { id: 'jw-challan', label: 'Challan Status', reportKey: 'jobworkChallan', view: 'challan' },
