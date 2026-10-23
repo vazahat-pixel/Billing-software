@@ -15,6 +15,21 @@ const SEP = '\u0001';
 if (!/^[A-Za-z0-9_]+$/.test(CO)) throw new Error('--co must be alphanumeric');
 
 const REPORTS = {
+  processReceiptDetail: {
+    view: 'JSM_VW_PROCESS_RECEIPT_DETAIL',
+    date: 'BILL_DATE',
+    cols: ['BOOK', 'MILL', 'GREYITEM', 'FINISHITEM', 'IT_RATE', 'IT_DESC1', 'SRAL_NO', 'NCBILL_NO', 'BILL_DATE', 'REC_QTY'],
+    key: ['NCBILL_NO', 'BILL_DATE', 'MILL', 'GREYITEM', 'REC_QTY'],
+    fix: 'BOOK AS XREGISTER, MILL AS XMILL, GREYITEM AS XGREYITEM, FINISHITEM AS XFINISHITEM, IT_RATE AS XRATE, IT_DESC1 AS XIT_DESC1',
+    filters: { mills: 'MILL', greyItems: 'GREYITEM', finishItems: 'FINISHITEM' },
+    x: { Register: 'XREGISTER', Mill: 'XMILL', GreyItem: 'XGREYITEM', FinishItem: 'XFINISHITEM', Rate: 'XRATE' },
+    tieBreak: 'BILL_DATE,SRAL_NO,NCBILL_NO',
+    scenarios: [
+      { name: 'register', params: { orderBy1: 'Register' } },
+      { name: 'mill + greyitem', params: { orderBy1: 'Mill', orderBy2: 'GreyItem' } },
+      { name: 'rate', params: { orderBy1: 'Rate' } },
+    ],
+  },
   jobSend: {
     view: 'JSM_VW_JOBWORK_ISSUE',
     date: 'CHLN_DATE',
@@ -47,6 +62,7 @@ const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
 for (const [name, r] of Object.entries(REPORTS)) {
   const rows = query(`SELECT ${r.cols.map((c) => sel(c, r.date)).join(', ')} FROM ${r.view} WHERE CO_PATH='${CO}'`, r.cols);
   const firstParty = rows[0]?.PARTY;
+  for (const row of rows) if ('SRAL_NO' in row) row.SRAL_NO = row.SRAL_NO;
   const scenarios = r.scenarios.map((s) => {
     const p = { from: '2026-04-01', to: '2027-03-31', orderBy2: 'None', ...s.params };
     for (const k of Object.keys(p)) if (Array.isArray(p[k])) p[k] = p[k].map((v) => (v === '__FIRST_PARTY__' ? firstParty : v));

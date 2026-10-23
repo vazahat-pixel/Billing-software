@@ -4,6 +4,7 @@
 const REPORTS = {
   Rpt_Process_Issue_Report: require('./reports/processSend'),
   Rpt_Job_IssueReport: require('./reports/jobSend'),
+  Rpt_Process_Receipt_Detail: require('./reports/processReceiptDetail'),
 };
 
 function get(reportId) {

@@ -1,0 +1,378 @@
+{
+ "report": "processReceiptDetail",
+ "key": [
+  "NCBILL_NO",
+  "BILL_DATE",
+  "MILL",
+  "GREYITEM",
+  "REC_QTY"
+ ],
+ "dateField": "BILL_DATE",
+ "rows": [
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "GREYITEM": "GRAY MICRO",
+   "FINISHITEM": "",
+   "IT_RATE": "5.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "1",
+   "NCBILL_NO": "1245",
+   "BILL_DATE": "2026-07-22",
+   "REC_QTY": "240.000"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "GREYITEM": "GRAY MICRO",
+   "FINISHITEM": "DOBBY",
+   "IT_RATE": "20.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "2",
+   "NCBILL_NO": "3",
+   "BILL_DATE": "2026-07-30",
+   "REC_QTY": "0.000"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "GREYITEM": "GRAY MICRO",
+   "FINISHITEM": "GRAY MICRO",
+   "IT_RATE": "200.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "3",
+   "NCBILL_NO": "2",
+   "BILL_DATE": "2026-08-04",
+   "REC_QTY": "0.000"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "GREYITEM": "GRAY MICRO",
+   "FINISHITEM": "",
+   "IT_RATE": "200.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "5",
+   "NCBILL_NO": "9",
+   "BILL_DATE": "2026-08-10",
+   "REC_QTY": "900.000"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "GREYITEM": "DOBBY",
+   "FINISHITEM": "",
+   "IT_RATE": "20.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "6",
+   "NCBILL_NO": "33",
+   "BILL_DATE": "2026-08-12",
+   "REC_QTY": "70.000"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "GREYITEM": "DOBBY",
+   "FINISHITEM": "",
+   "IT_RATE": "20000.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "7",
+   "NCBILL_NO": "222",
+   "BILL_DATE": "2026-08-14",
+   "REC_QTY": "2.000"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "GREYITEM": "BLOUSE",
+   "FINISHITEM": "",
+   "IT_RATE": "90.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "8",
+   "NCBILL_NO": "444",
+   "BILL_DATE": "2026-08-14",
+   "REC_QTY": "80.000"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "GREYITEM": "BLOUSE",
+   "FINISHITEM": "",
+   "IT_RATE": "2000.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "9",
+   "NCBILL_NO": "34",
+   "BILL_DATE": "2026-08-21",
+   "REC_QTY": "80.000"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE VASUDEV",
+   "GREYITEM": "SHIRT COTTON",
+   "FINISHITEM": "",
+   "IT_RATE": "10.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "10",
+   "NCBILL_NO": "145",
+   "BILL_DATE": "2026-08-24",
+   "REC_QTY": "450.000"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE VASUDEV",
+   "GREYITEM": "GRY SHIRT",
+   "FINISHITEM": "",
+   "IT_RATE": "10.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "10",
+   "NCBILL_NO": "145",
+   "BILL_DATE": "2026-08-24",
+   "REC_QTY": "2500.000"
+  }
+ ],
+ "scenarios": [
+  {
+   "name": "register",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "None",
+    "orderBy1": "Register"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "1245",
+     "BILL_DATE": "2026-07-22",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "GRAY MICRO",
+     "REC_QTY": "240.000"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-07-30",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "GRAY MICRO",
+     "REC_QTY": "0.000"
+    },
+    {
+     "NCBILL_NO": "2",
+     "BILL_DATE": "2026-08-04",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "GRAY MICRO",
+     "REC_QTY": "0.000"
+    },
+    {
+     "NCBILL_NO": "9",
+     "BILL_DATE": "2026-08-10",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "GRAY MICRO",
+     "REC_QTY": "900.000"
+    },
+    {
+     "NCBILL_NO": "33",
+     "BILL_DATE": "2026-08-12",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "DOBBY",
+     "REC_QTY": "70.000"
+    },
+    {
+     "NCBILL_NO": "222",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "DOBBY",
+     "REC_QTY": "2.000"
+    },
+    {
+     "NCBILL_NO": "444",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "BLOUSE",
+     "REC_QTY": "80.000"
+    },
+    {
+     "NCBILL_NO": "34",
+     "BILL_DATE": "2026-08-21",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "BLOUSE",
+     "REC_QTY": "80.000"
+    },
+    {
+     "NCBILL_NO": "145",
+     "BILL_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "GREYITEM": "SHIRT COTTON",
+     "REC_QTY": "450.000"
+    },
+    {
+     "NCBILL_NO": "145",
+     "BILL_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "GREYITEM": "GRY SHIRT",
+     "REC_QTY": "2500.000"
+    }
+   ]
+  },
+  {
+   "name": "mill + greyitem",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "GreyItem",
+    "orderBy1": "Mill"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "444",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "BLOUSE",
+     "REC_QTY": "80.000"
+    },
+    {
+     "NCBILL_NO": "34",
+     "BILL_DATE": "2026-08-21",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "BLOUSE",
+     "REC_QTY": "80.000"
+    },
+    {
+     "NCBILL_NO": "33",
+     "BILL_DATE": "2026-08-12",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "DOBBY",
+     "REC_QTY": "70.000"
+    },
+    {
+     "NCBILL_NO": "222",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "DOBBY",
+     "REC_QTY": "2.000"
+    },
+    {
+     "NCBILL_NO": "1245",
+     "BILL_DATE": "2026-07-22",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "GRAY MICRO",
+     "REC_QTY": "240.000"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-07-30",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "GRAY MICRO",
+     "REC_QTY": "0.000"
+    },
+    {
+     "NCBILL_NO": "2",
+     "BILL_DATE": "2026-08-04",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "GRAY MICRO",
+     "REC_QTY": "0.000"
+    },
+    {
+     "NCBILL_NO": "9",
+     "BILL_DATE": "2026-08-10",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "GRAY MICRO",
+     "REC_QTY": "900.000"
+    },
+    {
+     "NCBILL_NO": "145",
+     "BILL_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "GREYITEM": "GRY SHIRT",
+     "REC_QTY": "2500.000"
+    },
+    {
+     "NCBILL_NO": "145",
+     "BILL_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "GREYITEM": "SHIRT COTTON",
+     "REC_QTY": "450.000"
+    }
+   ]
+  },
+  {
+   "name": "rate",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "None",
+    "orderBy1": "Rate"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "1245",
+     "BILL_DATE": "2026-07-22",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "GRAY MICRO",
+     "REC_QTY": "240.000"
+    },
+    {
+     "NCBILL_NO": "145",
+     "BILL_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "GREYITEM": "SHIRT COTTON",
+     "REC_QTY": "450.000"
+    },
+    {
+     "NCBILL_NO": "145",
+     "BILL_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "GREYITEM": "GRY SHIRT",
+     "REC_QTY": "2500.000"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-07-30",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "GRAY MICRO",
+     "REC_QTY": "0.000"
+    },
+    {
+     "NCBILL_NO": "33",
+     "BILL_DATE": "2026-08-12",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "DOBBY",
+     "REC_QTY": "70.000"
+    },
+    {
+     "NCBILL_NO": "444",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "BLOUSE",
+     "REC_QTY": "80.000"
+    },
+    {
+     "NCBILL_NO": "2",
+     "BILL_DATE": "2026-08-04",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "GRAY MICRO",
+     "REC_QTY": "0.000"
+    },
+    {
+     "NCBILL_NO": "9",
+     "BILL_DATE": "2026-08-10",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "GRAY MICRO",
+     "REC_QTY": "900.000"
+    },
+    {
+     "NCBILL_NO": "34",
+     "BILL_DATE": "2026-08-21",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "BLOUSE",
+     "REC_QTY": "80.000"
+    },
+    {
+     "NCBILL_NO": "222",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "GREYITEM": "DOBBY",
+     "REC_QTY": "2.000"
+    }
+   ]
+  }
+ ]
+}
