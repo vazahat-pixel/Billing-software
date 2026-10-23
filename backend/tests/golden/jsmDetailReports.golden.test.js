@@ -10,6 +10,7 @@ const REPORTS = {
   jobSend: require('../../services/jsmReports/reports/jobSend'),
   processReceiptDetail: require('../../services/jsmReports/reports/processReceiptDetail'),
   jobReceiptDetail: require('../../services/jsmReports/reports/jobReceiptDetail'),
+  processReceiptSummary: require('../../services/jsmReports/reports/processReceiptSummary'),
 };
 const dir = path.join(__dirname, 'fixtures');
 const r2 = (v) => (/^-?\d+(\.\d+)?$/.test(String(v)) ? Number(Number(v).toFixed(2)) : String(v));
@@ -21,7 +22,10 @@ for (const file of fs.readdirSync(dir).filter((f) => REPORTS[(f.match(/^jsm_[a-z
   const rows = fx.rows.map((r, i) => ({
     ...r,
     [fx.dateField]: new Date(`${r[fx.dateField]}T00:00:00Z`),
+    DATEWISE: new Date(`${r[fx.dateField]}T00:00:00Z`),
     CHLN_NO: Number(r.CHLN_NO || 0),
+    MONTH_NO: r.MONTH_NO === undefined ? undefined : Number(r.MONTH_NO),
+    YEAR_NO: r.YEAR_NO === undefined ? undefined : Number(r.YEAR_NO),
     IT_RATE: r.IT_RATE === undefined ? undefined : Number(r.IT_RATE),
     SRAL_NO: r.SRAL_NO,
     CO_ENT_NO: String(i),

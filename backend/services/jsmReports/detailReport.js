@@ -19,7 +19,7 @@ function detailReport(spec) {
 
     const x1 = spec.xColumns[order1];
     const x2 = order2 === 'None' ? null : spec.xColumns[order2];
-    const orderCols = [x1, x2, ...spec.tieBreak].filter(Boolean);
+    const orderCols = (spec.orderColumns ? spec.orderColumns(order1, order2, x1, x2) : [x1, x2]).concat(spec.tieBreak).filter(Boolean);
     const base = (c) => spec.xSource[c] || c;
     if (new Set(orderCols.map(base)).size !== orderCols.length) {
       const err = new Error(DUPLICATE_ORDER);

@@ -15,6 +15,24 @@ const SEP = '\u0001';
 if (!/^[A-Za-z0-9_]+$/.test(CO)) throw new Error('--co must be alphanumeric');
 
 const REPORTS = {
+  processReceiptSummary: {
+    view: 'JSM_VW_PROCESS_RECEIPT_SUMMARY',
+    date: 'BILL_DATE',
+    cols: ['BOOK', 'MILL', 'MSME_TYPE', 'MONTH', 'MONTH_NO', 'YEAR_NO', 'SGC', 'SRAL_NO', 'NCBILL_NO', 'BILL_DATE', 'TO_REC_QTY', 'NET_TOT'],
+    key: ['NCBILL_NO', 'BILL_DATE', 'MILL', 'TO_REC_QTY', 'NET_TOT'],
+    fix: 'ENT_NO AS XENT_NO, CO_ENT_NO AS XCO_ENT_NO, BOOK AS XBOOK, MILL AS XMILL, MSME_TYPE AS XMSME_TYPE, BOOK AS XREGISTER, MONTH AS XMONTH, cast(bill_date as date) AS XDateWise',
+    filters: { mills: 'MILL', msmeTypes: 'MSME_TYPE' },
+    extraWhere: "A.sgc <> 'x'",
+    x: { Register: 'XREGISTER', Mill: 'XMILL', Msme_Type: 'XMSME_TYPE', Month: 'XMONTH', Book: 'XBOOK', DateWise: 'XDateWise' },
+    orderFn: (o1, o2, x1, x2) => (o1 === 'Month' ? ['YEAR_NO,MONTH_NO ASC', x1, x2] : o2 === 'Month' ? [x1, 'YEAR_NO,MONTH_NO ASC', x2] : [x1, x2]),
+    tieBreak: 'BILL_DATE,SRAL_NO,NCBILL_NO',
+    scenarios: [
+      { name: 'register', params: { orderBy1: 'Register' } },
+      { name: 'mill + month', params: { orderBy1: 'Mill', orderBy2: 'Month' } },
+      { name: 'month + mill', params: { orderBy1: 'Month', orderBy2: 'Mill' } },
+      { name: 'book + datewise', params: { orderBy1: 'Book', orderBy2: 'DateWise' } },
+    ],
+  },
   jobReceiptDetail: {
     view: 'JSM_VW_JOBWORK_RECEIPT_DETAIL',
     date: 'BILL_DATE',
@@ -82,8 +100,11 @@ for (const [name, r] of Object.entries(REPORTS)) {
     const p = { from: '2026-04-01', to: '2027-03-31', orderBy2: 'None', ...s.params };
     for (const k of Object.keys(p)) if (Array.isArray(p[k])) p[k] = p[k].map((v) => (v === '__FIRST_PARTY__' ? firstParty : v));
     const where = [`A.CO_PATH IN ('${CO}')`, `(A.${r.date} >='${p.from}' AND A.${r.date} <='${p.to}')`,
-      ...Object.entries(r.filters).map(([param, f]) => (p[param]?.length ? `A.${f} IN (${p[param].map(q).join(',')})` : `A.${f} NOT IN ('X9999')`))];
-    const order = [r.x[p.orderBy1], p.orderBy2 !== 'None' ? r.x[p.orderBy2] : null, r.tieBreak].filter(Boolean).join(',');
+      ...Object.entries(r.filters).map(([param, f]) => (p[param]?.length ? `A.${f} IN (${p[param].map(q).join(',')})` : `A.${f} NOT IN ('X9999')`)),
+      ...(r.extraWhere ? [r.extraWhere] : [])];
+    const x1 = r.x[p.orderBy1];
+    const x2 = p.orderBy2 !== 'None' ? r.x[p.orderBy2] : null;
+    const order = [...(r.orderFn ? r.orderFn(p.orderBy1, p.orderBy2, x1, x2) : [x1, x2]), r.tieBreak].filter(Boolean).join(',');
     try {
       const expected = query(`SELECT ${r.key.map((c) => sel(c, r.date)).join(', ')}, ${r.fix} FROM ${r.view} A WHERE ${where.join(' AND ')} ORDER BY ${order}`, r.key);
       return { name: s.name, params: p, expected };

@@ -1,0 +1,479 @@
+{
+ "report": "processReceiptSummary",
+ "key": [
+  "NCBILL_NO",
+  "BILL_DATE",
+  "MILL",
+  "TO_REC_QTY",
+  "NET_TOT"
+ ],
+ "dateField": "BILL_DATE",
+ "rows": [
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "MSME_TYPE": "",
+   "MONTH": "July",
+   "MONTH_NO": "7",
+   "YEAR_NO": "2026",
+   "SGC": "",
+   "SRAL_NO": "1",
+   "NCBILL_NO": "1245",
+   "BILL_DATE": "2026-07-22",
+   "TO_REC_QTY": "240.000",
+   "NET_TOT": "1164.00"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "MSME_TYPE": "",
+   "MONTH": "July",
+   "MONTH_NO": "7",
+   "YEAR_NO": "2026",
+   "SGC": "",
+   "SRAL_NO": "2",
+   "NCBILL_NO": "3",
+   "BILL_DATE": "2026-07-30",
+   "TO_REC_QTY": "0.000",
+   "NET_TOT": "0.00"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SGC": "",
+   "SRAL_NO": "3",
+   "NCBILL_NO": "2",
+   "BILL_DATE": "2026-08-04",
+   "TO_REC_QTY": "0.000",
+   "NET_TOT": "0.00"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SGC": "",
+   "SRAL_NO": "4",
+   "NCBILL_NO": "121",
+   "BILL_DATE": "2026-08-05",
+   "TO_REC_QTY": "0.000",
+   "NET_TOT": "0.00"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SGC": "",
+   "SRAL_NO": "5",
+   "NCBILL_NO": "9",
+   "BILL_DATE": "2026-08-10",
+   "TO_REC_QTY": "900.000",
+   "NET_TOT": "180000.00"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SGC": "",
+   "SRAL_NO": "6",
+   "NCBILL_NO": "33",
+   "BILL_DATE": "2026-08-12",
+   "TO_REC_QTY": "70.000",
+   "NET_TOT": "1400.00"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SGC": "",
+   "SRAL_NO": "7",
+   "NCBILL_NO": "222",
+   "BILL_DATE": "2026-08-14",
+   "TO_REC_QTY": "2.000",
+   "NET_TOT": "40000.00"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SGC": "",
+   "SRAL_NO": "8",
+   "NCBILL_NO": "444",
+   "BILL_DATE": "2026-08-14",
+   "TO_REC_QTY": "80.000",
+   "NET_TOT": "7200.00"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SGC": "",
+   "SRAL_NO": "9",
+   "NCBILL_NO": "34",
+   "BILL_DATE": "2026-08-21",
+   "TO_REC_QTY": "80.000",
+   "NET_TOT": "160000.00"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "MILL": "SHREE VASUDEV",
+   "MSME_TYPE": "",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "SGC": "",
+   "SRAL_NO": "10",
+   "NCBILL_NO": "145",
+   "BILL_DATE": "2026-08-24",
+   "TO_REC_QTY": "2950.000",
+   "NET_TOT": "29426.00"
+  }
+ ],
+ "scenarios": [
+  {
+   "name": "register",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "None",
+    "orderBy1": "Register"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "1245",
+     "BILL_DATE": "2026-07-22",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "240.000",
+     "NET_TOT": "1164.00"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-07-30",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "2",
+     "BILL_DATE": "2026-08-04",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "121",
+     "BILL_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "9",
+     "BILL_DATE": "2026-08-10",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "900.000",
+     "NET_TOT": "180000.00"
+    },
+    {
+     "NCBILL_NO": "33",
+     "BILL_DATE": "2026-08-12",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "70.000",
+     "NET_TOT": "1400.00"
+    },
+    {
+     "NCBILL_NO": "222",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "2.000",
+     "NET_TOT": "40000.00"
+    },
+    {
+     "NCBILL_NO": "444",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "80.000",
+     "NET_TOT": "7200.00"
+    },
+    {
+     "NCBILL_NO": "34",
+     "BILL_DATE": "2026-08-21",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "80.000",
+     "NET_TOT": "160000.00"
+    },
+    {
+     "NCBILL_NO": "145",
+     "BILL_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "TO_REC_QTY": "2950.000",
+     "NET_TOT": "29426.00"
+    }
+   ]
+  },
+  {
+   "name": "mill + month",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "Month",
+    "orderBy1": "Mill"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "1245",
+     "BILL_DATE": "2026-07-22",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "240.000",
+     "NET_TOT": "1164.00"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-07-30",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "2",
+     "BILL_DATE": "2026-08-04",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "121",
+     "BILL_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "9",
+     "BILL_DATE": "2026-08-10",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "900.000",
+     "NET_TOT": "180000.00"
+    },
+    {
+     "NCBILL_NO": "33",
+     "BILL_DATE": "2026-08-12",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "70.000",
+     "NET_TOT": "1400.00"
+    },
+    {
+     "NCBILL_NO": "222",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "2.000",
+     "NET_TOT": "40000.00"
+    },
+    {
+     "NCBILL_NO": "444",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "80.000",
+     "NET_TOT": "7200.00"
+    },
+    {
+     "NCBILL_NO": "34",
+     "BILL_DATE": "2026-08-21",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "80.000",
+     "NET_TOT": "160000.00"
+    },
+    {
+     "NCBILL_NO": "145",
+     "BILL_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "TO_REC_QTY": "2950.000",
+     "NET_TOT": "29426.00"
+    }
+   ]
+  },
+  {
+   "name": "month + mill",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "Mill",
+    "orderBy1": "Month"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "1245",
+     "BILL_DATE": "2026-07-22",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "240.000",
+     "NET_TOT": "1164.00"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-07-30",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "2",
+     "BILL_DATE": "2026-08-04",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "121",
+     "BILL_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "9",
+     "BILL_DATE": "2026-08-10",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "900.000",
+     "NET_TOT": "180000.00"
+    },
+    {
+     "NCBILL_NO": "33",
+     "BILL_DATE": "2026-08-12",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "70.000",
+     "NET_TOT": "1400.00"
+    },
+    {
+     "NCBILL_NO": "222",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "2.000",
+     "NET_TOT": "40000.00"
+    },
+    {
+     "NCBILL_NO": "444",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "80.000",
+     "NET_TOT": "7200.00"
+    },
+    {
+     "NCBILL_NO": "34",
+     "BILL_DATE": "2026-08-21",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "80.000",
+     "NET_TOT": "160000.00"
+    },
+    {
+     "NCBILL_NO": "145",
+     "BILL_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "TO_REC_QTY": "2950.000",
+     "NET_TOT": "29426.00"
+    }
+   ]
+  },
+  {
+   "name": "book + datewise",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "DateWise",
+    "orderBy1": "Book"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "1245",
+     "BILL_DATE": "2026-07-22",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "240.000",
+     "NET_TOT": "1164.00"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-07-30",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "2",
+     "BILL_DATE": "2026-08-04",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "121",
+     "BILL_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "0.000",
+     "NET_TOT": "0.00"
+    },
+    {
+     "NCBILL_NO": "9",
+     "BILL_DATE": "2026-08-10",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "900.000",
+     "NET_TOT": "180000.00"
+    },
+    {
+     "NCBILL_NO": "33",
+     "BILL_DATE": "2026-08-12",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "70.000",
+     "NET_TOT": "1400.00"
+    },
+    {
+     "NCBILL_NO": "222",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "2.000",
+     "NET_TOT": "40000.00"
+    },
+    {
+     "NCBILL_NO": "444",
+     "BILL_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "80.000",
+     "NET_TOT": "7200.00"
+    },
+    {
+     "NCBILL_NO": "34",
+     "BILL_DATE": "2026-08-21",
+     "MILL": "SHREE LAV",
+     "TO_REC_QTY": "80.000",
+     "NET_TOT": "160000.00"
+    },
+    {
+     "NCBILL_NO": "145",
+     "BILL_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "TO_REC_QTY": "2950.000",
+     "NET_TOT": "29426.00"
+    }
+   ]
+  }
+ ]
+}
