@@ -11,16 +11,16 @@ require('../../../models/InventoryLot');
 require('../../../models/Item');
 const { MONTHS, round } = require('../jcEngine');
 
-async function loadMillReceiptRows(companyId) {
+async function loadMillReceiptRows(companyId, bookModule = 'millRec') {
   const [jobs, book] = await Promise.all([
     Job.find({ companyId, status: { $in: ['Received', 'Partial'] } })
       .populate('workerId', 'name')
       .populate('outputItemId', 'name')
       .populate({ path: 'lotId', select: 'lotId itemId', populate: { path: 'itemId', select: 'name' } })
       .lean(),
-    Book.findOne({ companyId, module: 'millRec' }).sort({ createdAt: 1 }).lean(),
+    Book.findOne({ companyId, module: bookModule }).sort({ createdAt: 1 }).lean(),
   ]);
-  const bookName = book?.name || 'MILL RECEIPT';
+  const bookName = book?.name || (bookModule === 'jobRec' ? 'JOB RECEIPT' : 'MILL RECEIPT');
   return jobs.map((j) => {
     const date = j.receiveDate ? new Date(j.receiveDate) : (j.issueDate ? new Date(j.issueDate) : null);
     const qty = Number(j.receivedQty || 0);
@@ -34,6 +34,14 @@ async function loadMillReceiptRows(companyId) {
       REGISTER: bookName,
       MILL: j.workerId?.name || '',
       GREYITEM: grey,
+      PARTY: j.workerId?.name || '',
+      BROKER: '',
+      ITEM: grey,
+      RECITEM: j.outputItemId?.name || grey,
+      SHORT_PCS: Math.max(0, Number(j.issuePcs || 0) - Number(j.receivedPcs || 0)),
+      CONS_PCS: 0,
+      PLAIN_PCS: Number(j.receivedPcs || 0),
+      SHORT_QTY: round(Number(j.wastage || 0)),
       FINISHITEM: j.outputItemId?.name || grey,
       SRAL_NO: '',
       NCBILL_NO: String(j.billGpNo || j.challanNo || ''),

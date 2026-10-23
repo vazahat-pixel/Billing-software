@@ -1,0 +1,218 @@
+{
+ "report": "jobReceiptDetail",
+ "key": [
+  "NCBILL_NO",
+  "BILL_DATE",
+  "PARTY",
+  "ITEM",
+  "REC_PCS"
+ ],
+ "dateField": "BILL_DATE",
+ "rows": [
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "RECITEM": "",
+   "IT_RATE": "4.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "2",
+   "NCBILL_NO": "8",
+   "BILL_DATE": "2026-08-10",
+   "REC_PCS": "200"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "RECITEM": "DOBBY",
+   "IT_RATE": "44.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "3",
+   "NCBILL_NO": "999",
+   "BILL_DATE": "2026-08-11",
+   "REC_PCS": "4"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "BLOUSE",
+   "RECITEM": "BLOUSE",
+   "IT_RATE": "45.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "4",
+   "NCBILL_NO": "23",
+   "BILL_DATE": "2026-08-12",
+   "REC_PCS": "4"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "GRAY MICRO",
+   "RECITEM": "",
+   "IT_RATE": "200.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "5",
+   "NCBILL_NO": "3",
+   "BILL_DATE": "2026-08-12",
+   "REC_PCS": "2"
+  },
+  {
+   "BOOK": "JOBWORK BOOK",
+   "PARTY": "BROKER",
+   "BROKER": "",
+   "ITEM": "DOBBY",
+   "RECITEM": "",
+   "IT_RATE": "200.000",
+   "IT_DESC1": "",
+   "SRAL_NO": "6",
+   "NCBILL_NO": "333",
+   "BILL_DATE": "2026-08-21",
+   "REC_PCS": "2"
+  }
+ ],
+ "scenarios": [
+  {
+   "name": "register",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "None",
+    "orderBy1": "Register"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "8",
+     "BILL_DATE": "2026-08-10",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "REC_PCS": "200"
+    },
+    {
+     "NCBILL_NO": "999",
+     "BILL_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "REC_PCS": "4"
+    },
+    {
+     "NCBILL_NO": "23",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "REC_PCS": "4"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "GRAY MICRO",
+     "REC_PCS": "2"
+    },
+    {
+     "NCBILL_NO": "333",
+     "BILL_DATE": "2026-08-21",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "REC_PCS": "2"
+    }
+   ]
+  },
+  {
+   "name": "party + recitem",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "RecItem",
+    "orderBy1": "Party"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "8",
+     "BILL_DATE": "2026-08-10",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "REC_PCS": "200"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "GRAY MICRO",
+     "REC_PCS": "2"
+    },
+    {
+     "NCBILL_NO": "333",
+     "BILL_DATE": "2026-08-21",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "REC_PCS": "2"
+    },
+    {
+     "NCBILL_NO": "23",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "REC_PCS": "4"
+    },
+    {
+     "NCBILL_NO": "999",
+     "BILL_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "REC_PCS": "4"
+    }
+   ]
+  },
+  {
+   "name": "rate",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "None",
+    "orderBy1": "Rate"
+   },
+   "expected": [
+    {
+     "NCBILL_NO": "8",
+     "BILL_DATE": "2026-08-10",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "REC_PCS": "200"
+    },
+    {
+     "NCBILL_NO": "999",
+     "BILL_DATE": "2026-08-11",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "REC_PCS": "4"
+    },
+    {
+     "NCBILL_NO": "23",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "BLOUSE",
+     "REC_PCS": "4"
+    },
+    {
+     "NCBILL_NO": "3",
+     "BILL_DATE": "2026-08-12",
+     "PARTY": "BROKER",
+     "ITEM": "GRAY MICRO",
+     "REC_PCS": "2"
+    },
+    {
+     "NCBILL_NO": "333",
+     "BILL_DATE": "2026-08-21",
+     "PARTY": "BROKER",
+     "ITEM": "DOBBY",
+     "REC_PCS": "2"
+    }
+   ]
+  }
+ ]
+}

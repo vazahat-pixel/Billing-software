@@ -15,6 +15,21 @@ const SEP = '\u0001';
 if (!/^[A-Za-z0-9_]+$/.test(CO)) throw new Error('--co must be alphanumeric');
 
 const REPORTS = {
+  jobReceiptDetail: {
+    view: 'JSM_VW_JOBWORK_RECEIPT_DETAIL',
+    date: 'BILL_DATE',
+    cols: ['BOOK', 'PARTY', 'BROKER', 'ITEM', 'RECITEM', 'IT_RATE', 'IT_DESC1', 'SRAL_NO', 'NCBILL_NO', 'BILL_DATE', 'REC_PCS'],
+    key: ['NCBILL_NO', 'BILL_DATE', 'PARTY', 'ITEM', 'REC_PCS'],
+    fix: 'BOOK AS XREGISTER, PARTY AS XPARTY, BROKER AS XBROKER, ITEM AS XITEM, RECITEM AS XRECITEM, IT_RATE AS XRATE',
+    filters: { parties: 'PARTY', brokers: 'BROKER', items: 'ITEM' },
+    x: { Register: 'XREGISTER', Party: 'XPARTY', Broker: 'XBROKER', Item: 'XITEM', RecItem: 'XRECITEM', Rate: 'XRATE' },
+    tieBreak: 'BILL_DATE,SRAL_NO,NCBILL_NO',
+    scenarios: [
+      { name: 'register', params: { orderBy1: 'Register' } },
+      { name: 'party + recitem', params: { orderBy1: 'Party', orderBy2: 'RecItem' } },
+      { name: 'rate', params: { orderBy1: 'Rate' } },
+    ],
+  },
   processReceiptDetail: {
     view: 'JSM_VW_PROCESS_RECEIPT_DETAIL',
     date: 'BILL_DATE',

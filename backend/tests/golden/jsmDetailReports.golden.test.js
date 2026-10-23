@@ -9,6 +9,7 @@ const path = require('path');
 const REPORTS = {
   jobSend: require('../../services/jsmReports/reports/jobSend'),
   processReceiptDetail: require('../../services/jsmReports/reports/processReceiptDetail'),
+  jobReceiptDetail: require('../../services/jsmReports/reports/jobReceiptDetail'),
 };
 const dir = path.join(__dirname, 'fixtures');
 const r2 = (v) => (/^-?\d+(\.\d+)?$/.test(String(v)) ? Number(Number(v).toFixed(2)) : String(v));
