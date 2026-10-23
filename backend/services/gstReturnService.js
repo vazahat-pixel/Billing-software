@@ -11,6 +11,9 @@ const {
   placeOfSupply, filingPeriodFp, periodBounds, stateCodeFromGstin, b2clThreshold,
 } = require('../utils/gstDetermination');
 const auditService = require('./auditService');
+const {
+  allocateInvoiceLines, groupByRate, buildDocSeries, uqcLabel,
+} = require('../utils/gstr1Lines');
 
 const round2 = (n) => Number(Number(n || 0).toFixed(2));
 
@@ -55,7 +58,7 @@ class GstReturnService {
       isDeleted: { $ne: true },
       date: { $gte: startDate, $lte: endDate },
     })
-      .select('invoiceNo date')
+      .select('invoiceNo date bookId')
       .lean();
   }
 
@@ -64,7 +67,7 @@ class GstReturnService {
       companyId,
       date: { $gte: startDate, $lte: endDate },
     })
-      .populate('partyId', 'name gstin')
+      .populate('partyId', 'name gstin stateCode')
       .lean();
   }
 
@@ -89,7 +92,7 @@ class GstReturnService {
       .populate({
         path: 'partyLedgerId',
         select: 'name linkedPartyId',
-        populate: { path: 'linkedPartyId', select: 'gstin name' },
+        populate: { path: 'linkedPartyId', select: 'gstin name stateCode' },
       })
       .lean();
   }
@@ -142,6 +145,7 @@ class GstReturnService {
     const cdnrRows = [];
     const cdnuRows = [];
     const hsnMap = {};
+    const hsnB2bMap = {};
     const hsnB2cMap = {};
     const expRows = [];
     const exempMap = {
@@ -161,86 +165,15 @@ class GstReturnService {
     };
 
     /**
-     * Portal expects rate-wise itms. Split invoice tax by taxable share per rate so
-     * sum(itms) always equals the SAVED invoice tax (books stay authoritative).
+     * Portal expects rate-wise itms. Rows come from the invoice lines at each line's own GST rate,
+     * so a 5% + 18% bill files as two rate rows (as JSM does) and sum(itms) equals the saved tax.
      */
-    const buildRateWiseItms = (saleDoc, header) => {
-      const buckets = {};
-      for (const line of saleDoc.items || []) {
-        const lineTaxable = round2(
-          line.taxableAmount
-            ?? line.amount
-            ?? ((line.mts || line.qty || 0) * (line.rate || 0))
-        );
-        if (!(lineTaxable > 0)) continue;
-        const lineRate = Number(
-          line.gstRate ?? line.itemId?.gstRate ?? header.taxRate ?? 0
-        );
-        const key = Number(lineRate || 0).toFixed(2);
-        if (!buckets[key]) buckets[key] = { rt: Number(key), txval: 0 };
-        buckets[key].txval = round2(buckets[key].txval + lineTaxable);
-      }
-      const entries = Object.values(buckets);
-      if (!entries.length) {
-        return [{
-          num: 1,
-          itm_det: {
-            txval: header.taxable,
-            rt: header.taxRate,
-            iamt: header.igst,
-            camt: header.cgst,
-            samt: header.sgst,
-            csamt: header.cess,
-          },
-        }];
-      }
-      if (entries.length === 1) {
-        return [{
-          num: 1,
-          itm_det: {
-            txval: header.taxable,
-            rt: entries[0].rt,
-            iamt: header.igst,
-            camt: header.cgst,
-            samt: header.sgst,
-            csamt: header.cess,
-          },
-        }];
-      }
-
-      const baseTaxable = entries.reduce((s, e) => s + e.txval, 0) || header.taxable || 1;
-      let used = { iamt: 0, camt: 0, samt: 0, csamt: 0, txval: 0 };
-      const itms = entries.map((e, idx) => {
-        const isLast = idx === entries.length - 1;
-        const share = e.txval / baseTaxable;
-        const det = isLast
-          ? {
-              txval: round2(header.taxable - used.txval),
-              rt: e.rt,
-              iamt: round2(header.igst - used.iamt),
-              camt: round2(header.cgst - used.camt),
-              samt: round2(header.sgst - used.samt),
-              csamt: round2(header.cess - used.csamt),
-            }
-          : {
-              txval: round2(e.txval),
-              rt: e.rt,
-              iamt: round2(header.igst * share),
-              camt: round2(header.cgst * share),
-              samt: round2(header.sgst * share),
-              csamt: round2(header.cess * share),
-            };
-        used = {
-          txval: round2(used.txval + det.txval),
-          iamt: round2(used.iamt + det.iamt),
-          camt: round2(used.camt + det.camt),
-          samt: round2(used.samt + det.samt),
-          csamt: round2(used.csamt + det.csamt),
-        };
-        return { num: idx + 1, itm_det: det };
-      });
-      return itms;
-    };
+    const buildRateWiseItms = (allocated) => groupByRate(allocated).map((g, idx) => ({
+      num: idx + 1,
+      itm_det: {
+        txval: g.txval, rt: g.rt, iamt: g.iamt, camt: g.camt, samt: g.samt, csamt: g.csamt,
+      },
+    }));
 
     for (const s of sales) {
       const gstin = (s.customerId?.gstin || '').toUpperCase();
@@ -296,6 +229,11 @@ class GstReturnService {
         continue;
       }
 
+      const allocated = allocateInvoiceLines(s, {
+        taxable, taxRate, cgst, sgst, igst, cess,
+      });
+      const rateRows = groupByRate(allocated);
+
       const inv = {
         inum: s.invoiceNo,
         idt: invDate,
@@ -305,9 +243,7 @@ class GstReturnService {
         party_name: partyName,
         rchrg: s.reverseCharge ? 'Y' : 'N',
         inv_typ: 'R',
-        itms: buildRateWiseItms(s, {
-          taxable, taxRate, cgst, sgst, igst, cess,
-        }),
+        itms: buildRateWiseItms(allocated),
       };
 
       if (isRegistered) {
@@ -318,84 +254,84 @@ class GstReturnService {
         }
         party.inv.push(inv);
 
-        b2bRows.push({
-          gstin,
-          partyName,
-          invoiceNo: s.invoiceNo,
-          date: invDate,
-          netAmount: invVal,
-          stateName: posFullName,
-          reverseCharge: s.reverseCharge ? 'Y' : 'N',
-          taxRate: `${taxRate.toFixed(2)}%`,
-          invType: 'Regular',
-          taxableAmount: taxable,
-          cgst,
-          sgst,
-          igst,
-          cess,
-        });
+        for (const g of rateRows) {
+          b2bRows.push({
+            gstin,
+            partyName,
+            invoiceNo: s.invoiceNo,
+            date: invDate,
+            netAmount: invVal,
+            stateName: posFullName,
+            reverseCharge: s.reverseCharge ? 'Y' : 'N',
+            taxRate: `${g.rt.toFixed(2)}%`,
+            invType: 'Regular',
+            taxableAmount: g.txval,
+            cgst: g.camt,
+            sgst: g.samt,
+            igst: g.iamt,
+            cess: g.csamt,
+          });
+        }
       } else if (invVal > b2clThreshold(s.date) && isInterState) {
         // B2CL — large interstate unregistered
         b2cl.push({ ...inv, val: invVal });
-        b2clRows.push({
-          invoiceNo: s.invoiceNo,
-          date: invDate,
-          netAmount: invVal,
-          stateName: posFullName,
-          taxRate: taxRate.toFixed(2),
-          taxableAmount: taxable,
-          cess,
-          ecomm: s.ecommGstin || '',
-          igst,
-        });
-      } else {
-        // B2CS — small unregistered
-        const rate = Number(taxRate || 0);
-        const rateStr = rate.toFixed(2);
-        const key = `${posFullName}|${rateStr}`;
-        if (!b2csMap[key]) {
-          b2csMap[key] = {
-            sply_ty: isInterState ? 'INTER' : 'INTRA',
-            pos: posCode,
-            pos_name: posFullName,
-            typ: 'OE',
-            app_rate: '',
-            rt: rateStr,
-            txval: 0,
-            iamt: 0,
-            camt: 0,
-            samt: 0,
-            csamt: 0,
-            ecomm: '',
-          };
+        for (const g of rateRows) {
+          b2clRows.push({
+            invoiceNo: s.invoiceNo,
+            date: invDate,
+            netAmount: invVal,
+            stateName: posFullName,
+            taxRate: g.rt.toFixed(2),
+            taxableAmount: g.txval,
+            cess: g.csamt,
+            ecomm: s.ecommGstin || '',
+            igst: g.iamt,
+          });
         }
-        b2csMap[key].txval = round2(b2csMap[key].txval + taxable);
-        b2csMap[key].iamt = round2(b2csMap[key].iamt + igst);
-        b2csMap[key].camt = round2(b2csMap[key].camt + cgst);
-        b2csMap[key].samt = round2(b2csMap[key].samt + sgst);
-        b2csMap[key].csamt = round2(b2csMap[key].csamt + cess);
+      } else {
+        // B2CS — small unregistered, one row per place-of-supply + line rate
+        for (const g of rateRows) {
+          const rateStr = Number(g.rt || 0).toFixed(2);
+          const key = `${posFullName}|${rateStr}`;
+          if (!b2csMap[key]) {
+            b2csMap[key] = {
+              sply_ty: isInterState ? 'INTER' : 'INTRA',
+              pos: posCode,
+              pos_name: posFullName,
+              typ: 'OE',
+              app_rate: '',
+              rt: rateStr,
+              txval: 0,
+              iamt: 0,
+              camt: 0,
+              samt: 0,
+              csamt: 0,
+              ecomm: '',
+            };
+          }
+          b2csMap[key].txval = round2(b2csMap[key].txval + g.txval);
+          b2csMap[key].iamt = round2(b2csMap[key].iamt + g.iamt);
+          b2csMap[key].camt = round2(b2csMap[key].camt + g.camt);
+          b2csMap[key].samt = round2(b2csMap[key].samt + g.samt);
+          b2csMap[key].csamt = round2(b2csMap[key].csamt + g.csamt);
+        }
       }
 
-      // HSN Breakdown
-      for (const line of s.items || []) {
-        const hsn = line.itemId?.hsnCode || line.hsnCode || '9999';
-        const desc = line.itemId?.name || line.description || 'Goods/Services';
-        const uqc = line.itemId?.unit || line.unit || 'PCS';
-        const lineTaxable = round2(line.amount || line.taxableAmount || (line.mts || line.qty || 0) * (line.rate || 0));
-        const lineRate = line.itemId?.gstRate ?? line.gstRate ?? taxRate;
-        const rt = Number(lineRate || 0) / 100;
-        const lineQty = round2(line.mts || line.qty || 1);
-
+      // HSN (Table 12): one row per HSN + UQC + rate, from line taxable and the saved line tax
+      for (const r of allocated) {
+        const rtStr = Number(r.rate || 0).toFixed(2);
+        const key = `${r.hsn}|${r.uqc}|${rtStr}`;
         const accumulateHsn = (targetMap) => {
-          if (!targetMap[hsn]) {
-            targetMap[hsn] = {
+          if (!targetMap[key]) {
+            targetMap[key] = {
               num: Object.keys(targetMap).length + 1,
-              hsn_sc: hsn,
-              desc,
-              uqc,
+              hsn_sc: r.hsn,
+              desc: r.desc,
+              uqc: r.uqc,
+              uqcDesc: uqcLabel(r.uqc),
               qty: 0,
               val: 0,
-              rt: Number(lineRate || 0).toFixed(2),
+              rt: rtStr,
               txval: 0,
               iamt: 0,
               camt: 0,
@@ -403,21 +339,17 @@ class GstReturnService {
               csamt: 0,
             };
           }
-          targetMap[hsn].qty = round2(targetMap[hsn].qty + lineQty);
-          targetMap[hsn].txval = round2(targetMap[hsn].txval + lineTaxable);
-          targetMap[hsn].val = round2(targetMap[hsn].val + lineTaxable * (1 + rt));
-          if (isInterState) {
-            targetMap[hsn].iamt = round2(targetMap[hsn].iamt + lineTaxable * rt);
-          } else {
-            targetMap[hsn].camt = round2(targetMap[hsn].camt + (lineTaxable * rt) / 2);
-            targetMap[hsn].samt = round2(targetMap[hsn].samt + (lineTaxable * rt) / 2);
-          }
+          const h = targetMap[key];
+          h.qty = round2(h.qty + r.qty);
+          h.txval = round2(h.txval + r.txval);
+          h.iamt = round2(h.iamt + r.iamt);
+          h.camt = round2(h.camt + r.camt);
+          h.samt = round2(h.samt + r.samt);
+          h.csamt = round2(h.csamt + r.csamt);
+          h.val = round2(h.val + r.txval + r.iamt + r.camt + r.samt + r.csamt);
         };
-
         accumulateHsn(hsnMap);
-        if (!isRegistered) {
-          accumulateHsn(hsnB2cMap);
-        }
+        accumulateHsn(isRegistered ? hsnB2bMap : hsnB2cMap);
       }
     }
 
@@ -432,7 +364,13 @@ class GstReturnService {
       ).toUpperCase();
       const partyName = n.partyLedgerId?.name || n.partyName || '';
       const noteDate = n.date ? new Date(n.date).toISOString().slice(0, 10) : '';
-      const posCode = n.stateCode || companyPos;
+      const posCode = String(n.placeOfSupply || '').match(/^d{2}/)?.[0]
+        || placeOfSupply({
+          partyGstin: ctin,
+          partyStateCode: n.partyLedgerId?.linkedPartyId?.stateCode,
+          companyStateCode: companyPos,
+        }).stateCode
+        || companyPos;
       const stateName = stateNameFromCode(posCode) || '';
       const posFullName = `${posCode}${stateName ? `-${stateName}` : ''}`;
       const noteVal = round2(n.netAmount || n.amount);
@@ -497,7 +435,11 @@ class GstReturnService {
       const ctin = (r.partyId?.gstin || r.partyGstin || '').toUpperCase();
       const partyName = r.partyId?.name || r.partyName || '';
       const retDate = r.date ? new Date(r.date).toISOString().slice(0, 10) : '';
-      const posCode = r.stateCode || companyPos;
+      const posCode = placeOfSupply({
+        partyGstin: ctin,
+        partyStateCode: r.partyId?.stateCode,
+        companyStateCode: companyPos,
+      }).stateCode || companyPos;
       const stateName = stateNameFromCode(posCode) || '';
       const posFullName = `${posCode}${stateName ? `-${stateName}` : ''}`;
       const retTcs = Number(r.tcsAmount || r.tcs || 0);
@@ -574,38 +516,26 @@ class GstReturnService {
       rsn: n.reason,
     }));
 
-    const cancelCount = cancelledSales.length;
-    const totnum = sales.length + cancelCount;
-    const allDocNos = [
-      ...sales.map((s) => s.invoiceNo).filter(Boolean),
-      ...cancelledSales.map((s) => s.invoiceNo).filter(Boolean),
-    ].sort();
-
+    const creditNotes = notes.filter((n) => n.noteType === 'Credit');
+    const debitNotes = notes.filter((n) => n.noteType === 'Debit');
+    const salesReturns = returns.filter((r) => r.returnType === 'Sales');
+    const invoiceSeries = buildDocSeries(sales, cancelledSales, 'Invoices for outward supply');
+    const creditSeries = buildDocSeries(
+      [
+        ...creditNotes.map((n) => ({ invoiceNo: n.noteNo })),
+        ...salesReturns.map((r) => ({ invoiceNo: r.invoiceNo || r.returnNo })),
+      ],
+      [],
+      'Credit Note'
+    );
+    const debitSeries = buildDocSeries(debitNotes.map((n) => ({ invoiceNo: n.noteNo })), [], 'Debit Note');
+    const emptyDocRow = (docType) => ({
+      docType, from: '', to: '', totnum: 0, cancel: 0, net_issue: 0,
+    });
     const docsRows = [
-      {
-        docType: 'Invoices for outward supply',
-        from: allDocNos[0] || sales[0]?.invoiceNo || 'N/A',
-        to: allDocNos[allDocNos.length - 1] || sales[sales.length - 1]?.invoiceNo || 'N/A',
-        totnum,
-        cancel: cancelCount,
-        net_issue: totnum - cancelCount,
-      },
-      {
-        docType: 'Credit Notes',
-        from: notes.filter(n => n.noteType === 'Credit')[0]?.noteNo || returns[0]?.invoiceNo || 'N/A',
-        to: notes.filter(n => n.noteType === 'Credit').slice(-1)[0]?.noteNo || returns.slice(-1)[0]?.invoiceNo || 'N/A',
-        totnum: notes.filter(n => n.noteType === 'Credit').length + returns.length,
-        cancel: 0,
-        net_issue: notes.filter(n => n.noteType === 'Credit').length + returns.length,
-      },
-      {
-        docType: 'Debit Notes',
-        from: notes.filter(n => n.noteType === 'Debit')[0]?.noteNo || 'N/A',
-        to: notes.filter(n => n.noteType === 'Debit').slice(-1)[0]?.noteNo || 'N/A',
-        totnum: notes.filter(n => n.noteType === 'Debit').length,
-        cancel: 0,
-        net_issue: notes.filter(n => n.noteType === 'Debit').length,
-      }
+      ...invoiceSeries,
+      ...(debitSeries.length ? debitSeries : [emptyDocRow('Debit Note')]),
+      ...(creditSeries.length ? creditSeries : [emptyDocRow('Credit Note')]),
     ];
 
     const exempRows = Object.values(exempMap).map(e => ({
@@ -629,21 +559,26 @@ class GstReturnService {
       cdnrRows,
       cdnur,
       cdnuRows,
-      hsn: { data: Object.values(hsnMap) },
-      hsnRows: Object.values(hsnMap),
+      hsn: {
+        data: Object.values(hsnMap),
+        hsn_b2b: Object.values(hsnB2bMap),
+        hsn_b2c: Object.values(hsnB2cMap),
+      },
+      hsnRows: Object.values(hsnB2bMap),
       hsnB2cRows: Object.values(hsnB2cMap),
       doc_issue: {
-        doc_det: [{
-          doc_num: 1,
-          docs: [{
-            num: 1,
-            from: docsRows[0].from,
-            to: docsRows[0].to,
-            totnum,
-            cancel: cancelCount,
-            net_issue: totnum - cancelCount,
-          }],
-        }],
+        doc_det: [
+          { doc_num: 1, docs: invoiceSeries },
+          { doc_num: 4, docs: debitSeries },
+          { doc_num: 5, docs: creditSeries },
+        ]
+          .filter((d) => d.docs.length)
+          .map((d) => ({
+            doc_num: d.doc_num,
+            docs: d.docs.map((x, i) => ({
+              num: i + 1, from: x.from, to: x.to, totnum: x.totnum, cancel: x.cancel, net_issue: x.net_issue,
+            })),
+          })),
       },
       docsRows,
       expRows,
@@ -928,12 +863,16 @@ class GstReturnService {
     let cgst = 0;
     let sgst = 0;
     let igst = 0;
-    const rows = [...(g1.b2cs || []), ...(g1.b2clRows || []), ...(g1.b2cl || [])];
+    // B2CS rows carry txval/tax; B2CL invoices carry them in itms[].itm_det (inv.val is the invoice value).
+    const rows = [
+      ...(g1.b2cs || []),
+      ...(g1.b2cl || []).flatMap((inv) => (inv.itms || []).map((it) => it.itm_det || {})),
+    ];
     for (const row of rows) {
-      taxable += Number(row.txval || row.val || 0);
-      cgst += Number(row.camt || row.cgst || 0);
-      sgst += Number(row.samt || row.sgst || 0);
-      igst += Number(row.iamt || row.igst || 0);
+      taxable += Number(row.txval || 0);
+      cgst += Number(row.camt || 0);
+      sgst += Number(row.samt || 0);
+      igst += Number(row.iamt || 0);
     }
     return {
       taxable: round2(taxable),
@@ -947,8 +886,8 @@ class GstReturnService {
     let taxable = 0;
     let igst = 0;
     for (const row of g1.expRows || []) {
-      taxable += Number(row.txval || row.val || 0);
-      igst += Number(row.iamt || row.igst || 0);
+      taxable += Number(row.taxableAmount || 0);
+      igst += Number(row.igst || 0);
     }
     return { taxable: round2(taxable), cgst: 0, sgst: 0, igst: round2(igst) };
   }

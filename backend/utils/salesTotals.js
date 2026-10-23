@@ -192,4 +192,4 @@ function recalcSalesTotals(items = [], {
   };
 }
 
-module.exports = { lineAmount, lineTaxable, recalcSalesTotals };
+module.exports = { lineQty, lineAmount, lineTaxable, recalcSalesTotals };

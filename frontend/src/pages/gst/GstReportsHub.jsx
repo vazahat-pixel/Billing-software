@@ -81,6 +81,32 @@ export const JSM_GST_GROUPS = [
   },
 ];
 
+/** GSTR-3B API returns { payload: { sup_details, itc_elg, outward, inward, netPayable }, totals }. */
+function normalizeGstr3b(raw) {
+  const p = raw?.payload || raw || {};
+  const rev = p.sup_details?.isup_rev || {};
+  const zero = p.sup_details?.osup_zero || {};
+  const itc = (p.itc_elg?.itc_avl || []).reduce((t, r) => ({
+    igst: t.igst + Number(r.iamt || 0),
+    cgst: t.cgst + Number(r.camt || 0),
+    sgst: t.sgst + Number(r.samt || 0),
+    cess: t.cess + Number(r.csamt || 0),
+  }), { igst: 0, cgst: 0, sgst: 0, cess: 0 });
+  return {
+    ...p,
+    totals: raw?.totals,
+    zeroRated: { taxable: Number(zero.txval || 0), igst: Number(zero.iamt || 0), cess: Number(zero.csamt || 0) },
+    inward: {
+      taxable: Number(p.inward?.taxable || 0),
+      ...itc,
+      taxableRcm: Number(rev.txval || 0),
+      igstRcm: Number(rev.iamt || 0),
+      cgstRcm: Number(rev.camt || 0),
+      sgstRcm: Number(rev.samt || 0),
+    },
+  };
+}
+
 export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1' }) {
   const { company } = useStore();
   const [activeReport, setActiveReport] = useState(initialReport || 'gstr1');
@@ -160,7 +186,7 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
       let res = null;
       switch (activeReport) {
         case 'gst3b': {
-          res = await stage4Api.gstr3b({ period: periodKey });
+          res = normalizeGstr3b(await stage4Api.gstr3b({ period: periodKey }));
           break;
         }
         case 'gstr1': {
@@ -172,7 +198,8 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
           break;
         }
         case 'gstr9': {
-          res = await stage4Api.gstr9({ financialYear });
+          const g9 = await stage4Api.gstr9({ financialYear });
+          res = g9?.payload ? { ...g9.payload, totals: g9.totals } : g9;
           break;
         }
         case 'itc04': {
@@ -184,7 +211,17 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
           break;
         }
         case 'gstrMatching': {
-          res = await stage4Api.fullReconcile({ startDate: fromDate, endDate: toDate });
+          const recon = await gstinReportApi.crossReconciliation({ period: periodKey });
+          res = {
+            ...recon,
+            checks: (recon?.checks || []).map((c) => ({
+              checkName: c.check,
+              booksVal: c.value1,
+              portalVal: c.value2,
+              diff: c.difference,
+              status: c.status,
+            })),
+          };
           break;
         }
         case 'ewayBulk':
@@ -818,11 +855,11 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
                         </tr>
                         <tr>
                           <td className="px-3 py-2 font-medium">3.1(b) Outward Zero Rated Supplies (Exports)</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.zeroRated?.taxable || 0)}</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.zeroRated?.igst || 0)}</td>
                           <td className="px-3 py-2 text-right font-mono">₹0.00</td>
                           <td className="px-3 py-2 text-right font-mono">₹0.00</td>
-                          <td className="px-3 py-2 text-right font-mono">₹0.00</td>
-                          <td className="px-3 py-2 text-right font-mono">₹0.00</td>
-                          <td className="px-3 py-2 text-right font-mono">₹0.00</td>
+                          <td className="px-3 py-2 text-right font-mono">{money(reportData?.zeroRated?.cess || 0)}</td>
                         </tr>
                         <tr>
                           <td className="px-3 py-2 font-medium">3.1(d) Inward Supplies Liable to Reverse Charge (RCM)</td>

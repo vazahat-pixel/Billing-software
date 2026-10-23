@@ -10,7 +10,7 @@ const Item = require('../models/Item');
 const InventoryLot = require('../models/InventoryLot');
 const Company = require('../models/Company');
 const gstConfigService = require('./gstConfigService');
-const { stateNameFromCode, stateCodeFromGstin } = require('../utils/gstDetermination');
+const { stateNameFromCode, stateCodeFromGstin, b2clThreshold } = require('../utils/gstDetermination');
 
 const round2 = (n) => Number(Number(n || 0).toFixed(2));
 const mongoose = require('mongoose');
@@ -715,9 +715,11 @@ class GstinReportService {
         }
       }
 
-      // Missing GSTIN for B2B (taxable > 2.5L interstate unregistered)
-      if (!gstin && taxable > 250000 && s.igst > 0) {
-        errors.push({ severity: 'warning', code: 'MISSING_GSTIN_B2CL', invoiceNo: s.invoiceNo, date: s.date, message: `Large B2C interstate sale (₹${taxable.toLocaleString()}) — verify B2CL classification` });
+      // Unregistered inter-state invoice above the B2CL limit (₹1 lakh from 01-Aug-2024, ₹2.5 lakh before),
+      // judged on invoice value excluding TCS — the same rule GSTR-1 uses to classify it.
+      const invValue = Number(s.netAmount || 0) - Number(s.tcsAmount || s.tcs || 0);
+      if (!gstin && s.igst > 0 && invValue > b2clThreshold(s.date)) {
+        errors.push({ severity: 'warning', code: 'MISSING_GSTIN_B2CL', invoiceNo: s.invoiceNo, date: s.date, message: `Large B2C interstate sale (₹${invValue.toLocaleString()}) — verify B2CL classification` });
       }
 
       // Missing HSN

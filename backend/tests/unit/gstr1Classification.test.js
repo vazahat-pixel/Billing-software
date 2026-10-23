@@ -121,12 +121,20 @@ describe('GSTR-1 Classification & B2CL Threshold Verification', () => {
         ],
       }];
 
+      // JSM's own GSTR-1 export (D:\0JsmGstinCSV, b2cs + hsn(b2c)) files this bill as two rate rows from
+      // T_SL_ITEM line taxable; the 2,700 fold in header TAXABLE_AMT carries no tax, so it is not filed.
       const res = await runBuildGstr1({ sales, period: '072026' });
       assert.equal(res.payload.b2b.length, 0);
       assert.equal(res.payload.b2cl.length, 0);
-      assert.equal(res.payload.b2cs.length, 1);
-      assert.equal(res.payload.b2cs[0].sply_ty, 'INTRA');
-      assert.equal(res.payload.b2cs[0].txval, 84774.68);
+      assert.equal(res.payload.b2cs.length, 2);
+      const byRate = Object.fromEntries(res.payload.b2cs.map((r) => [Number(r.rt), r]));
+      assert.equal(byRate[5].sply_ty, 'INTRA');
+      assert.equal(byRate[5].txval, 42301.28);
+      assert.equal(byRate[5].camt, 1057.53);
+      assert.equal(byRate[5].samt, 1057.53);
+      assert.equal(byRate[18].txval, 37073.40);
+      assert.equal(byRate[18].camt, 3336.61);
+      assert.equal(byRate[18].samt, 3336.61);
     });
 
     it('Invoice 1101: Inter-state 5% unregistered (Rs 1,050.00 <= 100k) goes to B2CS', async () => {

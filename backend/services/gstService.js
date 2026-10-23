@@ -49,7 +49,7 @@ class GstService {
   }
 
   async getGstr2(companyId, startDate, endDate) {
-    const query = { companyId };
+    const query = { companyId, status: { $ne: 'cancelled' } };
     if (startDate || endDate) {
       query.date = {};
       if (startDate) query.date.$gte = new Date(startDate);
@@ -64,19 +64,24 @@ class GstService {
       .populate('supplierId', 'name gstin state')
       .populate('items.itemId', 'name hsnCode gstRate');
 
-    return purchases.map(p => ({
+    return purchases.map(p => {
+      // Split only when the bill carries no component breakup; an IGST bill keeps CGST/SGST at 0.
+      const hasSplit = Number(p.cgst || 0) || Number(p.sgst || 0) || Number(p.igst || 0);
+      const half = hasSplit ? 0 : (p.gstAmount || 0) / 2;
+      return {
       invoiceNo: p.invoiceNo,
       date: p.date,
       partyName: p.supplierId?.name,
       gstin: p.supplierId?.gstin,
       // FIXED: Now using standardized field name taxableAmount (was totalAmount — confusing)
       taxable: p.taxableAmount || 0,
-      cgst: p.cgst || (p.gstAmount || 0) / 2,
-      sgst: p.sgst || (p.gstAmount || 0) / 2,
+      cgst: hasSplit ? (p.cgst || 0) : half,
+      sgst: hasSplit ? (p.sgst || 0) : half,
       igst: p.igst || 0,
       gstAmount: p.gstAmount || 0,
       netAmount: p.netAmount || p.taxableAmount
-    }));
+      };
+    });
   }
 
   /** Unified CA dashboard — GSTR-1, GSTR-2, GSTR-3B, registers, warnings */

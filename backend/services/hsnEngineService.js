@@ -1,3 +1,5 @@
+const { lineAmount, lineTaxable } = require('../utils/salesTotals');
+const { lineRate } = require('../utils/gstr1Lines');
 const HsnMaster = require('../models/HsnMaster');
 const Sales = require('../models/Sales');
 const Purchase = require('../models/Purchase');
@@ -58,14 +60,19 @@ class HsnEngineService {
     return { synced: count };
   }
 
-  async summary(companyId, { period, from, to, type = 'HSN' } = {}) {
+  async summary(companyId, {
+    period, from, to, startDate: fromAlias, endDate: toAlias, type = 'HSN',
+  } = {}) {
     let startDate;
     let endDate;
+    const fromArg = from || fromAlias;
+    const toArg = to || toAlias;
     if (period) {
       ({ startDate, endDate } = periodBounds(period));
     } else {
-      startDate = from ? new Date(from) : new Date(0);
-      endDate = to ? new Date(to) : new Date();
+      startDate = fromArg ? new Date(fromArg) : new Date(0);
+      endDate = toArg ? new Date(toArg) : new Date();
+      if (toArg) endDate.setHours(23, 59, 59, 999);
     }
 
     const sales = await Sales.find({
@@ -76,6 +83,7 @@ class HsnEngineService {
 
     const purchases = await Purchase.find({
       companyId,
+      status: { $ne: 'cancelled' },
       date: { $gte: startDate, $lte: endDate },
     }).populate('items.itemId', 'name hsnCode gstRate unit').lean();
 
@@ -101,9 +109,10 @@ class HsnEngineService {
             };
           }
           const qty = Number(line.mts || line.qty || 0);
-          const taxable = round2(line.amount || qty * (line.rate || 0));
-          const rate = (map[code].gstRate || 0) / 100;
-          const tax = round2(taxable * rate);
+          // Same line rules as GSTR-1: taxable after line discounts, at the line's own GST rate.
+          const taxable = round2(lineTaxable({ ...line, amount: lineAmount(line) }));
+          const rate = (lineRate(line, map[code].gstRate) || 0) / 100;
+          const tax = round2(Number(line.gstAmt) > 0 ? line.gstAmt : taxable * rate);
           if (direction === 'out') {
             map[code].qtyOut = round2(map[code].qtyOut + qty);
             map[code].taxableOut = round2(map[code].taxableOut + taxable);

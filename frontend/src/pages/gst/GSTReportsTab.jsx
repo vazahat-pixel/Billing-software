@@ -262,29 +262,29 @@ const GSTReportsTab = ({ onClose, defaultFrom, defaultTo }) => {
         };
       case 'HSN':
         return {
-          headers: ['HSN', 'DESCRIPTION', 'UQC', 'TOTAL_QTY', 'TOTAL_VALUE', 'TAXABLE_VALUE', 'IGST', 'CGST', 'SGST', 'CESS'],
+          headers: ['HSN', 'DESCRIPTION', 'UQC', 'TOTAL_QTY', 'TOTAL_VALUE', 'RATE', 'TAXABLE_VALUE', 'IGST', 'CGST', 'SGST', 'CESS'],
           rows: gstr1Data.hsnRows.map(r => [
-            r.hsn_sc, hsnDescWise ? r.desc : (r.desc?.slice(0, 20) || ''), r.uqc || 'PCS',
-            Number(r.qty || 0).toFixed(2), Number(r.val || 0).toFixed(2), Number(r.txval || 0).toFixed(2),
+            r.hsn_sc, hsnDescWise ? r.desc : '', r.uqcDesc || r.uqc || 'PCS',
+            Number(r.qty || 0).toFixed(2), Number(r.val || 0).toFixed(2), Number(r.rt || 0).toFixed(2), Number(r.txval || 0).toFixed(2),
             Number(r.iamt || 0).toFixed(2), Number(r.camt || 0).toFixed(2), Number(r.samt || 0).toFixed(2),
             Number(r.csamt || 0).toFixed(2)
           ])
         };
       case 'HSN B2C':
         return {
-          headers: ['HSN', 'DESCRIPTION', 'UQC', 'TOTAL_QTY', 'TOTAL_VALUE', 'TAXABLE_VALUE', 'IGST', 'CGST', 'SGST', 'CESS'],
+          headers: ['HSN', 'DESCRIPTION', 'UQC', 'TOTAL_QTY', 'TOTAL_VALUE', 'RATE', 'TAXABLE_VALUE', 'IGST', 'CGST', 'SGST', 'CESS'],
           rows: gstr1Data.hsnB2cRows.map(r => [
-            r.hsn_sc, hsnDescWise ? r.desc : (r.desc?.slice(0, 20) || ''), r.uqc || 'PCS',
-            Number(r.qty || 0).toFixed(2), Number(r.val || 0).toFixed(2), Number(r.txval || 0).toFixed(2),
+            r.hsn_sc, hsnDescWise ? r.desc : '', r.uqcDesc || r.uqc || 'PCS',
+            Number(r.qty || 0).toFixed(2), Number(r.val || 0).toFixed(2), Number(r.rt || 0).toFixed(2), Number(r.txval || 0).toFixed(2),
             Number(r.iamt || 0).toFixed(2), Number(r.camt || 0).toFixed(2), Number(r.samt || 0).toFixed(2),
             Number(r.csamt || 0).toFixed(2)
           ])
         };
       case 'DOCS':
         return {
-          headers: ['DOC_TYPE', 'FROM_SR_NO', 'TO_SR_NO', 'TOT_COUNT', 'CANCELLED_COUNT', 'NET_ISSUED'],
+          headers: ['DOC_TYPE', 'FROM_SR_NO', 'TO_SR_NO', 'TOT_COUNT', 'CANCELLED_COUNT'],
           rows: gstr1Data.docsRows.map(r => [
-            r.docType, r.from, r.to, r.totnum, r.cancel, r.net_issue
+            r.docType, r.from, r.to, r.totnum, r.cancel
           ])
         };
       case 'EXP.':

@@ -134,9 +134,10 @@ export const exportGstr1Excel = (data, filename = 'GSTR1_V3_2_2.xlsx') => {
   const hsnRows = (data.hsnRows || []).map((r) => ({
     'HSN': r.hsn_sc || '',
     'Description': r.desc || '',
-    'UQC': r.uqc || 'PCS',
+    'UQC': r.uqcDesc || r.uqc || 'PCS',
     'Total Quantity': Number(r.qty || 0),
     'Total Value': Number(r.val || 0),
+    'Rate': Number(r.rt || 0),
     'Taxable Value': Number(r.txval || 0),
     'Integrated Tax Amount': Number(r.iamt || 0),
     'Central Tax Amount': Number(r.camt || 0),
@@ -150,9 +151,10 @@ export const exportGstr1Excel = (data, filename = 'GSTR1_V3_2_2.xlsx') => {
   const hsnB2cRows = (data.hsnB2cRows || []).map((r) => ({
     'HSN': r.hsn_sc || '',
     'Description': r.desc || '',
-    'UQC': r.uqc || 'PCS',
+    'UQC': r.uqcDesc || r.uqc || 'PCS',
     'Total Quantity': Number(r.qty || 0),
     'Total Value': Number(r.val || 0),
+    'Rate': Number(r.rt || 0),
     'Taxable Value': Number(r.txval || 0),
     'Integrated Tax Amount': Number(r.iamt || 0),
     'Central Tax Amount': Number(r.camt || 0),
@@ -179,7 +181,6 @@ export const exportGstr1Excel = (data, filename = 'GSTR1_V3_2_2.xlsx') => {
     'Sr. No. To': r.to || '',
     'Total Number': Number(r.totnum || 0),
     'Cancelled': Number(r.cancel || 0),
-    'Net Issued': Number(r.net_issue || 0),
   }));
   const docsSheet = XLSX.utils.json_to_sheet(docsRows.length ? docsRows : [{ 'Nature of Document': '' }]);
   XLSX.utils.book_append_sheet(wb, docsSheet, 'docs');
