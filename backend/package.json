@@ -49,6 +49,10 @@
     "smoke:golive": "node scripts/goLiveSmoke.js",
     "certify": "node scripts/certify/runCertification.js",
     "certify:gates": "node scripts/certify/runQualityGates.js",
+    "golden-master": "node scripts/golden-master/run-golden-master-suite.js",
+    "golden-master:extract": "node scripts/golden-master/jsm-extract-demo.js",
+    "golden-master:import": "node scripts/golden-master/mern-import-golden-data.js",
+    "golden-master:reconcile": "node scripts/golden-master/reconcile-reports.js",
     "perf:k6:smoke": "k6 run performance/k6/load-smoke.js",
     "perf:k6:stress": "k6 run performance/k6/load-stress.js"
   },
