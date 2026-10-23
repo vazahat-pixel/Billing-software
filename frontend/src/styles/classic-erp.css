@@ -1509,3 +1509,10 @@
 
 
 
+
+/* JSM Account Master (mst_acc_mast): fixed 978x502 pixel layout, scrolls sideways on narrow screens. */
+.jsm-am-scroll { overflow-x: auto; }
+.jsm-am-box { position: relative; width: 978px; height: 502px; font-family: Tahoma, Arial, sans-serif; font-size: 13px; }
+.jsm-am-box .classic-erp-input, .jsm-am-box .classic-erp-select { box-sizing: border-box; font-size: 12px; padding: 1px 4px; }
+.jsm-am-lbl { font-weight: 600; font-size: 12.5px; color: #1f2a44; white-space: nowrap; line-height: 16px; }
+.jsm-am-chk { display: flex; align-items: center; gap: 4px; font-weight: 600; font-size: 12.5px; }

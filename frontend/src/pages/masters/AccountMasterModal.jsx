@@ -316,8 +316,17 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
     setFormData((prev) => ({ ...prev, banks: (prev.banks || []).filter((_, i) => i !== idx) }));
   };
 
+  // JSM pixel layout: absolute position/size taken from the decompiled form.
+  const at = (left, top, width, height = 22) => ({ position: 'absolute', left, top, width, height });
+  const L = (left, top, text, red = false) => (
+    <span key={`${left}-${top}`} style={{ position: 'absolute', left, top }} className={`jsm-am-lbl${red ? ' red-label' : ''}`}>{text}</span>
+  );
+  const T = (left, top, width, key, props = {}) => (
+    <input style={at(left, top, width)} className="classic-erp-input" value={formData[key] ?? ''} onChange={setField(key)} disabled={locked} {...props} />
+  );
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-5xl">
+    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[1010px]">
       <div
         className="classic-erp-window erp-master-form"
         data-form-enter-nav="true"
@@ -381,222 +390,129 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
           )}
 
           {activeTab === 'Account' && (
-            <div className="relative space-y-2">
-              {/* Option Box in Top-Right corner matching JSM Screenshot 1 */}
-              <div className="absolute right-2 top-0 border border-[#9aa4b8] bg-[#f8f9fa] p-2 rounded-sm shadow-sm w-36 text-center select-none z-10">
-                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Option</div>
-                <div className="text-[11px] font-bold text-gray-700 mb-1">Conected Code</div>
-                <input
-                  type="text"
-                  className="classic-erp-input w-full text-center font-mono font-bold"
-                  value={formData.connectedCode || ''}
-                  onChange={setField('connectedCode')}
-                  disabled={locked}
-                  placeholder="Code"
-                />
-              </div>
-
-              {/* JSM Screenshot 1 Exact Fields Stack */}
-              <div className="classic-erp-frame space-y-2 pr-40">
-                {/* 1. Account */}
-                <div className="classic-erp-field-row">
-                  <span className="classic-erp-label red-label classic-erp-label--fixed">Account</span>
-                  <input
-                    ref={nameInputRef}
-                    type="text"
-                    className="classic-erp-input flex-1 font-bold"
-                    value={formData.name}
-                    onChange={setField('name')}
-                    disabled={locked}
-                    placeholder="Party / Account Name"
-                    autoFocus={mode === 'Add'}
-                  />
-                  <span className="classic-erp-label classic-erp-label--fixed-sm">Accd</span>
-                  <input type="text" className="classic-erp-input w-20 text-center font-mono" value={formData.accd || ''} readOnly placeholder="Auto" />
+            /* Same positions, sizes and captions as JSM mst_acc_mast (GroupBox1, 978x502). */
+            <div className="jsm-am-scroll">
+              <div className="jsm-am-box">
+                {L(10, 27, 'Account', true)}
+                <input ref={nameInputRef} style={at(107, 26, 519)} className="classic-erp-input font-bold" value={formData.name} onChange={setField('name')} disabled={locked} autoFocus={mode === 'Add'} />
+                {L(637, 31, 'A/c Id')}
+                <input style={at(689, 28, 80)} className="classic-erp-input text-center font-mono" value={formData.accd || ''} readOnly />
+                {L(883, 8, 'Accd')}
+                {L(884, 32, 'Option')}
+                {T(907, 56, 58, 'connectedCode', { title: 'Conected Code' })}
+                {L(10, 53, 'Alias')}
+                {T(107, 50, 519, 'alias')}
+                {L(10, 75, 'A/c. Head', true)}
+                <select style={at(107, 76, 376)} className="classic-erp-select font-bold" value={formData.group} onChange={setField('group')} disabled={locked}>
+                  {groupOptions.map((grp) => <option key={grp} value={grp}>{grp}</option>)}
+                </select>
+                <label style={at(498, 76, 107)} className="jsm-am-chk">
+                  <input type="checkbox" checked={!!formData.eCommerce} onChange={setField('eCommerce')} disabled={locked} /> E-Commerce
+                </label>
+                {L(638, 80, 'Status')}
+                <select style={at(689, 76, 112, 24)} className="classic-erp-select" value={formData.status} onChange={setField('status')} disabled={locked}>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+                {L(807, 89, 'Update In All Firm')}
+                {T(935, 86, 28, 'updateInAllFirm', { maxLength: 1, className: 'classic-erp-input text-center uppercase' })}
+                {L(807, 110, 'Update In All Year')}
+                {T(935, 107, 28, 'updateInAllYear', { maxLength: 1, className: 'classic-erp-input text-center uppercase' })}
+                {L(10, 110, 'Op.Balance')}
+                {T(107, 110, 160, 'openingBalance', { type: 'number', className: 'classic-erp-input text-right' })}
+                <select style={at(272, 109, 63, 24)} className="classic-erp-select font-bold" value={formData.openingBalanceType} onChange={setField('openingBalanceType')} disabled={locked}>
+                  <option value="Dr">DR</option>
+                  <option value="Cr">CR</option>
+                </select>
+                <input type="checkbox" style={at(370, 112, 16, 16)} checked={!!formData.mainGroup} onChange={setField('mainGroup')} disabled={locked} title="Under Main Group" />
+                {L(402, 112, 'Main Group')}
+                {T(487, 108, 241, 'mainGroupId', { disabled: locked || !formData.mainGroup })}
+                {L(10, 141, 'Address')}
+                {T(107, 138, 519, 'address')}
+                {T(107, 161, 519, 'address2')}
+                {T(107, 184, 519, 'address3')}
+                {L(10, 209, 'City')}
+                <input style={at(107, 208, 234)} list="city-options-list" className="classic-erp-input uppercase" value={formData.city} onChange={setField('city')} disabled={locked} />
+                <datalist id="city-options-list">
+                  {cityOptions.map((c) => <option key={c} value={c} />)}
+                </datalist>
+                {L(347, 212, 'PinCode')}
+                {T(413, 209, 114, 'pincode', { className: 'classic-erp-input font-mono' })}
+                {L(630, 139, 'Aadhar No')}
+                {T(709, 135, 181, 'aadharNo', { className: 'classic-erp-input font-mono' })}
+                {L(630, 162, 'Gstin No')}
+                {T(709, 160, 181, 'gstin', { maxLength: 15, className: 'classic-erp-input font-mono uppercase font-bold' })}
+                {L(630, 187, 'StateCode')}
+                {T(709, 184, 56, 'stateCode', { className: 'classic-erp-input font-mono' })}
+                {L(630, 211, 'StateName')}
+                {T(709, 208, 181, 'stateName')}
+                {L(630, 235, 'GstType')}
+                <select style={at(709, 232, 200)} className="classic-erp-select" value={formData.gstType} onChange={setField('gstType')} disabled={locked}>
+                  {['INVOICE (IN STATE)', 'INVOICE (OUT OF STATE)'].map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                {L(586, 258, 'Udyam Aadhar')}
+                {T(709, 256, 192, 'udyamAadhar', { className: 'classic-erp-input font-mono uppercase' })}
+                {L(605, 284, 'MSME Type')}
+                <select style={at(691, 280, 211, 24)} className="classic-erp-select" value={formData.msmeType} onChange={setField('msmeType')} disabled={locked}>
+                  {['None', 'Micro', 'Small', 'Medium'].map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                {T(909, 280, 64, 'msmeYear', { title: 'MSME Year' })}
+                {L(10, 241, 'Phone (O)')}
+                {T(107, 241, 444, 'phoneO', { className: 'classic-erp-input font-mono' })}
+                {L(10, 264, 'Phone (R)')}
+                {T(107, 265, 444, 'phoneR', { className: 'classic-erp-input font-mono' })}
+                {L(11, 290, 'Mobile')}
+                {T(107, 289, 297, 'mobile', { className: 'classic-erp-input font-mono font-bold' })}
+                {L(12, 315, 'Cont. Person')}
+                {T(107, 313, 298, 'contactPerson')}
+                {L(534, 308, 'SalesMan')}
+                {T(611, 305, 298, 'salesMan')}
+                {L(535, 331, 'AreaName')}
+                {T(611, 327, 298, 'areaName')}
+                {L(535, 352, 'Haste')}
+                {T(611, 349, 158, 'haste')}
+                {L(535, 377, 'Exp.City')}
+                {T(611, 372, 158, 'expCity')}
+                {L(10, 350, 'Broker')}
+                <div style={at(107, 347, 345)}>
+                  <ERPSelect className="classic-erp-select w-full" value={formData.brokerId} onChange={setField('brokerId')} disabled={locked} options={brokerOptions} placeholder="- Direct/No Broker -" recentKey="account-broker" />
                 </div>
-
-                {/* 2. A/c. Head */}
-                <div className="classic-erp-field-row">
-                  <span className="classic-erp-label red-label classic-erp-label--fixed">A/c. Head</span>
-                  <select
-                    className="classic-erp-select flex-1 font-bold"
-                    value={formData.group}
-                    onChange={setField('group')}
-                    disabled={locked}
-                  >
-                    {groupOptions.map((grp) => (
-                      <option key={grp} value={grp}>{grp}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 3. Address Line 1 */}
-                <div className="classic-erp-field-row">
-                  <span className="classic-erp-label classic-erp-label--fixed">Address</span>
-                  <input
-                    type="text"
-                    className="classic-erp-input flex-1"
-                    value={formData.address}
-                    onChange={setField('address')}
-                    disabled={locked}
-                    placeholder="Address Line 1"
-                  />
-                </div>
-
-                {/* 4. Address Line 2 */}
-                <div className="classic-erp-field-row">
-                  <span className="classic-erp-label classic-erp-label--fixed"></span>
-                  <input
-                    type="text"
-                    className="classic-erp-input flex-1"
-                    value={formData.address2}
-                    onChange={setField('address2')}
-                    disabled={locked}
-                    placeholder="Address Line 2 (Area, Landmark)"
-                  />
-                </div>
-
-                {/* 5. City */}
-                <div className="classic-erp-field-row">
-                  <span className="classic-erp-label classic-erp-label--fixed">City</span>
-                  <div className="flex-1 flex gap-2">
-                    <input
-                      type="text"
-                      list="city-options-list"
-                      className="classic-erp-input flex-1 uppercase"
-                      value={formData.city}
-                      onChange={setField('city')}
-                      disabled={locked}
-                      placeholder="Select or type City"
-                    />
-                    <datalist id="city-options-list">
-                      {cityOptions.map((c) => (
-                        <option key={c} value={c} />
-                      ))}
-                    </datalist>
-                    <span className="classic-erp-label classic-erp-label--fixed-sm">Pin</span>
-                    <input
-                      type="text"
-                      className="classic-erp-input w-24 font-mono"
-                      value={formData.pincode}
-                      onChange={setField('pincode')}
-                      disabled={locked}
-                      placeholder="Pincode"
-                    />
-                  </div>
-                </div>
-
-                {/* 6. Phone (O) */}
-                <div className="classic-erp-field-row">
-                  <span className="classic-erp-label classic-erp-label--fixed">Phone (O)</span>
-                  <input
-                    type="text"
-                    className="classic-erp-input flex-1 font-mono"
-                    value={formData.phoneO}
-                    onChange={setField('phoneO')}
-                    disabled={locked}
-                    placeholder="Office Phone"
-                  />
-                </div>
-
-                {/* 7. Phone (R) */}
-                <div className="classic-erp-field-row">
-                  <span className="classic-erp-label classic-erp-label--fixed">Phone (R)</span>
-                  <input
-                    type="text"
-                    className="classic-erp-input flex-1 font-mono"
-                    value={formData.phoneR}
-                    onChange={setField('phoneR')}
-                    disabled={locked}
-                    placeholder="Residence Phone"
-                  />
-                </div>
-
-                {/* 8. Mobile */}
-                <div className="classic-erp-field-row">
-                  <span className="classic-erp-label classic-erp-label--fixed">Mobile</span>
-                  <input
-                    type="text"
-                    className="classic-erp-input flex-1 font-mono font-bold"
-                    value={formData.mobile}
-                    onChange={setField('mobile')}
-                    disabled={locked}
-                    placeholder="Mobile Number"
-                  />
-                </div>
-              </div>
-
-              {/* Additional Account Details & Tax Section */}
-              <div className="classic-erp-frame bg-[#f8f9fa] p-2 mt-2">
-                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2 border-b border-gray-200 pb-1">
-                  Additional Details & Tax
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-xs">
-                  <div className="space-y-1.5">
-                    <div className="classic-erp-field-row">
-                      <span className="classic-erp-label classic-erp-label--fixed">Op. Balance</span>
-                      <input type="number" className="classic-erp-input flex-1 text-right" value={formData.openingBalance} onChange={setField('openingBalance')} disabled={locked} />
-                      <select className="classic-erp-select w-16 font-bold" value={formData.openingBalanceType} onChange={setField('openingBalanceType')} disabled={locked}>
-                        <option value="Dr">DR</option>
-                        <option value="Cr">CR</option>
-                      </select>
-                    </div>
-
-                    <div className="classic-erp-field-row">
-                      <span className="classic-erp-label classic-erp-label--fixed">GSTIN</span>
-                      <input
-                        type="text"
-                        className="classic-erp-input flex-1 font-mono uppercase font-bold"
-                        maxLength={15}
-                        value={formData.gstin}
-                        onChange={setField('gstin')}
-                        disabled={locked}
-                        placeholder="GSTIN (15 Digits)"
-                      />
-                    </div>
-
-                    <div className="classic-erp-field-row">
-                      <span className="classic-erp-label classic-erp-label--fixed">PAN</span>
-                      <input
-                        type="text"
-                        className="classic-erp-input flex-1 font-mono uppercase"
-                        maxLength={10}
-                        value={formData.pan}
-                        onChange={setField('pan')}
-                        disabled={locked}
-                        placeholder="PAN (10 digits)"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="classic-erp-field-row">
-                      <span className="classic-erp-label classic-erp-label--fixed">Broker</span>
-                      <ERPSelect
-                        className="classic-erp-select flex-1"
-                        value={formData.brokerId}
-                        onChange={setField('brokerId')}
-                        disabled={locked}
-                        options={brokerOptions}
-                        placeholder="- Direct/No Broker -"
-                        recentKey="account-broker"
-                      />
-                    </div>
-
-                    <div className="classic-erp-field-row">
-                      <span className="classic-erp-label classic-erp-label--fixed">Transport</span>
-                      <input type="text" className="classic-erp-input flex-1" value={formData.transport} onChange={setField('transport')} disabled={locked} placeholder="Transport Name" />
-                    </div>
-
-                    <div className="classic-erp-field-row">
-                      <span className="classic-erp-label classic-erp-label--fixed">Status</span>
-                      <select className="classic-erp-select flex-1" value={formData.status} onChange={setField('status')} disabled={locked}>
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
+                {L(10, 374, 'Transport')}
+                {T(107, 371, 345, 'transport')}
+                {L(11, 407, 'TIN CstNo')}
+                {T(107, 405, 225, 'tinCstNo')}
+                {L(347, 410, 'Hsn Code')}
+                {T(418, 407, 109, 'hsnCode', { className: 'classic-erp-input font-mono' })}
+                {L(11, 432, 'TIN VatGstNo')}
+                {T(107, 429, 225, 'tinGstNo')}
+                {L(13, 455, 'Pan No')}
+                {T(107, 452, 109, 'pan', { maxLength: 10, className: 'classic-erp-input font-mono uppercase' })}
+                {L(270, 455, 'DOB')}
+                {T(308, 452, 87, 'dob', { placeholder: 'dd/mm/yyyy' })}
+                {L(402, 455, 'Tds.Per')}
+                {T(460, 452, 67, 'tdsPer', { type: 'number', className: 'classic-erp-input text-right' })}
+                {L(547, 455, 'Tcs Per')}
+                {T(608, 452, 74, 'tcsPer', { type: 'number', className: 'classic-erp-input text-right' })}
+                {L(538, 401, 'DueDay')}
+                {T(599, 397, 63, 'dueDays', { type: 'number', className: 'classic-erp-input text-right' })}
+                {L(539, 421, 'RdRate')}
+                {T(599, 419, 63, 'rdRate', { type: 'number', className: 'classic-erp-input text-right' })}
+                {L(705, 401, 'Disc.1%')}
+                {T(764, 399, 63, 'disc1', { type: 'number', className: 'classic-erp-input text-right' })}
+                {L(704, 423, 'Disc.2%')}
+                {T(764, 421, 63, 'disc2', { type: 'number', className: 'classic-erp-input text-right' })}
+                {L(852, 379, 'Add%')}
+                {T(898, 375, 65, 'addPer', { type: 'number', className: 'classic-erp-input text-right' })}
+                {L(854, 401, 'Int. %')}
+                {T(898, 397, 65, 'intPer', { type: 'number', className: 'classic-erp-input text-right' })}
+                {L(834, 422, 'Commi%')}
+                {T(898, 419, 65, 'commi', { type: 'number', className: 'classic-erp-input text-right' })}
+                {L(790, 449, 'Max Level')}
+                {T(866, 449, 97, 'maxLevel', { type: 'number', className: 'classic-erp-input text-right' })}
+                {L(790, 473, 'Min Level')}
+                {T(866, 472, 97, 'minLevel', { type: 'number', className: 'classic-erp-input text-right' })}
+                {L(13, 479, 'Email')}
+                {T(107, 476, 420, 'email')}
               </div>
             </div>
           )}
@@ -651,60 +567,32 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
           )}
 
           {activeTab === 'Other Detail' && (
-            /* Other Detail Tab */
-            <div className="classic-erp-frame grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-24">DueDay:</span>
-                  <input type="number" className="classic-erp-input flex-1 text-right" value={formData.dueDays} onChange={setField('dueDays')} disabled={locked} />
-                </div>
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-24">RdRate:</span>
-                  <input type="number" className="classic-erp-input flex-1 text-right" value={formData.rdRate} onChange={setField('rdRate')} disabled={locked} />
-                </div>
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-24">Disc.1%:</span>
-                  <input type="number" className="classic-erp-input flex-1 text-right" value={formData.disc1} onChange={setField('disc1')} disabled={locked} />
-                </div>
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-24">Disc.2%:</span>
-                  <input type="number" className="classic-erp-input flex-1 text-right" value={formData.disc2} onChange={setField('disc2')} disabled={locked} />
-                </div>
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-24">Add%:</span>
-                  <input type="number" className="classic-erp-input flex-1 text-right" value={formData.addPer} onChange={setField('addPer')} disabled={locked} />
-                </div>
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-24">Int. %:</span>
-                  <input type="number" className="classic-erp-input flex-1 text-right" value={formData.intPer} onChange={setField('intPer')} disabled={locked} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-24">Commi%:</span>
-                  <input type="number" className="classic-erp-input flex-1 text-right" value={formData.commi} onChange={setField('commi')} disabled={locked} />
-                </div>
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-24">Max Level:</span>
-                  <input type="number" className="classic-erp-input flex-1 text-right" value={formData.maxLevel} onChange={setField('maxLevel')} disabled={locked} />
-                </div>
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-24">Min Level:</span>
-                  <input type="number" className="classic-erp-input flex-1 text-right" value={formData.minLevel} onChange={setField('minLevel')} disabled={locked} />
-                </div>
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-24">Tds.Per:</span>
-                  <input type="number" className="classic-erp-input flex-1 text-right" value={formData.tdsPer} onChange={setField('tdsPer')} disabled={locked} />
-                </div>
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-24">Tcs Per:</span>
-                  <input type="number" className="classic-erp-input flex-1 text-right" value={formData.tcsPer} onChange={setField('tcsPer')} disabled={locked} />
-                </div>
-                <div className="flex gap-2">
-                  <span className="classic-erp-label w-24">Credit Limit:</span>
-                  <input type="number" className="classic-erp-input flex-1 text-right font-bold" value={formData.creditLimit} onChange={setField('creditLimit')} disabled={locked} />
-                </div>
+            /* JSM mst_acc_mast GroupBox2 (Ref.1-4, factory address); Credit Limit / Dhara % / TDS Section are MERN-only. */
+            <div className="jsm-am-scroll">
+              <div className="jsm-am-box" style={{ height: 440 }}>
+                {L(62, 18, formData.name || '')}
+                {L(704, 15, 'CreateDate')}
+                <input style={at(785, 12, 87)} className="classic-erp-input" readOnly value={formData.createdAt ? new Date(formData.createdAt).toLocaleDateString('en-GB') : ''} />
+                {L(25, 64, 'Ref.1')}
+                {T(65, 63, 458, 'ref1')}
+                {L(25, 89, 'Ref.2')}
+                {T(65, 87, 458, 'ref2')}
+                {L(25, 123, 'Ref.3')}
+                {T(65, 121, 458, 'ref3')}
+                {L(25, 149, 'Ref.4')}
+                {T(65, 146, 458, 'ref4')}
+                {L(21, 192, 'Factory Address')}
+                {T(26, 212, 519, 'factoryAddress1')}
+                {T(26, 235, 519, 'factoryAddress2')}
+                {T(26, 256, 323, 'factoryCity')}
+                {L(7, 311, 'Mobile')}
+                <textarea style={at(65, 309, 448, 86)} className="classic-erp-input" value={formData.factoryMobile || ''} onChange={setField('factoryMobile')} disabled={locked} />
+                {L(600, 64, 'Credit Limit')}
+                {T(700, 63, 120, 'creditLimit', { type: 'number', className: 'classic-erp-input text-right font-bold' })}
+                {L(600, 89, 'Dhara %')}
+                {T(700, 87, 120, 'dharaPer', { type: 'number', className: 'classic-erp-input text-right' })}
+                {L(600, 123, 'TDS Section')}
+                {T(700, 121, 120, 'tdsSection', { className: 'classic-erp-input uppercase' })}
               </div>
             </div>
           )}

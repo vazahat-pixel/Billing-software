@@ -1,4 +1,7 @@
 const Party = require('../models/Party');
+// JSM Account Master text fields kept as entered (no business logic).
+const JSM_EXTRA_FIELDS = ['alias', 'address2', 'address3', 'pincode', 'brokerId', 'transport', 'salesMan', 'areaName', 'haste', 'expCity', 'hsnCode', 'dob', 'msmeYear', 'ref1', 'ref2', 'ref3', 'ref4', 'factoryAddress1', 'factoryAddress2', 'factoryCity', 'factoryMobile'];
+
 const LedgerMaster = require('../models/LedgerMaster');
 
 /** Trim/normalize party bank rows and drop any without a bank name. */
@@ -96,6 +99,8 @@ class PartyService {
       paymentTermsId: partyData.paymentTermsId || null,
       isFavorite: !!partyData.isFavorite,
       banks: sanitizeBanks(partyData.banks),
+      ...Object.fromEntries(JSM_EXTRA_FIELDS.map((f) => [f, String(partyData[f] ?? '').trim()])),
+      eCommerce: !!partyData.eCommerce,
     };
 
     const existing = await Party.findOne({
@@ -219,7 +224,7 @@ class PartyService {
       'aadharNo', 'stateCode', 'stateName', 'gstType', 'udyamAadhar', 'msmeType',
       'dueDays', 'rdRate', 'disc1', 'disc2', 'addPer', 'dharaPer', 'intPer', 'commi',
       'maxLevel', 'minLevel', 'tdsPer', 'tdsSection', 'tcsPer', 'paymentTermsId', 'isFavorite', 'lastUsedAt',
-      'banks'
+      'banks', ...JSM_EXTRA_FIELDS, 'eCommerce'
     ];
     const patch = {};
     allowed.forEach((key) => {
