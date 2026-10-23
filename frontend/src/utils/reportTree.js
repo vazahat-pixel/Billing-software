@@ -95,7 +95,7 @@ export const REPORT_TREE = [
     id: 'process',
     label: 'Process Reports',
     children: [
-      { id: 'process-send', label: 'Send', reportKey: 'processSend', view: 'send' },
+      { id: 'process-send', label: 'Send', reportKey: 'processSend', view: 'send', external: 'jsmReport', jsmForm: 'Rpt_Process_Issue_Report' },
       { id: 'process-receipt-sum', label: 'Receipt Summary', reportKey: 'processReceiptSummary', view: 'receiptSummary' },
       { id: 'process-receipt-det', label: 'Receipt Detail', reportKey: 'processReceiptDetail', view: 'receiptDetail' },
       { id: 'process-stock', label: 'Process Stock', reportKey: 'processSend', view: 'stock' },

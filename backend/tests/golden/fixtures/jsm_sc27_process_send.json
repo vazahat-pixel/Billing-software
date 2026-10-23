@@ -1,0 +1,1280 @@
+{
+ "source": {
+  "db": "JsmSql2_DEMO2026",
+  "coPath": "SC27"
+ },
+ "rows": [
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "PURPARTY": "",
+   "ITEM": "GRAY MICRO",
+   "MONTH": "July",
+   "MONTH_NO": "7",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "1",
+   "NCCHLN_NO": "1",
+   "CHLN_DATE": "2026-07-22",
+   "ISS_PCS": "48",
+   "ISS_QTY": "500.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "10.000",
+   "PU_AMOUNT": "5000.00",
+   "LOT_NO": "101",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "12"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "PURPARTY": "MAHESH SIR",
+   "ITEM": "GRAY MICRO",
+   "MONTH": "July",
+   "MONTH_NO": "7",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "2",
+   "NCCHLN_NO": "2",
+   "CHLN_DATE": "2026-07-25",
+   "ISS_PCS": "48",
+   "ISS_QTY": "500.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "10.000",
+   "PU_AMOUNT": "5000.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "12"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "PURPARTY": "MAHESH SIR",
+   "ITEM": "DOBBY",
+   "MONTH": "July",
+   "MONTH_NO": "7",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "3",
+   "NCCHLN_NO": "3",
+   "CHLN_DATE": "2026-07-25",
+   "ISS_PCS": "12",
+   "ISS_QTY": "236.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "0.000",
+   "PU_AMOUNT": "0.00",
+   "LOT_NO": "",
+   "REMARK_1": "EWEW",
+   "REMARK_2": "",
+   "PU_BILLNO": ""
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "PURPARTY": "PADMAVATI PRINT",
+   "ITEM": "GRAY MICRO",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "4",
+   "NCCHLN_NO": "4",
+   "CHLN_DATE": "2026-08-04",
+   "ISS_PCS": "10",
+   "ISS_QTY": "1000.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "10.000",
+   "PU_AMOUNT": "10000.00",
+   "LOT_NO": "80",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "2"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "PADMAVATI PRINT",
+   "PURPARTY": "",
+   "ITEM": "BLOUSE",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "5",
+   "NCCHLN_NO": "5",
+   "CHLN_DATE": "2026-08-05",
+   "ISS_PCS": "1000",
+   "ISS_QTY": "1000.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "5.000",
+   "PU_AMOUNT": "5000.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": ""
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "",
+   "PURPARTY": "PADMAVATI PRINT",
+   "ITEM": "GRAY MICRO",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "10",
+   "NCCHLN_NO": "10",
+   "CHLN_DATE": "2026-08-05",
+   "ISS_PCS": "99",
+   "ISS_QTY": "1000.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "9.000",
+   "PU_AMOUNT": "9000.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "10"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "PURPARTY": "PADMAVATI PRINT",
+   "ITEM": "TEST FABRIC",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "11",
+   "NCCHLN_NO": "11",
+   "CHLN_DATE": "2026-08-05",
+   "ISS_PCS": "5",
+   "ISS_QTY": "50.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "200.000",
+   "PU_AMOUNT": "10000.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "45"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "PURPARTY": "PADMAVATI PRINT",
+   "ITEM": "BLOUSE",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "12",
+   "NCCHLN_NO": "12",
+   "CHLN_DATE": "2026-08-05",
+   "ISS_PCS": "1000",
+   "ISS_QTY": "1000.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "5.000",
+   "PU_AMOUNT": "5000.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "2"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "PURPARTY": "PADMAVATI PRINT",
+   "ITEM": "TEST FABRIC",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "121",
+   "NCCHLN_NO": "121",
+   "CHLN_DATE": "2026-08-05",
+   "ISS_PCS": "100",
+   "ISS_QTY": "100.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "10.000",
+   "PU_AMOUNT": "1000.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "121"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "PURPARTY": "PADMAVATI PRINT",
+   "ITEM": "TEST FABRIC",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "111",
+   "NCCHLN_NO": "111",
+   "CHLN_DATE": "2026-08-05",
+   "ISS_PCS": "100",
+   "ISS_QTY": "100.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "10.000",
+   "PU_AMOUNT": "1000.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "222"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "PADMAVATI PRINT",
+   "PURPARTY": "",
+   "ITEM": "BLOUSE",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "122",
+   "NCCHLN_NO": "122",
+   "CHLN_DATE": "2026-08-05",
+   "ISS_PCS": "100",
+   "ISS_QTY": "100.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "10.000",
+   "PU_AMOUNT": "1000.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "99"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "",
+   "PURPARTY": "PADMAVATI PRINT",
+   "ITEM": "GRAY MICRO",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "123",
+   "NCCHLN_NO": "123",
+   "CHLN_DATE": "2026-08-10",
+   "ISS_PCS": "2",
+   "ISS_QTY": "50.000",
+   "ISS_KGS": "600.000",
+   "PU_RATE": "20.000",
+   "PU_AMOUNT": "1000.00",
+   "LOT_NO": "90",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "22"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "PURPARTY": "MAHESH SIR",
+   "ITEM": "DOBBY",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "124",
+   "NCCHLN_NO": "124",
+   "CHLN_DATE": "2026-08-12",
+   "ISS_PCS": "4",
+   "ISS_QTY": "80.000",
+   "ISS_KGS": "2.000",
+   "PU_RATE": "60.000",
+   "PU_AMOUNT": "4800.00",
+   "LOT_NO": "2",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "3"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "PURPARTY": "MAHESH SIR",
+   "ITEM": "DOBBY",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "125",
+   "NCCHLN_NO": "125",
+   "CHLN_DATE": "2026-08-14",
+   "ISS_PCS": "2",
+   "ISS_QTY": "5.000",
+   "ISS_KGS": "600.000",
+   "PU_RATE": "300.000",
+   "PU_AMOUNT": "1500.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "7"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "PURPARTY": "",
+   "ITEM": "BLOUSE",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "126",
+   "NCCHLN_NO": "126",
+   "CHLN_DATE": "2026-08-14",
+   "ISS_PCS": "9",
+   "ISS_QTY": "90.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "900.000",
+   "PU_AMOUNT": "81000.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "090"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE LAV",
+   "PURPARTY": "MAHESH SIR",
+   "ITEM": "BLOUSE",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "127",
+   "NCCHLN_NO": "127",
+   "CHLN_DATE": "2026-08-21",
+   "ISS_PCS": "9",
+   "ISS_QTY": "90.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "900.000",
+   "PU_AMOUNT": "81000.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "090"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE VASUDEV",
+   "PURPARTY": "RAJESH ENTERPRISE",
+   "ITEM": "SHIRT COTTON",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "128",
+   "NCCHLN_NO": "128",
+   "CHLN_DATE": "2026-08-24",
+   "ISS_PCS": "10",
+   "ISS_QTY": "1000.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "15.000",
+   "PU_AMOUNT": "15000.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "1"
+  },
+  {
+   "BOOK": "PROCESS CHARGE",
+   "REGISTER": "PROCESS CHARGE",
+   "MILL": "SHREE VASUDEV",
+   "PURPARTY": "",
+   "ITEM": "GRY SHIRT",
+   "MONTH": "August",
+   "MONTH_NO": "8",
+   "YEAR_NO": "2026",
+   "RE_FINISH": "",
+   "CHLN_NO": "129",
+   "NCCHLN_NO": "129",
+   "CHLN_DATE": "2026-08-24",
+   "ISS_PCS": "10",
+   "ISS_QTY": "5400.000",
+   "ISS_KGS": "0.000",
+   "PU_RATE": "10.000",
+   "PU_AMOUNT": "54000.00",
+   "LOT_NO": "",
+   "REMARK_1": "",
+   "REMARK_2": "",
+   "PU_BILLNO": "12"
+  }
+ ],
+ "scenarios": [
+  {
+   "name": "detail register",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "None",
+    "orderBy1": "Register"
+   },
+   "expected": [
+    {
+     "NCCHLN_NO": "1",
+     "CHLN_DATE": "2026-07-22",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "",
+     "ISS_PCS": "48",
+     "ISS_QTY": "500.000"
+    },
+    {
+     "NCCHLN_NO": "2",
+     "CHLN_DATE": "2026-07-25",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "48",
+     "ISS_QTY": "500.000"
+    },
+    {
+     "NCCHLN_NO": "3",
+     "CHLN_DATE": "2026-07-25",
+     "MILL": "SHREE LAV",
+     "ITEM": "DOBBY",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "12",
+     "ISS_QTY": "236.000"
+    },
+    {
+     "NCCHLN_NO": "4",
+     "CHLN_DATE": "2026-08-04",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "10",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "5",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "PADMAVATI PRINT",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "",
+     "ISS_PCS": "1000",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "10",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "99",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "11",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "TEST FABRIC",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "5",
+     "ISS_QTY": "50.000"
+    },
+    {
+     "NCCHLN_NO": "12",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "1000",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "111",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "TEST FABRIC",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "100",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "121",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "TEST FABRIC",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "100",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "122",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "PADMAVATI PRINT",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "",
+     "ISS_PCS": "100",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "123",
+     "CHLN_DATE": "2026-08-10",
+     "MILL": "",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "2",
+     "ISS_QTY": "50.000"
+    },
+    {
+     "NCCHLN_NO": "124",
+     "CHLN_DATE": "2026-08-12",
+     "MILL": "SHREE LAV",
+     "ITEM": "DOBBY",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "4",
+     "ISS_QTY": "80.000"
+    },
+    {
+     "NCCHLN_NO": "125",
+     "CHLN_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "ITEM": "DOBBY",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "2",
+     "ISS_QTY": "5.000"
+    },
+    {
+     "NCCHLN_NO": "126",
+     "CHLN_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "",
+     "ISS_PCS": "9",
+     "ISS_QTY": "90.000"
+    },
+    {
+     "NCCHLN_NO": "127",
+     "CHLN_DATE": "2026-08-21",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "9",
+     "ISS_QTY": "90.000"
+    },
+    {
+     "NCCHLN_NO": "128",
+     "CHLN_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "ITEM": "SHIRT COTTON",
+     "PURPARTY": "RAJESH ENTERPRISE",
+     "ISS_PCS": "10",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "129",
+     "CHLN_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "ITEM": "GRY SHIRT",
+     "PURPARTY": "",
+     "ISS_PCS": "10",
+     "ISS_QTY": "5400.000"
+    }
+   ]
+  },
+  {
+   "name": "detail mill + item",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "Item",
+    "orderBy1": "Mill"
+   },
+   "expected": [
+    {
+     "NCCHLN_NO": "10",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "99",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "123",
+     "CHLN_DATE": "2026-08-10",
+     "MILL": "",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "2",
+     "ISS_QTY": "50.000"
+    },
+    {
+     "NCCHLN_NO": "5",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "PADMAVATI PRINT",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "",
+     "ISS_PCS": "1000",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "122",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "PADMAVATI PRINT",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "",
+     "ISS_PCS": "100",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "12",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "1000",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "126",
+     "CHLN_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "",
+     "ISS_PCS": "9",
+     "ISS_QTY": "90.000"
+    },
+    {
+     "NCCHLN_NO": "127",
+     "CHLN_DATE": "2026-08-21",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "9",
+     "ISS_QTY": "90.000"
+    },
+    {
+     "NCCHLN_NO": "3",
+     "CHLN_DATE": "2026-07-25",
+     "MILL": "SHREE LAV",
+     "ITEM": "DOBBY",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "12",
+     "ISS_QTY": "236.000"
+    },
+    {
+     "NCCHLN_NO": "124",
+     "CHLN_DATE": "2026-08-12",
+     "MILL": "SHREE LAV",
+     "ITEM": "DOBBY",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "4",
+     "ISS_QTY": "80.000"
+    },
+    {
+     "NCCHLN_NO": "125",
+     "CHLN_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "ITEM": "DOBBY",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "2",
+     "ISS_QTY": "5.000"
+    },
+    {
+     "NCCHLN_NO": "1",
+     "CHLN_DATE": "2026-07-22",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "",
+     "ISS_PCS": "48",
+     "ISS_QTY": "500.000"
+    },
+    {
+     "NCCHLN_NO": "2",
+     "CHLN_DATE": "2026-07-25",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "48",
+     "ISS_QTY": "500.000"
+    },
+    {
+     "NCCHLN_NO": "4",
+     "CHLN_DATE": "2026-08-04",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "10",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "11",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "TEST FABRIC",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "5",
+     "ISS_QTY": "50.000"
+    },
+    {
+     "NCCHLN_NO": "111",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "TEST FABRIC",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "100",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "121",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "TEST FABRIC",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "100",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "129",
+     "CHLN_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "ITEM": "GRY SHIRT",
+     "PURPARTY": "",
+     "ISS_PCS": "10",
+     "ISS_QTY": "5400.000"
+    },
+    {
+     "NCCHLN_NO": "128",
+     "CHLN_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "ITEM": "SHIRT COTTON",
+     "PURPARTY": "RAJESH ENTERPRISE",
+     "ISS_PCS": "10",
+     "ISS_QTY": "1000.000"
+    }
+   ]
+  },
+  {
+   "name": "detail purparty + month",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "Month",
+    "orderBy1": "PurParty"
+   },
+   "expected": [
+    {
+     "NCCHLN_NO": "5",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "PADMAVATI PRINT",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "",
+     "ISS_PCS": "1000",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "122",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "PADMAVATI PRINT",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "",
+     "ISS_PCS": "100",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "126",
+     "CHLN_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "",
+     "ISS_PCS": "9",
+     "ISS_QTY": "90.000"
+    },
+    {
+     "NCCHLN_NO": "129",
+     "CHLN_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "ITEM": "GRY SHIRT",
+     "PURPARTY": "",
+     "ISS_PCS": "10",
+     "ISS_QTY": "5400.000"
+    },
+    {
+     "NCCHLN_NO": "1",
+     "CHLN_DATE": "2026-07-22",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "",
+     "ISS_PCS": "48",
+     "ISS_QTY": "500.000"
+    },
+    {
+     "NCCHLN_NO": "124",
+     "CHLN_DATE": "2026-08-12",
+     "MILL": "SHREE LAV",
+     "ITEM": "DOBBY",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "4",
+     "ISS_QTY": "80.000"
+    },
+    {
+     "NCCHLN_NO": "125",
+     "CHLN_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "ITEM": "DOBBY",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "2",
+     "ISS_QTY": "5.000"
+    },
+    {
+     "NCCHLN_NO": "127",
+     "CHLN_DATE": "2026-08-21",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "9",
+     "ISS_QTY": "90.000"
+    },
+    {
+     "NCCHLN_NO": "2",
+     "CHLN_DATE": "2026-07-25",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "48",
+     "ISS_QTY": "500.000"
+    },
+    {
+     "NCCHLN_NO": "3",
+     "CHLN_DATE": "2026-07-25",
+     "MILL": "SHREE LAV",
+     "ITEM": "DOBBY",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "12",
+     "ISS_QTY": "236.000"
+    },
+    {
+     "NCCHLN_NO": "4",
+     "CHLN_DATE": "2026-08-04",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "10",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "10",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "99",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "11",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "TEST FABRIC",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "5",
+     "ISS_QTY": "50.000"
+    },
+    {
+     "NCCHLN_NO": "12",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "1000",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "111",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "TEST FABRIC",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "100",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "121",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "TEST FABRIC",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "100",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "123",
+     "CHLN_DATE": "2026-08-10",
+     "MILL": "",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "2",
+     "ISS_QTY": "50.000"
+    },
+    {
+     "NCCHLN_NO": "128",
+     "CHLN_DATE": "2026-08-24",
+     "MILL": "SHREE VASUDEV",
+     "ITEM": "SHIRT COTTON",
+     "PURPARTY": "RAJESH ENTERPRISE",
+     "ISS_PCS": "10",
+     "ISS_QTY": "1000.000"
+    }
+   ]
+  },
+  {
+   "name": "detail month + datewise",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "DateWise",
+    "orderBy1": "Month"
+   },
+   "expectedError": "A column has been specified more than once in the order by list. Columns in the order by list must be unique."
+  },
+  {
+   "name": "detail filtered mill & item",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "None",
+    "orderBy1": "Item",
+    "mills": [
+     "SHREE LAV"
+    ],
+    "items": [
+     "GRAY MICRO",
+     "BLOUSE"
+    ]
+   },
+   "expected": [
+    {
+     "NCCHLN_NO": "12",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "1000",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "126",
+     "CHLN_DATE": "2026-08-14",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "",
+     "ISS_PCS": "9",
+     "ISS_QTY": "90.000"
+    },
+    {
+     "NCCHLN_NO": "127",
+     "CHLN_DATE": "2026-08-21",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "9",
+     "ISS_QTY": "90.000"
+    },
+    {
+     "NCCHLN_NO": "1",
+     "CHLN_DATE": "2026-07-22",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "",
+     "ISS_PCS": "48",
+     "ISS_QTY": "500.000"
+    },
+    {
+     "NCCHLN_NO": "2",
+     "CHLN_DATE": "2026-07-25",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "MAHESH SIR",
+     "ISS_PCS": "48",
+     "ISS_QTY": "500.000"
+    },
+    {
+     "NCCHLN_NO": "4",
+     "CHLN_DATE": "2026-08-04",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "10",
+     "ISS_QTY": "1000.000"
+    }
+   ]
+  },
+  {
+   "name": "detail date range",
+   "params": {
+    "from": "2026-08-01",
+    "to": "2026-08-05",
+    "orderBy2": "None",
+    "orderBy1": "Register"
+   },
+   "expected": [
+    {
+     "NCCHLN_NO": "4",
+     "CHLN_DATE": "2026-08-04",
+     "MILL": "SHREE LAV",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "10",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "5",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "PADMAVATI PRINT",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "",
+     "ISS_PCS": "1000",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "10",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "",
+     "ITEM": "GRAY MICRO",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "99",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "11",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "TEST FABRIC",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "5",
+     "ISS_QTY": "50.000"
+    },
+    {
+     "NCCHLN_NO": "12",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "1000",
+     "ISS_QTY": "1000.000"
+    },
+    {
+     "NCCHLN_NO": "111",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "TEST FABRIC",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "100",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "121",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "SHREE LAV",
+     "ITEM": "TEST FABRIC",
+     "PURPARTY": "PADMAVATI PRINT",
+     "ISS_PCS": "100",
+     "ISS_QTY": "100.000"
+    },
+    {
+     "NCCHLN_NO": "122",
+     "CHLN_DATE": "2026-08-05",
+     "MILL": "PADMAVATI PRINT",
+     "ITEM": "BLOUSE",
+     "PURPARTY": "",
+     "ISS_PCS": "100",
+     "ISS_QTY": "100.000"
+    }
+   ]
+  },
+  {
+   "name": "summary mill",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "None",
+    "orderBy1": "Mill",
+    "summary": true
+   },
+   "expected": [
+    {
+     "ZGROUP": "",
+     "ZGROUP2": "",
+     "ISS_PCS": "101",
+     "ISS_QTY": "1050.000",
+     "PU_AMOUNT": "10000.00",
+     "AVG_PU_RATE": "14.500000"
+    },
+    {
+     "ZGROUP": "",
+     "ZGROUP2": "PADMAVATI PRINT",
+     "ISS_PCS": "1100",
+     "ISS_QTY": "1100.000",
+     "PU_AMOUNT": "6000.00",
+     "AVG_PU_RATE": "7.500000"
+    },
+    {
+     "ZGROUP": "",
+     "ZGROUP2": "SHREE LAV",
+     "ISS_PCS": "1347",
+     "ISS_QTY": "3751.000",
+     "PU_AMOUNT": "205300.00",
+     "AVG_PU_RATE": "201.250000"
+    },
+    {
+     "ZGROUP": "",
+     "ZGROUP2": "SHREE VASUDEV",
+     "ISS_PCS": "20",
+     "ISS_QTY": "6400.000",
+     "PU_AMOUNT": "69000.00",
+     "AVG_PU_RATE": "12.500000"
+    }
+   ]
+  },
+  {
+   "name": "summary item + month",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "Month",
+    "orderBy1": "Item",
+    "summary": true
+   },
+   "expected": [
+    {
+     "ZGROUP": "BLOUSE",
+     "ZGROUP2": "August",
+     "ISS_PCS": "2118",
+     "ISS_QTY": "2280.000",
+     "PU_AMOUNT": "173000.00",
+     "AVG_PU_RATE": "364.000000"
+    },
+    {
+     "ZGROUP": "DOBBY",
+     "ZGROUP2": "July",
+     "ISS_PCS": "12",
+     "ISS_QTY": "236.000",
+     "PU_AMOUNT": ".00",
+     "AVG_PU_RATE": ".000000"
+    },
+    {
+     "ZGROUP": "DOBBY",
+     "ZGROUP2": "August",
+     "ISS_PCS": "6",
+     "ISS_QTY": "85.000",
+     "PU_AMOUNT": "6300.00",
+     "AVG_PU_RATE": "180.000000"
+    },
+    {
+     "ZGROUP": "GRAY MICRO",
+     "ZGROUP2": "July",
+     "ISS_PCS": "96",
+     "ISS_QTY": "1000.000",
+     "PU_AMOUNT": "10000.00",
+     "AVG_PU_RATE": "10.000000"
+    },
+    {
+     "ZGROUP": "GRAY MICRO",
+     "ZGROUP2": "August",
+     "ISS_PCS": "111",
+     "ISS_QTY": "2050.000",
+     "PU_AMOUNT": "20000.00",
+     "AVG_PU_RATE": "13.000000"
+    },
+    {
+     "ZGROUP": "GRY SHIRT",
+     "ZGROUP2": "August",
+     "ISS_PCS": "10",
+     "ISS_QTY": "5400.000",
+     "PU_AMOUNT": "54000.00",
+     "AVG_PU_RATE": "10.000000"
+    },
+    {
+     "ZGROUP": "SHIRT COTTON",
+     "ZGROUP2": "August",
+     "ISS_PCS": "10",
+     "ISS_QTY": "1000.000",
+     "PU_AMOUNT": "15000.00",
+     "AVG_PU_RATE": "15.000000"
+    },
+    {
+     "ZGROUP": "TEST FABRIC",
+     "ZGROUP2": "August",
+     "ISS_PCS": "205",
+     "ISS_QTY": "250.000",
+     "PU_AMOUNT": "12000.00",
+     "AVG_PU_RATE": "73.333333"
+    }
+   ]
+  },
+  {
+   "name": "summary month + mill",
+   "params": {
+    "from": "2026-04-01",
+    "to": "2027-03-31",
+    "orderBy2": "Mill",
+    "orderBy1": "Month",
+    "summary": true
+   },
+   "expected": [
+    {
+     "ZGROUP": "July",
+     "ZGROUP2": "SHREE LAV",
+     "ISS_PCS": "108",
+     "ISS_QTY": "1236.000",
+     "PU_AMOUNT": "10000.00",
+     "AVG_PU_RATE": "6.666666"
+    },
+    {
+     "ZGROUP": "August",
+     "ZGROUP2": "",
+     "ISS_PCS": "101",
+     "ISS_QTY": "1050.000",
+     "PU_AMOUNT": "10000.00",
+     "AVG_PU_RATE": "14.500000"
+    },
+    {
+     "ZGROUP": "August",
+     "ZGROUP2": "PADMAVATI PRINT",
+     "ISS_PCS": "1100",
+     "ISS_QTY": "1100.000",
+     "PU_AMOUNT": "6000.00",
+     "AVG_PU_RATE": "7.500000"
+    },
+    {
+     "ZGROUP": "August",
+     "ZGROUP2": "SHREE LAV",
+     "ISS_PCS": "1239",
+     "ISS_QTY": "2515.000",
+     "PU_AMOUNT": "195300.00",
+     "AVG_PU_RATE": "266.111111"
+    },
+    {
+     "ZGROUP": "August",
+     "ZGROUP2": "SHREE VASUDEV",
+     "ISS_PCS": "20",
+     "ISS_QTY": "6400.000",
+     "PU_AMOUNT": "69000.00",
+     "AVG_PU_RATE": "12.500000"
+    }
+   ]
+  }
+ ]
+}

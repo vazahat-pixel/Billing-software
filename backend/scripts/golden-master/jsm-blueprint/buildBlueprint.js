@@ -124,11 +124,15 @@ for (const name of [...usedForms].sort()) {
     runtimeTitle: f.rtTitle,
     width: f.w,
     height: f.h,
+    back: f.back,
+    fore: f.fore,
+    font: f.font,
     controls: f.controls
       .filter((c) => !/ToolTip|ErrorProvider|Timer|ContextMenu|ImageList|BindingSource|DataSet|PrintDocument|Dialog/.test(c.type))
       .map((c) => ({
         name: c.name, type: c.type, text: c.text, parent: c.parent, x: c.x, y: c.y, w: c.w, h: c.h, tab: c.tab,
         visible: c.visible, checked: c.checked, enabled: c.enabled, items: c.items, runtime: c.rt,
+        back: c.back, fore: c.fore, font: c.font, dock: c.dock, checkBoxes: c.checkBoxes,
       }))
       .map(compact),
     layouts: [...new Set(Object.values(f.methods || {}).flat().map((s) => s.replace(/^RPT_NAME='(.*)'$/, '$1')).filter((s) => layoutNames.has(s)))],

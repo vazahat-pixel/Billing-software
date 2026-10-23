@@ -38,6 +38,9 @@ public static class JsmFormDump
         public int X = -1, Y = -1, W = -1, H = -1, Tab = -1;
         public bool? Visible, Checked, Enabled;
         public List<string> Items = new List<string>();
+        public string Back, Fore, Font;
+        public int Dock = -1;
+        public bool? CheckBoxes;
         public string RtText;
         public bool? RtChecked, RtVisible, RtEnabled;
         public int RtSelectedIndex = -99;
@@ -47,7 +50,7 @@ public static class JsmFormDump
     class FormState
     {
         public Dictionary<string, Ctl> Ctls = new Dictionary<string, Ctl>();
-        public string Text, RtText;
+        public string Text, RtText, Back, Fore, Font;
         public int W = -1, H = -1;
         public Ctl Get(string n) { Ctl c; if (!Ctls.TryGetValue(n, out c)) { c = new Ctl { Name = n }; Ctls[n] = c; } return c; }
     }
@@ -87,6 +90,8 @@ public static class JsmFormDump
         var strArray = new List<string>();
         string lastNewType = null;
         var stack = new List<string>();
+        var floats = new List<float>();
+        string lastColor = null, lastFont = null;
         int i = 0;
         while (i < il.Length)
         {
@@ -107,11 +112,21 @@ public static class JsmFormDump
             else if (op.Value >= OpCodes.Ldc_I4_M1.Value && op.Value <= OpCodes.Ldc_I4_8.Value) ints.Add(op.Value - OpCodes.Ldc_I4_0.Value);
             else if (op == OpCodes.Ldc_I4_S) ints.Add((sbyte)il[i]);
             else if (op == OpCodes.Ldc_I4) ints.Add(token);
-            else if (op == OpCodes.Newobj) { try { lastNewType = mod.ResolveMethod(token).DeclaringType.Name; } catch { lastNewType = null; } }
+            else if (op == OpCodes.Ldc_R4) floats.Add(BitConverter.ToSingle(il, i));
+            else if (op == OpCodes.Newobj)
+            {
+                try { lastNewType = mod.ResolveMethod(token).DeclaringType.Name; } catch { lastNewType = null; }
+                if (lastNewType == "Font" && lastStr != null)
+                {
+                    var fsize = floats.Count > 0 ? floats[floats.Count - 1] : 8.25f;
+                    var style = ints.Count > 0 ? ints[0] : 0;
+                    lastFont = lastStr + "|" + fsize.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|" + style;
+                }
+            }
             else if (op == OpCodes.Stfld)
             {
                 if (!runtime) { try { var f = mod.ResolveField(token); if (lastNewType != null) fs.Get(f.Name).Type = lastNewType; } catch { } }
-                stack.Clear(); ints.Clear(); strArray.Clear(); lastNewType = null;
+                stack.Clear(); ints.Clear(); strArray.Clear(); floats.Clear(); lastNewType = null;
             }
             else if (op == OpCodes.Call || op == OpCodes.Callvirt)
             {
@@ -124,6 +139,10 @@ public static class JsmFormDump
                 }
                 catch { }
                 bool topIsThis = stack.Count > 0 && stack[stack.Count - 1] == "this";
+                string declName = null;
+                try { declName = mod.ResolveMethod(token).DeclaringType.Name; } catch { }
+                if (mname != null && (declName == "Color" || declName == "SystemColors") && mname.StartsWith("get_")) { lastColor = mname.Substring(4); i += size; continue; }
+                if (mname == "FromArgb" && declName == "Color" && ints.Count >= 3) { lastColor = "#" + string.Join("", ints.Skip(ints.Count - 3).Select(v => (v & 255).ToString("x2"))); i += size; continue; }
                 if (mname != null && mname.StartsWith("get_"))
                 {
                     if (onForm && topIsThis) stack[stack.Count - 1] = mname.Substring(4);
@@ -132,7 +151,7 @@ public static class JsmFormDump
                 if (!runtime && mname != null && mname.StartsWith("set_") && onForm && stack.Count == 1 && topIsThis && lastNewType != null)
                 {
                     fs.Get(mname.Substring(4)).Type = lastNewType;
-                    stack.Clear(); ints.Clear(); strArray.Clear(); lastNewType = null;
+                    stack.Clear(); ints.Clear(); strArray.Clear(); floats.Clear(); lastNewType = null;
                     i += size; continue;
                 }
                 string tgt = stack.Count > 0 ? stack[0] : null;
@@ -152,6 +171,11 @@ public static class JsmFormDump
                 else if (mname == "set_Enabled" && c != null && lastInt != int.MinValue) { if (runtime) c.RtEnabled = lastInt != 0; else c.Enabled = lastInt != 0; }
                 else if (mname == "set_SelectedIndex" && c != null && lastInt != int.MinValue && runtime) c.RtSelectedIndex = lastInt;
                 else if (!runtime && mname == "set_HeaderText" && c != null) c.Text = lastStr;
+                else if (!runtime && mname == "set_BackColor") { if (c != null) c.Back = lastColor; else if (tgt == "this") fs.Back = lastColor; }
+                else if (!runtime && mname == "set_ForeColor") { if (c != null) c.Fore = lastColor; else if (tgt == "this") fs.Fore = lastColor; }
+                else if (!runtime && mname == "set_Font") { if (c != null) c.Font = lastFont; else if (tgt == "this") fs.Font = lastFont; }
+                else if (!runtime && mname == "set_Dock" && c != null && lastInt != int.MinValue) c.Dock = lastInt;
+                else if (!runtime && mname == "set_CheckBoxes" && c != null && lastInt != int.MinValue) c.CheckBoxes = lastInt != 0;
                 else if (mname == "AddRange" && c != null)
                 {
                     if (!runtime && stack.Count > 1)
@@ -171,9 +195,9 @@ public static class JsmFormDump
                     if (!runtime && child != null && child != tgt && fs.Ctls.ContainsKey(child)) fs.Ctls[child].Parent = tgt;
                     else if (strArray.Count > 0 && lastStr != null) (runtime ? c.RtItems : c.Items).Add(lastStr);
                 }
-                stack.Clear(); ints.Clear(); strArray.Clear();
+                stack.Clear(); ints.Clear(); strArray.Clear(); floats.Clear();
             }
-            else if (op == OpCodes.Pop || op == OpCodes.Ret) { stack.Clear(); ints.Clear(); strArray.Clear(); }
+            else if (op == OpCodes.Pop || op == OpCodes.Ret) { stack.Clear(); ints.Clear(); strArray.Clear(); floats.Clear(); }
             i += size;
         }
     }
@@ -283,7 +307,9 @@ public static class JsmFormDump
             if (!firstForm) outSb.Append(",\n");
             firstForm = false;
             outSb.Append("{\"form\":").Append(Esc(t.Name)).Append(",\"title\":").Append(Esc(fs.Text)).Append(",\"rtTitle\":").Append(Esc(fs.RtText))
-                 .Append(",\"w\":").Append(fs.W).Append(",\"h\":").Append(fs.H).Append(",\"controls\":[");
+                 .Append(",\"w\":").Append(fs.W).Append(",\"h\":").Append(fs.H)
+                 .Append(",\"back\":").Append(Esc(fs.Back)).Append(",\"fore\":").Append(Esc(fs.Fore)).Append(",\"font\":").Append(Esc(fs.Font))
+                 .Append(",\"controls\":[");
             bool first = true;
             foreach (var c in fs.Ctls.Values.Where(c => c.Type != null))
             {
@@ -294,6 +320,8 @@ public static class JsmFormDump
                      .Append(",\"x\":").Append(c.X).Append(",\"y\":").Append(c.Y).Append(",\"w\":").Append(c.W).Append(",\"h\":").Append(c.H)
                      .Append(",\"tab\":").Append(c.Tab)
                      .Append(",\"visible\":").Append(B(c.Visible)).Append(",\"checked\":").Append(B(c.Checked)).Append(",\"enabled\":").Append(B(c.Enabled))
+                     .Append(",\"back\":").Append(Esc(c.Back)).Append(",\"fore\":").Append(Esc(c.Fore)).Append(",\"font\":").Append(Esc(c.Font))
+                     .Append(",\"dock\":").Append(c.Dock).Append(",\"checkBoxes\":").Append(B(c.CheckBoxes))
                      .Append(",\"items\":[").Append(string.Join(",", c.Items.Select(Esc))).Append("]")
                      .Append(",\"rt\":{\"text\":").Append(Esc(c.RtText)).Append(",\"checked\":").Append(B(c.RtChecked))
                      .Append(",\"visible\":").Append(B(c.RtVisible)).Append(",\"enabled\":").Append(B(c.RtEnabled))

@@ -80,6 +80,7 @@ import DownloadDesktopModal from '../components/desktop/DownloadDesktopModal';
 import { downloadMasterTemplate } from '../utils/excelTemplateGenerator';
 
 // Rare / heavy screens — lazy OK
+const JsmReport = lazy(() => import('../jsm/JsmReport'));
 const PurchaseEngineModal = lazy(() => import('./purchase/PurchaseEngineModal'));
 const InventoryEngineModal = lazy(() => import('./inventory/InventoryEngineModal'));
 const ProductionEngineModal = lazy(() => import('./jobwork/ProductionEngineModal'));
@@ -811,6 +812,8 @@ const Dashboard = () => {
       }));
    };
 
+   const [jsmReportForm, setJsmReportForm] = useState(null);
+
    const openReportLeaf = (leafId) => {
       openReportsHub('summary', leafId);
    };
@@ -1113,7 +1116,8 @@ const Dashboard = () => {
             openHub: openReportsHub,
             openExternal: (node) => {
                const ext = typeof node === 'string' ? node : node?.external;
-               if (ext === 'gstReports') openGstReport(node?.reportKind || 'gstr1');
+               if (ext === 'jsmReport') setJsmReportForm(node.jsmForm);
+               else if (ext === 'gstReports') openGstReport(node?.reportKind || 'gstr1');
                else if (ext === 'gstr1') openGstReport('gstr1');
                else if (ext === 'finalReport') {
                   setFinalReportKind(node.reportKind || 'groupList');
@@ -2670,6 +2674,16 @@ const Dashboard = () => {
             onClose={() => setModals(prev => ({ ...prev, recordsHub: false }))}
             initialTab={modals.recordsTab}
          />
+         {jsmReportForm && (
+            <Suspense fallback={null}>
+               <JsmReport
+                  formName={jsmReportForm}
+                  isOpen={Boolean(jsmReportForm)}
+                  onClose={() => setJsmReportForm(null)}
+                  companyName={user?.companyName || user?.company?.name || companySettings?.legalName || companyMeta?.name || ''}
+               />
+            </Suspense>
+         )}
          <ReportsHub
             isOpen={modals.reportsHub}
             onClose={() => setModals(prev => ({ ...prev, reportsHub: false, reportsLeafId: null }))}
@@ -2679,7 +2693,8 @@ const Dashboard = () => {
             onOpenExternal={(node) => {
                const ext = typeof node === 'string' ? node : node?.external;
                setModals(prev => ({ ...prev, reportsHub: false, reportsLeafId: null }));
-               if (ext === 'gstReports') toggleModal('gstReports', true);
+               if (ext === 'jsmReport') setJsmReportForm(node.jsmForm);
+               else if (ext === 'gstReports') toggleModal('gstReports', true);
                else if (ext === 'gstr1') toggleModal('gstr1', true);
                else if (ext === 'finalReport') {
                   setFinalReportKind(node?.reportKind || 'groupList');

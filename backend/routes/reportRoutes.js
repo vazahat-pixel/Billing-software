@@ -23,4 +23,8 @@ router.get('/diff-opening', reportController.getDiffOpening);
 router.get('/diff-ledger', reportController.getDiffYear);
 router.post('/import-bank', reportController.postImportBank);
 
+const jsmReportController = require('../controllers/jsmReportController');
+router.get('/jsm/:reportId/options', jsmReportController.options);
+router.get('/jsm/:reportId', jsmReportController.run);
+
 module.exports = router;
