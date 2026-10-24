@@ -39,5 +39,5 @@ nsis:
   deleteAppDataOnUninstall: false
 publish:
   - provider: generic
-    url: https://updates.example.com/textile-erp/
+    url: https://app.dealingindia.com/downloads/updates/
     channel: latest

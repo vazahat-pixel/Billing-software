@@ -1,6 +1,6 @@
 {
   "name": "textile-erp-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Textile ERP Desktop - Client Application",
   "main": "main.js",
@@ -70,7 +70,7 @@
     "publish": [
       {
         "provider": "generic",
-        "url": "https://updates.example.com/textile-erp/"
+        "url": "https://app.dealingindia.com/downloads/updates/"
       }
     ]
   },
