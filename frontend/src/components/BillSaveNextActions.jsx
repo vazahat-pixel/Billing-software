@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import ErpTopLayer from './erp/ErpTopLayer';
 
 /**
@@ -16,28 +16,53 @@ const BillSaveNextActions = ({
   onNew,
   onClose
 }) => {
-  // Esc closes this popup only (capture phase, so the bill window behind does not also close).
+  const cardRef = useRef(null);
+  // Callers rebuild these every render; refs keep the key handler (and initial focus) set up once per open.
+  const latest = useRef({ actions, onClose });
+  latest.current = { actions, onClose };
+
+  // Keyboard, in capture phase so the bill window behind never sees these keys:
+  // Esc closes, arrows move between buttons, Enter presses the focused one, 1-9 pick "Continue to".
   useEffect(() => {
-    if (!open || !onClose) return undefined;
+    if (!open) return undefined;
+    const buttons = () => [...(cardRef.current?.querySelectorAll('button:not([disabled]):not([data-nav-skip])') || [])];
+    const focusTimer = setTimeout(() => buttons()[0]?.focus(), 30);
     const onKey = (e) => {
-      if (e.key !== 'Escape') return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      onClose();
+      const list = buttons();
+      const at = list.indexOf(document.activeElement);
+      const stop = () => { e.preventDefault(); e.stopImmediatePropagation(); };
+      const { actions, onClose } = latest.current;
+      if (e.key === 'Escape') {
+        stop();
+        onClose?.();
+      } else if (['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft'].includes(e.key) && list.length) {
+        stop();
+        const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1;
+        list[(at + step + list.length) % list.length].focus();
+      } else if (e.key === 'Enter' && at >= 0) {
+        stop();
+        list[at].click();
+      } else if (/^[1-9]$/.test(e.key) && actions[Number(e.key) - 1]) {
+        stop();
+        actions[Number(e.key) - 1].onClick();
+      }
     };
     window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [open, onClose]);
+    return () => {
+      clearTimeout(focusTimer);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [open]);
 
   if (!open) return null;
 
   return (
     <ErpTopLayer>
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
-      <div className="w-full max-w-md bg-white border border-[var(--border)] rounded-xl shadow-[var(--shadow-float)] overflow-hidden">
+      <div ref={cardRef} className="[&_button:focus]:outline [&_button:focus]:outline-[3px] [&_button:focus]:outline-blue-600 [&_button:focus]:outline-offset-2 w-full max-w-md bg-white border border-[var(--border)] rounded-xl shadow-[var(--shadow-float)] overflow-hidden">
         <div className="bg-[var(--accent-gradient)] text-white px-4 py-3 text-[13px] font-semibold flex justify-between items-center">
           <span>{title}</span>
-          <button type="button" onClick={onClose} className="text-white/80 hover:text-white hover:bg-white/15 rounded-md w-7 h-7 flex items-center justify-center">
+          <button type="button" data-nav-skip onClick={onClose} className="text-white/80 hover:text-white hover:bg-white/15 rounded-md w-7 h-7 flex items-center justify-center">
             ×
           </button>
         </div>

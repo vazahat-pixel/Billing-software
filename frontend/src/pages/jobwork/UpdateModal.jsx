@@ -477,6 +477,8 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
               const firstItem = purchaseLines.find((l) => l.itemId)?.itemId;
               if (firstItem) setActiveItemId(String(firstItem));
               notifySuccess(`Loaded ${purchaseLines.length} line(s) from Purchase ${initialData.invoiceNo || ''}`.trim());
+              const noQty = purchaseLines.filter((l) => !(Number(l.qty) > 0)).length;
+              if (noQty) notifyWarning(`${noQty} line(s) have Pcs but no meters in the purchase — enter Qty or Cut before saving`);
             } else {
               notifyWarning(`Purchase ${initialData.invoiceNo || ''} has no balance stock to issue`.trim());
             }
@@ -922,7 +924,19 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
 
     const activeLines = calc.linesWithAmt.filter((l) => l.lotId && Number(l.qty) > 0);
     if (activeLines.length === 0) {
-      notifyWarning('Add at least one line — pick an Item and enter quantity');
+      // Say exactly what the filled line is missing instead of a generic "add a line".
+      const idx = calc.linesWithAmt.findIndex((l) => l.itemId || l.lotId || Number(l.pcs) > 0);
+      const line = idx >= 0 ? calc.linesWithAmt[idx] : null;
+      if (line && !line.lotId) {
+        notifyWarning(`Line ${idx + 1}: no stock lot for "${line.itemName || 'item'}" — use Fetch From Purchase Bill`);
+      } else if (line) {
+        notifyWarning(`Line ${idx + 1}: enter Qty (or Cut) — this purchase has Pcs ${line.pcs || 0} but no meters`);
+        const cell = document.querySelectorAll('.erp-job-issue-table tbody tr')[idx]?.querySelector('[data-col="cut"]')
+          || document.querySelectorAll('.erp-job-issue-table tbody tr')[idx]?.querySelector('[data-col="qty"]');
+        cell?.focus();
+      } else {
+        notifyWarning('Add at least one line — pick an Item and enter quantity');
+      }
       return;
     }
 
