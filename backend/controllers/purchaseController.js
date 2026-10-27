@@ -4,8 +4,11 @@ const auditService = require('../services/auditService');
 const asyncHandler = require('../utils/asyncHandler');
 const { ok, created } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
+const Purchase = require('../models/Purchase');
+const { renumberIfTaken } = require('../utils/offlineRenumber');
 
 exports.createPurchase = asyncHandler(async (req, res) => {
+  await renumberIfTaken(req, res, { Model: Purchase, field: 'invoiceNo' });
   const purchase = await purchaseService.createPurchase({ ...req.body, companyId: req.companyId });
   await auditService.log(req, 'CREATE_BILL', 'Purchase', purchase._id, null, {
     invoiceNo: purchase.invoiceNo,

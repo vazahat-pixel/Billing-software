@@ -40,7 +40,9 @@ import {
 /** Later party fetches must not overwrite a save that already landed. */
 let partiesFetchSeq = 0;
 import { cacheEntities, getCachedEntities, generateLocalId, clearOfflineDB, prepareCompanyCache, setActiveCompanyId, patchOfflineCache } from '../utils/offlineDB';
-import { saveOffline, saveOfflineUpdate, saveOfflineDelete } from '../utils/syncQueue';
+import { saveOffline, saveOfflineUpdate, saveOfflineDelete, newOperationId } from '../utils/syncQueue';
+/** One id per create: sent online and, if that fails, with the queued copy, so it is saved once. */
+const withOperationId = (d) => (d && typeof d === 'object' && !d.operationId ? { ...d, operationId: newOperationId() } : d);
 import {
   enrichSalePayload,
   enrichPurchasePayload,
@@ -527,6 +529,7 @@ const useStore = create((set, get) => ({
   },
 
   addParty: async (partyData) => {
+    partyData = withOperationId(partyData);
     const saveLocal = async () => {
       const localId = generateLocalId();
       const localParty = normalizeParty({ ...partyData, _id: localId, id: localId, offlinePending: true });
@@ -647,6 +650,7 @@ const useStore = create((set, get) => ({
   },
 
   addItem: async (itemData) => {
+    itemData = withOperationId(itemData);
     const saveLocal = async () => {
       const localId = generateLocalId();
       const localItem = normalizeItem({ ...itemData, _id: localId, id: localId, offlinePending: true });
@@ -772,6 +776,7 @@ const useStore = create((set, get) => ({
   },
 
   addPurchase: async (purchaseData) => {
+    purchaseData = withOperationId(purchaseData);
     const enriched = enrichPurchasePayload(purchaseData, get());
     const applyInventory = (state) => {
       const lots = applyPurchaseToInventory(state.inventoryLots, enriched.items, state.items);
@@ -942,6 +947,7 @@ const useStore = create((set, get) => ({
   },
 
   addSale: async (saleData) => {
+    saleData = withOperationId(saleData);
     const enriched = enrichSalePayload(saleData, get());
     const applyInventory = (state) => {
       const lots = applySaleToInventory(state.inventoryLots, enriched.items);
@@ -1166,6 +1172,7 @@ const useStore = create((set, get) => ({
   },
 
   issueToMill: async (issueData) => {
+    issueData = withOperationId(issueData);
     const saveLocal = async () => {
       const localId = generateLocalId();
       const jobCardNo = issueData.jobCardNo || `JC-OFF-${Date.now().toString().slice(-6)}`;
@@ -1211,6 +1218,7 @@ const useStore = create((set, get) => ({
   },
 
   receiveFromMill: async (receiveData) => {
+    receiveData = withOperationId(receiveData);
     const saveLocal = async () => {
       const targetId = receiveData.jobId || receiveData._id || receiveData.id;
       const localId = targetId || generateLocalId();
@@ -1222,7 +1230,7 @@ const useStore = create((set, get) => ({
         receivedDate: receiveData.receivedDate || new Date().toISOString().split('T')[0],
         offlinePending: true,
       };
-      await saveOffline('jobs', { ...updatedJob, action: 'updateReceive' });
+      await saveOffline('jobs', updatedJob, 'create', { endpoint: '/jobs/receive', queuePayload: receiveData });
       set((state) => ({
         jobWorkEntries: state.jobWorkEntries.map((j) =>
           String(j._id || j.id) === String(targetId) ? { ...j, ...updatedJob } : j
@@ -1384,6 +1392,7 @@ const useStore = create((set, get) => ({
   },
 
   addLedger: async (ledgerData) => {
+    ledgerData = withOperationId(ledgerData);
     const saveLocal = async () => {
       const localId = generateLocalId();
       const localLedger = {
@@ -1414,6 +1423,7 @@ const useStore = create((set, get) => ({
   },
 
   addPayment: async (data) => {
+    data = withOperationId(data);
     const saveLocal = async () => {
       const localId = generateLocalId();
       const voucherNo = `OFF-PV-${Date.now().toString().slice(-6)}`;
@@ -1477,6 +1487,7 @@ const useStore = create((set, get) => ({
   },
 
   addReceipt: async (data) => {
+    data = withOperationId(data);
     const saveLocal = async () => {
       const localId = generateLocalId();
       const voucherNo = `OFF-RV-${Date.now().toString().slice(-6)}`;
@@ -2085,6 +2096,7 @@ const useStore = create((set, get) => ({
   },
 
   addNote: async (data) => {
+    data = withOperationId(data);
     const saveLocal = async () => {
       const localId = generateLocalId();
       const localNote = {
@@ -2131,7 +2143,7 @@ const useStore = create((set, get) => ({
   },
 
   /** Contra voucher — transfer between two Cash/Bank ledgers (Stage 3 financial engine). */
-  postContra: async ({ fromLedgerId, toLedgerId, amount, entryDate, narration }) => {
+  postContra: async ({ fromLedgerId, toLedgerId, amount, entryDate, narration, operationId = newOperationId() }) => {
     const saveLocal = async () => {
       const localId = generateLocalId();
       const localContra = {
@@ -2144,14 +2156,15 @@ const useStore = create((set, get) => ({
         narration: narration || 'Contra Voucher',
         voucherType: 'Contra',
         offlinePending: true,
+        operationId,
       };
-      await saveOffline('payments', localContra);
+      await saveOffline('payments', localContra, 'create', { endpoint: '/stage3/journals/contra' });
       set((state) => ({ vouchers: [localContra, ...state.vouchers] }));
       return localContra;
     };
     if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
-      return await accountingApi.stage3.contra({ fromLedgerId, toLedgerId, amount, entryDate, narration });
+      return await accountingApi.stage3.contra({ fromLedgerId, toLedgerId, amount, entryDate, narration, operationId });
     } catch (err) {
       if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
       console.error('Contra voucher failed:', err);
@@ -2411,6 +2424,7 @@ const useStore = create((set, get) => ({
 
   // --- MANUAL JOURNAL ---
   addJournalEntry: async (entryData) => {
+    entryData = withOperationId(entryData);
     const saveLocal = async () => {
       const localId = generateLocalId();
       const localVoucher = {
@@ -2420,7 +2434,7 @@ const useStore = create((set, get) => ({
         voucherType: 'Journal',
         offlinePending: true,
       };
-      await saveOffline('payments', localVoucher);
+      await saveOffline('payments', localVoucher, 'create', { endpoint: '/accounting/journal' });
       set((state) => ({ vouchers: [localVoucher, ...state.vouchers] }));
       return localVoucher;
     };

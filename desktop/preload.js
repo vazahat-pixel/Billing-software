@@ -44,4 +44,6 @@ contextBridge.exposeInMainWorld('textileDesktop', {
   needsSetup: () => ipcRenderer.invoke('desktop:needs-setup'),
   markSetupDone: () => ipcRenderer.invoke('desktop:mark-setup-done'),
   backup: () => ipcRenderer.invoke('desktop:backup'),
+  /** Renderer reports how many offline entries are still waiting to upload (close/quit warning). */
+  setPendingSync: (count) => ipcRenderer.send('desktop:pending-sync', Number(count) || 0),
 });

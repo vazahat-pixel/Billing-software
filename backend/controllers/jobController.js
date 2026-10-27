@@ -1,8 +1,15 @@
 const jobService = require('../services/jobService');
+const Job = require('../models/Job');
+const { isOfflineSync, renumberIfTaken } = require('../utils/offlineRenumber');
 
 exports.issueToJob = async (req, res) => {
   try {
     req.body.companyId = req.companyId;
+    if (isOfflineSync(req)) {
+      // The service numbers by jobCardNo || challanNo; check the same value.
+      if (!req.body.jobCardNo && req.body.challanNo) req.body.jobCardNo = req.body.challanNo;
+      await renumberIfTaken(req, res, { Model: Job, field: 'jobCardNo', alsoCheck: ['challanNo'], clear: ['challanNo'] });
+    }
     const job = await jobService.issueToJob(req.body);
     res.status(201).json({ success: true, data: job });
   } catch (error) {

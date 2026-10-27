@@ -106,6 +106,13 @@ client.interceptors.request.use((config) => {
         : `req-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
+  // A create that carries an operationId is applied once on the server even if it is sent again
+  // (reply lost, then saved offline and re-sent by the sync queue).
+  const opId = config.data && typeof config.data === 'object' ? config.data.operationId : null;
+  if (opId && String(config.method).toLowerCase() === 'post' && !config.headers['Idempotency-Key']) {
+    config.headers['Idempotency-Key'] = String(opId);
+  }
+
   // Licence device binding — read from cache only, so this stays synchronous.
   const deviceIdentity = getCachedDeviceIdentity();
   if (deviceIdentity?.deviceId) {
