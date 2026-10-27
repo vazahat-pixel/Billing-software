@@ -825,27 +825,31 @@ textarea.classic-erp-input {
   white-space: normal !important;
   word-break: break-word !important;
 }
+/* 22 columns (Chadti added at 10). Widths are by position — keep in step with the <th> order in
+   ReceiveModal: SrNo, LotNo, ChlnNo, ItemName, G.Pcs, Grey, Finish, Final, Shtg%, Chadti, Job.Rate,
+   Job Amount, CP, Tp, Finish Item, Cut, F.Pcs, Proc Type, Cutting Pending, Pending, Final?, (delete). */
 .mill-receive-grid th:nth-child(1) { width: 3% !important; }
-.mill-receive-grid th:nth-child(2) { width: 8% !important; }
-.mill-receive-grid th:nth-child(3) { width: 7% !important; }
-.mill-receive-grid th:nth-child(4) { width: 10% !important; }
+.mill-receive-grid th:nth-child(2) { width: 6% !important; }
+.mill-receive-grid th:nth-child(3) { width: 6% !important; }
+.mill-receive-grid th:nth-child(4) { width: 8% !important; }
 .mill-receive-grid th:nth-child(5) { width: 4% !important; }
 .mill-receive-grid th:nth-child(6),
 .mill-receive-grid th:nth-child(7),
 .mill-receive-grid th:nth-child(8),
-.mill-receive-grid th:nth-child(10),
-.mill-receive-grid th:nth-child(17) { width: 5% !important; }
+.mill-receive-grid th:nth-child(11),
+.mill-receive-grid th:nth-child(18),
+.mill-receive-grid th:nth-child(19) { width: 5% !important; }
 .mill-receive-grid th:nth-child(9),
-.mill-receive-grid th:nth-child(16),
-.mill-receive-grid th:nth-child(19) { width: 4% !important; }
-.mill-receive-grid th:nth-child(11) { width: 6% !important; }
-.mill-receive-grid th:nth-child(12),
+.mill-receive-grid th:nth-child(10),
+.mill-receive-grid th:nth-child(17),
+.mill-receive-grid th:nth-child(20) { width: 4% !important; }
+.mill-receive-grid th:nth-child(12) { width: 7% !important; }
 .mill-receive-grid th:nth-child(13),
-.mill-receive-grid th:nth-child(15),
-.mill-receive-grid th:nth-child(20) { width: 3% !important; }
-.mill-receive-grid th:nth-child(14) { width: 6% !important; }
-.mill-receive-grid th:nth-child(18) { width: 5% !important; }
-.mill-receive-grid th:nth-child(21) { width: 2% !important; }
+.mill-receive-grid th:nth-child(14),
+.mill-receive-grid th:nth-child(16),
+.mill-receive-grid th:nth-child(21) { width: 3% !important; }
+.mill-receive-grid th:nth-child(15) { width: 6% !important; }
+.mill-receive-grid th:nth-child(22) { width: 2% !important; }
 .classic-erp-window.erp-job-issue-window .erp-job-issue-header-grid,
 .classic-erp-window.erp-job-receipt-window .erp-job-receipt-header-grid,
 .classic-erp-window.erp-job-issue-window .erp-job-issue-footer-grid {
