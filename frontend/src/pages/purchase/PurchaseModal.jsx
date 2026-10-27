@@ -97,6 +97,8 @@ const PurchaseModal = ({
   const openedOnceRef = useRef(false);
   const modalContainerRef = useRef(null);
   const suppBillRef = useRef(null);
+  const challanRef = useRef(null);
+  const chDateRef = useRef(null);
   const lastEnterRef = useRef({ time: 0, idx: -1 });
 
   const [showFindModal, setShowFindModal] = useState(false);
@@ -1811,33 +1813,53 @@ const PurchaseModal = ({
                         value={header.billDate}
                         onChange={e => setHeader({ ...header, billDate: e.target.value })}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
+                          if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
                             e.stopPropagation();
-                            focusPurchaseVendor();
+                            challanRef.current?.focus();
+                            try { challanRef.current?.select(); } catch { /* ignore */ }
+                          }
+                        }}
+                        disabled={locked}
+                      />
+                    </div>
+                    {/* Enter order: Supp. Bill → Date → Challan → Ch Date → Vendor */}
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Challan:</span>
+                      <input
+                        ref={challanRef}
+                        type="text"
+                        data-enter-order="3.1"
+                        className="classic-erp-input"
+                        value={header.challanNo}
+                        placeholder="Challan No"
+                        onChange={e => setHeader({ ...header, challanNo: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            chDateRef.current?.focus();
                           }
                         }}
                         disabled={locked}
                       />
                     </div>
                     <div className="classic-erp-field">
-                      <span className="classic-erp-label">Challan:</span>
-                      <input
-                        type="text"
-                        className="classic-erp-input"
-                        value={header.challanNo}
-                        placeholder="Challan No"
-                        onChange={e => setHeader({ ...header, challanNo: e.target.value })}
-                        disabled={locked}
-                      />
-                    </div>
-                    <div className="classic-erp-field">
                       <span className="classic-erp-label">Ch Date:</span>
                       <input
+                        ref={chDateRef}
                         type="date"
+                        data-enter-order="3.2"
                         className="classic-erp-input"
                         value={header.chDate}
                         onChange={e => setHeader({ ...header, chDate: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            focusPurchaseVendor();
+                          }
+                        }}
                         disabled={locked}
                       />
                     </div>

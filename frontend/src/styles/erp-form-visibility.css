@@ -725,6 +725,10 @@ textarea.classic-erp-input {
   height: auto !important;
   margin-top: 0 !important;
 }
+/* Full-height workspaces (GST hub): their side lists scroll only inside a fixed height. */
+.erp-modal-sheet.erp-modal-fill {
+  height: calc(100dvh - 112px) !important;
+}
 .erp-modal-sheet .classic-erp-window {
   max-height: calc(100dvh - 112px) !important;
 }
