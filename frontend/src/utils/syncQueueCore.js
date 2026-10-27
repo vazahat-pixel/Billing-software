@@ -121,6 +121,9 @@ export function classifyError(err) {
   const status = err?.response?.status;
   const code = err?.response?.data?.code;
   if (!err?.response) return 'offline'; // no reply: network down / server unreachable
+  // Login expired (the client already tried a token refresh): keep everything queued until the
+  // user logs in again — never mark entries as refused because of the session.
+  if (status === 401) return 'auth';
   if (status === 409 && code === 'IDEMPOTENCY_IN_PROGRESS') return 'retry';
   if (status === 408 || status === 429 || status >= 500) return 'retry';
   return 'rejected'; // the server refused this entry (validation, stock…): needs the user

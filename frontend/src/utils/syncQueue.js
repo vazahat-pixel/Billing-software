@@ -99,6 +99,9 @@ const syncItem = async (item) => {
 
 let syncing = false;
 
+/** True while an upload run is in progress (logout waits for it). */
+export const isSyncRunning = () => syncing;
+
 /**
  * Send the active company's queued entries, oldest first. Masters created offline go before the
  * bills that use them; a bill still pointing at an unsynced master waits. A network failure stops
@@ -150,9 +153,13 @@ export const processSyncQueue = async (onSynced, onError, onComplete, opts = {})
       } catch (err) {
         const kind = classifyError(err);
         const message = err?.response?.data?.message || err.message;
-        if (kind === 'offline') {
-          await updateSyncItem(item.id, { status: 'pending', error: null, lastAttempt: new Date().toISOString() });
-          break; // connection gone — stop; everything left stays queued
+        if (kind === 'offline' || kind === 'auth') {
+          await updateSyncItem(item.id, {
+            status: 'pending',
+            error: kind === 'auth' ? 'Login expired — log in again to upload' : null,
+            lastAttempt: new Date().toISOString()
+          });
+          break; // connection or login gone — stop; everything left stays queued
         }
         if (kind === 'retry') {
           await updateSyncItem(item.id, { status: 'pending', error: message, lastAttempt: new Date().toISOString() });

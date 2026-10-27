@@ -64,6 +64,9 @@ export const loginWithOfflineSupport = async ({
       throw new Error(body.message || 'Login failed: invalid server response');
     }
     assertRole(user);
+    // 30-day refresh token: lets the app renew the 8-hour access token instead of logging out.
+    if (payload.refreshToken) localStorage.setItem('refreshToken', payload.refreshToken);
+    else localStorage.removeItem('refreshToken');
     // IndexedDB can throw "Internal error." in Electron — never block online login.
     try {
       await saveOfflineCredential(emailNorm, password, { token, user });

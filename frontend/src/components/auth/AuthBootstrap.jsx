@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import useStore from '../../store/useStore';
 import { initSyncListener } from '../../utils/syncQueue';
-import { subscribeNetworkStatus } from '../../utils/networkStatus';
+import { subscribeNetworkStatus, isOffline as isNetworkOffline } from '../../utils/networkStatus';
+import SessionExpiredModal from './SessionExpiredModal';
 import { useLocalApiAsSourceOfTruth, isDesktopShell } from '../../utils/desktopMode';
 import { notifySuccess, notifyWarning } from '../../utils/notify';
 
@@ -108,6 +109,53 @@ const AuthBootstrap = ({ children }) => {
     });
   }, [desktopLocal]);
 
+  // Renewed login token (API client refresh): keep the store in step.
+  useEffect(() => {
+    const onRefreshed = (e) => {
+      if (e.detail?.token) useStore.setState({ token: e.detail.token });
+    };
+    window.addEventListener('erp-token-refreshed', onRefreshed);
+    return () => window.removeEventListener('erp-token-refreshed', onRefreshed);
+  }, []);
+
+  // Several devices on one account: when the app comes back to the front after a while (next
+  // morning, after working on another PC), reload from the cloud so their entries show here.
+  useEffect(() => {
+    if (desktopLocal) return undefined;
+    const STALE_MS = 5 * 60 * 1000;
+    let hiddenAt = document.visibilityState === 'hidden' ? Date.now() : null;
+    let blurredAt = null;
+    const reload = () => {
+      const st = useStore.getState();
+      if (!st.token || isNetworkOffline()) return;
+      st.refreshAllData?.().catch(() => {});
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now();
+      } else if (hiddenAt && Date.now() - hiddenAt > STALE_MS) {
+        hiddenAt = null;
+        reload();
+      } else {
+        hiddenAt = null;
+      }
+    };
+    // Electron tray hide/show does not always change visibility; window focus covers it.
+    const onBlur = () => { blurredAt = Date.now(); };
+    const onFocus = () => {
+      if (blurredAt && Date.now() - blurredAt > STALE_MS) reload();
+      blurredAt = null;
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [desktopLocal]);
+
   if (!sessionReady) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-[var(--bg-base)] erp-motion-fade-in">
@@ -119,7 +167,12 @@ const AuthBootstrap = ({ children }) => {
     );
   }
 
-  return <div className="erp-motion-fade-in min-h-full">{children}</div>;
+  return (
+    <div className="erp-motion-fade-in min-h-full">
+      {children}
+      <SessionExpiredModal />
+    </div>
+  );
 };
 
 export default AuthBootstrap;

@@ -78,6 +78,7 @@ import StockLedgerModal from './reports/StockLedgerModal';
 import DataImportModal from '../components/import/DataImportModal';
 import DownloadDesktopModal from '../components/desktop/DownloadDesktopModal';
 import { downloadMasterTemplate } from '../utils/excelTemplateGenerator';
+import { logoutWithSync } from '../utils/safeLogout';
 
 // Rare / heavy screens — lazy OK
 const JsmReport = lazy(() => import('../jsm/JsmReport'));
@@ -323,9 +324,9 @@ const Dashboard = () => {
    const [caPwd, setCaPwd] = useState({ current: '', next: '' });
    const [caPwdSaving, setCaPwdSaving] = useState(false);
 
+   // Uploads this computer's offline entries first, so the account opened on another PC has them.
    const handleLogout = async () => {
-      await logout();
-      navigate('/login');
+      if (await logoutWithSync()) navigate('/login');
    };
 
    /** Menu visible only when Plan sells it AND Module Control leaves it on. */

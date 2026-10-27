@@ -83,6 +83,74 @@ const client = axios.create({
 const hasStoredSession = () =>
   !!(localStorage.getItem('token') && localStorage.getItem('user'));
 
+// --- Session refresh ----------------------------------------------------------------------------
+// The access token lives 8 h; login also issues a 30-day refresh token. On a 401 the client trades
+// the refresh token for a new access token once and replays the request, so a desktop left open all
+// day never fails a save at the 8-hour mark. Only when the refresh itself is refused (idle
+// overnight, revoked) is 'erp-session-expired' raised, and the user logs in again over the open
+// screen — the half-filled bill and the offline queue stay.
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/refresh', '/auth/register', '/auth/forgot-password',
+  '/auth/reset-password', '/auth/send-registration-otp', '/auth/verify-registration-otp'];
+let refreshInFlight = null;
+
+/** companyId inside a JWT (payload only, no verification — the server verifies). */
+const tokenCompanyId = (token) => {
+  try {
+    const part = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(part)).companyId || null;
+  } catch {
+    return null;
+  }
+};
+
+const sessionExpired = (message) => Object.assign(new Error(message), { sessionExpired: true });
+
+export const refreshAccessToken = () => {
+  if (refreshInFlight) return refreshInFlight;
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) return Promise.reject(sessionExpired('No refresh token — please log in again'));
+  refreshInFlight = client
+    .request({
+      method: 'post',
+      url: '/auth/refresh',
+      data: { refreshToken },
+      _skipRefresh: true,
+      skipAuthRedirect: true,
+      forceNetwork: true,
+      silent: true,
+    })
+    .then((res) => {
+      const { token, refreshToken: next } = res.data || {};
+      if (!token) throw sessionExpired('Session refresh failed');
+      // Never continue in another company than the one open on screen.
+      const active = localStorage.getItem('offlineCompanyId'); // offlineDB COMPANY_KEY
+      const fresh = tokenCompanyId(token);
+      if (active && fresh && String(active) !== String(fresh)) {
+        throw sessionExpired('Company changed — please log in again');
+      }
+      localStorage.setItem('token', token);
+      if (next) localStorage.setItem('refreshToken', next);
+      window.dispatchEvent(new CustomEvent('erp-token-refreshed', { detail: { token } }));
+      return token;
+    })
+    .catch((err) => {
+      if (err?.sessionExpired || err?.response?.status === 401) {
+        // Another tab may have rotated the token a moment earlier: use what it stored.
+        const stored = localStorage.getItem('refreshToken');
+        if (stored && stored !== refreshToken && !err.message?.startsWith('Company changed')) {
+          return localStorage.getItem('token');
+        }
+        if (stored === refreshToken) localStorage.removeItem('refreshToken');
+        throw Object.assign(err, { sessionExpired: true });
+      }
+      throw err; // network trouble: keep the refresh token and try again later
+    })
+    .finally(() => {
+      refreshInFlight = null;
+    });
+  return refreshInFlight;
+};
+
 client.interceptors.request.use((config) => {
   const method = (config.method || 'get').toLowerCase();
   const mutating = MUTATING_METHODS.has(method);
@@ -183,6 +251,28 @@ client.interceptors.response.use(
     ) {
       cfg.__retried = true;
       return client.request(cfg);
+    }
+
+    // Expired access token: refresh once and replay the same request.
+    const reqUrl = String(cfg.url || '');
+    if (
+      error.response?.status === 401 &&
+      !cfg._skipRefresh &&
+      !cfg.__refreshed &&
+      localStorage.getItem('token') &&
+      !AUTH_ENDPOINTS.some((p) => reqUrl.includes(p))
+    ) {
+      try {
+        const token = await refreshAccessToken();
+        cfg.__refreshed = true;
+        cfg.headers = { ...(cfg.headers || {}), Authorization: `Bearer ${token}` };
+        return client.request(cfg);
+      } catch (refreshErr) {
+        if (refreshErr?.sessionExpired) {
+          window.dispatchEvent(new CustomEvent('erp-session-expired', { detail: { message: refreshErr.message } }));
+        }
+        // fall through: reject with the original 401
+      }
     }
 
     if (error.response?.status === 401 && !cfg.skipAuthRedirect) {

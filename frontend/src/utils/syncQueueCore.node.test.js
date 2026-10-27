@@ -73,6 +73,7 @@ test('error classes', () => {
   assert.equal(classifyError({ response: { status: 409, data: { code: 'IDEMPOTENCY_IN_PROGRESS' } } }), 'retry');
   assert.equal(classifyError({ response: { status: 400, data: { message: 'Insufficient stock' } } }), 'rejected');
   assert.equal(classifyError({ response: { status: 409, data: { message: 'duplicate' } } }), 'rejected');
+  assert.equal(classifyError({ response: { status: 401, data: { message: 'Token is not valid' } } }), 'auth');
 });
 
 test('renumber notice only when the server changed the bill number', () => {

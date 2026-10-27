@@ -328,6 +328,7 @@ const useStore = create((set, get) => ({
     await clearOfflineDB();
     persistOfflineFlag(null, null);
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('role');
     localStorage.removeItem('user');
     try {
