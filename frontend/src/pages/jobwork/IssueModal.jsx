@@ -287,9 +287,14 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       if (lot.weaver) weaverNames.add(lot.weaver.trim());
     });
 
-    return Array.from(weaverNames)
-      .sort((a, b) => a.localeCompare(b))
-      .map((name) => ({ value: name, label: name }));
+    // Weaver is optional: the list opens on focus with the current value highlighted, so a blank
+    // option lets Enter move on with no weaver instead of auto-picking the first name.
+    return [
+      { value: '', label: '— No Weaver —' },
+      ...Array.from(weaverNames)
+        .sort((a, b) => a.localeCompare(b))
+        .map((name) => ({ value: name, label: name })),
+    ];
   }, [parties, inventoryLots, purchases]);
 
   const purchaseLots = useMemo(
@@ -592,7 +597,8 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   };
 
   const handleWeaverChange = (val) => {
-    setForm((f) => ({
+    // Re-confirming the same weaver (e.g. Enter while passing through) keeps the chosen bill/lot.
+    setForm((f) => (f.weaver === (val || '') ? f : {
       ...f,
       weaver: val || '',
       puBillNo: '',
