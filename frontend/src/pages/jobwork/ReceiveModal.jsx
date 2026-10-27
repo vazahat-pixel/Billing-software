@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import ErpTopLayer from '../../components/erp/ErpTopLayer';
 import { createPortal } from 'react-dom';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { focusNextField } from '../../utils/formEnterNavigation';
@@ -1036,7 +1037,6 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const handleFind = () => {
       setShowFindDialog(true);
       setFindSearchText('');
-      setFoundRecords([]);
    };
 
    const focusSerialNo = () => {
@@ -2234,6 +2234,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
 
                {/* Quick Mill Receive Number Find Modal with + / - and Enter -> Edit */}
                 {showFindDialog && (
+                   <ErpTopLayer>
                    <div
                       className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
                       onClick={() => setShowFindDialog(false)}
@@ -2348,6 +2349,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                          </div>
                       </div>
                    </div>
+                   </ErpTopLayer>
                 )}
 
                {printOpen && (

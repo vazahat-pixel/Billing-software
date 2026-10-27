@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import ErpTopLayer from '../../components/erp/ErpTopLayer';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
 import { ERPCombobox } from '../../components/erp';
@@ -1307,6 +1308,7 @@ const ReturnModal = ({
 
     {/* Quick Return Number Find Modal with + / - and Enter -> Edit */}
     {showFindModal && (
+      <ErpTopLayer>
       <div
         className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
         onClick={() => setShowFindModal(false)}
@@ -1429,6 +1431,7 @@ const ReturnModal = ({
           </div>
         </div>
       </div>
+      </ErpTopLayer>
     )}
     </>
   );

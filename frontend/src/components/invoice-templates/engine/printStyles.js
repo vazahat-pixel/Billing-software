@@ -134,9 +134,10 @@ export const enginePrintCss = `
       break-inside: avoid !important;
     }
 
+    /* Printed once after the bill. A fixed footer repeats on every page and covers the last lines. */
     .ipe-print-footer {
-      position: fixed !important;
-      bottom: 0 !important;
+      position: static !important;
+      margin-top: 3mm;
     }
   }
 `;

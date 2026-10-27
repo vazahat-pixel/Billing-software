@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import ErpTopLayer from './erp/ErpTopLayer';
 
 /**
  * Desktop ERP style — after bill save, show next-step options.
@@ -15,9 +16,23 @@ const BillSaveNextActions = ({
   onNew,
   onClose
 }) => {
+  // Esc closes this popup only (capture phase, so the bill window behind does not also close).
+  useEffect(() => {
+    if (!open || !onClose) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      onClose();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (
+    <ErpTopLayer>
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
       <div className="w-full max-w-md bg-white border border-[var(--border)] rounded-xl shadow-[var(--shadow-float)] overflow-hidden">
         <div className="bg-[var(--accent-gradient)] text-white px-4 py-3 text-[13px] font-semibold flex justify-between items-center">
@@ -86,6 +101,7 @@ const BillSaveNextActions = ({
         </div>
       </div>
     </div>
+    </ErpTopLayer>
   );
 };
 

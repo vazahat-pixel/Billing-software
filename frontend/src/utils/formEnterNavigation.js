@@ -104,9 +104,25 @@ export function findEnterSaveButton(container) {
     || container.querySelector('button[type="submit"]:not([disabled])');
 }
 
+/** Next/previous cell in the same item line, so a line's own order wins over header data-enter-order. */
+function siblingInLine(currentEl, step) {
+  const row = currentEl?.closest?.('[data-line-grid] tbody tr');
+  if (!row) return null;
+  const usable = new Set(getFocusableElements(row));
+  const cells = Array.from(row.querySelectorAll(FOCUSABLE_SELECTOR)).filter((el) => usable.has(el)); // DOM order
+  const i = cells.indexOf(currentEl);
+  return i === -1 ? null : cells[i + step] || null;
+}
+
 export function focusNextField(currentEl) {
   const container = findFormContainer(currentEl);
   if (!container) return false;
+
+  const inLine = siblingInLine(currentEl, 1);
+  if (inLine) {
+    focusElement(inLine);
+    return true;
+  }
 
   const next = nextFocusableAfter(container, currentEl);
   if (next) {
@@ -153,6 +169,12 @@ export function focusFormFooter(currentEl) {
 export function focusPrevField(currentEl) {
   const container = findFormContainer(currentEl);
   if (!container) return false;
+
+  const inLine = siblingInLine(currentEl, -1);
+  if (inLine) {
+    focusElement(inLine);
+    return true;
+  }
 
   const focusable = getFocusableElements(container);
   const idx = focusable.indexOf(currentEl);
@@ -365,12 +387,18 @@ export function handleFormArrowKeyDown(e) {
     }
   }
 
+  // Number inputs report no caret (selectionStart is null), and a cell entered by keyboard has its
+  // whole value selected — both count as being at the edge, so one arrow press moves on.
+  const caretless = isInput && (target.selectionStart == null || (
+    target.selectionStart === 0 && target.selectionEnd === String(target.value ?? '').length
+  ));
+
   // Left Arrow: Move to previous field if at start of input
   if (e.key === 'ArrowLeft') {
     let atStart = false;
     if (isInput) {
       try {
-        atStart = target.selectionStart === 0 && target.selectionEnd === 0;
+        atStart = caretless || (target.selectionStart === 0 && target.selectionEnd === 0);
       } catch {
         atStart = true;
       }
@@ -393,7 +421,7 @@ export function handleFormArrowKeyDown(e) {
     let atEnd = false;
     if (isInput) {
       try {
-        atEnd = target.selectionStart === target.value.length;
+        atEnd = caretless || target.selectionStart === target.value.length;
       } catch {
         atEnd = true;
       }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import ErpTopLayer from '../../components/erp/ErpTopLayer';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { ERPCombobox } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
@@ -1588,6 +1589,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
 
       {/* Quick Issue / Challan Number Find Modal with + / - and Enter -> Edit */}
       {findOpen && (
+        <ErpTopLayer>
         <div
           className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
           onClick={() => setFindOpen(false)}
@@ -1710,6 +1712,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
             </div>
           </div>
         </div>
+        </ErpTopLayer>
       )}
 
       <AccountMasterModal

@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import ErpTopLayer from '../../components/erp/ErpTopLayer';
+import { salesApi } from '../../api/sales.api';
 import { createPortal } from 'react-dom';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
@@ -2563,6 +2565,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
     {/* Quick Bill Number Find Modal with + / - and Enter -> Edit */}
     {showFindModal && (
+      <ErpTopLayer>
       <div
         className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
         onClick={() => setShowFindModal(false)}
@@ -2687,6 +2690,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           </div>
         </div>
       </div>
+      </ErpTopLayer>
     )}
 
     {typeof document !== 'undefined' && saveNextActions && createPortal(

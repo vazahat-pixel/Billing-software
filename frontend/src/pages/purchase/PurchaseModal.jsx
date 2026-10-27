@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import ErpTopLayer from '../../components/erp/ErpTopLayer';
 import { createPortal } from 'react-dom';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
@@ -2563,6 +2564,7 @@ const PurchaseModal = ({
 
       {/* Quick Purchase Bill Number Find Modal with + / - and Enter -> Edit */}
       {showFindModal && (
+        <ErpTopLayer>
         <div
           className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
           onClick={() => setShowFindModal(false)}
@@ -2687,6 +2689,7 @@ const PurchaseModal = ({
             </div>
           </div>
         </div>
+        </ErpTopLayer>
       )}
 
       {typeof document !== 'undefined' && saveNextActions && createPortal(

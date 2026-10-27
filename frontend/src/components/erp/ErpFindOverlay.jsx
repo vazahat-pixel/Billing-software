@@ -1,4 +1,5 @@
 import React from 'react';
+import ErpTopLayer from './ErpTopLayer';
 
 /** Shared F3 find list — same keys as Sale / Purchase. */
 export default function ErpFindOverlay({
@@ -14,6 +15,7 @@ export default function ErpFindOverlay({
   onClose,
 }) {
   return (
+    <ErpTopLayer>
     <div
       className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
       data-find-modal
@@ -78,5 +80,6 @@ export default function ErpFindOverlay({
         </div>
       </div>
     </div>
+    </ErpTopLayer>
   );
 }

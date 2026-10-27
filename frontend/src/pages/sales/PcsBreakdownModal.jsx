@@ -183,6 +183,29 @@ export default function PcsBreakdownModal({
       handleOk();
       return;
     }
+    if (e.key.startsWith('Arrow') && !e.altKey && !e.ctrlKey && !e.shiftKey) {
+      // Arrows walk the grid in screen order: Remark | Pcs | Qty/Bndl, rows up/down.
+      // In Remark (text) Left/Right move only from the start/end of the text.
+      const cols = ['remark', 'pcs', 'qtyBndl'];
+      const el = e.currentTarget;
+      const isText = el.type === 'text';
+      const atStart = !isText || (el.selectionStart === 0 && el.selectionEnd === 0);
+      const atEnd = !isText || (el.selectionStart === el.value.length && el.selectionEnd === el.value.length);
+      let target = null;
+      if (e.key === 'ArrowLeft' && atStart) target = [idx, cols[cols.indexOf(field) - 1]];
+      if (e.key === 'ArrowRight' && atEnd) target = [idx, cols[cols.indexOf(field) + 1]];
+      if (e.key === 'ArrowUp') target = [idx - 1, field];
+      if (e.key === 'ArrowDown') target = [idx + 1, field];
+      if (!target) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const next = target[1] && document.getElementById(`pcs-${target[0]}-${target[1]}`);
+      if (next) {
+        next.focus();
+        try { next.select(); } catch { /* number inputs */ }
+      }
+      return;
+    }
     if (e.key !== 'Enter') return;
     e.preventDefault();
     e.stopPropagation();
