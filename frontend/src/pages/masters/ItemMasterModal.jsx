@@ -62,6 +62,24 @@ const emptyForm = () => ({
   ewayBillProductName: '',
   description: '',
   imageUrl: '',
+  // JSM Item Master fields
+  itemChrCode: '',
+  vatRate1: '0',
+  vatRate2: '0',
+  delCharge: '0',
+  cessRate: '0',
+  lfrRate: '0',
+  partyGroup: '',
+  bundle: '0',
+  salesProfitPer: '0',
+  jobRate: '0',
+  maxLevel: '0',
+  minLevel: '0',
+  showIn: 'All',
+  ewayProductDesc2: '',
+  gstTaxLabel2: '',
+  negativeStockMessage: false,
+  hindiName: '',
 });
 
 const toForm = (item) => {
@@ -98,6 +116,23 @@ const toForm = (item) => {
     ewayBillProductName: item.ewayBillProductName || '',
     description: item.description || '',
     imageUrl: item.imageUrl || '',
+    itemChrCode: item.itemChrCode || '',
+    vatRate1: String(item.vatRate1 ?? 0),
+    vatRate2: String(item.vatRate2 ?? 0),
+    delCharge: String(item.delCharge ?? 0),
+    cessRate: String(item.cessRate ?? 0),
+    lfrRate: String(item.lfrRate ?? 0),
+    partyGroup: item.partyGroup || '',
+    bundle: String(item.bundle ?? 0),
+    salesProfitPer: String(item.salesProfitPer ?? 0),
+    jobRate: String(item.jobRate ?? 0),
+    maxLevel: String(item.maxLevel ?? 0),
+    minLevel: String(item.minLevel ?? 0),
+    showIn: item.showIn || 'All',
+    ewayProductDesc2: item.ewayProductDesc2 || '',
+    gstTaxLabel2: item.gstTaxLabel2 || '',
+    negativeStockMessage: !!item.negativeStockMessage,
+    hindiName: item.hindiName || '',
   };
 };
 
@@ -253,6 +288,23 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
         ewayBillProductName: formData.ewayBillProductName,
         description: formData.description,
         imageUrl: formData.imageUrl,
+        itemChrCode: formData.itemChrCode,
+        vatRate1: Number(formData.vatRate1 || 0),
+        vatRate2: Number(formData.vatRate2 || 0),
+        delCharge: Number(formData.delCharge || 0),
+        cessRate: Number(formData.cessRate || 0),
+        lfrRate: Number(formData.lfrRate || 0),
+        partyGroup: formData.partyGroup,
+        bundle: Number(formData.bundle || 0),
+        salesProfitPer: Number(formData.salesProfitPer || 0),
+        jobRate: Number(formData.jobRate || 0),
+        maxLevel: Number(formData.maxLevel || 0),
+        minLevel: Number(formData.minLevel || 0),
+        showIn: formData.showIn,
+        ewayProductDesc2: formData.ewayProductDesc2,
+        gstTaxLabel2: formData.gstTaxLabel2,
+        negativeStockMessage: !!formData.negativeStockMessage,
+        hindiName: formData.hindiName,
       };
       let response;
       if (editId) {
@@ -292,12 +344,21 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
     }
   };
 
+  // JSM pixel layout: absolute position/size taken from the decompiled Mst_Item_Mast form.
+  const at = (left, top, width, height = 22) => ({ position: 'absolute', left, top, width, height });
+  const L = (left, top, text, red = false) => (
+    <span key={`${left}-${top}`} style={{ position: 'absolute', left, top }} className={`jsm-am-lbl${red ? ' red-label' : ''}`}>{text}</span>
+  );
+  const T = (left, top, width, key, props = {}) => (
+    <input style={at(left, top, width)} className="classic-erp-input" value={formData[key] ?? ''} onChange={(e) => setField(key, e.target.value)} disabled={readOnly} {...props} />
+  );
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={`Item Master (${items.length})`}
-      className="max-w-4xl"
+      className="max-w-[1010px]"
       footer={activeTab === 'Add' && !readOnly && (
         <>
           <button type="button" className="erp-btn erp-btn-secondary" data-action="new" disabled={saving} onClick={() => { setEditId(null); setFormData(emptyForm()); }}>Clear</button>
@@ -413,110 +474,114 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
           </table>
         </div>
       ) : (
-        <div className="erp-modal-body max-h-[70vh] overflow-y-auto space-y-3" onKeyDown={handleFormEnterKeyDown}>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              {formData.imageUrl ? (
-                <img src={formData.imageUrl} alt="Item" className="h-16 w-16 rounded object-cover border border-[var(--border)]" />
-              ) : (
-                <div className="h-16 w-16 rounded border border-dashed border-[var(--border)] flex items-center justify-center text-[10px] text-[var(--text-muted)]">
-                  No image
-                </div>
-              )}
+        <div className="erp-modal-body max-h-[72vh] overflow-y-auto space-y-3" onKeyDown={handleFormEnterKeyDown}>
+          {/* Same positions, sizes and captions as JSM Mst_Item_Mast (GroupBox1); image box on the right. */}
+          <div className="jsm-am-scroll">
+            <div className="jsm-am-box" style={{ width: 930, height: 478 }}>
+              {L(13, 26, 'Item Name', true)}
+              <input style={at(96, 23, 340)} className="classic-erp-input font-bold uppercase" value={formData.itemName} onChange={(e) => setField('itemName', e.target.value)} disabled={readOnly} />
+              {L(14, 48, 'Item ID')}
+              {T(96, 46, 88, 'itemChrCode')}
+              {L(266, 50, 'Hsn Code')}
+              {T(340, 46, 96, 'hsnCode', { className: 'classic-erp-input font-mono' })}
+              {L(514, 24, 'Tax Rate')}
+              {T(583, 22, 64, 'vatRate1', { type: 'number', className: 'classic-erp-input text-right' })}
+              {T(651, 22, 64, 'vatRate2', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(515, 55, 'Del.Chrg')}
+              {T(583, 51, 64, 'delCharge', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(541, 81, 'Cess')}
+              {T(583, 76, 64, 'cessRate', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(553, 106, 'Lfr')}
+              {T(583, 100, 64, 'lfrRate', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(13, 78, 'Category')}
+              <select style={at(96, 75, 340)} className="classic-erp-select" value={formData.group} onChange={(e) => setField('group', e.target.value)} disabled={readOnly}>
+                {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              {L(14, 105, 'Unit')}
+              <select style={at(96, 103, 168)} className="classic-erp-select" value={formData.unit} onChange={(e) => setField('unit', e.target.value)} disabled={readOnly}>
+                {UNIT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              {L(277, 106, 'PartyGroup')}
+              {T(381, 102, 166, 'partyGroup', { className: 'classic-erp-input uppercase' })}
+              {L(14, 138, 'Op.Pcs')}
+              {T(96, 134, 74, 'opPcs', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(181, 138, 'Cut')}
+              {T(212, 135, 74, 'cut', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(291, 138, 'Fold')}
+              {T(330, 135, 63, 'fold', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(406, 138, 'Bundle')}
+              {T(461, 135, 74, 'bundle', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(14, 166, 'Op.Qty')}
+              {T(96, 163, 96, 'opQty', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(206, 168, 'Op.Rate')}
+              {T(270, 165, 103, 'opRate', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(391, 169, 'Op.Value')}
+              {T(461, 166, 114, 'opValue', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(10, 201, 'Pu.Rate')}
+              {T(96, 198, 114, 'purRate', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(10, 224, 'Sl.Rate')}
+              {T(96, 222, 114, 'salesRate', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(226, 221, 'Sales%')}
+              {T(297, 218, 78, 'salesProfitPer', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(387, 219, 'Max. Level')}
+              {T(468, 217, 96, 'maxLevel', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(10, 248, 'Job.Rate')}
+              {T(96, 246, 114, 'jobRate', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(226, 245, 'MRP')}
+              {T(282, 242, 94, 'mrp', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(388, 243, 'Min. Level')}
+              {T(468, 241, 96, 'minLevel', { type: 'number', className: 'classic-erp-input text-right' })}
+              {L(10, 286, 'Eway Bill Prod.Name')}
+              {T(154, 283, 239, 'ewayBillProductName')}
+              {L(431, 283, 'Show Status')}
+              <select style={at(526, 278, 99, 24)} className="classic-erp-select" value={formData.showIn} onChange={(e) => setField('showIn', e.target.value)} disabled={readOnly}>
+                {['All', 'Sales', 'Purchase'].map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+              {L(73, 309, 'Description')}
+              {T(154, 306, 239, 'description')}
+              {L(404, 308, '(2)')}
+              {T(429, 305, 223, 'ewayProductDesc2')}
+              {L(11, 340, 'GST TAX RATE')}
+              <select style={at(132, 335, 278, 24)} className="classic-erp-select font-bold" value={formData.gstTaxLabel} onChange={(e) => setField('gstTaxLabel', e.target.value)} disabled={readOnly}>
+                {GST_OPTIONS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </select>
+              <label style={at(444, 337, 174, 20)} className="jsm-am-chk">
+                <input type="checkbox" checked={!!formData.negativeStockMessage} onChange={(e) => setField('negativeStockMessage', e.target.checked)} disabled={readOnly} />
+                Nagetive Message [Y/N]
+              </label>
+              {L(11, 368, 'GST TAX RATE (2)')}
+              <select style={at(132, 365, 278, 24)} className="classic-erp-select" value={formData.gstTaxLabel2} onChange={(e) => setField('gstTaxLabel2', e.target.value)} disabled={readOnly}>
+                <option value="">—</option>
+                {GST_OPTIONS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </select>
+              {L(463, 404, 'ItemCode')}
+              <input ref={itemCodeRef} style={at(543, 401, 67)} className="classic-erp-input font-mono" value={formData.itemCode} onChange={(e) => setField('itemCode', e.target.value)} disabled={readOnly} autoFocus={activeTab === 'Add'} />
+              {T(43, 444, 367, 'hindiName', { placeholder: 'Hindi name / हिंदी नाम' })}
+
+              {/* Image (JSM PictureBox1 + Brows / Remove Image) */}
+              <div style={at(690, 46, 230, 230)} className="border border-[var(--border)] rounded flex items-center justify-center overflow-hidden bg-[var(--bg-base)]">
+                {formData.imageUrl
+                  ? <img src={formData.imageUrl} alt="Item" className="max-w-full max-h-full object-contain" />
+                  : <span className="text-[11px] text-[var(--text-muted)]">No image</span>}
+              </div>
               {!readOnly && (
-                <div className="flex gap-2">
+                <>
                   <input ref={fileRef} type="file" accept="image/*" className="hidden" tabIndex={-1} data-enter-skip="true" onChange={onBrowseImage} />
-                  <button type="button" className="erp-btn erp-btn-secondary h-8 px-3 text-[11px]" onClick={() => fileRef.current?.click()}>
-                    Browse Image
-                  </button>
-                  <button
-                    type="button"
-                    className="erp-btn erp-btn-secondary h-8 px-3 text-[11px]"
-                    onClick={() => setField('imageUrl', '')}
-                    disabled={!formData.imageUrl}
-                  >
-                    Remove Image
-                  </button>
-                </div>
+                  <button type="button" tabIndex={-1} style={at(690, 11, 110, 26)} className="erp-btn erp-btn-secondary text-[11px]" onClick={() => fileRef.current?.click()}>Brows Image</button>
+                  <button type="button" tabIndex={-1} style={at(810, 11, 110, 26)} className="erp-btn erp-btn-secondary text-[11px]" disabled={!formData.imageUrl} onClick={() => setField('imageUrl', '')}>Remove Image</button>
+                </>
               )}
             </div>
-            <FormField label="ItemCode" className="w-40">
-              <ERPInput
-                ref={itemCodeRef}
-                autoFocus={activeTab === 'Add'}
-                value={formData.itemCode}
-                onChange={(e) => setField('itemCode', e.target.value)}
-                disabled={readOnly}
-              />
-            </FormField>
           </div>
 
-          <FormField label="Item Name">
-            <ERPInput value={formData.itemName} onChange={(e) => setField('itemName', e.target.value)} disabled={readOnly} />
-          </FormField>
-
-          <div className="erp-grid erp-grid-2">
-            <FormField label="HSN Digits">
-              <ERPInput type="number" value={formData.hsnDigits} onChange={(e) => setField('hsnDigits', e.target.value)} disabled={readOnly} />
-            </FormField>
-            <FormField label="Hsn Code">
-              <ERPInput value={formData.hsnCode} onChange={(e) => setField('hsnCode', e.target.value)} disabled={readOnly} />
-            </FormField>
-            <FormField label="Category">
-              <ERPSelect
-                value={formData.group}
-                onChange={(e) => setField('group', e.target.value)}
-                disabled={readOnly}
-                options={CATEGORY_OPTIONS}
-              />
-            </FormField>
-            <FormField label="Unit">
-              <ERPSelect
-                value={formData.unit}
-                onChange={(e) => setField('unit', e.target.value)}
-                disabled={readOnly}
-                options={UNIT_OPTIONS}
-              />
-            </FormField>
-          </div>
-
-          <div className="erp-grid erp-grid-3">
-            <FormField label="Op.Pcs">
-              <ERPInput type="number" value={formData.opPcs} onChange={(e) => setField('opPcs', e.target.value)} disabled={readOnly} />
-            </FormField>
-            <FormField label="Cut">
-              <ERPInput type="number" step="0.01" value={formData.cut} onChange={(e) => setField('cut', e.target.value)} disabled={readOnly} />
-            </FormField>
-            <FormField label="Op.Qty">
-              <ERPInput type="number" step="0.01" value={formData.opQty} onChange={(e) => setField('opQty', e.target.value)} disabled={readOnly} />
-            </FormField>
-            <FormField label="Op.Rate">
-              <ERPInput type="number" step="0.00001" value={formData.opRate} onChange={(e) => setField('opRate', e.target.value)} disabled={readOnly} />
-            </FormField>
-            <FormField label="Op.Value">
-              <ERPInput type="number" step="0.01" value={formData.opValue} onChange={(e) => setField('opValue', e.target.value)} disabled={readOnly} />
-            </FormField>
-          </div>
-
-          <div className="erp-grid erp-grid-3">
-            <FormField label="Pu.Rate">
-              <ERPInput type="number" step="0.00001" value={formData.purRate} onChange={(e) => setField('purRate', e.target.value)} disabled={readOnly} />
-            </FormField>
-            <FormField label="Sl.Rate">
-              <ERPInput type="number" step="0.00001" value={formData.salesRate} onChange={(e) => setField('salesRate', e.target.value)} disabled={readOnly} />
-            </FormField>
-            <FormField label="MRP">
-              <ERPInput type="number" step="0.00001" value={formData.mrp} onChange={(e) => setField('mrp', e.target.value)} disabled={readOnly} />
-            </FormField>
-          </div>
-
+          {/* MERN-only details kept from before (not on the JSM form). */}
           <div className="rounded border border-[var(--border)] p-2.5 bg-[var(--bg-card)] space-y-2">
             <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
-              Textile Technical Specifications
+              Other Detail — HSN digits & textile specifications
             </div>
             <div className="erp-grid erp-grid-3">
-              <FormField label="Fold Less %">
-                <ERPInput type="number" step="0.01" value={formData.fold} onChange={(e) => setField('fold', e.target.value)} disabled={readOnly} placeholder="0.00" />
+              <FormField label="HSN Digits">
+                <ERPInput type="number" value={formData.hsnDigits} onChange={(e) => setField('hsnDigits', e.target.value)} disabled={readOnly} />
               </FormField>
               <FormField label="Reed">
                 <ERPInput value={formData.reed} onChange={(e) => setField('reed', e.target.value)} disabled={readOnly} placeholder="e.g. 64" />
@@ -544,23 +609,6 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
               </FormField>
             </div>
           </div>
-
-          <FormField label="Eway Bill Prod.Name">
-            <ERPInput value={formData.ewayBillProductName} onChange={(e) => setField('ewayBillProductName', e.target.value)} disabled={readOnly} />
-          </FormField>
-
-          <FormField label="Description">
-            <ERPInput value={formData.description} onChange={(e) => setField('description', e.target.value)} disabled={readOnly} />
-          </FormField>
-
-          <FormField label="GST TAX RATE">
-            <ERPSelect
-              value={formData.gstTaxLabel}
-              onChange={(e) => setField('gstTaxLabel', e.target.value)}
-              disabled={readOnly}
-              options={GST_OPTIONS.map((g) => ({ value: g.value, label: g.label }))}
-            />
-          </FormField>
         </div>
       )}
       </div>
