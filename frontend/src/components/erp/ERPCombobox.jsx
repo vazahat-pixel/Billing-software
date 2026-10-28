@@ -199,6 +199,8 @@ export default function ERPCombobox({
     }
 
     if (e.key === 'Escape') {
+      // list already closed: let Esc reach the window (cancel / close), as everywhere else
+      if (!open) return;
       e.preventDefault();
       e.stopPropagation();
       setOpen(false);
@@ -235,6 +237,14 @@ export default function ERPCombobox({
         onCreateNew(query.trim());
         setOpen(false);
         setQuery('');
+        return;
+      }
+      // empty list and nothing typed (e.g. an optional box with no entries yet): move on instead of sticking
+      if (open && listCount === 0 && !query.trim()) {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+        focusNextField(e.target);
         return;
       }
       /* closed: let global Enter-nav or custom onKeyDown move to next field */

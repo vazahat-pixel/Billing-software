@@ -101,7 +101,10 @@ export function findEnterSaveButton(container) {
     || container.querySelector('.classic-erp-btn.btn-green:not([disabled])')
     || container.querySelector('.classic-erp-form-footer button.btn-blue:not([disabled])')
     || container.querySelector('.erp-bill-action-bar button.btn-blue:not([disabled])')
-    || container.querySelector('button[type="submit"]:not([disabled])');
+    || container.querySelector('button[type="submit"]:not([disabled])')
+    // Save in the window's own footer (Modal footer sits outside the form body)
+    || container.closest('[data-erp-dialog]')?.querySelector('.erp-modal-footer [data-enter-save]:not([disabled]), .erp-modal-footer button[data-action="save"]:not([disabled])')
+    || null;
 }
 
 /** Next/previous cell in the same item line, so a line's own order wins over header data-enter-order. */

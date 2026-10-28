@@ -7,6 +7,7 @@ import { erpConfirmDelete } from '../../../utils/confirm';
 import { notifyError, notifySuccess, notifyWarning } from '../../../utils/notify';
 import LAYOUTS from './jsmMasterLayouts.json';
 import { JSM_SUBMASTER_FORMS, recordToValues, valuesToPayload, nextCodeOf, isValidGstin } from './jsmSubMasterForms';
+import { jsmMnemonic } from '../../../components/jsm/JsmFormCanvas';
 import { stateCodeFromGstin, stateNameFromCode } from '../../../utils/gstStateCodes';
 
 /**
@@ -28,6 +29,16 @@ export default function JsmSubMasterWindow({ isOpen, onClose, type, readOnly = f
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const wrapRef = useRef(null);
+  const keyRef = useRef(null);
+
+  // Window keys are taken here, before the app-wide hotkeys (which press buttons in whichever
+  // window comes first on the page): F2 New, F3 Find, Ctrl+Enter Save, Alt+letter, Esc.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e) => keyRef.current?.(e);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [isOpen]);
 
   const records = useMemo(
     () => subMasters.filter((r) => r.type === type).sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)),
@@ -189,18 +200,28 @@ export default function JsmSubMasterWindow({ isOpen, onClose, type, readOnly = f
     },
   };
 
-  const onKeyDown = (e) => {
-    if (e.key !== 'Escape' || find) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (editing) doCancel();
-    else onClose?.();
+  keyRef.current = (e) => {
+    const root = wrapRef.current;
+    if (!root || find) return; // the Help list handles its own keys
+    const inHere = root.contains(document.activeElement) || document.activeElement === document.body;
+    if (!inHere) return;
+    const take = (fn) => { e.preventDefault(); e.stopPropagation(); fn?.(); };
+    const press = (name) => { if (buttons[name]?.enabled) buttons[name].onClick?.(); };
+    if (e.key === 'Escape') return take(() => (editing ? doCancel() : onClose?.()));
+    if (e.key === 'F3') return take(() => press('btn_Find'));
+    if (e.key === 'F2') return take(() => press('btn_New'));
+    if (e.key === 'Enter' && e.ctrlKey) return take(() => press('btn_sv'));
+    if (e.altKey && !e.ctrlKey && e.key.length === 1) {
+      const k = e.key.toLowerCase();
+      const btn = layout.controls.find((c) => /Button/.test(c.t) && c.t !== 'RadioButton' && jsmMnemonic(c.text).key === k);
+      if (btn) take(() => press(btn.n));
+    }
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} bare enableEscape={false} className="!max-w-none !w-auto">
       {/* data-enter-nav="off": JSM moves between boxes itself (tab order), not the app-wide Enter keys */}
-      <div ref={wrapRef} className="jsm-window" data-enter-nav="off" onKeyDown={onKeyDown}>
+      <div ref={wrapRef} className="jsm-window" data-enter-nav="off">
         <div className="jsm-titlebar">
           <span>{layout.title}</span>
           <button type="button" className="jsm-titlebar-close" onClick={() => (editing ? doCancel() : onClose?.())} title="Close">✕</button>

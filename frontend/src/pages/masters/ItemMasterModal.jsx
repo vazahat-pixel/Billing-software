@@ -80,6 +80,7 @@ const emptyForm = () => ({
   gstTaxLabel2: '',
   negativeStockMessage: false,
   hindiName: '',
+  brand: '',
 });
 
 const toForm = (item) => {
@@ -90,6 +91,7 @@ const toForm = (item) => {
   return {
     itemName: item.itemName || item.name || '',
     itemCode: item.itemCode || '',
+    brand: item.brand || '',
     group: item.categoryLabel || item.group || item.category || 'FINISH STOCK',
     unit: item.unit || 'NETQTY',
     hsnDigits: String(item.hsnDigits ?? 0),
@@ -145,6 +147,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
   const [showImport, setShowImport] = useState(false);
   const fileRef = useRef(null);
   const itemCodeRef = useRef(null);
+  const itemNameRef = useRef(null);
   const searchInputRef = useRef(null);
   const [itemSearch, setItemSearch] = useState('');
   const [focusedItemIndex, setFocusedItemIndex] = useState(0);
@@ -180,8 +183,9 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
   useEffect(() => {
     if (isOpen && activeTab === 'Add') {
       const t = setTimeout(() => {
-        itemCodeRef.current?.focus();
-        try { itemCodeRef.current?.select(); } catch {}
+        // JSM Mst_Item_Mast: the cursor starts in Item Name (tab 0)
+        itemNameRef.current?.focus();
+        try { itemNameRef.current?.select(); } catch {}
       }, 70);
       return () => clearTimeout(t);
     }
@@ -245,6 +249,25 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
     reader.readAsDataURL(file);
   };
 
+  const currentIndex = useMemo(() => {
+    if (!editId || !items.length) return -1;
+    return items.findIndex((it) => (it._id || it.id) === editId);
+  }, [editId, items]);
+
+  const navigateTo = (index) => {
+    if (!items.length) return;
+    const bounded = Math.max(0, Math.min(index, items.length - 1));
+    const target = items[bounded];
+    if (target) {
+      loadForEdit(target);
+    }
+  };
+
+  const handleFirst = () => navigateTo(0);
+  const handlePrev = () => navigateTo(currentIndex <= 0 ? 0 : currentIndex - 1);
+  const handleNext = () => navigateTo(currentIndex >= items.length - 1 ? items.length - 1 : (currentIndex < 0 ? 0 : currentIndex + 1));
+  const handleLast = () => navigateTo(items.length - 1);
+
   const handleSave = async () => {
     if (saving) return;
     if (!formData.itemName?.trim()) return notifyWarning('Item name is required');
@@ -254,6 +277,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
         itemName: formData.itemName.trim(),
         name: formData.itemName.trim(),
         itemCode: formData.itemCode,
+        brand: formData.brand || '',
         group: formData.group,
         categoryLabel: formData.group,
         unit: formData.unit,
@@ -359,15 +383,37 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
       onClose={onClose}
       title={`Item Master (${items.length})`}
       className="max-w-[1010px]"
-      footer={activeTab === 'Add' && !readOnly && (
-        <>
-          <button type="button" className="erp-btn erp-btn-secondary" data-action="new" disabled={saving} onClick={() => { setEditId(null); setFormData(emptyForm()); }}>Clear</button>
-          <button type="button" className="erp-btn erp-btn-secondary" data-action="cancel" disabled={saving} onClick={onClose}>Cancel</button>
-          <button type="button" className="erp-btn erp-btn-primary" data-action="save" disabled={saving} data-enter-save="true" onClick={handleSave}>
-            {saving ? 'Saving…' : (editId ? 'Update item' : 'Save item')}
-          </button>
-        </>
-      )}
+      footer={
+        <div className="w-full flex items-center justify-between select-none">
+          <div className="flex items-center gap-1">
+            <button className="classic-erp-btn" type="button" onClick={handleFirst} disabled={saving || !items.length} title="First Record (<)">&lt;</button>
+            <button className="classic-erp-btn" type="button" onClick={handlePrev} disabled={saving || !items.length} title="Previous Record (<<)">&lt;&lt;</button>
+            <button className="classic-erp-btn" type="button" onClick={handleNext} disabled={saving || !items.length} title="Next Record (>>)">	&gt;&gt;</button>
+            <button className="classic-erp-btn" type="button" onClick={handleLast} disabled={saving || !items.length} title="Last Record (>)">&gt;</button>
+            {currentIndex >= 0 && (
+              <span className="text-[11px] font-mono text-gray-600 px-1">
+                {currentIndex + 1} / {items.length}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {activeTab === 'Add' && !readOnly && (
+              <>
+                <button type="button" className="classic-erp-btn" data-action="new" disabled={saving} onClick={() => { setEditId(null); setFormData(emptyForm()); }}>New / Clear</button>
+                <button type="button" className="classic-erp-btn btn-blue font-bold" data-action="save" disabled={saving} data-enter-save="true" onClick={handleSave}>
+                  {saving ? 'Saving…' : (editId ? 'Update' : 'Save')}
+                </button>
+                {editId && (
+                  <button type="button" className="classic-erp-btn btn-red" data-action="delete" disabled={saving} onClick={() => handleDelete(editId)}>
+                    Delete
+                  </button>
+                )}
+              </>
+            )}
+            <button type="button" className="classic-erp-btn" data-action="cancel" disabled={saving} onClick={onClose}>Exit</button>
+          </div>
+        </div>
+      }
     >
       <div
         data-form-enter-nav="true"
@@ -479,7 +525,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
           <div className="jsm-am-scroll">
             <div className="jsm-am-box" style={{ width: 930, height: 478 }}>
               {L(13, 26, 'Item Name', true)}
-              <input style={at(96, 23, 340)} className="classic-erp-input font-bold uppercase" value={formData.itemName} onChange={(e) => setField('itemName', e.target.value)} disabled={readOnly} />
+              <input ref={itemNameRef} style={at(96, 23, 340)} className="classic-erp-input font-bold uppercase" value={formData.itemName} onChange={(e) => setField('itemName', e.target.value)} disabled={readOnly} />
               {L(14, 48, 'Item ID')}
               {T(96, 46, 88, 'itemChrCode')}
               {L(266, 50, 'Hsn Code')}
@@ -502,7 +548,9 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                 {UNIT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
               {L(277, 106, 'PartyGroup')}
-              {T(381, 102, 166, 'partyGroup', { className: 'classic-erp-input uppercase' })}
+              {T(360, 102, 140, 'partyGroup', { className: 'classic-erp-input uppercase' })}
+              {L(510, 106, 'Brand')}
+              {T(556, 102, 110, 'brand', { className: 'classic-erp-input uppercase', placeholder: 'Brand' })}
               {L(14, 138, 'Op.Pcs')}
               {T(96, 134, 74, 'opPcs', { type: 'number', className: 'classic-erp-input text-right' })}
               {L(181, 138, 'Cut')}
@@ -555,7 +603,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                 {GST_OPTIONS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
               </select>
               {L(463, 404, 'ItemCode')}
-              <input ref={itemCodeRef} style={at(543, 401, 67)} className="classic-erp-input font-mono" value={formData.itemCode} onChange={(e) => setField('itemCode', e.target.value)} disabled={readOnly} autoFocus={activeTab === 'Add'} />
+              <input ref={itemCodeRef} style={at(543, 401, 67)} className="classic-erp-input font-mono" value={formData.itemCode} onChange={(e) => setField('itemCode', e.target.value)} disabled={readOnly} />
               {T(43, 444, 367, 'hindiName', { placeholder: 'Hindi name / हिंदी नाम' })}
 
               {/* Image (JSM PictureBox1 + Brows / Remove Image) */}

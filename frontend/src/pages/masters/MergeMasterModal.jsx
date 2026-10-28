@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Modal from '../../components/ui/Modal';
 import { ERPSearchableSelect } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
@@ -14,6 +14,7 @@ const MergeMasterModal = ({ isOpen, onClose, initialEntity }) => {
   }, [isOpen, initialEntity]);
   const [sourceId, setSourceId] = useState('');
   const [targetId, setTargetId] = useState('');
+  const mergeBtnRef = useRef(null);
   const [saving, setSaving] = useState(false);
   const [importText, setImportText] = useState('');
   const [dryRunResult, setDryRunResult] = useState(null);
@@ -117,9 +118,16 @@ const MergeMasterModal = ({ isOpen, onClose, initialEntity }) => {
           </div>
           <div>
             <label className="text-[10px] font-black uppercase text-slate-400">Target (keep)</label>
-            <ERPSearchableSelect className="w-full mt-1" value={targetId} onChange={setTargetId} options={options} placeholder="Target…" />
+            <ERPSearchableSelect
+              className="w-full mt-1"
+              value={targetId}
+              // two frames: after the dropdown's own move to the next box
+              onChange={(v) => { setTargetId(v); if (v) requestAnimationFrame(() => requestAnimationFrame(() => mergeBtnRef.current?.focus())); }}
+              options={options}
+              placeholder="Target…"
+            />
           </div>
-          <button type="button" disabled={saving} onClick={handleMerge} className="w-full py-2 bg-black text-white text-[10px] font-black uppercase">
+          <button ref={mergeBtnRef} type="button" disabled={saving} onClick={handleMerge} className="w-full py-2 bg-black text-white text-[10px] font-black uppercase focus:ring-2 focus:ring-blue-500">
             {saving ? 'Merging…' : 'Merge'}
           </button>
         </section>

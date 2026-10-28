@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Offline Reports & Accounting Engine
  * Provides client-side ledger statements, outstanding reports, GST reports,
  * and financial statements when running offline or disconnected from backend.
@@ -230,25 +230,27 @@ export async function computeOfflineLedgerStatement({ ledgerId, from, to, state 
     if (j.offlineDeleted) continue;
     const workerId = j.workerId?._id || j.workerId?.id || j.workerId;
     const workerName = j.workerName || j.workerId?.name;
-    if (isMatchingParty(workerId, workerName, targetPartyId, ledgerName)) {
-      const charges = Number(j.processCharges || j.charges || 0);
-      if (charges > 0) {
+        if (isMatchingParty(workerId, workerName, targetPartyId, ledgerName)) {
+      const charges = Number(j.charges || j.processCharges || j.totalAmount || 0);
+      const gst = Number(j.gstAmount || 0);
+      const totalAmt = charges + gst;
+      if (totalAmt > 0) {
         rawEntries.push({
-          _id: `job-${j._id || j.id}`,
-          date: toDateStr(j.receivedDate || j.issueDate) || new Date().toISOString().slice(0, 10),
-          voucherNo: j.jobCardNo || 'JC',
-          billVoucherNo: j.jobCardNo || 'JC',
+          _id: 'job-' + (j._id || j.id),
+          date: toDateStr(j.receiveDate || j.receivedDate || j.date || j.issueDate) || new Date().toISOString().slice(0, 10),
+          voucherNo: j.billGpNo || j.challanNo || j.jobCardNo || 'JC',
+          billVoucherNo: j.billGpNo || j.challanNo || j.jobCardNo || 'JC',
           chequeNo: '',
-          remarks: j.processType || 'Job Work',
+          remarks: j.billGpNo ? 'GP No.: ' + j.billGpNo : (j.processType || 'Job Work'),
           accBill: 'B',
           cp: 'SCC',
           contraShortCode: 'SCC',
           voucherType: 'JobWorkCharges',
           particulars: 'JOB WORK CHARGES',
           contraAccount: 'JOB WORK',
-          narration: `Job Work (${j.processType || 'Process'}) Lot: ${j.lotId || ''}`,
+          narration: 'Job Work (' + (j.processType || 'Process') + ') Bill: ' + (j.billGpNo || j.jobCardNo || ''),
           debit: 0,
-          credit: round2(charges),
+          credit: round2(totalAmt),
           refType: 'JobWorkCharges',
           refId: j._id || j.id,
         });

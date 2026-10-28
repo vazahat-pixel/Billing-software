@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
@@ -83,16 +83,41 @@ const OpeningBalanceModal = ({ isOpen, onClose, readOnly = false }) => {
     }
   };
 
+  // JSM grid keys: Find + Enter -> first OP.BAL; Enter OP.BAL -> DR/CR -> next row; Up/Down between rows;
+  // Enter on the last row's DR/CR -> Save.
+  const gridRef = useRef(null);
+  const cell = (row, col) => gridRef.current?.querySelector(`[data-ob-row="${row}"][data-ob-col="${col}"]`);
+  const focusCell = (row, col) => {
+    const el = cell(row, col);
+    if (!el) return false;
+    el.focus();
+    if (el.select) el.select();
+    return true;
+  };
+  const onGridKey = (row, col) => (e) => {
+    if (e.ctrlKey || e.altKey) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (focusCell(row + (e.key === 'ArrowDown' ? 1 : -1), col)) e.preventDefault();
+      return;
+    }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (col === 'bal') { focusCell(row, 'type'); return; }
+    if (!focusCell(row + 1, 'bal')) gridRef.current?.querySelector('[data-action="save"]')?.focus();
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Opening Balance" className="max-w-5xl">
-      <div className="p-3 flex flex-col gap-2" data-enter-nav="off">
+      <div ref={gridRef} className="p-3 flex flex-col gap-2" data-enter-nav="off">
         <div className="flex flex-wrap items-center gap-2">
           <input
             className="classic-erp-input w-64"
             placeholder="Find account / code / station"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); focusCell(0, 'bal'); } }}
             data-master-find="true"
+            autoFocus
           />
           <select className="classic-erp-select w-56" value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)}>
             <option value="">All groups</option>
@@ -111,7 +136,7 @@ const OpeningBalanceModal = ({ isOpen, onClose, readOnly = false }) => {
               </tr>
             </thead>
             <tbody>
-              {visible.map((r) => (
+              {visible.map((r, i) => (
                 <tr key={r.id} className={r.changed ? 'bg-amber-50' : 'hover:bg-slate-50'}>
                   <td className="border border-slate-200 px-1.5">{r.group}</td>
                   <td className="border border-slate-200 px-1.5 font-mono">{r.acCode}</td>
@@ -125,6 +150,9 @@ const OpeningBalanceModal = ({ isOpen, onClose, readOnly = false }) => {
                       className="w-full h-6 px-1 text-right border-0 bg-transparent font-mono"
                       value={r.opBal}
                       onChange={(e) => setRow(r.id, { opBal: e.target.value })}
+                      onKeyDown={onGridKey(i, 'bal')}
+                      data-ob-row={i}
+                      data-ob-col="bal"
                       disabled={readOnly}
                     />
                   </td>
@@ -133,6 +161,9 @@ const OpeningBalanceModal = ({ isOpen, onClose, readOnly = false }) => {
                       className="w-full h-6 border-0 bg-transparent font-bold"
                       value={r.opType}
                       onChange={(e) => setRow(r.id, { opType: e.target.value })}
+                      onKeyDown={onGridKey(i, 'type')}
+                      data-ob-row={i}
+                      data-ob-col="type"
                       disabled={readOnly}
                     >
                       <option value="Dr">DR</option>
@@ -159,7 +190,7 @@ const OpeningBalanceModal = ({ isOpen, onClose, readOnly = false }) => {
           <div className="flex gap-2">
             {changedIds.length > 0 && <span className="text-[11px] text-amber-700 self-center">{changedIds.length} changed</span>}
             {!readOnly && (
-              <button type="button" className="classic-erp-btn btn-blue font-bold" onClick={handleSave} disabled={saving || !changedIds.length}>
+              <button type="button" className="classic-erp-btn btn-blue font-bold" data-action="save" data-enter-save="true" onClick={handleSave} disabled={saving || !changedIds.length}>
                 {saving ? 'Saving…' : 'Save'}
               </button>
             )}
