@@ -1022,6 +1022,7 @@ const Dashboard = () => {
    };
 
    const menuData = {
+      // Same order and sub-menus as JSM's Master menu; masters JSM does not have stay under OtherMaster.
       Master: [
          { label: 'Account', key: 'accountMaster' },
          { label: 'Account Main Group', action: () => toggleModal('accountGroupMaster', true) },
@@ -1034,29 +1035,62 @@ const Dashboard = () => {
          { label: 'Item TaxSlab', action: () => openGenericMaster('ItemTaxSlab') },
          { label: 'Station', action: () => openGenericMaster('City') },
          { label: 'Transport', action: () => openGenericMaster('Transport') },
-         { label: 'Color', action: () => openGenericMaster('Color') },
-         { label: 'Design', action: () => openGenericMaster('Design') },
-         { label: 'Quality', action: () => openGenericMaster('Quality') },
-         { label: 'Pattern', action: () => openGenericMaster('Pattern') },
-         { label: 'Brand', action: () => openGenericMaster('Brand') },
-         { label: 'Shade', action: () => openGenericMaster('Shade') },
-         { label: 'Process', action: () => openGenericMaster('Process') },
-         { label: 'Machine', action: () => openGenericMaster('Machine') },
-         { label: 'Department', action: () => openGenericMaster('Department') },
-         { label: 'Payment Terms', action: () => openGenericMaster('PaymentTerms') },
-         { label: 'Currency', action: () => openGenericMaster('Currency') },
-         { label: 'Size Master', action: () => openGenericMaster('Size') },
-         { label: 'Area Master', action: () => openGenericMaster('Area') },
-         { label: 'Party Bank', action: () => openGenericMaster('PartyBank') },
-         { label: 'Warehouse', action: () => setModals(prev => ({ ...prev, warehouseMaster: true })) },
          { label: 'Type', action: () => openGenericMaster('Type') },
-         { label: 'OtherMaster', action: () => openGenericMaster('OtherMaster') },
-         { label: 'Job Worker', action: () => setModals(prev => ({ ...prev, jobWorker: true })) },
-         { label: 'Lastyear BillEntry', action: () => openRecordsHub('sales') },
+         {
+            label: 'OtherMaster',
+            children: [
+               { label: 'Party Bank', action: () => openGenericMaster('PartyBank') },
+               { label: 'Online Key List', soon: true },
+               { label: 'AreaMaster', action: () => openGenericMaster('Area') },
+               { label: 'Colour Master', action: () => openGenericMaster('Color') },
+               { label: 'Size Master', action: () => openGenericMaster('Size') },
+               { label: 'Party+Station Master', soon: true },
+               { label: 'Date+Item Rate Master', soon: true },
+               { label: 'Design', action: () => openGenericMaster('Design') },
+               { label: 'Quality', action: () => openGenericMaster('Quality') },
+               { label: 'Pattern', action: () => openGenericMaster('Pattern') },
+               { label: 'Brand', action: () => openGenericMaster('Brand') },
+               { label: 'Shade', action: () => openGenericMaster('Shade') },
+               { label: 'Process', action: () => openGenericMaster('Process') },
+               { label: 'Machine', action: () => openGenericMaster('Machine') },
+               { label: 'Department', action: () => openGenericMaster('Department') },
+               { label: 'Payment Terms', action: () => openGenericMaster('PaymentTerms') },
+               { label: 'Currency', action: () => openGenericMaster('Currency') },
+               { label: 'Warehouse', action: () => setModals(prev => ({ ...prev, warehouseMaster: true })) },
+               { label: 'Job Worker', action: () => setModals(prev => ({ ...prev, jobWorker: true })) },
+               { label: 'Other Master', action: () => openGenericMaster('OtherMaster') },
+            ],
+         },
+         {
+            label: 'Lastyear BillEntry',
+            children: [
+               { label: 'Sales', soon: true },
+               { label: 'Purchase', soon: true },
+               { label: 'Process', soon: true },
+               { label: 'JobWork', soon: true },
+               { label: 'Jv Expense', soon: true },
+               { label: 'Mill Issue Lot', key: 'millIssue' },
+               { label: 'JobWork Issue Lot', key: 'jobIssue' },
+               { label: 'Grey Purchase Lot', key: 'purchase' },
+               { label: 'UnAdjust Entry Status', soon: true },
+               { label: 'Old Bills (List)', action: () => openRecordsHub('sales') },
+            ],
+         },
          { label: 'Opening Balance', action: () => setModals(prev => ({ ...prev, openingBalance: true })) },
          { label: 'Opening StockEntry', action: () => setModals(prev => ({ ...prev, openingStock: true })) },
-         { label: 'Merge Event', action: () => setModals(prev => ({ ...prev, mergeMaster: true })) },
+         {
+            label: 'Merge Event',
+            children: [
+               { label: 'Merge Account', action: () => setModals(prev => ({ ...prev, mergeMaster: true, mergeEntity: 'party' })) },
+               { label: 'Merge Item', action: () => setModals(prev => ({ ...prev, mergeMaster: true, mergeEntity: 'item' })) },
+               { label: 'Merge Station', soon: true },
+               { label: 'Merge Transport', soon: true },
+               { label: 'Party Bank', soon: true },
+            ],
+         },
          { label: 'Item Rate Master', action: () => toggleModal('itemMaster', true) },
+         { label: 'Tank', soon: true },
+         { label: 'Pump', soon: true },
          { label: 'Bulk Import (Excel / CSV)', action: () => setModals(prev => ({ ...prev, dataImport: true, dataImportEntity: 'auto' })) }
       ],
       Transaction: [
@@ -1248,6 +1282,13 @@ const Dashboard = () => {
          if (section === 'Advanced') return;
          if (permissions.canAccessSection(section)) {
             let allowedItems = items.filter(isMenuItemAllowed);
+            if (section === 'Master') {
+               // Master sub-menus: the folder obeys its own right, each entry inside keeps the right it had at top level
+               allowedItems = allowedItems
+                  .filter((i) => !i.children || isMenuItemAllowed({ label: i.label }))
+                  .map((i) => (i.children ? { ...i, children: i.children.filter(isMenuItemAllowed) } : i))
+                  .filter((i) => !i.children || i.children.length > 0);
+            }
             if (section === 'Admin') {
                allowedItems = allowedItems.filter(i => i.label !== 'User Rights' || permissions.canManageUsers);
             }
@@ -2543,6 +2584,7 @@ const Dashboard = () => {
          />
          <MergeMasterModal
             isOpen={modals.mergeMaster}
+            initialEntity={modals.mergeEntity}
             onClose={() => setModals(prev => ({ ...prev, mergeMaster: false }))}
          />
          <DataImportModal

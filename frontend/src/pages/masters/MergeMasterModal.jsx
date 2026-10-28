@@ -6,9 +6,12 @@ import { masterDataApi } from '../../api';
 import { toast } from '../../store/useToastStore';
 import { erpConfirm } from '../../utils/confirm';
 
-const MergeMasterModal = ({ isOpen, onClose }) => {
+const MergeMasterModal = ({ isOpen, onClose, initialEntity }) => {
   const { parties, items, fetchParties, fetchItems } = useStore();
-  const [entity, setEntity] = useState('party');
+  const [entity, setEntity] = useState(initialEntity || 'party');
+  useEffect(() => {
+    if (isOpen && initialEntity) setEntity(initialEntity);
+  }, [isOpen, initialEntity]);
   const [sourceId, setSourceId] = useState('');
   const [targetId, setTargetId] = useState('');
   const [saving, setSaving] = useState(false);
