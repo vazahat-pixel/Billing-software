@@ -1022,18 +1022,19 @@ const Dashboard = () => {
    };
 
    const menuData = {
-      // Same order and sub-menus as JSM's Master menu; masters JSM does not have stay under OtherMaster.
+      // Same order, groups (separatorBefore) and sub-menus as JSM's Master menu; masters JSM does not
+      // have, and Bulk Import, sit at the end of OtherMaster.
       Master: [
          { label: 'Account', key: 'accountMaster' },
          { label: 'Account Main Group', action: () => toggleModal('accountGroupMaster', true) },
          { label: 'Account Head', action: () => toggleModal('accountGroupMaster', true) },
          { label: 'Book Master', key: 'bookMaster' },
          { label: 'Book Type', action: () => openGenericMaster('BookType') },
-         { label: 'Item', key: 'itemMaster' },
+         { label: 'Item', key: 'itemMaster', separatorBefore: true },
          { label: 'Item Group', action: () => openGenericMaster('ItemGroup') },
          { label: 'Unit', action: () => openGenericMaster('Unit') },
          { label: 'Item TaxSlab', action: () => openGenericMaster('ItemTaxSlab') },
-         { label: 'Station', action: () => openGenericMaster('City') },
+         { label: 'Station', action: () => openGenericMaster('City'), separatorBefore: true },
          { label: 'Transport', action: () => openGenericMaster('Transport') },
          { label: 'Type', action: () => openGenericMaster('Type') },
          {
@@ -1046,6 +1047,10 @@ const Dashboard = () => {
                { label: 'Size Master', action: () => openGenericMaster('Size') },
                { label: 'Party+Station Master', soon: true },
                { label: 'Date+Item Rate Master', soon: true },
+               {
+                  label: 'More Masters',
+                  separatorBefore: true,
+                  children: [
                { label: 'Design', action: () => openGenericMaster('Design') },
                { label: 'Quality', action: () => openGenericMaster('Quality') },
                { label: 'Pattern', action: () => openGenericMaster('Pattern') },
@@ -1059,10 +1064,14 @@ const Dashboard = () => {
                { label: 'Warehouse', action: () => setModals(prev => ({ ...prev, warehouseMaster: true })) },
                { label: 'Job Worker', action: () => setModals(prev => ({ ...prev, jobWorker: true })) },
                { label: 'Other Master', action: () => openGenericMaster('OtherMaster') },
+               { label: 'Bulk Import (Excel / CSV)', action: () => setModals(prev => ({ ...prev, dataImport: true, dataImportEntity: 'auto' })), separatorBefore: true },
+                  ],
+               },
             ],
          },
          {
             label: 'Lastyear BillEntry',
+            separatorBefore: true,
             children: [
                { label: 'Sales', soon: true },
                { label: 'Purchase', soon: true },
@@ -1073,13 +1082,14 @@ const Dashboard = () => {
                { label: 'JobWork Issue Lot', key: 'jobIssue' },
                { label: 'Grey Purchase Lot', key: 'purchase' },
                { label: 'UnAdjust Entry Status', soon: true },
-               { label: 'Old Bills (List)', action: () => openRecordsHub('sales') },
+               { label: 'Old Bills (List)', action: () => openRecordsHub('sales'), separatorBefore: true },
             ],
          },
          { label: 'Opening Balance', action: () => setModals(prev => ({ ...prev, openingBalance: true })) },
          { label: 'Opening StockEntry', action: () => setModals(prev => ({ ...prev, openingStock: true })) },
          {
             label: 'Merge Event',
+            separatorBefore: true,
             children: [
                { label: 'Merge Account', action: () => setModals(prev => ({ ...prev, mergeMaster: true, mergeEntity: 'party' })) },
                { label: 'Merge Item', action: () => setModals(prev => ({ ...prev, mergeMaster: true, mergeEntity: 'item' })) },
@@ -1089,9 +1099,6 @@ const Dashboard = () => {
             ],
          },
          { label: 'Item Rate Master', action: () => toggleModal('itemMaster', true) },
-         { label: 'Tank', soon: true },
-         { label: 'Pump', soon: true },
-         { label: 'Bulk Import (Excel / CSV)', action: () => setModals(prev => ({ ...prev, dataImport: true, dataImportEntity: 'auto' })) }
       ],
       Transaction: [
          { label: 'Sales', key: 'sales' },
@@ -1276,6 +1283,14 @@ const Dashboard = () => {
       ]
    };
 
+   // A sub-menu that would run past the bottom of the window opens higher up, as in Windows.
+   const keepFlyoutOnScreen = (el) => {
+      if (!el) return;
+      el.style.top = '';
+      const over = el.getBoundingClientRect().bottom - (window.innerHeight - 30); // clear the KEYS bar
+      if (over > 0) el.style.top = `${-over}px`;
+   };
+
    const visibleMenuData = useMemo(() => {
       const filtered = {};
       Object.entries(menuData).forEach(([section, items]) => {
@@ -1284,10 +1299,11 @@ const Dashboard = () => {
             let allowedItems = items.filter(isMenuItemAllowed);
             if (section === 'Master') {
                // Master sub-menus: the folder obeys its own right, each entry inside keeps the right it had at top level
-               allowedItems = allowedItems
-                  .filter((i) => !i.children || isMenuItemAllowed({ label: i.label }))
-                  .map((i) => (i.children ? { ...i, children: i.children.filter(isMenuItemAllowed) } : i))
+               const allowTree = (list) => list
+                  .filter((i) => (i.children ? isMenuItemAllowed({ label: i.label }) : isMenuItemAllowed(i)))
+                  .map((i) => (i.children ? { ...i, children: allowTree(i.children) } : i))
                   .filter((i) => !i.children || i.children.length > 0);
+               allowedItems = allowTree(allowedItems);
             }
             if (section === 'Admin') {
                allowedItems = allowedItems.filter(i => i.label !== 'User Rights' || permissions.canManageUsers);
@@ -1536,13 +1552,13 @@ const Dashboard = () => {
                            {section}
                         </button>
                         {isOpen && (
-                           <div className="erp-menu-dropdown">
+                           <div className={`erp-menu-dropdown${section === 'Master' ? ' erp-menu-dropdown--jsm' : ''}`}>
                                  {visibleMenuData[section].map((item, idx) => {
                                     const renderMenuNode = (node, keyPrefix) => {
                                        const label = typeof node === 'object' ? node.label : node;
                                        const { badge, text } = parseMenuLabel(label);
                                        const kids = Array.isArray(node.children) ? node.children : null;
-                                       const needsSeparator = text === 'Closing / UnClosing Year' || text === 'Voucher Relndex';
+                                       const needsSeparator = node.separatorBefore || text === 'Closing / UnClosing Year' || text === 'Voucher Relndex';
                                        const flyoutOpen = openFlyoutPath === keyPrefix
                                           || (typeof openFlyoutPath === 'string' && openFlyoutPath.startsWith(`${keyPrefix}-`));
 
@@ -1571,7 +1587,10 @@ const Dashboard = () => {
                                                       <span className="erp-menu-chevron">{flyoutOpen ? '▾' : '▸'}</span>
                                                    </button>
                                                    {flyoutOpen && (
-                                                      <div className={section === 'Reports' ? 'erp-menu-nest' : 'erp-menu-flyout erp-menu-flyout--open'}>
+                                                      <div
+                                                         className={section === 'Reports' ? 'erp-menu-nest' : 'erp-menu-flyout erp-menu-flyout--open'}
+                                                         ref={section === 'Reports' ? undefined : keepFlyoutOnScreen}
+                                                      >
                                                          {kids.map((child, cIdx) => renderMenuNode(child, `${keyPrefix}-${cIdx}`))}
                                                       </div>
                                                    )}
