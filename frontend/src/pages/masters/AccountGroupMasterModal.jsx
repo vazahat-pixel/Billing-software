@@ -138,6 +138,26 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
     setMode(editMode && !readOnly ? 'EDIT' : 'VIEW');
   };
 
+  const currentIndex = useMemo(() => {
+    if (!selectedId || !filteredGroups.length) return -1;
+    return filteredGroups.findIndex((g) => g.id === selectedId);
+  }, [selectedId, filteredGroups]);
+
+  const navigateTo = (index) => {
+    if (!filteredGroups.length) return;
+    const bounded = Math.max(0, Math.min(index, filteredGroups.length - 1));
+    const target = filteredGroups[bounded];
+    if (target) {
+      loadGroup(target, false);
+      setFocusedRowIndex(bounded);
+    }
+  };
+
+  const handleFirst = () => navigateTo(0);
+  const handlePrev = () => navigateTo(currentIndex <= 0 ? 0 : currentIndex - 1);
+  const handleNext = () => navigateTo(currentIndex >= filteredGroups.length - 1 ? filteredGroups.length - 1 : (currentIndex < 0 ? 0 : currentIndex + 1));
+  const handleLast = () => navigateTo(filteredGroups.length - 1);
+
   const handleNew = () => {
     if (readOnly) return;
     const nextCode = groupList.length ? Math.max(...groupList.map((g) => Number(g.graccd) || 100)) + 1 : 101;
@@ -648,6 +668,51 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
         {/* BOTTOM ACTION TOOLBAR (Identical to JSM Screenshot 2) */}
         <div className="bg-[#d4d0c8] p-1.5 border-t border-[#808080] flex items-center justify-between gap-1 flex-wrap select-none">
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              data-action="first"
+              onClick={handleFirst}
+              disabled={!filteredGroups.length}
+              className="px-2.5 py-1 text-xs font-bold border border-[#808080] bg-[#e0dfd8] hover:bg-[#c0c0c0] text-slate-800 shadow-sm cursor-pointer disabled:opacity-50"
+              title="First Record (<)"
+            >
+              &lt;
+            </button>
+            <button
+              type="button"
+              data-action="prev"
+              onClick={handlePrev}
+              disabled={!filteredGroups.length}
+              className="px-2.5 py-1 text-xs font-bold border border-[#808080] bg-[#e0dfd8] hover:bg-[#c0c0c0] text-slate-800 shadow-sm cursor-pointer disabled:opacity-50"
+              title="Previous Record (<<)"
+            >
+              &lt;&lt;
+            </button>
+            <button
+              type="button"
+              data-action="next"
+              onClick={handleNext}
+              disabled={!filteredGroups.length}
+              className="px-2.5 py-1 text-xs font-bold border border-[#808080] bg-[#e0dfd8] hover:bg-[#c0c0c0] text-slate-800 shadow-sm cursor-pointer disabled:opacity-50"
+              title="Next Record (>>)"
+            >
+              &gt;&gt;
+            </button>
+            <button
+              type="button"
+              data-action="last"
+              onClick={handleLast}
+              disabled={!filteredGroups.length}
+              className="px-2.5 py-1 text-xs font-bold border border-[#808080] bg-[#e0dfd8] hover:bg-[#c0c0c0] text-slate-800 shadow-sm cursor-pointer disabled:opacity-50"
+              title="Last Record (>)"
+            >
+              &gt;
+            </button>
+            {currentIndex >= 0 && (
+              <span className="text-[11px] font-mono text-gray-600 px-1">
+                {currentIndex + 1} / {filteredGroups.length}
+              </span>
+            )}
             <button
               type="button"
               data-action="new"

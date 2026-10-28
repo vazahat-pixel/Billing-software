@@ -199,6 +199,26 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
     }
   };
 
+  const currentIndex = useMemo(() => {
+    if (!selectedId || !filteredList.length) return -1;
+    return filteredList.findIndex(item => item._id === selectedId);
+  }, [selectedId, filteredList]);
+
+  const navigateTo = (index) => {
+    if (!filteredList.length) return;
+    const bounded = Math.max(0, Math.min(index, filteredList.length - 1));
+    const target = filteredList[bounded];
+    if (target) {
+      loadRecord(target, false);
+      setFocusedIndex(bounded);
+    }
+  };
+
+  const handleFirst = () => navigateTo(0);
+  const handlePrev = () => navigateTo(currentIndex <= 0 ? 0 : currentIndex - 1);
+  const handleNext = () => navigateTo(currentIndex >= filteredList.length - 1 ? filteredList.length - 1 : (currentIndex < 0 ? 0 : currentIndex + 1));
+  const handleLast = () => navigateTo(filteredList.length - 1);
+
   const handleNew = () => {
     if (readOnly) return;
     resetForm();
@@ -364,6 +384,15 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
         {/* JSM Standard Desktop Action Bar */}
         <div className="bg-[#e8ebf0] border-b border-[var(--border)] px-3 py-1.5 flex items-center justify-between gap-2 select-none">
           <div className="flex items-center gap-1.5">
+            <button className="classic-erp-btn" type="button" onClick={handleFirst} disabled={!filteredList.length} title="First Record (<)">&lt;</button>
+            <button className="classic-erp-btn" type="button" onClick={handlePrev} disabled={!filteredList.length} title="Previous Record (<<)">&lt;&lt;</button>
+            <button className="classic-erp-btn" type="button" onClick={handleNext} disabled={!filteredList.length} title="Next Record (>>)">	&gt;&gt;</button>
+            <button className="classic-erp-btn" type="button" onClick={handleLast} disabled={!filteredList.length} title="Last Record (>)">&gt;</button>
+            {currentIndex >= 0 && (
+              <span className="text-[11px] font-mono text-gray-600 px-1">
+                {currentIndex + 1} / {filteredList.length}
+              </span>
+            )}
             <button
               type="button"
               data-action="new"

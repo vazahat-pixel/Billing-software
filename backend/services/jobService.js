@@ -247,27 +247,41 @@ class JobService {
 
       const job = await Job.findOne({ _id: jobId, companyId }).session(session);
       if (!job) throw AppError.notFound('Job record not found');
-      if (job.status === 'Received') throw AppError.badRequest('This job has already been fully received');
       if (job.status === 'Cancelled') throw AppError.badRequest('Cannot receive against a cancelled job');
 
+      const isChainJob = Array.isArray(job.steps) && job.steps.length > 0;
+      const previouslyReceivedGrey = isChainJob ? 0 : Number(job.receivedGreyQty ?? job.receivedQty ?? 0);
+      const previouslyReceivedGreyPcs = isChainJob ? 0 : Number(job.receivedGreyPcs ?? job.receivedPcs ?? 0);
+      const pendingQtyCheck = Number((Number(job.issueQty || 0) - previouslyReceivedGrey).toFixed(4));
+      const pendingPcsCheck = Number(job.issuePcs || 0) - previouslyReceivedGreyPcs;
+
+      if (job.status === 'Received' && pendingQtyCheck <= 0.001 && pendingPcsCheck <= 0) {
+        throw AppError.badRequest('This job has already been fully received');
+      }
+
       if (billGpNo) {
-        // Multiple challans for the SAME job worker can share one Bill/Gp No
-        // (combined mill receipt). Only block reuse across a different worker,
-        // which usually indicates an accidental duplicate/typo.
+        const cleanBill = String(billGpNo).trim();
+        const incomingSerial = receiveData.serialNo ? String(receiveData.serialNo).trim() : null;
         const existingReceipt = await Job.findOne({
-          billGpNo: String(billGpNo).trim(),
+          billGpNo: cleanBill,
           companyId,
           status: { $in: ['Received', 'Partial'] },
-          workerId: { $ne: job.workerId },
+          _id: { $ne: job._id },
         }).session(session);
+
         if (existingReceipt) {
-          throw AppError.badRequest(`Bill/GP No. "${billGpNo}" is already used for a different Job Party. Please use a different one.`);
+          const existingSerial = existingReceipt.serialNo ? String(existingReceipt.serialNo).trim() : null;
+          if (incomingSerial && existingSerial && incomingSerial !== existingSerial) {
+            throw AppError.badRequest(`Duplicate Bill/GP No. "${cleanBill}" is already used in receipt #${existingSerial}. Duplicate save is not allowed.`);
+          }
+          if (String(existingReceipt.workerId) !== String(job.workerId)) {
+            throw AppError.badRequest(`Bill/GP No. "${cleanBill}" is already used for a different Job Party. Please use a unique one.`);
+          }
         }
       }
 
       if (trancheQty < 0) throw AppError.badRequest('Received quantity cannot be negative');
 
-      const isChainJob = Array.isArray(job.steps) && job.steps.length > 0;
       const previouslyReceivedQty = isChainJob ? 0 : Number(job.receivedQty || 0);
       const previouslyReceivedPcs = isChainJob ? 0 : Number(job.receivedPcs || 0);
 
@@ -277,8 +291,6 @@ class JobService {
       const has = (v) => v != null && v !== '' && Number.isFinite(Number(v));
       const trancheGrey = has(receiveData.receivedGreyQty) ? Math.max(0, Number(receiveData.receivedGreyQty)) : trancheQty;
       const trancheGreyPcs = has(receiveData.receivedGreyPcs) ? Math.max(0, Number(receiveData.receivedGreyPcs)) : tranchePcs;
-      const previouslyReceivedGrey = isChainJob ? 0 : Number(job.receivedGreyQty ?? job.receivedQty ?? 0);
-      const previouslyReceivedGreyPcs = isChainJob ? 0 : Number(job.receivedGreyPcs ?? job.receivedPcs ?? 0);
       const pendingQty = Number((Number(job.issueQty || 0) - previouslyReceivedGrey).toFixed(4));
 
       if (!isChainJob && trancheGrey > pendingQty + 0.0001) {
@@ -297,14 +309,10 @@ class JobService {
       const cumulativeGrey = isChainJob ? trancheGrey : Number((previouslyReceivedGrey + trancheGrey).toFixed(4));
       const cumulativeGreyPcs = isChainJob ? trancheGreyPcs : previouslyReceivedGreyPcs + trancheGreyPcs;
 
-      // Defaults to final/complete — matches every existing caller's expectation that one
-      // receive call closes the job (any shortfall books as wastage). A caller must
-      // EXPLICITLY pass isFinal: false to keep the job open for another tranche; this can
-      // never be inferred from the remaining balance, because normal job-work almost
-      // never returns exactly 100% of the issued quantity (see docblock above) — if
-      // "remaining <= 0" gated finality, an ordinary receive with real wastage would get
-      // stuck Partial forever instead of closing with that shortfall as wastage.
-      const isFinal = isChainJob || receiveData.isFinal !== false;
+      const remainingGrey = Math.max(0, Number((Number(job.issueQty || 0) - cumulativeGrey).toFixed(4)));
+      const remainingPcs = Math.max(0, Number(job.issuePcs || 0) - cumulativeGreyPcs);
+      const isBalanceZero = remainingGrey <= 0.05 && remainingPcs <= 0;
+      const isFinal = isChainJob || (receiveData.isFinal === false ? false : (receiveData.isFinal === true ? true : isBalanceZero));
       const openStep = job.steps?.length
         ? job.steps.find((s) => ['In-Process', 'QC-Pending', 'QC-Pass'].includes(s.status))
         : null;
@@ -741,17 +749,25 @@ class JobService {
       const oldQty = Number(job.receivedQty || 0);
       const oldPcs = Number(job.receivedPcs || 0);
 
-      // Validate Bill/GP No uniqueness across different workers if changed
+      // Validate Bill/GP No uniqueness across different workers or receipts if changed
       if (billGpNo) {
+        const cleanBill = String(billGpNo).trim();
+        const incomingSerial = receiveData.serialNo ? String(receiveData.serialNo).trim() : (job.serialNo ? String(job.serialNo).trim() : null);
         const existingReceipt = await Job.findOne({
-          billGpNo: String(billGpNo).trim(),
+          billGpNo: cleanBill,
           companyId,
           _id: { $ne: job._id },
           status: { $in: ['Received', 'Partial'] },
-          workerId: { $ne: workerId || job.workerId },
         }).session(session);
+
         if (existingReceipt) {
-          throw AppError.badRequest(`Bill/GP No. "${billGpNo}" is already used for a different Job Party.`);
+          const existingSerial = existingReceipt.serialNo ? String(existingReceipt.serialNo).trim() : null;
+          if (incomingSerial && existingSerial && incomingSerial !== existingSerial) {
+            throw AppError.badRequest(`Duplicate Bill/GP No. "${cleanBill}" is already used in receipt #${existingSerial}. Duplicate save is not allowed.`);
+          }
+          if (String(existingReceipt.workerId) !== String(workerId || job.workerId)) {
+            throw AppError.badRequest(`Bill/GP No. "${cleanBill}" is already used for a different Job Party.`);
+          }
         }
       }
 
@@ -797,8 +813,10 @@ class JobService {
         await journalEngineService.reverseJournal(companyId, entry._id, { session });
       }
 
-      // Recompute wastage
-      const finalFlag = isFinal !== false;
+      // Recompute wastage & final status
+      const remainingGrey = Math.max(0, Number((Number(job.issueQty || 0) - newGrey).toFixed(4)));
+      const isBalanceZero = remainingGrey <= 0.05;
+      const finalFlag = isFinal === false ? false : (isFinal === true ? true : isBalanceZero);
       const tolerancePct = job.toleranceWastagePct ?? 3;
       let wastage = 0;
       let abnormalWastage = 0;

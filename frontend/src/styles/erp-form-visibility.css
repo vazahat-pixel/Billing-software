@@ -1233,18 +1233,18 @@ textarea.classic-erp-input {
   width: 100% !important;
 }
 
-/* Mill Receipt — classic field placement */
+/* Mill Receipt — exact JSM WinForms field placement and styling */
 .mill-rec-head {
   display: grid;
-  grid-template-columns: 76px minmax(180px, 1.4fr) 72px minmax(120px, 1fr) 100px 72px 64px minmax(96px, 0.8fr);
+  grid-template-columns: 74px minmax(240px, 1.8fr) 50px minmax(80px, 0.7fr) 140px minmax(75px, 0.6fr) 60px minmax(75px, 0.6fr);
   grid-template-areas:
-    "plab party gstlab gstin totlab tot serlab serial"
-    ".    addr  rlab   rcon  .      .   datelab date"
-    "blab bill  altl   altl  revlab rev b2lab   b2"
-    ".    .     .      .     hsnlab hsn hsn     type";
-  gap: 2px 4px;
+    "plab party party   gstlab gstin  totlab totlab serlab serial"
+    ".    addr  addr    .      .      tot    tot    datelab date"
+    ".    addr  addr    revlab rev    .      .      b2lab  b2"
+    "blab bill  altllab altlin hsnlab hsn    typelab type   type";
+  gap: 3px 5px;
   align-items: center;
-  padding: 3px 4px;
+  padding: 4px 6px;
   background: #d4d0c8;
   border: 1px solid #808080;
   box-sizing: border-box;
@@ -1272,41 +1272,39 @@ textarea.classic-erp-input {
 .mill-rec-addr {
   background: #fff;
   border: 1px solid #808080;
-  min-height: 20px;
-  height: 20px;
+  min-height: 38px;
+  height: 38px;
   font-size: 11px;
-  line-height: 18px;
-  padding: 0 4px;
+  line-height: 16px;
+  padding: 2px 4px;
   overflow: hidden;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
-.mill-rec-altl {
-  grid-area: altl;
-  background: #111;
-  color: #fff;
-  font-size: 10px;
+.mill-rec-altl-label {
+  grid-area: altllab;
+  color: #8b0000;
+  font-size: 11px;
   font-weight: 700;
-  text-align: center;
-  height: 20px;
-  line-height: 20px;
   white-space: nowrap;
-  padding: 0 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+}
+.mill-rec-altl-label:hover {
+  text-decoration: underline;
 }
 .mill-rec-gstbox {
-  background: #f6e6c0;
-  border: 1px solid #d6c08a;
-  padding: 2px 4px;
+  background: #fbf4dc;
+  border: 1px solid #d8cbaf;
+  padding: 3px 4px;
 }
 .mill-rec-round {
   background: #fff59a !important;
+}
+.mill-rec-rcm {
+  background: #ffff99 !important;
+  color: #78350f !important;
+  font-weight: 700 !important;
 }
 .mill-rec-actions {
   background: #000;
@@ -1330,29 +1328,43 @@ textarea.classic-erp-input {
   line-height: 1.1;
   padding: 2px 8px;
   min-width: 52px;
+  cursor: pointer;
 }
-.mill-rec-btn:disabled { opacity: 0.45; }
+.mill-rec-btn:hover {
+  background: #ececec;
+}
+.mill-rec-btn:active {
+  border-color: #555 #fff #fff #555;
+}
+.mill-rec-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .mill-rec-btn-new {
   background: #0000b4;
   color: #fff;
   border-color: #7aa2ff #00004a #00004a #7aa2ff;
 }
+.mill-rec-btn-new:hover {
+  background: #1a1abf;
+}
 .mill-rec-status {
   flex: 1;
   background: #f7b6c8;
   color: #111;
-  text-align: center;
+  text-align: left;
+  padding-left: 8px;
   font-size: 11px;
   font-weight: 700;
-  min-height: 18px;
-  line-height: 18px;
+  min-height: 20px;
+  line-height: 20px;
   margin-right: 4px;
+  border: 1px solid #d6859b;
 }
 .mill-rec-sheet .mill-receive-grid th {
   white-space: nowrap !important;
   word-break: normal !important;
   font-size: 10px !important;
   background: #e8e8e8;
+  color: #000;
+  font-weight: 700;
 }
 
 /* Job Receipt — tight classic sheet, no empty stretch */

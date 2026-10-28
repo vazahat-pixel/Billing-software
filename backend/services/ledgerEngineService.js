@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 const AccountingEntry = require('../models/AccountingEntry');
 const LedgerMaster = require('../models/LedgerMaster');
 
@@ -31,6 +31,14 @@ const LIVE_ENTRY_FILTER = {
   status: { $ne: 'Draft' },
 };
 
+function parseEndOfDay(dateVal) {
+  if (!dateVal) return null;
+  if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
+    return new Date(dateVal + 'T23:59:59.999Z');
+  }
+  return new Date(dateVal);
+}
+
 /**
  * Ledger Engine — Sprint 3.3
  * All balances derived from journals + master OB (when no Opening journal).
@@ -53,7 +61,7 @@ class LedgerEngineService {
     if (from || to) {
       match.entryDate = {};
       if (from) match.entryDate.$gte = new Date(from);
-      if (to) match.entryDate.$lte = new Date(to);
+      if (to) match.entryDate.$lte = parseEndOfDay(to);
     }
 
     const pipeline = [
@@ -296,7 +304,7 @@ class LedgerEngineService {
     if (from || to) {
       entryFilter.entryDate = {};
       if (from) entryFilter.entryDate.$gte = new Date(from);
-      if (to) entryFilter.entryDate.$lte = new Date(to);
+      if (to) entryFilter.entryDate.$lte = parseEndOfDay(to);
     }
 
     const entries = await AccountingEntry.find(entryFilter).sort({ entryDate: 1, createdAt: 1 });

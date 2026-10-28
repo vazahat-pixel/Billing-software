@@ -1,4 +1,4 @@
-const LedgerMaster = require('../models/LedgerMaster');
+﻿const LedgerMaster = require('../models/LedgerMaster');
 const AccountingEntry = require('../models/AccountingEntry');
 const Party = require('../models/Party');
 const Counter = require('../models/Counter');
@@ -373,8 +373,9 @@ class AccountingService {
       const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c', session);
 
       const narr = `Mill Issue ${job.jobCardNo || ''} → ${millLedger.name} | ${job.processType || 'Process'} | ${qty} mts @ ₹${rate}/mtr`;
+      // Dr Mill Party (goods with mill — shows as DEBIT on party ledger) / Cr Stock A/c
       const lines = [
-        { ledgerId: jwipLedger._id, ledgerName: jwipLedger.name, type: 'Dr', amount, narration: narr },
+        { ledgerId: millLedger._id, ledgerName: millLedger.name, type: 'Dr', amount, narration: narr },
         { ledgerId: stockLedger._id, ledgerName: stockLedger.name, type: 'Cr', amount, narration: narr },
       ];
 
@@ -421,9 +422,10 @@ class AccountingService {
 
       const recvQty = parseFloat(receivedQty || job.receivedQty || 0);
       const narr = `Mill Receive ${job.jobCardNo || ''} from ${millLedger.name} | finished ${recvQty} mts | material back ${issueQty} mts`;
+      // Dr Stock A/c (material back in stock) / Cr Mill Party (goods returned from mill — shows as CREDIT on party ledger)
       const lines = [
         { ledgerId: stockLedger._id, ledgerName: stockLedger.name, type: 'Dr', amount, narration: narr },
-        { ledgerId: jwipLedger._id, ledgerName: jwipLedger.name, type: 'Cr', amount, narration: narr },
+        { ledgerId: millLedger._id, ledgerName: millLedger.name, type: 'Cr', amount, narration: narr },
       ];
 
       const data = {

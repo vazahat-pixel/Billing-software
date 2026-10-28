@@ -119,6 +119,15 @@ const BookSchema = new mongoose.Schema({
   roundOff: { type: String, trim: true, default: '' },
   vatCalculation: { type: String, trim: true, default: '' },
   getDataFromChallan: { type: String, trim: true, default: '' },
+  factoryAddress1: { type: String, trim: true, default: '' },
+  factoryAddress2: { type: String, trim: true, default: '' },
+  factoryCity: { type: String, trim: true, default: '' },
+  bank1Name: { type: String, trim: true, default: '' },
+  bank1AccountNo: { type: String, trim: true, default: '' },
+  bank2Name: { type: String, trim: true, default: '' },
+  bank2AccountNo: { type: String, trim: true, default: '' },
+  indexCd: { type: String, trim: true, default: '' },
+  dhara: { type: String, trim: true, default: '' },
   tdsCode: {
     type: Number,
     default: 0
