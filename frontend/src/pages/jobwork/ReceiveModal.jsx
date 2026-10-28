@@ -11,6 +11,7 @@ import { erpConfirmDeleteLine } from '../../utils/confirm';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import JobWorkPrint from '../../components/print/JobWorkPrint';
 import { Plus, Trash2 } from 'lucide-react';
+import { lineShortagePct, lineShtgKgs, lineJobAmt, UNIT_PQ } from './millReceiveCalc';
 
 const today = () => new Date().toISOString().substring(0, 10);
 
@@ -22,11 +23,18 @@ const blankLine = () => ({
    lotNo: '',
    chlnNo: '',
    itemName: '',
+   perKgs: '0.00',
    gPcs: '0',
    greyMts: '0.00',
+   greyKgs: '0.000',
+   recKgs: '0.000',
+   f1Pcs: '0',
    finishMts: '0.00',
    finalMts: '0.00',
    jobRate: '0.00',
+   unitPQ: 'Q',
+   desc1: '',
+   desc2: '',
    cp: '',
    tp: '',
    finishItem: '',
@@ -41,32 +49,13 @@ const blankLine = () => ({
    pendingPcs: 0,
 });
 
+/** Challan balance in grey returned (JSM); receipts saved before grey was recorded use finish. */
 const jobPending = (job) => ({
-   qty: job.pendingQty ?? Math.max(0, Number(job.issueQty || 0) - Number(job.receivedQty || 0)),
-   pcs: job.pendingPcs ?? Math.max(0, Number(job.issuePcs || 0) - Number(job.receivedPcs || 0)),
+   qty: job.pendingQty ?? Math.max(0, Number(job.issueQty || 0) - Number(job.receivedGreyQty ?? job.receivedQty ?? 0)),
+   pcs: job.pendingPcs ?? Math.max(0, Number(job.issuePcs || 0) - Number(job.receivedGreyPcs ?? job.receivedPcs ?? 0)),
 });
 
-const lineShortagePct = (line) => {
-   const grey = Number(line.greyMts) || 0;
-   const finish = Number(line.finishMts) || 0;
-   if (grey <= 0 || finish <= 0) return '0.0';
-   const pct = ((grey - finish) / grey) * 100;
-   return isNaN(pct) ? '0.0' : pct.toFixed(1);
-};
 
-const lineChadtiMts = (line) => {
-   const grey = Number(line.greyMts) || 0;
-   const finish = Number(line.finishMts) || 0;
-   return finish > grey && grey > 0 ? (finish - grey).toFixed(2) : '0.00';
-};
-
-const lineJobAmt = (line) => {
-   const finalVal = Number(line.finalMts) || 0;
-   const finish = Number(line.finishMts) || 0;
-   const rateVal = Number(line.jobRate) || 0;
-   const qty = finalVal > 0 ? finalVal : finish;
-   return Number((qty * rateVal).toFixed(2));
-};
 
 const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = null }) => {
    const {
@@ -228,11 +217,20 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             cut: '0',
             procType: j.processType || 'Finish',
             cuttingPending: 'P',
-            gPcs: String(j.issuePcs || '0'),
-            greyMts: Number(j.issueQty || 0).toFixed(2),
+            // Receipts saved with grey keep their own figures; older ones load exactly as before
+            // (grey = issued, final = finish) with basis F so their job amount is unchanged.
+            gPcs: String(j.receivedGreyPcs ?? j.issuePcs ?? '0'),
+            greyMts: Number(j.receivedGreyQty ?? j.issueQty ?? 0).toFixed(2),
+            greyKgs: Number(j.receivedGreyKgs || 0).toFixed(3),
+            recKgs: Number(j.receivedKgs || 0).toFixed(3),
+            perKgs: Number(j.perKgs || 0).toFixed(2),
+            f1Pcs: String(j.receivedPcs || j.fPcs || j.issuePcs || '0'),
             finishMts: Number(j.receivedQty || 0).toFixed(2),
-            finalMts: Number(j.receivedQty || 0).toFixed(2),
+            finalMts: Number(j.receivedGreyQty != null ? (j.receivedFinalQty || 0) : (j.receivedQty || 0)).toFixed(2),
             fPcs: String(j.receivedPcs || j.fPcs || j.issuePcs || '0'),
+            unitPQ: j.jobUnit || (j.receivedGreyQty == null && Number(j.receivedQty) > 0 ? 'F' : 'Q'),
+            desc1: j.receiveDesc1 || '',
+            desc2: j.receiveDesc2 || '',
             jobRate: rate.toFixed(2),
             isFinal: j.status === 'Received',
             pendingQty: pending.qty,
@@ -628,6 +626,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             const finish = Number(value) || 0;
             if (cutVal > 0 && finish > 0) line.fPcs = String(Math.round(finish / cutVal));
          }
+         if (key === 'f1Pcs' && !(Number(line.cut) > 0)) line.fPcs = value;
          next[idx] = line;
          return next;
       });
@@ -715,9 +714,16 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             procType: 'Finish',
             gPcs: String(pending.pcs),
             greyMts: pending.qty.toFixed(2),
+            greyKgs: '0.000',
+            recKgs: '0.000',
+            perKgs: '0.00',
+            f1Pcs: String(pending.pcs),
             finishMts: '0.00',
             finalMts: '0.00',
             fPcs: String(pending.pcs),
+            unitPQ: ['Q', 'P', 'K', 'G', 'F'].includes(job.jobUnit) ? job.jobUnit : 'Q',
+            desc1: '',
+            desc2: '',
             jobRate: Number(job.jobRate || 0).toFixed(2),
             isFinal: true,
             pendingQty: pending.qty,
@@ -893,8 +899,10 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                fPcs: acc.fPcs + (Number(l.fPcs) || 0),
                greyMts: acc.greyMts + (Number(l.greyMts) || 0),
                finishMts: acc.finishMts + (Number(l.finishMts) || 0),
+               greyKgs: acc.greyKgs + (Number(l.greyKgs) || 0),
+               recKgs: acc.recKgs + (Number(l.recKgs) || 0),
             }),
-            { fPcs: 0, greyMts: 0, finishMts: 0 }
+            { fPcs: 0, greyMts: 0, finishMts: 0, greyKgs: 0, recKgs: 0 }
          ),
       [lines]
    );
@@ -1155,6 +1163,16 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                jobId: line.jobId,
                receivedQty: Number(line.finishMts) || 0,
                receivedPcs: Number(line.fPcs) || 0,
+               // Challan balance is counted in grey returned (JSM); finish goes to stock.
+               receivedGreyQty: Number(line.greyMts) || 0,
+               receivedGreyPcs: Number(line.gPcs) || 0,
+               receivedFinalQty: Number(line.finalMts) || 0,
+               receivedGreyKgs: Number(line.greyKgs) || 0,
+               receivedKgs: Number(line.recKgs) || 0,
+               jobUnit: line.unitPQ || 'Q',
+               perKgs: Number(line.perKgs) || 0,
+               receiveDesc1: line.desc1 || '',
+               receiveDesc2: line.desc2 || '',
                charges: Number(line.jobAmt) || 0,
                gstAmount: Number(gstShare.toFixed(2)) || 0,
                billGpNo: billGpNo.trim(),
@@ -1450,27 +1468,34 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                            <table className="mill-receive-grid w-full text-[10px] font-mono border-collapse" data-line-grid>
                               <thead>
                                  <tr className="bg-[#e2e8f0] text-slate-800 border-b border-[#808080] text-[10px]">
-                                    <th className="border-r border-[#808080] p-1 w-10 text-center">SrNo</th>
-                                    <th className="border-r border-[#808080] p-1 w-32 text-left">LotNo</th>
-                                    <th className="border-r border-[#808080] p-1 w-28 text-left">Chln No</th>
-                                    <th className="border-r border-[#808080] p-1 w-48 text-left">ItemName</th>
-                                    <th className="border-r border-[#808080] p-1 w-20 text-right">G.Pcs</th>
-                                    <th className="border-r border-[#808080] p-1 w-24 text-right">Grey.Mts</th>
-                                    <th className="border-r border-[#808080] p-1 w-24 text-right">Finish.Mts</th>
-                                    <th className="border-r border-[#808080] p-1 w-24 text-right">Final.Mts</th>
-                                    <th className="border-r border-[#808080] p-1 w-20 text-right">Shtg%</th>
-                                    <th className="border-r border-[#808080] p-1 w-20 text-right" title="Process Gain / Chadti Mts (_col_s_chadti)">Chadti</th>
-                                    <th className="border-r border-[#808080] p-1 w-24 text-right">Job.Rate</th>
-                                    <th className="border-r border-[#808080] p-1 w-28 text-right">Job Amount</th>
-                                    <th className="border-r border-[#808080] p-1 w-16 text-center">CP</th>
-                                    <th className="border-r border-[#808080] p-1 w-16 text-center">Tp</th>
-                                    <th className="border-r border-[#808080] p-1 w-40 text-left">Finish Item</th>
-                                    <th className="border-r border-[#808080] p-1 w-16 text-center">Cut</th>
-                                    <th className="border-r border-[#808080] p-1 w-20 text-right">F.Pcs</th>
-                                    <th className="border-r border-[#808080] p-1 w-28 text-left">Proc Type</th>
-                                    <th className="border-r border-[#808080] p-1 w-28 text-left">Cutting Pending</th>
-                                    <th className="border-r border-[#808080] p-1 w-20 text-right">Pending</th>
-                                    <th className="border-r border-[#808080] p-1 w-14 text-center">Final?</th>
+                                    <th className="border-r border-[#808080] p-1 text-center">SrNo</th>
+                                    <th className="border-r border-[#808080] p-1 text-left">LotNo</th>
+                                    <th className="border-r border-[#808080] p-1 text-left">Chln No</th>
+                                    <th className="border-r border-[#808080] p-1 text-left">ItemName</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">PerKgs</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">G.Pcs</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">Grey.Mts</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">Gry.Kgs</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">Rec.Kgs</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">Shtg.Kgs.</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">F.Pcs</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">Finish.Mts</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">Final.Mts</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">Shtg%</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">Job.Rate</th>
+                                    <th className="border-r border-[#808080] p-1 text-center" title="Job amount on: Q Finish Mts, P Pcs, K Rec Kgs, G Grey Kgs, F Final Mts">P/Q/K</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">Job Amount</th>
+                                    <th className="border-r border-[#808080] p-1 text-center">CP</th>
+                                    <th className="border-r border-[#808080] p-1 text-center">Tp</th>
+                                    <th className="border-r border-[#808080] p-1 text-left">Finish Item</th>
+                                    <th className="border-r border-[#808080] p-1 text-center">Cut</th>
+                                    <th className="border-r border-[#808080] p-1 text-right">F.Pcs</th>
+                                    <th className="border-r border-[#808080] p-1 text-left">ProcType</th>
+                                    <th className="border-r border-[#808080] p-1 text-left">Cutting Pending</th>
+                                    <th className="border-r border-[#808080] p-1 text-left">Description1</th>
+                                    <th className="border-r border-[#808080] p-1 text-left">Description2</th>
+                                    <th className="border-r border-[#808080] p-1 text-right" title="Grey still pending on this challan before this line">Pending</th>
+                                    <th className="border-r border-[#808080] p-1 text-center">Final?</th>
                                     <th className="p-1 w-8" />
                                  </tr>
                               </thead>
@@ -1578,6 +1603,15 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
+                                             type="number"
+                                             step="0.01"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                             value={line.perKgs}
+                                             onChange={(e) => setLineField(idx, 'perKgs', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
                                              id={`grid-gpcs-${idx}`}
                                              type="number"
                                              className="w-full h-6 px-1 border-none text-right bg-transparent"
@@ -1591,6 +1625,41 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                              className="w-full h-6 px-1 border-none text-right bg-transparent"
                                              value={line.greyMts}
                                              onChange={(e) => setLineField(idx, 'greyMts', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="number"
+                                             step="0.001"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                             value={line.greyKgs}
+                                             onChange={(e) => setLineField(idx, 'greyKgs', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="number"
+                                             step="0.001"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                             value={line.recKgs}
+                                             onChange={(e) => setLineField(idx, 'recKgs', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="text"
+                                             data-enter-include=""
+                                             className="w-full h-6 px-1 border-none text-right bg-slate-100"
+                                             value={lineShtgKgs(line)}
+                                             readOnly
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="number"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                             value={line.f1Pcs}
+                                             onChange={(e) => setLineField(idx, 'f1Pcs', e.target.value)}
                                           />
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
@@ -1621,21 +1690,21 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
-                                             type="text"
-                                             data-enter-include=""
-                                             className="w-full h-6 px-1 border-none text-right bg-slate-100 font-mono text-emerald-800 font-bold"
-                                             value={lineChadtiMts(line)}
-                                             readOnly
-                                             title="Process Gain / Chadti Mts (_col_s_chadti)"
-                                          />
-                                       </td>
-                                       <td className="border-r border-slate-300 p-0.5">
-                                          <input
                                              type="number"
                                              className="w-full h-6 px-1 border-none text-right bg-transparent font-bold"
                                              value={line.jobRate}
                                              onChange={(e) => setLineField(idx, 'jobRate', e.target.value)}
                                           />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <select
+                                             className="w-full h-6 px-0.5 border-none bg-transparent text-[10px] font-bold text-center"
+                                             value={line.unitPQ || 'Q'}
+                                             onChange={(e) => setLineField(idx, 'unitPQ', e.target.value)}
+                                             title="Job amount on: Q Finish Mts, P Pcs, K Rec Kgs, G Grey Kgs, F Final Mts"
+                                          >
+                                             {UNIT_PQ.map(([v, label]) => <option key={v} value={v} title={label}>{v}</option>)}
+                                          </select>
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
@@ -1711,6 +1780,22 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                              onChange={(e) => setLineField(idx, 'cuttingPending', e.target.value)}
                                           />
                                        </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="text"
+                                             className="w-full h-6 px-1 border-none bg-transparent"
+                                             value={line.desc1}
+                                             onChange={(e) => setLineField(idx, 'desc1', e.target.value)}
+                                          />
+                                       </td>
+                                       <td className="border-r border-slate-300 p-0.5">
+                                          <input
+                                             type="text"
+                                             className="w-full h-6 px-1 border-none bg-transparent"
+                                             value={line.desc2}
+                                             onChange={(e) => setLineField(idx, 'desc2', e.target.value)}
+                                          />
+                                       </td>
                                        <td className="border-r border-slate-300 p-0.5 text-right bg-slate-100 text-slate-600" title="Still pending on this challan before this line">
                                           {line.jobId ? Number(line.pendingQty || 0).toFixed(2) : ''}
                                        </td>
@@ -1756,7 +1841,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                            <div>Send.Mts : {gridTotals.greyMts.toFixed(2)}</div>
                            <div>Rec.Mts : {gridTotals.finishMts.toFixed(2)}</div>
                            <div>FnsPcs : {gridTotals.fPcs}</div>
-                           <div>(Snd.Kgs : 0 &middot; Rec.Kgs : 0)</div>
+                           <div>(Snd.Kgs : {gridTotals.greyKgs.toFixed(3)} &middot; Rec.Kgs : {gridTotals.recKgs.toFixed(3)})</div>
                         </div>
 
                         {/* 4. FOOTER MULTI-COLUMN ADJUSTMENTS */}

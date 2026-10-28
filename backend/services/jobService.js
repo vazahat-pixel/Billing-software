@@ -30,6 +30,25 @@ async function resolveOutputItemId(companyId, inputItemId, processName, explicit
   return mapping?.outputItemId || null;
 }
 
+/**
+ * JSM Mill Receipt line details kept on the job: Final.Mts, Gry.Kgs, Rec.Kgs (added up across
+ * partial receipts), job amount basis (P/Q/K), PerKgs and Description 1/2 (latest receipt).
+ */
+function applyReceiptDetail(job, data, { cumulative }) {
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  const add = (field, v) => {
+    if (v == null || v === '') return;
+    job[field] = Number(((cumulative ? num(job[field]) : 0) + num(v)).toFixed(4));
+  };
+  add('receivedFinalQty', data.receivedFinalQty);
+  add('receivedGreyKgs', data.receivedGreyKgs);
+  add('receivedKgs', data.receivedKgs);
+  if (['Q', 'P', 'K', 'G', 'F'].includes(data.jobUnit)) job.jobUnit = data.jobUnit;
+  if (data.perKgs != null && data.perKgs !== '') job.perKgs = num(data.perKgs);
+  if (data.receiveDesc1 != null) job.receiveDesc1 = String(data.receiveDesc1).trim();
+  if (data.receiveDesc2 != null) job.receiveDesc2 = String(data.receiveDesc2).trim();
+}
+
 function computeWastageSplit(issueQty, receivedQty, tolerancePct) {
   const wastage = Math.max(0, Number((issueQty - receivedQty).toFixed(4)));
   const toleranceQty = Number(((issueQty * (tolerancePct || 0)) / 100).toFixed(4));
@@ -251,13 +270,22 @@ class JobService {
       const isChainJob = Array.isArray(job.steps) && job.steps.length > 0;
       const previouslyReceivedQty = isChainJob ? 0 : Number(job.receivedQty || 0);
       const previouslyReceivedPcs = isChainJob ? 0 : Number(job.receivedPcs || 0);
-      const pendingQty = Number((Number(job.issueQty || 0) - previouslyReceivedQty).toFixed(4));
 
-      if (!isChainJob && trancheQty > pendingQty + 0.0001) {
+      // JSM Mill Receipt: the challan balance is counted in GREY returned (Grey.Mts / G.Pcs);
+      // finish (receivedQty) is the output that goes to stock. A caller that sends no grey keeps
+      // the old behaviour exactly (grey = finish).
+      const has = (v) => v != null && v !== '' && Number.isFinite(Number(v));
+      const trancheGrey = has(receiveData.receivedGreyQty) ? Math.max(0, Number(receiveData.receivedGreyQty)) : trancheQty;
+      const trancheGreyPcs = has(receiveData.receivedGreyPcs) ? Math.max(0, Number(receiveData.receivedGreyPcs)) : tranchePcs;
+      const previouslyReceivedGrey = isChainJob ? 0 : Number(job.receivedGreyQty ?? job.receivedQty ?? 0);
+      const previouslyReceivedGreyPcs = isChainJob ? 0 : Number(job.receivedGreyPcs ?? job.receivedPcs ?? 0);
+      const pendingQty = Number((Number(job.issueQty || 0) - previouslyReceivedGrey).toFixed(4));
+
+      if (!isChainJob && trancheGrey > pendingQty + 0.0001) {
         throw AppError.badRequest(
-          `Received quantity (${trancheQty}) cannot exceed the pending balance (${pendingQty})` +
-          (previouslyReceivedQty > 0
-            ? ` — ${previouslyReceivedQty} of ${job.issueQty} already received against this job`
+          `Received grey quantity (${trancheGrey}) cannot exceed the pending balance (${pendingQty})` +
+          (previouslyReceivedGrey > 0
+            ? ` — ${previouslyReceivedGrey} of ${job.issueQty} already received against this job`
             : ` (issued quantity ${job.issueQty})`)
         );
       }
@@ -266,6 +294,8 @@ class JobService {
         ? trancheQty
         : Number((previouslyReceivedQty + trancheQty).toFixed(4));
       const cumulativeReceivedPcs = isChainJob ? tranchePcs : previouslyReceivedPcs + tranchePcs;
+      const cumulativeGrey = isChainJob ? trancheGrey : Number((previouslyReceivedGrey + trancheGrey).toFixed(4));
+      const cumulativeGreyPcs = isChainJob ? trancheGreyPcs : previouslyReceivedGreyPcs + trancheGreyPcs;
 
       // Defaults to final/complete — matches every existing caller's expectation that one
       // receive call closes the job (any shortfall books as wastage). A caller must
@@ -316,7 +346,8 @@ class JobService {
       const gstAmount = gstRate > 0
         ? Number(((charges * gstRate) / 100).toFixed(2))
         : (parseFloat(receiveData.gstAmount) || 0);
-      const greyMaterialCost = greyCostPerMtr * trancheQty;
+      // Material cost is the grey consumed, spread over the finished metres it became.
+      const greyMaterialCost = greyCostPerMtr * trancheGrey;
       const trancheFinishedRate =
         trancheQty > 0
           ? Number(((greyMaterialCost + charges) / trancheQty).toFixed(4))
@@ -328,12 +359,16 @@ class JobService {
       let abnormalWastage = 0;
       if (isFinal) {
         const tolerancePct = job.toleranceWastagePct ?? 3;
-        ({ wastage, abnormalWastage } = computeWastageSplit(job.issueQty, cumulativeReceivedQty, tolerancePct));
+        // Wastage = grey not returned. Process shrinkage (grey -> finish) is not a loss (JSM Shtg%).
+        ({ wastage, abnormalWastage } = computeWastageSplit(job.issueQty, cumulativeGrey, tolerancePct));
       }
 
       job.receivedQty = cumulativeReceivedQty;
       job.receivedPcs = cumulativeReceivedPcs;
+      job.receivedGreyQty = cumulativeGrey;
+      job.receivedGreyPcs = cumulativeGreyPcs;
       job.wastage = wastage;
+      applyReceiptDetail(job, receiveData, { cumulative: !isChainJob && previouslyReceivedQty > 0 });
       // issueToJob seeds job.processCharges with the raw per-unit jobRate as a
       // placeholder (not a total) when no explicit processCharges is given at issue time
       // — safe to overwrite under the old flat-assignment design, but this is now a
@@ -529,7 +564,7 @@ class JobService {
         abnormalWastage,
         finishedRate: trancheFinishedRate,
         isFinal,
-        pendingQty: isFinal ? 0 : Number((Number(job.issueQty || 0) - cumulativeReceivedQty).toFixed(4)),
+        pendingQty: isFinal ? 0 : Number((Number(job.issueQty || 0) - cumulativeGrey).toFixed(4)),
       };
     });
   }
@@ -695,6 +730,10 @@ class JobService {
       }
 
       const newQty = Number(receivedQty != null ? receivedQty : job.receivedQty);
+      // Grey returned (JSM balance basis); without it, grey = finish as before.
+      const hasGrey = receiveData.receivedGreyQty != null && receiveData.receivedGreyQty !== '' && Number.isFinite(Number(receiveData.receivedGreyQty));
+      const newGrey = hasGrey ? Math.max(0, Number(receiveData.receivedGreyQty)) : newQty;
+      const hasGreyPcs = receiveData.receivedGreyPcs != null && receiveData.receivedGreyPcs !== '' && Number.isFinite(Number(receiveData.receivedGreyPcs));
       const newPcs = Number(receivedPcs != null ? receivedPcs : (job.receivedPcs || 0));
       const newCharges = charges != null ? Number(charges) : Number(job.processCharges || 0);
       const newGst = gstAmount != null ? Number(gstAmount) : Number(job.processGstAmount || 0);
@@ -764,13 +803,16 @@ class JobService {
       let wastage = 0;
       let abnormalWastage = 0;
       if (finalFlag) {
-        ({ wastage, abnormalWastage } = computeWastageSplit(job.issueQty, newQty, tolerancePct));
+        ({ wastage, abnormalWastage } = computeWastageSplit(job.issueQty, newGrey, tolerancePct));
       }
 
       // Update job record
       job.receivedQty = newQty;
       job.receivedPcs = newPcs;
+      job.receivedGreyQty = newGrey;
+      job.receivedGreyPcs = hasGreyPcs ? Math.max(0, Number(receiveData.receivedGreyPcs)) : newPcs;
       job.wastage = wastage;
+      applyReceiptDetail(job, receiveData, { cumulative: false });
       job.processCharges = newCharges;
       job.processGstAmount = newGst;
       if (billGpNo != null) job.billGpNo = String(billGpNo).trim();
@@ -895,6 +937,12 @@ class JobService {
       job.status = 'Issued';
       job.receivedQty = 0;
       job.receivedPcs = 0;
+      // Grey returned and the JSM receipt details go back to "not received" too.
+      job.receivedGreyQty = null;
+      job.receivedGreyPcs = null;
+      job.receivedFinalQty = 0;
+      job.receivedGreyKgs = 0;
+      job.receivedKgs = 0;
       job.wastage = 0;
       job.processCharges = 0;
       job.processGstAmount = 0;

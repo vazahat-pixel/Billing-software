@@ -119,6 +119,23 @@ const JobSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  /**
+   * Grey returned against this challan (JSM Mill Receipt Grey.Mts / G.Pcs). As in JSM, the
+   * challan balance and wastage are counted in grey; receivedQty / receivedPcs stay the finished
+   * output that goes into stock. null = receipts saved before grey was recorded separately —
+   * then grey is taken as equal to finish, exactly as those receipts were calculated.
+   */
+  receivedGreyQty: { type: Number, default: null },
+  receivedGreyPcs: { type: Number, default: null },
+  receivedFinalQty: { type: Number, default: 0 }, // Final.Mts (after fold)
+  receivedGreyKgs: { type: Number, default: 0 }, // Gry.Kgs
+  receivedKgs: { type: Number, default: 0 }, // Rec.Kgs
+  // Job amount basis (JSM P/Q/K): Q finish mts, P pcs, K rec kgs, G grey kgs, F final mts.
+  // '' on older receipts (screen then reproduces their old amount).
+  jobUnit: { type: String, default: '' },
+  perKgs: { type: Number, default: 0 },
+  receiveDesc1: { type: String, trim: true, default: '' },
+  receiveDesc2: { type: String, trim: true, default: '' },
   status: {
     type: String,
     /**
@@ -175,12 +192,19 @@ const JobSchema = new mongoose.Schema({
 JobSchema.index({ jobCardNo: 1, companyId: 1 }, { unique: true });
 JobSchema.index({ companyId: 1, status: 1, issueDate: -1 });
 
-/** What's left to receive against this job — the Receive screen pre-fills from this. */
+/** Grey returned so far (falls back to finish for receipts saved before grey was recorded). */
+JobSchema.virtual('greyReceivedQty').get(function greyReceivedQty() {
+  return Number(this.receivedGreyQty ?? this.receivedQty ?? 0);
+});
+
+/** What's left to receive against this job, in grey as in JSM — the Receive screen pre-fills from this. */
 JobSchema.virtual('pendingQty').get(function pendingQty() {
-  return Math.max(0, Number((Number(this.issueQty || 0) - Number(this.receivedQty || 0)).toFixed(4)));
+  const back = Number(this.receivedGreyQty ?? this.receivedQty ?? 0);
+  return Math.max(0, Number((Number(this.issueQty || 0) - back).toFixed(4)));
 });
 JobSchema.virtual('pendingPcs').get(function pendingPcs() {
-  return Math.max(0, Number(this.issuePcs || 0) - Number(this.receivedPcs || 0));
+  const back = Number(this.receivedGreyPcs ?? this.receivedPcs ?? 0);
+  return Math.max(0, Number(this.issuePcs || 0) - back);
 });
 
 const { enterpriseIntegrityPlugin } = require('./mixins/enterpriseMetaSchema');

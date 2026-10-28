@@ -372,8 +372,10 @@ class ReportService {
       issueQty: j.issueQty || 0,
       receivedPcs: j.receivedPcs || 0,
       receivedQty: j.receivedQty || 0,
-      pendingPcs: Math.max(0, Number(j.issuePcs || 0) - Number(j.receivedPcs || 0)),
-      pendingQty: round2(Math.max(0, Number(j.issueQty || 0) - Number(j.receivedQty || 0))),
+      // Balance in grey returned (JSM); older receipts without grey use finish as before.
+      pendingPcs: Math.max(0, Number(j.issuePcs || 0) - Number(j.receivedGreyPcs ?? j.receivedPcs ?? 0)),
+      pendingQty: round2(Math.max(0, Number(j.issueQty || 0) - Number(j.receivedGreyQty ?? j.receivedQty ?? 0))),
+      receivedGreyQty: Number(j.receivedGreyQty ?? j.receivedQty ?? 0),
       wastage: j.wastage || 0,
       wastagePct: j.issueQty ? ((j.wastage || 0) / j.issueQty * 100).toFixed(1) : 0,
       challanNo: j.challanNo || '',

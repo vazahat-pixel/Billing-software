@@ -936,7 +936,7 @@ class GstinReportService {
         receivedQty: j.receivedQty || 0,
         receivedPcs: j.receivedPcs || 0,
         wastage: j.wastage || 0,
-        pendingQty: Math.max(0, (j.issueQty || 0) - (j.receivedQty || 0)),
+        pendingQty: Math.max(0, (j.issueQty || 0) - Number(j.receivedGreyQty ?? j.receivedQty ?? 0)),
         status: j.status,
         challanNo: j.challanNo || '',
         // Material movement — ITC-04 tracks goods sent/received, not financial amounts
