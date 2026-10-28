@@ -420,12 +420,20 @@ class AccountingService {
       const jwipLedger = await this.getSystemLedger(companyId, 'Job Work In Progress', session);
       const stockLedger = await this.getSystemLedger(companyId, 'Stock A/c', session);
 
+      // Challans issued before goods-with-mill moved to the party ledger were debited to Job Work In
+      // Progress; close those against the same ledger so neither ledger is left with a one-sided amount.
+      const issueQuery = AccountingEntry.findOne({ companyId, refType: 'JobIssue', refId: job._id }).select('lines').lean();
+      if (session) issueQuery.session(session);
+      const issueEntry = await issueQuery;
+      const issueDebit = issueEntry?.lines?.find((l) => l.type === 'Dr');
+      const closeLedger = issueDebit && String(issueDebit.ledgerId) === String(jwipLedger._id) ? jwipLedger : millLedger;
+
       const recvQty = parseFloat(receivedQty || job.receivedQty || 0);
       const narr = `Mill Receive ${job.jobCardNo || ''} from ${millLedger.name} | finished ${recvQty} mts | material back ${issueQty} mts`;
       // Dr Stock A/c (material back in stock) / Cr Mill Party (goods returned from mill — shows as CREDIT on party ledger)
       const lines = [
         { ledgerId: stockLedger._id, ledgerName: stockLedger.name, type: 'Dr', amount, narration: narr },
-        { ledgerId: millLedger._id, ledgerName: millLedger.name, type: 'Cr', amount, narration: narr },
+        { ledgerId: closeLedger._id, ledgerName: closeLedger.name, type: 'Cr', amount, narration: narr },
       ];
 
       const data = {
