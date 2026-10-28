@@ -5,6 +5,7 @@ import { masterDataApi } from '../../api/masters.api';
 import { downloadMasterTemplate } from '../../utils/excelTemplateGenerator';
 import { toast } from '../../store/useToastStore';
 import useStore from '../../store/useStore';
+import { chunkBillRows, mergeBillPreviews, mergeBillResults } from './billImportChunks';
 import {
   Upload,
   FileSpreadsheet,
@@ -18,6 +19,21 @@ import {
   ChevronRight,
   Info,
 } from 'lucide-react';
+
+function BILL_FIELDS(partyLabel) {
+  return [
+    { key: 'billNo', label: 'Bill No *', required: true },
+    { key: 'date', label: 'Bill Date * (dd/mm/yyyy)', required: true },
+    { key: 'party', label: `${partyLabel} Name *`, required: true },
+    { key: 'item', label: 'Item Name *', required: true },
+    { key: 'pcs', label: 'Pcs' },
+    { key: 'mts', label: 'Mts / Qty' },
+    { key: 'rate', label: 'Rate' },
+    { key: 'amount', label: 'Amount (blank = Mts x Rate)' },
+    { key: 'gstPer', label: 'GST %' },
+    { key: 'hsn', label: 'HSN Code' },
+  ];
+}
 
 const ENTITY_CONFIGS = {
   item: {
@@ -67,7 +83,42 @@ const ENTITY_CONFIGS = {
       { key: 'rate', label: 'Rate' },
     ],
   },
+  salesBill: {
+    label: 'Old Sales Bills',
+    description: 'Past sales invoices, one row per bill line; stock, GST and outstanding are built',
+    bill: true,
+    fields: BILL_FIELDS('Customer'),
+  },
+  purchaseBill: {
+    label: 'Old Purchase Bills',
+    description: 'Past purchase bills, one row per bill line; stock, GST and outstanding are built',
+    bill: true,
+    fields: BILL_FIELDS('Supplier'),
+  },
 };
+
+const isBillEntity = (entity) => !!ENTITY_CONFIGS[entity]?.bill;
+
+// Old bills can be thousands of rows: send them in batches of whole bills (request size / time limits).
+async function previewRows(entity, rows, columnMappings) {
+  if (!isBillEntity(entity)) return masterDataApi.previewImport({ entity, rows, columnMappings });
+  const parts = [];
+  for (const chunk of chunkBillRows(rows, columnMappings)) {
+    parts.push(await masterDataApi.previewImport({ entity, rows: chunk, columnMappings }));
+  }
+  return mergeBillPreviews(parts);
+}
+
+async function executeRows(entity, rows, columnMappings, onProgress) {
+  if (!isBillEntity(entity)) return masterDataApi.executeImport({ entity, rows, columnMappings });
+  const chunks = chunkBillRows(rows, columnMappings);
+  const parts = [];
+  for (let i = 0; i < chunks.length; i += 1) {
+    onProgress?.(i + 1, chunks.length);
+    parts.push(await masterDataApi.executeImport({ entity, rows: chunks[i], columnMappings }));
+  }
+  return mergeBillResults(parts);
+}
 
 export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto' }) {
   const { fetchItems, fetchParties } = useStore();
@@ -85,6 +136,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
   const [previewData, setPreviewData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [progress, setProgress] = useState('');
 
   const currentConfig = ENTITY_CONFIGS[selectedEntity] || ENTITY_CONFIGS.item;
 
@@ -166,11 +218,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
       setColumnMappings(res.mappings || {});
 
       // Automatically generate preview
-      const previewRes = await masterDataApi.previewImport({
-        entity: currentEntity === 'auto' ? detected : currentEntity,
-        rows: jsonData,
-        columnMappings: res.mappings || {},
-      });
+      const previewRes = await previewRows(currentEntity === 'auto' ? detected : currentEntity, jsonData, res.mappings || {});
       setPreviewData(previewRes);
 
       setStep(2);
@@ -198,11 +246,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
         });
         setColumnMappings(res.mappings || {});
 
-        const previewRes = await masterDataApi.previewImport({
-          entity: newEntity,
-          rows: rawRows,
-          columnMappings: res.mappings || {},
-        });
+        const previewRes = await previewRows(newEntity, rawRows, res.mappings || {});
         setPreviewData(previewRes);
       } catch (err) {
         toast.error(err.message || 'Error updating mappings');
@@ -218,11 +262,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
 
     // Refresh live preview
     try {
-      const previewRes = await masterDataApi.previewImport({
-        entity: selectedEntity,
-        rows: rawRows,
-        columnMappings: updated,
-      });
+      const previewRes = await previewRows(selectedEntity, rawRows, updated);
       setPreviewData(previewRes);
     } catch (err) {
       // Ignore preview errors during active editing
@@ -233,16 +273,13 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
   const handleExecuteImport = async () => {
     setIsProcessing(true);
     try {
-      const result = await masterDataApi.executeImport({
-        entity: selectedEntity,
-        rows: rawRows,
-        columnMappings,
-      });
+      const result = await executeRows(selectedEntity, rawRows, columnMappings, (n, total) => setProgress(total > 1 ? `${n}/${total}` : ''));
       setImportResult(result);
       setStep(3);
 
       // Trigger store refreshes
       fetchItems?.();
+      if (currentConfig.bill) useStore.getState().refreshAllData?.().catch(() => {});
       fetchParties?.();
 
       toast.success(
@@ -252,6 +289,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
       toast.error('Import failed: ' + (err.message || err));
     } finally {
       setIsProcessing(false);
+      setProgress('');
     }
   };
 
@@ -431,6 +469,8 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
                   <option value="item">Items Master</option>
                   <option value="party">Parties Master</option>
                   <option value="openingStock">Opening Stock Lots</option>
+                  <option value="salesBill">Old Sales Bills</option>
+                  <option value="purchaseBill">Old Purchase Bills</option>
                 </select>
               </div>
             </div>
@@ -505,8 +545,50 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
               </div>
             </div>
 
+            {currentConfig.bill && previewData && (
+              <div className="flex flex-col gap-2">
+                <div className="text-[11px] text-slate-700 bg-blue-50 border border-blue-200 rounded p-2">
+                  <b>{previewData.bills}</b> bills found in <b>{previewData.totalRows}</b> rows.
+                  {' '}{previewData.alreadyImported > 0 && <><b>{previewData.alreadyImported}</b> already in the software (will be skipped). </>}
+                  {previewData.newParties?.length > 0 && <>New parties to create: <b>{previewData.newParties.length}</b>. </>}
+                  {previewData.newItems?.length > 0 && <>New items to create: <b>{previewData.newItems.length}</b>.</>}
+                </div>
+                {previewData.errors?.length > 0 && (
+                  <div className="border border-rose-200 bg-rose-50 rounded p-2 max-h-24 overflow-y-auto text-[10px] text-rose-700">
+                    {previewData.errors.map((e, idx) => <div key={idx}>Row {e.row}: {e.error}</div>)}
+                  </div>
+                )}
+                {previewData.sampleBills?.length > 0 && (
+                  <div className="border border-slate-200 rounded-lg overflow-x-auto max-h-40 bg-white">
+                    <table className="w-full text-left text-[10px] border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 border-b text-slate-600">
+                          <th className="p-2 font-bold">Bill No</th>
+                          <th className="p-2 font-bold">Date</th>
+                          <th className="p-2 font-bold">Party</th>
+                          <th className="p-2 font-bold text-right">Lines</th>
+                          <th className="p-2 font-bold text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y text-slate-700">
+                        {previewData.sampleBills.map((b, idx) => (
+                          <tr key={idx}>
+                            <td className="p-2 font-mono">{b.billNo}</td>
+                            <td className="p-2">{new Date(b.date).toLocaleDateString('en-GB')}</td>
+                            <td className="p-2 font-semibold text-slate-900">{b.party}</td>
+                            <td className="p-2 text-right">{b.lines}</td>
+                            <td className="p-2 text-right font-bold">{Number(b.amount || 0).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Live Data Preview */}
-            {previewData?.sampleRows?.length > 0 && (
+            {!currentConfig.bill && previewData?.sampleRows?.length > 0 && (
               <div>
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                   Sample Data Preview (First {previewData.sampleRows.length} Rows)
@@ -608,12 +690,12 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
                 {isProcessing ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    Importing Records...
+                    Importing {currentConfig.bill ? 'Bills' : 'Records'}... {progress}
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    Import {previewData?.validRows || 0} Records
+                    Import {previewData?.validRows || 0} {currentConfig.bill ? 'Bills' : 'Records'}
                   </>
                 )}
               </button>
@@ -660,7 +742,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
                 <ul className="text-[10px] text-rose-700 space-y-0.5 list-disc pl-4">
                   {importResult.errors.map((e, idx) => (
                     <li key={idx}>
-                      Row {e.row}: {e.error}
+                      {e.row ? `Row ${e.row}` : `Bill ${e.bill} (${e.party})`}: {e.error}
                     </li>
                   ))}
                 </ul>

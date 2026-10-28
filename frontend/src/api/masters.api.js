@@ -96,7 +96,8 @@ export const masterDataApi = {
   importRows: (body) => unwrap(post('/masters/import', body)),
   suggestMappings: (body) => unwrap(post('/masters/import/suggest-mappings', body)),
   previewImport: (body) => unwrap(post('/masters/import/preview', body)),
-  executeImport: (body) => unwrap(post('/masters/import/execute', body)),
+  // old bills create real invoices one by one: allow a batch up to 3 minutes
+  executeImport: (body) => unwrap(post('/masters/import/execute', body, { timeout: 180000 })),
   exportRows: (entity) => unwrap(get('/masters/export', { entity })),
   listFinancialYears: () => unwrap(get('/masters/financial-years')).then((d) => asArray(d)),
   createFinancialYear: (body) => unwrap(post('/masters/financial-years', body)),

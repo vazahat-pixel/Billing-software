@@ -9,6 +9,7 @@ const partyService = require('./partyService');
 const itemService = require('./itemService');
 const auditService = require('./auditService');
 const AppError = require('../utils/AppError');
+const billImportService = require('./billImportService');
 
 /**
  * Intelligent Synonym Dictionary for Legacy ERP / Excel Column Matching.
@@ -138,6 +139,9 @@ class DataImportService {
    * Analyzes raw table headers and suggests column mappings.
    */
   suggestMappings(headers = [], targetEntity = 'auto') {
+    if (billImportService.BILL_ENTITIES.includes(targetEntity)) {
+      return { detectedEntity: targetEntity, mappings: billImportService.suggestBillMappings(headers) };
+    }
     const entity = targetEntity === 'auto' ? detectEntityFromHeaders(headers) : targetEntity;
     const mappings = {};
     const usedFields = new Set();
@@ -315,6 +319,9 @@ class DataImportService {
     if (!Array.isArray(rows) || rows.length === 0) {
       throw AppError.badRequest('Rows array is required');
     }
+    if (billImportService.BILL_ENTITIES.includes(entity)) {
+      return billImportService.preview({ companyId, entity, rows, columnMappings });
+    }
 
     const sampleLimit = Math.min(rows.length, 10);
     const sampleRows = [];
@@ -382,6 +389,16 @@ class DataImportService {
   async execute({ companyId, entity, rows = [], columnMappings = {}, options = {}, userId }) {
     if (!Array.isArray(rows) || rows.length === 0) {
       throw AppError.badRequest('Rows array is required');
+    }
+
+    if (billImportService.BILL_ENTITIES.includes(entity)) {
+      const billResult = await billImportService.execute({ companyId, entity, rows, columnMappings, options, userId });
+      await auditService.logSystem({
+        companyId, userId, action: 'DATA_IMPORT', module: entity, before: null,
+        after: { created: billResult.created, skipped: billResult.skipped, failed: billResult.failed },
+        reason: `Old data import: ${entity}`,
+      });
+      return billResult;
     }
 
     const result = {
