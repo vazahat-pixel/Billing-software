@@ -11,7 +11,11 @@ const TABS = [
   { key: 'newYear', label: 'New A/c Year (Manual)' },
   { key: 'mismatch', label: 'MisMatch Data Scanner' },
   { key: 'series', label: 'Missing Series' },
+  { key: 'duplicates', label: 'Duplicate Entries' },
 ];
+
+const fmtDay = (d) => (d ? new Date(d).toLocaleDateString('en-GB') : '');
+const fmtTime = (d) => (d ? new Date(d).toLocaleString('en-GB') : '');
 
 /**
  * System Utilities — Year Closing/Reopening, New Financial Year, MisMatch Scanner, Missing Series.
@@ -22,8 +26,9 @@ const TABS = [
 const SystemUtilitiesModal = ({ isOpen, onClose }) => {
   const {
     fetchFinancialYears, createFinancialYear, validateYearClose,
-    closeFinancialYear, reopenFinancialYear, fetchMismatchScan, fetchMissingSeries,
+    closeFinancialYear, reopenFinancialYear, fetchMismatchScan, fetchMissingSeries, fetchDuplicateEntries,
   } = useStore();
+  const [dups, setDups] = useState(null);
 
   const [tab, setTab] = useState('yearClose');
   const [loading, setLoading] = useState(false);
@@ -134,6 +139,15 @@ const SystemUtilitiesModal = ({ isOpen, onClose }) => {
     setLoading(true);
     try {
       setSeries(await fetchMissingSeries());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runDuplicateScan = async () => {
+    setLoading(true);
+    try {
+      setDups(await fetchDuplicateEntries());
     } finally {
       setLoading(false);
     }
@@ -272,6 +286,56 @@ const SystemUtilitiesModal = ({ isOpen, onClose }) => {
                     )}
                   </>
                 )}
+              </div>
+            )}
+
+            {tab === 'duplicates' && (
+              <div className="classic-erp-frame flex flex-col gap-2 text-[11px]">
+                <p className="text-slate-600">
+                  Lists entries that look saved twice: same party, same day and same amount (Mill Issue: same lot and quantity).
+                  Nothing is deleted here. Check each group and delete the extra entry from its own screen.
+                </p>
+                <button type="button" className="classic-erp-btn btn-blue w-fit" onClick={runDuplicateScan} disabled={loading}>Scan for Duplicates</button>
+                {dups && (dups.totalGroups === 0 ? (
+                  <div className="text-green-700 font-bold">✓ No duplicate entries found</div>
+                ) : (
+                  <>
+                    <div className="font-bold">
+                      {dups.totalGroups} group(s) found
+                      {dups.likelyDoubleSaves > 0 && <span className="text-red-700"> — {dups.likelyDoubleSaves} saved within a few minutes of each other (most likely one entry saved twice)</span>}
+                    </div>
+                    <div className="overflow-auto max-h-96 border border-slate-300">
+                      <table className="w-full text-[10px] border-collapse">
+                        <thead className="bg-slate-100 sticky top-0">
+                          <tr>
+                            <th className="p-1 text-left">Type</th>
+                            <th className="p-1 text-left">Date</th>
+                            <th className="p-1 text-left">Party</th>
+                            <th className="p-1 text-right">Amount / Qty</th>
+                            <th className="p-1 text-left">Entries (No — saved at)</th>
+                            <th className="p-1 text-left">Why</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dups.groups.map((g, i) => (
+                            <tr key={i} className={`border-t ${g.likelyDoubleSave ? 'bg-red-50' : ''}`}>
+                              <td className="p-1 font-bold">{g.kind}</td>
+                              <td className="p-1">{g.day ? g.day.split('-').reverse().join('/') : fmtDay(g.entries[0]?.date)}</td>
+                              <td className="p-1">{g.party}</td>
+                              <td className="p-1 text-right">{g.amount != null ? Number(g.amount).toFixed(2) : g.qty}</td>
+                              <td className="p-1">
+                                {g.entries.map((e) => (
+                                  <div key={String(e.id)}>{e.no || e.supplierBillNo || '-'}{e.challanNo ? ` (Chl ${e.challanNo})` : ''} — {fmtTime(e.createdAt)}</div>
+                                ))}
+                              </td>
+                              <td className="p-1">{g.reason}{g.likelyDoubleSave ? ' · saved twice?' : ''}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ))}
               </div>
             )}
           </div>

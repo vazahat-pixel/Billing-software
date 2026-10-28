@@ -2267,6 +2267,15 @@ const useStore = create((set, get) => ({
     }
   },
 
+  fetchDuplicateEntries: async () => {
+    try {
+      return await utilityApi.duplicateEntries();
+    } catch (err) {
+      console.error('Duplicate entry scan failed:', err);
+      return null;
+    }
+  },
+
   fetchMismatchScan: async () => {
     try {
       return await stage4Api.fullReconcile();
