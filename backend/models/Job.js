@@ -98,6 +98,15 @@ const JobSchema = new mongoose.Schema({
   gstPer: { type: Number, default: 0, min: 0 },
   gstType: { type: String, default: 'CGST+SGST' },
   remark: { type: String, default: '' },
+  // Mill Issue header fields as in JSM I_Tran_Inv_Proc_Issue (the screen already sent transport /
+  // lrNo / markaNo / hsnCode, but without schema fields they were dropped on save).
+  broker: { type: String, trim: true, default: '' },
+  issueKgs: { type: Number, default: 0, min: 0 },
+  masterName: { type: String, trim: true, default: '' },
+  transport: { type: String, trim: true, default: '' },
+  lrNo: { type: String, trim: true, default: '' },
+  markaNo: { type: String, trim: true, default: '' },
+  hsnCode: { type: String, trim: true, default: '' },
   receivedPcs: {
     type: Number,
     default: 0

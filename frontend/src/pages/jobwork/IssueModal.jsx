@@ -63,6 +63,9 @@ const emptyForm = (book) => ({
   lrNo: '',
   markaNo: '',
   hsnCd: '',
+  broker: '',
+  issKgs: '',
+  masterName: '',
   procType: 'Process Charge',
   finish: '',
   book: book || 'PROCESS ISSUE BOOK',
@@ -124,6 +127,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   const puBillNoRef = useRef(null);
   const issPcsRef = useRef(null);
   const issQtyRef = useRef(null);
+  const issKgsRef = useRef(null);
   const puRateRef = useRef(null);
   const jobRateRef = useRef(null);
 
@@ -259,6 +263,15 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     const rate = Number(form.puRate) || 0;
     return Number((qty * rate).toFixed(2));
   }, [form.issQty, form.puRate]);
+
+  // Broker (JSM Mill Issue txt_Bname): broker accounts from the party master.
+  const brokerOptions = useMemo(
+    () => (parties || [])
+      .filter((p) => p.type === 'Broker' || String(p.group || '').toUpperCase().includes('BROKER'))
+      .map((p) => ({ value: p.name, label: p.name }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    [parties]
+  );
 
   const weaverOptions = useMemo(() => {
     const weaverNames = new Set();
@@ -748,6 +761,9 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       transport: job.transport || '',
       lrNo: job.lrNo || '',
       markaNo: job.markaNo || '',
+      broker: job.broker || '',
+      issKgs: job.issueKgs ? String(job.issueKgs) : '',
+      masterName: job.masterName || '',
       hsnCd: job.hsnCode || job.hsnCd || '',
       procType: job.processType || 'Process Charge',
       finish: job.finish || '',
@@ -923,6 +939,9 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         lrNo: form.lrNo || undefined,
         markaNo: form.markaNo || undefined,
         hsnCode: form.hsnCd || undefined,
+        broker: form.broker || '',
+        issueKgs: Number(form.issKgs) || 0,
+        masterName: form.masterName || '',
         remark,
         remarks: remark,
       });
@@ -1281,6 +1300,21 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                     </div>
                   </div>
 
+                  <div className="classic-erp-field classic-erp-field--lg">
+                    <span className="classic-erp-label">Broker</span>
+                    <div className="classic-erp-control">
+                      <ERPCombobox
+                        value={form.broker}
+                        onChange={(val) => setField('broker', val || '')}
+                        disabled={locked}
+                        options={brokerOptions}
+                        placeholder="Search Broker…"
+                        recentKey="mill-issue-broker"
+                        allowClear
+                      />
+                    </div>
+                  </div>
+
                   <div className="erp-job-issue-metrics">
                     {/* Column 1: Iss Pcs & Iss Qty */}
                     <div className="flex flex-col gap-1">
@@ -1315,9 +1349,28 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                            onKeyDown={(e) => {
                              if (e.key === 'Enter' && !locked) {
                                e.preventDefault(); e.stopPropagation();
-                               focusPuRate();
+                               issKgsRef.current?.focus();
+                               try { issKgsRef.current?.select(); } catch { /* number input */ }
                              }
                            }}
+                        />
+                      </div>
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label">Iss Kgs</span>
+                        <input
+                          ref={issKgsRef}
+                          type="number"
+                          step="0.001"
+                          className="classic-erp-input text-right"
+                          value={form.issKgs}
+                          onChange={(e) => setField('issKgs', e.target.value)}
+                          disabled={locked}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !locked) {
+                              e.preventDefault(); e.stopPropagation();
+                              focusPuRate();
+                            }
+                          }}
                         />
                       </div>
                     </div>
@@ -1453,6 +1506,19 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                         className="classic-erp-input"
                         value={form.remark2}
                         onChange={(e) => setField('remark2', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="classic-erp-field classic-erp-field--lg">
+                    <span className="classic-erp-label">Master</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="text"
+                        className="classic-erp-input uppercase"
+                        value={form.masterName || ''}
+                        onChange={(e) => setField('masterName', e.target.value)}
                         disabled={locked}
                       />
                     </div>
