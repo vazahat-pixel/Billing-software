@@ -314,6 +314,11 @@ const useStore = create((set, get) => ({
       } catch { /* config store optional during early boot */ }
       set({ user: stored, role: platformRole, plan, sessionReady: true });
       if (stored.email) await updateOfflineSession(stored.email, { token, user: stored });
+      // App opened again (e.g. next morning): load everything fresh from the cloud, so entries
+      // made on another PC or in the browser show here, as after a login.
+      queueMicrotask(() => {
+        get().refreshAllData?.().catch(() => get().hydrateFromCache().catch(() => {}));
+      });
     } catch (err) {
       handleNetworkFailure(err);
       if (isNetworkError(err) && hasLocal) {

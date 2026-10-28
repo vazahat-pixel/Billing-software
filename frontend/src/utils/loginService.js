@@ -81,8 +81,10 @@ export const loginWithOfflineSupport = async ({
       e.requires2fa = true;
       throw e;
     }
-    // Only silently fall back to offline if browser suddenly lost connectivity
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    // Fall back to the saved offline login when the server gave no answer at all — browser
+    // offline, or connected but the server unreachable (ISP / server down). A wrong password
+    // or any other server reply still fails normally.
+    if (!err.response || (typeof navigator !== 'undefined' && !navigator.onLine)) {
       try {
         const session = await tryOfflineLogin(emailNorm, password, { adminOnly });
         return { token: session.token, user: assertRole(session.user) };
