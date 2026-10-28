@@ -1,8 +1,8 @@
-version: 1.0.3
+version: 1.0.4
 files:
-  - url: TextileERP-Setup-1.0.3.exe
-    sha512: mpUOcwnMXWS4eeSPRbYxv4zgLqLtp9i1l0GpJ6XP153uS3NYYFBJUVQqsoOrzDPpun5LXGdUKNlUqK74ZHg3fQ==
-    size: 90081911
-path: TextileERP-Setup-1.0.3.exe
-sha512: mpUOcwnMXWS4eeSPRbYxv4zgLqLtp9i1l0GpJ6XP153uS3NYYFBJUVQqsoOrzDPpun5LXGdUKNlUqK74ZHg3fQ==
-releaseDate: '2026-10-27T17:58:35.851Z'
+  - url: TextileERP-Setup-1.0.4.exe
+    sha512: 9pView2AzK49XxS7IpF1ox1ee1JqGrTT0x78pJizKcDGnDn0swqCUYOicLpacDnWszpJuhqjl12Nr+RK5d0AZA==
+    size: 90086525
+path: TextileERP-Setup-1.0.4.exe
+sha512: 9pView2AzK49XxS7IpF1ox1ee1JqGrTT0x78pJizKcDGnDn0swqCUYOicLpacDnWszpJuhqjl12Nr+RK5d0AZA==
+releaseDate: '2026-10-28T05:20:03.955Z'
