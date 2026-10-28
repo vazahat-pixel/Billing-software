@@ -1,0 +1,101 @@
+/* JSM (WinForms) look for screens drawn by JsmFormCanvas — Windows 10 control styles. */
+.jsm-window {
+  position: relative;
+  display: inline-block;
+  background: #fff;
+  border: 1px solid #8a8a8a;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  user-select: none;
+}
+.jsm-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  padding-left: 10px;
+  background: #fff;
+  color: #000;
+  font: 12px 'Segoe UI', Tahoma, Arial, sans-serif;
+  border-bottom: 1px solid #e5e5e5;
+}
+.jsm-titlebar-close {
+  width: 46px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  cursor: default;
+}
+.jsm-titlebar-close:hover {
+  background: #e81123;
+  color: #fff;
+}
+.jsm-form,
+.jsm-form * {
+  box-sizing: border-box;
+}
+.jsm-input {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 3px;
+  border: 1px solid #7a7a7a;
+  border-radius: 0;
+  outline: none;
+  user-select: text;
+}
+.jsm-input:focus {
+  border-color: #0078d7;
+}
+select.jsm-input {
+  padding: 0 1px;
+}
+.jsm-btn {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #adadad;
+  border-radius: 0;
+  cursor: default;
+  line-height: 1.1;
+}
+.jsm-btn:not(:disabled):hover {
+  background: #e5f1fb !important;
+  border-color: #0078d7;
+}
+.jsm-btn:focus-visible,
+.jsm-btn:focus {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+  border-color: #0078d7;
+}
+.jsm-btn:disabled {
+  border-color: #bfbfbf;
+}
+.jsm-find-backdrop {
+  position: absolute;
+  inset: 30px 0 0 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 4px;
+  z-index: 5;
+}
+.jsm-find {
+  border: 1px solid #555;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+.jsm-listbox {
+  box-sizing: border-box;
+  overflow-y: auto;
+  border: 1px solid #828790;
+}
+.jsm-listbox-row {
+  padding: 0 3px;
+  line-height: 17px;
+  white-space: nowrap;
+  cursor: default;
+}
+.jsm-listbox-row--sel {
+  background: #0078d7;
+  color: #fff;
+}

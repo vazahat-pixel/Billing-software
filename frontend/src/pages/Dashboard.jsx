@@ -35,6 +35,8 @@ import CompanySettingsModal from './settings/CompanySettingsModal';
 import ReportsHub from './reports/ReportsHub';
 import DataRecordsHub from './records/DataRecordsHub';
 import GenericMasterModal from './masters/GenericMasterModal';
+import JsmSubMasterWindow from './masters/jsm/JsmSubMasterWindow';
+import { JSM_SUBMASTER_FORMS } from './masters/jsm/jsmSubMasterForms';
 import WarehouseMasterModal from './masters/WarehouseMasterModal';
 import MergeMasterModal from './masters/MergeMasterModal';
 import OrderModal from './transactions/OrderModal';
@@ -2580,12 +2582,22 @@ const Dashboard = () => {
          />
 
          {/* New Database-Connected Modals */}
-         <GenericMasterModal 
-            isOpen={modals.genericMaster} 
-            onClose={() => setModals(prev => ({ ...prev, genericMaster: false }))} 
-            type={modals.genericMasterType}
-            readOnly={permissions.readOnlyMasters || mobileViewOnly}
-         />
+         {/* masters JSM has as their own form open in the JSM-drawn window */}
+         {JSM_SUBMASTER_FORMS[modals.genericMasterType] ? (
+            <JsmSubMasterWindow
+               isOpen={modals.genericMaster}
+               onClose={() => setModals(prev => ({ ...prev, genericMaster: false }))}
+               type={modals.genericMasterType}
+               readOnly={permissions.readOnlyMasters || mobileViewOnly}
+            />
+         ) : (
+            <GenericMasterModal
+               isOpen={modals.genericMaster}
+               onClose={() => setModals(prev => ({ ...prev, genericMaster: false }))}
+               type={modals.genericMasterType}
+               readOnly={permissions.readOnlyMasters || mobileViewOnly}
+            />
+         )}
          <OpeningBalanceModal
             isOpen={modals.openingBalance}
             onClose={() => setModals(prev => ({ ...prev, openingBalance: false }))}
