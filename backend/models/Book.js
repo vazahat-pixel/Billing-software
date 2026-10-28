@@ -111,6 +111,14 @@ const BookSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // JSM Book Master (Mst_BookMast) fields: print template, bank refs, options. Stored as entered.
+  crystal: { type: String, trim: true, default: '' },
+  ref2: { type: String, trim: true, default: '' },
+  ref3: { type: String, trim: true, default: '' },
+  ref4: { type: String, trim: true, default: '' },
+  roundOff: { type: String, trim: true, default: '' },
+  vatCalculation: { type: String, trim: true, default: '' },
+  getDataFromChallan: { type: String, trim: true, default: '' },
   tdsCode: {
     type: Number,
     default: 0

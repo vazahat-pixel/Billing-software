@@ -146,7 +146,14 @@ exports.createBook = async (req, res) => {
       notes: req.body.notes || '',
       jobWorkBook: !!req.body.jobWorkBook,
       tdsHead: req.body.tdsHead || '',
-      tdsCode: Number(req.body.tdsCode || 0)
+      tdsCode: Number(req.body.tdsCode || 0),
+      crystal: req.body.crystal || '',
+      ref2: req.body.ref2 || '',
+      ref3: req.body.ref3 || '',
+      ref4: req.body.ref4 || '',
+      roundOff: req.body.roundOff || '',
+      vatCalculation: req.body.vatCalculation || '',
+      getDataFromChallan: req.body.getDataFromChallan || ''
     });
 
     await newBook.save();
@@ -180,7 +187,8 @@ exports.updateBook = async (req, res) => {
       'accountNo', 'gstinNo', 'stateCode', 'stateName', 'gstType', 'retailTax',
       'detailJobWork', 'rowFinishMaterial', 'incExcVat', 'effectOnStock',
       'address1', 'address2', 'dist', 'state', 'head1', 'head2', 'createDate',
-      'notes', 'jobWorkBook', 'tdsHead', 'tdsCode'
+      'notes', 'jobWorkBook', 'tdsHead', 'tdsCode',
+      'crystal', 'ref2', 'ref3', 'ref4', 'roundOff', 'vatCalculation', 'getDataFromChallan'
     ];
 
     for (const key of fields) {

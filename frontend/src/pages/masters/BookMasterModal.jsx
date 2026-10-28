@@ -35,6 +35,14 @@ const emptyForm = (module = 'sales') => ({
   jobWorkBook: false,
   tdsHead: '',
   tdsCode: 0,
+  // JSM Mst_BookMast
+  crystal: '',
+  ref2: '',
+  ref3: '',
+  ref4: '',
+  roundOff: '',
+  vatCalculation: '',
+  getDataFromChallan: '',
 });
 
 const toFormDate = (v) => {
@@ -420,6 +428,23 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
                     <span className="bm-label">A/c No.</span>
                     <input type="text" className="classic-erp-input" value={formData.accountNo} onChange={setField('accountNo')} disabled={locked} />
                   </div>
+                  {/* JSM: Crystal (print template) and Ref.2–4 beside A/c No. */}
+                  <div className="bm-field">
+                    <span className="bm-label">Crystal</span>
+                    <input type="text" className="classic-erp-input" value={formData.crystal || ''} onChange={setField('crystal')} disabled={locked} />
+                  </div>
+                  <div className="bm-field">
+                    <span className="bm-label">Ref.2</span>
+                    <input type="text" className="classic-erp-input" value={formData.ref2 || ''} onChange={setField('ref2')} disabled={locked} />
+                  </div>
+                  <div className="bm-field">
+                    <span className="bm-label">Ref.3</span>
+                    <input type="text" className="classic-erp-input" value={formData.ref3 || ''} onChange={setField('ref3')} disabled={locked} />
+                  </div>
+                  <div className="bm-field">
+                    <span className="bm-label">Ref.4</span>
+                    <input type="text" className="classic-erp-input" value={formData.ref4 || ''} onChange={setField('ref4')} disabled={locked} />
+                  </div>
                   <div className="bm-gst-inner">
                     <div className="bm-field">
                       <span className="bm-label bm-label--gst">GstinNo</span>
@@ -535,6 +560,19 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
               <div className="bm-field">
                 <span className="bm-label">Tds Code</span>
                 <input type="number" className="classic-erp-input bm-ref-input" value={formData.tdsCode} onChange={setField('tdsCode')} disabled={locked} />
+              </div>
+              {/* JSM BookDetail tab */}
+              <div className="bm-field">
+                <span className="bm-label">Round Off</span>
+                <input type="text" className="classic-erp-input bm-ref-input" value={formData.roundOff || ''} onChange={setField('roundOff')} disabled={locked} />
+              </div>
+              <div className="bm-field">
+                <span className="bm-label">Vat Calculation</span>
+                <input type="text" className="classic-erp-input bm-ref-input" value={formData.vatCalculation || ''} onChange={setField('vatCalculation')} disabled={locked} />
+              </div>
+              <div className="bm-field">
+                <span className="bm-label" title="For Sales (Get Data From Challan/Slip)">Get From Challan</span>
+                <input type="text" className="classic-erp-input bm-ref-input" maxLength={1} value={formData.getDataFromChallan || ''} onChange={setField('getDataFromChallan')} disabled={locked} placeholder="Y/N" />
               </div>
               <div className="bm-field bm-field--addr">
                 <span className="bm-label">Notes</span>

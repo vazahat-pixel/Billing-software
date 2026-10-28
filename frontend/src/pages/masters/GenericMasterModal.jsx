@@ -5,6 +5,26 @@ import { Plus, Edit2, Save, X, Search, Trash2, FileText } from 'lucide-react';
 import { erpConfirmDelete } from '../../utils/confirm';
 import { notifyError, notifySuccess, notifyWarning } from '../../utils/notify';
 
+// JSM master fields that MERN did not show (decompiled mst_station, mst_transport, mst_unit,
+// mst_typemn, mst_drawmn). Stored in extraFields next to the existing ones; 'code' uses the
+// form's existing Code state.
+const UQC_LIST = ['BAG-BAGS', 'BAL-BALE', 'BDL-BUNDLES', 'BKL-BUCKLES', 'BOX-BOX', 'BUN-BUNCHES', 'CTN-CARTONS', 'DOZ-DOZENS',
+  'DRM-DRUMS', 'GGK-GREAT GROSS', 'GMS-GRAMMES', 'GRS-GROSS', 'GYD-GROSS YARDS', 'KGS-KILOGRAMS', 'KLR-KILOLITRE', 'KME-KILOMETRE',
+  'MLT-MILILITRE', 'MTR-METERS', 'MTS-METRIC TON', 'NOS-NUMBERS', 'PAC-PACKS', 'PCS-PIECES', 'PRS-PAIRS', 'QTL-QUINTAL',
+  'ROL-ROLLS', 'SET-SETS', 'SQF-SQUARE FEET', 'SQM-SQUARE METERS', 'SQY-SQUARE YARDS', 'TBS-TABLETS', 'TGM-TEN GROSS',
+  'THD-THOUSANDS', 'TON-TONNES', 'TUB-TUBES', 'UGS-US GALLONS', 'UNT-UNITS', 'YDS-YARDS', 'OTH-OTHERS'];
+const JSM_EXTRA = {
+  City: [['code', 'Code'], ['dist', 'Dist'], ['stateCode', 'StateCode'], ['jsmStateName', 'StateName'], ['distance', 'Distance (Km)']],
+  Transport: [['code', 'Code'], ['address1', 'Address 1'], ['address2', 'Address 2'], ['city', 'City'], ['pincode', 'Pin-Code'],
+    ['state', 'State'], ['email', 'E-Mail'], ['party', 'Party'], ['mode', 'Mode', ['', 'Road', 'Rail', 'Air', 'Ship']]],
+  Unit: [['quc', 'QUC', ['', ...UQC_LIST]]],
+  Type: [['region', 'Select Region'], ['taxCalculation', 'Tax Calculation']],
+  PartyBank: [['code', 'Code']],
+  // JSM "Account Main Group" = Main Account Master (Mst_Acc_Main_Mast)
+  AccountGroup: [['accountHead', 'A/c. Head'], ['address1', 'Address'], ['address2', 'Address (2)'], ['city', 'City'],
+    ['phoneO', 'Phone (O)'], ['phoneR', 'Phone (R)'], ['mobile', 'Mobile']],
+};
+
 const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
   const { subMasters, fetchSubMasters, addSubMaster, updateSubMaster, deleteSubMaster } = useStore();
 
@@ -33,6 +53,7 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
   const [ifsc, setIfsc] = useState('');
   const [ratio, setRatio] = useState('1');
   const [description, setDescription] = useState('');
+  const [jsm, setJsm] = useState({});
 
   // Table search
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,6 +103,7 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
     setIfsc('');
     setRatio('1');
     setDescription('');
+    setJsm({});
     setSelectedId(null);
     setErrorMsg('');
   };
@@ -161,6 +183,7 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
     setIfsc(ex.ifsc || '');
     setRatio(String(ex.ratio ?? '1'));
     setDescription(ex.description || '');
+    setJsm(ex);
     setErrorMsg('');
     setMode(editMode && !readOnly ? 'EDIT' : 'VIEW');
   };
@@ -275,6 +298,10 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
           category,
           description: description.trim()
         };
+      }
+
+      for (const [key] of JSM_EXTRA[type] || []) {
+        extraFields[key] = key === 'code' ? code.trim() : String(jsm[key] ?? '').trim();
       }
 
       const payload = {
@@ -648,6 +675,32 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
                     disabled={readOnly || mode === 'VIEW'}
                   />
                 </div>
+              </div>
+            )}
+            {(JSM_EXTRA[type] || []).length > 0 && (
+              <div className="grid grid-cols-12 gap-2 mt-2">
+                {JSM_EXTRA[type].map(([key, label, options]) => (
+                  <div key={key} className={key === 'address1' || key === 'address2' || key === 'party' ? 'col-span-4' : 'col-span-2'}>
+                    <label className="classic-erp-label">{label}</label>
+                    {options ? (
+                      <select
+                        className="classic-erp-select w-full mt-0.5"
+                        value={(key === 'code' ? code : jsm[key]) ?? ''}
+                        onChange={(e) => setJsm((p) => ({ ...p, [key]: e.target.value }))}
+                        disabled={readOnly || mode === 'VIEW'}
+                      >
+                        {options.map((o) => <option key={o} value={o}>{o || '—'}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        className="classic-erp-input w-full mt-0.5"
+                        value={(key === 'code' ? code : jsm[key]) ?? ''}
+                        onChange={(e) => (key === 'code' ? setCode(e.target.value) : setJsm((p) => ({ ...p, [key]: e.target.value })))}
+                        disabled={readOnly || mode === 'VIEW'}
+                      />
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </form>
