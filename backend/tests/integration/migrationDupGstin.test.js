@@ -92,4 +92,28 @@ describe('JSM import: two accounts with the same GSTIN (isolated DB)', { skip: f
     const rep = unwrapBody(await api2('post', `/runs/${runId}/reconcile`, {}));
     assert.equal(rep.mismatched, 0, JSON.stringify(rep.checks.filter((c) => !c.ok).slice(0, 6)));
   });
+
+  it('two JSM items with the same item code (and a code already in the company) do not stop the import', async () => {
+    const reg = await request(app).post('/api/auth/register').send({ name: 'Code Owner', email: `code-${Date.now()}@example.com`, password: 'TestPass123!', companyName: 'Item Code Co' });
+    const h3 = authHeader(reg.body.token);
+    const api3 = (m, pth, body) => { const r = request(app)[m](`/api/migration${pth}`).set(h3); return body === undefined ? r : r.send(body); };
+    const lines = zlib.gunzipSync(fs.readFileSync(FIXTURE)).toString('utf8').split('\n');
+    const items = [...new Set(lines.map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((x) => x && x._ === 'row' && x.t === 'MST_IT_MAST' && YEARS.includes(String(x.r.CO_PATH).trim()) && Number(x.r.ITEM_CODE) > 0).map((x) => String(x.r.ITEM_CODE).trim()))].slice(0, 3);
+    const out = lines.map((l) => { let x; try { x = JSON.parse(l); } catch { return l; } if (!x || x._ !== 'row' || x.t !== 'MST_IT_MAST') return l;
+      const i = items.indexOf(String(x.r.ITEM_CODE).trim()); if (i < 0) return l; return JSON.stringify({ ...x, r: { ...x.r, CHR_CODE: i < 2 ? 'DF962' : 'TAKEN1' } }); });
+    const buf = zlib.gzipSync(Buffer.from(out.join('\n')));
+    const runId = unwrapBody(await api3('post', '/runs', {})).id;
+    const cid = (await require('../../models/MigrationRun').MigrationRun.findById(runId).lean()).companyId;
+    await require('../../models/Item').collection.insertOne({ companyId: cid, name: 'ALREADY HERE', itemCode: 'TAKEN1', isDeleted: false });
+    await request(app).put(`/api/migration/runs/${runId}/chunk?index=0`).set(h3).set('Content-Type', 'application/octet-stream').send(buf);
+    assert.equal(unwrapBody(await api3('post', `/runs/${runId}/complete`, { bytes: buf.length })).status, 'uploaded');
+    assert.equal((await api3('post', `/runs/${runId}/apply`, { years: YEARS })).status, 200);
+    let r;
+    for (let i = 0; i < 200; i += 1) { r = unwrapBody(await api3('get', `/runs/${runId}`)); if (['applied', 'failed'].includes(r.status)) break; await new Promise((x) => setTimeout(x, 300)); }
+    assert.equal(r.status, 'applied', r.error);
+    const codes = (await require('../../models/Item').collection.find({ companyId: cid }).toArray()).map((x) => x.itemCode).filter(Boolean).sort();
+    assert.ok(codes.includes('DF962') && codes.includes('DF962/2') && codes.includes('TAKEN1') && codes.includes('TAKEN1/2'), JSON.stringify(codes));
+    const rep = unwrapBody(await api3('post', `/runs/${runId}/reconcile`, {}));
+    assert.equal(rep.mismatched, 0, JSON.stringify(rep.checks.filter((c) => !c.ok).slice(0, 6)));
+  });
 });
