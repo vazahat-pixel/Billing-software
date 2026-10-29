@@ -51,6 +51,13 @@ contextBridge.exposeInMainWorld('textileDesktop', {
     cleanup: (file) => ipcRenderer.invoke('jsm:cleanup', file),
     onProgress: (fn) => { const h = (_e, p) => fn(p); ipcRenderer.on('jsm:progress', h); return () => ipcRenderer.removeListener('jsm:progress', h); },
   },
+  /** App updates: state is { status, current, version, notes, percent, manual, error }. */
+  update: {
+    getState: () => ipcRenderer.invoke('update:get-state'),
+    check: () => ipcRenderer.invoke('update:check'),
+    install: () => ipcRenderer.invoke('update:install'),
+    onState: (fn) => { const h = (_e, st) => fn(st); ipcRenderer.on('update:state', h); return () => ipcRenderer.removeListener('update:state', h); },
+  },
   /** Renderer reports how many offline entries are still waiting to upload (close/quit warning). */
   setPendingSync: (count) => ipcRenderer.send('desktop:pending-sync', Number(count) || 0),
 });

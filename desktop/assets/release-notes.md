@@ -1,0 +1,7 @@
+- Import from JSM: bring all masters, bills, mill and job work, receipts and payments, notes and ledgers of every year in one click (Master > Import Data). It is checked against JSM, and you can undo it.
+- Excel import: Parties, Items, Opening Stock, Sales Bills and Purchase Bills sheets in one workbook.
+- Stock report: the 2nd and 3rd year now start with the previous year's closing stock.
+- Masters (Account, Book, Item, Group and others) open on the last record; F2 edits it, Enter starts a new one, arrow keys move between records.
+- Lastyear BillEntry, Merge Station, Merge Transport, Party+Station and Date+Item Rate menus now open their screens.
+- Mill Issue and Mill Receive show the saved challan right after Save.
+- New versions now show here with "Update now". Help > Check for updates checks at any time.

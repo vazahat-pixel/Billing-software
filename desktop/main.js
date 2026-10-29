@@ -5,6 +5,8 @@
 const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, Notification, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+// Registers the update:* IPC handlers early, so the screen can ask for the update state at any time.
+const updater = require('./updater');
 
 // Ensure only a single instance of Textile ERP runs at any time.
 // Prevents duplicate processes from locking or corrupting the IndexedDB backing store (%APPDATA%/Textile ERP/IndexedDB).
@@ -281,6 +283,7 @@ function buildMenu() {
       label: 'Help',
       submenu: [
         { label: `Version ${app.getVersion()}`, enabled: false },
+        { label: 'Check for updates…', click: () => updater.checkForUpdates() },
         {
           label: 'About offline desktop',
           click: () => {
@@ -477,7 +480,7 @@ app.whenReady().then(async () => {
   createWindow();
   createTray();
   try {
-    require('./updater').setupAutoUpdater();
+    updater.setupAutoUpdater();
   } catch {
     /* optional */
   }

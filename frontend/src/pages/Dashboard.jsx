@@ -1101,6 +1101,7 @@ const Dashboard = () => {
             ],
          },
          { label: 'Item Rate Master', action: () => toggleModal('itemMaster', true) },
+         { label: 'Import Data (JSM / Excel)', action: () => setModals(prev => ({ ...prev, dataImport: true, dataImportEntity: 'auto' })), separatorBefore: true },
       ],
       Transaction: [
          { label: 'Sales', key: 'sales' },

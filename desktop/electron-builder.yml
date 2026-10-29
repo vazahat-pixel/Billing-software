@@ -38,6 +38,8 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: Textile ERP
   deleteAppDataOnUninstall: false
+releaseInfo:
+  releaseNotesFile: release-notes.md
 publish:
   - provider: generic
     url: https://app.dealingindia.com/downloads/updates/
