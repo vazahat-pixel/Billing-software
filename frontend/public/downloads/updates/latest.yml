@@ -1,8 +1,16 @@
-version: 1.0.6
+version: 1.0.8
 files:
-  - url: TextileERP-Setup-1.0.6.exe
-    sha512: i5cLjzug9/dlCMgOov+0CcL0fdDw5sgO9BwdNTqQu/8N0S5QEIPxp9xqjUb6LtqUpmh5JrfvEn67zAW+V47Ihw==
-    size: 90100899
-path: TextileERP-Setup-1.0.6.exe
-sha512: i5cLjzug9/dlCMgOov+0CcL0fdDw5sgO9BwdNTqQu/8N0S5QEIPxp9xqjUb6LtqUpmh5JrfvEn67zAW+V47Ihw==
-releaseDate: '2026-10-29T06:54:14.016Z'
+  - url: TextileERP-Setup-1.0.8.exe
+    sha512: d7OULlLLT3QaWsjFyA9G3FcfKPqukom9qOT0BjbE2wG6eIr4h4lGJKYTi6RoRGoOSMJC1Z2gOKqc2zGhxdjkKg==
+    size: 90112807
+path: TextileERP-Setup-1.0.8.exe
+sha512: d7OULlLLT3QaWsjFyA9G3FcfKPqukom9qOT0BjbE2wG6eIr4h4lGJKYTi6RoRGoOSMJC1Z2gOKqc2zGhxdjkKg==
+releaseNotes: |
+  - Import from JSM: bring all masters, bills, mill and job work, receipts and payments, notes and ledgers of every year in one click (Master > Import Data). It is checked against JSM, and you can undo it.
+  - Excel import: Parties, Items, Opening Stock, Sales Bills and Purchase Bills sheets in one workbook.
+  - Stock report: the 2nd and 3rd year now start with the previous year's closing stock.
+  - Masters (Account, Book, Item, Group and others) open on the last record; F2 edits it, Enter starts a new one, arrow keys move between records.
+  - Lastyear BillEntry, Merge Station, Merge Transport, Party+Station and Date+Item Rate menus now open their screens.
+  - Mill Issue and Mill Receive show the saved challan right after Save.
+  - New versions now show here with "Update now". Help > Check for updates checks at any time.
+releaseDate: '2026-10-29T09:52:41.116Z'
