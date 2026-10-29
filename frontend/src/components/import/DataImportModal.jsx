@@ -262,7 +262,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
       const byName = currentEntity === 'auto'
         ? ['salesBill', 'purchaseBill', 'openingStock', 'party', 'item'].find((k) => SHEET_HINTS[k].test(sheetName) && !SKIP_SHEETS.test(sheetName))
         : null;
-      if (byName) currentEntity = byName;
+      if (byName) { currentEntity = byName; setSelectedEntity(byName); }
 
       // Call backend to auto-suggest mappings
       const res = await masterDataApi.suggestMappings({
