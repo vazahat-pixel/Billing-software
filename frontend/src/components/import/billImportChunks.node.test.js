@@ -39,3 +39,35 @@ test('batch answers add up', () => {
   const r = mergeBillResults([{ created: 2, skipped: 1, failed: 0, errors: [] }, { created: 1, failed: 1, errors: [{ bill: '5', error: 'y' }] }]);
   assert.deepEqual([r.created, r.skipped, r.failed, r.errors.length], [3, 1, 1, 1]);
 });
+
+import { chunkRows, safeHeaderKey, mergeMasterPreviews, mergeMasterResults } from './billImportChunks.js';
+
+test('master rows go in plain batches', () => {
+  const rows = Array.from({ length: 7 }, (_, i) => ({ i }));
+  assert.deepEqual(chunkRows(rows, 3).map((c) => c.length), [3, 3, 1]);
+  assert.deepEqual(chunkRows([], 3), []);
+});
+
+test('a heading with a dot is sent without the dot MongoDB would strip', () => {
+  assert.ok(!safeHeaderKey('Mobile No.').includes('.'));
+  assert.ok(!safeHeaderKey('$ Amount').startsWith('$'));
+  assert.equal(safeHeaderKey('Party Name'), 'Party Name');
+});
+
+test('master batch answers add up and row numbers point to the right sheet row', () => {
+  const p = mergeMasterPreviews([
+    { entity: 'party', totalRows: 3, validRows: 2, duplicateRows: 0, invalidRows: 1, sampleRows: [{ name: 'A' }], errors: [{ row: 2, message: 'x' }], warnings: [] },
+    { entity: 'party', totalRows: 2, validRows: 1, duplicateRows: 1, invalidRows: 0, sampleRows: [{ name: 'B' }], errors: [], warnings: [{ message: 'w', count: 2, rows: [1, 2] }] },
+    { entity: 'party', totalRows: 1, validRows: 1, duplicateRows: 0, invalidRows: 0, sampleRows: [], errors: [], warnings: [{ message: 'w', count: 1, rows: [1] }] },
+  ], [3, 2, 1]);
+  assert.deepEqual([p.totalRows, p.validRows, p.duplicateRows, p.invalidRows], [6, 4, 1, 1]);
+  assert.equal(p.sampleRows.length, 2);
+  assert.deepEqual(p.errors, [{ row: 3, message: 'x' }]); // sheet row = batch row + 1 (heading row)
+  assert.deepEqual(p.warnings, [{ message: 'w', count: 3, rows: [5, 6, 7] }]); // same note from two batches is one line
+  const r = mergeMasterResults([
+    { total: 3, created: 2, skipped: 0, failed: 1, errors: [{ row: 3, error: 'a' }] },
+    { total: 2, created: 1, skipped: 1, failed: 0, errors: [] },
+  ], [3, 2]);
+  assert.deepEqual([r.total, r.created, r.skipped, r.failed], [5, 3, 1, 1]);
+  assert.deepEqual(r.errors, [{ row: 4, error: 'a' }]);
+});

@@ -66,9 +66,9 @@ export function downloadMasterTemplate() {
       'Unit (MTRS/PCS)': 'MTRS',
       'Purchase Rate': 42.50,
       'Sales Rate': 56.00,
-      'Opening Stock (Mtrs)': 1200.00,
-      'Opening Pieces': 12,
-      'Opening Rate': 42.50,
+      'Opening Stock (Mtrs)': '',
+      'Opening Pieces': '',
+      'Opening Rate': '',
     },
     {
       'Item Name *': 'Pure Rayon 14KG Plain Grey',
@@ -79,9 +79,9 @@ export function downloadMasterTemplate() {
       'Unit (MTRS/PCS)': 'MTRS',
       'Purchase Rate': 35.00,
       'Sales Rate': 40.00,
-      'Opening Stock (Mtrs)': 2500.00,
-      'Opening Pieces': 25,
-      'Opening Rate': 35.00,
+      'Opening Stock (Mtrs)': '',
+      'Opening Pieces': '',
+      'Opening Rate': '',
     },
   ];
   const itemsWs = XLSX.utils.json_to_sheet(itemsData);
@@ -140,13 +140,13 @@ export function downloadMasterTemplate() {
 
   // 4. Instructions Sheet
   const instructions = [
-    { 'Instructions & Field Guide': '1. Do not modify the sheet names (Parties, Items, Opening Stock Lots).' },
-    { 'Instructions & Field Guide': '2. Fields with * are mandatory. Others can be left blank if not available.' },
-    { 'Instructions & Field Guide': '3. Category should be one of: Grey, Finished, Yarn, Others (Default is Finished).' },
-    { 'Instructions & Field Guide': '4. Party Type should be one of: Customer, Supplier, Both, Broker, Job Worker, Transport.' },
-    { 'Instructions & Field Guide': '5. Unit should be MTRS or PCS (Default is MTRS).' },
-    { 'Instructions & Field Guide': '6. Opening Balance Dr/Cr: Use Dr if customer owes you, Cr if you owe supplier.' },
-    { 'Instructions & Field Guide': '7. You can also import existing Excel/CSV files exported from Tally/Busy/Vyapar using our Smart Column Auto-Mapper.' },
+    { 'Instructions & Field Guide': '1. Import the sheets one by one, in this order: Parties, Items, Opening Stock Lots. In the import screen choose the sheet, then Import; after it finishes pick the next sheet.' },
+    { 'Instructions & Field Guide': '2. Do not change the column headings. Fields with * are mandatory; the others can stay blank.' },
+    { 'Instructions & Field Guide': '3. Opening stock: enter it on the Opening Stock Lots sheet (one row per lot). Do NOT also fill Opening Stock on the Items sheet, or the stock is counted twice.' },
+    { 'Instructions & Field Guide': '4. Category: Grey, Finished, Yarn or Others (blank = Finished). Unit: MTRS, PCS or KGS (blank = MTRS). GST Rate: 5, 12, 18 ... (blank = 5).' },
+    { 'Instructions & Field Guide': '5. Party Type: Customer, Supplier, Both, Broker, Job Worker, Transport. Opening Balance: write the amount; Dr/Cr column says who owes whom (Dr = customer owes you, Cr = you owe supplier). Blank Dr/Cr = Customer Dr, Supplier Cr.' },
+    { 'Instructions & Field Guide': '6. Amounts like 1,50,000 or 1,50,000 Cr are understood. Import is safe to repeat: names that already exist are skipped.' },
+    { 'Instructions & Field Guide': '7. Excel/CSV exported from other software (Tally, Busy, Vyapar, JSM) can be imported directly; the screen matches the column names for you and lets you correct them.' },
   ];
   const instructionsWs = XLSX.utils.json_to_sheet(instructions);
   instructionsWs['!cols'] = [{ wch: 100 }];

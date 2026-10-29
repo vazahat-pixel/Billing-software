@@ -4,9 +4,14 @@ const masterDataService = require('../services/masterDataService');
 const setupMasterService = require('../services/setupMasterService');
 const dataImportService = require('../services/dataImportService');
 
+// Parties, items and the other master lists live on the group's first company (same rule as /parties, /items);
+// bills belong to the company being worked. Single companies: both are req.companyId.
+const BILL_ENTITIES = ['salesBill', 'purchaseBill'];
+const masterCompanyOf = (req) => req.masterCompanyId || req.companyId;
+
 exports.mergeParties = asyncHandler(async (req, res) => {
   const { sourceId, targetId } = req.body;
-  const result = await masterDataService.mergeParties(req.companyId, {
+  const result = await masterDataService.mergeParties(masterCompanyOf(req), {
     sourceId,
     targetId,
     userId: req.user?._id || req.user?.id,
@@ -16,7 +21,7 @@ exports.mergeParties = asyncHandler(async (req, res) => {
 
 exports.mergeItems = asyncHandler(async (req, res) => {
   const { sourceId, targetId } = req.body;
-  const result = await masterDataService.mergeItems(req.companyId, {
+  const result = await masterDataService.mergeItems(masterCompanyOf(req), {
     sourceId,
     targetId,
     userId: req.user?._id || req.user?.id,
@@ -32,9 +37,11 @@ exports.suggestMappings = asyncHandler(async (req, res) => {
 
 exports.previewImport = asyncHandler(async (req, res) => {
   const { entity, rows, columnMappings } = req.body;
+  const importEntity = entity || 'item';
   const data = await dataImportService.preview({
-    companyId: req.companyId,
-    entity: entity || 'item',
+    companyId: BILL_ENTITIES.includes(importEntity) ? req.companyId : masterCompanyOf(req),
+    lotCompanyId: req.companyId,
+    entity: importEntity,
     rows: rows || [],
     columnMappings: columnMappings || {},
   });
@@ -43,9 +50,11 @@ exports.previewImport = asyncHandler(async (req, res) => {
 
 exports.executeImport = asyncHandler(async (req, res) => {
   const { entity, rows, columnMappings, options } = req.body;
+  const importEntity = entity || 'item';
   const data = await dataImportService.execute({
-    companyId: req.companyId,
-    entity: entity || 'item',
+    companyId: BILL_ENTITIES.includes(importEntity) ? req.companyId : masterCompanyOf(req),
+    lotCompanyId: req.companyId,
+    entity: importEntity,
     rows: rows || [],
     columnMappings: columnMappings || {},
     options: options || {},
@@ -55,7 +64,7 @@ exports.executeImport = asyncHandler(async (req, res) => {
 });
 
 exports.importMasters = asyncHandler(async (req, res) => {
-  const data = await masterDataService.importMasters(req.companyId, {
+  const data = await masterDataService.importMasters(masterCompanyOf(req), {
     entity: req.body.entity,
     rows: req.body.rows || [],
     dryRun: req.body.dryRun !== false,
@@ -65,7 +74,7 @@ exports.importMasters = asyncHandler(async (req, res) => {
 });
 
 exports.exportMasters = asyncHandler(async (req, res) => {
-  const data = await masterDataService.exportMasters(req.companyId, req.query.entity || 'party');
+  const data = await masterDataService.exportMasters(masterCompanyOf(req), req.query.entity || 'party');
   return ok(res, data);
 });
 

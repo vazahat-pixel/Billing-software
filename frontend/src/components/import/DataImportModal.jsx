@@ -5,7 +5,10 @@ import { masterDataApi } from '../../api/masters.api';
 import { downloadMasterTemplate } from '../../utils/excelTemplateGenerator';
 import { toast } from '../../store/useToastStore';
 import useStore from '../../store/useStore';
-import { chunkBillRows, mergeBillPreviews, mergeBillResults } from './billImportChunks';
+import {
+  chunkBillRows, mergeBillPreviews, mergeBillResults,
+  chunkRows, mergeMasterPreviews, mergeMasterResults, safeHeaderKey,
+} from './billImportChunks';
 import {
   Upload,
   FileSpreadsheet,
@@ -64,8 +67,16 @@ const ENTITY_CONFIGS = {
       { key: 'mobile', label: 'Mobile Number' },
       { key: 'email', label: 'Email Address' },
       { key: 'address', label: 'Address' },
+      { key: 'address2', label: 'Address 2' },
+      { key: 'address3', label: 'Address 3' },
       { key: 'city', label: 'City / Station' },
+      { key: 'pincode', label: 'Pin Code' },
       { key: 'state', label: 'State' },
+      { key: 'stateCode', label: 'State Code' },
+      { key: 'phoneO', label: 'Phone (Office)' },
+      { key: 'phoneR', label: 'Phone (Residence)' },
+      { key: 'contactPerson', label: 'Contact Person' },
+      { key: 'dueDays', label: 'Due / Credit Days' },
       { key: 'openingBalance', label: 'Opening Balance' },
       { key: 'openingBalanceType', label: 'Dr / Cr' },
       { key: 'creditLimit', label: 'Credit Limit' },
@@ -101,7 +112,14 @@ const isBillEntity = (entity) => !!ENTITY_CONFIGS[entity]?.bill;
 
 // Old bills can be thousands of rows: send them in batches of whole bills (request size / time limits).
 async function previewRows(entity, rows, columnMappings) {
-  if (!isBillEntity(entity)) return masterDataApi.previewImport({ entity, rows, columnMappings });
+  if (!isBillEntity(entity)) {
+    const chunks = chunkRows(rows, 1000);
+    const masterParts = [];
+    for (const chunk of chunks) {
+      masterParts.push(await masterDataApi.previewImport({ entity, rows: chunk, columnMappings }));
+    }
+    return mergeMasterPreviews(masterParts, chunks.map((c) => c.length));
+  }
   const parts = [];
   for (const chunk of chunkBillRows(rows, columnMappings)) {
     parts.push(await masterDataApi.previewImport({ entity, rows: chunk, columnMappings }));
@@ -110,7 +128,15 @@ async function previewRows(entity, rows, columnMappings) {
 }
 
 async function executeRows(entity, rows, columnMappings, onProgress) {
-  if (!isBillEntity(entity)) return masterDataApi.executeImport({ entity, rows, columnMappings });
+  if (!isBillEntity(entity)) {
+    const batches = chunkRows(rows, 150);
+    const masterParts = [];
+    for (let i = 0; i < batches.length; i += 1) {
+      onProgress?.(i + 1, batches.length);
+      masterParts.push(await masterDataApi.executeImport({ entity, rows: batches[i], columnMappings }));
+    }
+    return mergeMasterResults(masterParts, batches.map((c) => c.length));
+  }
   const chunks = chunkBillRows(rows, columnMappings);
   const parts = [];
   for (let i = 0; i < chunks.length; i += 1) {
@@ -118,6 +144,22 @@ async function executeRows(entity, rows, columnMappings, onProgress) {
     parts.push(await masterDataApi.executeImport({ entity, rows: chunks[i], columnMappings }));
   }
   return mergeBillResults(parts);
+}
+
+const SHEET_HINTS = {
+  party: /part|account|customer|supplier|ledger|debtor|creditor/i,
+  item: /item|product|fabric|quality|goods/i,
+  openingStock: /opening|stock|lot/i,
+  salesBill: /sale|invoice/i,
+  purchaseBill: /purch/i,
+};
+const SKIP_SHEETS = /instruction|read ?me|guide|help|note/i;
+
+/** The sheet to open first: the one named like the chosen data type, else the first real data sheet. */
+function pickSheetFor(entity, names) {
+  const hint = SHEET_HINTS[entity];
+  const named = hint ? names.find((n) => hint.test(n) && !SKIP_SHEETS.test(n)) : null;
+  return named || names.find((n) => !SKIP_SHEETS.test(n)) || names[0];
 }
 
 export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto' }) {
@@ -137,12 +179,17 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
   const [isProcessing, setIsProcessing] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [progress, setProgress] = useState('');
+  // what the user asked for in step 1 ('auto' = detect for every sheet); selectedEntity is what is shown now
+  const [entityChoice, setEntityChoice] = useState(initialEntity);
+  const [importedSheets, setImportedSheets] = useState([]);
 
   const currentConfig = ENTITY_CONFIGS[selectedEntity] || ENTITY_CONFIGS.item;
 
   const resetAll = () => {
     setStep(1);
     setSelectedEntity(initialEntity);
+    setEntityChoice(initialEntity);
+    setImportedSheets([]);
     setFileName('');
     setSheets([]);
     setActiveSheet('');
@@ -176,10 +223,11 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
         setWorkbookData(wb);
         setSheets(wb.SheetNames);
 
-        // Pick first sheet or matching sheet
-        const sheetNameToUse = wb.SheetNames[0];
+        // The sheet named like the chosen data type (Parties / Items / Opening Stock Lots...), else the first data sheet
+        const sheetNameToUse = pickSheetFor(entityChoice, wb.SheetNames);
         setActiveSheet(sheetNameToUse);
-        loadSheetContent(wb, sheetNameToUse, selectedEntity);
+        setImportedSheets([]);
+        loadSheetContent(wb, sheetNameToUse, entityChoice);
       } catch (err) {
         toast.error('Failed to parse Excel file: ' + err.message);
         setIsProcessing(false);
@@ -193,7 +241,10 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
     setIsProcessing(true);
     try {
       const ws = wb.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      // headings with a "." (Mobile No., Op. Bal.) would be stripped by the server's input filter: send them dot-free
+      const jsonData = XLSX.utils.sheet_to_json(ws, { defval: '' }).map((r) => (
+        Object.fromEntries(Object.entries(r).map(([k, v]) => [safeHeaderKey(k), v]))
+      ));
 
       if (!jsonData || jsonData.length === 0) {
         toast.error(`Sheet "${sheetName}" is empty.`);
@@ -232,11 +283,12 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
   const handleSheetChange = (sheetName) => {
     if (!workbookData) return;
     setActiveSheet(sheetName);
-    loadSheetContent(workbookData, sheetName, selectedEntity);
+    loadSheetContent(workbookData, sheetName, entityChoice);
   };
 
   const handleEntityChange = async (newEntity) => {
     setSelectedEntity(newEntity);
+    setEntityChoice(newEntity);
     if (rawHeaders.length > 0) {
       setIsProcessing(true);
       try {
@@ -275,6 +327,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
     try {
       const result = await executeRows(selectedEntity, rawRows, columnMappings, (n, total) => setProgress(total > 1 ? `${n}/${total}` : ''));
       setImportResult(result);
+      setImportedSheets((prev) => (prev.includes(activeSheet) ? prev : [...prev, activeSheet]));
       setStep(3);
 
       // Trigger store refreshes
@@ -302,7 +355,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
       title="Data Import & Migration Assistant"
       className="max-w-4xl"
     >
-      <div className="p-6 flex flex-col gap-6 text-slate-800">
+      <div className="p-6 flex flex-col gap-6 text-slate-800 flex-1 min-h-0 overflow-y-auto">
         {/* Progress Stepper */}
         <div className="flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-3">
@@ -380,7 +433,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
                   <button
                     key={key}
                     type="button"
-                    onClick={() => setSelectedEntity(key)}
+                    onClick={() => { setSelectedEntity(key); setEntityChoice(key); }}
                     className={`p-3 rounded-lg border text-left transition flex flex-col justify-between ${
                       selectedEntity === key
                         ? 'border-blue-600 bg-blue-50/50 shadow-sm'
@@ -587,6 +640,21 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
               </div>
             )}
 
+            {!currentConfig.bill && previewData?.errors?.length > 0 && (
+              <div className="border border-rose-200 bg-rose-50 rounded p-2 max-h-28 overflow-y-auto text-[10px] text-rose-700">
+                <div className="font-bold uppercase mb-0.5">Rows that will not be imported ({previewData.invalidRows})</div>
+                {previewData.errors.map((e, idx) => <div key={idx}>Row {e.row}: {e.message || e.error}</div>)}
+              </div>
+            )}
+            {!currentConfig.bill && previewData?.warnings?.length > 0 && (
+              <div className="border border-amber-200 bg-amber-50 rounded p-2 max-h-24 overflow-y-auto text-[10px] text-amber-800">
+                <div className="font-bold uppercase mb-0.5">Please check</div>
+                {previewData.warnings.map((w, idx) => (
+                  <div key={idx}>{w.message} - {w.count} row{w.count === 1 ? '' : 's'}{w.rows?.length ? ` (e.g. row ${w.rows.join(', ')})` : ''}</div>
+                ))}
+              </div>
+            )}
+
             {/* Live Data Preview */}
             {!currentConfig.bill && previewData?.sampleRows?.length > 0 && (
               <div>
@@ -672,8 +740,8 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
               </div>
             )}
 
-            {/* Action Bar */}
-            <div className="flex items-center justify-between pt-3 border-t">
+            {/* Action Bar (stays visible while the rest scrolls) */}
+            <div className="flex items-center justify-between pt-3 pb-6 -mb-6 -mx-6 px-6 border-t sticky -bottom-6 bg-[var(--bg-card,#fff)] z-10">
               <button
                 type="button"
                 onClick={() => setStep(1)}
@@ -712,7 +780,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
 
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Data Import Completed Successfully!
+                {importResult.failed > 0 ? 'Import finished - some rows were not imported' : 'Data Import Completed Successfully!'}
               </h3>
               <p className="text-xs text-slate-500 mt-1 max-w-md">
                 Your legacy data has been validated and injected into the Billing Software master database.
@@ -746,6 +814,24 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {sheets.filter((n) => !SKIP_SHEETS.test(n) && !importedSheets.includes(n)).length > 0 && (
+              <div className="w-full max-w-md text-left border border-blue-200 bg-blue-50 rounded-lg p-3">
+                <div className="text-[10px] font-bold uppercase text-blue-900 mb-1.5">More sheets in this file (import in this order: Parties, Items, Opening Stock)</div>
+                <div className="flex flex-wrap gap-2">
+                  {sheets.filter((n) => !SKIP_SHEETS.test(n) && !importedSheets.includes(n)).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => handleSheetChange(n)}
+                      className="px-3 py-1.5 bg-white border border-blue-400 text-blue-900 text-[11px] font-bold rounded hover:bg-blue-100"
+                    >
+                      Import sheet: {n}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

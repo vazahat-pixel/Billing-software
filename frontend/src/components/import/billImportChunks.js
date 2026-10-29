@@ -66,3 +66,59 @@ export function mergeBillResults(parts) {
   }
   return out;
 }
+
+/** Plain batches of rows (masters need no grouping). */
+export function chunkRows(rows, size = 150) {
+  const out = [];
+  for (let i = 0; i < (rows || []).length; i += size) out.push(rows.slice(i, i + size));
+  return out;
+}
+
+/**
+ * A "." in a column heading is a key separator for MongoDB and the server drops such keys, so
+ * "Mobile No." used to vanish from every row. U+2024 looks like a dot and the column matcher ignores it.
+ */
+export function safeHeaderKey(header) {
+  return String(header ?? '').replace(/\./g, '․').replace(/^\$/, '＄');
+}
+
+/** Row numbers inside a batch -> row numbers of the whole sheet (header row is row 1 in Excel). */
+function shiftRows(list, offset) {
+  return (list || []).map((e) => (e.row ? { ...e, row: e.row + offset } : e));
+}
+
+/** Adds up the answers of master-import preview batches. */
+export function mergeMasterPreviews(parts, sizes) {
+  const warnGroups = new Map();
+  const out = { totalRows: 0, validRows: 0, duplicateRows: 0, invalidRows: 0, sampleRows: [], errors: [], warnings: [] };
+  let offset = 1; // +1: the heading row is Excel row 1
+  parts.forEach((p, i) => {
+    out.entity = out.entity || p.entity;
+    ['totalRows', 'validRows', 'duplicateRows', 'invalidRows'].forEach((k) => { out[k] += Number(p[k] || 0); });
+    if (out.sampleRows.length < 10) out.sampleRows.push(...(p.sampleRows || []).slice(0, 10 - out.sampleRows.length));
+    out.errors.push(...shiftRows(p.errors, offset));
+    for (const w of p.warnings || []) {
+      const g = warnGroups.get(w.message) || { message: w.message, count: 0, rows: [] };
+      g.count += Number(w.count || 1);
+      for (const r of w.rows || []) if (g.rows.length < 5) g.rows.push(r + offset);
+      warnGroups.set(w.message, g);
+    }
+    offset += sizes[i];
+  });
+  out.errors = out.errors.slice(0, 50);
+  out.warnings = [...warnGroups.values()];
+  return out;
+}
+
+/** Adds up the answers of master-import execute batches. */
+export function mergeMasterResults(parts, sizes) {
+  const out = { total: 0, created: 0, skipped: 0, failed: 0, errors: [] };
+  let offset = 1; // +1: the heading row is Excel row 1
+  parts.forEach((p, i) => {
+    out.entity = out.entity || p.entity;
+    ['total', 'created', 'skipped', 'failed'].forEach((k) => { out[k] += Number(p[k] || 0); });
+    out.errors.push(...shiftRows(p.errors, offset));
+    offset += sizes[i];
+  });
+  return out;
+}
