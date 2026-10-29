@@ -111,8 +111,12 @@ exports.createBook = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Name, code, and module are required' });
     }
 
-    // Check for code collision with system books
-    const codeConflict = await Book.findOne({ module, code });
+    // The code must be free among this module's system books and this company's own books (the DB index
+    // is unique per company); books of other companies do not matter.
+    const codeConflict = await Book.findOne({
+      code,
+      $or: [{ companyId: null, module }, ...(companyId ? [{ companyId }] : [])],
+    });
     if (codeConflict) {
       return res.status(400).json({ success: false, message: `Book code '${code}' is already in use for this module` });
     }
