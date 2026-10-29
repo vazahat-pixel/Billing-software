@@ -16,7 +16,7 @@ const HAVE_DATA = fs.existsSync(FIXTURE);
 
 // The package is exported from a JSM database and stays on the developer PC (git-ignored); the test is skipped without it.
 describe('JSM migration end to end (isolated DB)', { skip: HAVE_DATA ? false : 'no local JSM package (backend/tests/fixtures/migration/jsm_demo_anonymised.ndjson.gz or JSM_DEMO_PACKAGE)' }, () => {
-  let app; let request; let shutdown; let h; let runId; let companyId;
+  let app; let request; let shutdown; let h; let runId; let companyId; let baseline;
   const api = (m, p, body) => { const r = request(app)[m](`/api/migration${p}`).set(h); return body === undefined ? r : r.send(body); };
   const waitFor = async (pred, ms = 60000) => { const t0 = Date.now(); for (;;) { const r = unwrapBody(await api('get', `/runs/${runId}`)); if (pred(r)) return r; if (Date.now() - t0 > ms) throw new Error(`timeout; last status ${r.status} ${r.error}`); await new Promise((x) => setTimeout(x, 300)); } };
 
@@ -25,6 +25,8 @@ describe('JSM migration end to end (isolated DB)', { skip: HAVE_DATA ? false : '
     const reg = await request(app).post('/api/auth/register').send({ name: 'Mig Owner', email: `mig-${Date.now()}@example.com`, password: 'TestPass123!', companyName: 'Migration Co' });
     h = authHeader(reg.body.token);
     companyId = unwrapBody(await request(app).get('/api/auth/me').set(h)).companyId;
+    const cid = new (require('mongoose').Types.ObjectId)(companyId);
+    baseline = { sub: await require('../../models/SubMaster').collection.countDocuments({ companyId: cid }), god: await require('../../models/Warehouse').collection.countDocuments({ companyId: cid }) };
   });
   after(async () => { if (shutdown) await shutdown(); });
 
@@ -78,6 +80,12 @@ describe('JSM migration end to end (isolated DB)', { skip: HAVE_DATA ? false : '
     const rep = unwrapBody(await api('post', `/runs/${runId}/reconcile`, {}));
     const bad = rep.checks.filter((c) => !c.ok);
     assert.equal(rep.mismatched, 0, `mismatches: ${JSON.stringify(bad.slice(0, 8))}`);
+    // every JSM account is checked, also those that went into an existing account of the same name (Round Off, TDS ...)
+    const accounts = rep.checks.filter((c) => c.area === 'Account balance');
+    assert.ok(accounts.length >= 73, `account checks: ${accounts.length}`);
+    // station, transport, tax slab, unit, party bank ... are all checked by name
+    const masters = rep.checks.filter((c) => c.area === 'Masters');
+    for (const kind of ['City', 'ItemTaxSlab', 'Unit', 'ItemGroup', 'PartyBank', 'AccountGroup', 'Type', 'BookType']) assert.ok(masters.some((c) => c.key === kind && c.jsm > 0 && c.ok), `${kind}: ${JSON.stringify(masters)}`);
     assert.ok(rep.total > 60, `only ${rep.total} checks ran`);
     const csv = await request(app).get(`/api/migration/runs/${runId}/report.csv`).set(h);
     assert.equal(csv.status, 200);
@@ -93,6 +101,11 @@ describe('JSM migration end to end (isolated DB)', { skip: HAVE_DATA ? false : '
     assert.equal(tb.status, 200, JSON.stringify(tb.body).slice(0, 200));
     const lots = unwrapBody(await request(app).get('/api/inventory/lots').set(h));
     assert.ok((Array.isArray(lots) ? lots : lots.items || lots.lots).length > 0);
+    // the Station / Transport / Tax Slab / Party Bank screens (F3) list JSM's entries
+    for (const type of ['City', 'ItemTaxSlab', 'PartyBank', 'Unit']) {
+      const list = unwrapBody(await request(app).get(`/api/submasters?type=${type}`).set(h));
+      assert.ok((Array.isArray(list) ? list : list.items || []).filter((x) => x.type === type).length > 0, `${type} list empty`);
+    }
   });
 
   it('a company that already has transactions is refused; a repeat apply is refused', async () => {
@@ -109,5 +122,8 @@ describe('JSM migration end to end (isolated DB)', { skip: HAVE_DATA ? false : '
     for (const n of ['Sales', 'Purchase', 'Job', 'PaymentVoucher', 'AccountingEntry', 'InventoryLot', 'StockMovement', 'BillSettlement', 'Party', 'Item']) {
       assert.equal(await require(`../../models/${n}`).collection.countDocuments({ companyId: new (require('mongoose').Types.ObjectId)(companyId) }), 0, `${n} left behind`);
     }
+    const cid = new (require('mongoose').Types.ObjectId)(companyId);
+    assert.equal(await require('../../models/SubMaster').collection.countDocuments({ companyId: cid }), baseline.sub, 'other masters left behind');
+    assert.equal(await require('../../models/Warehouse').collection.countDocuments({ companyId: cid }), baseline.god, 'godowns left behind');
   });
 });
