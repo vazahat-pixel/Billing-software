@@ -138,9 +138,18 @@ export function downloadMasterTemplate() {
   ];
   XLSX.utils.book_append_sheet(wb, stockWs, 'Opening Stock Lots');
 
-  // 4. Instructions Sheet
+  // 4. Old bills: one row per bill line; rows with the same Bill No + Party + Date are one bill
+  const billSheet = (partyHeader, rows) => {
+    const ws = XLSX.utils.json_to_sheet(rows.map(([billNo, dt, party, item, pcs, mts, rate, gst]) => ({ 'Bill No *': billNo, 'Bill Date * (dd/mm/yyyy)': dt, [partyHeader]: party, 'Item Name *': item, Pcs: pcs, 'Mts / Qty': mts, Rate: rate, 'Amount (blank = Mts x Rate)': '', 'GST %': gst, 'HSN Code': '5208' })));
+    ws['!cols'] = [{ wch: 12 }, { wch: 22 }, { wch: 30 }, { wch: 30 }, { wch: 8 }, { wch: 12 }, { wch: 10 }, { wch: 26 }, { wch: 8 }, { wch: 10 }];
+    return ws;
+  };
+  XLSX.utils.book_append_sheet(wb, billSheet('Customer Name *', [['101', '05/04/2025', 'Shree Ganesh Textiles', 'Cotton 60x60 Cambric Print', 10, 1000, 56, 5], ['101', '05/04/2025', 'Shree Ganesh Textiles', 'Pure Rayon 14KG Plain Grey', 5, 500, 40, 5]]), 'Sales Bills');
+  XLSX.utils.book_append_sheet(wb, billSheet('Supplier Name *', [['P-11', '02/04/2025', 'Modern Mills Pvt Ltd', 'Pure Rayon 14KG Plain Grey', 20, 2000, 35, 5]]), 'Purchase Bills');
+
+  // 5. Instructions Sheet
   const instructions = [
-    { 'Instructions & Field Guide': '1. Import the sheets one by one, in this order: Parties, Items, Opening Stock Lots. In the import screen choose the sheet, then Import; after it finishes pick the next sheet.' },
+    { 'Instructions & Field Guide': '1. Import the sheets one by one, in this order: Parties, Items, Opening Stock Lots, then Purchase Bills and Sales Bills (old bills; stock, GST and outstanding are built from them). In the import screen choose the sheet, then Import; after it finishes pick the next sheet.' },
     { 'Instructions & Field Guide': '2. Do not change the column headings. Fields with * are mandatory; the others can stay blank.' },
     { 'Instructions & Field Guide': '3. Opening stock: enter it on the Opening Stock Lots sheet (one row per lot). Do NOT also fill Opening Stock on the Items sheet, or the stock is counted twice.' },
     { 'Instructions & Field Guide': '4. Category: Grey, Finished, Yarn or Others (blank = Finished). Unit: MTRS, PCS or KGS (blank = MTRS). GST Rate: 5, 12, 18 ... (blank = 5).' },

@@ -258,6 +258,12 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
       setRawHeaders(headers);
       setRawRows(jsonData);
 
+      // A sheet named like its data (Sales Bills, Purchase Bills, Opening Stock Lots, Parties, Items) tells the type; else the headings do
+      const byName = currentEntity === 'auto'
+        ? ['salesBill', 'purchaseBill', 'openingStock', 'party', 'item'].find((k) => SHEET_HINTS[k].test(sheetName) && !SKIP_SHEETS.test(sheetName))
+        : null;
+      if (byName) currentEntity = byName;
+
       // Call backend to auto-suggest mappings
       const res = await masterDataApi.suggestMappings({
         headers,

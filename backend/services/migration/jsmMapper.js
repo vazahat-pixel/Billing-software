@@ -29,6 +29,7 @@ function uniqueNo(base, taken, suffixes) {
   const first = str(base);
   const tryKey = (v) => { if (v && !taken.has(v)) { taken.add(v); return true; } return false; };
   if (tryKey(first)) return first;
+  taken.renamed = (taken.renamed || 0) + 1; // the number was already used (another year or book): a suffix keeps it unique
   for (const s of suffixes) { const v = `${first}/${s}`; if (tryKey(v)) return v; }
   let i = 2; while (!tryKey(`${first}/${i}`)) i += 1;
   return `${first}/${i}`;
@@ -563,6 +564,9 @@ function buildPlan(tables, { companyId }) {
   expected.outstandingByParty = Object.fromEntries(outByParty);
 
   docs.InventoryLot = lots; // final state of every lot after all stock events
+  for (const [label, set] of [['sales bill', saleNos], ['purchase bill', purchaseNos], ['mill/job challan', jobNos], ['voucher', voucherNosR], ['voucher', voucherNosP], ['GST note', noteNos]]) {
+    if (set.renamed) warn(`${set.renamed} ${label} number(s) were already used by another book or year in JSM; they were saved with a suffix (e.g. 101/SCC28) so the number stays unique here. The original number is the part before the slash.`);
+  }
   const counts = Object.fromEntries(Object.entries(docs).map(([k, v]) => [k, v.length]));
   return { docs, keys, expected, warnings, blockers: blockers.slice(0, 20), counts, years };
 }
