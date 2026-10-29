@@ -153,11 +153,13 @@ async function apply(run, { years } = {}) {
 
     // masters that already exist under the same name are reused, not duplicated
     for (const [name, nameField, byId] of [['Party', 'name'], ['Item', 'name'], ['LedgerMaster', 'name']]) {
-      const existing = await model(name).collection.find({ companyId: run.companyId }, { projection: { name: 1 } }).toArray();
+      const existing = await model(name).collection.find({ companyId: run.companyId }, { projection: { name: 1, gstin: 1 } }).toArray();
       if (!existing.length) continue;
       const have = new Map(existing.map((e) => [String(e.name).toLowerCase(), e._id]));
+      // a party already here with the same GSTIN is the same firm (GSTIN is unique per company)
+      const haveGstin = new Map(name === 'Party' ? existing.filter((e) => e.gstin).map((e) => [String(e.gstin).toUpperCase(), e._id]) : []);
       const dropped = new Map();
-      plan.docs[name] = plan.docs[name].filter((d) => { const hit = have.get(String(d[nameField]).toLowerCase()); if (hit) { dropped.set(String(d._id), hit); return false; } return true; });
+      plan.docs[name] = plan.docs[name].filter((d) => { const hit = have.get(String(d[nameField]).toLowerCase()) || (d.gstin && haveGstin.get(String(d.gstin).toUpperCase())); if (hit) { dropped.set(String(d._id), hit); return false; } return true; });
       if (dropped.size) remapIds(plan.docs, dropped);
     }
     // other masters (station, transport, tax slab ...) already there under the same name are kept as they are
