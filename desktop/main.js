@@ -388,6 +388,16 @@ ipcMain.handle('desktop:machine-id', () => {
   }
 });
 
+// --- Import from JSM (read-only; the JSM login never leaves this process) ---
+const jsmService = require('./jsmExtractor/service');
+ipcMain.handle('jsm:detect', () => jsmService.detect().catch((e) => ({ ok: false, reason: 'error', message: String(e.message).slice(0, 200), installs: [] })));
+ipcMain.handle('jsm:export', async (event, args) => {
+  const r = await jsmService.exportPackage(args, (p) => { try { event.sender.send('jsm:progress', p); } catch { /* window closed */ } });
+  return { file: r.file, bytes: r.bytes, totalRows: r.totalRows };
+});
+ipcMain.handle('jsm:read-chunk', (_e, { file, index, size }) => jsmService.readChunk(file, index, size));
+ipcMain.handle('jsm:cleanup', (_e, file) => { jsmService.removeExport(file); return true; });
+
 ipcMain.handle('desktop:backup', async () => {
   await runBackupDialog();
   return true;

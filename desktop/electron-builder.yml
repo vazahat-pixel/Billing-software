@@ -12,6 +12,7 @@ files:
   - config.json
   - config.example.json
   - localRuntime/**/*
+  - jsmExtractor/**/*
   - renderer/**/*
   - '!renderer/downloads/**/*'
   - assets/**/*

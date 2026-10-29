@@ -5,6 +5,7 @@ import { masterDataApi } from '../../api/masters.api';
 import { downloadMasterTemplate } from '../../utils/excelTemplateGenerator';
 import { toast } from '../../store/useToastStore';
 import useStore from '../../store/useStore';
+import JsmImportWizard from './JsmImportWizard';
 import {
   chunkBillRows, mergeBillPreviews, mergeBillResults,
   chunkRows, mergeMasterPreviews, mergeMasterResults, safeHeaderKey,
@@ -182,6 +183,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
   // what the user asked for in step 1 ('auto' = detect for every sheet); selectedEntity is what is shown now
   const [entityChoice, setEntityChoice] = useState(initialEntity);
   const [importedSheets, setImportedSheets] = useState([]);
+  const [jsmOpen, setJsmOpen] = useState(false);
 
   const currentConfig = ENTITY_CONFIGS[selectedEntity] || ENTITY_CONFIGS.item;
 
@@ -401,6 +403,13 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
         {/* STEP 1: Upload File & Select Entity */}
         {step === 1 && (
           <div className="flex flex-col gap-6">
+            <div className="flex items-center justify-between bg-emerald-50 border border-emerald-300 rounded-lg p-4">
+              <div>
+                <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wide">Coming from JSM? Bring everything in one click</h4>
+                <p className="text-[11px] text-emerald-900/80 mt-0.5">All masters, bills, mill and job work, receipts and payments, ledgers and stock of every year, checked against JSM. Runs in the Desktop app on the computer where JSM is installed.</p>
+              </div>
+              <button type="button" onClick={() => setJsmOpen(true)} className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold rounded shadow-sm shrink-0 ml-4">Import from JSM</button>
+            </div>
             <div className="flex items-center justify-between bg-blue-50/70 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center gap-3">
                 <FileSpreadsheet className="w-8 h-8 text-blue-600 shrink-0" />
@@ -854,6 +863,7 @@ export default function DataImportModal({ isOpen, onClose, initialEntity = 'auto
           </div>
         )}
       </div>
+      <JsmImportWizard isOpen={jsmOpen} onClose={() => setJsmOpen(false)} />
     </Modal>
   );
 }

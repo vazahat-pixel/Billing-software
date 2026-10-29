@@ -43,8 +43,8 @@ async function listCompanies(conn, db) {
     coCode: Number(r.CO_CODE),
     name: r.CO_NAME,
     gstin: r.CO_GST_NO || r.CO_GSTIN || '',
-    from: (r.CO_FR_DATE || '').slice(0, 10),
-    to: (r.CO_TO_DATE || '').slice(0, 10),
+    from: String(r.CO_FR_DATE || r.FROM_DATE || r.CO_FROM_DATE || '').slice(0, 10),
+    to: String(r.CO_TO_DATE || r.TO_DATE || '').slice(0, 10),
     lastYearCoCode: Number(r.LAST_YR_CO_CODE) || 0,
     nextYearCoCode: Number(r.NEXT_YR_CO_CODE) || 0,
   }));
