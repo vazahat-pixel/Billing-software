@@ -116,6 +116,60 @@ function filterYears(tables, years) {
   return out;
 }
 
+const pathGet = (o, f) => f.split('.').reduce((v, k) => (v == null ? v : v[k]), o);
+const pathSet = (o, f, val) => { const ks = f.split('.'); let t = o; for (const k of ks.slice(0, -1)) t = t[k] ||= {}; t[ks[ks.length - 1]] = val; };
+/** Does a document fall under a partial index (the simple forms used in our models)? */
+function underPartial(doc, filter) {
+  if (!filter) return true;
+  return Object.entries(filter).every(([f, cond]) => {
+    const v = pathGet(doc, f);
+    if (!cond || typeof cond !== 'object' || cond instanceof Date) return v === cond;
+    if (cond.$exists !== undefined && (v !== undefined) !== Boolean(cond.$exists)) return false;
+    if (cond.$type === 'string' && typeof v !== 'string') return false;
+    if (cond.$type === 'number' && typeof v !== 'number') return false;
+    if (cond.$gt !== undefined && !(v > cond.$gt)) return false;
+    return v !== undefined && v !== null;
+  });
+}
+
+/**
+ * Before saving: every unique rule of the database (bill numbers, item codes, party codes, names ...) is checked
+ * against the import itself and what the company already has. A clash gets /2, /3 ... (a number field is left
+ * empty) and a warning, so the import never stops on "duplicate key".
+ */
+async function makeUnique(docsByModel, companyId, warnings) {
+  for (const name of MODELS) {
+    const list = docsByModel[name] || [];
+    if (!list.length) continue;
+    // the database's own rules, plus the model's (in case an index is not built yet)
+    let dbIndexes = [];
+    try { dbIndexes = await model(name).collection.indexes(); } catch { /* collection not created yet */ }
+    const fromSchema = (model(name).schema?.indexes() || []).map(([key, o]) => ({ key, unique: !!o?.unique, partialFilterExpression: o?.partialFilterExpression, name: JSON.stringify(key) }));
+    const seenIx = new Set();
+    const indexes = [...dbIndexes, ...fromSchema].filter((i) => { const k = JSON.stringify(Object.keys(i.key || {}).sort()); if (seenIx.has(k)) return false; seenIx.add(k); return true; });
+    for (const ix of indexes.filter((i) => i.unique && i.name !== '_id_' && i.key && 'companyId' in i.key)) {
+      const fields = Object.keys(ix.key).filter((f) => f !== 'companyId');
+      if (!fields.length) continue;
+      const keyOf = (d) => JSON.stringify(fields.map((f) => { const v = pathGet(d, f); return v == null ? null : String(v); }));
+      const existing = await model(name).collection.find({ companyId }, { projection: Object.fromEntries(fields.map((f) => [f, 1])) }).toArray();
+      const taken = new Set(existing.filter((d) => underPartial(d, ix.partialFilterExpression)).map(keyOf));
+      let fixed = 0;
+      for (const d of list) {
+        if (!underPartial(d, ix.partialFilterExpression)) continue;
+        let k = keyOf(d);
+        if (!taken.has(k)) { taken.add(k); continue; }
+        fixed += 1;
+        const f = [...fields].reverse().find((x) => typeof pathGet(d, x) === 'string');
+        if (!f) { const nf = fields.find((x) => typeof pathGet(d, x) === 'number'); if (nf) pathSet(d, nf, undefined); continue; }
+        const base = pathGet(d, f);
+        for (let i = 2; taken.has(k); i += 1) { pathSet(d, f, `${base}/${i}`); k = keyOf(d); }
+        taken.add(k);
+      }
+      if (fixed) warnings.push(`${fixed} ${name} record(s): ${fields.join(' + ')} was already used (twice in JSM, or already in this company); saved with /2, /3 ... so the import could finish`);
+    }
+  }
+}
+
 async function insertAll(run, docsByModel) {
   const total = Object.values(docsByModel).reduce((n, l) => n + l.length, 0);
   let done = 0;
@@ -184,6 +238,7 @@ async function apply(run, { years } = {}) {
     const godHave = new Set((await model('Warehouse').collection.find({ companyId: run.companyId }, { projection: { name: 1, code: 1 } }).toArray()).flatMap((w) => [String(w.name).toLowerCase(), `#${w.code}`]));
     plan.docs.Warehouse = (plan.docs.Warehouse || []).filter((w) => !godHave.has(String(w.name).toLowerCase()) && !godHave.has(`#${w.code}`));
 
+    await makeUnique(plan.docs, run.companyId, plan.warnings);
     await insertAll(run, plan.docs);
     await bumpCounters(run.companyId, plan.docs);
     run.status = 'applied'; run.appliedAt = new Date(); run.summary = summarise(plan); run.progress = { stage: 'done', done: 1, total: 1 };
