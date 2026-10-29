@@ -15,7 +15,7 @@ const { MigrationRun, MigrationRunDocs } = require('../../models/MigrationRun');
 const { scanPackage, loadPackage } = require('./packageReader');
 const { buildPlan } = require('./jsmMapper');
 
-const MODELS = ['Party', 'LedgerMaster', 'Item', 'InventoryLot', 'StockMovement', 'Purchase', 'Sales', 'Job', 'ReturnInvoice', 'DebitCreditNote', 'PaymentVoucher', 'AccountingEntry', 'BillSettlement'];
+const MODELS = ['SubMaster', 'Warehouse', 'Party', 'LedgerMaster', 'Item', 'InventoryLot', 'StockMovement', 'Purchase', 'Sales', 'Job', 'ReturnInvoice', 'DebitCreditNote', 'PaymentVoucher', 'AccountingEntry', 'BillSettlement'];
 const BATCH = 1000;
 const UPLOAD_DIR = process.env.MIGRATION_UPLOAD_DIR || path.join(os.tmpdir(), 'billing-migration');
 const model = (n) => require(`../../models/${n}`);
@@ -160,13 +160,18 @@ async function apply(run, { years } = {}) {
       plan.docs[name] = plan.docs[name].filter((d) => { const hit = have.get(String(d[nameField]).toLowerCase()); if (hit) { dropped.set(String(d._id), hit); return false; } return true; });
       if (dropped.size) remapIds(plan.docs, dropped);
     }
+    // other masters (station, transport, tax slab ...) already there under the same name are kept as they are
+    const subHave = new Set((await model('SubMaster').collection.find({ companyId: run.companyId }, { projection: { type: 1, name: 1 } }).toArray()).map((d) => `${d.type}|${String(d.name).toLowerCase()}`));
+    plan.docs.SubMaster = (plan.docs.SubMaster || []).filter((d) => !subHave.has(`${d.type}|${String(d.name).toLowerCase()}`));
+    const godHave = new Set((await model('Warehouse').collection.find({ companyId: run.companyId }, { projection: { name: 1, code: 1 } }).toArray()).flatMap((w) => [String(w.name).toLowerCase(), `#${w.code}`]));
+    plan.docs.Warehouse = (plan.docs.Warehouse || []).filter((w) => !godHave.has(String(w.name).toLowerCase()) && !godHave.has(`#${w.code}`));
 
     await insertAll(run, plan.docs);
     await bumpCounters(run.companyId, plan.docs);
     run.status = 'applied'; run.appliedAt = new Date(); run.summary = summarise(plan); run.progress = { stage: 'done', done: 1, total: 1 };
     run.expectedInternal = undefined;
     await run.save();
-    await MigrationRun.collection.updateOne({ _id: run._id }, { $set: { 'summary.expectedFull': { closing: plan.expected.closing, outstandingByParty: plan.expected.outstandingByParty } } });
+    await MigrationRun.collection.updateOne({ _id: run._id }, { $set: { 'summary.expectedFull': { closing: plan.expected.closing, outstandingByParty: plan.expected.outstandingByParty, masters: plan.expected.masters || {} } } });
     return run;
   } catch (err) {
     run.status = 'failed'; run.error = String(err.message || err).slice(0, 500); await run.save();
@@ -238,11 +243,13 @@ async function reconcile(run) {
   const lines = await model('AccountingEntry').collection.aggregate([{ $match: { companyId: cid } }, { $unwind: '$lines' },
     { $group: { _id: '$lines.ledgerId', dr: { $sum: { $cond: [{ $eq: ['$lines.type', 'Dr'] }, '$lines.amount', 0] } }, cr: { $sum: { $cond: [{ $eq: ['$lines.type', 'Cr'] }, '$lines.amount', 0] } } } }]).toArray();
   const posted = new Map(lines.map((l) => [String(l._id), l.dr - l.cr]));
-  for (const l of ledgers) {
-    const code = String(l.code || '');
-    const want = full.closing?.[code]; if (!want) continue;
-    const op = (l.openingBalanceType === 'Cr' ? -1 : 1) * (l.openingBalance || 0);
-    add('Account balance', `${want.name} (Dr+ / Cr-)`, want.balance, r2(op + (posted.get(String(l._id)) || 0)));
+  // every JSM account is checked; one that went into an existing account of the same name (Round Off, TDS ...) is found by name
+  const byCode = new Map(ledgers.filter((l) => l.code).map((l) => [String(l.code), l]));
+  const byName = new Map(ledgers.map((l) => [String(l.name || '').trim().toLowerCase(), l]));
+  for (const [code, want] of Object.entries(full.closing || {})) {
+    const l = byCode.get(code) || byName.get(String(want.name || '').trim().toLowerCase());
+    const op = l ? (l.openingBalanceType === 'Cr' ? -1 : 1) * (l.openingBalance || 0) : 0;
+    add('Account balance', `${want.name} (Dr+ / Cr-)`, want.balance, l ? r2(op + (posted.get(String(l._id)) || 0)) : 0);
   }
   // outstanding per party
   const out = await model('BillSettlement').collection.aggregate([{ $match: { companyId: cid } }, { $group: { _id: '$partyId', o: { $sum: '$outstandingAmount' } } }]).toArray();
@@ -252,6 +259,15 @@ async function reconcile(run) {
   // the expected outstanding was computed with the ids of the plan; compare by party name through the stored ids
   const idsByName = new Map(parties.map((p) => [String(p._id), p.name]));
   for (const [pid, want] of Object.entries(full.outstandingByParty || {})) add('Outstanding', `${idsByName.get(pid) || pid}`, want, got.get(pid) || 0);
+
+  // other masters: every JSM name is here (station, transport, tax slab, unit, party bank ...)
+  for (const [kind, names] of Object.entries(full.masters || {})) {
+    const have = kind === 'Godown'
+      ? await model('Warehouse').collection.find({ companyId: cid }, { projection: { name: 1 } }).toArray()
+      : await model('SubMaster').collection.find({ companyId: cid, type: kind }, { projection: { name: 1 } }).toArray();
+    const set = new Set(have.map((d) => String(d.name).trim().toLowerCase()));
+    add('Masters', kind, names.length, names.filter((nm) => set.has(String(nm).trim().toLowerCase())).length);
+  }
 
   // stock never negative
   const neg = await model('InventoryLot').collection.countDocuments({ companyId: cid, $or: [{ remainingMtrs: { $lt: 0 } }, { remainingPcs: { $lt: 0 } }] });
