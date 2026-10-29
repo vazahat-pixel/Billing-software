@@ -63,4 +63,33 @@ describe('JSM import: two accounts with the same GSTIN (isolated DB)', { skip: f
     assert.equal(rep.mismatched, 0, JSON.stringify(rep.checks.filter((c) => !c.ok).slice(0, 6)));
     assert.ok(rep.warnings.some((w) => String(w.message || w).includes(GSTIN)), 'the shared GSTIN is reported');
   });
+
+  it('parties left behind by an earlier failed attempt do not stop the import', async () => {
+    const reg = await request(app).post('/api/auth/register').send({ name: 'Left Owner', email: `left-${Date.now()}@example.com`, password: 'TestPass123!', companyName: 'Leftover Co' });
+    const h2 = authHeader(reg.body.token);
+    const api2 = (m, pth, body) => { const r = request(app)[m](`/api/migration${pth}`).set(h2); return body === undefined ? r : r.send(body); };
+    const buf = fs.readFileSync(FIXTURE);
+    const runId = unwrapBody(await api2('post', '/runs', {})).id;
+    const { MigrationRun } = require('../../models/MigrationRun');
+    const cid = (await MigrationRun.findById(runId).lean()).companyId;
+    // what an earlier attempt left: a party with a JSM code but another name, and a same-name party with another code
+    const { loadPackage } = require('../../services/migration/packageReader');
+    const { buildPlan } = require('../../services/migration/jsmMapper');
+    const pkg = await loadPackage(FIXTURE);
+    const keep = (rows) => rows.filter((r) => !r.CO_PATH || YEARS.includes(String(r.CO_PATH).trim()));
+    const tables = Object.fromEntries(Object.entries(pkg.tables).map(([k, v]) => [k, keep(v)]));
+    const [a, b] = buildPlan(tables, { companyId: cid }).docs.Party.filter((x) => x.accd > 0);
+    const Party = require('../../models/Party').collection;
+    await Party.insertMany([{ companyId: cid, name: 'LEFT FROM EARLIER', accd: a.accd, isDeleted: false }, { companyId: cid, name: b.name, accd: 99999, isDeleted: false }]);
+
+    await request(app).put(`/api/migration/runs/${runId}/chunk?index=0`).set(h2).set('Content-Type', 'application/octet-stream').send(buf);
+    assert.equal(unwrapBody(await api2('post', `/runs/${runId}/complete`, { bytes: buf.length })).status, 'uploaded');
+    assert.equal((await api2('post', `/runs/${runId}/apply`, { years: YEARS })).status, 200);
+    let r;
+    for (let i = 0; i < 200; i += 1) { r = unwrapBody(await api2('get', `/runs/${runId}`)); if (['applied', 'failed'].includes(r.status)) break; await new Promise((x) => setTimeout(x, 300)); }
+    assert.equal(r.status, 'applied', r.error);
+    assert.equal(await Party.countDocuments({ companyId: cid, accd: a.accd }), 1, 'the party with that JSM code is reused');
+    const rep = unwrapBody(await api2('post', `/runs/${runId}/reconcile`, {}));
+    assert.equal(rep.mismatched, 0, JSON.stringify(rep.checks.filter((c) => !c.ok).slice(0, 6)));
+  });
 });
