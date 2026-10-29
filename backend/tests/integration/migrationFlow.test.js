@@ -35,6 +35,15 @@ describe('JSM migration end to end (isolated DB)', { skip: HAVE_DATA ? false : '
     await request(app).put(`/api/migration/runs/${bad}/chunk?index=0`).set(h).set('Content-Type', 'application/octet-stream').send(buf.subarray(0, Math.floor(buf.length / 2)));
     const badDone = await api('post', `/runs/${bad}/complete`, { bytes: buf.length });
     assert.equal(unwrapBody(badDone).status, 'invalid');
+    // desktop 1.0.8 pads the last piece with zero bytes: the padding is cut off and the upload is accepted
+    const padded = unwrapBody(await api('post', '/runs', {})).id;
+    const withZeros = Buffer.concat([buf, Buffer.alloc(6 * 1024 * 1024 - (buf.length % (6 * 1024 * 1024)))]);
+    await request(app).put(`/api/migration/runs/${padded}/chunk?index=0`).set(h).set('Content-Type', 'application/octet-stream').send(withZeros);
+    assert.equal(unwrapBody(await api('post', `/runs/${padded}/complete`, { bytes: buf.length })).status, 'uploaded');
+    // extra bytes that are not padding are still refused
+    const junk = unwrapBody(await api('post', '/runs', {})).id;
+    await request(app).put(`/api/migration/runs/${junk}/chunk?index=0`).set(h).set('Content-Type', 'application/octet-stream').send(Buffer.concat([buf, Buffer.from('junk')]));
+    assert.equal(unwrapBody(await api('post', `/runs/${junk}/complete`, { bytes: buf.length })).status, 'invalid');
 
     runId = unwrapBody(await api('post', '/runs', {})).id;
     const size = 20000; let i = 0;

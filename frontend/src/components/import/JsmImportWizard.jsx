@@ -71,7 +71,7 @@ export default function JsmImportWizard({ isOpen, onClose }) {
       setRunId(run.id);
       const chunks = Math.max(1, Math.ceil(ex.bytes / CHUNK));
       for (let i = 0; i < chunks; i += 1) {
-        const bytes = await desktop.readChunk(ex.file, i, CHUNK);
+        const bytes = new Uint8Array(await desktop.readChunk(ex.file, i, CHUNK)); // exact-size copy: a view would upload its whole backing buffer
         let sent = false;
         for (let attempt = 0; attempt < 4 && !sent; attempt += 1) {
           try { await migrationApi.uploadChunk(run.id, i, bytes); sent = true; } catch (err) { if (attempt === 3) throw err; await new Promise((r) => setTimeout(r, 1500 * (attempt + 1))); }
