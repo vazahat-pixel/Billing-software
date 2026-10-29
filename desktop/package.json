@@ -1,6 +1,6 @@
 {
   "name": "textile-erp-desktop",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "description": "Textile ERP Desktop - Client Application",
   "main": "main.js",
