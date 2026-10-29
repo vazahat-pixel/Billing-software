@@ -106,13 +106,28 @@ function buildPlan(tables, { companyId }) {
     return p;
   };
 
+  // One GSTIN = one party here (GSTIN is unique per company). JSM may have two accounts with the same GSTIN:
+  // their bills go under one party (GSTR-1 keeps the GSTIN), and each account keeps its own ledger and balance.
+  const partyByGstin = new Map();
+  const addParty = (code, a, kind) => {
+    const p = makeParty(code, a, kind);
+    const same = p.gstin && partyByGstin.get(p.gstin);
+    if (same) {
+      warn(`Account "${str(a.first.AC_NAME)}" has the same GSTIN ${p.gstin} as "${same.name}": its bills are under "${same.name}"; it keeps its own ledger and balance`);
+      return same;
+    }
+    if (p.gstin) partyByGstin.set(p.gstin, p);
+    docs.Party.push(p);
+    return p;
+  };
+
   for (const [code, a] of acc) {
     const r = a.first;
     const sideDr = str(r.OP_DRCR).toUpperCase() !== 'CR';
     let party = null;
     if (!a.isBook && ['Customer', 'Supplier', 'Job Worker', 'Broker'].includes(a.info.kind)) {
-      party = makeParty(code, a);
-      docs.Party.push(party); keys.Party[`AC:${code}`] = party._id; a.partyId = party._id;
+      party = addParty(code, a);
+      keys.Party[`AC:${code}`] = party._id; a.partyId = party._id;
     }
     const ledger = {
       _id: oid(), companyId, name: unique(str(r.AC_NAME) || `ACCOUNT ${code}`, ledgerNames), code: String(code),
@@ -130,8 +145,8 @@ function buildPlan(tables, { companyId }) {
     const a = acc.get(c);
     if (!a) { warn(`${where}: account ${c} not found`); return null; }
     if (!a.partyId) {
-      const p = makeParty(c, a, kind);
-      docs.Party.push(p); keys.Party[`AC:${c}`] = p._id; a.partyId = p._id;
+      const p = addParty(c, a, kind);
+      keys.Party[`AC:${c}`] = p._id; a.partyId = p._id;
       const led = docs.LedgerMaster.find((l) => l._id.equals(a.ledgerId));
       if (led) { led.accountType = 'Party'; led.linkedPartyId = p._id; }
       warn(`${where}: account "${a.row.AC_NAME}" is not in a debtor/creditor group; created as ${kind}`);
