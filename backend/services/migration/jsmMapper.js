@@ -41,7 +41,7 @@ function buildPlan(tables, { companyId }) {
   const warn = (m) => { if (warnings.length < 500) warnings.push(m); };
   const blockers = []; // problems that make the import unsafe (shown in preview, refuse apply)
   const docs = { Party: [], LedgerMaster: [], Item: [], Sales: [], Purchase: [], Job: [], InventoryLot: [], StockMovement: [],
-    PaymentVoucher: [], DebitCreditNote: [], ReturnInvoice: [], BillSettlement: [], AccountingEntry: [] };
+    PaymentVoucher: [], DebitCreditNote: [], ReturnInvoice: [], BillSettlement: [], AccountingEntry: [], SubMaster: [], Warehouse: [] };
   const keys = {}; Object.keys(docs).forEach((k) => { keys[k] = {}; });
 
   // ---- company-years, oldest first -------------------------------------------------------------------
@@ -225,6 +225,47 @@ function buildPlan(tables, { companyId }) {
     }
   }
   // goods already at a mill / job worker at the start of the first year: carried as challans (LAST_YEAR='LAST'), handled below
+
+  // ---- other masters (what F3 shows in JSM's Station, Transport, Tax Slab ... screens); one per name, first year wins ----
+  const subSeen = new Set();
+  const flag = (v) => /^y/i.test(str(v));
+  const addSub = (type, name, extraFields) => {
+    const nm = str(name); const k = `${type}|${nm.toLowerCase()}`;
+    if (!nm || subSeen.has(k)) return;
+    subSeen.add(k);
+    const at = years[0]?.from || new Date();
+    docs.SubMaster.push({ _id: oid(), companyId, type, name: nm, extraFields, isFavorite: false, lastUsedAt: null, createdAt: at, updatedAt: at });
+  };
+  const yearRows = (n) => byYear(T(n).filter((r) => !str(r.CO_PATH) || wanted.has(str(r.CO_PATH))));
+  const stateName = new Map(T('MST_STATE').map((r) => [str(r.STATE_CODE), str(r.STATE_NAME)]));
+  for (const r of yearRows('MST_STATION')) {
+    addSub('City', r.ST_NAME, { code: str(r.ST_CODE), dist: str(r.DIST), state: str(r.STATE), stateCode: str(r.STATE_CODE), jsmStateName: stateName.get(str(r.STATE_CODE)) || str(r.STATE),
+      pincode: str(r.PIN_CODE), distance: str(r.DISTANCE), address1: str(r.ADD_1), address2: str(r.ADD_2), city: str(r.CITY) });
+  }
+  for (const r of yearRows('MST_TR_PORT')) {
+    addSub('Transport', r.TRNS_NAME, { code: str(r.TRNS_CODE), address1: str(r.ADD_1), address2: str(r.ADD_2), city: str(r.CITY), phone: str(r.PHONE_1), transporterId: str(r.TRNS_GSTIN),
+      email: str(r.TRNS_Email), pincode: str(r.TRNS_PINCODE), state: str(r.TRNS_STATE), mode: str(r.TRNS_MODE), party: num(r.AC_CODE) ? (accName(r.AC_CODE) || '') : '', contactPerson: '', route: '' });
+  }
+  for (const r of yearRows('MST_IT_TAX_SLAB')) {
+    addSub('ItemTaxSlab', r.SLAB_NAME, { code: str(r.SLAB_CODE), category: /^s/i.test(str(r.IT_CAT)) ? 'Services' : 'Goods', sgstRate: num(r.SGST), cgstRate: num(r.CGST), igstRate: num(r.IGST), gstRate: num(r.IGST), cessRate: num(r.CESS) });
+  }
+  for (const r of yearRows('MST_ITG_MAST')) addSub('ItemGroup', r.GRIT_NAME, { code: str(r.GRIT_CODE), category: 'Goods', description: '' });
+  for (const r of yearRows('MST_UNIT')) addSub('Unit', r.UNIT_NAME, { code: str(r.UNIT_CODE), quc: str(r.QUC), category: 'Goods', description: '' });
+  for (const r of yearRows('MST_TYPE')) addSub('Type', r.MST_NAME, { code: str(r.MST_CODE), region: str(r.REG_GST), taxCalculation: str(r.TAX_GST), category: 'Goods', description: '' });
+  for (const r of yearRows('MST_DRAW_BANK')) addSub('PartyBank', r.MST_NAME, { code: str(r.MST_CODE), branch: '', ifsc: '', accountType: '' });
+  for (const r of yearRows('MST_BOOK_MN')) addSub('BookType', r.BOOK_NAME, { code: str(r.BOOK_CODE), category: 'Goods', description: '' });
+  for (const g of T('MST_ACG_MAST')) {
+    addSub('AccountGroup', g.GRAC_HEAD, { graccd: str(g.GRAC_CODE), primary: flag(g.PRIMARY_YN) ? 'Y' : 'N', mainGroup: str(grp.get(str(g.PRIMARY_CD))?.GRAC_HEAD), groupType: str(g.GRAC_TYPE), indexCd: str(g.GRCHR_CODE) || '0', active: true,
+      optionalFields: { broker: flag(g.DB_BRK), transport: flag(g.DB_TRNS), mainGroup: flag(g.DB_MG), dueDays: flag(g.DB_DUE), interestCommi: flag(g.DB_INT), adat: flag(g.DB_ADT), cstTinNo: flag(g.DB_CST), gstTinNo: flag(g.DB_GST), panNo: flag(g.DB_PAN), maxLimit: flag(g.DB_MAX), minLimit: flag(g.DB_MIN), tdsPer: flag(g.DB_TDS) } });
+  }
+  const godSeen = new Set();
+  for (const r of yearRows('MST_GODWON')) {
+    const nm = str(r.MST_NAME); const code = (str(r.B_SORT_NM) || str(r.MST_CODE) || nm).toUpperCase();
+    if (!nm || godSeen.has(nm.toLowerCase()) || godSeen.has(`#${code}`)) continue;
+    godSeen.add(nm.toLowerCase()); godSeen.add(`#${code}`);
+    const at = years[0]?.from || new Date();
+    docs.Warehouse.push({ _id: oid(), companyId, name: nm, code, type: 'Godown', parentId: null, address: [str(r.ADDRESS_1), str(r.ADDRESS_2)].filter(Boolean).join(', '), isDefault: false, status: 'Active', createdAt: at, updatedAt: at });
+  }
 
   // ---- vouchers' reference tables -------------------------------------------------------------------------
   const bookName = (code) => accName(code) || `Book ${code}`;
@@ -562,6 +603,10 @@ function buildPlan(tables, { companyId }) {
   const outByParty = new Map();
   for (const [list, party] of [[docs.Sales, 'customerId'], [docs.Purchase, 'supplierId']]) for (const d of list) outByParty.set(String(d[party]), r2((outByParty.get(String(d[party])) || 0) + Math.max(0, d.netAmount - d.paidAmount)));
   expected.outstandingByParty = Object.fromEntries(outByParty);
+  // every master name JSM has, by kind (reconciliation checks each one is here)
+  expected.masters = {};
+  for (const d of docs.SubMaster) (expected.masters[d.type] ||= []).push(d.name);
+  if (docs.Warehouse.length) expected.masters.Godown = docs.Warehouse.map((w) => w.name);
 
   docs.InventoryLot = lots; // final state of every lot after all stock events
   for (const [label, set] of [['sales bill', saleNos], ['purchase bill', purchaseNos], ['mill/job challan', jobNos], ['voucher', voucherNosR], ['voucher', voucherNosP], ['GST note', noteNos]]) {
