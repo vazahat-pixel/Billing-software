@@ -99,3 +99,6 @@ downloads/
 credentials.json
 temp_auto_push.bat
 temp_interactive_push.bat
+
+# local-only test data exported from a real JSM database (never commit)
+backend/tests/fixtures/migration/*.gz

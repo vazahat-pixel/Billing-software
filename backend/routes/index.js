@@ -93,6 +93,7 @@ router.use('/sync', require('./sync.routes'));
 
 // --- Masters: the shell of the product, shipped with every plan -------------
 router.use('/masters', requireModule('masters'), mastersRoutes);
+router.use('/migration', requireModule('masters'), require('./migration.routes'));
 router.use('/parties', requireModule('masters'), masterScope, partyRoutes);
 router.use('/items', requireModule('masters'), masterScope, itemRoutes);
 router.use('/books', requireModule('masters'), masterScope, bookRoutes);

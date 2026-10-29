@@ -21,6 +21,8 @@ const SKIP_TABLE = /^(TMP_|TEMP_|PC[A-Z0-9_]*_|A_REPORT|A_STOCK|A_TEMP|AA_TEMP|T
 /** Global tables (no CO_PATH column) that master data refers to. */
 const GLOBAL_TABLES = ['MST_ACG_MAST', 'MST_STATE', 'MST_BOOK_MN', 'J_AddLessSetup'];
 
+// Columns that hold logins or passwords (e-way bill / e-invoice / SMS credentials live in J_COMPANY) are never exported.
+const SECRET_COLUMN = /(PASS|PWD|USER_?I|E_USER|SECRET|TOKEN|API_?KEY)/i;
 const sqlList = (paths) => paths.map((p) => `'${String(p).replace(/'/g, "''")}'`).join(',');
 
 /** User tables of the database that carry a CO_PATH column (= company/year data). */
@@ -85,6 +87,7 @@ async function writePackage(conn, db, coPaths, outFile, onProgress = () => {}) {
     let rows = [];
     try {
       rows = await exportTable(conn, db, t.name, where);
+      for (const r of rows) for (const c of Object.keys(r)) if (SECRET_COLUMN.test(c)) delete r[c];
     } catch (err) {
       if (!/not found/.test(err.message)) throw err;
     }
