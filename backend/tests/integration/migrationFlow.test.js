@@ -25,7 +25,10 @@ describe('JSM migration end to end (isolated DB)', { skip: HAVE_DATA ? false : '
     const reg = await request(app).post('/api/auth/register').send({ name: 'Mig Owner', email: `mig-${Date.now()}@example.com`, password: 'TestPass123!', companyName: 'Migration Co' });
     h = authHeader(reg.body.token);
     companyId = unwrapBody(await request(app).get('/api/auth/me').set(h)).companyId;
-    const cid = new (require('mongoose').Types.ObjectId)(companyId);
+    // the company the import writes to (the one the signed-in user works in)
+    const probe = unwrapBody(await request(app).post('/api/migration/runs').set(h).send({})).id;
+    const cid = (await require('../../models/MigrationRun').MigrationRun.findById(probe).lean()).companyId;
+    companyId = String(cid);
     baseline = { sub: await require('../../models/SubMaster').collection.countDocuments({ companyId: cid }), god: await require('../../models/Warehouse').collection.countDocuments({ companyId: cid }) };
   });
   after(async () => { if (shutdown) await shutdown(); });
