@@ -70,7 +70,10 @@ function readChunk(file, index, size) {
   try {
     const buf = Buffer.alloc(size);
     const n = fs.readSync(fd, buf, 0, size, index * size);
-    return buf.subarray(0, n);
+    // A copy of exactly n bytes: a view on the larger buffer crosses IPC with its whole 6 MB backing store.
+    const out = new Uint8Array(n);
+    out.set(buf.subarray(0, n));
+    return out;
   } finally { fs.closeSync(fd); }
 }
 

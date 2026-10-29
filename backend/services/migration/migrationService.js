@@ -60,9 +60,29 @@ async function appendChunk(run, index, buffer) {
   return run;
 }
 
+function onlyZerosAfter(file, from, to) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    const buf = Buffer.alloc(Math.min(1024 * 1024, to - from));
+    for (let pos = from; pos < to;) {
+      const n = fs.readSync(fd, buf, 0, Math.min(buf.length, to - pos), pos);
+      if (n <= 0) return false;
+      for (let i = 0; i < n; i += 1) if (buf[i] !== 0) return false;
+      pos += n;
+    }
+    return true;
+  } finally { fs.closeSync(fd); }
+}
+
 async function completeUpload(run, { expectedBytes } = {}) {
   if (!fs.existsSync(run.filePath)) throw AppError.badRequest('Nothing was uploaded');
-  const size = fs.statSync(run.filePath).size;
+  let size = fs.statSync(run.filePath).size;
+  // Desktop 1.0.8 sends its last piece padded with zero bytes up to the full piece size; cut that padding off.
+  if (expectedBytes && size > Number(expectedBytes) && onlyZerosAfter(run.filePath, Number(expectedBytes), size)) {
+    fs.truncateSync(run.filePath, Number(expectedBytes));
+    size = Number(expectedBytes);
+    run.uploadedBytes = size;
+  }
   if (expectedBytes && size !== Number(expectedBytes)) {
     run.status = 'invalid'; run.problems = [`Uploaded ${size} bytes, expected ${expectedBytes}`]; await run.save();
     return run;
