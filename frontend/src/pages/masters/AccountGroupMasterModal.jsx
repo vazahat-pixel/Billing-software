@@ -60,14 +60,9 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
   useEffect(() => {
     if (isOpen) {
       fetchSubMasters('AccountGroup');
-      setMode(readOnly ? 'VIEW' : 'ADD');
-      setFormData({ ...DEFAULT_FORM, graccd: String(Date.now()).slice(-3) });
-      setSelectedId(null);
       setSearchQuery('');
-      setFocusedRowIndex(0);
-      setTimeout(() => groupHeadRef.current?.focus(), 80);
     }
-  }, [isOpen, readOnly]);
+  }, [isOpen]);
 
   const groupList = useMemo(() => {
     return subMasters
@@ -137,6 +132,20 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
     });
     setMode(editMode && !readOnly ? 'EDIT' : 'VIEW');
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (groupList.length > 0) {
+      if (!selectedId || !groupList.some(g => g.id === selectedId)) {
+        const recent = groupList[groupList.length - 1];
+        loadGroup(recent, false);
+      }
+    } else {
+      setMode(readOnly ? 'VIEW' : 'ADD');
+      setFormData({ ...DEFAULT_FORM, graccd: String(Date.now()).slice(-3) });
+      setSelectedId(null);
+    }
+  }, [isOpen, groupList, readOnly]);
 
   const currentIndex = useMemo(() => {
     if (!selectedId || !filteredGroups.length) return -1;
@@ -303,10 +312,38 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
       <div
         className="classic-erp-window select-none text-slate-800"
         data-form-enter-nav="true"
+        tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'F3') {
             e.preventDefault();
             handleFind();
+          } else if (e.key === 'F2') {
+            e.preventDefault();
+            if (mode === 'VIEW' && selectedId) {
+              handleEdit();
+            } else if (mode === 'VIEW') {
+              handleNew();
+            }
+          } else if (e.key === 'Enter') {
+            if (mode === 'VIEW' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handleNew();
+            }
+          } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            if (mode === 'VIEW' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handlePrev();
+            }
+          } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+            if (mode === 'VIEW' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handleNext();
+            }
+          } else if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || (e.altKey && e.key.toLowerCase() === 's')) {
+            e.preventDefault();
+            if (mode === 'ADD' || mode === 'EDIT') {
+              handleSave();
+            }
           }
         }}
       >

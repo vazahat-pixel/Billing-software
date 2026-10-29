@@ -1177,7 +1177,7 @@ const useStore = create((set, get) => ({
     }
   },
 
-  issueToMill: async (issueData) => {
+  issueToMill: async (issueData, { skipRefetch = false } = {}) => {
     issueData = withOperationId(issueData);
     const saveLocal = async () => {
       const localId = generateLocalId();
@@ -1215,7 +1215,9 @@ const useStore = create((set, get) => ({
     if (isOffline() && canSaveOffline(get)) return saveLocal();
     try {
       const _ji = await jobsApi.issue(issueData);
-      await get().fetchJobs();
+      if (!skipRefetch) {
+        await get().fetchJobs();
+      }
       return _ji;
     } catch (err) {
       if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
@@ -1223,7 +1225,7 @@ const useStore = create((set, get) => ({
     }
   },
 
-  receiveFromMill: async (receiveData) => {
+  receiveFromMill: async (receiveData, { skipRefetch = false } = {}) => {
     receiveData = withOperationId(receiveData);
     const saveLocal = async () => {
       const targetId = receiveData.jobId || receiveData._id || receiveData.id;
@@ -1249,8 +1251,10 @@ const useStore = create((set, get) => ({
     try {
       const _jr = await jobsApi.receive(receiveData);
       const res = { data: { data: _jr } };
-      await get().fetchJobs();
-      await get().fetchInventory();
+      if (!skipRefetch) {
+        await get().fetchJobs();
+        await get().fetchInventory();
+      }
       return res.data.data;
     } catch (err) {
       if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();
@@ -1258,7 +1262,7 @@ const useStore = create((set, get) => ({
     }
   },
 
-  updateJobReceive: async (receiveData) => {
+  updateJobReceive: async (receiveData, { skipRefetch = false } = {}) => {
     const saveLocal = async () => {
       const targetId = receiveData.jobId || receiveData._id || receiveData.id;
       const updatedJob = {
@@ -1278,8 +1282,10 @@ const useStore = create((set, get) => ({
     try {
       const _jr = await jobsApi.updateReceive(receiveData);
       const res = { data: { data: _jr } };
-      await get().fetchJobs();
-      await get().fetchInventory();
+      if (!skipRefetch) {
+        await get().fetchJobs();
+        await get().fetchInventory();
+      }
       return res.data.data;
     } catch (err) {
       if ((isNetworkError(err) || !navigator.onLine) && canSaveOffline(get)) return saveLocal();

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import Modal from '../../components/ui/Modal';
 import { ERPSearchableSelect } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
@@ -7,7 +7,7 @@ import { toast } from '../../store/useToastStore';
 import { erpConfirm } from '../../utils/confirm';
 
 const MergeMasterModal = ({ isOpen, onClose, initialEntity }) => {
-  const { parties, items, fetchParties, fetchItems } = useStore();
+  const { parties, items, subMasters, fetchParties, fetchItems, fetchSubMasters } = useStore();
   const [entity, setEntity] = useState(initialEntity || 'party');
   useEffect(() => {
     if (isOpen && initialEntity) setEntity(initialEntity);
@@ -23,6 +23,7 @@ const MergeMasterModal = ({ isOpen, onClose, initialEntity }) => {
     if (isOpen) {
       fetchParties();
       fetchItems();
+      fetchSubMasters?.();
       setSourceId('');
       setTargetId('');
       setDryRunResult(null);
@@ -33,6 +34,10 @@ const MergeMasterModal = ({ isOpen, onClose, initialEntity }) => {
   const options =
     entity === 'party'
       ? parties.map((p) => ({ value: p._id || p.id, label: p.name }))
+      : entity === 'station'
+      ? (subMasters || []).filter((s) => s.type === 'City').map((s) => ({ value: s._id || s.id, label: s.name }))
+      : entity === 'transport'
+      ? (subMasters || []).filter((s) => s.type === 'Transport').map((s) => ({ value: s._id || s.id, label: s.name }))
       : items.map((i) => ({ value: i._id || i.id, label: i.name || i.itemName }));
 
   const handleMerge = async () => {

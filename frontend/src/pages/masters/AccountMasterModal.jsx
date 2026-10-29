@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
 import { ERPSelect } from '../../components/forms/FormElements';
@@ -161,6 +161,14 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       setMode(readOnly ? 'View' : initialPartyId ? 'Edit' : 'Add');
     } else if (readOnly) {
       setMode('View');
+    } else if (parties && parties.length > 0) {
+      if (!selectedPartyId || !parties.some(p => (p._id || p.id) === selectedPartyId)) {
+        const recent = parties[parties.length - 1];
+        const id = recent._id || recent.id;
+        setSelectedPartyId(id);
+        setFormData({ ...EMPTY_ACCOUNT, ...recent });
+        setMode('View');
+      }
     } else {
       setFormData({ ...EMPTY_ACCOUNT });
       setSelectedPartyId('');
@@ -418,6 +426,28 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
               inp?.focus();
               try { inp?.select(); } catch {}
             }, 60);
+          } else if (e.key === 'F2') {
+            e.preventDefault();
+            if (mode === 'View' && (formData._id || formData.id || selectedPartyId)) {
+              handleEdit();
+            } else if (mode === 'View') {
+              handleNew();
+            }
+          } else if (e.key === 'Enter') {
+            if (mode === 'View' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handleNew();
+            }
+          } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            if (mode === 'View' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handlePrev();
+            }
+          } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+            if (mode === 'View' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handleNext();
+            }
           }
         }}
       >

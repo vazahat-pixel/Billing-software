@@ -111,11 +111,11 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
   useEffect(() => {
     if (isOpen && type) {
       fetchSubMasters(type);
-      resetForm();
       setSearchQuery('');
-      setMode(readOnly ? 'VIEW' : 'ADD');
     }
   }, [isOpen, type]);
+
+
 
   // Compute readable title
   const title = useMemo(() => {
@@ -187,6 +187,20 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
     setErrorMsg('');
     setMode(editMode && !readOnly ? 'EDIT' : 'VIEW');
   };
+
+  useEffect(() => {
+    if (!isOpen || !type) return;
+    const itemsOfType = subMasters.filter((item) => item.type === type);
+    if (itemsOfType.length > 0) {
+      if (!selectedId || !itemsOfType.some((it) => it._id === selectedId)) {
+        const recent = itemsOfType[itemsOfType.length - 1];
+        loadRecord(recent, false);
+      }
+    } else {
+      resetForm();
+      setMode(readOnly ? 'VIEW' : 'ADD');
+    }
+  }, [isOpen, type, subMasters, readOnly]);
 
   // Tax slab auto-split: changing IGST splits equally into SGST and CGST
   const handleIgstChange = (val) => {
@@ -330,17 +344,22 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
         extraFields
       };
 
+      let saved;
       if (mode === 'EDIT' && selectedId) {
-        await updateSubMaster(selectedId, payload);
+        saved = await updateSubMaster(selectedId, payload);
         notifySuccess(`${title} record updated`);
       } else {
-        await addSubMaster(payload);
+        saved = await addSubMaster(payload);
         notifySuccess(`${title} record saved`);
       }
 
-      resetForm();
-      setMode('VIEW');
-      fetchSubMasters(type);
+      await fetchSubMasters(type);
+      const resItem = saved || payload;
+      if (resItem && (resItem._id || resItem.id)) {
+        loadRecord(resItem, false);
+      } else {
+        setMode('VIEW');
+      }
     } catch (err) {
       setErrorMsg(err.response?.data?.message || err.message || 'Failed to save record');
     } finally {
@@ -364,12 +383,40 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
     <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-4xl">
       <div
         className="classic-erp-window flex flex-col max-h-[92vh]"
+        tabIndex={0}
         data-form-enter-nav="true"
         onKeyDown={(e) => {
           if (e.key === 'F3') {
             e.preventDefault();
             searchInputRef.current?.focus();
             try { searchInputRef.current?.select(); } catch {}
+          } else if (e.key === 'F2') {
+            e.preventDefault();
+            if (mode === 'VIEW' && selectedId) {
+              handleEdit();
+            } else if (mode === 'VIEW') {
+              handleNew();
+            }
+          } else if (e.key === 'Enter') {
+            if (mode === 'VIEW' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handleNew();
+            }
+          } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            if (mode === 'VIEW' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handlePrev();
+            }
+          } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+            if (mode === 'VIEW' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handleNext();
+            }
+          } else if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || (e.altKey && e.key.toLowerCase() === 's')) {
+            e.preventDefault();
+            if (mode === 'ADD' || mode === 'EDIT') {
+              handleSubmit();
+            }
           }
         }}
       >

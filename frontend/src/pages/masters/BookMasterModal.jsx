@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
 import { ERPSelect } from '../../components/forms/FormElements';
@@ -132,9 +132,9 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
         setFormData(emptyForm(selectedModule));
         setTimeout(() => { nameInputRef.current?.focus(); }, 80);
       } else if (data && data.length > 0) {
-        const first = data[0];
-        setSelectedBookId(first._id || first.id);
-        setFormData(mapBookToForm(first));
+        const recent = data[data.length - 1];
+        setSelectedBookId(recent._id || recent.id);
+        setFormData(mapBookToForm(recent));
       } else {
         setSelectedBookId('');
         setFormData(emptyForm(selectedModule));
@@ -148,10 +148,9 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
 
   useEffect(() => {
     if (isOpen) {
-      loadBooks({ startNew: !readOnly });
+      loadBooks({ startNew: false });
       setActiveTab('Book');
-      if (!readOnly) setMode('Add');
-      else setMode('View');
+      setMode('View');
     }
   }, [isOpen, selectedModule, readOnly]);
 
@@ -329,7 +328,38 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[920px]">
-      <div className="classic-erp-window flex flex-col h-full max-h-[90vh]">
+            <div
+        className="classic-erp-window flex flex-col h-full max-h-[90vh]"
+        data-form-enter-nav="true"
+        onKeyDown={(e) => {
+          if (e.key === 'F3') {
+            e.preventDefault();
+            const sel = document.querySelector('.classic-erp-select select, select');
+            sel?.focus();
+          } else if (e.key === 'F2') {
+            e.preventDefault();
+            if (mode === 'View' && selectedBookId) {
+              handleEdit();
+              setTimeout(() => nameInputRef.current?.focus(), 60);
+            } else if (mode === 'View') {
+              handleNew();
+            }
+          } else if (e.key === 'Enter' && mode === 'View') {
+            e.preventDefault();
+            handleNew();
+          } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            if (mode === 'View') {
+              e.preventDefault();
+              handlePrev();
+            }
+          } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+            if (mode === 'View') {
+              e.preventDefault();
+              handleNext();
+            }
+          }
+        }}
+      >
         <ErpBusyOverlay show={loading} message="Loading books…" />
         <ErpBusyOverlay show={!loading && saving} message="Saving book…" />
         <div className="classic-erp-header">

@@ -1636,7 +1636,46 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 </div>
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Date:</span>
-                  <input type="date" className="classic-erp-input" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
+                  <input
+                    type="date"
+                    className="classic-erp-input"
+                    value={header.billDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setHeader((prev) => ({
+                        ...prev,
+                        billDate: val,
+                        chDate: val,
+                        orderDate: val,
+                      }));
+                      setFooter((prev) => {
+                        const days = parseInt(prev.dueDays || 0, 10);
+                        const d = new Date(val || Date.now());
+                        if (!isNaN(days) && days > 0) d.setDate(d.getDate() + days);
+                        return {
+                          ...prev,
+                          lrDate: val,
+                          dueDate: !isNaN(days) && days > 0 ? d.toISOString().split('T')[0] : prev.dueDate,
+                        };
+                      });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        const val = e.target.value || header.billDate;
+                        setHeader((prev) => ({
+                          ...prev,
+                          billDate: val,
+                          chDate: val,
+                          orderDate: val,
+                        }));
+                        setFooter((prev) => ({
+                          ...prev,
+                          lrDate: val,
+                        }));
+                      }
+                    }}
+                    disabled={locked}
+                  />
                 </div>
               </div>
 
@@ -1713,40 +1752,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                   <input type="text" className="classic-erp-input" value={header.city} onChange={e => setHeader({ ...header, city: e.target.value })} disabled={locked} />
                 </div>
               </div>
-              <div className="classic-erp-meta-grid--3 erp-sales-party-meta" style={{ marginTop: 2 }}>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Transport:</span>
-                  <input
-                    type="text"
-                    className="classic-erp-input"
-                    value={footer.transport || ''}
-                    onChange={e => setFooter(prev => ({ ...prev, transport: e.target.value }))}
-                    disabled={locked}
-                    placeholder="Transport name"
-                  />
-                </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">LR No:</span>
-                  <input
-                    type="text"
-                    className="classic-erp-input"
-                    value={footer.lrNo || ''}
-                    onChange={e => setFooter(prev => ({ ...prev, lrNo: e.target.value }))}
-                    disabled={locked}
-                    placeholder="LR No"
-                  />
-                </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">LR Date:</span>
-                  <input
-                    type="date"
-                    className="classic-erp-input"
-                    value={footer.lrDate || ''}
-                    onChange={e => setFooter(prev => ({ ...prev, lrDate: e.target.value }))}
-                    disabled={locked}
-                  />
-                </div>
-              </div>
+
               <div className="classic-erp-meta-grid--3 erp-sales-broker-row">
                 {showBroker ? (
                   <div className="classic-erp-field">

@@ -208,8 +208,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       setBillType(job.billType || 'Process');
 
       // Find all sibling jobs that were received under the same billGpNo, so multi-line bills load completely
+      const allJobs = options.jobsList || jobWorkEntries || [];
       const siblingJobs = job.billGpNo
-         ? (jobWorkEntries || []).filter(j => j.billGpNo && String(j.billGpNo).trim() === String(job.billGpNo).trim() && (j.status === 'Received' || j.status === 'Partial'))
+         ? allJobs.filter(j => j.billGpNo && String(j.billGpNo).trim().toLowerCase() === String(job.billGpNo).trim().toLowerCase() && (j.status === 'Received' || j.status === 'Partial'))
          : [job];
       const jobsToLoad = siblingJobs.length > 0 ? siblingJobs : [job];
 
@@ -1265,6 +1266,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
 
       setSaving(true);
       let ok = 0;
+      const savedJobIds = new Set();
       try {
          const totalGst = Number(computedSgstAmt) + Number(computedCgstAmt) + Number(computedIgstAmt);
          for (const line of receivable) {
@@ -1302,10 +1304,14 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                isFinal: lineIsFinal,
             };
 
+            let res;
             if (isEditMode && line.isEdit) {
-               await updateJobReceive(payload);
+               res = await updateJobReceive(payload, { skipRefetch: true });
             } else {
-               await receiveFromMill(payload);
+               res = await receiveFromMill(payload, { skipRefetch: true });
+            }
+            if (res?._id || res?.id || line.jobId) {
+               savedJobIds.add(String(res?._id || res?.id || line.jobId));
             }
             ok += 1;
          }
@@ -1315,7 +1321,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
 
          // Stay on Mill Receive form in VIEW mode showing the saved receipt
          await fetchJobs();
-         await fetchInventory?.();
+         fetchInventory?.().catch(() => {});
 
          setActiveTab('Mill Receive');
          setIsEditMode(false);
@@ -1324,14 +1330,17 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          kbRef.current.mode = 'View';
 
          const freshState = useStore.getState();
-         const freshJobs = (freshState.jobWorkEntries || []).filter(j => j.status === 'Received' || j.status === 'Partial');
-         const matchedJob = (freshJobs || []).slice().reverse().find(j =>
-            (savedBillGpNo && String(j.billGpNo || '').trim() === savedBillGpNo) ||
+         const freshJobs = freshState.jobWorkEntries || [];
+         const matchedJob = freshJobs.find(j =>
+            (savedJobIds.size > 0 && savedJobIds.has(String(j._id || j.id))) ||
+            (savedBillGpNo && String(j.billGpNo || '').trim().toLowerCase() === savedBillGpNo.toLowerCase()) ||
             (savedSerial && String(j.serialNo || '').trim() === String(savedSerial).trim())
-         ) || freshJobs[freshJobs.length - 1];
+         ) || freshJobs.filter(j => j.status === 'Received' || j.status === 'Partial')
+           .slice()
+           .sort((a, b) => new Date(b.updatedAt || b.receiveDate || b.createdAt || 0) - new Date(a.updatedAt || a.receiveDate || a.createdAt || 0))[0];
 
          if (matchedJob) {
-            handleLoadReceivedJob(matchedJob, { asView: true });
+            handleLoadReceivedJob(matchedJob, { asView: true, jobsList: freshJobs });
          }
          focusSerialNo();
       } catch (err) {

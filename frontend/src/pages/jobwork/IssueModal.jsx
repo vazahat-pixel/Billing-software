@@ -918,7 +918,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       ].filter(Boolean).join(' | ');
       const remark = [form.remark1, form.remark2, dispatchNotes].filter(Boolean).join('\n');
       const { millId, procType, finish, jobRate } = form;
-      await issueToMill({
+      const savedJob = await issueToMill({
         jobCardNo: form.challanNo,
         challanNo: form.challanNo,
         issueDate: form.date,
@@ -946,63 +946,47 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         remarks: remark,
       });
       toast.success('Mill Issue saved — stock reduced from lot');
-      const [, lots] = await Promise.all([fetchJobs(), fetchInventory()]);
-      const remaining = fromPurchase ? findLotsFromPurchase(lots || [], fromPurchase) : [];
+      fetchInventory().catch(() => {});
 
-      if (keepOpen) {
-        const nextNo = await getNextChallanNo();
-        const base = { ...emptyForm(selectedBook), challanNo: nextNo, millId, procType, finish, jobRate };
-        setMode('Add');
-        setSelectedJobId('');
+      if (fromPurchase) {
+        const freshLots = useStore.getState().inventoryLots || [];
+        const remaining = findLotsFromPurchase(freshLots, fromPurchase);
         if (remaining.length) {
+          const nextNo = await getNextChallanNo();
           const lot = remaining[0];
           const lotId = lot._id || lot.id;
           const itemName = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
           const puRate = lot.rate ?? lot.purchaseRate ?? lot.avgRate ?? '';
+          setMode('Add');
           setForm({
-            ...base,
+            ...emptyForm(selectedBook),
             challanNo: nextNo,
+            millId,
+            procType,
+            finish,
+            jobRate,
             lotId,
             itemName,
             issPcs: String(lot.remainingPcs ?? ''),
             issQty: String(lot.remainingMtrs ?? ''),
             puRate: puRate !== '' && puRate != null ? String(puRate) : '',
-            puBillNo: fromPurchase?.invoiceNo || base.puBillNo,
+            puBillNo: fromPurchase?.invoiceNo || '',
           });
-          toast.info(`Ready for next challan (${remaining.length} lot(s) left)`);
-        } else {
-          setForm(base);
-          toast.info('Ready for next challan (same mill)');
+          setSelectedJobId('');
+          toast.success(`Next lot from purchase ready (${remaining.length} left)`);
+          return true;
         }
-      } else if (remaining.length) {
-        const nextNo = await getNextChallanNo();
-        const lot = remaining[0];
-        const lotId = lot._id || lot.id;
-        const itemName = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
-        const puRate = lot.rate ?? lot.purchaseRate ?? lot.avgRate ?? '';
-        setMode('Add');
-        setForm({
-          ...emptyForm(selectedBook),
-          challanNo: nextNo,
-          millId,
-          procType,
-          finish,
-          jobRate,
-          lotId,
-          itemName,
-          issPcs: String(lot.remainingPcs ?? ''),
-          issQty: String(lot.remainingMtrs ?? ''),
-          puRate: puRate !== '' && puRate != null ? String(puRate) : '',
-          puBillNo: fromPurchase?.invoiceNo || '',
-        });
-        setSelectedJobId('');
-        toast.success(`Next lot from purchase ready (${remaining.length} left)`);
-      } else {
-        if (fromPurchase) setFromPurchase(null);
-        await handleNew();
-        setMode('View');
-        setFindOpen(true);
+        setFromPurchase(null);
       }
+
+      // Display newly saved challan in View mode
+      const savedId = savedJob?._id || savedJob?.id;
+      if (savedId) {
+        loadJob(savedId, 'View');
+      } else {
+        setMode('View');
+      }
+      setFindOpen(false);
       return true;
     } catch (err) {
       toast.error(err, { fallback: 'Failed to save mill issue' });
@@ -1602,15 +1586,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                 <button type="submit" className="classic-erp-btn btn-blue" disabled={saving || locked}>
                   <SaveButtonLabel saving={saving} label="Save" />
                 </button>
-                <button
-                  type="button"
-                  className="classic-erp-btn btn-blue"
-                  disabled={saving || locked}
-                  onClick={() => handleSave(null, { keepOpen: true })}
-                  title="Save this challan and start a new one (Ctrl+Enter)"
-                >
-                  <SaveButtonLabel saving={saving} label="Save & New" />
-                </button>
+                
                 <button type="button" className="classic-erp-btn" onClick={handleCancel} disabled={saving}>
                   Cancel
                 </button>
