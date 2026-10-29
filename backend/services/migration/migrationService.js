@@ -124,9 +124,10 @@ async function insertAll(run, docsByModel) {
     const M = model(name);
     for (let i = 0; i < list.length; i += BATCH) {
       const batch = list.slice(i, i + BATCH);
+      // listed BEFORE the insert: if the batch fails halfway, undo still removes the part that got in
+      await MigrationRunDocs.create({ runId: run._id, model: name, ids: batch.map((d) => d._id) });
       // collection-level insert: documents keep their own dates and ids, no per-document save hooks
       await M.collection.insertMany(batch.map((d) => ({ ...d, isDeleted: false, version: 0 })), { ordered: true });
-      await MigrationRunDocs.create({ runId: run._id, model: name, ids: batch.map((d) => d._id) });
       done += batch.length;
       run.progress = { stage: `saving ${name}`, done, total };
       await run.save();
@@ -152,16 +153,31 @@ async function apply(run, { years } = {}) {
     if (plan.blockers.length) throw AppError.badRequest(plan.blockers.join(' '));
 
     // masters that already exist under the same name are reused, not duplicated
+    const reused = new Map();
     for (const [name, nameField, byId] of [['Party', 'name'], ['Item', 'name'], ['LedgerMaster', 'name']]) {
-      const existing = await model(name).collection.find({ companyId: run.companyId }, { projection: { name: 1, gstin: 1 } }).toArray();
+      const existing = await model(name).collection.find({ companyId: run.companyId }, { projection: { name: 1, gstin: 1, accd: 1 } }).toArray();
       if (!existing.length) continue;
-      const have = new Map(existing.map((e) => [String(e.name).toLowerCase(), e._id]));
-      // a party already here with the same GSTIN is the same firm (GSTIN is unique per company)
+      const have = new Map(existing.map((e) => [String(e.name).toLowerCase(), e]));
+      // a party already here with the same JSM account code or GSTIN is the same account / firm (both are unique per company)
+      const haveAccd = new Map(name === 'Party' ? existing.filter((e) => Number(e.accd) > 0).map((e) => [Number(e.accd), e._id]) : []);
       const haveGstin = new Map(name === 'Party' ? existing.filter((e) => e.gstin).map((e) => [String(e.gstin).toUpperCase(), e._id]) : []);
       const dropped = new Map();
-      plan.docs[name] = plan.docs[name].filter((d) => { const hit = have.get(String(d[nameField]).toLowerCase()) || (d.gstin && haveGstin.get(String(d.gstin).toUpperCase())); if (hit) { dropped.set(String(d._id), hit); return false; } return true; });
+      plan.docs[name] = plan.docs[name].filter((d) => {
+        const byName = have.get(String(d[nameField]).toLowerCase());
+        // a same-name party with a different JSM code is another account: keep this one under a distinct name
+        const nameOk = byName && !(name === 'Party' && Number(byName.accd) > 0 && Number(d.accd) > 0 && Number(byName.accd) !== Number(d.accd));
+        const hit = (Number(d.accd) > 0 && haveAccd.get(Number(d.accd))) || (d.gstin && haveGstin.get(String(d.gstin).toUpperCase())) || (nameOk && byName._id);
+        if (hit) { dropped.set(String(d._id), hit); return false; }
+        if (byName) d[nameField] = `${d[nameField]} (${d.accd || 2})`;
+        return true;
+      });
       if (dropped.size) remapIds(plan.docs, dropped);
+      for (const [from, to] of dropped) reused.set(from, to);
     }
+    // the expected outstanding follows a reused party to its existing record
+    const outBy = {};
+    for (const [pid, v] of Object.entries(plan.expected.outstandingByParty || {})) { const k = String(reused.get(pid) || pid); outBy[k] = Math.round(((outBy[k] || 0) + v) * 100) / 100; }
+    plan.expected.outstandingByParty = outBy;
     // other masters (station, transport, tax slab ...) already there under the same name are kept as they are
     const subHave = new Set((await model('SubMaster').collection.find({ companyId: run.companyId }, { projection: { type: 1, name: 1 } }).toArray()).map((d) => `${d.type}|${String(d.name).toLowerCase()}`));
     plan.docs.SubMaster = (plan.docs.SubMaster || []).filter((d) => !subHave.has(`${d.type}|${String(d.name).toLowerCase()}`));
