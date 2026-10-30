@@ -6,10 +6,10 @@
   "main": "main.js",
   "author": "Textile ERP",
   "scripts": {
-    "start": "electron .",
+    "start": "node init && electron .",
     "fetch:mongo": "node scripts/fetch-mongodb.cjs",
     "prepare:backend": "node scripts/prepare-backend.cjs",
-    "build:ui": "node scripts/build-ui.cjs",
+    "build:ui": "node init && node scripts/build-ui.cjs",
     "smoke:local": "node scripts/smoke-local-boot.js",
     "sync:installer": "node scripts/sync-installer.cjs",
     "pack": "npm run build:ui && electron-builder --dir",
