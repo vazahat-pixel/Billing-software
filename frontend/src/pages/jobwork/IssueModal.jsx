@@ -926,6 +926,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         lotId: form.lotId,
         workerId: form.millId,
         processType: form.procType || 'Process Charge',
+        workKind: 'Mill',
         finish: form.finish || '',
         issueQty: qty,
         issuePcs: pcs,

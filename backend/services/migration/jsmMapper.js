@@ -57,7 +57,7 @@ function buildPlan(tables, { companyId }) {
   const headChain = (code) => { const out = []; let g = grp.get(str(code)); let guard = 0; while (g && guard++ < 8) { out.push(g); g = grp.get(str(g.PRIMARY_CD)); } return out; };
   const groupInfo = (code) => {
     const chain = headChain(code);
-    const heads = chain.map((g) => str(g.GRAC_HEAD).toUpperCase()).join(' > ');
+    const heads = chain.map((g) => str(g.GRAC_HEAD).toUpperCase()).filter(Boolean).join(' > ');
     const type = chain.map((g) => str(g.GRAC_TYPE).toUpperCase()).find(Boolean) || '';
     let kind = 'ledger';
     let acct = 'General';
@@ -68,7 +68,7 @@ function buildPlan(tables, { companyId }) {
     if (/CASH/.test(heads)) acct = 'Cash'; else if (/BANK/.test(heads) && kind === 'ledger') acct = 'Bank';
     else if (/DUT(Y|IES)|TAX|GST/.test(heads) && kind === 'ledger') acct = 'Tax';
     const group = /CAPITAL/.test(heads) ? 'Capital' : type.startsWith('ASSET') ? 'Assets' : type.startsWith('LIAB') ? 'Liabilities' : type.startsWith('INC') ? 'Income' : type.startsWith('EXP') ? 'Expenses' : 'Assets';
-    return { kind, acct, group, heads: chain.map((g) => str(g.GRAC_HEAD)).join(' > ') };
+    return { kind, acct, group, heads: chain.map((g) => str(g.GRAC_HEAD)).filter(Boolean).join(' > ') };
   };
 
   // ---- accounts (parties / ledgers / books); one per AC_CODE across all years --------------------------
@@ -87,6 +87,14 @@ function buildPlan(tables, { companyId }) {
   const ledgerNames = new Set(); const partyNames = new Set();
   const unique = (name, set) => { let n = name; let i = 2; while (set.has(n.toLowerCase())) { n = `${name} (${i})`; i += 1; } set.add(n.toLowerCase()); return n; };
 
+  // JSM keeps a party's city, transport, broker and bank as codes into its masters
+  const byPathCode = (table, codeField) => { const m = new Map(); for (const r of T(table)) { const c = str(r[codeField]); if (!c || c === '0') continue; m.set(`${str(r.CO_PATH)}|${c}`, r); if (!m.has(`*|${c}`)) m.set(`*|${c}`, r); } return (path, c) => m.get(`${path}|${str(c)}`) || m.get(`*|${str(c)}`) || null; };
+  const stationOf = byPathCode('MST_STATION', 'ST_CODE');
+  const transportOf = byPathCode('MST_TR_PORT', 'TRNS_CODE');
+  const drawBankOf = byPathCode('MST_DRAW_BANK', 'MST_CODE');
+  const MSME = ['Micro', 'Small', 'Medium', 'Manufacturing- Micro', 'Manufacturing- Small', 'Manufacturing- Medium', 'Services- Micro', 'Services- Small', 'Services- Medium', 'Traders- Micro', 'Traders- Small', 'Traders- Medium'];
+  const msmeOf = (v) => MSME.find((m) => m.toLowerCase().replace(/[^a-z]/g, '') === str(v).toLowerCase().replace(/[^a-z]/g, '')) || 'None';
+  const partyBroker = new Map(); // party _id -> JSM broker account code (linked once every party exists)
   const makeParty = (code, a, forcedKind) => {
     const r = a.first;
     const kind = forcedKind || a.info.kind;
@@ -101,8 +109,16 @@ function buildPlan(tables, { companyId }) {
       dueDays: num(r.DUE_DAYS), tdsPer: num(r.TDS_PER), tcsPer: num(r.TCS_PER), intPer: num(r.INT_PER), commi: num(r.BRK_COMMI),
       openingBalance: Math.abs(num(r.OP_BAL)), openingBalanceType: sideDr ? 'Dr' : 'Cr', status: str(r.AC_STATUS) === 'Inactive' ? 'Inactive' : 'Active',
       hsnCode: str(r.HSN_CODE), udyamAadhar: str(r.MSME_NO),
+      pincode: '', transport: '', brokerId: '', msmeType: msmeOf(r.MSME_TYPE),
+      factoryAddress1: str(r.FADD_1), factoryAddress2: str(r.FADD_2), factoryCity: str(r.FST_NAME), factoryMobile: str(r.FMOBILE),
+      banks: [[r.AC_BANK_1, r.AC_NO_1], [r.AC_BANK_2, r.AC_NO_2]].filter(([b, n]) => str(b) && str(b) !== '0' || str(n)).map(([b, n]) => ({ name: str(drawBankOf(str(r.CO_PATH), b)?.MST_NAME) || (/^\d+$/.test(str(b)) ? '' : str(b)), accountNo: str(n), ifsc: '' })),
     };
     if (p.openingBalanceType !== 'Dr' && p.openingBalanceType !== 'Cr') p.openingBalanceType = 'Dr';
+    const st = num(r.ST_CODE) ? stationOf(str(r.CO_PATH), r.ST_CODE) : null;
+    if (st) { p.city = str(st.ST_NAME) || p.city; p.pincode = str(st.PIN_CODE); if (!p.state) p.state = str(st.STATE); }
+    const tr = num(r.TRNS_CODE) ? transportOf(str(r.CO_PATH), r.TRNS_CODE) : null;
+    if (tr) p.transport = str(tr.TRNS_NAME);
+    if (num(r.BR_CODE)) partyBroker.set(String(p._id), str(r.BR_CODE));
     return p;
   };
 
@@ -148,7 +164,9 @@ function buildPlan(tables, { companyId }) {
       const p = addParty(c, a, kind);
       keys.Party[`AC:${c}`] = p._id; a.partyId = p._id;
       const led = docs.LedgerMaster.find((l) => l._id.equals(a.ledgerId));
-      if (led) { led.accountType = 'Party'; led.linkedPartyId = p._id; }
+      // a bank / cash account (a JSM book, or one under a bank / cash head) stays a Bank / Cash ledger
+      const money = a.isBook || /BANK BALANCE|CASH[- ]?IN[- ]?HAND|BANK O\.?D/i.test(a.info.heads);
+      if (led && !money) { led.accountType = 'Party'; led.linkedPartyId = p._id; }
       warn(`${where}: account "${a.row.AC_NAME}" is not in a debtor/creditor group; created as ${kind}`);
     }
     return a;
@@ -310,7 +328,7 @@ function buildPlan(tables, { companyId }) {
     const supplierNo = str(h.NCBILL_NO);
     const doc = {
       _id: id, companyId, supplierId: supplier.partyId,
-      invoiceNo: uniqueNo(`PUR-${path}-${num(h.ENT_NO)}`, purchaseNos, []),
+      invoiceNo: uniqueNo(String(num(h.SRAL_NO) || num(h.ENT_NO)), purchaseNos, [str(h.TR_CODE), path]),
       supplierInvoiceNo: supplierNo ? uniqueNo(`${supplier.partyId}|${supplierNo}`, purchaseSupplierNos, [path]).split('|')[1] : undefined,
       date: at, bookId: bookName(h.TR_CODE), items, taxableAmount: r2(taxable), gstType: igst > 0 ? 'IGST' : (cg + sg > 0 ? 'CGST+SGST' : 'Exempt'),
       cgst: cg, sgst: sg, igst, gstAmount: r2(cg + sg + igst), netAmount: r2(net), roundOff: num(h.ROUND_OFF), tdsAmount: num(h.T_TDS_AMT) || num(h.TDS_AMT),
@@ -345,7 +363,7 @@ function buildPlan(tables, { companyId }) {
       jobCardNo: uniqueNo(no, jobNos, [kind === 'Job' ? 'J' : 'M', path]), challanNo: no, purchaseBillNo: str(h.PU_BILLNO), purchaseRate: num(h.PU_RATE), jobRate: num(h.JOB_RATE),
       gstPer: num(h.TOT_GST_P), issueKgs: num(h.ISS_KGS), masterName: str(h.MASTER_NAME), transport: str(h.TRANSPORT), lrNo: str(h.LR_NO), markaNo: str(h.MARKA_NO),
       status: 'Issued', issueDate: at, receivedPcs: 0, receivedQty: 0, receivedGreyQty: 0, receivedGreyPcs: 0, wastage: 0, processCharges: 0, processGstAmount: 0,
-      chargesPaidAmount: 0, remark: str(h.REMARK_1), createdAt: at, updatedAt: at, lotId: null,
+      chargesPaidAmount: 0, remark: str(h.REMARK_1), createdAt: at, updatedAt: at, lotId: null, workKind: kind === 'Job' ? 'Job' : 'Mill', receipts: [],
     };
     docs.Job.push(doc);
     const sk = `${path}:${kind === 'Job' ? 'I_JOB_ISSUE' : 'I_MILL_CH'}:${num(h.ENT_NO)}${kind === 'Job' ? `:${num(h.NO_SR)}` : ''}`;
@@ -381,6 +399,7 @@ function buildPlan(tables, { companyId }) {
       j.doc.wastage = r2(j.doc.wastage + num(l.SH_TG) + num(l.SHORT_QTY));
       j.doc.receiveDate = at; j.doc.billGpNo = str(h.NCBILL_NO); j.doc.serialNo = str(h.SRAL_NO); j.doc.perKgs = num(l.REC_KGS);
       j.doc.processCharges = r2(j.doc.processCharges + num(l.IT_AMOUNT));
+      j.doc.receipts.push({ date: at, billNo: str(h.NCBILL_NO), serialNo: str(h.SRAL_NO), greyQty: r2(sendQ), finishQty: r2(rec), pcs, kgs: num(l.REC_KGS), shortQty: r2(num(l.SH_TG) + num(l.SHORT_QTY)), rate: num(l.IT_RATE), amount: r2(num(l.IT_AMOUNT)) });
       j.doc.updatedAt = at;
       events.push({ at, order: 3, run: () => {
         const lot = addLot({ item: finishItem, source: 'job_receive', no: `${j.doc.jobCardNo}-R${str(l.ENT_NO)}-${num(l.SR_NO)}`, pcs, mts: rec, rate: num(l.IT_RATE), at, jobId: j.doc._id });
@@ -605,6 +624,14 @@ function buildPlan(tables, { companyId }) {
     docs.AccountingEntry.push({ _id: id, companyId, entryNo: `JSM-${e.path}-${e.sp}-${e.ent}`, entryDate: at, voucherType: vt, refType: rt, refId: ref, lines, totalDebit, totalCredit, status: 'Posted', isReversed: false, narration: `${e.sp} ${e.ent} (migrated)`, createdAt: at, updatedAt: at });
     keys.AccountingEntry[`${e.path}:${e.sp}:${e.ent}`] = id;
     if (ref) { const target = [docs.Sales, docs.Purchase, docs.PaymentVoucher, docs.DebitCreditNote, docs.ReturnInvoice].flatMap((l) => l).find((d) => String(d._id) === String(ref)); if (target) target.accountingEntryId = id; }
+  }
+
+  // ---- party -> broker (JSM BR_CODE), now that every party exists --------------------------------------------------------------------------------------
+  for (const pd of docs.Party) {
+    const bc = partyBroker.get(String(pd._id)); if (!bc) continue;
+    const b = acc.get(bc); if (!b) continue;
+    if (!b.partyId) partyFor(bc, 'Broker', `Broker of ${pd.name}`);
+    if (b.partyId) pd.brokerId = String(b.partyId);
   }
 
   // ---- expected figures taken from JSM's own data (for reconciliation) --------------------------------------------------------------------------------------

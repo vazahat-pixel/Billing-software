@@ -136,6 +136,25 @@ const JobSchema = new mongoose.Schema({
   perKgs: { type: Number, default: 0 },
   receiveDesc1: { type: String, trim: true, default: '' },
   receiveDesc2: { type: String, trim: true, default: '' },
+  /** 'Mill' (Mill Issue) or 'Job' (Job Issue). '' on challans saved before it was kept: counted as mill. */
+  workKind: { type: String, enum: ['', 'Mill', 'Job'], default: '' },
+  /**
+   * Each receipt against this challan as JSM lists it in Process Stock (date, mill bill, grey / finish qty, pcs).
+   * Filled by the JSM import; challans without it show their received totals as one line.
+   */
+  receipts: [{
+    _id: false,
+    date: Date,
+    billNo: { type: String, default: '' },
+    serialNo: { type: String, default: '' },
+    greyQty: { type: Number, default: 0 },
+    finishQty: { type: Number, default: 0 },
+    pcs: { type: Number, default: 0 },
+    kgs: { type: Number, default: 0 },
+    shortQty: { type: Number, default: 0 },
+    rate: { type: Number, default: 0 },
+    amount: { type: Number, default: 0 },
+  }],
   status: {
     type: String,
     /**

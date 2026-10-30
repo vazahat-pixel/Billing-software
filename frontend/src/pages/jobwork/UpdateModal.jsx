@@ -988,6 +988,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
           lotId: line.lotId,
           workerId: header.partyId,
           processType: 'Process Charge',
+          workKind: 'Job',
           issueQty: Number(line.qty) || 0,
           issuePcs: Number(line.pcs) || 0,
           weaver: '',

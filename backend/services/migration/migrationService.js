@@ -193,8 +193,17 @@ async function insertAll(run, docsByModel) {
 async function bumpCounters(companyId, docs) {
   const Counter = model('Counter');
   const maxNum = (list, f) => list.reduce((m, d) => { const n = parseInt(String(d[f]).match(/^\d+$/) ? d[f] : 0, 10); return Number.isFinite(n) && n > m ? n : m; }, 0);
-  await Counter.collection.updateOne({ _id: `BILLNO-sales-${companyId}` }, { $max: { seq: maxNum(docs.Sales || [], 'invoiceNo') } }, { upsert: true });
-  await Counter.collection.updateOne({ _id: `BILLNO-purchase-${companyId}` }, { $max: { seq: 0 } }, { upsert: true });
+  const bump = (module, seq) => Counter.collection.updateOne({ _id: `BILLNO-${module}-${companyId}` }, { $max: { seq } }, { upsert: true });
+  // every series continues after the highest imported number (JSM's numbers are kept as they are)
+  const vouchers = docs.PaymentVoucher || []; const returns = docs.ReturnInvoice || [];
+  await bump('sales', maxNum(docs.Sales || [], 'invoiceNo'));
+  await bump('purchase', maxNum(docs.Purchase || [], 'invoiceNo'));
+  await bump('receipt', maxNum(vouchers.filter((v) => v.voucherType === 'Receipt'), 'voucherNo'));
+  await bump('payment', maxNum(vouchers.filter((v) => v.voucherType === 'Payment'), 'voucherNo'));
+  await bump('note', maxNum(docs.DebitCreditNote || [], 'noteNo'));
+  await bump('salesReturn', maxNum(returns.filter((r) => r.returnType === 'Sales'), 'invoiceNo'));
+  await bump('purchaseReturn', maxNum(returns.filter((r) => r.returnType === 'Purchase'), 'invoiceNo'));
+  await bump('job', Math.max(maxNum(docs.Job || [], 'jobCardNo'), maxNum(docs.Job || [], 'challanNo')));
 }
 
 async function apply(run, { years } = {}) {
@@ -280,7 +289,8 @@ async function undo(run, { keepStatus = false } = {}) {
   }
   await MigrationRunDocs.deleteMany({ runId: run._id });
   const Counter = model('Counter');
-  await Counter.collection.deleteMany({ _id: { $in: [`BILLNO-sales-${run.companyId}`, `BILLNO-purchase-${run.companyId}`] }, seq: { $lte: 1e9 } }).catch(() => {});
+  const series = ['sales', 'purchase', 'receipt', 'payment', 'note', 'salesReturn', 'purchaseReturn', 'job'];
+  await Counter.collection.deleteMany({ _id: { $in: series.map((m) => `BILLNO-${m}-${run.companyId}`) }, seq: { $lte: 1e9 } }).catch(() => {});
   if (!keepStatus) { run.status = 'undone'; run.undoneAt = new Date(); run.reconciliation = null; await run.save(); }
   return run;
 }

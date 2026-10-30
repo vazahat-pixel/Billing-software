@@ -104,6 +104,19 @@ describe('JSM migration end to end (isolated DB)', { skip: HAVE_DATA ? false : '
     assert.equal(tb.status, 200, JSON.stringify(tb.body).slice(0, 200));
     const lots = unwrapBody(await request(app).get('/api/inventory/lots').set(h));
     assert.ok((Array.isArray(lots) ? lots : lots.items || lots.lots).length > 0);
+    // purchase Sr.No is JSM's own serial, and every number series continues after the imported numbers
+    const cid = new (require('mongoose').Types.ObjectId)(companyId);
+    const purNos = (await require('../../models/Purchase').collection.find({ companyId: cid }).project({ invoiceNo: 1 }).toArray()).map((x) => x.invoiceNo);
+    assert.ok(purNos.length && purNos.every((n) => /^\d+(\/[\w-]+)?$/.test(String(n))), `purchase numbers: ${purNos.slice(0, 8)}`);
+    const Counter = require('../../models/Counter');
+    for (const m of ['sales', 'purchase', 'receipt', 'payment']) {
+      const c = await Counter.collection.findOne({ _id: `BILLNO-${m}-${companyId}` });
+      assert.ok(Number(c?.seq) > 0, `${m} series continues after the import (seq ${c?.seq})`);
+    }
+    // mill and job work challans are told apart; a challan keeps each receipt line
+    const jobs = await require('../../models/Job').collection.find({ companyId: cid }).project({ workKind: 1, receipts: 1 }).toArray();
+    assert.ok(jobs.some((j) => j.workKind === 'Mill') && jobs.some((j) => j.workKind === 'Job'), 'mill and job work challans');
+    assert.ok(jobs.some((j) => (j.receipts || []).length > 0), 'receipt lines kept');
     // the Station / Transport / Tax Slab / Party Bank screens (F3) list JSM's entries
     for (const type of ['City', 'ItemTaxSlab', 'PartyBank', 'Unit']) {
       const list = unwrapBody(await request(app).get(`/api/submasters?type=${type}`).set(h));
