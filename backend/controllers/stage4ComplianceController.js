@@ -39,7 +39,7 @@ exports.gstr1 = asyncHandler(async (req, res) => {
   return ok(res, await gstReturnService.buildGstr1(req.companyId, period(req)));
 });
 exports.gstr3b = asyncHandler(async (req, res) => {
-  return ok(res, await gstReturnService.buildGstr3b(req.companyId, period(req)));
+  return ok(res, await gstReturnService.buildGstr3b(req.companyId, period(req), { from: req.query.from, to: req.query.to }));
 });
 exports.gstr9 = asyncHandler(async (req, res) => {
   return ok(res, await gstReturnService.buildGstr9(req.companyId, req.query.financialYear || req.body.financialYear));

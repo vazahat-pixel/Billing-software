@@ -103,7 +103,7 @@ const IssueMultipleModal = lazy(() => import('./jobwork/IssueMultipleModal'));
 const CuttingBeamEntryModal = lazy(() => import('./inventory/CuttingBeamEntryModal'));
 const JobWorkerMaster = lazy(() => import('./masters/JobWorkerMaster'));
 const InventoryPage = lazy(() => import('./inventory/InventoryPage'));
-const Gst3bMonthlyModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst3bMonthlyModal })));
+const Gst3bMonthlyModal = lazy(() => import('./gst/Gstr3bJsmReport'));
 const Gstr1Modal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gstr1Modal })));
 const Gst2bMatchingModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst2bMatchingModal })));
 const Gst3bDetailModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst3bDetailModal })));
@@ -1168,6 +1168,7 @@ const Dashboard = () => {
             openExternal: (node) => {
                const ext = typeof node === 'string' ? node : node?.external;
                if (ext === 'jsmReport') setJsmReportForm(node.jsmForm);
+               else if (ext === 'gstReports' && node?.reportKind === 'gst3b') toggleModal('gst3bMonthly', true);
                else if (ext === 'gstReports') openGstReport(node?.reportKind || 'gstr1');
                else if (ext === 'gstr1') openGstReport('gstr1');
                else if (ext === 'finalReport') {

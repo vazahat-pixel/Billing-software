@@ -673,9 +673,18 @@ class GstReturnService {
   /**
    * GSTR-3B summary from books
    */
-  async buildGstr3b(companyId, period) {
+  async buildGstr3b(companyId, period, range = null) {
     const cfg = await this._companyCtx(companyId);
-    const { startDate, endDate } = periodBounds(period);
+    // JSM asks From / To dates; the portal-style monthly period stays the default
+    let { startDate, endDate } = periodBounds(period);
+    if (range && range.from && range.to) {
+      const f = new Date(range.from);
+      const t = new Date(range.to);
+      if (!Number.isNaN(f.getTime()) && !Number.isNaN(t.getTime())) {
+        startDate = new Date(f.getFullYear(), f.getMonth(), f.getDate());
+        endDate = new Date(t.getFullYear(), t.getMonth(), t.getDate(), 23, 59, 59, 999);
+      }
+    }
     const sales = await this._salesInPeriod(companyId, startDate, endDate);
     // Table 4 ITC: purchase bills plus mill, job work and expense bills with GST (JSM: all books inward)
     const purchaseBills = (await this._purchasesInPeriod(companyId, startDate, endDate)).map((p) => ({ ...p, source: 'Purchase' }));
@@ -854,8 +863,28 @@ class GstReturnService {
       itcBySource: ['Purchase', 'Mill', 'JobWork', 'Expense'].map((source) => {
         const list = itcEligiblePurchases.filter((x) => x.source === source);
         const sum = (f) => round2(list.reduce((acc, x) => acc + (x[f] || 0), 0));
-        return { source, count: list.length, taxable: sum('taxableAmount'), igst: sum('igst'), cgst: sum('cgst'), sgst: sum('sgst'), cess: sum('cess') };
+        return { source, count: list.length, taxedTaxable: round2(list.filter((x) => (x.igst || 0) + (x.cgst || 0) + (x.sgst || 0) > 0).reduce((acc, x) => acc + (x.taxableAmount || 0), 0)), taxable: sum('taxableAmount'), igst: sum('igst'), cgst: sum('cgst'), sgst: sum('sgst'), cess: sum('cess') };
       }),
+    };
+
+    // JSM-style breakdown for the printed 3B (additive; the figures above are unchanged)
+    const sum4 = (list) => ({
+      taxable: round2(list.reduce((a, x) => a + Number(x.taxableAmount || 0), 0)),
+      igst: round2(list.reduce((a, x) => a + Number(x.igst || 0), 0)),
+      cgst: round2(list.reduce((a, x) => a + Number(x.cgst || 0), 0)),
+      sgst: round2(list.reduce((a, x) => a + Number(x.sgst || 0), 0)),
+    });
+    const purchaseNotes = await this._notesInPeriod(companyId, startDate, endDate, 'Purchase');
+    payload.jsm = {
+      from: startDate,
+      to: endDate,
+      sales: sum4(sales.filter((x) => !isNilExempt(x) && !['Export', 'ZeroRated'].includes(String(x.gstType || '')))),
+      salesReturn: sum4(returns.filter((r) => r.returnType === 'Sales')),
+      salesCredit: sum4(notes.filter((n) => n.noteType === 'Credit')),
+      salesDebit: sum4(notes.filter((n) => n.noteType === 'Debit')),
+      purchaseCredit: sum4(purchaseNotes.filter((n) => n.noteType === 'Credit')),
+      purchaseDebit: sum4(purchaseNotes.filter((n) => n.noteType === 'Debit')),
+      rcm: { taxable: round2(rcm.reduce((x, y) => x + (y.taxableAmount || 0), 0)), ...rcmTax },
     };
 
     return {
