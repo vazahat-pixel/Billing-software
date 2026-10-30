@@ -133,10 +133,14 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       }
       return true;
     });
+    // JSM order: financial year, then bill number (its first run of digits: "101/SCC28" is bill 101), then date
+    const billNum = (s) => parseInt(String(s.invoiceNo || '').match(/\d+/)?.[0] ?? '', 10);
+    const fyOf = (s) => { const d = new Date(s.date || 0); return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; };
     return [...list].sort((a, b) => {
-      const numA = parseInt(String(a.invoiceNo || '').replace(/\D/g, ''), 10);
-      const numB = parseInt(String(b.invoiceNo || '').replace(/\D/g, ''), 10);
-      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      if (fyOf(a) !== fyOf(b)) return fyOf(a) - fyOf(b);
+      const numA = billNum(a);
+      const numB = billNum(b);
+      if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
       return new Date(a.date || 0) - new Date(b.date || 0);
     });
   }, [sales, header.book]);
@@ -513,6 +517,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       setPrintInvoiceId(null);
       setPrintInvoiceData(null);
       setBootLoading(false);
+      // forget the bill that was being looked at, so the form opens on the latest bill again
+      setSelectedInvoiceId('');
+      setMode('View');
       return;
     }
 

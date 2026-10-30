@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import {
   handleFormEnterKeyDown,
   handleFormArrowKeyDown,
+  moveAlongButtonRow,
   handleGridDeleteKey,
   focusFormFooter,
   findFormContainer,
@@ -38,20 +39,28 @@ export function useFormEnterNavigation(enabled = true) {
         return;
       }
 
-      // Arrow navigation (Left/Right/Up/Down)
+      // Arrow navigation (Left/Right/Up/Down); on a button, Left/Right walk the button row
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key) && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (moveAlongButtonRow(e)) return;
         handleFormArrowKeyDown(e);
         return;
       }
 
       // F3: Find / Search in current master modal or active screen
       if (e.key === 'F3') {
+        // the window being worked in: the one holding the cursor, else the topmost one open
+        const WINDOW_SEL = '.classic-erp-window, [role="dialog"], [data-erp-dialog]';
+        const shownWindows = Array.from(document.querySelectorAll(WINDOW_SEL))
+          .filter((w) => w.offsetParent !== null || w.getClientRects().length > 0);
         const activeContainer =
-          document.querySelector('.classic-erp-window:not([style*="display: none"]), [role="dialog"]:not([style*="display: none"]), [data-erp-dialog]') ||
+          e.target?.closest?.(WINDOW_SEL) ||
+          shownWindows[shownWindows.length - 1] ||
           findFormContainer(e.target) ||
           document.body;
-        const findTarget = activeContainer?.querySelector?.(
-          '[data-master-find], input[placeholder*="Find" i], input[placeholder*="Search" i], button[data-action="find"], .classic-erp-btn[title*="Find" i]'
+        // a master's own F3 list (its Find button) wins over any search box in the same window
+        const findTarget = activeContainer?.querySelector?.('button[data-master-find]:not([disabled])')
+          || activeContainer?.querySelector?.('[data-master-find]') || activeContainer?.querySelector?.(
+          'input[placeholder*="Find" i], input[placeholder*="Search" i], button[data-action="find"], .classic-erp-btn[title*="Find" i]'
         );
         if (findTarget) {
           e.preventDefault();

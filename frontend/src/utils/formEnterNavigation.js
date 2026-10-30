@@ -360,6 +360,36 @@ export function handleFormEnterKeyDown(e) {
   }
 }
 
+/**
+ * ← / → on a button moves to the previous / next button on the same row (New, Save, Find, Edit, Delete,
+ * Print, Exit ... at the bottom of every form). Enter still presses the focused button.
+ */
+export function moveAlongButtonRow(e) {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return false;
+  if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.defaultPrevented) return false;
+  const target = e.target;
+  if (!(target instanceof HTMLElement) || target.tagName !== 'BUTTON') return false;
+  if (target.closest('[data-arrow-nav="off"], [role="menu"], [role="listbox"], [role="tablist"], .erp-menu-bar, [data-find-modal]')) return false;
+  const box = target.getBoundingClientRect();
+  const midY = box.top + box.height / 2;
+  // the row = enabled, visible buttons near the focused one whose middle sits on the same line
+  let scope = target.parentElement;
+  for (let up = 0; scope && up < 3 && scope.querySelectorAll('button').length < 2; up += 1) scope = scope.parentElement;
+  if (!scope) return false;
+  const row = Array.from(scope.querySelectorAll('button')).filter((b) => {
+    if (b.disabled || !isVisible(b) || b.tabIndex === -1) return false;
+    const r = b.getBoundingClientRect();
+    return Math.abs(r.top + r.height / 2 - midY) <= Math.max(6, box.height / 2);
+  }).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+  const idx = row.indexOf(target);
+  const next = idx < 0 ? null : row[idx + (e.key === 'ArrowRight' ? 1 : -1)];
+  if (!next) return false;
+  e.preventDefault();
+  e.stopPropagation();
+  next.focus();
+  return true;
+}
+
 export function handleFormArrowKeyDown(e) {
   if (!shouldHandleFormNavigation(e)) return;
 

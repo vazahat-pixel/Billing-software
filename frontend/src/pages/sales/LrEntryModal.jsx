@@ -60,7 +60,12 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
     const kept = [...savedKeep.current.values()].filter(
       (b) => !pending.some((p) => String(p._id || p.id) === String(b._id || b.id))
     );
-    const list = [...kept, ...pending];
+    // in bill-number order, as JSM lists them (financial year, then the bill's number, then date)
+    const billNum = (b) => parseInt(String(b.invoiceNo || '').match(/\d+/)?.[0] ?? '', 10);
+    const fyOf = (b) => { const d = new Date(b.date || 0); return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; };
+    const list = [...kept, ...pending].sort((a, b) => (fyOf(a) - fyOf(b))
+      || ((billNum(a) || 0) - (billNum(b) || 0))
+      || (new Date(a.date || 0) - new Date(b.date || 0)));
     setPendingBills(list);
     setLrData((prev) => {
       const next = { ...prev };
@@ -223,8 +228,23 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
       onClose?.();
       return;
     }
-    if (e.key !== 'Enter' && e.key !== 'Tab') return;
     if (e.ctrlKey || e.altKey || e.metaKey) return;
+    // arrows: up / down change bill, left / right change column once the cursor is at the edge of the text
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      const row = rowIdx + (e.key === 'ArrowDown' ? 1 : -1);
+      if (row >= 0 && row < filtered.length) { e.preventDefault(); e.stopPropagation(); focusCell(row, colIdx); }
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const el = e.target;
+      const len = String(el.value ?? '').length;
+      const caretless = el.selectionStart == null || (el.selectionStart === 0 && el.selectionEnd === len);
+      const atEdge = caretless || (e.key === 'ArrowLeft' ? el.selectionStart === 0 : el.selectionEnd === len);
+      const col = colIdx + (e.key === 'ArrowRight' ? 1 : -1);
+      if (atEdge && col >= 0 && col < COLS.length) { e.preventDefault(); e.stopPropagation(); focusCell(rowIdx, col); }
+      return;
+    }
+    if (e.key !== 'Enter' && e.key !== 'Tab') return;
     e.preventDefault();
     e.stopPropagation();
     const backward = e.shiftKey;
