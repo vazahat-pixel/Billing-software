@@ -136,6 +136,9 @@ const JobSchema = new mongoose.Schema({
   perKgs: { type: Number, default: 0 },
   receiveDesc1: { type: String, trim: true, default: '' },
   receiveDesc2: { type: String, trim: true, default: '' },
+  /** JSM challan lot number (free text) and 'LAST' for a challan carried in from an earlier year. */
+  lotNo: { type: String, trim: true, default: '' },
+  lastYear: { type: String, trim: true, default: '' },
   /** 'Mill' (Mill Issue) or 'Job' (Job Issue). '' on challans saved before it was kept: counted as mill. */
   workKind: { type: String, enum: ['', 'Mill', 'Job'], default: '' },
   /**

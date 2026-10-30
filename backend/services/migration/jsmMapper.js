@@ -350,11 +350,25 @@ function buildPlan(tables, { companyId }) {
 
   // ---- mill issue / receipt and job work (the Job collection holds both) ----------------------------------------
   const jobNos = new Set(); const jobByKey = new Map();
-  const mkJob = (h, processType, kind) => {
+  // JSM lists a challan saved without a mill or an item (code 0) under a blank name; keep it the same way
+  let noMill = null; let noItem = null;
+  const blankWorker = () => {
+    if (!noMill) {
+      const pd = { _id: oid(), companyId, name: unique('(NO MILL)', partyNames), type: 'Job Worker', group: '', accd: 0, gstin: '', openingBalance: 0, openingBalanceType: 'Dr', status: 'Active', city: '', state: '' };
+      docs.Party.push(pd); noMill = { partyId: pd._id, row: { AC_NAME: pd.name }, info: { kind: 'Job Worker' } };
+    }
+    return noMill;
+  };
+  const blankItem = () => {
+    if (!noItem) { noItem = { _id: oid(), companyId, name: unique('(NO ITEM)', itemNames), category: 'Finished', gstRate: 0, unit: 'MTRS' }; docs.Item.push(noItem); }
+    return noItem;
+  };
+  const mkJob = (h, processType, kind, { carried = false } = {}) => {
     const path = str(h.CO_PATH);
-    const worker = partyFor(h.AC_CODE, 'Job Worker', `${kind} challan ${str(h.NCCHLN_NO || h.CHLN_NO)} (${path})`);
-    const it = itemFor(h.ITEM_CODE, path, `${kind} challan ${str(h.CHLN_NO)}`);
+    const worker = num(h.AC_CODE) ? partyFor(h.AC_CODE, 'Job Worker', `${kind} challan ${str(h.NCCHLN_NO || h.CHLN_NO)} (${path})`) : blankWorker();
+    const it = num(h.ITEM_CODE) ? itemFor(h.ITEM_CODE, path, `${kind} challan ${str(h.CHLN_NO)}`) : blankItem();
     if (!worker || !it) return null;
+    if (!num(h.AC_CODE) || !num(h.ITEM_CODE)) warn(`${kind} challan ${str(h.NCCHLN_NO || h.CHLN_NO)} (${path}) has no ${num(h.AC_CODE) ? 'item' : 'mill / party'} in JSM; kept under ${num(h.AC_CODE) ? '(NO ITEM)' : '(NO MILL)'} as JSM lists it`);
     const at = date(h.CHLN_DATE) || years[yearIdx.get(path)]?.from || new Date();
     const id = oid();
     const no = str(h.NCCHLN_NO) || str(h.CHLN_NO) || String(num(h.ENT_NO));
@@ -363,13 +377,14 @@ function buildPlan(tables, { companyId }) {
       jobCardNo: uniqueNo(no, jobNos, [kind === 'Job' ? 'J' : 'M', path]), challanNo: no, purchaseBillNo: str(h.PU_BILLNO), purchaseRate: num(h.PU_RATE), jobRate: num(h.JOB_RATE),
       gstPer: num(h.TOT_GST_P), issueKgs: num(h.ISS_KGS), masterName: str(h.MASTER_NAME), transport: str(h.TRANSPORT), lrNo: str(h.LR_NO), markaNo: str(h.MARKA_NO),
       status: 'Issued', issueDate: at, receivedPcs: 0, receivedQty: 0, receivedGreyQty: 0, receivedGreyPcs: 0, wastage: 0, processCharges: 0, processGstAmount: 0,
-      chargesPaidAmount: 0, remark: str(h.REMARK_1), createdAt: at, updatedAt: at, lotId: null, workKind: kind === 'Job' ? 'Job' : 'Mill', receipts: [],
+      chargesPaidAmount: 0, remark: [str(h.REMARK_1), str(h.REMARK_2)].filter(Boolean).join('\n'), createdAt: at, updatedAt: at, lotId: null, workKind: kind === 'Job' ? 'Job' : 'Mill', receipts: [],
+      lotNo: str(h.LOT_NO), weaver: num(h.PU_CODE) ? accName(h.PU_CODE) : '', lastYear: carried ? 'LAST' : str(h.LAST_YEAR), finish: str(h.RE_FINISH) || '',
     };
     docs.Job.push(doc);
     const sk = `${path}:${kind === 'Job' ? 'I_JOB_ISSUE' : 'I_MILL_CH'}:${num(h.ENT_NO)}${kind === 'Job' ? `:${num(h.NO_SR)}` : ''}`;
     keys.Job[sk] = id; jobByKey.set(`${kind}|${path}|${num(h.ENT_NO)}${kind === 'Job' ? `|${num(h.NO_SR)}` : ''}`, { doc, it, at, worker });
     events.push({ at, order: 2, run: () => {
-      const lot = takeOut(it, doc.issueQty, doc.issuePcs, at, 'ISSUE', id, `${kind} issue ${doc.jobCardNo}`, str(h.LOT_NO))
+      const lot = (carried ? null : takeOut(it, doc.issueQty, doc.issuePcs, at, 'ISSUE', id, `${kind} issue ${doc.jobCardNo}`, str(h.LOT_NO)))
         || (lotsOfItem.get(String(it._id)) || [])[0]
         || addLot({ item: it, source: 'opening', no: `CARRIED-${path}-${no}`, pcs: 0, mts: 0, rate: num(h.PU_RATE), at });
       doc.lotId = lot._id;
@@ -383,13 +398,23 @@ function buildPlan(tables, { companyId }) {
   const gpHeader = (name) => new Map(rowsOf(name).map((h) => [`${str(h.CO_PATH)}|${num(h.ENT_NO)}`, h]));
   const millGp = gpHeader('I_MILL_GP'); const jobGp = gpHeader('I_JOB_RECEIPT');
   const receiptBills = []; // { kind, header, doc }
+  const openingChallans = new Set(); // earlier-year challans added for receipts: issued = what came back
+  const at0 = (h) => date(h.BILL_DATE) || new Date();
   const applyReceipts = (lineTable, headerMap, kind, sndKey) => {
     for (const l of byYear(rowsOf(lineTable))) {
       const path = str(l.CO_PATH);
       const h = headerMap.get(`${path}|${num(l.ENT_NO)}`); if (!h) { warn(`${lineTable} ${path}/${num(l.ENT_NO)}: bill header missing`); continue; }
       const jk = kind === 'Job' ? `Job|${path}|${num(l.SND_ENTNO)}|${num(l.SND_ENT_SRNO)}` : `Mill|${path}|${num(l.SND_ENTNO)}`;
-      const j = jobByKey.get(jk);
-      if (!j) { warn(`${lineTable} ${path}/${num(l.ENT_NO)}: issue challan ${num(l.SND_ENTNO)} not found`); continue; }
+      let j = jobByKey.get(jk);
+      if (!j) {
+        // the challan is from an earlier year that was not imported: add it as an opening challan (goods already at the
+        // mill / worker when the first imported year began) so the receipt, its bill and the balance are kept
+        const start = years[yearIdx.get(path)]?.from || years[0]?.from || at0(h);
+        const made = mkJob({ CO_PATH: path, AC_CODE: h.AC_CODE, ITEM_CODE: num(l.ITEM_CODE) ? l.ITEM_CODE : l.GP_CODE, ISS_PCS: 0, ISS_QTY: 0, CHLN_DATE: start, NCCHLN_NO: `${num(l.SND_ENTNO)}${kind === 'Job' && num(l.SND_ENT_SRNO) ? `/${num(l.SND_ENT_SRNO)}` : ''}`, ENT_NO: l.SND_ENTNO, NO_SR: l.SND_ENT_SRNO, REMARK_1: 'Earlier year challan (opening)' }, kind === 'Job' ? 'Job Work' : 'Process Charge', kind, { carried: true });
+        if (made) { openingChallans.add(made); warn(`${lineTable} ${path}/${num(l.ENT_NO)}: issue challan ${num(l.SND_ENTNO)} is from an earlier year; added as an opening challan`); }
+        j = jobByKey.get(jk);
+        if (!j) { warn(`${lineTable} ${path}/${num(l.ENT_NO)}: issue challan ${num(l.SND_ENTNO)} not found`); continue; }
+      }
       const at = date(h.BILL_DATE) || j.at;
       const finishItem = (num(l.GP_CODE) ? itemFor(l.GP_CODE, path, `${kind} receive`) : null) || j.it;
       const rec = num(l.REC_QTY); const sendQ = num(l.SND_QTY) || num(l.SND_QTY_TP);
@@ -410,6 +435,7 @@ function buildPlan(tables, { companyId }) {
     }
   };
   applyReceipts('I_MILL_IT', millGp, 'Mill'); applyReceipts('I_JOB_REC_IT', jobGp, 'Job');
+  for (const d of openingChallans) { d.issueQty = r2(d.receivedGreyQty); d.issuePcs = d.receivedGreyPcs; }
   // bill level amounts (GST, add/less, TDS) go on the first challan of each bill
   const seenBill = new Set();
   const billJob = new Map(); // "Mill|path|ENT_NO" -> the challan that carries the bill (ledger rows open it)
