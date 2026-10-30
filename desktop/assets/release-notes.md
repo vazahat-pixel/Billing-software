@@ -1,10 +1,5 @@
-- Sales: all bills load (not only the last 100); the form opens on the latest bill again after viewing an old one.
-- ← / → move between the buttons at the bottom of every form (New, Save, Find, Edit ...).
-- F3 on every master (Account, Item, Book, Group, Station, Transport ...) opens the list of all saved entries.
-- Ledger: every row opens its own form (receipt, payment, discount, sales, purchase, mill / job bill, journal).
-- LR Entry list in bill-number order, with arrow keys.
-- Process Stock report as in JSM: each challan with its receipts and the balance still at the mill.
-- Balance Sheet and P&L grouped by your JSM heads (Unsecured Loan, Suspense Account, Creditors for Salary ...), with the opening stock.
-- GSTR-3B: mill and job work bills now counted in ITC, shown per source.
-- Outstanding: Process and JobWork show the mill / job work bills.
-- Import from JSM: city, transport and broker of parties; bank accounts stay bank accounts; JSM purchase numbers; numbering continues after the import.
+- Screens now follow JSM: menu order (Master, Transaction, Inventory, Reports, Others Reports, Utilities, Setup System, Company), the black quick toolbar (1 Sales, 2 Pur, 3 Rec, 4 Pay, Ledger, Z Trail, 5 M.Iss, 6 M.Rec, 7 J.Iss, 8 J.Rec, 9 Debt O/s), the home desktop with the 3B / GSTR-1 / 2B shortcuts, and the status line at the bottom.
+- Keys 1-9 and Z open the toolbar screens from the home screen; Alt alone moves to the menu bar.
+- GSTR-3B Monthly Return as JSM prints it: From / To dates, Screen / Print / Excel, sales, returns, notes and purchases by book.
+- GSTIN Sales / Purchase / Process / JobWork / Journal / Expense reports as JSM: register, GSTIN-wise totals and grand total.
+- Setup System > Setting and Others Reports menus arranged as in JSM.
