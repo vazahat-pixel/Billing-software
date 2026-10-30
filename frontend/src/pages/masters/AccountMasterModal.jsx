@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
+import MasterFindOverlay from '../../components/erp/MasterFindOverlay';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
@@ -104,6 +105,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   const [activeTab, setActiveTab] = useState(initialTab);
   const [mode, setMode] = useState('View'); // 'View', 'Add', 'Edit'
   const [selectedPartyId, setSelectedPartyId] = useState('');
+  const [findOpen, setFindOpen] = useState(false); // F3 list
   const [saving, setSaving] = useState(false);
   const [bootLoading, setBootLoading] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -421,11 +423,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
           if (e.key === 'F3') {
             e.preventDefault();
             setMode('View');
-            setTimeout(() => {
-              const inp = document.querySelector('.classic-erp-select input');
-              inp?.focus();
-              try { inp?.select(); } catch {}
-            }, 60);
+            setFindOpen(true);
           } else if (e.key === 'F2') {
             e.preventDefault();
             if (mode === 'View' && (formData._id || formData.id || selectedPartyId)) {
@@ -817,11 +815,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
               data-master-find="true"
               onClick={() => {
                 setMode('View');
-                setTimeout(() => {
-                  const inp = document.querySelector('.classic-erp-select input');
-                  inp?.focus();
-                  try { inp?.select(); } catch {}
-                }, 50);
+                setFindOpen(true);
               }}
               disabled={saving}
               title="Find Party (F3)"
@@ -858,6 +852,13 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
           fetchParties?.();
         }}
         initialEntity="party"
+      />
+      <MasterFindOverlay
+        open={findOpen}
+        title="FIND ACCOUNT"
+        rows={(parties || []).map((p) => ({ id: p._id || p.id, no: p.accd || '', name: p.name, meta: [p.type, p.city, p.gstin].filter(Boolean).join(' · ') }))}
+        onPick={(id) => { setFindOpen(false); handleSelectParty(id); setMode('View'); }}
+        onClose={() => setFindOpen(false)}
       />
     </Modal>
   );

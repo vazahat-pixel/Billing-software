@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
+import MasterFindOverlay from '../../components/erp/MasterFindOverlay';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
@@ -96,6 +97,7 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedBookId, setSelectedBookId] = useState('');
+  const [findOpen, setFindOpen] = useState(false); // F3 list
   const [mode, setMode] = useState('View');
   const [error, setError] = useState('');
   const [formData, setFormData] = useState(emptyForm('sales'));
@@ -334,8 +336,7 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
         onKeyDown={(e) => {
           if (e.key === 'F3') {
             e.preventDefault();
-            const sel = document.querySelector('.classic-erp-select select, select');
-            sel?.focus();
+            setFindOpen(true);
           } else if (e.key === 'F2') {
             e.preventDefault();
             if (mode === 'View' && selectedBookId) {
@@ -700,12 +701,19 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
               <SaveButtonLabel saving={saving} />
             </button>
             <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked}>Cancel</button>
-            <button className="classic-erp-btn" type="button" onClick={handleFind} disabled={readOnly}>Find</button>
+            <button className="classic-erp-btn" type="button" data-master-find="true" onClick={() => setFindOpen(true)} title="Find (F3)">Find</button>
             <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || !selectedBookId}>Delete</button>
             <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
           </div>
         </div>
       </div>
+      <MasterFindOverlay
+        open={findOpen}
+        title="FIND BOOK"
+        rows={books.map((b) => ({ id: b._id || b.id, no: b.code || '', name: b.name, meta: [b.bookType, b.module].filter(Boolean).join(' · ') }))}
+        onPick={(id) => { setFindOpen(false); handleSelectBook({ target: { value: id } }); }}
+        onClose={() => setFindOpen(false)}
+      />
     </Modal>
   );
 };

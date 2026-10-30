@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Modal from '../../components/ui/Modal';
+import MasterFindOverlay from '../../components/erp/MasterFindOverlay';
 import useStore from '../../store/useStore';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { erpConfirmDelete } from '../../utils/confirm';
@@ -46,6 +47,7 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
 
   const [mode, setMode] = useState('VIEW'); // 'VIEW' | 'ADD' | 'EDIT'
   const [selectedId, setSelectedId] = useState(null);
+  const [findOpen, setFindOpen] = useState(false); // F3 list
   const [formData, setFormData] = useState({ ...DEFAULT_FORM });
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -205,10 +207,7 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
     }
   };
 
-  const handleFind = () => {
-    searchInputRef.current?.focus();
-    try { searchInputRef.current?.select(); } catch {}
-  };
+  const handleFind = () => setFindOpen(true);
 
   const handleDelete = async () => {
     if (readOnly || !selectedId) {
@@ -802,6 +801,7 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
             <button
               type="button"
               data-action="find"
+              data-master-find="true"
               onClick={handleFind}
               className="px-3 py-1 text-xs font-bold border border-[#808080] bg-[#e0dfd8] hover:bg-[#c0c0c0] text-slate-800 shadow-sm cursor-pointer"
               title="Find / Search (F3)"
@@ -864,6 +864,13 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
           </div>
         </div>
       </div>
+      <MasterFindOverlay
+        open={findOpen}
+        title="FIND ACCOUNT GROUP"
+        rows={groupList.map((g) => ({ id: g.id, no: g.graccd, name: g.name, meta: [g.groupType, g.mainGroup].filter(Boolean).join(' · ') }))}
+        onPick={(id) => { setFindOpen(false); const g = groupList.find((x) => x.id === id); if (g) loadGroup(g, false); }}
+        onClose={() => setFindOpen(false)}
+      />
     </Modal>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
+import MasterFindOverlay from '../../components/erp/MasterFindOverlay';
 import { Plus, Edit2, Save, X, Search, Trash2, FileText } from 'lucide-react';
 import { erpConfirmDelete } from '../../utils/confirm';
 import { notifyError, notifySuccess, notifyWarning } from '../../utils/notify';
@@ -54,6 +55,7 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
   const [ratio, setRatio] = useState('1');
   const [description, setDescription] = useState('');
   const [jsm, setJsm] = useState({});
+  const [findOpen, setFindOpen] = useState(false); // F3 list
 
   // Table search
   const [searchQuery, setSearchQuery] = useState('');
@@ -254,9 +256,7 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
     setMode('VIEW');
   };
 
-  const handleFind = () => {
-    searchInputRef.current?.focus();
-  };
+  const handleFind = () => setFindOpen(true);
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
@@ -388,8 +388,7 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
         onKeyDown={(e) => {
           if (e.key === 'F3') {
             e.preventDefault();
-            searchInputRef.current?.focus();
-            try { searchInputRef.current?.select(); } catch {}
+            setFindOpen(true);
           } else if (e.key === 'F2') {
             e.preventDefault();
             if (mode === 'VIEW' && selectedId) {
@@ -484,6 +483,7 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
               type="button"
               data-action="find"
               data-master-find-btn="true"
+              data-master-find="true"
               onClick={handleFind}
               className="classic-erp-btn"
               title="Find / Search Records (F3)"
@@ -942,6 +942,17 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
           <span>Tip: Double-click row to Edit &bull; Auto-calcs SGST/CGST from IGST</span>
         </div>
       </div>
+      <MasterFindOverlay
+        open={findOpen}
+        title={`FIND ${String(type || '').toUpperCase()}`}
+        rows={subMasters.filter((it) => it.type === type).map((it) => {
+          const ex = it.extraFields || {};
+          const gst = type === 'ItemTaxSlab' && (ex.igstRate ?? ex.gstRate) != null ? `GST ${ex.igstRate ?? ex.gstRate}%` : '';
+          return { id: it._id, no: ex.code || ex.graccd || '', name: it.name, meta: [ex.city, ex.state || ex.jsmStateName, gst, ex.branch, ex.phone].filter(Boolean).join(' · ') };
+        })}
+        onPick={(id) => { setFindOpen(false); const rec = subMasters.find((it) => it._id === id); if (rec) loadRecord(rec, false); }}
+        onClose={() => setFindOpen(false)}
+      />
     </Modal>
   );
 };

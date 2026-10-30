@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import Modal from '../../components/ui/Modal';
+import MasterFindOverlay from '../../components/erp/MasterFindOverlay';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
 import useStore from '../../store/useStore';
@@ -91,6 +92,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
   const [mode, setMode] = useState('VIEW'); // 'VIEW' | 'ADD' | 'EDIT'
   const [formData, setFormData] = useState(emptyForm());
   const [editId, setEditId] = useState(null);
+  const [findOpen, setFindOpen] = useState(false); // F3 list
   const [saving, setSaving] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const fileRef = useRef(null);
@@ -225,13 +227,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
     setActiveTab('Form');
   };
 
-  const handleFind = () => {
-    setActiveTab('List');
-    setTimeout(() => {
-      searchInputRef.current?.focus();
-      try { searchInputRef.current?.select(); } catch {}
-    }, 60);
-  };
+  const handleFind = () => setFindOpen(true);
 
   const handleSave = async () => {
     if (saving || readOnly) return;
@@ -436,6 +432,15 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
               }`}
             >
               View List ({items.length})
+            </button>
+            <button
+              type="button"
+              data-master-find="true"
+              onClick={handleFind}
+              title="Find (F3)"
+              className="px-3 py-1 text-xs font-bold rounded-sm border bg-slate-200 text-slate-700 border-transparent hover:bg-slate-300"
+            >
+              Find (F3)
             </button>
           </div>
 
@@ -936,6 +941,13 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
           onImportComplete={fetchItems}
         />
       )}
+      <MasterFindOverlay
+        open={findOpen}
+        title="FIND ITEM"
+        rows={items.map((it) => ({ id: it._id || it.id, no: it.itemCode || '', name: it.itemName || it.name, meta: [it.category, it.unit, it.hsnCode && `HSN ${it.hsnCode}`].filter(Boolean).join(' · ') }))}
+        onPick={(id) => { setFindOpen(false); const it = items.find((x) => (x._id || x.id) === id); if (it) loadItem(it, false); }}
+        onClose={() => setFindOpen(false)}
+      />
     </Modal>
   );
 };
