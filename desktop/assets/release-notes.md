@@ -1,7 +1,10 @@
-- Import from JSM: bring all masters, bills, mill and job work, receipts and payments, notes and ledgers of every year in one click (Master > Import Data). It is checked against JSM, and you can undo it.
-- Excel import: Parties, Items, Opening Stock, Sales Bills and Purchase Bills sheets in one workbook.
-- Stock report: the 2nd and 3rd year now start with the previous year's closing stock.
-- Masters (Account, Book, Item, Group and others) open on the last record; F2 edits it, Enter starts a new one, arrow keys move between records.
-- Lastyear BillEntry, Merge Station, Merge Transport, Party+Station and Date+Item Rate menus now open their screens.
-- Mill Issue and Mill Receive show the saved challan right after Save.
-- New versions now show here with "Update now". Help > Check for updates checks at any time.
+- Sales: all bills load (not only the last 100); the form opens on the latest bill again after viewing an old one.
+- ← / → move between the buttons at the bottom of every form (New, Save, Find, Edit ...).
+- F3 on every master (Account, Item, Book, Group, Station, Transport ...) opens the list of all saved entries.
+- Ledger: every row opens its own form (receipt, payment, discount, sales, purchase, mill / job bill, journal).
+- LR Entry list in bill-number order, with arrow keys.
+- Process Stock report as in JSM: each challan with its receipts and the balance still at the mill.
+- Balance Sheet and P&L grouped by your JSM heads (Unsecured Loan, Suspense Account, Creditors for Salary ...), with the opening stock.
+- GSTR-3B: mill and job work bills now counted in ITC, shown per source.
+- Outstanding: Process and JobWork show the mill / job work bills.
+- Import from JSM: city, transport and broker of parties; bank accounts stay bank accounts; JSM purchase numbers; numbering continues after the import.
