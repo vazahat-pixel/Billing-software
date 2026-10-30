@@ -5,6 +5,8 @@
 const { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, shell, Notification, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+// Registers the update:* IPC handlers early, so the screen can ask for the update state at any time.
+const updater = require('./updater');
 
 // Ensure only a single instance of Textile ERP runs at any time.
 // Prevents duplicate processes from locking or corrupting the IndexedDB backing store (%APPDATA%/Textile ERP/IndexedDB).
@@ -18,6 +20,8 @@ if (!gotSingleInstanceLock) {
 let mainWindow = null;
 let tray = null;
 let localStack = null;
+/** Offline entries the renderer still has to upload (reported over 'desktop:pending-sync'). */
+let rendererPendingSync = 0;
 const isDev = !app.isPackaged;
 
 app.on('second-instance', () => {
@@ -139,6 +143,16 @@ function createWindow() {
   mainWindow.on('close', (e) => {
     if (app.isQuiting) return;
     e.preventDefault();
+    if (rendererPendingSync > 0) {
+      // Window close only hides to the tray, so uploading continues — say so, and ask for internet.
+      dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: 'Entries not uploaded yet',
+        message: `${rendererPendingSync} offline entr${rendererPendingSync === 1 ? 'y is' : 'ies are'} not on the cloud yet.`,
+        detail: 'Please turn the internet ON. Textile ERP keeps running in the tray and uploads them automatically.\n\nInternet ON karein — entries apne aap cloud par chali jayengi. App tray mein chalta rahega.',
+        buttons: ['OK'],
+      }).catch(() => {});
+    }
     mainWindow.hide();
   });
 }
@@ -269,6 +283,7 @@ function buildMenu() {
       label: 'Help',
       submenu: [
         { label: `Version ${app.getVersion()}`, enabled: false },
+        { label: 'Check for updates…', click: () => updater.checkForUpdates() },
         {
           label: 'About offline desktop',
           click: () => {
@@ -319,6 +334,9 @@ ipcMain.handle('desktop:notify', (_e, { title, body }) => {
   return true;
 });
 
+ipcMain.on('desktop:pending-sync', (_e, count) => {
+  rendererPendingSync = Math.max(0, Number(count) || 0);
+});
 ipcMain.handle('desktop:version', () => app.getVersion());
 ipcMain.handle('desktop:platform', () => process.platform);
 ipcMain.handle('desktop:api-url', () => resolveApiBaseUrl());
@@ -372,6 +390,16 @@ ipcMain.handle('desktop:machine-id', () => {
     return { error: err.message, deviceId: null, fingerprint: null };
   }
 });
+
+// --- Import from JSM (read-only; the JSM login never leaves this process) ---
+const jsmService = require('./jsmExtractor/service');
+ipcMain.handle('jsm:detect', () => jsmService.detect().catch((e) => ({ ok: false, reason: 'error', message: String(e.message).slice(0, 200), installs: [] })));
+ipcMain.handle('jsm:export', async (event, args) => {
+  const r = await jsmService.exportPackage(args, (p) => { try { event.sender.send('jsm:progress', p); } catch { /* window closed */ } });
+  return { file: r.file, bytes: r.bytes, totalRows: r.totalRows };
+});
+ipcMain.handle('jsm:read-chunk', (_e, { file, index, size }) => jsmService.readChunk(file, index, size));
+ipcMain.handle('jsm:cleanup', (_e, file) => { jsmService.removeExport(file); return true; });
 
 ipcMain.handle('desktop:backup', async () => {
   await runBackupDialog();
@@ -452,7 +480,7 @@ app.whenReady().then(async () => {
   createWindow();
   createTray();
   try {
-    require('./updater').setupAutoUpdater();
+    updater.setupAutoUpdater();
   } catch {
     /* optional */
   }
@@ -467,6 +495,9 @@ app.on('before-quit', async (e) => {
   e.preventDefault();
 
   if (!app._forceQuitConfirmed) {
+    // Entries waiting to upload: the renderer's offline queue (remote mode) plus the local
+    // outbox (hybrid mode). Nothing is lost on quit — they upload the next time the app is opened.
+    let pending = rendererPendingSync;
     try {
       const base = resolveApiBaseUrl();
       if (base) {
@@ -474,25 +505,28 @@ app.on('before-quit', async (e) => {
         const res = await fetch(url, { signal: AbortSignal.timeout(1500) });
         if (res.ok) {
           const json = await res.json();
-          const pending = Number(json?.data?.pendingOutbox || 0);
-          if (pending > 0) {
-            const { response } = await dialog.showMessageBox(mainWindow || undefined, {
-              type: 'warning',
-              title: 'Pending Cloud Synchronization',
-              message: `You have ${pending} offline transaction(s) that have not synced to the cloud yet.`,
-              detail: 'Closing now will pause cloud synchronization until the application is opened again. Are you sure you want to quit?',
-              buttons: ['Cancel', 'Quit Anyway'],
-              defaultId: 0,
-              cancelId: 0,
-            });
-            if (response !== 1) {
-              return;
-            }
-          }
+          pending += Number(json?.data?.pendingOutbox || 0);
         }
       }
     } catch {
       /* ignore probe errors on shutdown */
+    }
+    if (pending > 0) {
+      const { response } = await dialog.showMessageBox(mainWindow || undefined, {
+        type: 'warning',
+        title: 'Entries not uploaded yet',
+        message: `${pending} offline entr${pending === 1 ? 'y has' : 'ies have'} not been uploaded to the cloud yet.`,
+        detail: 'Turn the internet ON and keep Textile ERP open until they upload. If you quit now they stay safe on this computer and upload the next time you open the app with internet.\n\nInternet ON karke app khula rakhein jab tak entries cloud par na chali jaayein. Abhi band karenge to entries is computer mein safe rahengi aur agli baar internet ke saath app kholne par upload hongi.',
+        buttons: ['Keep app open', 'Quit anyway'],
+        defaultId: 0,
+        cancelId: 0,
+      });
+      if (response !== 1) {
+        // Quit cancelled: back to normal, so closing the window hides it again instead of exiting.
+        app.isQuiting = false;
+        mainWindow?.show();
+        return;
+      }
     }
   }
 

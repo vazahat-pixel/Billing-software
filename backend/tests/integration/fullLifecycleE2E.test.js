@@ -335,7 +335,8 @@ describe('Full lifecycle: Purchase -> Job Issue -> Job Receive -> Sale -> Paymen
 
     const worker = ledgerTotals(allEntries, workerLedgerId);
     assert.ok(Math.abs(worker.dr - worker.cr) < 0.01, `job worker ledger must net to 0: Dr=${worker.dr} Cr=${worker.cr}`);
-    assert.ok(Math.abs(worker.cr - 1050) < 0.01, `worker Cr should be 1050 (job charges), got ${worker.cr}`);
+    // job charges 1050 + grey goods back from the mill 5000 (100 m x Rs50, debited to the party on issue)
+    assert.ok(Math.abs(worker.cr - 6050) < 0.01, `worker Cr should be 6050 (job charges + goods back), got ${worker.cr}`);
   });
 
   it('STEP 11 — Trial Balance: grand total Dr = grand total Cr across the ENTIRE company', async () => {

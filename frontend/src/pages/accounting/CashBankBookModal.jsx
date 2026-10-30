@@ -289,20 +289,22 @@ const CashBankBookModal = ({
     // as bills too, or a Job Worker's party would never show anything to settle against.
     const jobBills = (jobWorkEntries || [])
       .filter((j) => String(j.workerId?._id || j.workerId || '') === String(header.partyId))
-      .filter((j) => j.status === 'Received' && (Number(j.processCharges || 0) + Number(j.processGstAmount || 0)) > 0)
+      .filter((j) => (j.status === 'Received' || j.status === 'Partial') && (Number(j.processCharges || 0) + Number(j.processGstAmount || 0)) > 0)
       .map((j) => {
         const rawBillAmt = Number(j.processCharges || 0) + Number(j.processGstAmount || 0) + Number(j.roundOff || 0);
         const billAmt = round2(rawBillAmt);
         const paid = round2(Number(j.chargesPaidAmount || 0));
         const rawOs = Math.max(0, billAmt - paid);
         const outstanding = rawOs < 0.01 ? 0 : round2(rawOs);
-        const billDt = j.receiveDate ? new Date(j.receiveDate).toISOString().split('T')[0] : '';
+        const billOn = j.processBillDate || j.receiveDate;
+        const billDt = billOn ? new Date(billOn).toISOString().split('T')[0] : '';
         const osDy = billDt
           ? Math.max(0, Math.floor((Date.now() - new Date(billDt).getTime()) / 86400000))
           : 0;
         return {
           _id: j._id,
-          invoiceNo: j.jobCardNo || j.challanNo || '',
+          // the mill's / worker's own bill number when there is one
+          invoiceNo: j.processBillNo || j.billGpNo || j.jobCardNo || j.challanNo || '',
           billDt,
           billAmt,
           paidAmt: paid,

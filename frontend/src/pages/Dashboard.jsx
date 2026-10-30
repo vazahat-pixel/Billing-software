@@ -30,11 +30,14 @@ import { focusErpWindow, minimizeErpWindow } from '../hooks/useErpWindow';
 import { showDevTools, DEV_ONLY_MENU_LABELS } from '../utils/showDevTools';
 import BookSelectionModal from '../components/BookSelectionModal';
 import ErpKeyboardHintBar, { APP_KEYBOARD_HINTS } from '../components/erp/ErpKeyboardHintBar';
+import JsmStatusBar from '../components/erp/JsmStatusBar';
 import { getDefaultBooksForModule } from '../utils/defaultBooks';
 import CompanySettingsModal from './settings/CompanySettingsModal';
 import ReportsHub from './reports/ReportsHub';
 import DataRecordsHub from './records/DataRecordsHub';
 import GenericMasterModal from './masters/GenericMasterModal';
+import JsmSubMasterWindow from './masters/jsm/JsmSubMasterWindow';
+import { JSM_SUBMASTER_FORMS } from './masters/jsm/jsmSubMasterForms';
 import WarehouseMasterModal from './masters/WarehouseMasterModal';
 import MergeMasterModal from './masters/MergeMasterModal';
 import OrderModal from './transactions/OrderModal';
@@ -78,6 +81,7 @@ import StockLedgerModal from './reports/StockLedgerModal';
 import DataImportModal from '../components/import/DataImportModal';
 import DownloadDesktopModal from '../components/desktop/DownloadDesktopModal';
 import { downloadMasterTemplate } from '../utils/excelTemplateGenerator';
+import { logoutWithSync } from '../utils/safeLogout';
 
 // Rare / heavy screens — lazy OK
 const JsmReport = lazy(() => import('../jsm/JsmReport'));
@@ -99,10 +103,11 @@ const IssueMultipleModal = lazy(() => import('./jobwork/IssueMultipleModal'));
 const CuttingBeamEntryModal = lazy(() => import('./inventory/CuttingBeamEntryModal'));
 const JobWorkerMaster = lazy(() => import('./masters/JobWorkerMaster'));
 const InventoryPage = lazy(() => import('./inventory/InventoryPage'));
-const Gst3bMonthlyModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst3bMonthlyModal })));
-const Gstr1Modal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gstr1Modal })));
+const Gst3bMonthlyModal = lazy(() => import('./gst/Gstr3bJsmReport'));
+const GstinJsmReport = lazy(() => import('./gst/GstinJsmReport'));
+const Gstr1Modal = lazy(() => import('./gst/Gstr1JsmReport'));
 const Gst2bMatchingModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst2bMatchingModal })));
-const Gst3bDetailModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst3bDetailModal })));
+const Gst3bDetailModal = lazy(() => import('./gst/AllInwardOutward3bModal'));
 const Gstr1ErrorChekModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gstr1ErrorChekModal })));
 const GstComplianceModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.GstComplianceModal })));
 const GstReportsHub = lazy(() => import('./gst/GstReportsHub'));
@@ -323,9 +328,9 @@ const Dashboard = () => {
    const [caPwd, setCaPwd] = useState({ current: '', next: '' });
    const [caPwdSaving, setCaPwdSaving] = useState(false);
 
+   // Uploads this computer's offline entries first, so the account opened on another PC has them.
    const handleLogout = async () => {
-      await logout();
-      navigate('/login');
+      if (await logoutWithSync()) navigate('/login');
    };
 
    /** Menu visible only when Plan sells it AND Module Control leaves it on. */
@@ -427,6 +432,7 @@ const Dashboard = () => {
    const [purchaseInitialData, setPurchaseInitialData] = useState(null);
    const [salesInitialData, setSalesInitialData] = useState(null);
    const [voucherInitialId, setVoucherInitialId] = useState(null);
+   const [jobInitialId, setJobInitialId] = useState(null); // mill / job receipt opened from a ledger row
    const [finalReportKind, setFinalReportKind] = useState('groupList');
    const [fasCheckKind, setFasCheckKind] = useState('interest');
    const [stockLedgerKind, setStockLedgerKind] = useState('stockMts');
@@ -454,6 +460,7 @@ const Dashboard = () => {
       accountGroupMaster: false,
       itemMaster: false,
       gst3bMonthly: false,
+      gstinJsm: false,
       gstr1: false,
       gst2bMatching: false,
       gst3bDetail: false,
@@ -813,6 +820,7 @@ const Dashboard = () => {
    };
 
    const [jsmReportForm, setJsmReportForm] = useState(null);
+   const [gstinJsmKind, setGstinJsmKind] = useState('gstinPurchase');
 
    const openReportLeaf = (leafId) => {
       openReportsHub('summary', leafId);
@@ -849,6 +857,15 @@ const Dashboard = () => {
             openCompanyPanel(e.key === 'F2' ? 'year' : 'list');
             return;
          }
+         // JSM toolbar keys on the desktop: 1-9, Z (Trail), F10 (Help)
+         if (!ctrl && !e.altKey && !e.metaKey && document.activeElement?.closest?.('.erp-menu-bar') == null) {
+            const tool = { 1: 'sales', 2: 'purchase', 3: 'receipt', 4: 'payment', 5: 'millIssue', 6: 'millRec', 7: 'jobIssue', 8: 'jobRec', 9: 'outstanding', z: 'zTrial', f10: 'help' }[key];
+            if (tool && (!e.shiftKey || key === 'z')) {
+               e.preventDefault();
+               runToolbarItemRef.current?.({ id: tool });
+               return;
+            }
+         }
          if (!e.altKey || ctrl || e.shiftKey) return;
          const open = {
             s: () => toggleModal('sales', true),
@@ -873,7 +890,19 @@ const Dashboard = () => {
       const isTyping = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
       const triggers = () => [...document.querySelectorAll('.erp-menu-bar .erp-menu-trigger')];
       const openItems = () => [...document.querySelectorAll('.erp-menu-dropdown button.erp-menu-item')].filter((el) => el.offsetParent !== null);
+      // A plain Alt press-and-release focuses the menu bar, as in JSM (Windows menus); F10 is JSM's Help.
+      let altAlone = false;
+      const onAltDown = (e) => { altAlone = e.key === 'Alt' && !e.ctrlKey && !e.shiftKey && !e.metaKey; };
+      const onAltUp = (e) => {
+         if (e.key !== 'Alt' || !altAlone) return;
+         altAlone = false;
+         if (isTyping(document.activeElement) || document.querySelector('[data-erp-modal-z]')) return;
+         e.preventDefault();
+         triggers()[0]?.focus();
+      };
+      const toolbarButtons = () => [...document.querySelectorAll('.erp-jsm-toolbar button, aside.erp-rail button')];
       const onMenuKey = (e) => {
+         if (e.key !== 'Alt') altAlone = false;
          if (e.altKey || e.ctrlKey || e.metaKey || e.isComposing) return;
          const el = e.target;
          // If Book Selection modal is open, let IT handle arrow/enter/escape — don't steal keys
@@ -881,28 +910,22 @@ const Dashboard = () => {
          if (e.key === 'F9') {
             e.preventDefault();
             e.stopPropagation();
-            const rail = [...document.querySelectorAll('aside.erp-rail button')];
-            const current = rail.find((btn) => btn.className.includes('bg-[var(--accent)]')) || rail[0];
+            const rail = toolbarButtons();
+            const current = rail.find((btn) => /--active|bg-\[var\(--accent\)\]/.test(btn.className)) || rail[0];
             current?.focus();
             return;
          }
-         if (e.key === 'F10') {
-            if (isTyping(el)) return;
-            e.preventDefault();
-            const first = triggers()[0];
-            first?.focus();
-            return;
-         }
-         const onRail = el?.closest?.('aside.erp-rail button');
-         if (onRail && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End')) {
-            const rail = [...document.querySelectorAll('aside.erp-rail button')];
+         const onRail = el?.closest?.('.erp-jsm-toolbar button, aside.erp-rail button');
+         if (onRail && ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+            const rail = toolbarButtons();
             const i = rail.indexOf(onRail);
             if (i < 0) return;
             e.preventDefault();
             e.stopPropagation();
+            const fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight';
             const next = e.key === 'Home' ? rail[0]
                : e.key === 'End' ? rail[rail.length - 1]
-               : rail[(i + (e.key === 'ArrowDown' ? 1 : rail.length - 1)) % rail.length];
+               : rail[(i + (fwd ? 1 : rail.length - 1)) % rail.length];
             next?.focus();
             return;
          }
@@ -941,7 +964,13 @@ const Dashboard = () => {
          }
       };
       window.addEventListener('keydown', onMenuKey, true);
-      return () => window.removeEventListener('keydown', onMenuKey, true);
+      window.addEventListener('keydown', onAltDown, true);
+      window.addEventListener('keyup', onAltUp, true);
+      return () => {
+         window.removeEventListener('keydown', onMenuKey, true);
+         window.removeEventListener('keydown', onAltDown, true);
+         window.removeEventListener('keyup', onAltUp, true);
+      };
    }, []);
 
    const [gstHubInitialReport, setGstHubInitialReport] = useState('gstr1');
@@ -1021,42 +1050,84 @@ const Dashboard = () => {
    };
 
    const menuData = {
+      // Same order, groups (separatorBefore) and sub-menus as JSM's Master menu; masters JSM does not
+      // have, and Bulk Import, sit at the end of OtherMaster.
       Master: [
          { label: 'Account', key: 'accountMaster' },
          { label: 'Account Main Group', action: () => toggleModal('accountGroupMaster', true) },
          { label: 'Account Head', action: () => toggleModal('accountGroupMaster', true) },
          { label: 'Book Master', key: 'bookMaster' },
          { label: 'Book Type', action: () => openGenericMaster('BookType') },
-         { label: 'Item', key: 'itemMaster' },
+         { label: 'Item', key: 'itemMaster', separatorBefore: true },
          { label: 'Item Group', action: () => openGenericMaster('ItemGroup') },
          { label: 'Unit', action: () => openGenericMaster('Unit') },
          { label: 'Item TaxSlab', action: () => openGenericMaster('ItemTaxSlab') },
-         { label: 'Station', action: () => openGenericMaster('City') },
+         { label: 'Station', action: () => openGenericMaster('City'), separatorBefore: true },
          { label: 'Transport', action: () => openGenericMaster('Transport') },
-         { label: 'Color', action: () => openGenericMaster('Color') },
-         { label: 'Design', action: () => openGenericMaster('Design') },
-         { label: 'Quality', action: () => openGenericMaster('Quality') },
-         { label: 'Pattern', action: () => openGenericMaster('Pattern') },
-         { label: 'Brand', action: () => openGenericMaster('Brand') },
-         { label: 'Shade', action: () => openGenericMaster('Shade') },
-         { label: 'Process', action: () => openGenericMaster('Process') },
-         { label: 'Machine', action: () => openGenericMaster('Machine') },
-         { label: 'Department', action: () => openGenericMaster('Department') },
-         { label: 'Payment Terms', action: () => openGenericMaster('PaymentTerms') },
-         { label: 'Currency', action: () => openGenericMaster('Currency') },
-         { label: 'Size Master', action: () => openGenericMaster('Size') },
-         { label: 'Area Master', action: () => openGenericMaster('Area') },
-         { label: 'Party Bank', action: () => openGenericMaster('PartyBank') },
-         { label: 'Warehouse', action: () => setModals(prev => ({ ...prev, warehouseMaster: true })) },
          { label: 'Type', action: () => openGenericMaster('Type') },
-         { label: 'OtherMaster', action: () => openGenericMaster('OtherMaster') },
-         { label: 'Job Worker', action: () => setModals(prev => ({ ...prev, jobWorker: true })) },
-         { label: 'Lastyear BillEntry', action: () => openRecordsHub('sales') },
+         {
+            label: 'OtherMaster',
+            children: [
+               { label: 'Party Bank', action: () => openGenericMaster('PartyBank') },
+               { label: 'Online Key List', action: () => openGenericMaster('OnlineKeys') },
+               { label: 'AreaMaster', action: () => openGenericMaster('Area') },
+               { label: 'Colour Master', action: () => openGenericMaster('Color') },
+               { label: 'Size Master', action: () => openGenericMaster('Size') },
+               { label: 'Party+Station Master', action: () => openGenericMaster('City') },
+               { label: 'Date+Item Rate Master', action: () => toggleModal('itemMaster', true) },
+               {
+                  label: 'More Masters',
+                  separatorBefore: true,
+                  children: [
+               { label: 'Design', action: () => openGenericMaster('Design') },
+               { label: 'Quality', action: () => openGenericMaster('Quality') },
+               { label: 'Pattern', action: () => openGenericMaster('Pattern') },
+               { label: 'Brand', action: () => openGenericMaster('Brand') },
+               { label: 'Shade', action: () => openGenericMaster('Shade') },
+               { label: 'Process', action: () => openGenericMaster('Process') },
+               { label: 'Machine', action: () => openGenericMaster('Machine') },
+               { label: 'Department', action: () => openGenericMaster('Department') },
+               { label: 'Payment Terms', action: () => openGenericMaster('PaymentTerms') },
+               { label: 'Currency', action: () => openGenericMaster('Currency') },
+               { label: 'Warehouse', action: () => setModals(prev => ({ ...prev, warehouseMaster: true })) },
+               { label: 'Job Worker', action: () => setModals(prev => ({ ...prev, jobWorker: true })) },
+               { label: 'Other Master', action: () => openGenericMaster('OtherMaster') },
+               { label: 'Bulk Import (Excel / CSV)', action: () => setModals(prev => ({ ...prev, dataImport: true, dataImportEntity: 'auto' })), separatorBefore: true },
+                  ],
+               },
+            ],
+         },
+         {
+            label: 'Lastyear BillEntry',
+            separatorBefore: true,
+            children: [
+               { label: 'Sales', key: 'sales' },
+               { label: 'Purchase', key: 'purchase' },
+               { label: 'Process', key: 'millRec' },
+               { label: 'JobWork', key: 'jobIssue' },
+               { label: 'Jv Expense', action: () => openJournal() },
+               { label: 'Mill Issue Lot', key: 'millIssue' },
+               { label: 'JobWork Issue Lot', key: 'jobIssue' },
+               { label: 'Grey Purchase Lot', key: 'purchase' },
+               { label: 'UnAdjust Entry Status', action: () => setModals(prev => ({ ...prev, outstanding: true })) },
+               { label: 'Old Bills (List)', action: () => openRecordsHub('sales'), separatorBefore: true },
+            ],
+         },
          { label: 'Opening Balance', action: () => setModals(prev => ({ ...prev, openingBalance: true })) },
          { label: 'Opening StockEntry', action: () => setModals(prev => ({ ...prev, openingStock: true })) },
-         { label: 'Merge Event', action: () => setModals(prev => ({ ...prev, mergeMaster: true })) },
+         {
+            label: 'Merge Event',
+            separatorBefore: true,
+            children: [
+               { label: 'Merge Account', action: () => setModals(prev => ({ ...prev, mergeMaster: true, mergeEntity: 'party' })) },
+               { label: 'Merge Item', action: () => setModals(prev => ({ ...prev, mergeMaster: true, mergeEntity: 'item' })) },
+               { label: 'Merge Station', action: () => setModals(prev => ({ ...prev, mergeMaster: true, mergeEntity: 'station' })) },
+               { label: 'Merge Transport', action: () => setModals(prev => ({ ...prev, mergeMaster: true, mergeEntity: 'transport' })) },
+               { label: 'Party Bank', action: () => openGenericMaster('PartyBank') },
+            ],
+         },
          { label: 'Item Rate Master', action: () => toggleModal('itemMaster', true) },
-         { label: 'Bulk Import (Excel / CSV)', action: () => setModals(prev => ({ ...prev, dataImport: true, dataImportEntity: 'auto' })) }
+         { label: 'Import Data (JSM / Excel)', action: () => setModals(prev => ({ ...prev, dataImport: true, dataImportEntity: 'auto' })), separatorBefore: true },
       ],
       Transaction: [
          { label: 'Sales', key: 'sales' },
@@ -1091,25 +1162,8 @@ const Dashboard = () => {
          { label: 'Beam Entry', action: () => setModals(prev => ({ ...prev, beamEntry: true })) },
          { label: 'Stock Ledger', key: 'inventoryPage' },
       ],
-      'GST / Tax': [
-         { label: '3B Monthly Return', action: () => openGstReport('gst3b') },
-         { label: 'Gstr-1 Error Checking', action: () => openGstReport('gstr1Errors') },
-         { label: 'Gstr-1 Report', action: () => openGstReport('gstr1') },
-         { label: 'Gstr Matching', action: () => openGstReport('gstrMatching') },
-         { label: 'Gstr-2 Report', action: () => openGstReport('gstr2') },
-         { label: 'Gstr-9', action: () => openGstReport('gstr9') },
-         { label: 'ITC 04', action: () => openGstReport('itc04') },
-         { label: 'E-Way Bill Bulk Generation', action: () => openGstReport('ewayBulk') },
-         { label: 'E-Way Bill / Invoice Status', action: () => openGstReport('ewayStatus') },
-         { label: 'E-Way Excel Upload', action: () => openGstReport('ewayExcel') },
-         { label: 'Gst 4.5', action: () => openGstReport('gst45') },
-         { label: 'Gstin - Sales', action: () => openGstReport('gstinSales') },
-         { label: 'Gstin - Purchase', action: () => openGstReport('gstinPurchase') },
-         { label: 'Gstin - Process', action: () => openGstReport('gstinProcess') },
-         { label: 'Gstin - JobWork', action: () => openGstReport('gstinJobwork') },
-         { label: 'Gstin - Journal Report', action: () => openGstReport('gstinJournal') },
-         { label: 'Gstin - Expense', action: () => openGstReport('gstinExpense') },
-      ],
+      // As JSM: GST returns sit under Reports > Gst Reports (no separate GST menu), and the
+      // outstanding / daily / master-list reports under Others Reports.
       Reports: [
          ...buildReportsMenuItems({
             openLeaf: openReportLeaf,
@@ -1117,6 +1171,8 @@ const Dashboard = () => {
             openExternal: (node) => {
                const ext = typeof node === 'string' ? node : node?.external;
                if (ext === 'jsmReport') setJsmReportForm(node.jsmForm);
+               else if (ext === 'gstReports' && node?.reportKind === 'gst3b') toggleModal('gst3bMonthly', true);
+               else if (ext === 'gstReports' && /^gstin(Sales|Purchase|Process|Jobwork|Journal|Expense)$/.test(node?.reportKind || '')) { setGstinJsmKind(node.reportKind); toggleModal('gstinJsm', true); }
                else if (ext === 'gstReports') openGstReport(node?.reportKind || 'gstr1');
                else if (ext === 'gstr1') openGstReport('gstr1');
                else if (ext === 'finalReport') {
@@ -1133,7 +1189,10 @@ const Dashboard = () => {
                   setModals((prev) => ({ ...prev, outstanding: true, outstandingSalesFull: true }));
                } else if (ext) toggleModal(ext, true);
             },
-         }),
+         }).filter((i) => i.label !== 'All Reports Hub'),
+      ],
+      // Same order and sub-menus as JSM's Others Reports; the MERN-only hubs sit at the end.
+      'Others Reports': [
          {
             label: 'Outstanding Zoom',
             children: [
@@ -1150,39 +1209,26 @@ const Dashboard = () => {
             children: [
                { label: 'Debitors', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
                { label: 'Creditors', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
-               { label: 'Process (Mill)', action: () => setModals(prev => ({ ...prev, outstandingProcessFull: true })) },
+               { label: 'Process', action: () => setModals(prev => ({ ...prev, outstandingProcessFull: true })) },
+               { label: 'JobWork', action: () => setModals(prev => ({ ...prev, outstandingJobworkFull: true })) },
+               { label: 'Update O/s. Bill', action: () => setModals(prev => ({ ...prev, outstanding: true })) },
+               { label: 'UnAdjust Setup', action: () => setModals(prev => ({ ...prev, outstanding: true })) },
+            ],
+         },
+         {
+            label: 'Brokreg Statment',
+            children: [
+               { label: 'Sales', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
+               { label: 'Purchase', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
                { label: 'JobWork', action: () => setModals(prev => ({ ...prev, outstandingJobworkFull: true })) },
             ],
          },
-         { label: 'Brokreg Statment', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
          { label: 'Daily Transaction', action: () => openReportsHub('daily') },
          { label: 'Master List', action: () => openReportsHub('masters') },
          { label: 'Letter Pad', action: () => openReportsHub('general') },
          { label: 'Zoom Item Ledger', action: () => openReportsHub('stockItem') },
+         { label: 'All Reports Hub', action: () => openReportsHub('summary'), separatorBefore: true },
          { label: 'CA Desk', key: 'caDashboard' },
-         { label: 'Z Trial (Trial Balance)', action: () => setModals(prev => ({ ...prev, zTrial: true })) },
-      ],
-      'Others Reports': [
-         {
-            label: 'Outstanding Zoom',
-            children: [
-               { label: 'Debitors', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
-               { label: 'Creditors', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
-               { label: 'Process', action: () => setModals(prev => ({ ...prev, outstandingProcessFull: true })) },
-               { label: 'JobWork', action: () => setModals(prev => ({ ...prev, outstandingJobworkFull: true })) },
-               { label: 'Age Analysis', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
-               { label: 'Os New Format Testing', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
-            ],
-         },
-         { label: 'Daily Transaction', action: () => openReportsHub('daily') },
-         { label: 'Master List', action: () => openReportsHub('masters') },
-         { label: 'Item Ledger', action: () => openReportsHub('stockItem') },
-         { label: '3B Monthly Return', key: 'gst3bMonthly' },
-         { label: 'Gstr-1 Error Checking', key: 'gstr1Errorchek' },
-         { label: 'Gstr Matching', key: 'gst2bMatching' },
-         { label: 'Gstr-9', action: () => setModals(prev => ({ ...prev, gstComplianceReports: true })) },
-         { label: 'Tds Reports', action: () => setModals(prev => ({ ...prev, gstComplianceReports: true })) },
-         { label: 'Tcs Reports', action: () => setModals(prev => ({ ...prev, gstComplianceReports: true })) },
       ],
       Advanced: [
          { label: 'Purchase Order / GRN', action: () => setModals(prev => ({ ...prev, purchaseEngine: true })) },
@@ -1218,12 +1264,25 @@ const Dashboard = () => {
          { label: 'Application Sync', action: () => refreshAllData().then(() => toast.success('All data refreshed.')) },
       ],
       'Setup System': [
-         { label: 'Setting', action: () => openSettings('appearance') },
-         { label: 'Company Info', action: () => openSettings('company') },
-         { label: 'CA Access', action: () => openSettings('caAccess') },
+         {
+            label: 'Setting',
+            children: [
+               { label: 'Menu Setup', action: () => openSettings('modules') },
+               { label: 'Customize Settings', action: () => openSettings('features') },
+               { label: 'Add/Less Setup', action: () => openSettings('custom') },
+               { label: 'Printer Setting', action: () => openSettings('print') },
+               { label: 'Terms & Condition', action: () => openSettings('vouchers') },
+               { label: 'Add Column In Reports', action: () => openSettings('reports') },
+               { label: 'Sp Find Column Setting', action: () => openSettings('columns') },
+               { label: 'Change PassWord', action: () => openSettings('users'), separatorBefore: true },
+               { label: 'Theme', action: () => openSettings('appearance') },
+            ],
+         },
          { label: 'Extra Event', action: () => openSettings('notificationRules') },
          { label: 'Extra Event DetailData', action: () => openSettings('notificationRules') },
          { label: 'User Setup', action: () => openSettings('users') },
+         { label: 'Company Info', action: () => openSettings('companyInfo'), separatorBefore: true },
+         { label: 'CA Access', action: () => openSettings('caAccess') },
       ],
       Records: showRecordsHub ? [
          { label: 'All Records Hub', action: () => openRecordsHub('accounts') },
@@ -1234,11 +1293,19 @@ const Dashboard = () => {
          { label: 'Item Records', action: () => openRecordsHub('items') }
       ] : [],
       Company: [
-         { label: 'Change Company  F3', action: () => openCompanyPanel('list') },
-         { label: 'Change Year  F2', action: () => openCompanyPanel('year') },
+         { label: 'Change Company -F3', action: () => openCompanyPanel('list') },
+         { label: 'Change Year -F2', action: () => openCompanyPanel('year') },
          { label: 'Company Master', action: () => openCompanyPanel('master') },
          { label: 'Information', action: () => openCompanyPanel('info') },
       ]
+   };
+
+   // A sub-menu that would run past the bottom of the window opens higher up, as in Windows.
+   const keepFlyoutOnScreen = (el) => {
+      if (!el) return;
+      el.style.top = '';
+      const over = el.getBoundingClientRect().bottom - (window.innerHeight - 30); // clear the KEYS bar
+      if (over > 0) el.style.top = `${-over}px`;
    };
 
    const visibleMenuData = useMemo(() => {
@@ -1247,6 +1314,14 @@ const Dashboard = () => {
          if (section === 'Advanced') return;
          if (permissions.canAccessSection(section)) {
             let allowedItems = items.filter(isMenuItemAllowed);
+            if (section === 'Master') {
+               // Master sub-menus: the folder obeys its own right, each entry inside keeps the right it had at top level
+               const allowTree = (list) => list
+                  .filter((i) => (i.children ? isMenuItemAllowed({ label: i.label }) : isMenuItemAllowed(i)))
+                  .map((i) => (i.children ? { ...i, children: allowTree(i.children) } : i))
+                  .filter((i) => !i.children || i.children.length > 0);
+               allowedItems = allowTree(allowedItems);
+            }
             if (section === 'Admin') {
                allowedItems = allowedItems.filter(i => i.label !== 'User Rights' || permissions.canManageUsers);
             }
@@ -1263,9 +1338,12 @@ const Dashboard = () => {
       return filtered;
    }, [permissions, moduleConfig, bundle, user?.role, showRecordsHub]);
 
+   // JSM's menu bar order; Records (MERN only) comes last, before Exit.
+   const JSM_MENU_ORDER = ['Master', 'Transaction', 'Inventory', 'Reports', 'Others Reports', 'Utilities', 'Setup System', 'Company', 'Records'];
    const menuSections = useMemo(() => {
       const keys = Object.keys(visibleMenuData);
-      return visibleMenuData.Company ? ['Company', ...keys.filter((key) => key !== 'Company')] : keys;
+      const rank = (k) => { const i = JSM_MENU_ORDER.indexOf(k); return i < 0 ? JSM_MENU_ORDER.length : i; };
+      return [...keys].sort((a, b) => rank(a) - rank(b));
    }, [visibleMenuData]);
 
    const ALL_CORE_MODULES = [
@@ -1299,11 +1377,54 @@ const Dashboard = () => {
       setModals(prev => ({ ...prev, [key]: true }));
    };
 
+   // JSM's black quick toolbar: "1 Sales | 2 Pur | 3 Rec | 4 Pay | Ledger | Z Trail | 5 M.Iss | 6 M.Rec |
+   // 7 J.Iss | 8 J.Rec || 9 Debt O/s | F10 Help". The digit / letter keys work on the desktop like in JSM.
+   const JSM_TOOLBAR = [
+      { id: 'sales', hotkey: '1', label: 'Sales', title: 'Sales Invoice' },
+      { id: 'purchase', hotkey: '2', label: 'Pur', title: 'Purchase Invoice' },
+      { id: 'receipt', hotkey: '3', label: 'Rec', title: 'Bank / Cash Receipt' },
+      { id: 'payment', hotkey: '4', label: 'Pay', title: 'Bank / Cash Payment' },
+      { id: 'ledger', label: 'Ledger', title: 'Account Ledger' },
+      { id: 'zTrial', hotkey: 'Z', label: 'Trail', title: 'Trial Balance' },
+      { id: 'millIssue', hotkey: '5', label: 'M.Iss', title: 'Mill Issue' },
+      { id: 'millRec', hotkey: '6', label: 'M.Rec', title: 'Mill Receipt' },
+      { id: 'jobIssue', hotkey: '7', label: 'J.Iss', title: 'Job Issue' },
+      { id: 'jobRec', hotkey: '8', label: 'J.Rec', title: 'Job Receipt' },
+      { sep: 'sep1' },
+      { id: 'outstanding', hotkey: '9', label: 'Debt O/s', title: 'Debtors Outstanding' },
+      { id: 'help', hotkey: 'F10', label: 'Help', title: 'Keyboard help' },
+      { id: 'update', label: 'Update', title: 'Refresh all data', small: true },
+      { id: 'helpKeys', label: 'Help', title: 'Keyboard help', small: true },
+      { id: 'eway', label: 'E-Way', title: 'E-Way Bill', small: true },
+      { id: 'desk', label: 'Desk', title: 'CA Desk', small: true },
+   ];
+   const showKeyHelp = () => toast.info('1 Sales · 2 Pur · 3 Rec · 4 Pay · Z Trail · 5 M.Iss · 6 M.Rec · 7 J.Iss · 8 J.Rec · 9 Debt O/s · Alt menu · F9 toolbar · F2 year · F3 company. Inside a bill: Enter next field, Ctrl+Enter save, Esc close.');
+   const runToolbarItem = (t) => {
+      setActiveMenuKey(t.id);
+      if (t.id === 'zTrial') setModals(prev => ({ ...prev, zTrial: true }));
+      else if (t.id === 'outstanding') {
+         yieldOtherWindows('outstanding');
+         setModals(prev => ({ ...prev, outstanding: true, outstandingSalesFull: true }));
+      } else if (t.id === 'help' || t.id === 'helpKeys') showKeyHelp();
+      else if (t.id === 'update') refreshAllData().then(() => toast.success('All data refreshed.'));
+      else if (t.id === 'eway') openGstReport('ewayStatus');
+      else if (t.id === 'desk') toggleModal('caDashboard', true);
+      else toggleModal(t.id, true);
+   };
+   const runToolbarItemRef = useRef(runToolbarItem);
+   runToolbarItemRef.current = runToolbarItem;
+   const formatDeskStamp = (d) => {
+      const t = new Date(d);
+      if (Number.isNaN(t.getTime())) return '';
+      const p = (n) => String(n).padStart(2, '0');
+      return `${p(t.getDate())}/${p(t.getMonth() + 1)}/${t.getFullYear()} ${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())}`;
+   };
+
    return (
       <div className="erp-shell erp-shell-with-kbd fixed inset-0 flex overflow-hidden">
 
-         {/* Core modules — compact rail */}
-         <aside className="erp-rail flex flex-col py-2 gap-0.5 shrink-0 overflow-y-auto no-scrollbar">
+         {/* CA users keep the small rail (CA Desk + password); everyone else gets the JSM quick toolbar under the menu */}
+         {isCaUser && <aside className="erp-rail flex flex-col py-2 gap-0.5 shrink-0 overflow-y-auto no-scrollbar">
             <p className="px-3 py-1.5 text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-wider shrink-0" title="F9 focuses this list. Up and Down move. Enter opens.">Quick · F9</p>
             {!isCaUser && (
                <button
@@ -1377,7 +1498,7 @@ const Dashboard = () => {
                   <span className="text-[11px] font-medium truncate leading-tight">Help</span>
                </button>
             </div>
-         </aside>
+         </aside>}
 
          {/* Main area */}
          <main className="flex-1 min-w-0 flex flex-col bg-[var(--bg-base)] relative min-h-0">
@@ -1494,13 +1615,13 @@ const Dashboard = () => {
                            {section}
                         </button>
                         {isOpen && (
-                           <div className="erp-menu-dropdown">
+                           <div className={`erp-menu-dropdown${section === 'Master' ? ' erp-menu-dropdown--jsm' : ''}`}>
                                  {visibleMenuData[section].map((item, idx) => {
                                     const renderMenuNode = (node, keyPrefix) => {
                                        const label = typeof node === 'object' ? node.label : node;
                                        const { badge, text } = parseMenuLabel(label);
                                        const kids = Array.isArray(node.children) ? node.children : null;
-                                       const needsSeparator = text === 'Closing / UnClosing Year' || text === 'Voucher Relndex';
+                                       const needsSeparator = node.separatorBefore || text === 'Closing / UnClosing Year' || text === 'Voucher Relndex';
                                        const flyoutOpen = openFlyoutPath === keyPrefix
                                           || (typeof openFlyoutPath === 'string' && openFlyoutPath.startsWith(`${keyPrefix}-`));
 
@@ -1529,7 +1650,10 @@ const Dashboard = () => {
                                                       <span className="erp-menu-chevron">{flyoutOpen ? '▾' : '▸'}</span>
                                                    </button>
                                                    {flyoutOpen && (
-                                                      <div className={section === 'Reports' ? 'erp-menu-nest' : 'erp-menu-flyout erp-menu-flyout--open'}>
+                                                      <div
+                                                         className={section === 'Reports' ? 'erp-menu-nest' : 'erp-menu-flyout erp-menu-flyout--open'}
+                                                         ref={section === 'Reports' ? undefined : keepFlyoutOnScreen}
+                                                      >
                                                          {kids.map((child, cIdx) => renderMenuNode(child, `${keyPrefix}-${cIdx}`))}
                                                       </div>
                                                    )}
@@ -1576,6 +1700,26 @@ const Dashboard = () => {
                      Exit
                   </button>
                </div>}
+
+               {!isCaUser && (
+                  <nav className="erp-jsm-toolbar select-none" aria-label="Quick toolbar (F9)">
+                     <span className="erp-jsm-toolbar__user" aria-hidden>{(user?.name || 'U').charAt(0).toUpperCase()}</span>
+                     {JSM_TOOLBAR.map((t) => (t.sep ? (
+                        <span key={t.sep} className="erp-jsm-toolbar__sep" aria-hidden>|</span>
+                     ) : (
+                        <button
+                           key={t.label}
+                           type="button"
+                           data-jsm-tool={t.id}
+                           title={t.hotkey ? `${t.title} (${t.hotkey})` : t.title}
+                           onClick={() => runToolbarItem(t)}
+                           className={`erp-jsm-toolbar__btn${t.small ? ' erp-jsm-toolbar__btn--small' : ''}${activeMenuKey === t.id ? ' erp-jsm-toolbar__btn--active' : ''}`}
+                        >
+                           {t.hotkey && !t.small ? `${t.hotkey} ` : ''}{t.label}
+                        </button>
+                     )))}
+                  </nav>
+               )}
 
             </header>
 
@@ -1660,34 +1804,6 @@ const Dashboard = () => {
                      </div>
                   </div>
                )}
-               <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                     <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Dashboard</h2>
-                     <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                        Daily flow: Purchase → Mill → Sales → Cash/Bank → Ledger
-                     </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                     {lastSynced && (
-                        <span className="text-[9px] font-medium text-emerald-600 self-center">Live</span>
-                     )}
-                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={handleSync} disabled={showSoftSync || showDashboardSkeleton}>
-                        <FontAwesomeIcon icon={faSync} className={`text-[9px] mr-1 ${showSoftSync || showDashboardSkeleton ? 'animate-spin' : ''}`} />
-                        {showSoftSync || showDashboardSkeleton ? 'Syncing…' : 'Sync'}
-                     </button>
-                     {showRecordsHub && (
-                        <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => openRecordsHub('accounts')}>Records</button>
-                     )}
-                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => openReportsHub('summary')}>Reports</button>
-                     {showCADesk && isModuleAllowed('caDashboard') && (
-                        <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => toggleModal('caDashboard', true)}>CA Desk</button>
-                     )}
-                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => toggleModal('ledger', true)}>Ledger</button>
-                     <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" onClick={() => setModals(prev => ({ ...prev, zTrial: true }))}>Z Trial</button>
-                     <button type="button" className="erp-btn erp-btn-primary h-7 px-3 text-[11px]" onClick={() => toggleModal('sales', true)}>+ Invoice</button>
-                  </div>
-               </div>
-
                {showDashboardSkeleton ? (
                   <CardGridLoader count={6} />
                ) : (
@@ -1861,114 +1977,43 @@ const Dashboard = () => {
                       )}
                    </div>
 
-                   {/* Right Side: Dealing India Billing Software Showcase (Ultra Crisp, High Contrast & Compact) */}
-                   <div 
-                      className="flex-1 p-5 sm:p-6 flex flex-col justify-between select-none"
-                      style={{ backgroundColor: 'var(--bg-card, #ffffff)' }}
-                   >
-                      
-                      {/* Main Brand Showcase: Focused, Bold & Ultra Visible */}
-                      <div className="flex-1 flex flex-col justify-center items-center text-center py-4">
-                         {/* Refined Brand Logo Icon */}
-                         <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white font-black text-2xl flex items-center justify-center shadow-md mb-3 shrink-0">
-                            DI
-                         </div>
-
-                         {/* Main Title: Dealing India Billing Software */}
-                         <h2 
-                            className="text-2xl sm:text-3xl font-black tracking-tight"
-                            style={{ color: 'var(--text-primary, #0f172a)' }}
-                         >
-                            Dealing India Billing Software
-                         </h2>
-                         <p 
-                            className="text-[13px] sm:text-[14px] mt-1.5 font-semibold max-w-lg"
-                            style={{ color: 'var(--text-secondary, #475569)' }}
-                         >
-                            Complete Textile Billing, Grey & Finished Stock, Mill Jobwork & GST Solution
+                   {/* Right side: JSM's desktop — company block, the five GST shortcuts and the support lines */}
+                   <div className="erp-jsm-desk flex-1 flex flex-col justify-between select-none">
+                      <div className="erp-jsm-desk__company">
+                         <p className="erp-jsm-desk__name">{(user?.companyName || user?.company?.name || companySettings?.legalName || companySettings?.shortName || companyMeta?.name || 'Company').toUpperCase()}</p>
+                         {companySettings?.financialYear && <p className="erp-jsm-desk__year">( {companySettings.financialYear} )</p>}
+                         {(user?.company?.coCode || companySettings?.codeRef) && <p className="erp-jsm-desk__code">{user?.company?.coCode || companySettings?.codeRef}</p>}
+                         {lastSynced && <p className="erp-jsm-desk__backup">LAST SYNC DATE : {formatDeskStamp(lastSynced)}</p>}
+                      </div>
+                      <div className="erp-jsm-desk__icons">
+                         {[
+                            { id: 'gst3bMonthly', label: '3B MONTHLY', glyph: '₹' },
+                            { id: 'gstr1', label: 'GSTR-1', glyph: '🧾' },
+                            { id: 'gst2bMatching', label: '2B MATCHING', glyph: '⚖' },
+                            { id: 'gst3bDetail', label: '3B DETAIL', glyph: '📋' },
+                            { id: 'gstr1Errorchek', label: 'R-1 ERRORCHEK', glyph: '🔍' },
+                         ].map((ic) => (
+                            <button
+                               key={ic.id}
+                               type="button"
+                               className="erp-jsm-desk__icon"
+                               onDoubleClick={() => toggleModal(ic.id, true)}
+                               onClick={() => toggleModal(ic.id, true)}
+                            >
+                               <span className="erp-jsm-desk__glyph" aria-hidden>{ic.glyph}</span>
+                               <span className="erp-jsm-desk__label">{ic.label}</span>
+                            </button>
+                         ))}
+                      </div>
+                      <div className="erp-jsm-desk__support">
+                         <p>SUPPORT TIME: [11:00 am to 7:00 pm]</p>
+                         <p>PH.NO. : <a href="tel:+919876543210">+91 98765 43210</a></p>
+                         <p>
+                            <a href="https://wa.me/919876543210" target="_blank" rel="noopener noreferrer">WHATSAPP</a>
+                            {' · '}
+                            <button type="button" onClick={() => setModals((prev) => ({ ...prev, downloadDesktop: true }))}>DESKTOP .EXE</button>
                          </p>
-
-                         {/* High-Contrast Compact Feature Badges */}
-                         <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
-                            <span 
-                               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border"
-                               style={{ backgroundColor: '#ecfdf5', color: '#065f46', borderColor: '#a7f3d0' }}
-                            >
-                               <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                               100% Offline + Cloud Sync
-                            </span>
-                            <span 
-                               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border"
-                               style={{ backgroundColor: '#f0f9ff', color: '#075985', borderColor: '#bae6fd' }}
-                            >
-                               ✓ GST & E-Way Ready
-                            </span>
-                            <span 
-                               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border"
-                               style={{ backgroundColor: '#eef2ff', color: '#3730a3', borderColor: '#c7d2fe' }}
-                            >
-                               ✓ Mill Issue & Rec Challan
-                            </span>
-                            <span 
-                               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border"
-                               style={{ backgroundColor: '#fffbeb', color: '#92400e', borderColor: '#fde68a' }}
-                            >
-                               ✓ Fast Keyboard Entries
-                            </span>
-                         </div>
                       </div>
-
-                      {/* Compact Helpline & Support Bar (Ultra Crisp, High Contrast & Clean) */}
-                      <div className="mt-auto pt-3 border-t border-[var(--border, #e2e8f0)]">
-                         <div 
-                            className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl border"
-                            style={{ backgroundColor: 'var(--bg-subtle, #f8fafc)', borderColor: 'var(--border, #e2e8f0)' }}
-                         >
-                            <div className="flex items-center gap-3">
-                               <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                  </svg>
-                               </div>
-                               <div>
-                                  <p 
-                                     className="text-[10px] uppercase font-extrabold tracking-wider"
-                                     style={{ color: 'var(--text-secondary, #475569)' }}
-                                  >
-                                     Customer Support & Helpline
-                                  </p>
-                                  <a 
-                                     href="tel:+919876543210" 
-                                     className="text-[14px] font-black hover:underline flex items-center gap-1.5"
-                                     style={{ color: '#1d4ed8' }}
-                                  >
-                                     <span>📞 +91 98765 43210</span>
-                                     <span className="text-[11px] font-normal text-slate-500">• Surat, Gujarat</span>
-                                  </a>
-                               </div>
-                            </div>
-
-                            {/* Compact Action Buttons */}
-                            <div className="flex items-center gap-2">
-                               <a
-                                  href="https://wa.me/919876543210"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="h-7 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-xs transition-colors"
-                               >
-                                  <span>💬 WhatsApp</span>
-                               </a>
-                               <button
-                                  type="button"
-                                  onClick={() => setModals((prev) => ({ ...prev, downloadDesktop: true }))}
-                                  className="h-7 px-3.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-bold text-[11px] flex items-center gap-1.5 shadow-xs transition-colors"
-                               >
-                                  <span>💻 Desktop .EXE</span>
-                               </button>
-                            </div>
-                         </div>
-                      </div>
-
                    </div>
                 </div>
                 </>)}
@@ -2162,8 +2207,9 @@ const Dashboard = () => {
          />
          <ReceiveModal
             isOpen={modals.millRec}
-            onClose={() => toggleModal('millRec', false)}
+            onClose={() => { setJobInitialId(null); toggleModal('millRec', false); }}
             selectedBook={selectedBooks.millRec?.name}
+            initialJobId={jobInitialId}
             onOpenPayment={(partyId) => {
                setVoucherInitialId(null);
                openModalDirect('payment');
@@ -2180,8 +2226,9 @@ const Dashboard = () => {
          />
          <JobReceiptModal
             isOpen={modals.jobRec}
-            onClose={() => toggleModal('jobRec', false)}
+            onClose={() => { setJobInitialId(null); toggleModal('jobRec', false); }}
             selectedBook={selectedBooks.jobRec?.name}
+            initialJobId={jobInitialId}
             onOpenPayment={(partyId) => {
                setVoucherInitialId(null);
                openModalDirect('payment');
@@ -2210,6 +2257,21 @@ const Dashboard = () => {
                   openModalDirect('payment');
                   focusErpWindow('cashbank-bank-Payment');
                }
+            }}
+            onOpenJob={(data) => {
+               const refId = ledgerRefId(data?.row);
+               const docNo = String(data?.docNo || data?.row?.billVoucherNo || '');
+               const jobs = useStore.getState().jobWorkEntries || [];
+               const found = jobs.find((j) => refId && idOf(j._id || j.id) === refId)
+                  || jobs.find((j) => docNo && (String(j.billGpNo || '') === docNo || String(j.jobCardNo || '') === docNo));
+               if (!found) {
+                  toast.info(`Bill #${docNo}`);
+                  return;
+               }
+               const isJobWork = String(found.processType || '') === 'Job Work';
+               setJobInitialId(idOf(found._id || found.id));
+               minimizeErpWindow('ledger');
+               openModalDirect(isJobWork ? 'jobRec' : 'millRec');
             }}
             onOpenReceipt={(data) => {
                const docNo = data?.voucherNo || data?.docNo || data?.row?.billVoucherNo || '';
@@ -2430,6 +2492,7 @@ const Dashboard = () => {
                   mode="beam"
                />
             )}
+            {modals.gstinJsm && <GstinJsmReport isOpen kind={gstinJsmKind} onClose={() => toggleModal('gstinJsm', false)} />}
             {modals.gst3bMonthly && <Gst3bMonthlyModal isOpen onClose={() => toggleModal('gst3bMonthly', false)} />}
             {modals.gstr1 && <Gstr1Modal isOpen onClose={() => toggleModal('gstr1', false)} />}
             {modals.gstReports && (
@@ -2519,12 +2582,22 @@ const Dashboard = () => {
          />
 
          {/* New Database-Connected Modals */}
-         <GenericMasterModal 
-            isOpen={modals.genericMaster} 
-            onClose={() => setModals(prev => ({ ...prev, genericMaster: false }))} 
-            type={modals.genericMasterType}
-            readOnly={permissions.readOnlyMasters || mobileViewOnly}
-         />
+         {/* masters JSM has as their own form open in the JSM-drawn window */}
+         {JSM_SUBMASTER_FORMS[modals.genericMasterType] ? (
+            <JsmSubMasterWindow
+               isOpen={modals.genericMaster}
+               onClose={() => setModals(prev => ({ ...prev, genericMaster: false }))}
+               type={modals.genericMasterType}
+               readOnly={permissions.readOnlyMasters || mobileViewOnly}
+            />
+         ) : (
+            <GenericMasterModal
+               isOpen={modals.genericMaster}
+               onClose={() => setModals(prev => ({ ...prev, genericMaster: false }))}
+               type={modals.genericMasterType}
+               readOnly={permissions.readOnlyMasters || mobileViewOnly}
+            />
+         )}
          <OpeningBalanceModal
             isOpen={modals.openingBalance}
             onClose={() => setModals(prev => ({ ...prev, openingBalance: false }))}
@@ -2542,6 +2615,7 @@ const Dashboard = () => {
          />
          <MergeMasterModal
             isOpen={modals.mergeMaster}
+            initialEntity={modals.mergeEntity}
             onClose={() => setModals(prev => ({ ...prev, mergeMaster: false }))}
          />
          <DataImportModal
@@ -2712,21 +2786,17 @@ const Dashboard = () => {
          <FailedSyncModal isOpen={syncModalOpen} onClose={() => setSyncModalOpen(false)} />
          <ErpWindowDockTray />
          <PwaInstallPrompt />
-         <ErpKeyboardHintBar
-            className="erp-shell-kbd-fixed"
-            items={[
-               ...APP_KEYBOARD_HINTS,
-               { keys: 'Ctrl+S', label: 'Sales' },
-               { keys: 'Alt+P', label: 'Purchase' },
-               { keys: 'Alt+R', label: 'Reports' },
-               { keys: 'Alt+L', label: 'Ledger' },
-               { keys: 'Alt+B', label: 'Receipt' },
-               { keys: 'Alt+Y', label: 'Payment' },
-               { keys: 'Alt+M', label: 'Mill' },
-               { keys: 'Alt+G', label: 'GSTR-1' },
-               { keys: 'Alt+O', label: 'Outstanding' },
-            ]}
-         />
+         {isCaUser ? (
+            <ErpKeyboardHintBar className="erp-shell-kbd-fixed" items={APP_KEYBOARD_HINTS} />
+         ) : (
+            <JsmStatusBar
+               className="erp-shell-kbd-fixed"
+               code={user?.company?.coCode || companySettings?.codeRef}
+               company={user?.companyName || user?.company?.name || companySettings?.legalName || companySettings?.shortName || companyMeta?.name}
+               year={companySettings?.financialYear}
+               path={companySettings?.coDataPath}
+            />
+         )}
 
       </div>
    );

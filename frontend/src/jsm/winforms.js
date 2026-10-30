@@ -27,6 +27,13 @@ const SYSTEM_COLORS = {
   GradientActiveCaption: '#b9d1ea',
   GradientInactiveCaption: '#d7e4f2',
   HotTrack: '#0066cc',
+  ActiveBorder: '#b4b4b4',
+  ActiveCaptionText: '#000000',
+  Desktop: '#000000',
+  InactiveBorder: '#f4f7fc',
+  InactiveCaptionText: '#000000',
+  MenuBar: '#f0f0f0',
+  MenuHighlight: '#3399ff',
 };
 
 /** WinForms color name / "#rrggbb" → CSS color. Named web colors (SlateGray, Bisque…) pass through. */

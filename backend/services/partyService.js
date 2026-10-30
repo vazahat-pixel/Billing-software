@@ -99,6 +99,7 @@ class PartyService {
       paymentTermsId: partyData.paymentTermsId || null,
       isFavorite: !!partyData.isFavorite,
       banks: sanitizeBanks(partyData.banks),
+      group: String(partyData.group || '').trim().toUpperCase(),
       ...Object.fromEntries(JSM_EXTRA_FIELDS.map((f) => [f, String(partyData[f] ?? '').trim()])),
       eCommerce: !!partyData.eCommerce,
     };

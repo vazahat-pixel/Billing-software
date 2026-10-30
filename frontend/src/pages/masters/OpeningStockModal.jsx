@@ -98,6 +98,8 @@ const OpeningStockModal = ({ isOpen, onClose, readOnly = false }) => {
         {!readOnly && (
           <button
             type="button"
+            data-action="save"
+            data-enter-save="true"
             onClick={handleSave}
             disabled={saving}
             className="w-full py-3 bg-black text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-50"

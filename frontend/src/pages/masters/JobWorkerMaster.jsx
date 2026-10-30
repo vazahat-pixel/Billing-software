@@ -163,6 +163,7 @@ const JobWorkerMaster = () => {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required 
+                    autoFocus
                   />
                   <SelectInput 
                     label="Work Type" 
@@ -194,6 +195,7 @@ const JobWorkerMaster = () => {
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest px-0.5">Special Instructions</label>
                     <textarea 
+                      data-enter-next="true"
                       value={instructions}
                       onChange={(e) => setInstructions(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-[13px] outline-none transition-all placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 h-24 resize-none"

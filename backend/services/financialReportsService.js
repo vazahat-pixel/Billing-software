@@ -372,7 +372,7 @@ class FinancialReportsService {
   async finalHeads(companyId) {
     const LedgerMaster = require('../models/LedgerMaster');
     const ledgers = await LedgerMaster.find({ companyId, isActive: true })
-      .select('name code group subGroup accountType linkedPartyId')
+      .select('name code group subGroup jsmHead accountType linkedPartyId')
       .sort({ name: 1 })
       .lean();
     const partyIds = [...new Set(ledgers.map((l) => l.linkedPartyId).filter(Boolean).map(String))];
@@ -398,7 +398,7 @@ class FinancialReportsService {
     }
     const heads = [...headSet.entries()]
       .map(([name, code]) => ({ name, code }))
-      .sort((a, b) => groupRank(a.name) - groupRank(b.name) || a.name.localeCompare(b.name));
+      .sort((a, b) => a.name.localeCompare(b.name));
     return { accounts, heads };
   }
 
@@ -431,7 +431,7 @@ class FinancialReportsService {
       ? (r) => (r.subGroup || r.head || 'OTHERS').toUpperCase()
       : (r) => r.head;
     if (order === 'alpha') rows.sort((a, b) => a.name.localeCompare(b.name));
-    const groups = packGroups(rows, keyFn, order !== 'group');
+    const groups = packGroups(rows, keyFn);
 
     const sideOf = (lines, field) => lines
       .filter((l) => l[field] > 0.001)
@@ -494,6 +494,11 @@ class FinancialReportsService {
     const tradingRight = [];
     const plLeft = [];
     const plRight = [];
+    // JSM's P&L takes an income / expense account's opening balance too (e.g. OPENING STOCK under TRADING EXPENSE);
+    // that opening belongs to the first year of the books, so it is added when the period starts in that year.
+    const firstEntry = await AccountingEntry.findOne({ companyId }).sort({ entryDate: 1 }).select('entryDate').lean();
+    const startFy = (d) => { const x = new Date(d); return new Date(x.getMonth() >= 3 ? x.getFullYear() : x.getFullYear() - 1, 3, 1); };
+    const withOpenings = !from || !firstEntry || new Date(from) < new Date(startFy(firstEntry.entryDate).getFullYear() + 1, 3, 1);
 
     const place = (listPos, listNeg, ledgerName, signed) => {
       if (signed >= 0.005) listPos.push({ name: String(ledgerName || '').toUpperCase(), amount: round2(signed) });
@@ -501,16 +506,17 @@ class FinancialReportsService {
     };
 
     for (const b of balances) {
-      if (b.balance <= 0.001) continue;
       const g = b.ledger.group;
       if (g !== 'Income' && g !== 'Expenses') continue;
+      const drSigned = round2((b.type === 'Dr' ? b.balance : -b.balance) + (withOpenings ? ledgerEngine.signedOpening(b.ledger) : 0));
+      if (Math.abs(drSigned) <= 0.001) continue;
       const trading = isTradingLedger(b.ledger);
       if (g === 'Expenses') {
-        const signed = b.type === 'Dr' ? b.balance : -b.balance;
+        const signed = drSigned;
         if (trading) place(tradingLeft, tradingRight, b.ledger.name, signed);
         else place(plLeft, plRight, b.ledger.name, signed);
       } else {
-        const signed = b.type === 'Cr' ? b.balance : -b.balance;
+        const signed = -drSigned;
         if (trading) place(tradingRight, tradingLeft, b.ledger.name, signed);
         else place(plRight, plLeft, b.ledger.name, signed);
       }
@@ -589,7 +595,7 @@ class FinancialReportsService {
       ? (r) => (r.subGroup || r.head || 'OTHERS').toUpperCase()
       : (r) => r.head;
     const sorted = order === 'alpha' ? [...rows].sort((a, b) => a.name.localeCompare(b.name)) : rows;
-    const groups = packGroups(sorted, keyFn, order !== 'group');
+    const groups = packGroups(sorted, keyFn);
     const left = [];
     const right = [];
     for (const g of groups) {
@@ -642,29 +648,6 @@ class FinancialReportsService {
   }
 }
 
-const JSM_GROUP_ORDER = [
-  'CAPITAL ACCOUNT',
-  'CREDITORS FOR JOBWORK',
-  'CREDITORS FOR PROCESS',
-  'SUNDRY CREDITORS',
-  'DUTIES & TAXES',
-  'PROVISIONS',
-  'BANK BALANCE',
-  'CASH-IN-HAND',
-  'SUNDRY DEBTORS',
-  'CURRENT ASSETS',
-  'FIXED ASSETS',
-  'TRADING INCOME',
-  'TRADING EXPENSE',
-  'PROFIT & LOSS INCOME',
-  'PROFIT & LOSS EXPENSE',
-];
-
-function groupRank(name) {
-  const i = JSM_GROUP_ORDER.indexOf(name);
-  return i === -1 ? 500 : i;
-}
-
 function isTradingLedger(ledger) {
   const sub = String(ledger.subGroup || '').toUpperCase();
   const name = String(ledger.name || '').toUpperCase();
@@ -673,7 +656,20 @@ function isTradingLedger(ledger) {
   return false;
 }
 
+/**
+ * An account brought from JSM keeps its own JSM head (UNSECURED LOAN, CREDITORS FOR SALARY, SUSPENSE ACCOUNT,
+ * BANK BALANCE ...) and JSM's final reports group by it. Imports before jsmHead was stored carry the head chain in
+ * subGroup ("HEAD > PARENT > ..."), its first part being the head.
+ */
+function jsmHeadOf(ledger) {
+  if (ledger.jsmHead) return String(ledger.jsmHead).trim().toUpperCase();
+  const sg = String(ledger.subGroup || '');
+  return sg.includes('>') ? sg.split('>')[0].trim().toUpperCase() : '';
+}
+
 function jsmCategory(ledger, partyType) {
+  const head = jsmHeadOf(ledger);
+  if (head) return head;
   const group = ledger.group || '';
   if (group === 'Income') return isTradingLedger(ledger) ? 'TRADING INCOME' : 'PROFIT & LOSS INCOME';
   if (group === 'Expenses') return isTradingLedger(ledger) ? 'TRADING EXPENSE' : 'PROFIT & LOSS EXPENSE';
@@ -706,7 +702,7 @@ function publicLine(l) {
   };
 }
 
-function packGroups(rows, keyFn, alphaGroups = false) {
+function packGroups(rows, keyFn) {
   const map = new Map();
   for (const row of rows) {
     const key = keyFn(row) || 'OTHERS';
@@ -723,7 +719,8 @@ function packGroups(rows, keyFn, alphaGroups = false) {
         totalCredit: round2(sorted.reduce((s, l) => s + l.credit, 0)),
       };
     })
-    .sort((a, b) => (alphaGroups ? a.name.localeCompare(b.name) : groupRank(a.name) - groupRank(b.name) || a.name.localeCompare(b.name)));
+    // JSM lists the heads in name order (CAPITAL ACCOUNT, CASH-IN-HAND, CREDITORS FOR ..., DUTIES & TAXES, PROVISIONS ...)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 module.exports = new FinancialReportsService();

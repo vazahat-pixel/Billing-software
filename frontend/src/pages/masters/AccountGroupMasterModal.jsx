@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Modal from '../../components/ui/Modal';
+import MasterFindOverlay from '../../components/erp/MasterFindOverlay';
 import useStore from '../../store/useStore';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { erpConfirmDelete } from '../../utils/confirm';
@@ -46,6 +47,7 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
 
   const [mode, setMode] = useState('VIEW'); // 'VIEW' | 'ADD' | 'EDIT'
   const [selectedId, setSelectedId] = useState(null);
+  const [findOpen, setFindOpen] = useState(false); // F3 list
   const [formData, setFormData] = useState({ ...DEFAULT_FORM });
   const [searchQuery, setSearchQuery] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,14 +62,9 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
   useEffect(() => {
     if (isOpen) {
       fetchSubMasters('AccountGroup');
-      setMode(readOnly ? 'VIEW' : 'ADD');
-      setFormData({ ...DEFAULT_FORM, graccd: String(Date.now()).slice(-3) });
-      setSelectedId(null);
       setSearchQuery('');
-      setFocusedRowIndex(0);
-      setTimeout(() => groupHeadRef.current?.focus(), 80);
     }
-  }, [isOpen, readOnly]);
+  }, [isOpen]);
 
   const groupList = useMemo(() => {
     return subMasters
@@ -138,6 +135,40 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
     setMode(editMode && !readOnly ? 'EDIT' : 'VIEW');
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (groupList.length > 0) {
+      if (!selectedId || !groupList.some(g => g.id === selectedId)) {
+        const recent = groupList[groupList.length - 1];
+        loadGroup(recent, false);
+      }
+    } else {
+      setMode(readOnly ? 'VIEW' : 'ADD');
+      setFormData({ ...DEFAULT_FORM, graccd: String(Date.now()).slice(-3) });
+      setSelectedId(null);
+    }
+  }, [isOpen, groupList, readOnly]);
+
+  const currentIndex = useMemo(() => {
+    if (!selectedId || !filteredGroups.length) return -1;
+    return filteredGroups.findIndex((g) => g.id === selectedId);
+  }, [selectedId, filteredGroups]);
+
+  const navigateTo = (index) => {
+    if (!filteredGroups.length) return;
+    const bounded = Math.max(0, Math.min(index, filteredGroups.length - 1));
+    const target = filteredGroups[bounded];
+    if (target) {
+      loadGroup(target, false);
+      setFocusedRowIndex(bounded);
+    }
+  };
+
+  const handleFirst = () => navigateTo(0);
+  const handlePrev = () => navigateTo(currentIndex <= 0 ? 0 : currentIndex - 1);
+  const handleNext = () => navigateTo(currentIndex >= filteredGroups.length - 1 ? filteredGroups.length - 1 : (currentIndex < 0 ? 0 : currentIndex + 1));
+  const handleLast = () => navigateTo(filteredGroups.length - 1);
+
   const handleNew = () => {
     if (readOnly) return;
     const nextCode = groupList.length ? Math.max(...groupList.map((g) => Number(g.graccd) || 100)) + 1 : 101;
@@ -176,10 +207,7 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
     }
   };
 
-  const handleFind = () => {
-    searchInputRef.current?.focus();
-    try { searchInputRef.current?.select(); } catch {}
-  };
+  const handleFind = () => setFindOpen(true);
 
   const handleDelete = async () => {
     if (readOnly || !selectedId) {
@@ -283,10 +311,38 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
       <div
         className="classic-erp-window select-none text-slate-800"
         data-form-enter-nav="true"
+        tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'F3') {
             e.preventDefault();
             handleFind();
+          } else if (e.key === 'F2') {
+            e.preventDefault();
+            if (mode === 'VIEW' && selectedId) {
+              handleEdit();
+            } else if (mode === 'VIEW') {
+              handleNew();
+            }
+          } else if (e.key === 'Enter') {
+            if (mode === 'VIEW' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handleNew();
+            }
+          } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            if (mode === 'VIEW' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handlePrev();
+            }
+          } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+            if (mode === 'VIEW' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handleNext();
+            }
+          } else if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || (e.altKey && e.key.toLowerCase() === 's')) {
+            e.preventDefault();
+            if (mode === 'ADD' || mode === 'EDIT') {
+              handleSave();
+            }
           }
         }}
       >
@@ -650,6 +706,51 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
           <div className="flex items-center gap-1">
             <button
               type="button"
+              data-action="first"
+              onClick={handleFirst}
+              disabled={!filteredGroups.length}
+              className="px-2.5 py-1 text-xs font-bold border border-[#808080] bg-[#e0dfd8] hover:bg-[#c0c0c0] text-slate-800 shadow-sm cursor-pointer disabled:opacity-50"
+              title="First Record (<)"
+            >
+              &lt;
+            </button>
+            <button
+              type="button"
+              data-action="prev"
+              onClick={handlePrev}
+              disabled={!filteredGroups.length}
+              className="px-2.5 py-1 text-xs font-bold border border-[#808080] bg-[#e0dfd8] hover:bg-[#c0c0c0] text-slate-800 shadow-sm cursor-pointer disabled:opacity-50"
+              title="Previous Record (<<)"
+            >
+              &lt;&lt;
+            </button>
+            <button
+              type="button"
+              data-action="next"
+              onClick={handleNext}
+              disabled={!filteredGroups.length}
+              className="px-2.5 py-1 text-xs font-bold border border-[#808080] bg-[#e0dfd8] hover:bg-[#c0c0c0] text-slate-800 shadow-sm cursor-pointer disabled:opacity-50"
+              title="Next Record (>>)"
+            >
+              &gt;&gt;
+            </button>
+            <button
+              type="button"
+              data-action="last"
+              onClick={handleLast}
+              disabled={!filteredGroups.length}
+              className="px-2.5 py-1 text-xs font-bold border border-[#808080] bg-[#e0dfd8] hover:bg-[#c0c0c0] text-slate-800 shadow-sm cursor-pointer disabled:opacity-50"
+              title="Last Record (>)"
+            >
+              &gt;
+            </button>
+            {currentIndex >= 0 && (
+              <span className="text-[11px] font-mono text-gray-600 px-1">
+                {currentIndex + 1} / {filteredGroups.length}
+              </span>
+            )}
+            <button
+              type="button"
               data-action="new"
               onClick={handleNew}
               disabled={readOnly}
@@ -700,6 +801,7 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
             <button
               type="button"
               data-action="find"
+              data-master-find="true"
               onClick={handleFind}
               className="px-3 py-1 text-xs font-bold border border-[#808080] bg-[#e0dfd8] hover:bg-[#c0c0c0] text-slate-800 shadow-sm cursor-pointer"
               title="Find / Search (F3)"
@@ -762,6 +864,13 @@ const AccountGroupMasterModal = ({ isOpen, onClose, readOnly = false }) => {
           </div>
         </div>
       </div>
+      <MasterFindOverlay
+        open={findOpen}
+        title="FIND ACCOUNT GROUP"
+        rows={groupList.map((g) => ({ id: g.id, no: g.graccd, name: g.name, meta: [g.groupType, g.mainGroup].filter(Boolean).join(' · ') }))}
+        onPick={(id) => { setFindOpen(false); const g = groupList.find((x) => x.id === id); if (g) loadGroup(g, false); }}
+        onClose={() => setFindOpen(false)}
+      />
     </Modal>
   );
 };

@@ -3,6 +3,8 @@ const auditService = require('../services/auditService');
 const asyncHandler = require('../utils/asyncHandler');
 const { ok, created } = require('../utils/apiResponse');
 const AppError = require('../utils/AppError');
+const Sales = require('../models/Sales');
+const { renumberIfTaken } = require('../utils/offlineRenumber');
 
 exports.createInvoice = asyncHandler(async (req, res) => {
   const operationId =
@@ -11,6 +13,7 @@ exports.createInvoice = asyncHandler(async (req, res) => {
     req.headers['idempotency-key'] ||
     undefined;
   const deviceId = req.headers['x-device-id'] || req.body?.deviceId || '';
+  await renumberIfTaken(req, res, { Model: Sales, field: 'invoiceNo' });
   const sales = await salesService.createInvoice(
     { ...req.body, companyId: req.companyId, operationId },
     { operationId, deviceId }

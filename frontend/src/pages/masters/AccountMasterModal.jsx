@@ -1,12 +1,26 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
+import MasterFindOverlay from '../../components/erp/MasterFindOverlay';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import DataImportModal from '../../components/import/DataImportModal';
 import { GST_STATE_CODES } from '../../utils/gstStateCodes';
+
+const MSME_TYPE_OPTIONS = [
+  'None',
+  'Manufacturing- Micro',
+  'Manufacturing- Small',
+  'Manufacturing- Medium',
+  'Services- Micro',
+  'Services- Small',
+  'Services- Medium',
+  'Traders- Micro',
+  'Traders- Small',
+  'Traders- Medium',
+];
 
 const EMPTY_ACCOUNT = {
   name: '',
@@ -15,16 +29,20 @@ const EMPTY_ACCOUNT = {
   group: 'SUNDRY DEBTORS',
   openingBalance: 0,
   openingBalanceType: 'Dr',
+  agencyOpBal: 0,
+  agencyDrCr: 'Dr',
   mainGroup: false,
   mainGroupId: '',
   address: '',
   address2: '',
+  address3: '',
   city: '',
   pincode: '',
   phoneO: '',
   phoneR: '',
   mobile: '',
   contactPerson: '',
+  hastePhone: '',
   brokerId: '',
   transport: '',
   tinCstNo: '',
@@ -41,6 +59,7 @@ const EMPTY_ACCOUNT = {
   gstType: 'INVOICE (IN STATE)',
   udyamAadhar: '',
   msmeType: 'None',
+  msmeYear: '',
   dueDays: 0,
   creditLimit: 0,
   tdsSection: '',
@@ -49,12 +68,33 @@ const EMPTY_ACCOUNT = {
   disc2: 0,
   addPer: 0,
   dharaPer: 0,
+  dharaType: '',
   intPer: 0,
   commi: 0,
   maxLevel: 0,
   minLevel: 0,
   tdsPer: 0,
   tcsPer: 0,
+  surchargePer: 0,
+  ewayPassword: '',
+  nature: '',
+  indexCd: '',
+  alias: '',
+  salesMan: '',
+  areaName: '',
+  haste: '',
+  expCity: '',
+  hsnCode: '',
+  dob: '',
+  ref1: '',
+  ref2: '',
+  ref3: '',
+  ref4: '',
+  factoryAddress1: '',
+  factoryAddress2: '',
+  factoryCity: '',
+  factoryMobile: '',
+  eCommerce: false,
   banks: []
 };
 
@@ -65,6 +105,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   const [activeTab, setActiveTab] = useState(initialTab);
   const [mode, setMode] = useState('View'); // 'View', 'Add', 'Edit'
   const [selectedPartyId, setSelectedPartyId] = useState('');
+  const [findOpen, setFindOpen] = useState(false); // F3 list
   const [saving, setSaving] = useState(false);
   const [bootLoading, setBootLoading] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -122,6 +163,14 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       setMode(readOnly ? 'View' : initialPartyId ? 'Edit' : 'Add');
     } else if (readOnly) {
       setMode('View');
+    } else if (parties && parties.length > 0) {
+      if (!selectedPartyId || !parties.some(p => (p._id || p.id) === selectedPartyId)) {
+        const recent = parties[parties.length - 1];
+        const id = recent._id || recent.id;
+        setSelectedPartyId(id);
+        setFormData({ ...EMPTY_ACCOUNT, ...recent });
+        setMode('View');
+      }
     } else {
       setFormData({ ...EMPTY_ACCOUNT });
       setSelectedPartyId('');
@@ -153,13 +202,46 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
     }
   }, [formData.gstin]);
 
+  const currentIndex = useMemo(() => {
+    if (!selectedPartyId || !parties.length) return -1;
+    return parties.findIndex(p => (p._id || p.id) === selectedPartyId);
+  }, [selectedPartyId, parties]);
+
+  const navigateTo = (index) => {
+    if (!parties.length) return;
+    const bounded = Math.max(0, Math.min(index, parties.length - 1));
+    const target = parties[bounded];
+    if (target) {
+      const id = target._id || target.id;
+      setSelectedPartyId(id);
+      setFormData({ ...EMPTY_ACCOUNT, ...target });
+      setMode('View');
+    }
+  };
+
+  const handleFirst = () => navigateTo(0);
+  const handlePrev = () => navigateTo(currentIndex <= 0 ? 0 : currentIndex - 1);
+  const handleNext = () => navigateTo(currentIndex >= parties.length - 1 ? parties.length - 1 : (currentIndex < 0 ? 0 : currentIndex + 1));
+  const handleLast = () => navigateTo(parties.length - 1);
+
+  const handleBankFieldChange = (index, field, val) => {
+    setFormData(prev => {
+      const nextBanks = [...(prev.banks || [])];
+      while (nextBanks.length <= index) {
+        nextBanks.push({ name: '', accountNo: '', ifsc: '' });
+      }
+      nextBanks[index] = { ...nextBanks[index], [field]: val };
+      return { ...prev, banks: nextBanks };
+    });
+  };
+
   const handleSelectParty = (e) => {
     const id = e?.target?.value ?? e;
     setSelectedPartyId(id);
     if (id) {
       const party = parties.find(p => p._id === id || p.id === id);
       if (party) {
-        setFormData({ ...formData, ...party });
+        setFormData({ ...EMPTY_ACCOUNT, ...party });
         setMode('View');
       }
     }
@@ -332,6 +414,8 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
         data-form-enter-nav="true"
         onKeyDown={(e) => {
           if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || (e.altKey && e.key.toLowerCase() === 's')) {
+            // the app-wide Ctrl+Enter / Alt+S already pressed this window's Save; don't save a second time
+            if (e.defaultPrevented) return;
             e.preventDefault();
             e.stopPropagation();
             if (!locked && !saving && !bootLoading) handleSave();
@@ -339,11 +423,29 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
           if (e.key === 'F3') {
             e.preventDefault();
             setMode('View');
-            setTimeout(() => {
-              const inp = document.querySelector('.classic-erp-select input');
-              inp?.focus();
-              try { inp?.select(); } catch {}
-            }, 60);
+            setFindOpen(true);
+          } else if (e.key === 'F2') {
+            e.preventDefault();
+            if (mode === 'View' && (formData._id || formData.id || selectedPartyId)) {
+              handleEdit();
+            } else if (mode === 'View') {
+              handleNew();
+            }
+          } else if (e.key === 'Enter') {
+            if (mode === 'View' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handleNew();
+            }
+          } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            if (mode === 'View' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handlePrev();
+            }
+          } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+            if (mode === 'View' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handleNext();
+            }
           }
         }}
       >
@@ -451,10 +553,10 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                   {['INVOICE (IN STATE)', 'INVOICE (OUT OF STATE)'].map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
                 {L(586, 258, 'Udyam Aadhar')}
-                {T(709, 256, 192, 'udyamAadhar', { className: 'classic-erp-input font-mono uppercase' })}
+                {T(709, 256, 192, 'udyamAadhar', { className: 'classic-erp-input font-mono uppercase', placeholder: 'UDYAM-XX-00-0000000' })}
                 {L(605, 284, 'MSME Type')}
                 <select style={at(691, 280, 211, 24)} className="classic-erp-select" value={formData.msmeType} onChange={setField('msmeType')} disabled={locked}>
-                  {['None', 'Micro', 'Small', 'Medium'].map((t) => <option key={t} value={t}>{t}</option>)}
+                  {MSME_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
                 {T(909, 280, 64, 'msmeYear', { title: 'MSME Year' })}
                 {L(10, 241, 'Phone (O)')}
@@ -512,7 +614,13 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                 {L(790, 473, 'Min Level')}
                 {T(866, 472, 97, 'minLevel', { type: 'number', className: 'classic-erp-input text-right' })}
                 {L(13, 479, 'Email')}
-                {T(107, 476, 420, 'email')}
+                {T(107, 476, 380, 'email')}
+                {L(510, 479, 'Agcy Op.Bal')}
+                {T(590, 476, 90, 'agencyOpBal', { type: 'number', className: 'classic-erp-input text-right' })}
+                <select style={at(685, 475, 50, 24)} className="classic-erp-select font-bold" value={formData.agencyDrCr} onChange={setField('agencyDrCr')} disabled={locked}>
+                  <option value="Dr">DR</option>
+                  <option value="Cr">CR</option>
+                </select>
               </div>
             </div>
           )}
@@ -591,95 +699,150 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                 {T(700, 63, 120, 'creditLimit', { type: 'number', className: 'classic-erp-input text-right font-bold' })}
                 {L(600, 89, 'Dhara %')}
                 {T(700, 87, 120, 'dharaPer', { type: 'number', className: 'classic-erp-input text-right' })}
-                {L(600, 123, 'TDS Section')}
-                {T(700, 121, 120, 'tdsSection', { className: 'classic-erp-input uppercase' })}
+                {L(600, 115, 'TDS Section')}
+                {T(700, 113, 120, 'tdsSection', { className: 'classic-erp-input uppercase' })}
+
+                {L(600, 145, 'Bank 1 Name')}
+                <input style={at(700, 143, 200)} className="classic-erp-input uppercase" value={formData.banks?.[0]?.name || ''} onChange={(e) => handleBankFieldChange(0, 'name', e.target.value.toUpperCase())} disabled={locked} placeholder="Bank 1 Name" />
+                {L(600, 171, 'Bank 1 A/c No')}
+                <input style={at(700, 169, 200)} className="classic-erp-input font-mono" value={formData.banks?.[0]?.accountNo || ''} onChange={(e) => handleBankFieldChange(0, 'accountNo', e.target.value)} disabled={locked} placeholder="Bank 1 Account Number" />
+
+                {L(600, 201, 'Bank 2 Name')}
+                <input style={at(700, 199, 200)} className="classic-erp-input uppercase" value={formData.banks?.[1]?.name || ''} onChange={(e) => handleBankFieldChange(1, 'name', e.target.value.toUpperCase())} disabled={locked} placeholder="Bank 2 Name" />
+                {L(600, 227, 'Bank 2 A/c No')}
+                <input style={at(700, 225, 200)} className="classic-erp-input font-mono" value={formData.banks?.[1]?.accountNo || ''} onChange={(e) => handleBankFieldChange(1, 'accountNo', e.target.value)} disabled={locked} placeholder="Bank 2 Account Number" />
               </div>
             </div>
           )}
         </div>
 
-        {/* Action Button Bar matching JSM Screenshot 1 */}
-        <div className="classic-erp-form-footer select-none">
-          <button
-            className={`classic-erp-btn ${mode === 'Add' ? 'bg-[#0000d0] text-white ring-2 ring-blue-400 font-bold' : ''}`}
-            type="button"
-            data-action="new"
-            onClick={handleNew}
-            disabled={readOnly || saving}
-            title="New Account (Alt+N / F2)"
-          >
-            New
-          </button>
-          <button
-            className={`classic-erp-btn ${mode === 'Edit' ? 'bg-[#0000d0] text-white ring-2 ring-blue-400 font-bold' : ''}`}
-            type="button"
-            data-action="edit"
-            onClick={handleEdit}
-            disabled={readOnly || saving}
-            title="Edit Account (Alt+E)"
-          >
-            Edit
-          </button>
-          <button
-            ref={saveBtnRef}
-            className="classic-erp-btn btn-blue font-bold"
-            type="button"
-            data-action="save"
-            data-enter-save="true"
-            onClick={handleSave}
-            disabled={locked || saving || bootLoading}
-            title="Save Account (Alt+S / Enter on Save)"
-          >
-            <SaveButtonLabel saving={saving} />
-          </button>
-          <button
-            className="classic-erp-btn"
-            type="button"
-            data-action="cancel"
-            onClick={handleCancel}
-            disabled={locked || saving}
-            title="Cancel (Alt+C)"
-          >
-            Cancel
-          </button>
-          <button
-            className="classic-erp-btn"
-            type="button"
-            data-action="find"
-            data-master-find="true"
-            onClick={() => {
-              setMode('View');
-              setTimeout(() => {
-                const inp = document.querySelector('.classic-erp-select input');
-                inp?.focus();
-                try { inp?.select(); } catch {}
-              }, 50);
-            }}
-            disabled={saving}
-            title="Find Party (F3)"
-          >
-            Find
-          </button>
-          <button
-            className="classic-erp-btn btn-red"
-            type="button"
-            data-action="delete"
-            onClick={handleDelete}
-            disabled={readOnly || locked || saving || !(formData._id || formData.id)}
-            title="Delete Account (Alt+D)"
-          >
-            Delete
-          </button>
-          <button
-            className="classic-erp-btn"
-            type="button"
-            data-action="exit"
-            onClick={onClose}
-            disabled={saving}
-            title="Exit (Alt+X / Esc)"
-          >
-            Exit
-          </button>
+        {/* Action Button Bar matching JSM Desktop Form */}
+        <div className="classic-erp-form-footer select-none flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <button
+              className="classic-erp-btn"
+              type="button"
+              data-action="first"
+              onClick={handleFirst}
+              disabled={saving || !parties.length}
+              title="First Record (<)"
+            >
+              &lt;
+            </button>
+            <button
+              className="classic-erp-btn"
+              type="button"
+              data-action="prev"
+              onClick={handlePrev}
+              disabled={saving || !parties.length}
+              title="Previous Record (<<)"
+            >
+              &lt;&lt;
+            </button>
+            <button
+              className="classic-erp-btn"
+              type="button"
+              data-action="next"
+              onClick={handleNext}
+              disabled={saving || !parties.length}
+              title="Next Record (>>)"
+            >
+              &gt;&gt;
+            </button>
+            <button
+              className="classic-erp-btn"
+              type="button"
+              data-action="last"
+              onClick={handleLast}
+              disabled={saving || !parties.length}
+              title="Last Record (>)"
+            >
+              &gt;
+            </button>
+            {currentIndex >= 0 && (
+              <span className="text-[11px] font-mono text-gray-600 px-1">
+                {currentIndex + 1} / {parties.length}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              className={`classic-erp-btn ${mode === 'Add' ? 'bg-[#0000d0] text-white ring-2 ring-blue-400 font-bold' : ''}`}
+              type="button"
+              data-action="new"
+              onClick={handleNew}
+              disabled={readOnly || saving}
+              title="New Account (Alt+N / F2)"
+            >
+              New
+            </button>
+            <button
+              className={`classic-erp-btn ${mode === 'Edit' ? 'bg-[#0000d0] text-white ring-2 ring-blue-400 font-bold' : ''}`}
+              type="button"
+              data-action="edit"
+              onClick={handleEdit}
+              disabled={readOnly || saving}
+              title="Edit Account (Alt+E)"
+            >
+              Edit
+            </button>
+            <button
+              ref={saveBtnRef}
+              className="classic-erp-btn btn-blue font-bold"
+              type="button"
+              data-action="save"
+              data-enter-save="true"
+              onClick={handleSave}
+              disabled={locked || saving || bootLoading}
+              title="Save Account (Alt+S / Enter on Save)"
+            >
+              <SaveButtonLabel saving={saving} />
+            </button>
+            <button
+              className="classic-erp-btn"
+              type="button"
+              data-action="cancel"
+              onClick={handleCancel}
+              disabled={locked || saving}
+              title="Cancel (Alt+C)"
+            >
+              Cancel
+            </button>
+            <button
+              className="classic-erp-btn"
+              type="button"
+              data-action="find"
+              data-master-find="true"
+              onClick={() => {
+                setMode('View');
+                setFindOpen(true);
+              }}
+              disabled={saving}
+              title="Find Party (F3)"
+            >
+              Find
+            </button>
+            <button
+              className="classic-erp-btn btn-red"
+              type="button"
+              data-action="delete"
+              onClick={handleDelete}
+              disabled={readOnly || locked || saving || !(formData._id || formData.id)}
+              title="Delete Account (Alt+D)"
+            >
+              Delete
+            </button>
+            <button
+              className="classic-erp-btn"
+              type="button"
+              data-action="exit"
+              onClick={onClose}
+              disabled={saving}
+              title="Exit (Alt+X / Esc)"
+            >
+              Exit
+            </button>
+          </div>
         </div>
       </div>
       <DataImportModal
@@ -689,6 +852,13 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
           fetchParties?.();
         }}
         initialEntity="party"
+      />
+      <MasterFindOverlay
+        open={findOpen}
+        title="FIND ACCOUNT"
+        rows={(parties || []).map((p) => ({ id: p._id || p.id, no: p.accd || '', name: p.name, meta: [p.type, p.city, p.gstin].filter(Boolean).join(' · ') }))}
+        onPick={(id) => { setFindOpen(false); handleSelectParty(id); setMode('View'); }}
+        onClose={() => setFindOpen(false)}
       />
     </Modal>
   );

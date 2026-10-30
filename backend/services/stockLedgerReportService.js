@@ -220,9 +220,21 @@ async function getStockLedgerReport(companyId, options = {}) {
     }
   });
 
-  const greyOpening = items.filter((item) => catOf(item) === 'grey').reduce((sum, item) => sum + openingQty(item, basis), 0);
-  const finOpening = items.filter((item) => catOf(item) === 'finish').reduce((sum, item) => sum + openingQty(item, basis), 0);
-  const niOpening = items.filter((item) => catOf(item) === 'ni').reduce((sum, item) => sum + openingQty(item, basis), 0);
+  let greyOpening = items.filter((item) => catOf(item) === 'grey').reduce((sum, item) => sum + openingQty(item, basis), 0);
+  let finOpening = items.filter((item) => catOf(item) === 'finish').reduce((sum, item) => sum + openingQty(item, basis), 0);
+  let niOpening = items.filter((item) => catOf(item) === 'ni').reduce((sum, item) => sum + openingQty(item, basis), 0);
+
+  // Earlier years: the item master opening is the stock at the START OF THE DATA, so a report for a later year
+  // must open with the previous year's closing (opening + all flows up to the day before this year began).
+  // Without earlier documents nothing changes (single-year results are identical to before).
+  const before = (d) => !!d && new Date(d) < from;
+  const hasEarlier = purchases.some((d) => before(d.date)) || sales.some((d) => before(d.date)) || returns.some((d) => before(d.date))
+    || jobs.some((j) => before(j.issueDate) || before(j.receiveDate));
+  if (hasEarlier) {
+    const dayBefore = new Date(from.getTime() - 86400000).toISOString().slice(0, 10);
+    const prev = await getStockLedgerReport(companyId, { ...options, asOn: dayBefore, __closingsOnly: true });
+    greyOpening = prev.greyClosing; finOpening = prev.finClosing; niOpening = prev.niClosing;
+  }
 
   const greyClosing = greyOpening + flow.greyPurchase + flow.greyMillReturn + flow.greySalesRtn
     - flow.greyReturn - flow.greyIssue - flow.greySales;
@@ -233,6 +245,7 @@ async function getStockLedgerReport(companyId, options = {}) {
   const finClosing = finOpening + flow.finProcess + flow.finPurchase + flow.finSlReturn + flow.jobReceipt
     - flow.finPuReturn - flow.finSales - flow.jobIssue - flow.kfIssue;
   const niClosing = niOpening + flow.niPurchase + flow.niSlReturn - flow.niPuReturn - flow.niSales;
+  if (options.__closingsOnly) return { greyClosing, finClosing, niClosing };
 
   const grey = section('Grey', [
     ['Opening Stock', greyOpening],

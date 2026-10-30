@@ -101,12 +101,31 @@ export function findEnterSaveButton(container) {
     || container.querySelector('.classic-erp-btn.btn-green:not([disabled])')
     || container.querySelector('.classic-erp-form-footer button.btn-blue:not([disabled])')
     || container.querySelector('.erp-bill-action-bar button.btn-blue:not([disabled])')
-    || container.querySelector('button[type="submit"]:not([disabled])');
+    || container.querySelector('button[type="submit"]:not([disabled])')
+    // Save in the window's own footer (Modal footer sits outside the form body)
+    || container.closest('[data-erp-dialog]')?.querySelector('.erp-modal-footer [data-enter-save]:not([disabled]), .erp-modal-footer button[data-action="save"]:not([disabled])')
+    || null;
+}
+
+/** Next/previous cell in the same item line, so a line's own order wins over header data-enter-order. */
+function siblingInLine(currentEl, step) {
+  const row = currentEl?.closest?.('[data-line-grid] tbody tr');
+  if (!row) return null;
+  const usable = new Set(getFocusableElements(row));
+  const cells = Array.from(row.querySelectorAll(FOCUSABLE_SELECTOR)).filter((el) => usable.has(el)); // DOM order
+  const i = cells.indexOf(currentEl);
+  return i === -1 ? null : cells[i + step] || null;
 }
 
 export function focusNextField(currentEl) {
   const container = findFormContainer(currentEl);
   if (!container) return false;
+
+  const inLine = siblingInLine(currentEl, 1);
+  if (inLine) {
+    focusElement(inLine);
+    return true;
+  }
 
   const next = nextFocusableAfter(container, currentEl);
   if (next) {
@@ -153,6 +172,12 @@ export function focusFormFooter(currentEl) {
 export function focusPrevField(currentEl) {
   const container = findFormContainer(currentEl);
   if (!container) return false;
+
+  const inLine = siblingInLine(currentEl, -1);
+  if (inLine) {
+    focusElement(inLine);
+    return true;
+  }
 
   const focusable = getFocusableElements(container);
   const idx = focusable.indexOf(currentEl);
@@ -335,6 +360,36 @@ export function handleFormEnterKeyDown(e) {
   }
 }
 
+/**
+ * ← / → on a button moves to the previous / next button on the same row (New, Save, Find, Edit, Delete,
+ * Print, Exit ... at the bottom of every form). Enter still presses the focused button.
+ */
+export function moveAlongButtonRow(e) {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return false;
+  if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.defaultPrevented) return false;
+  const target = e.target;
+  if (!(target instanceof HTMLElement) || target.tagName !== 'BUTTON') return false;
+  if (target.closest('[data-arrow-nav="off"], [role="menu"], [role="listbox"], [role="tablist"], .erp-menu-bar, [data-find-modal]')) return false;
+  const box = target.getBoundingClientRect();
+  const midY = box.top + box.height / 2;
+  // the row = enabled, visible buttons near the focused one whose middle sits on the same line
+  let scope = target.parentElement;
+  for (let up = 0; scope && up < 3 && scope.querySelectorAll('button').length < 2; up += 1) scope = scope.parentElement;
+  if (!scope) return false;
+  const row = Array.from(scope.querySelectorAll('button')).filter((b) => {
+    if (b.disabled || !isVisible(b) || b.tabIndex === -1) return false;
+    const r = b.getBoundingClientRect();
+    return Math.abs(r.top + r.height / 2 - midY) <= Math.max(6, box.height / 2);
+  }).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+  const idx = row.indexOf(target);
+  const next = idx < 0 ? null : row[idx + (e.key === 'ArrowRight' ? 1 : -1)];
+  if (!next) return false;
+  e.preventDefault();
+  e.stopPropagation();
+  next.focus();
+  return true;
+}
+
 export function handleFormArrowKeyDown(e) {
   if (!shouldHandleFormNavigation(e)) return;
 
@@ -365,12 +420,18 @@ export function handleFormArrowKeyDown(e) {
     }
   }
 
+  // Number inputs report no caret (selectionStart is null), and a cell entered by keyboard has its
+  // whole value selected — both count as being at the edge, so one arrow press moves on.
+  const caretless = isInput && (target.selectionStart == null || (
+    target.selectionStart === 0 && target.selectionEnd === String(target.value ?? '').length
+  ));
+
   // Left Arrow: Move to previous field if at start of input
   if (e.key === 'ArrowLeft') {
     let atStart = false;
     if (isInput) {
       try {
-        atStart = target.selectionStart === 0 && target.selectionEnd === 0;
+        atStart = caretless || (target.selectionStart === 0 && target.selectionEnd === 0);
       } catch {
         atStart = true;
       }
@@ -393,7 +454,7 @@ export function handleFormArrowKeyDown(e) {
     let atEnd = false;
     if (isInput) {
       try {
-        atEnd = target.selectionStart === target.value.length;
+        atEnd = caretless || target.selectionStart === target.value.length;
       } catch {
         atEnd = true;
       }

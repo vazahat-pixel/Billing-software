@@ -243,10 +243,15 @@ export const clearOfflineDB = async () => {
     const db = await getDB();
     // CRITICAL: Never wipe syncQueue on logout! Pending offline transactions
     // must be preserved until successfully synced to MongoDB cloud.
+    // Device copies still waiting to upload stay too, so offline bills remain visible after re-login.
     const storesToClear = DATA_STORES.filter((s) => s !== 'syncQueue');
     const tx = db.transaction(storesToClear, 'readwrite');
     for (const store of storesToClear) {
-      await tx.objectStore(store).clear();
+      const os = tx.objectStore(store);
+      const rows = await os.getAll();
+      for (const row of rows) {
+        if (!row.offlinePending) await os.delete(row.id);
+      }
     }
     await tx.done;
   } finally {
@@ -397,11 +402,13 @@ export const clearCompanyCache = async (companyId) => {
   const cid = String(companyId);
   const db = await getDB();
 
-  for (const store of DATA_STORES) {
+  // Switching company clears that company's cached lists only. Its upload queue and the device
+  // copies still waiting to upload are kept — they sync the next time that company is opened.
+  for (const store of DATA_STORES.filter((s) => s !== 'syncQueue')) {
     const all = await db.getAll(store);
     const tx = db.transaction(store, 'readwrite');
     for (const row of all) {
-      if (String(row.companyId) === cid) {
+      if (String(row.companyId) === cid && !row.offlinePending) {
         await tx.store.delete(row.id);
       }
     }

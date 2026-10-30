@@ -189,7 +189,10 @@ describe('Job Work partial receive', () => {
     assert.ok(Math.abs(dr - cr) < 0.01, 'stock valuation entry is balanced');
   });
 
-  it('a normal single-shot full receive (no isFinal sent) behaves exactly as before — full backward compatibility', async () => {
+  // Rule since 2026-10-28 (owner's change): when isFinal is not sent, the challan closes only when
+  // its grey balance is zero; a short receive stays open. Sending isFinal: true still closes it
+  // with the shortfall as wastage.
+  it('no isFinal sent + short receive: challan stays open with the balance pending, no wastage', async () => {
     const lotId = await mkGreyLot(30);
     const jobId = await issueJob(lotId, 30, 0);
 
@@ -198,8 +201,31 @@ describe('Job Work partial receive', () => {
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     const job = await Job.findById(jobId);
-    assert.equal(job.status, 'Received', 'omitting isFinal defaults to a final/complete receive, like before');
-    assert.ok(Math.abs(Number(job.wastage) - 2) < 0.01, 'shortfall books as wastage exactly like the old single-shot design');
+    assert.equal(job.status, 'Partial');
+    assert.ok(Math.abs(Number(job.pendingQty) - 2) < 0.01, 'the 2 m not yet back stay pending');
+    assert.ok(Math.abs(Number(job.wastage || 0)) < 0.01, 'nothing is booked as wastage while the challan is open');
+  });
+
+  it('no isFinal sent + full grey back: challan closes by itself', async () => {
+    const lotId = await mkGreyLot(30);
+    const jobId = await issueJob(lotId, 30, 0);
+    const res = await request(app).post('/api/jobs/receive').set(auth(tok)).send({
+      jobId, receivedQty: 30, receivedPcs: 0, charges: 500, gstAmount: 50,
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal((await Job.findById(jobId)).status, 'Received');
+  });
+
+  it('isFinal: true + short receive: closes and books the shortfall as wastage, as before', async () => {
+    const lotId = await mkGreyLot(30);
+    const jobId = await issueJob(lotId, 30, 0);
+    const res = await request(app).post('/api/jobs/receive').set(auth(tok)).send({
+      jobId, receivedQty: 28, receivedPcs: 0, charges: 500, gstAmount: 50, isFinal: true,
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const job = await Job.findById(jobId);
+    assert.equal(job.status, 'Received');
+    assert.ok(Math.abs(Number(job.wastage) - 2) < 0.01);
   });
 
   it('over-receiving beyond the pending balance is rejected (error message unchanged for existing callers)', async () => {

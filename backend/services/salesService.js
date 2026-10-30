@@ -450,7 +450,10 @@ class SalesService {
     }); // end withTransaction
   }
 
-  async getSales(companyId, { page = 1, limit = 100, startDate, endDate, status } = {}) {
+  async getSales(companyId, { page = 1, limit, startDate, endDate, status } = {}) {
+    // No page size asked for = every bill (the sales screen, its Find list, receipts' bill list and the
+    // LR list all read this; a default of 100 hid older bills once a company had more).
+    if (limit === undefined || limit === null || limit === '' || Number(limit) <= 0) limit = 0;
     const query = { companyId };
     if (status) query.status = status;
     if (startDate || endDate) {
@@ -463,18 +466,19 @@ class SalesService {
       }
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const size = parseInt(limit, 10) || 0;
+    const skip = size ? (parseInt(page, 10) - 1) * size : 0;
     const [sales, total] = await Promise.all([
       Sales.find(query)
         .populate('customerId', 'name gstin state city station')
         .populate('items.itemId', 'name hsnCode gstRate')
         .sort({ date: -1, createdAt: -1 })
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(size),
       Sales.countDocuments(query)
     ]);
 
-    return { sales, total, page: parseInt(page), limit: parseInt(limit) };
+    return { sales, total, page: size ? parseInt(page, 10) : 1, limit: size || total };
   }
 
   async getSaleById(id, companyId) {

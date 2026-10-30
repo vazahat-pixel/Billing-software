@@ -12,7 +12,8 @@ export const invoicePrintCss = `
     html, body {
       margin: 0 !important;
       padding: 0 !important;
-      width: 210mm !important;
+      /* auto, not 210mm: @page margins leave 190mm, a wider body is clipped on the right */
+      width: auto !important;
       background: #fff !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
@@ -98,10 +99,8 @@ export const invoicePrintCss = `
     }
 
     body.invoice-printing .ipe-print-footer {
-      position: fixed !important;
-      bottom: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
+      position: static !important;
+      margin-top: 3mm !important;
     }
   }
 `;

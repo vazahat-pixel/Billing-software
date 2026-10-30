@@ -1,6 +1,6 @@
 {
   "name": "textile-erp-desktop",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "private": true,
   "description": "Textile ERP Desktop - Client Application",
   "main": "main.js",
@@ -31,6 +31,7 @@
       "config.json",
       "config.example.json",
       "localRuntime/**/*",
+      "jsmExtractor/**/*",
       "renderer/**/*",
       "!renderer/downloads/**/*",
       "assets/**/*"
@@ -53,7 +54,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "TextileERP-Setup-${version}.${ext}",
@@ -67,10 +70,13 @@
       "shortcutName": "Textile ERP",
       "deleteAppDataOnUninstall": false
     },
+    "releaseInfo": {
+      "releaseNotesFile": "release-notes.md"
+    },
     "publish": [
       {
         "provider": "generic",
-        "url": "https://updates.example.com/textile-erp/"
+        "url": "https://app.dealingindia.com/downloads/updates/"
       }
     ]
   },

@@ -11,6 +11,9 @@ const PartySchema = new mongoose.Schema({
     enum: ['Customer', 'Supplier', 'Both', 'Broker', 'Job Worker', 'Transport', 'Employee', 'Salesman', 'Agent'],
     required: true
   },
+  // A/c. Head chosen in Account Master (e.g. EXPENCES, BANK ACCOUNTS). Empty for older parties —
+  // the app then shows the head that matches the type.
+  group: { type: String, trim: true, uppercase: true, default: '' },
   gstin: {
     type: String,
     uppercase: true,
@@ -131,8 +134,45 @@ const PartySchema = new mongoose.Schema({
   },
   msmeType: {
     type: String,
-    enum: ['None', 'Micro', 'Small', 'Medium'],
+    enum: [
+      'None', 'Micro', 'Small', 'Medium',
+      'Manufacturing- Micro', 'Manufacturing- Small', 'Manufacturing- Medium',
+      'Services- Micro', 'Services- Small', 'Services- Medium',
+      'Traders- Micro', 'Traders- Small', 'Traders- Medium'
+    ],
     default: 'None'
+  },
+  agencyOpBal: {
+    type: Number,
+    default: 0
+  },
+  agencyDrCr: {
+    type: String,
+    default: 'Dr'
+  },
+  surchargePer: {
+    type: Number,
+    default: 0
+  },
+  dharaType: {
+    type: String,
+    default: ''
+  },
+  ewayPassword: {
+    type: String,
+    default: ''
+  },
+  hastePhone: {
+    type: String,
+    default: ''
+  },
+  nature: {
+    type: String,
+    default: ''
+  },
+  indexCd: {
+    type: String,
+    default: ''
   },
   dueDays: {
     type: Number,

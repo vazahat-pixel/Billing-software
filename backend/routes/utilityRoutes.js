@@ -8,5 +8,6 @@ router.use(guard('accounting'));
 const read = requirePermission('accounting', 'read');
 
 router.get('/missing-series', read, utilityController.missingSeries);
+router.get('/duplicate-entries', read, utilityController.duplicateEntries);
 
 module.exports = router;

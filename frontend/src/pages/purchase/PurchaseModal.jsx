@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import ErpTopLayer from '../../components/erp/ErpTopLayer';
 import { createPortal } from 'react-dom';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
@@ -96,6 +97,8 @@ const PurchaseModal = ({
   const openedOnceRef = useRef(false);
   const modalContainerRef = useRef(null);
   const suppBillRef = useRef(null);
+  const challanRef = useRef(null);
+  const chDateRef = useRef(null);
   const lastEnterRef = useRef({ time: 0, idx: -1 });
 
   const [showFindModal, setShowFindModal] = useState(false);
@@ -603,6 +606,7 @@ const PurchaseModal = ({
   };
 
   const navigateToAdjacentBill = (dir) => {
+    if (mode !== 'View') return;
     if (!bookPurchases.length) {
       toast.info('No purchase bills to navigate');
       return;
@@ -630,8 +634,7 @@ const PurchaseModal = ({
       setMode('View');
       toast.info(`Bill #${cleanVNo(nextBill.vNo || nextBill.invoiceNo) || nextBill.supplierInvoiceNo || ''} (${nextIdx + 1}/${bookPurchases.length})`);
     } else if (nextIdx >= bookPurchases.length && dir > 0) {
-      handleNew();
-      toast.info('New Purchase Bill (Add mode)');
+      toast.info(`Last bill reached (${bookPurchases.length}/${bookPurchases.length})`);
     } else if (nextIdx < 0) {
       toast.info(`First bill reached (1/${bookPurchases.length})`);
     }
@@ -747,29 +750,30 @@ const PurchaseModal = ({
         return;
       }
 
+      // 1. If user is typing inside ANY text input or textarea (e.g. Supp. Bill No '-' or remarks),
+      // NEVER intercept + or - or navigation keys! Let the input receive the typed character.
+      const el = e.target;
+      const inTextInput = el && (
+        (el.tagName === 'INPUT' && !['button', 'submit', 'checkbox', 'radio'].includes(el.type)) ||
+        el.tagName === 'TEXTAREA' ||
+        el.isContentEditable
+      );
+      if (inTextInput) {
+        return;
+      }
+
+      // 2. Bill navigation keys (+ / -): ONLY allowed in View mode (when viewing/finding saved bills).
+      // When bill entry has started (mode === 'Add' or 'Edit'), + and - MUST NOT change bills!
       const prevKey = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
       const nextKey = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
       if ((prevKey || nextKey) && !e.ctrlKey && !e.altKey && !showFindModal) {
-        if (mode === 'View') {
+        if (mode === 'View' && !readOnly) {
           e.preventDefault();
           e.stopPropagation();
           navigateToAdjacentBill(prevKey ? -1 : 1);
           return;
         }
-
-        const isPageNav = e.key === 'PageUp' || e.key === 'PageDown';
-        const el = e.target;
-        const inTextInput = el && (
-          (el.tagName === 'INPUT' && !['button', 'submit', 'checkbox', 'radio'].includes(el.type)) ||
-          el.tagName === 'TEXTAREA'
-        );
-
-        if (isPageNav || !inTextInput || (mode === 'Add' && prevKey && !gridItems.some(i => i.itemId))) {
-          e.preventDefault();
-          e.stopPropagation();
-          navigateToAdjacentBill(prevKey ? -1 : 1);
-          return;
-        }
+        return;
       }
 
       // Enter on a saved bill starts a new one, cursor on Bill No.
@@ -1235,6 +1239,7 @@ const PurchaseModal = ({
         add,
         billNo: h.billNo != null && h.billNo !== '' ? h.billNo : prev.billNo,
         billDate: h.billDate || prev.billDate,
+        chDate: h.chDate || h.billDate || prev.chDate,
         type: h.type || prev.type,
         gstType: h.gstType || prev.gstType,
       };
@@ -1808,35 +1813,68 @@ const PurchaseModal = ({
                         data-enter-order="3"
                         className="classic-erp-input"
                         value={header.billDate}
-                        onChange={e => setHeader({ ...header, billDate: e.target.value })}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setHeader(prev => ({
+                            ...prev,
+                            billDate: val,
+                            chDate: (!prev.chDate || prev.chDate === prev.billDate) ? val : prev.chDate
+                          }));
+                        }}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
+                          if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
                             e.stopPropagation();
-                            focusPurchaseVendor();
+                            const val = e.target.value || header.billDate;
+                            setHeader(prev => ({
+                              ...prev,
+                              billDate: val,
+                              chDate: val
+                            }));
+                            challanRef.current?.focus();
+                            try { challanRef.current?.select(); } catch { /* ignore */ }
+                          }
+                        }}
+                        disabled={locked}
+                      />
+                    </div>
+                    {/* Enter order: Supp. Bill → Date → Challan → Ch Date → Vendor */}
+                    <div className="classic-erp-field">
+                      <span className="classic-erp-label">Challan:</span>
+                      <input
+                        ref={challanRef}
+                        type="text"
+                        data-enter-order="3.1"
+                        className="classic-erp-input"
+                        value={header.challanNo}
+                        placeholder="Challan No"
+                        onChange={e => setHeader({ ...header, challanNo: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            chDateRef.current?.focus();
                           }
                         }}
                         disabled={locked}
                       />
                     </div>
                     <div className="classic-erp-field">
-                      <span className="classic-erp-label">Challan:</span>
-                      <input
-                        type="text"
-                        className="classic-erp-input"
-                        value={header.challanNo}
-                        placeholder="Challan No"
-                        onChange={e => setHeader({ ...header, challanNo: e.target.value })}
-                        disabled={locked}
-                      />
-                    </div>
-                    <div className="classic-erp-field">
                       <span className="classic-erp-label">Ch Date:</span>
                       <input
+                        ref={chDateRef}
                         type="date"
+                        data-enter-order="3.2"
                         className="classic-erp-input"
                         value={header.chDate}
                         onChange={e => setHeader({ ...header, chDate: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            focusPurchaseVendor();
+                          }
+                        }}
                         disabled={locked}
                       />
                     </div>
@@ -2502,7 +2540,7 @@ const PurchaseModal = ({
 
           {/* Action bar — outside scroll/window so New/Save never clip */}
           <div className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]">
-            <ErpKeyboardHintBar items={PURCHASE_KEYBOARD_HINTS} dense className="mr-auto min-w-0 flex-1 max-w-full sm:max-w-[55%]" />
+            <ErpKeyboardHintBar items={mode === 'View' ? PURCHASE_KEYBOARD_HINTS : FORM_KEYBOARD_HINTS} dense className="mr-auto min-w-0 flex-1 max-w-full sm:max-w-[55%]" />
             <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving} title="New Bill (Alt+N)">New</button>
             <button className="classic-erp-btn btn-blue" type="button" data-enter-save onClick={handleSave} disabled={locked || saving || bootLoading}>
               <SaveButtonLabel saving={saving} />
@@ -2563,6 +2601,7 @@ const PurchaseModal = ({
 
       {/* Quick Purchase Bill Number Find Modal with + / - and Enter -> Edit */}
       {showFindModal && (
+        <ErpTopLayer>
         <div
           className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
           onClick={() => setShowFindModal(false)}
@@ -2687,6 +2726,7 @@ const PurchaseModal = ({
             </div>
           </div>
         </div>
+        </ErpTopLayer>
       )}
 
       {typeof document !== 'undefined' && saveNextActions && createPortal(

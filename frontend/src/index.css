@@ -354,6 +354,65 @@
   background: var(--border-subtle);
 }
 
+/* Master menu: JSM (WinForms) look — white, square, bold black items, grey group lines, blue hover */
+.erp-menu-dropdown.erp-menu-dropdown--jsm,
+.erp-menu-dropdown--jsm .erp-menu-flyout {
+  background: #ffffff !important;
+  border: 1px solid #a0a0a0 !important;
+  border-radius: 0;
+  box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.35);
+  padding: 2px;
+  backdrop-filter: none;
+  color: #000;
+}
+.erp-menu-dropdown.erp-menu-dropdown--jsm {
+  width: 14.5rem;
+  max-height: none;
+  overflow: visible;
+  margin-top: 1px;
+}
+.erp-menu-dropdown--jsm .erp-menu-flyout {
+  left: 100%;
+  top: -3px;
+  width: 14.5rem;
+  max-height: none;
+  overflow: visible;
+}
+.erp-menu-dropdown--jsm .erp-menu-item {
+  padding: 4px 8px 4px 22px;
+  min-height: 24px;
+  font-family: Tahoma, 'Microsoft Sans Serif', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #000 !important;
+  border-radius: 0;
+  transition: none;
+}
+.erp-menu-dropdown--jsm .erp-menu-item:hover,
+.erp-menu-dropdown--jsm .erp-menu-item--parent.erp-menu-trigger--open {
+  background: #cce8ff !important;
+  color: #000 !important;
+  box-shadow: inset 0 0 0 1px #99d1ff;
+  transform: none;
+}
+.erp-menu-dropdown--jsm .erp-menu-chevron {
+  opacity: 1;
+  font-size: 0;
+}
+.erp-menu-dropdown--jsm .erp-menu-chevron::after {
+  content: '▸';
+  font-size: 11px;
+  color: #000;
+}
+.erp-menu-dropdown--jsm .erp-menu-separator {
+  height: 1px;
+  margin: 3px 2px 3px 22px;
+  background: #d7d7d7;
+}
+.erp-menu-dropdown--jsm .erp-menu-soon {
+  font-family: Arial, sans-serif;
+}
+
 .erp-shortcut-bar {
   display: flex;
   align-items: center;
@@ -599,3 +658,93 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ── JSM shell: black quick toolbar, desktop, status line (colours follow the active theme accent) ── */
+.erp-jsm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 30px;
+  padding: 0 6px;
+  background: #000;
+  color: #fff;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.erp-jsm-toolbar::-webkit-scrollbar { display: none; }
+.erp-jsm-toolbar__user {
+  width: 20px; height: 20px; margin-right: 6px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 4px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
+}
+.erp-jsm-toolbar__btn {
+  height: 24px;
+  padding: 0 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  border-right: 2px solid #fff;
+  background: transparent;
+  flex-shrink: 0;
+}
+.erp-jsm-toolbar__btn:hover,
+.erp-jsm-toolbar__btn:focus-visible,
+.erp-jsm-toolbar__btn--active {
+  background: var(--accent);
+  outline: none;
+}
+.erp-jsm-toolbar__btn--small {
+  font-size: 10px;
+  padding: 0 5px;
+  border-right: 0;
+}
+.erp-jsm-toolbar__sep {
+  margin: 0 2px;
+  font-weight: 700;
+  color: #fff;
+}
+.erp-jsm-desk {
+  position: relative;
+  padding: 22px 28px 18px;
+  color: #fff;
+  background:
+    radial-gradient(120% 90% at 85% 110%, rgba(255, 255, 255, 0.16) 0%, transparent 55%),
+    linear-gradient(160deg, color-mix(in srgb, var(--accent) 70%, #000) 0%, var(--accent) 100%);
+}
+.erp-jsm-desk__company { text-align: left; max-width: 420px; }
+.erp-jsm-desk__name { font-size: 22px; font-weight: 800; letter-spacing: 0.02em; text-align: center; }
+.erp-jsm-desk__year,
+.erp-jsm-desk__code { font-size: 20px; font-weight: 800; text-align: center; line-height: 1.15; }
+.erp-jsm-desk__backup { font-size: 10px; margin-top: 4px; text-align: center; opacity: 0.9; }
+.erp-jsm-desk__icons { display: flex; flex-wrap: wrap; gap: 18px; margin: 56px 0 auto; padding-bottom: 28px; }
+.erp-jsm-desk__icon {
+  width: 82px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 6px 2px; border-radius: 6px; color: #fff;
+}
+.erp-jsm-desk__icon:hover,
+.erp-jsm-desk__icon:focus-visible { background: rgba(255, 255, 255, 0.16); outline: none; }
+.erp-jsm-desk__glyph { font-size: 30px; line-height: 1; }
+.erp-jsm-desk__label { font-size: 9px; font-weight: 700; letter-spacing: 0.02em; text-align: center; }
+.erp-jsm-desk__support {
+  font-family: 'Courier New', ui-monospace, monospace;
+  font-size: 13px; font-weight: 800; line-height: 1.25; letter-spacing: 0.02em;
+}
+.erp-jsm-desk__support a,
+.erp-jsm-desk__support button { color: #fff; text-decoration: underline; font-weight: 800; }
+.erp-jsm-status {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  background: #000;
+  color: #fff;
+  font-family: 'Courier New', ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: pre;
+  overflow: hidden;
+}
+.erp-jsm-status__lead { font-weight: 800; }
+.erp-jsm-status__dot { width: 12px; height: 12px; margin-left: 4px; background: #16a34a; flex-shrink: 0; }

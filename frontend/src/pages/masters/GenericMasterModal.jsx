@@ -1,9 +1,30 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
+import MasterFindOverlay from '../../components/erp/MasterFindOverlay';
 import { Plus, Edit2, Save, X, Search, Trash2, FileText } from 'lucide-react';
 import { erpConfirmDelete } from '../../utils/confirm';
 import { notifyError, notifySuccess, notifyWarning } from '../../utils/notify';
+
+// JSM master fields that MERN did not show (decompiled mst_station, mst_transport, mst_unit,
+// mst_typemn, mst_drawmn). Stored in extraFields next to the existing ones; 'code' uses the
+// form's existing Code state.
+const UQC_LIST = ['BAG-BAGS', 'BAL-BALE', 'BDL-BUNDLES', 'BKL-BUCKLES', 'BOX-BOX', 'BUN-BUNCHES', 'CTN-CARTONS', 'DOZ-DOZENS',
+  'DRM-DRUMS', 'GGK-GREAT GROSS', 'GMS-GRAMMES', 'GRS-GROSS', 'GYD-GROSS YARDS', 'KGS-KILOGRAMS', 'KLR-KILOLITRE', 'KME-KILOMETRE',
+  'MLT-MILILITRE', 'MTR-METERS', 'MTS-METRIC TON', 'NOS-NUMBERS', 'PAC-PACKS', 'PCS-PIECES', 'PRS-PAIRS', 'QTL-QUINTAL',
+  'ROL-ROLLS', 'SET-SETS', 'SQF-SQUARE FEET', 'SQM-SQUARE METERS', 'SQY-SQUARE YARDS', 'TBS-TABLETS', 'TGM-TEN GROSS',
+  'THD-THOUSANDS', 'TON-TONNES', 'TUB-TUBES', 'UGS-US GALLONS', 'UNT-UNITS', 'YDS-YARDS', 'OTH-OTHERS'];
+const JSM_EXTRA = {
+  City: [['code', 'Code'], ['dist', 'Dist'], ['stateCode', 'StateCode'], ['jsmStateName', 'StateName'], ['distance', 'Distance (Km)']],
+  Transport: [['code', 'Code'], ['address1', 'Address 1'], ['address2', 'Address 2'], ['city', 'City'], ['pincode', 'Pin-Code'],
+    ['state', 'State'], ['email', 'E-Mail'], ['party', 'Party'], ['mode', 'Mode', ['', 'Road', 'Rail', 'Air', 'Ship']]],
+  Unit: [['quc', 'QUC', ['', ...UQC_LIST]]],
+  Type: [['region', 'Select Region'], ['taxCalculation', 'Tax Calculation']],
+  PartyBank: [['code', 'Code']],
+  // JSM "Account Main Group" = Main Account Master (Mst_Acc_Main_Mast)
+  AccountGroup: [['accountHead', 'A/c. Head'], ['address1', 'Address'], ['address2', 'Address (2)'], ['city', 'City'],
+    ['phoneO', 'Phone (O)'], ['phoneR', 'Phone (R)'], ['mobile', 'Mobile']],
+};
 
 const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
   const { subMasters, fetchSubMasters, addSubMaster, updateSubMaster, deleteSubMaster } = useStore();
@@ -33,6 +54,8 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
   const [ifsc, setIfsc] = useState('');
   const [ratio, setRatio] = useState('1');
   const [description, setDescription] = useState('');
+  const [jsm, setJsm] = useState({});
+  const [findOpen, setFindOpen] = useState(false); // F3 list
 
   // Table search
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,6 +105,7 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
     setIfsc('');
     setRatio('1');
     setDescription('');
+    setJsm({});
     setSelectedId(null);
     setErrorMsg('');
   };
@@ -89,11 +113,11 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
   useEffect(() => {
     if (isOpen && type) {
       fetchSubMasters(type);
-      resetForm();
       setSearchQuery('');
-      setMode(readOnly ? 'VIEW' : 'ADD');
     }
   }, [isOpen, type]);
+
+
 
   // Compute readable title
   const title = useMemo(() => {
@@ -161,9 +185,24 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
     setIfsc(ex.ifsc || '');
     setRatio(String(ex.ratio ?? '1'));
     setDescription(ex.description || '');
+    setJsm(ex);
     setErrorMsg('');
     setMode(editMode && !readOnly ? 'EDIT' : 'VIEW');
   };
+
+  useEffect(() => {
+    if (!isOpen || !type) return;
+    const itemsOfType = subMasters.filter((item) => item.type === type);
+    if (itemsOfType.length > 0) {
+      if (!selectedId || !itemsOfType.some((it) => it._id === selectedId)) {
+        const recent = itemsOfType[itemsOfType.length - 1];
+        loadRecord(recent, false);
+      }
+    } else {
+      resetForm();
+      setMode(readOnly ? 'VIEW' : 'ADD');
+    }
+  }, [isOpen, type, subMasters, readOnly]);
 
   // Tax slab auto-split: changing IGST splits equally into SGST and CGST
   const handleIgstChange = (val) => {
@@ -175,6 +214,26 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
       setCgstRate(half);
     }
   };
+
+  const currentIndex = useMemo(() => {
+    if (!selectedId || !filteredList.length) return -1;
+    return filteredList.findIndex(item => item._id === selectedId);
+  }, [selectedId, filteredList]);
+
+  const navigateTo = (index) => {
+    if (!filteredList.length) return;
+    const bounded = Math.max(0, Math.min(index, filteredList.length - 1));
+    const target = filteredList[bounded];
+    if (target) {
+      loadRecord(target, false);
+      setFocusedIndex(bounded);
+    }
+  };
+
+  const handleFirst = () => navigateTo(0);
+  const handlePrev = () => navigateTo(currentIndex <= 0 ? 0 : currentIndex - 1);
+  const handleNext = () => navigateTo(currentIndex >= filteredList.length - 1 ? filteredList.length - 1 : (currentIndex < 0 ? 0 : currentIndex + 1));
+  const handleLast = () => navigateTo(filteredList.length - 1);
 
   const handleNew = () => {
     if (readOnly) return;
@@ -197,9 +256,7 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
     setMode('VIEW');
   };
 
-  const handleFind = () => {
-    searchInputRef.current?.focus();
-  };
+  const handleFind = () => setFindOpen(true);
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
@@ -277,23 +334,32 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
         };
       }
 
+      for (const [key] of JSM_EXTRA[type] || []) {
+        extraFields[key] = key === 'code' ? code.trim() : String(jsm[key] ?? '').trim();
+      }
+
       const payload = {
         type,
         name: name.trim(),
         extraFields
       };
 
+      let saved;
       if (mode === 'EDIT' && selectedId) {
-        await updateSubMaster(selectedId, payload);
+        saved = await updateSubMaster(selectedId, payload);
         notifySuccess(`${title} record updated`);
       } else {
-        await addSubMaster(payload);
+        saved = await addSubMaster(payload);
         notifySuccess(`${title} record saved`);
       }
 
-      resetForm();
-      setMode('VIEW');
-      fetchSubMasters(type);
+      await fetchSubMasters(type);
+      const resItem = saved || payload;
+      if (resItem && (resItem._id || resItem.id)) {
+        loadRecord(resItem, false);
+      } else {
+        setMode('VIEW');
+      }
     } catch (err) {
       setErrorMsg(err.response?.data?.message || err.message || 'Failed to save record');
     } finally {
@@ -317,12 +383,39 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
     <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-4xl">
       <div
         className="classic-erp-window flex flex-col max-h-[92vh]"
+        tabIndex={0}
         data-form-enter-nav="true"
         onKeyDown={(e) => {
           if (e.key === 'F3') {
             e.preventDefault();
-            searchInputRef.current?.focus();
-            try { searchInputRef.current?.select(); } catch {}
+            setFindOpen(true);
+          } else if (e.key === 'F2') {
+            e.preventDefault();
+            if (mode === 'VIEW' && selectedId) {
+              handleEdit();
+            } else if (mode === 'VIEW') {
+              handleNew();
+            }
+          } else if (e.key === 'Enter') {
+            if (mode === 'VIEW' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handleNew();
+            }
+          } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            if (mode === 'VIEW' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handlePrev();
+            }
+          } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+            if (mode === 'VIEW' && !e.target.closest('button, input, select, textarea')) {
+              e.preventDefault();
+              handleNext();
+            }
+          } else if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || (e.altKey && e.key.toLowerCase() === 's')) {
+            e.preventDefault();
+            if (mode === 'ADD' || mode === 'EDIT') {
+              handleSubmit();
+            }
           }
         }}
       >
@@ -337,6 +430,15 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
         {/* JSM Standard Desktop Action Bar */}
         <div className="bg-[#e8ebf0] border-b border-[var(--border)] px-3 py-1.5 flex items-center justify-between gap-2 select-none">
           <div className="flex items-center gap-1.5">
+            <button className="classic-erp-btn" type="button" onClick={handleFirst} disabled={!filteredList.length} title="First Record (<)">&lt;</button>
+            <button className="classic-erp-btn" type="button" onClick={handlePrev} disabled={!filteredList.length} title="Previous Record (<<)">&lt;&lt;</button>
+            <button className="classic-erp-btn" type="button" onClick={handleNext} disabled={!filteredList.length} title="Next Record (>>)">	&gt;&gt;</button>
+            <button className="classic-erp-btn" type="button" onClick={handleLast} disabled={!filteredList.length} title="Last Record (>)">&gt;</button>
+            {currentIndex >= 0 && (
+              <span className="text-[11px] font-mono text-gray-600 px-1">
+                {currentIndex + 1} / {filteredList.length}
+              </span>
+            )}
             <button
               type="button"
               data-action="new"
@@ -381,6 +483,7 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
               type="button"
               data-action="find"
               data-master-find-btn="true"
+              data-master-find="true"
               onClick={handleFind}
               className="classic-erp-btn"
               title="Find / Search Records (F3)"
@@ -650,6 +753,32 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
                 </div>
               </div>
             )}
+            {(JSM_EXTRA[type] || []).length > 0 && (
+              <div className="grid grid-cols-12 gap-2 mt-2">
+                {JSM_EXTRA[type].map(([key, label, options]) => (
+                  <div key={key} className={key === 'address1' || key === 'address2' || key === 'party' ? 'col-span-4' : 'col-span-2'}>
+                    <label className="classic-erp-label">{label}</label>
+                    {options ? (
+                      <select
+                        className="classic-erp-select w-full mt-0.5"
+                        value={(key === 'code' ? code : jsm[key]) ?? ''}
+                        onChange={(e) => setJsm((p) => ({ ...p, [key]: e.target.value }))}
+                        disabled={readOnly || mode === 'VIEW'}
+                      >
+                        {options.map((o) => <option key={o} value={o}>{o || '—'}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        className="classic-erp-input w-full mt-0.5"
+                        value={(key === 'code' ? code : jsm[key]) ?? ''}
+                        onChange={(e) => (key === 'code' ? setCode(e.target.value) : setJsm((p) => ({ ...p, [key]: e.target.value })))}
+                        disabled={readOnly || mode === 'VIEW'}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </form>
           {errorMsg && <p className="text-[11px] text-[var(--red)] font-semibold mt-1.5">{errorMsg}</p>}
         </div>
@@ -813,6 +942,17 @@ const GenericMasterModal = ({ isOpen, onClose, type, readOnly = false }) => {
           <span>Tip: Double-click row to Edit &bull; Auto-calcs SGST/CGST from IGST</span>
         </div>
       </div>
+      <MasterFindOverlay
+        open={findOpen}
+        title={`FIND ${String(type || '').toUpperCase()}`}
+        rows={subMasters.filter((it) => it.type === type).map((it) => {
+          const ex = it.extraFields || {};
+          const gst = type === 'ItemTaxSlab' && (ex.igstRate ?? ex.gstRate) != null ? `GST ${ex.igstRate ?? ex.gstRate}%` : '';
+          return { id: it._id, no: ex.code || ex.graccd || '', name: it.name, meta: [ex.city, ex.state || ex.jsmStateName, gst, ex.branch, ex.phone].filter(Boolean).join(' · ') };
+        })}
+        onPick={(id) => { setFindOpen(false); const rec = subMasters.find((it) => it._id === id); if (rec) loadRecord(rec, false); }}
+        onClose={() => setFindOpen(false)}
+      />
     </Modal>
   );
 };

@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+﻿const mongoose = require('mongoose');
 const AccountingEntry = require('../models/AccountingEntry');
 const LedgerMaster = require('../models/LedgerMaster');
 
@@ -31,6 +31,14 @@ const LIVE_ENTRY_FILTER = {
   status: { $ne: 'Draft' },
 };
 
+function parseEndOfDay(dateVal) {
+  if (!dateVal) return null;
+  if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
+    return new Date(dateVal + 'T23:59:59.999Z');
+  }
+  return new Date(dateVal);
+}
+
 /**
  * Ledger Engine — Sprint 3.3
  * All balances derived from journals + master OB (when no Opening journal).
@@ -53,7 +61,7 @@ class LedgerEngineService {
     if (from || to) {
       match.entryDate = {};
       if (from) match.entryDate.$gte = new Date(from);
-      if (to) match.entryDate.$lte = new Date(to);
+      if (to) match.entryDate.$lte = parseEndOfDay(to);
     }
 
     const pipeline = [
@@ -296,7 +304,7 @@ class LedgerEngineService {
     if (from || to) {
       entryFilter.entryDate = {};
       if (from) entryFilter.entryDate.$gte = new Date(from);
-      if (to) entryFilter.entryDate.$lte = new Date(to);
+      if (to) entryFilter.entryDate.$lte = parseEndOfDay(to);
     }
 
     const entries = await AccountingEntry.find(entryFilter).sort({ entryDate: 1, createdAt: 1 });
@@ -306,9 +314,12 @@ class LedgerEngineService {
 
     for (const entry of entries) {
       const src = sourceMap[String(entry.refId)] || {};
+      const isRelated = (l) => relatedIds.some((rid) => rid.toString() === (l.ledgerId || '').toString());
+      const relatedCount = entry.lines.filter(isRelated).length;
+      const usedOpposite = new Set();
 
       for (const line of entry.lines) {
-        if (!relatedIds.some((rid) => rid.toString() === (line.ledgerId || '').toString())) continue;
+        if (!isRelated(line)) continue;
 
         // Find all opposite (contra) lines in this journal entry that are on the opposite side (Dr vs Cr)
         const oppositeLines = entry.lines.filter(
@@ -319,9 +330,17 @@ class LedgerEngineService {
         );
         const effectiveOppositeLines = oppositeLines.length > 0 ? oppositeLines : allOtherLines;
 
+        // The account on the other side of this very line: as JSM recorded it (imported lines carry it), or — when
+        // the party has several lines in one voucher (bank part, discount part) — the opposite line of the same amount.
+        let pairedName = line.contraName || '';
+        if (!pairedName && relatedCount > 1) {
+          const twin = effectiveOppositeLines.find((o) => !usedOpposite.has(o) && Math.abs((Number(o.amount) || 0) - (Number(line.amount) || 0)) < 0.005);
+          if (twin) { usedOpposite.add(twin); pairedName = twin.ledgerName || ''; }
+        }
+
         // If it's a Payment/Receipt/Journal with multiple contra legs (e.g. Bank + Discount),
         // split into separate rows for each contra leg so user sees Bank and Discount lines separately!
-        if (effectiveOppositeLines.length > 1 && ['Payment', 'Receipt', 'Journal'].includes(entry.voucherType)) {
+        if (!pairedName && effectiveOppositeLines.length > 1 && ['Payment', 'Receipt', 'Journal'].includes(entry.voucherType)) {
           const totalOppositeAmt = effectiveOppositeLines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
 
           for (const opp of effectiveOppositeLines) {
@@ -384,7 +403,8 @@ class LedgerEngineService {
             // For Journal/Payment/Receipt with single contra — use the actual contra ledger name
             const mainContra = effectiveOppositeLines[0];
             particulars = displayContraName(
-              mainContra?.ledgerName
+              pairedName
+                || mainContra?.ledgerName
                 || effectiveOppositeLines.map((l) => l.ledgerName).filter(Boolean).join(', ')
                 || vt
                 || rt

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import ErpTopLayer from '../../components/erp/ErpTopLayer';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { ERPCombobox } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
@@ -62,6 +63,9 @@ const emptyForm = (book) => ({
   lrNo: '',
   markaNo: '',
   hsnCd: '',
+  broker: '',
+  issKgs: '',
+  masterName: '',
   procType: 'Process Charge',
   finish: '',
   book: book || 'PROCESS ISSUE BOOK',
@@ -123,6 +127,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   const puBillNoRef = useRef(null);
   const issPcsRef = useRef(null);
   const issQtyRef = useRef(null);
+  const issKgsRef = useRef(null);
   const puRateRef = useRef(null);
   const jobRateRef = useRef(null);
 
@@ -259,6 +264,15 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
     return Number((qty * rate).toFixed(2));
   }, [form.issQty, form.puRate]);
 
+  // Broker (JSM Mill Issue txt_Bname): broker accounts from the party master.
+  const brokerOptions = useMemo(
+    () => (parties || [])
+      .filter((p) => p.type === 'Broker' || String(p.group || '').toUpperCase().includes('BROKER'))
+      .map((p) => ({ value: p.name, label: p.name }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    [parties]
+  );
+
   const weaverOptions = useMemo(() => {
     const weaverNames = new Set();
 
@@ -286,9 +300,14 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       if (lot.weaver) weaverNames.add(lot.weaver.trim());
     });
 
-    return Array.from(weaverNames)
-      .sort((a, b) => a.localeCompare(b))
-      .map((name) => ({ value: name, label: name }));
+    // Weaver is optional: the list opens on focus with the current value highlighted, so a blank
+    // option lets Enter move on with no weaver instead of auto-picking the first name.
+    return [
+      { value: '', label: '— No Weaver —' },
+      ...Array.from(weaverNames)
+        .sort((a, b) => a.localeCompare(b))
+        .map((name) => ({ value: name, label: name })),
+    ];
   }, [parties, inventoryLots, purchases]);
 
   const purchaseLots = useMemo(
@@ -591,7 +610,8 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
   };
 
   const handleWeaverChange = (val) => {
-    setForm((f) => ({
+    // Re-confirming the same weaver (e.g. Enter while passing through) keeps the chosen bill/lot.
+    setForm((f) => (f.weaver === (val || '') ? f : {
       ...f,
       weaver: val || '',
       puBillNo: '',
@@ -741,6 +761,9 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       transport: job.transport || '',
       lrNo: job.lrNo || '',
       markaNo: job.markaNo || '',
+      broker: job.broker || '',
+      issKgs: job.issueKgs ? String(job.issueKgs) : '',
+      masterName: job.masterName || '',
       hsnCd: job.hsnCode || job.hsnCd || '',
       procType: job.processType || 'Process Charge',
       finish: job.finish || '',
@@ -895,7 +918,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
       ].filter(Boolean).join(' | ');
       const remark = [form.remark1, form.remark2, dispatchNotes].filter(Boolean).join('\n');
       const { millId, procType, finish, jobRate } = form;
-      await issueToMill({
+      const savedJob = await issueToMill({
         jobCardNo: form.challanNo,
         challanNo: form.challanNo,
         issueDate: form.date,
@@ -903,6 +926,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         lotId: form.lotId,
         workerId: form.millId,
         processType: form.procType || 'Process Charge',
+        workKind: 'Mill',
         finish: form.finish || '',
         issueQty: qty,
         issuePcs: pcs,
@@ -916,67 +940,54 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         lrNo: form.lrNo || undefined,
         markaNo: form.markaNo || undefined,
         hsnCode: form.hsnCd || undefined,
+        broker: form.broker || '',
+        issueKgs: Number(form.issKgs) || 0,
+        masterName: form.masterName || '',
         remark,
         remarks: remark,
       });
       toast.success('Mill Issue saved — stock reduced from lot');
-      const [, lots] = await Promise.all([fetchJobs(), fetchInventory()]);
-      const remaining = fromPurchase ? findLotsFromPurchase(lots || [], fromPurchase) : [];
+      fetchInventory().catch(() => {});
 
-      if (keepOpen) {
-        const nextNo = await getNextChallanNo();
-        const base = { ...emptyForm(selectedBook), challanNo: nextNo, millId, procType, finish, jobRate };
-        setMode('Add');
-        setSelectedJobId('');
+      if (fromPurchase) {
+        const freshLots = useStore.getState().inventoryLots || [];
+        const remaining = findLotsFromPurchase(freshLots, fromPurchase);
         if (remaining.length) {
+          const nextNo = await getNextChallanNo();
           const lot = remaining[0];
           const lotId = lot._id || lot.id;
           const itemName = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
           const puRate = lot.rate ?? lot.purchaseRate ?? lot.avgRate ?? '';
+          setMode('Add');
           setForm({
-            ...base,
+            ...emptyForm(selectedBook),
             challanNo: nextNo,
+            millId,
+            procType,
+            finish,
+            jobRate,
             lotId,
             itemName,
             issPcs: String(lot.remainingPcs ?? ''),
             issQty: String(lot.remainingMtrs ?? ''),
             puRate: puRate !== '' && puRate != null ? String(puRate) : '',
-            puBillNo: fromPurchase?.invoiceNo || base.puBillNo,
+            puBillNo: fromPurchase?.invoiceNo || '',
           });
-          toast.info(`Ready for next challan (${remaining.length} lot(s) left)`);
-        } else {
-          setForm(base);
-          toast.info('Ready for next challan (same mill)');
+          setSelectedJobId('');
+          toast.success(`Next lot from purchase ready (${remaining.length} left)`);
+          return true;
         }
-      } else if (remaining.length) {
-        const nextNo = await getNextChallanNo();
-        const lot = remaining[0];
-        const lotId = lot._id || lot.id;
-        const itemName = lot.itemName || lot.itemId?.name || lot.itemId?.itemName || '';
-        const puRate = lot.rate ?? lot.purchaseRate ?? lot.avgRate ?? '';
-        setMode('Add');
-        setForm({
-          ...emptyForm(selectedBook),
-          challanNo: nextNo,
-          millId,
-          procType,
-          finish,
-          jobRate,
-          lotId,
-          itemName,
-          issPcs: String(lot.remainingPcs ?? ''),
-          issQty: String(lot.remainingMtrs ?? ''),
-          puRate: puRate !== '' && puRate != null ? String(puRate) : '',
-          puBillNo: fromPurchase?.invoiceNo || '',
-        });
-        setSelectedJobId('');
-        toast.success(`Next lot from purchase ready (${remaining.length} left)`);
-      } else {
-        if (fromPurchase) setFromPurchase(null);
-        await handleNew();
-        setMode('View');
-        setFindOpen(true);
+        setFromPurchase(null);
       }
+
+      // Display newly saved challan in View mode
+      const savedId = savedJob?._id || savedJob?.id;
+      if (savedId) {
+        loadJob(savedId, 'View');
+      } else {
+        setMode('View');
+      }
+      setFindOpen(false);
       return true;
     } catch (err) {
       toast.error(err, { fallback: 'Failed to save mill issue' });
@@ -1274,6 +1285,21 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                     </div>
                   </div>
 
+                  <div className="classic-erp-field classic-erp-field--lg">
+                    <span className="classic-erp-label">Broker</span>
+                    <div className="classic-erp-control">
+                      <ERPCombobox
+                        value={form.broker}
+                        onChange={(val) => setField('broker', val || '')}
+                        disabled={locked}
+                        options={brokerOptions}
+                        placeholder="Search Broker…"
+                        recentKey="mill-issue-broker"
+                        allowClear
+                      />
+                    </div>
+                  </div>
+
                   <div className="erp-job-issue-metrics">
                     {/* Column 1: Iss Pcs & Iss Qty */}
                     <div className="flex flex-col gap-1">
@@ -1308,9 +1334,28 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                            onKeyDown={(e) => {
                              if (e.key === 'Enter' && !locked) {
                                e.preventDefault(); e.stopPropagation();
-                               focusPuRate();
+                               issKgsRef.current?.focus();
+                               try { issKgsRef.current?.select(); } catch { /* number input */ }
                              }
                            }}
+                        />
+                      </div>
+                      <div className="classic-erp-field">
+                        <span className="classic-erp-label">Iss Kgs</span>
+                        <input
+                          ref={issKgsRef}
+                          type="number"
+                          step="0.001"
+                          className="classic-erp-input text-right"
+                          value={form.issKgs}
+                          onChange={(e) => setField('issKgs', e.target.value)}
+                          disabled={locked}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !locked) {
+                              e.preventDefault(); e.stopPropagation();
+                              focusPuRate();
+                            }
+                          }}
                         />
                       </div>
                     </div>
@@ -1451,6 +1496,19 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                     </div>
                   </div>
 
+                  <div className="classic-erp-field classic-erp-field--lg">
+                    <span className="classic-erp-label">Master</span>
+                    <div className="classic-erp-control">
+                      <input
+                        type="text"
+                        className="classic-erp-input uppercase"
+                        value={form.masterName || ''}
+                        onChange={(e) => setField('masterName', e.target.value)}
+                        disabled={locked}
+                      />
+                    </div>
+                  </div>
+
                   {selectedLot && (
                     <div className="erp-job-issue-stock">
                       Stock: {Number(selectedLot.remainingPcs || 0)} pcs ·{' '}
@@ -1529,15 +1587,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
                 <button type="submit" className="classic-erp-btn btn-blue" disabled={saving || locked}>
                   <SaveButtonLabel saving={saving} label="Save" />
                 </button>
-                <button
-                  type="button"
-                  className="classic-erp-btn btn-blue"
-                  disabled={saving || locked}
-                  onClick={() => handleSave(null, { keepOpen: true })}
-                  title="Save this challan and start a new one (Ctrl+Enter)"
-                >
-                  <SaveButtonLabel saving={saving} label="Save & New" />
-                </button>
+                
                 <button type="button" className="classic-erp-btn" onClick={handleCancel} disabled={saving}>
                   Cancel
                 </button>
@@ -1588,6 +1638,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
 
       {/* Quick Issue / Challan Number Find Modal with + / - and Enter -> Edit */}
       {findOpen && (
+        <ErpTopLayer>
         <div
           className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
           onClick={() => setFindOpen(false)}
@@ -1710,6 +1761,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
             </div>
           </div>
         </div>
+        </ErpTopLayer>
       )}
 
       <AccountMasterModal

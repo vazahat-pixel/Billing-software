@@ -1,0 +1,145 @@
+/**
+ * Full migration flow over the real routes on an in-memory database, using the anonymised JSM demo package:
+ * upload in chunks -> preview -> apply -> reconcile (0 mismatches) -> existing screens still read the data -> undo.
+ */
+const { describe, it, before, after } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
+const { bootIsolatedApp } = require('../helpers/isolatedApp');
+const { authHeader, unwrapBody } = require('../helpers/setup');
+
+const YEARS = ['SC27', 'SCC28']; // the two years of one company (VC27 in the demo is a different company)
+const FIXTURE = process.env.JSM_DEMO_PACKAGE || path.join(__dirname, '..', 'fixtures', 'migration', 'jsm_demo_anonymised.ndjson.gz');
+
+const HAVE_DATA = fs.existsSync(FIXTURE);
+
+// The package is exported from a JSM database and stays on the developer PC (git-ignored); the test is skipped without it.
+describe('JSM migration end to end (isolated DB)', { skip: HAVE_DATA ? false : 'no local JSM package (backend/tests/fixtures/migration/jsm_demo_anonymised.ndjson.gz or JSM_DEMO_PACKAGE)' }, () => {
+  let app; let request; let shutdown; let h; let runId; let companyId; let baseline;
+  const api = (m, p, body) => { const r = request(app)[m](`/api/migration${p}`).set(h); return body === undefined ? r : r.send(body); };
+  const waitFor = async (pred, ms = 60000) => { const t0 = Date.now(); for (;;) { const r = unwrapBody(await api('get', `/runs/${runId}`)); if (pred(r)) return r; if (Date.now() - t0 > ms) throw new Error(`timeout; last status ${r.status} ${r.error}`); await new Promise((x) => setTimeout(x, 300)); } };
+
+  before(async () => {
+    ({ app, request, shutdown } = await bootIsolatedApp());
+    const reg = await request(app).post('/api/auth/register').send({ name: 'Mig Owner', email: `mig-${Date.now()}@example.com`, password: 'TestPass123!', companyName: 'Migration Co' });
+    h = authHeader(reg.body.token);
+    companyId = unwrapBody(await request(app).get('/api/auth/me').set(h)).companyId;
+    // the company the import writes to (the one the signed-in user works in)
+    const probe = unwrapBody(await request(app).post('/api/migration/runs').set(h).send({})).id;
+    const cid = (await require('../../models/MigrationRun').MigrationRun.findById(probe).lean()).companyId;
+    companyId = String(cid);
+    baseline = { sub: await require('../../models/SubMaster').collection.countDocuments({ companyId: cid }), god: await require('../../models/Warehouse').collection.countDocuments({ companyId: cid }) };
+  });
+  after(async () => { if (shutdown) await shutdown(); });
+
+  it('uploads the package in chunks, and a cut-off upload is refused', async () => {
+    const buf = fs.readFileSync(FIXTURE);
+    // a truncated upload
+    const bad = unwrapBody(await api('post', '/runs', {})).id;
+    await request(app).put(`/api/migration/runs/${bad}/chunk?index=0`).set(h).set('Content-Type', 'application/octet-stream').send(buf.subarray(0, Math.floor(buf.length / 2)));
+    const badDone = await api('post', `/runs/${bad}/complete`, { bytes: buf.length });
+    assert.equal(unwrapBody(badDone).status, 'invalid');
+    // desktop 1.0.8 pads the last piece with zero bytes: the padding is cut off and the upload is accepted
+    const padded = unwrapBody(await api('post', '/runs', {})).id;
+    const withZeros = Buffer.concat([buf, Buffer.alloc(6 * 1024 * 1024 - (buf.length % (6 * 1024 * 1024)))]);
+    await request(app).put(`/api/migration/runs/${padded}/chunk?index=0`).set(h).set('Content-Type', 'application/octet-stream').send(withZeros);
+    assert.equal(unwrapBody(await api('post', `/runs/${padded}/complete`, { bytes: buf.length })).status, 'uploaded');
+    // extra bytes that are not padding are still refused
+    const junk = unwrapBody(await api('post', '/runs', {})).id;
+    await request(app).put(`/api/migration/runs/${junk}/chunk?index=0`).set(h).set('Content-Type', 'application/octet-stream').send(Buffer.concat([buf, Buffer.from('junk')]));
+    assert.equal(unwrapBody(await api('post', `/runs/${junk}/complete`, { bytes: buf.length })).status, 'invalid');
+
+    runId = unwrapBody(await api('post', '/runs', {})).id;
+    const size = 20000; let i = 0;
+    for (let off = 0; off < buf.length; off += size, i += 1) {
+      const r = await request(app).put(`/api/migration/runs/${runId}/chunk?index=${i}`).set(h).set('Content-Type', 'application/octet-stream').send(buf.subarray(off, off + size));
+      assert.equal(r.status, 200, JSON.stringify(r.body));
+    }
+    // a repeated chunk (network retry) is harmless; a skipped one is refused
+    const retry = await request(app).put(`/api/migration/runs/${runId}/chunk?index=0`).set(h).set('Content-Type', 'application/octet-stream').send(buf.subarray(0, size));
+    assert.equal(retry.status, 200);
+    const skip = await request(app).put(`/api/migration/runs/${runId}/chunk?index=99`).set(h).set('Content-Type', 'application/octet-stream').send(Buffer.from('x'));
+    assert.equal(skip.status, 400);
+    const done = unwrapBody(await api('post', `/runs/${runId}/complete`, { bytes: buf.length }));
+    assert.equal(done.status, 'uploaded', JSON.stringify(done.problems));
+  });
+
+  it('preview shows counts and totals without creating anything', async () => {
+    const all = unwrapBody(await api('post', `/runs/${runId}/preview`, {}));
+    assert.ok(all.blockers.length > 0, 'the demo package mixes two different companies; preview must say so');
+    const p = unwrapBody(await api('post', `/runs/${runId}/preview`, { years: YEARS }));
+    assert.equal(p.blockers.length, 0);
+    assert.ok(p.counts.Sales >= 25 && p.counts.Purchase >= 20 && p.counts.AccountingEntry > 50, JSON.stringify(p.counts));
+    assert.ok(p.expected.totals.salesNet > 0);
+    const Sales = require('../../models/Sales');
+    assert.equal(await Sales.countDocuments({}), 0);
+  });
+
+  it('apply creates everything; reconciliation against the JSM figures has no mismatch', async () => {
+    assert.equal((await api('post', `/runs/${runId}/apply`, { years: YEARS })).status, 200);
+    const r = await waitFor((x) => ['applied', 'failed'].includes(x.status));
+    assert.equal(r.status, 'applied', r.error);
+    const rep = unwrapBody(await api('post', `/runs/${runId}/reconcile`, {}));
+    const bad = rep.checks.filter((c) => !c.ok);
+    assert.equal(rep.mismatched, 0, `mismatches: ${JSON.stringify(bad.slice(0, 8))}`);
+    // every JSM account is checked, also those that went into an existing account of the same name (Round Off, TDS ...)
+    const accounts = rep.checks.filter((c) => c.area === 'Account balance');
+    assert.ok(accounts.length >= 73, `account checks: ${accounts.length}`);
+    // station, transport, tax slab, unit, party bank ... are all checked by name
+    const masters = rep.checks.filter((c) => c.area === 'Masters');
+    for (const kind of ['City', 'ItemTaxSlab', 'Unit', 'ItemGroup', 'PartyBank', 'AccountGroup', 'Type', 'BookType']) assert.ok(masters.some((c) => c.key === kind && c.jsm > 0 && c.ok), `${kind}: ${JSON.stringify(masters)}`);
+    assert.ok(rep.total > 60, `only ${rep.total} checks ran`);
+    const csv = await request(app).get(`/api/migration/runs/${runId}/report.csv`).set(h);
+    assert.equal(csv.status, 200);
+    assert.match(csv.text, /^Area,Item,JSM,MERN,Difference,Result/);
+  });
+
+  it('the imported data is visible to the normal screens/reports', async () => {
+    const parties = unwrapBody(await request(app).get('/api/parties').set(h));
+    assert.ok((Array.isArray(parties) ? parties : parties.items || parties.parties).length >= 15);
+    const sales = unwrapBody(await request(app).get('/api/sales').set(h));
+    assert.ok((Array.isArray(sales) ? sales : sales.items || sales.sales).length >= 20);
+    const tb = await request(app).get('/api/accounting/trial-balance').set(h);
+    assert.equal(tb.status, 200, JSON.stringify(tb.body).slice(0, 200));
+    const lots = unwrapBody(await request(app).get('/api/inventory/lots').set(h));
+    assert.ok((Array.isArray(lots) ? lots : lots.items || lots.lots).length > 0);
+    // purchase Sr.No is JSM's own serial, and every number series continues after the imported numbers
+    const cid = new (require('mongoose').Types.ObjectId)(companyId);
+    const purNos = (await require('../../models/Purchase').collection.find({ companyId: cid }).project({ invoiceNo: 1 }).toArray()).map((x) => x.invoiceNo);
+    assert.ok(purNos.length && purNos.every((n) => /^\d+(\/[\w-]+)?$/.test(String(n))), `purchase numbers: ${purNos.slice(0, 8)}`);
+    const Counter = require('../../models/Counter');
+    for (const m of ['sales', 'purchase', 'receipt', 'payment']) {
+      const c = await Counter.collection.findOne({ _id: `BILLNO-${m}-${companyId}` });
+      assert.ok(Number(c?.seq) > 0, `${m} series continues after the import (seq ${c?.seq})`);
+    }
+    // mill and job work challans are told apart; a challan keeps each receipt line
+    const jobs = await require('../../models/Job').collection.find({ companyId: cid }).project({ workKind: 1, receipts: 1 }).toArray();
+    assert.ok(jobs.some((j) => j.workKind === 'Mill') && jobs.some((j) => j.workKind === 'Job'), 'mill and job work challans');
+    assert.ok(jobs.some((j) => (j.receipts || []).length > 0), 'receipt lines kept');
+    // the Station / Transport / Tax Slab / Party Bank screens (F3) list JSM's entries
+    for (const type of ['City', 'ItemTaxSlab', 'PartyBank', 'Unit']) {
+      const list = unwrapBody(await request(app).get(`/api/submasters?type=${type}`).set(h));
+      assert.ok((Array.isArray(list) ? list : list.items || []).filter((x) => x.type === type).length > 0, `${type} list empty`);
+    }
+  });
+
+  it('a company that already has transactions is refused; a repeat apply is refused', async () => {
+    const run2 = unwrapBody(await api('post', '/runs', {})).id;
+    const res = await api('post', `/runs/${run2}/apply`, {});
+    assert.equal(res.status, 400);
+    assert.match(res.body.message, /no transactions|not ready/i);
+  });
+
+  it('undo removes exactly what the import created', async () => {
+    const un = await api('post', `/runs/${runId}/undo`, {});
+    assert.equal(un.status, 200, JSON.stringify(un.body));
+    assert.equal(unwrapBody(un).status, 'undone');
+    for (const n of ['Sales', 'Purchase', 'Job', 'PaymentVoucher', 'AccountingEntry', 'InventoryLot', 'StockMovement', 'BillSettlement', 'Party', 'Item']) {
+      assert.equal(await require(`../../models/${n}`).collection.countDocuments({ companyId: new (require('mongoose').Types.ObjectId)(companyId) }), 0, `${n} left behind`);
+    }
+    const cid = new (require('mongoose').Types.ObjectId)(companyId);
+    assert.equal(await require('../../models/SubMaster').collection.countDocuments({ companyId: cid }), baseline.sub, 'other masters left behind');
+    assert.equal(await require('../../models/Warehouse').collection.countDocuments({ companyId: cid }), baseline.god, 'godowns left behind');
+  });
+});

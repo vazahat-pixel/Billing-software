@@ -228,6 +228,7 @@ const LedgerModal = ({
   onOpenSales,
   onOpenPurchase,
   onOpenNote,
+  onOpenJob,
   onOpenOutstanding,
 }) => {
   const {
@@ -634,6 +635,20 @@ const LedgerModal = ({
       else if (fallback) fallback();
     };
 
+    // A bank / cash voucher line opens its voucher — also its discount / TDS lines (JSM: the receipt's own rows).
+    if (refType.includes('receipt') || vt === 'receipt') {
+      open(onOpenReceipt, () => toast.info(`Receipt Voucher #${docNo}`));
+      return;
+    }
+    if (refType.includes('payment') || vt === 'payment') {
+      open(onOpenPayment, () => toast.info(`Payment Voucher #${docNo}`));
+      return;
+    }
+    // mill (process) and job work bills open their receipt form
+    if (vt.includes('job') || refType.includes('job')) {
+      open(onOpenJob, () => setJvRow(row));
+      return;
+    }
     if (desc.includes('discount')) {
       open(onOpenNote, () => toast.info(`Note #${docNo}`));
       return;
@@ -658,10 +673,7 @@ const LedgerModal = ({
       open(onOpenReceipt, () => toast.info(`Receipt Voucher #${docNo}`));
       return;
     }
-    if (refType.includes('journal') || vt.includes('journal') || docUp.startsWith('JV')) {
-      open(onOpenJournal, () => setJvRow(row));
-      return;
-    }
+    // a journal opens as the voucher itself (its Dr / Cr lines), not an empty new-journal form
     setJvRow(row);
   };
 

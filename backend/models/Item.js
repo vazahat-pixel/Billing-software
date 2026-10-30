@@ -54,6 +54,24 @@ const ItemSchema = new mongoose.Schema({
   itemGroupId: { type: mongoose.Schema.Types.ObjectId, ref: 'SubMaster', default: null },
   defaultWarehouseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', default: null },
   barcode: { type: String, trim: true, default: '' },
+  // JSM Item Master fields (Mst_Item_Mast). Display / entry only — no calculation uses them yet.
+  itemChrCode: { type: String, trim: true, default: '' }, // "Item ID"
+  vatRate1: { type: Number, default: 0 }, // "Tax Rate" (pre-GST)
+  vatRate2: { type: Number, default: 0 },
+  delCharge: { type: Number, default: 0 }, // "Del.Chrg"
+  cessRate: { type: Number, default: 0 }, // "Cess"
+  lfrRate: { type: Number, default: 0 }, // "Lfr"
+  partyGroup: { type: String, trim: true, default: '' },
+  bundle: { type: Number, default: 0 },
+  salesProfitPer: { type: Number, default: 0 }, // "Sales%"
+  jobRate: { type: Number, default: 0 },
+  showIn: { type: String, enum: ['All', 'Sales', 'Purchase'], default: 'All' }, // "Show Status"
+  ewayProductDesc2: { type: String, trim: true, default: '' },
+  gstTaxLabel2: { type: String, trim: true, default: '' }, // "GST TAX RATE (2)"
+  negativeStockMessage: { type: Boolean, default: false }, // "Nagetive Message [Y/N]"
+  hindiName: { type: String, trim: true, default: '' },
+  itemCosting: { type: Number, default: 0 },
+  extraRemarks: [{ remark: { type: String, trim: true, default: '' }, value: { type: String, trim: true, default: '' } }],
   isFavorite: { type: Boolean, default: false, index: true },
   lastUsedAt: { type: Date, default: null },
   companyId: {

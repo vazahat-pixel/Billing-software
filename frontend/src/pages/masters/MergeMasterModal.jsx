@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import Modal from '../../components/ui/Modal';
 import { ERPSearchableSelect } from '../../components/forms/FormElements';
 import useStore from '../../store/useStore';
@@ -6,11 +6,15 @@ import { masterDataApi } from '../../api';
 import { toast } from '../../store/useToastStore';
 import { erpConfirm } from '../../utils/confirm';
 
-const MergeMasterModal = ({ isOpen, onClose }) => {
-  const { parties, items, fetchParties, fetchItems } = useStore();
-  const [entity, setEntity] = useState('party');
+const MergeMasterModal = ({ isOpen, onClose, initialEntity }) => {
+  const { parties, items, subMasters, fetchParties, fetchItems, fetchSubMasters } = useStore();
+  const [entity, setEntity] = useState(initialEntity || 'party');
+  useEffect(() => {
+    if (isOpen && initialEntity) setEntity(initialEntity);
+  }, [isOpen, initialEntity]);
   const [sourceId, setSourceId] = useState('');
   const [targetId, setTargetId] = useState('');
+  const mergeBtnRef = useRef(null);
   const [saving, setSaving] = useState(false);
   const [importText, setImportText] = useState('');
   const [dryRunResult, setDryRunResult] = useState(null);
@@ -19,6 +23,7 @@ const MergeMasterModal = ({ isOpen, onClose }) => {
     if (isOpen) {
       fetchParties();
       fetchItems();
+      fetchSubMasters?.();
       setSourceId('');
       setTargetId('');
       setDryRunResult(null);
@@ -29,6 +34,10 @@ const MergeMasterModal = ({ isOpen, onClose }) => {
   const options =
     entity === 'party'
       ? parties.map((p) => ({ value: p._id || p.id, label: p.name }))
+      : entity === 'station'
+      ? (subMasters || []).filter((s) => s.type === 'City').map((s) => ({ value: s._id || s.id, label: s.name }))
+      : entity === 'transport'
+      ? (subMasters || []).filter((s) => s.type === 'Transport').map((s) => ({ value: s._id || s.id, label: s.name }))
       : items.map((i) => ({ value: i._id || i.id, label: i.name || i.itemName }));
 
   const handleMerge = async () => {
@@ -114,9 +123,16 @@ const MergeMasterModal = ({ isOpen, onClose }) => {
           </div>
           <div>
             <label className="text-[10px] font-black uppercase text-slate-400">Target (keep)</label>
-            <ERPSearchableSelect className="w-full mt-1" value={targetId} onChange={setTargetId} options={options} placeholder="Target…" />
+            <ERPSearchableSelect
+              className="w-full mt-1"
+              value={targetId}
+              // two frames: after the dropdown's own move to the next box
+              onChange={(v) => { setTargetId(v); if (v) requestAnimationFrame(() => requestAnimationFrame(() => mergeBtnRef.current?.focus())); }}
+              options={options}
+              placeholder="Target…"
+            />
           </div>
-          <button type="button" disabled={saving} onClick={handleMerge} className="w-full py-2 bg-black text-white text-[10px] font-black uppercase">
+          <button ref={mergeBtnRef} type="button" disabled={saving} onClick={handleMerge} className="w-full py-2 bg-black text-white text-[10px] font-black uppercase focus:ring-2 focus:ring-blue-500">
             {saving ? 'Merging…' : 'Merge'}
           </button>
         </section>

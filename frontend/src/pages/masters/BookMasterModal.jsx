@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
+import MasterFindOverlay from '../../components/erp/MasterFindOverlay';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
@@ -35,6 +36,22 @@ const emptyForm = (module = 'sales') => ({
   jobWorkBook: false,
   tdsHead: '',
   tdsCode: 0,
+  crystal: '',
+  ref2: '',
+  ref3: '',
+  ref4: '',
+  roundOff: '',
+  vatCalculation: '',
+  getDataFromChallan: '',
+  factoryAddress1: '',
+  factoryAddress2: '',
+  factoryCity: '',
+  bank1Name: '',
+  bank1AccountNo: '',
+  bank2Name: '',
+  bank2AccountNo: '',
+  indexCd: '',
+  dhara: '',
 });
 
 const toFormDate = (v) => {
@@ -74,11 +91,13 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
   const { fetchBooksByModule, createBook, updateBook, deleteBook } = useStore();
 
   const [selectedModule, setSelectedModule] = useState('sales');
+  const nameInputRef = useRef(null);
   const [activeTab, setActiveTab] = useState('Book');
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedBookId, setSelectedBookId] = useState('');
+  const [findOpen, setFindOpen] = useState(false); // F3 list
   const [mode, setMode] = useState('View');
   const [error, setError] = useState('');
   const [formData, setFormData] = useState(emptyForm('sales'));
@@ -104,15 +123,20 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
     stateCode: book.stateCode != null ? String(book.stateCode) : '0',
   });
 
-  const loadBooks = async () => {
+  const loadBooks = async ({ startNew = false } = {}) => {
     setLoading(true);
     try {
       const data = await fetchBooksByModule(selectedModule);
       setBooks(data || []);
-      if (data && data.length > 0) {
-        const first = data[0];
-        setSelectedBookId(first._id || first.id);
-        setFormData(mapBookToForm(first));
+      if (startNew) {
+        // JSM: a New book opens empty with the cursor in Book Name
+        setSelectedBookId('');
+        setFormData(emptyForm(selectedModule));
+        setTimeout(() => { nameInputRef.current?.focus(); }, 80);
+      } else if (data && data.length > 0) {
+        const recent = data[data.length - 1];
+        setSelectedBookId(recent._id || recent.id);
+        setFormData(mapBookToForm(recent));
       } else {
         setSelectedBookId('');
         setFormData(emptyForm(selectedModule));
@@ -126,12 +150,32 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
 
   useEffect(() => {
     if (isOpen) {
-      loadBooks();
+      loadBooks({ startNew: false });
       setActiveTab('Book');
-      if (!readOnly) setMode('Add');
-      else setMode('View');
+      setMode('View');
     }
   }, [isOpen, selectedModule, readOnly]);
+
+  const currentIndex = useMemo(() => {
+    if (!selectedBookId || !books.length) return -1;
+    return books.findIndex((b) => (b._id || b.id) === selectedBookId);
+  }, [selectedBookId, books]);
+
+  const navigateTo = (index) => {
+    if (!books.length) return;
+    const bounded = Math.max(0, Math.min(index, books.length - 1));
+    const target = books[bounded];
+    if (target) {
+      setSelectedBookId(target._id || target.id);
+      setFormData(mapBookToForm(target));
+      setMode('View');
+    }
+  };
+
+  const handleFirst = () => navigateTo(0);
+  const handlePrev = () => navigateTo(currentIndex <= 0 ? 0 : currentIndex - 1);
+  const handleNext = () => navigateTo(currentIndex >= books.length - 1 ? books.length - 1 : (currentIndex < 0 ? 0 : currentIndex + 1));
+  const handleLast = () => navigateTo(books.length - 1);
 
   const handleSelectBook = (e) => {
     const id = e.target.value;
@@ -179,7 +223,12 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
   const handleSave = async (e) => {
     if (e) e.preventDefault();
     if (saving || locked) return;
-    if (!formData.name || !formData.code) {
+    // JSM leaves Book Id blank on New; a new book with no Id takes the next number of this module
+    const autoCode = mode !== 'Edit' && !String(formData.code || '').trim()
+      ? String(books.reduce((max, b) => Math.max(max, Number(b.code) || 0), 0) + 1)
+      : null;
+    const form = autoCode ? { ...formData, code: autoCode } : formData;
+    if (!form.name || !form.code) {
       setError('Name and Code are required');
       return;
     }
@@ -187,8 +236,8 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
     setSaving(true);
     try {
       const payload = {
-        ...formData,
-        name: formData.name.toUpperCase(),
+        ...form,
+        name: form.name.toUpperCase(),
         module: selectedModule,
         opBalance: Number(formData.opBalance || 0),
         tdsCode: Number(formData.tdsCode || 0),
@@ -281,7 +330,37 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[920px]">
-      <div className="classic-erp-window flex flex-col h-full max-h-[90vh]">
+            <div
+        className="classic-erp-window flex flex-col h-full max-h-[90vh]"
+        data-form-enter-nav="true"
+        onKeyDown={(e) => {
+          if (e.key === 'F3') {
+            e.preventDefault();
+            setFindOpen(true);
+          } else if (e.key === 'F2') {
+            e.preventDefault();
+            if (mode === 'View' && selectedBookId) {
+              handleEdit();
+              setTimeout(() => nameInputRef.current?.focus(), 60);
+            } else if (mode === 'View') {
+              handleNew();
+            }
+          } else if (e.key === 'Enter' && mode === 'View') {
+            e.preventDefault();
+            handleNew();
+          } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+            if (mode === 'View') {
+              e.preventDefault();
+              handlePrev();
+            }
+          } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+            if (mode === 'View') {
+              e.preventDefault();
+              handleNext();
+            }
+          }
+        }}
+      >
         <ErpBusyOverlay show={loading} message="Loading books…" />
         <ErpBusyOverlay show={!loading && saving} message="Saving book…" />
         <div className="classic-erp-header">
@@ -335,6 +414,7 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
                   type="text"
                   className="classic-erp-input"
                   placeholder="Id / Name"
+                  data-master-find
                   value={findCode}
                   onChange={(e) => setFindCode(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleFind()}
@@ -358,6 +438,7 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
                     <span className="bm-label bm-label--req">Book Name</span>
                     <div className="bm-inline">
                       <input
+                        ref={nameInputRef}
                         type="text"
                         className="classic-erp-input bm-name-input"
                         value={formData.name}
@@ -419,6 +500,23 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
                   <div className="bm-field">
                     <span className="bm-label">A/c No.</span>
                     <input type="text" className="classic-erp-input" value={formData.accountNo} onChange={setField('accountNo')} disabled={locked} />
+                  </div>
+                  {/* JSM: Crystal (print template) and Ref.2–4 beside A/c No. */}
+                  <div className="bm-field">
+                    <span className="bm-label">Crystal</span>
+                    <input type="text" className="classic-erp-input" value={formData.crystal || ''} onChange={setField('crystal')} disabled={locked} />
+                  </div>
+                  <div className="bm-field">
+                    <span className="bm-label">Ref.2</span>
+                    <input type="text" className="classic-erp-input" value={formData.ref2 || ''} onChange={setField('ref2')} disabled={locked} />
+                  </div>
+                  <div className="bm-field">
+                    <span className="bm-label">Ref.3</span>
+                    <input type="text" className="classic-erp-input" value={formData.ref3 || ''} onChange={setField('ref3')} disabled={locked} />
+                  </div>
+                  <div className="bm-field">
+                    <span className="bm-label">Ref.4</span>
+                    <input type="text" className="classic-erp-input" value={formData.ref4 || ''} onChange={setField('ref4')} disabled={locked} />
                   </div>
                   <div className="bm-gst-inner">
                     <div className="bm-field">
@@ -511,6 +609,7 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
 
               <div className="bm-section bm-notes">
                 <textarea
+                  data-enter-next="true"
                   className="classic-erp-input"
                   placeholder="Notes / Description"
                   value={formData.notes || ''}
@@ -536,9 +635,46 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
                 <span className="bm-label">Tds Code</span>
                 <input type="number" className="classic-erp-input bm-ref-input" value={formData.tdsCode} onChange={setField('tdsCode')} disabled={locked} />
               </div>
+              {/* JSM BookDetail tab (Mst_BookMast TabPage2) */}
+              <div className="bm-field">
+                <span className="bm-label">Bank 1 Name</span>
+                <input type="text" className="classic-erp-input uppercase" value={formData.bank1Name || ''} onChange={setField('bank1Name')} disabled={locked} placeholder="Bank 1 Name" />
+              </div>
+              <div className="bm-field">
+                <span className="bm-label">Bank 1 A/c No</span>
+                <input type="text" className="classic-erp-input font-mono" value={formData.bank1AccountNo || ''} onChange={setField('bank1AccountNo')} disabled={locked} placeholder="Bank 1 Account Number" />
+              </div>
+              <div className="bm-field">
+                <span className="bm-label">Bank 2 Name</span>
+                <input type="text" className="classic-erp-input uppercase" value={formData.bank2Name || ''} onChange={setField('bank2Name')} disabled={locked} placeholder="Bank 2 Name" />
+              </div>
+              <div className="bm-field">
+                <span className="bm-label">Bank 2 A/c No</span>
+                <input type="text" className="classic-erp-input font-mono" value={formData.bank2AccountNo || ''} onChange={setField('bank2AccountNo')} disabled={locked} placeholder="Bank 2 Account Number" />
+              </div>
+              <div className="bm-field bm-field--addr">
+                <span className="bm-label">Factory Address</span>
+                <div className="bm-addr-stack">
+                  <input type="text" className="classic-erp-input" value={formData.factoryAddress1 || ''} onChange={setField('factoryAddress1')} disabled={locked} placeholder="Factory Address line 1" />
+                  <input type="text" className="classic-erp-input" value={formData.factoryAddress2 || ''} onChange={setField('factoryAddress2')} disabled={locked} placeholder="Factory Address line 2" />
+                  <input type="text" className="classic-erp-input uppercase" value={formData.factoryCity || ''} onChange={setField('factoryCity')} disabled={locked} placeholder="Factory City" />
+                </div>
+              </div>
+              <div className="bm-field">
+                <span className="bm-label">Round Off</span>
+                <input type="text" className="classic-erp-input bm-ref-input" value={formData.roundOff || ''} onChange={setField('roundOff')} disabled={locked} />
+              </div>
+              <div className="bm-field">
+                <span className="bm-label">Vat Calculation</span>
+                <input type="text" className="classic-erp-input bm-ref-input" value={formData.vatCalculation || ''} onChange={setField('vatCalculation')} disabled={locked} />
+              </div>
+              <div className="bm-field">
+                <span className="bm-label" title="For Sales (Get Data From Challan/Slip)">Get From Challan</span>
+                <input type="text" className="classic-erp-input bm-ref-input" maxLength={1} value={formData.getDataFromChallan || ''} onChange={setField('getDataFromChallan')} disabled={locked} placeholder="Y/N" />
+              </div>
               <div className="bm-field bm-field--addr">
                 <span className="bm-label">Notes</span>
-                <textarea className="classic-erp-input" style={{ minHeight: 140 }} value={formData.notes || ''} onChange={setField('notes')} disabled={locked} />
+                <textarea className="classic-erp-input" style={{ minHeight: 90 }} value={formData.notes || ''} onChange={setField('notes')} disabled={locked} />
               </div>
             </div>
           )}
@@ -546,18 +682,38 @@ const BookMasterModal = ({ isOpen, onClose, readOnly = false }) => {
           {error && <p className="bm-error">{error}</p>}
         </div>
 
-        <div className="classic-erp-form-footer">
-          <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode === 'Add' || mode === 'Edit'}>New</button>
-          <button className="classic-erp-btn" type="button" onClick={handleEdit} disabled={readOnly || mode !== 'View' || !selectedBookId}>Edit</button>
-          <button className="classic-erp-btn btn-blue" type="button" onClick={handleSave} disabled={locked || saving || loading}>
-            <SaveButtonLabel saving={saving} />
-          </button>
-          <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked}>Cancel</button>
-          <button className="classic-erp-btn" type="button" onClick={handleFind} disabled={readOnly}>Find</button>
-          <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || !selectedBookId}>Delete</button>
-          <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
+        <div className="classic-erp-form-footer select-none flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <button className="classic-erp-btn" type="button" onClick={handleFirst} disabled={saving || !books.length} title="First Record (<)">&lt;</button>
+            <button className="classic-erp-btn" type="button" onClick={handlePrev} disabled={saving || !books.length} title="Previous Record (<<)">&lt;&lt;</button>
+            <button className="classic-erp-btn" type="button" onClick={handleNext} disabled={saving || !books.length} title="Next Record (>>)">	&gt;&gt;</button>
+            <button className="classic-erp-btn" type="button" onClick={handleLast} disabled={saving || !books.length} title="Last Record (>)">&gt;</button>
+            {currentIndex >= 0 && (
+              <span className="text-[11px] font-mono text-gray-600 px-1">
+                {currentIndex + 1} / {books.length}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode === 'Add' || mode === 'Edit'}>New</button>
+            <button className="classic-erp-btn" type="button" onClick={handleEdit} disabled={readOnly || mode !== 'View' || !selectedBookId}>Edit</button>
+            <button className="classic-erp-btn btn-blue" type="button" data-action="save" data-enter-save="true" onClick={handleSave} disabled={locked || saving || loading}>
+              <SaveButtonLabel saving={saving} />
+            </button>
+            <button className="classic-erp-btn" type="button" onClick={handleCancel} disabled={locked}>Cancel</button>
+            <button className="classic-erp-btn" type="button" data-master-find="true" onClick={() => setFindOpen(true)} title="Find (F3)">Find</button>
+            <button className="classic-erp-btn btn-red" type="button" onClick={handleDelete} disabled={readOnly || !selectedBookId}>Delete</button>
+            <button className="classic-erp-btn" type="button" onClick={onClose}>Exit</button>
+          </div>
         </div>
       </div>
+      <MasterFindOverlay
+        open={findOpen}
+        title="FIND BOOK"
+        rows={books.map((b) => ({ id: b._id || b.id, no: b.code || '', name: b.name, meta: [b.bookType, b.module].filter(Boolean).join(' · ') }))}
+        onPick={(id) => { setFindOpen(false); handleSelectBook({ target: { value: id } }); }}
+        onClose={() => setFindOpen(false)}
+      />
     </Modal>
   );
 };

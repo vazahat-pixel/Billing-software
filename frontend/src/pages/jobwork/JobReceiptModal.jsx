@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import ErpTopLayer from '../../components/erp/ErpTopLayer';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { ERPCombobox } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
@@ -65,7 +66,7 @@ const emptyFooter = () => ({
   rcmCharge: '',
 });
 
-const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = null }) => {
+const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = null, initialJobId = null }) => {
   const { jobWorkEntries, parties, fetchJobs, fetchParties, receiveFromMill } = useStore();
 
   const [mode, setMode] = useState('Add');
@@ -255,7 +256,10 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
         return new Date(a.receiveDate || a.issueDate || a.createdAt || 0) - new Date(b.receiveDate || b.issueDate || b.createdAt || 0);
       });
     const latest = list[list.length - 1];
-    if (latest) loadReceipt(latest._id || latest.id, 'View');
+    // opened from a ledger row: that bill's challan, otherwise the latest receipt
+    const wanted = initialJobId ? existingJobs.find((j) => String(j._id || j.id) === String(initialJobId)) : null;
+    if (wanted) loadReceipt(wanted._id || wanted.id, 'View');
+    else if (latest) loadReceipt(latest._id || latest.id, 'View');
 
     const backgroundTasks = [];
     if (!hasMasters) backgroundTasks.push(fetchParties?.());
@@ -285,7 +289,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
+  }, [isOpen, initialJobId]);
 
   useEffect(() => {
     if (isOpen && selectedBook) {
@@ -1440,6 +1444,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
 
       {/* Quick Job Receipt Number Find Modal with + / - and Enter -> Edit */}
       {findOpen && (
+        <ErpTopLayer>
         <div
           className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
           onClick={() => setFindOpen(false)}
@@ -1561,6 +1566,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
             </div>
           </div>
         </div>
+        </ErpTopLayer>
       )}
 
       <JobLotLookupModal

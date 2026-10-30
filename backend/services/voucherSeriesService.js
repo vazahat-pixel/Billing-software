@@ -106,7 +106,8 @@ async function peekNext(companyId, module) {
       let max = 0;
       for (const p of purchases) {
         const raw = String(p.vNo || p.invoiceNo || '').replace(/-OFF.*$/i, '').trim();
-        let val = parseInt(raw.replace(/\D/g, ''), 10);
+        // a number's own value: its leading digits ("1/82" is bill 1 of book 82, not 182), else its last digits ("PUR-0012")
+        let val = parseInt((raw.match(/^\d+/) || raw.match(/\d+(?=\D*$)/) || [''])[0], 10);
         if (!isNaN(val)) {
           if (val >= 2000000000 && val <= 2099999999) {
             val = val % 10000;
@@ -232,7 +233,8 @@ async function allocateNext(companyId, module, { session = null } = {}) {
         let max = 0;
         for (const p of purchases) {
           const raw = String(p.vNo || p.invoiceNo || '').replace(/-OFF.*$/i, '').trim();
-          let val = parseInt(raw.replace(/\D/g, ''), 10);
+          // a number's own value: its leading digits ("1/82" is bill 1 of book 82, not 182), else its last digits ("PUR-0012")
+          let val = parseInt((raw.match(/^\d+/) || raw.match(/\d+(?=\D*$)/) || [''])[0], 10);
           if (!isNaN(val)) {
             if (val >= 2000000000 && val <= 2099999999) {
               val = val % 10000;

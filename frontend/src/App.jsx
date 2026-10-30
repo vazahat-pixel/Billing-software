@@ -6,6 +6,7 @@ import FallbackRedirect from './components/auth/FallbackRedirect';
 import { ConfigProvider } from './context/ConfigContext';
 import ApiLoader from './components/ui/ApiLoader';
 import AppProviders from './providers/AppProviders';
+import UpdateBanner from './components/desktop/UpdateBanner';
 
 // Stage 7.8 — route-level code splitting (admin / auth lazy; ERP shell eager)
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -54,6 +55,7 @@ function App() {
     <Router>
       <AppProviders>
       <ApiLoader />
+      <UpdateBanner />
       <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/landing" element={<LandingPage />} />

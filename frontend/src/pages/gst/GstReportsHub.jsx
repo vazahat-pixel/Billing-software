@@ -440,7 +440,7 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
       isOpen={isOpen}
       onClose={onClose}
       bare
-      className="max-w-[96vw] w-full h-[94vh] p-0 rounded-2xl overflow-hidden shadow-2xl border border-[var(--border)]"
+      className="erp-modal-fill max-w-[96vw] w-full h-[94vh] p-0 rounded-2xl overflow-hidden shadow-2xl border border-[var(--border)]"
     >
       <div className="flex flex-1 min-h-0 h-full max-h-full w-full bg-[var(--bg-base)] text-[var(--text-primary)] overflow-hidden">
         {/* ================================================================= */}
@@ -475,7 +475,7 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
           {/* Categorized List with guaranteed scrolling */}
           <div
             className="flex-1 min-h-0 overflow-y-auto p-2 space-y-3 custom-scrollbar"
-            style={{ maxHeight: 'calc(100% - 130px)', scrollbarGutter: 'stable' }}
+            style={{ scrollbarGutter: 'stable' }}
           >
             {JSM_GST_GROUPS.map((grp) => {
               const filteredReports = grp.reports.filter((r) =>
@@ -899,6 +899,15 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
                           <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.sgst)}</td>
                           <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.cess)}</td>
                         </tr>
+                        {(reportData?.itcBySource || []).map((s) => (
+                          <tr key={s.source} className="text-[var(--text-muted)]">
+                            <td className="px-3 py-1.5 pl-8">{s.source === 'JobWork' ? 'Job Work' : s.source} bills ({s.count})</td>
+                            <td className="px-3 py-1.5 text-right font-mono">{money(s.igst)}</td>
+                            <td className="px-3 py-1.5 text-right font-mono">{money(s.cgst)}</td>
+                            <td className="px-3 py-1.5 text-right font-mono">{money(s.sgst)}</td>
+                            <td className="px-3 py-1.5 text-right font-mono">{money(s.cess)}</td>
+                          </tr>
+                        ))}
                         <tr className="bg-[var(--bg-base)] font-bold">
                           <td className="px-3 py-2">Net ITC Available (A - B)</td>
                           <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.igst)}</td>

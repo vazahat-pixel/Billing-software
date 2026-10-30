@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import ErpTopLayer from '../../components/erp/ErpTopLayer';
+import { salesApi } from '../../api/sales.api';
 import { createPortal } from 'react-dom';
 import Modal from '../../components/ui/Modal';
 import useStore from '../../store/useStore';
@@ -131,10 +133,14 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       }
       return true;
     });
+    // JSM order: financial year, then bill number (its first run of digits: "101/SCC28" is bill 101), then date
+    const billNum = (s) => parseInt(String(s.invoiceNo || '').match(/\d+/)?.[0] ?? '', 10);
+    const fyOf = (s) => { const d = new Date(s.date || 0); return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; };
     return [...list].sort((a, b) => {
-      const numA = parseInt(String(a.invoiceNo || '').replace(/\D/g, ''), 10);
-      const numB = parseInt(String(b.invoiceNo || '').replace(/\D/g, ''), 10);
-      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      if (fyOf(a) !== fyOf(b)) return fyOf(a) - fyOf(b);
+      const numA = billNum(a);
+      const numB = billNum(b);
+      if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
       return new Date(a.date || 0) - new Date(b.date || 0);
     });
   }, [sales, header.book]);
@@ -511,6 +517,9 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       setPrintInvoiceId(null);
       setPrintInvoiceData(null);
       setBootLoading(false);
+      // forget the bill that was being looked at, so the form opens on the latest bill again
+      setSelectedInvoiceId('');
+      setMode('View');
       return;
     }
 
@@ -1634,7 +1643,46 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                 </div>
                 <div className="classic-erp-field">
                   <span className="classic-erp-label">Date:</span>
-                  <input type="date" className="classic-erp-input" value={header.billDate} onChange={e => setHeader({ ...header, billDate: e.target.value })} disabled={locked} />
+                  <input
+                    type="date"
+                    className="classic-erp-input"
+                    value={header.billDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setHeader((prev) => ({
+                        ...prev,
+                        billDate: val,
+                        chDate: val,
+                        orderDate: val,
+                      }));
+                      setFooter((prev) => {
+                        const days = parseInt(prev.dueDays || 0, 10);
+                        const d = new Date(val || Date.now());
+                        if (!isNaN(days) && days > 0) d.setDate(d.getDate() + days);
+                        return {
+                          ...prev,
+                          lrDate: val,
+                          dueDate: !isNaN(days) && days > 0 ? d.toISOString().split('T')[0] : prev.dueDate,
+                        };
+                      });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        const val = e.target.value || header.billDate;
+                        setHeader((prev) => ({
+                          ...prev,
+                          billDate: val,
+                          chDate: val,
+                          orderDate: val,
+                        }));
+                        setFooter((prev) => ({
+                          ...prev,
+                          lrDate: val,
+                        }));
+                      }
+                    }}
+                    disabled={locked}
+                  />
                 </div>
               </div>
 
@@ -1711,40 +1759,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
                   <input type="text" className="classic-erp-input" value={header.city} onChange={e => setHeader({ ...header, city: e.target.value })} disabled={locked} />
                 </div>
               </div>
-              <div className="classic-erp-meta-grid--3 erp-sales-party-meta" style={{ marginTop: 2 }}>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">Transport:</span>
-                  <input
-                    type="text"
-                    className="classic-erp-input"
-                    value={footer.transport || ''}
-                    onChange={e => setFooter(prev => ({ ...prev, transport: e.target.value }))}
-                    disabled={locked}
-                    placeholder="Transport name"
-                  />
-                </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">LR No:</span>
-                  <input
-                    type="text"
-                    className="classic-erp-input"
-                    value={footer.lrNo || ''}
-                    onChange={e => setFooter(prev => ({ ...prev, lrNo: e.target.value }))}
-                    disabled={locked}
-                    placeholder="LR No"
-                  />
-                </div>
-                <div className="classic-erp-field">
-                  <span className="classic-erp-label">LR Date:</span>
-                  <input
-                    type="date"
-                    className="classic-erp-input"
-                    value={footer.lrDate || ''}
-                    onChange={e => setFooter(prev => ({ ...prev, lrDate: e.target.value }))}
-                    disabled={locked}
-                  />
-                </div>
-              </div>
+
               <div className="classic-erp-meta-grid--3 erp-sales-broker-row">
                 {showBroker ? (
                   <div className="classic-erp-field">
@@ -2563,6 +2578,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
     {/* Quick Bill Number Find Modal with + / - and Enter -> Edit */}
     {showFindModal && (
+      <ErpTopLayer>
       <div
         className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
         onClick={() => setShowFindModal(false)}
@@ -2687,6 +2703,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
           </div>
         </div>
       </div>
+      </ErpTopLayer>
     )}
 
     {typeof document !== 'undefined' && saveNextActions && createPortal(

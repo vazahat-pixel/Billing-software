@@ -21,10 +21,9 @@ import {
 } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 
-import useStore from '../../store/useStore';
+import { logoutWithSync } from '../../utils/safeLogout';
 
 const Sidebar = () => {
-  const { logout } = useStore();
 
   const menuItems = [
     { name: 'Terminal', icon: LayoutDashboard, path: '/' },
@@ -81,7 +80,7 @@ const Sidebar = () => {
           Alerts
         </NavLink>
         <button
-          onClick={logout}
+          onClick={() => { logoutWithSync(); }}
           className="flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-medium tracking-[0.02em] text-[var(--red)] hover:bg-[var(--red-bg)] transition-all w-full text-left group"
         >
           <LogOut size={14} className="stroke-[2] group-hover:-translate-x-1 transition-transform" />

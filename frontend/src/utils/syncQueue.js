@@ -5,6 +5,7 @@ import {
   updateSyncItem,
   getPendingSyncItems,
   getFailedSyncItems,
+  getSyncQueueItems,
   putOfflineRecord,
   addToSyncQueue,
   generateLocalId,
@@ -18,22 +19,19 @@ import {
   normalizePurchase,
   normalizeParty,
   normalizeItem,
-  normalizeVoucher,
-  normalizeInventoryLot
+  normalizeVoucher
 } from './normalizers';
-import { isOffline } from './networkStatus';
+import { isOffline, subscribeNetworkStatus } from './networkStatus';
 import { useLocalApiAsSourceOfTruth } from './desktopMode';
-
-const ENDPOINTS = {
-  sales: '/sales',
-  purchases: '/purchases',
-  parties: '/parties',
-  items: '/items',
-  payments: '/accounting/payments',
-  receipts: '/accounting/receipts',
-  jobs: '/jobs/issue',
-  ledgers: '/accounting/ledgers'
-};
+import {
+  isLocalId,
+  remapLocalIds,
+  pendingLocalRefs,
+  resolveRequest,
+  idempotencyKeyOf,
+  classifyError,
+  renumberNotice
+} from './syncQueueCore';
 
 const NORMALIZERS = {
   sales: normalizeSale,
@@ -43,108 +41,76 @@ const NORMALIZERS = {
   payments: normalizeVoucher,
   receipts: normalizeVoucher,
   jobs: (j) => j,
-  ledgers: (l) => l
+  ledgers: (l) => l,
+  notes: (n) => n
 };
 
 const INVENTORY_AFFECTING = new Set(['sales', 'purchases', 'jobs']);
+const AUTO_RETRY_MS = 30 * 1000;
 
-const isDuplicateError = (err) => {
-  const msg = (err?.response?.data?.message || err?.message || '').toLowerCase();
-  return msg.includes('duplicate') || msg.includes('already exists') || msg.includes('unique');
-};
+/** New operation id for a create; the same id goes online first and, if that fails, into the queue. */
+export const newOperationId = () =>
+  (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : generateLocalId());
 
-const isLocalId = (id) => String(id || '').startsWith('local-');
-
-const renameInvoiceNo = (payload) => {
-  const current = payload.invoiceNo;
-  if (!current || current === 'AUTO') return { ...payload, invoiceNo: 'AUTO' };
-  return { ...payload, invoiceNo: `${current}-OFF${Date.now().toString().slice(-4)}` };
-};
-
-const runCreate = async (item) => {
-  let endpoint = ENDPOINTS[item.entityType];
-  let payload = { ...item.payload };
-  if (item.entityType === 'jobs') {
-    if (item.action === 'receive' || item.action === 'updateReceive') {
-      endpoint = '/jobs/receive';
-    } else {
-      endpoint = '/jobs/issue';
-    }
-  }
-  // Offline drafts use local-* ids — never send those as Mongo _id
-  if (isLocalId(payload._id) || isLocalId(payload.id)) {
-    const { _id, id, localId, ...rest } = payload;
-    payload = rest;
-  }
-  if (payload.invoiceNo && String(payload.invoiceNo).startsWith('local-')) {
-    payload = { ...payload, invoiceNo: 'AUTO' };
-  }
+/** Tell listeners (status bar, desktop close warning) that the queue changed. */
+const announce = async () => {
+  if (typeof window === 'undefined') return;
   try {
-    return await api.post(endpoint, payload, { forceNetwork: true });
-  } catch (err) {
-    if (isDuplicateError(err) && (item.entityType === 'sales' || item.entityType === 'purchases')) {
-      payload = renameInvoiceNo(payload);
-      return await api.post(endpoint, payload, { forceNetwork: true });
-    }
-    throw err;
+    const all = await getSyncQueueItems(null);
+    const open = all.filter((i) => i.status === 'pending' || i.status === 'failed');
+    const detail = {
+      pending: open.length,
+      failed: open.filter((i) => i.status === 'failed').length,
+      thisCompany: open.filter((i) => String(i.companyId) === String(getActiveCompanyId())).length
+    };
+    window.dispatchEvent(new CustomEvent('erp-sync-queue-changed', { detail }));
+    window.textileDesktop?.setPendingSync?.(detail.pending);
+  } catch {
+    /* ignore */
   }
 };
 
-const runUpdate = async (item) => {
-  if (item.entityType === 'jobs') {
-    if (item.action === 'updateReceive') {
-      return api.put('/jobs/receive', item.payload, { forceNetwork: true });
-    }
-    return api.put('/jobs/process', item.payload, { forceNetwork: true });
+/** Point every waiting entry (and its device copy) at the server id of a master that just synced. */
+const remapQueue = async (localId, serverId) => {
+  if (!localId || !serverId || !isLocalId(localId)) return;
+  const idMap = new Map([[localId, String(serverId)]]);
+  const all = await getSyncQueueItems(null);
+  for (const q of all) {
+    const payload = remapLocalIds(q.payload, idMap);
+    if (JSON.stringify(payload) !== JSON.stringify(q.payload)) await updateSyncItem(q.id, { payload });
   }
-  const endpoint = ENDPOINTS[item.entityType];
-  const targetId = item.serverId || item.localId;
-  if (item.payload?.status && Object.keys(item.payload).length === 1) {
-    return api.put(`${endpoint}/${targetId}/status`, item.payload, { forceNetwork: true });
-  }
-  return api.put(`${endpoint}/${targetId}`, item.payload, { forceNetwork: true });
 };
 
-const runDelete = async (item) => {
-  const endpoint = ENDPOINTS[item.entityType];
-  const targetId = item.serverId || item.localId;
-  return api.delete(`${endpoint}/${targetId}`, { forceNetwork: true });
-};
-
-const syncItem = async (item, onSynced) => {
-  const action = item.action || 'create';
-  let response;
-
-  if (action === 'create') {
-    response = await runCreate(item);
-  } else if (action === 'update') {
-    response = await runUpdate(item);
-  } else if (action === 'delete') {
-    await runDelete(item);
-    if (item.localId) await removeOfflineRecord(item.entityType, item.localId);
-    await removeSyncItem(item.id);
-    if (onSynced) onSynced(item.entityType, null, item.localId, action);
-    return null;
-  } else {
-    throw new Error(`Unknown sync action: ${action}`);
-  }
-
+const syncItem = async (item) => {
+  const req = resolveRequest(item);
+  if (!req.url) throw Object.assign(new Error(`No sync address for ${item.entityType}`), { response: { status: 400 } });
+  const response = await api.request({
+    method: req.method,
+    url: req.url,
+    data: req.data,
+    forceNetwork: true,
+    headers: { 'Idempotency-Key': idempotencyKeyOf(item), 'X-Offline-Sync': '1' }
+  });
+  if (req.method === 'delete') return null;
   const raw = response.data?.data || response.data;
   const normalize = NORMALIZERS[item.entityType];
-  const synced = normalize ? normalize(raw) : raw;
-
-  if (item.localId && action === 'create') {
-    await removeOfflineRecord(item.entityType, item.localId);
-  }
-  await removeSyncItem(item.id);
-
-  if (onSynced) onSynced(item.entityType, synced, item.localId, action);
-  return synced;
+  return normalize ? normalize(raw) : raw;
 };
 
 let syncing = false;
 
-export const processSyncQueue = async (onSynced, onError, onComplete) => {
+/** True while an upload run is in progress (logout waits for it). */
+export const isSyncRunning = () => syncing;
+
+/**
+ * Send the active company's queued entries, oldest first. Masters created offline go before the
+ * bills that use them; a bill still pointing at an unsynced master waits. A network failure stops
+ * the run (entries stay pending); a server refusal marks only that entry and the rest continue.
+ * @param {{ includeRejected?: boolean }} opts — rejected entries are retried on reconnect / manual
+ *   retry, not on every timer tick.
+ */
+export const processSyncQueue = async (onSynced, onError, onComplete, opts = {}) => {
+  const includeRejected = opts.includeRejected !== false;
   if (useLocalApiAsSourceOfTruth()) return { synced: 0, failed: 0 };
   if (syncing || isOffline()) return { synced: 0, failed: 0 };
   syncing = true;
@@ -152,27 +118,58 @@ export const processSyncQueue = async (onSynced, onError, onComplete) => {
   let synced = 0;
   let failed = 0;
   let needsInventoryRefresh = false;
+  const renumbered = [];
 
   try {
-    const pending = await getPendingSyncItems();
-    pending.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const pending = (await getPendingSyncItems())
+      .filter((i) => includeRejected || i.status !== 'failed')
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-    for (const item of pending) {
+    for (const queued of pending) {
+      // Re-read: an earlier entry in this run may have remapped this one's ids.
+      const item = (await getSyncQueueItems(null)).find((q) => q.id === queued.id);
+      if (!item) continue;
+      const waitingOn = pendingLocalRefs(item.payload, item.localId);
+      if (waitingOn.length) {
+        await updateSyncItem(item.id, { status: 'pending', error: 'Waiting for a party / item created offline to upload first' });
+        continue;
+      }
       try {
-        await updateSyncItem(item.id, { status: 'pending' });
-        await syncItem(item, (entityType, syncedRecord, localId, action) => {
-          if (INVENTORY_AFFECTING.has(entityType) && action !== 'delete') {
-            needsInventoryRefresh = true;
-          }
-          if (onSynced) onSynced(entityType, syncedRecord, localId, action);
-        });
+        const action = item.action || 'create';
+        const saved = await syncItem(item);
+        if (action === 'create' && isLocalId(item.localId)) {
+          const serverId = saved?._id || saved?.id;
+          await remapQueue(item.localId, serverId);
+        }
+        if (item.localId && (action === 'create' || action === 'delete')) {
+          await removeOfflineRecord(item.entityType, item.localId);
+        }
+        await removeSyncItem(item.id);
+        const notice = renumberNotice(item, saved);
+        if (notice) renumbered.push(notice);
+        if (INVENTORY_AFFECTING.has(item.entityType) && action !== 'delete') needsInventoryRefresh = true;
+        if (onSynced) onSynced(item.entityType, saved, item.localId, action, notice);
         synced++;
       } catch (err) {
+        const kind = classifyError(err);
+        const message = err?.response?.data?.message || err.message;
+        if (kind === 'offline' || kind === 'auth') {
+          await updateSyncItem(item.id, {
+            status: 'pending',
+            error: kind === 'auth' ? 'Login expired — log in again to upload' : null,
+            lastAttempt: new Date().toISOString()
+          });
+          break; // connection or login gone — stop; everything left stays queued
+        }
+        if (kind === 'retry') {
+          await updateSyncItem(item.id, { status: 'pending', error: message, lastAttempt: new Date().toISOString() });
+          continue;
+        }
         failed++;
         await updateSyncItem(item.id, {
           status: 'failed',
           retries: (item.retries || 0) + 1,
-          error: err?.response?.data?.message || err.message,
+          error: message,
           lastAttempt: new Date().toISOString()
         });
         if (onError) onError(item, err);
@@ -180,13 +177,20 @@ export const processSyncQueue = async (onSynced, onError, onComplete) => {
     }
   } finally {
     syncing = false;
-    if (onComplete) onComplete({ synced, failed, needsInventoryRefresh });
+    await announce();
+    if (onComplete) onComplete({ synced, failed, needsInventoryRefresh, renumbered });
   }
 
-  return { synced, failed, needsInventoryRefresh };
+  return { synced, failed, needsInventoryRefresh, renumbered };
 };
 
-export const saveOffline = async (entityType, payload, action = 'create') => {
+/**
+ * Save an entry on the device and queue it for upload.
+ * @param {{ endpoint?: string, queuePayload?: object }} opts — endpoint: exact create address when it
+ *   is not the entity's default (contra, journal, receive); queuePayload: what to send, when it
+ *   differs from the device copy.
+ */
+export const saveOffline = async (entityType, payload, action = 'create', opts = {}) => {
   if (useLocalApiAsSourceOfTruth()) {
     throw new Error('Desktop local mode: use live API (IndexedDB queue disabled)');
   }
@@ -200,13 +204,17 @@ export const saveOffline = async (entityType, payload, action = 'create') => {
     createdAt: payload.createdAt || new Date().toISOString()
   }, companyId);
 
+  const sendPayload = { ...(opts.queuePayload || payload) };
   await addToSyncQueue({
     entityType,
     action,
-    payload: { ...payload },
+    payload: sendPayload,
     localId,
-    serverId: action === 'create' ? null : localId
+    serverId: action === 'create' ? null : localId,
+    opKey: sendPayload.operationId || generateLocalId(),
+    ...(opts.endpoint ? { endpoint: opts.endpoint } : {})
   }, companyId);
+  await announce();
   return record;
 };
 
@@ -227,9 +235,11 @@ export const saveOfflineUpdate = async (entityType, id, payload) => {
       action: 'update',
       payload: { ...payload },
       localId: id,
-      serverId: id
+      serverId: id,
+      opKey: generateLocalId()
     }, companyId);
   }
+  await announce();
   return record;
 };
 
@@ -239,6 +249,7 @@ export const saveOfflineDelete = async (entityType, id) => {
   if (isLocalId(id)) {
     await removeOfflineRecord(entityType, id);
     await removeSyncQueueByLocalId(id);
+    await announce();
     return;
   }
 
@@ -248,9 +259,24 @@ export const saveOfflineDelete = async (entityType, id) => {
     action: 'delete',
     payload: {},
     localId: id,
-    serverId: id
+    serverId: id,
+    opKey: generateLocalId()
   }, companyId);
+  await announce();
 };
+
+/** Drop an entry the server will never accept (user confirmed). Removes the device copy too. */
+export const discardSyncItem = async (queueId) => {
+  const item = (await getSyncQueueItems(null)).find((q) => q.id === queueId);
+  if (!item) return;
+  if (item.localId && isLocalId(item.localId)) await removeOfflineRecord(item.entityType, item.localId);
+  await removeSyncItem(queueId);
+  await announce();
+};
+
+/** Entries still waiting (not refused) — e.g. a bill waiting for its offline party to upload. */
+export const getWaitingSyncItems = async () =>
+  (await getPendingSyncItems()).filter((i) => i.status === 'pending');
 
 export const retrySyncItem = async (queueId, onSynced, onError, onComplete) => {
   await updateSyncItem(queueId, { status: 'pending', error: null });
@@ -258,21 +284,38 @@ export const retrySyncItem = async (queueId, onSynced, onError, onComplete) => {
 };
 
 export const retryAllFailed = async (onSynced, onError, onComplete) => {
-  const failed = await getFailedSyncItems();
-  await Promise.all(failed.map((item) => updateSyncItem(item.id, { status: 'pending', error: null })));
+  const failedItems = await getFailedSyncItems();
+  await Promise.all(failedItems.map((item) => updateSyncItem(item.id, { status: 'pending', error: null })));
   return processSyncQueue(onSynced, onError, onComplete);
 };
 
+/**
+ * Upload whenever a connection is available: on start, when the browser or the server comes back,
+ * and every 30 s while anything is queued (pending entries only; refused ones wait for reconnect
+ * or a manual retry).
+ */
 export const initSyncListener = (onSynced, onError, onComplete) => {
   if (useLocalApiAsSourceOfTruth()) {
     return () => {};
   }
-  const run = () => processSyncQueue(onSynced, onError, onComplete);
+  const run = (opts) => processSyncQueue(onSynced, onError, onComplete, opts);
 
-  window.addEventListener('online', run);
-  if (!isOffline()) run();
+  let wasOffline = isOffline();
+  const unsubscribe = subscribeNetworkStatus(({ isOffline: offlineNow }) => {
+    if (wasOffline && !offlineNow) run({ includeRejected: true });
+    wasOffline = offlineNow;
+  });
+  const onBrowserOnline = () => run({ includeRejected: true });
+  window.addEventListener('online', onBrowserOnline);
+  const timer = setInterval(() => { if (!isOffline()) run({ includeRejected: false }); }, AUTO_RETRY_MS);
+  if (!isOffline()) run({ includeRejected: true });
+  announce();
 
-  return () => window.removeEventListener('online', run);
+  return () => {
+    unsubscribe();
+    window.removeEventListener('online', onBrowserOnline);
+    clearInterval(timer);
+  };
 };
 
 export const getPendingCount = async () => {
@@ -281,8 +324,8 @@ export const getPendingCount = async () => {
 };
 
 export const getFailedCount = async () => {
-  const failed = await getFailedSyncItems();
-  return failed.length;
+  const failedItems = await getFailedSyncItems();
+  return failedItems.length;
 };
 
 export { getFailedSyncItems, getPendingSyncItems };

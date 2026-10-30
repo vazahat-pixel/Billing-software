@@ -69,6 +69,9 @@ router.use(companyIsolationMiddleware);
 // Grace-period read-only guard — applies to every tenant write below.
 router.use(blockWritesWhenReadOnly);
 
+// Exactly-once writes for the offline sync queue (only requests carrying an Idempotency-Key).
+router.use(require('../middlewares/idempotency.middleware'));
+
 // --- Ungated: platform surface, not a sellable module -----------------------
 // /dashboard, /admin, /config, /users, /integrity, /stage*, /developer must stay
 // reachable even for a company whose modules are switched off, otherwise the
@@ -90,6 +93,7 @@ router.use('/sync', require('./sync.routes'));
 
 // --- Masters: the shell of the product, shipped with every plan -------------
 router.use('/masters', requireModule('masters'), mastersRoutes);
+router.use('/migration', requireModule('masters'), require('./migration.routes'));
 router.use('/parties', requireModule('masters'), masterScope, partyRoutes);
 router.use('/items', requireModule('masters'), masterScope, itemRoutes);
 router.use('/books', requireModule('masters'), masterScope, bookRoutes);

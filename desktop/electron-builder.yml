@@ -12,6 +12,7 @@ files:
   - config.json
   - config.example.json
   - localRuntime/**/*
+  - jsmExtractor/**/*
   - renderer/**/*
   - '!renderer/downloads/**/*'
   - assets/**/*
@@ -37,7 +38,9 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: Textile ERP
   deleteAppDataOnUninstall: false
+releaseInfo:
+  releaseNotesFile: release-notes.md
 publish:
   - provider: generic
-    url: https://updates.example.com/textile-erp/
+    url: https://app.dealingindia.com/downloads/updates/
     channel: latest

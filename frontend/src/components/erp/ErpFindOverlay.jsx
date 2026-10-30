@@ -1,4 +1,5 @@
 import React from 'react';
+import ErpTopLayer from './ErpTopLayer';
 
 /** Shared F3 find list — same keys as Sale / Purchase. */
 export default function ErpFindOverlay({
@@ -8,12 +9,15 @@ export default function ErpFindOverlay({
   inputRef,
   onKeyDown,
   countLabel = 'bills',
+  label = 'No:',
+  placeholder = 'Type number or press + / −',
   rows = [],
   activeIdx = 0,
   onSelect,
   onClose,
 }) {
   return (
+    <ErpTopLayer>
     <div
       className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
       data-find-modal
@@ -33,7 +37,7 @@ export default function ErpFindOverlay({
           </span>
         </div>
         <div className="p-3 bg-slate-100 border-b border-slate-300 flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-700 shrink-0">No:</span>
+          <span className="text-xs font-bold text-slate-700 shrink-0">{label}</span>
           <input
             ref={inputRef}
             type="text"
@@ -41,7 +45,7 @@ export default function ErpFindOverlay({
             value={search}
             onChange={(e) => onSearch(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Type number or press + / −"
+            placeholder={placeholder}
             className="flex-1 px-3 py-1.5 border-2 border-blue-600 rounded text-sm font-bold bg-[#fffde6] text-slate-900 focus:outline-none font-mono"
           />
           <span className="text-[11px] font-bold text-slate-600 shrink-0">{rows.length} {countLabel}</span>
@@ -78,5 +82,6 @@ export default function ErpFindOverlay({
         </div>
       </div>
     </div>
+    </ErpTopLayer>
   );
 }

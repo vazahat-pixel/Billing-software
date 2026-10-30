@@ -3,12 +3,13 @@ import { useLocation } from 'react-router-dom';
 import { Search, Bell, User, ChevronDown, Calendar, Building, LogOut, Settings } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import useStore from '../../store/useStore';
+import { logoutWithSync } from '../../utils/safeLogout';
 import OfflineIndicator from '../OfflineIndicator';
 import PlanStatusBadge from './PlanStatusBadge';
 
 const Topbar = () => {
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
-  const { logout, user } = useStore();
+  const { user } = useStore();
   const location = useLocation();
 
   const pageTitle = React.useMemo(() => {
@@ -101,7 +102,7 @@ const Topbar = () => {
                   </button>
                   <div className="h-[1px] bg-slate-50 mx-4 my-2"></div>
                   <button
-                    onClick={logout}
+                    onClick={() => { logoutWithSync(); }}
                     className="w-full text-left px-5 py-3 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 rounded-xl flex items-center gap-4 transition-all"
                   >
                     <LogOut size={16} strokeWidth={2.5} />

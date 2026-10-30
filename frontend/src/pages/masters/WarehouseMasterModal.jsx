@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Modal from '../../components/ui/Modal';
 import { Plus, Trash2, Search } from 'lucide-react';
 import { ERPSelect } from '../../components/forms/FormElements';
@@ -46,6 +46,8 @@ const WarehouseMasterModal = ({ isOpen, onClose, readOnly = false }) => {
       r.code?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const nameRef = useRef(null);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim() || !code.trim()) {
@@ -58,6 +60,7 @@ const WarehouseMasterModal = ({ isOpen, onClose, readOnly = false }) => {
       toast.success('Location saved');
       setName('');
       setCode('');
+      nameRef.current?.focus(); // ready for the next location
       await load();
     } catch (err) {
       toast.error(err);
@@ -89,7 +92,7 @@ const WarehouseMasterModal = ({ isOpen, onClose, readOnly = false }) => {
           <form onSubmit={handleSubmit} className="grid grid-cols-4 gap-2 items-end">
             <div>
               <label className="text-[10px] font-black uppercase text-slate-400">Name</label>
-              <input className="w-full border border-slate-200 px-2 py-2 text-sm" value={name} onChange={(e) => setName(e.target.value)} />
+              <input ref={nameRef} autoFocus className="w-full border border-slate-200 px-2 py-2 text-sm" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div>
               <label className="text-[10px] font-black uppercase text-slate-400">Code</label>

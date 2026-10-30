@@ -95,6 +95,26 @@ function normalizePayload(itemData, { requireName = true } = {}) {
     defaultWarehouseId: itemData.defaultWarehouseId || null,
     barcode: itemData.barcode || '',
     isFavorite: !!itemData.isFavorite,
+    // JSM Item Master fields (kept as entered).
+    itemChrCode: String(itemData.itemChrCode || '').trim(),
+    vatRate1: Number(itemData.vatRate1 || 0),
+    vatRate2: Number(itemData.vatRate2 || 0),
+    delCharge: Number(itemData.delCharge || 0),
+    cessRate: Number(itemData.cessRate || 0),
+    lfrRate: Number(itemData.lfrRate || 0),
+    partyGroup: String(itemData.partyGroup || '').trim(),
+    bundle: Number(itemData.bundle || 0),
+    salesProfitPer: Number(itemData.salesProfitPer || 0),
+    jobRate: Number(itemData.jobRate || 0),
+    showIn: ['All', 'Sales', 'Purchase'].includes(itemData.showIn) ? itemData.showIn : 'All',
+    ewayProductDesc2: String(itemData.ewayProductDesc2 || '').trim(),
+    gstTaxLabel2: String(itemData.gstTaxLabel2 || '').trim(),
+    negativeStockMessage: !!itemData.negativeStockMessage,
+    hindiName: String(itemData.hindiName || '').trim(),
+    itemCosting: Number(itemData.itemCosting || 0),
+    extraRemarks: Array.isArray(itemData.extraRemarks)
+      ? itemData.extraRemarks.slice(0, 3).map((r) => ({ remark: String(r?.remark || '').trim(), value: String(r?.value ?? '').trim() }))
+      : [],
     companyId: itemData.companyId,
   };
 }

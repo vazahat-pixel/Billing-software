@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import ErpTopLayer from '../../components/erp/ErpTopLayer';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { ERPCombobox } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
@@ -7,6 +8,7 @@ import { notifySuccess, notifyError, notifyWarning, notifyInfo } from '../../uti
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import { Trash2, Plus, Search } from 'lucide-react';
 import PuBillLookupModal from './PuBillLookupModal';
+import { buildPuBillRows } from './puBillLookupUtils';
 import JobWorkPrint from '../../components/print/JobWorkPrint';
 import AccountMasterModal from '../masters/AccountMasterModal';
 
@@ -467,8 +469,19 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
         if (cancelled) return;
         if (initialData) {
           handleNew();
-          if (initialData.supplierName) {
-            setHeader((h) => ({ ...h, broker: initialData.supplierName }));
+          // The purchase supplier is not the broker; Broker stays for the user to fill.
+          if (initialData.purchaseId) {
+            const purchaseLines = linesFromPurchase(initialData.purchaseId);
+            if (purchaseLines.length) {
+              setLines(purchaseLines);
+              const firstItem = purchaseLines.find((l) => l.itemId)?.itemId;
+              if (firstItem) setActiveItemId(String(firstItem));
+              notifySuccess(`Loaded ${purchaseLines.length} line(s) from Purchase ${initialData.invoiceNo || ''}`.trim());
+              const noQty = purchaseLines.filter((l) => !(Number(l.qty) > 0)).length;
+              if (noQty) notifyWarning(`${noQty} line(s) have Pcs but no meters in the purchase — enter Qty or Cut before saving`);
+            } else {
+              notifyWarning(`Purchase ${initialData.invoiceNo || ''} has no balance stock to issue`.trim());
+            }
           }
           if (initialData.partyName) {
             const match = (useStore.getState().parties || []).find(
@@ -587,6 +600,30 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
     setLotLookupOpen(true);
   };
 
+  /** Grid lines for every purchase line that still has stock, same shape as picking each from Pu.BillNo. */
+  const linesFromPurchase = (purchaseId) => {
+    const st = useStore.getState();
+    return buildPuBillRows({ inventoryLots: st.inventoryLots, purchases: st.purchases, items: st.items })
+      .filter((r) => String(r.purchaseId) === String(purchaseId) && (Number(r.balPcs) > 0 || Number(r.balMts) > 0))
+      .map((r) => {
+        const pcs = Number(r.balPcs || 0);
+        const qty = Number(r.balMts || 0);
+        const cut = pcs > 0 ? Number((qty / pcs).toFixed(3)) : 0;
+        return {
+          ...blankLine(),
+          itemId: r.itemId ? String(r.itemId) : '',
+          lotId: r.lotId ? String(r.lotId) : '',
+          lotNo: r.lotCode || r.billNo || '',
+          itemName: r.itemName || '',
+          pcs: pcs > 0 ? String(pcs) : '',
+          cut: cut > 0 ? String(cut) : '',
+          qty: qty > 0 ? String(qty) : '',
+          fabRate: r.puRate > 0 ? String(r.puRate) : '',
+          narration: r.billNo ? `From Pur Bill: ${r.billNo}` : '',
+        };
+      });
+  };
+
   const handleLotSelect = (row) => {
     if (!row) return;
 
@@ -646,10 +683,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
       }
     });
 
-    if (row.supplierName && !header.broker) {
-      setHeader((h) => ({ ...h, broker: row.supplierName }));
-    }
-    toast.success(`Loaded from Purchase ${row.billNo} · ${row.itemName}`);
+    notifySuccess(`Loaded from Purchase ${row.billNo} · ${row.itemName}`);
   };
 
   const handleNew = (override = {}) => {
@@ -890,7 +924,19 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
 
     const activeLines = calc.linesWithAmt.filter((l) => l.lotId && Number(l.qty) > 0);
     if (activeLines.length === 0) {
-      notifyWarning('Add at least one line — pick an Item and enter quantity');
+      // Say exactly what the filled line is missing instead of a generic "add a line".
+      const idx = calc.linesWithAmt.findIndex((l) => l.itemId || l.lotId || Number(l.pcs) > 0);
+      const line = idx >= 0 ? calc.linesWithAmt[idx] : null;
+      if (line && !line.lotId) {
+        notifyWarning(`Line ${idx + 1}: no stock lot for "${line.itemName || 'item'}" — use Fetch From Purchase Bill`);
+      } else if (line) {
+        notifyWarning(`Line ${idx + 1}: enter Qty (or Cut) — this purchase has Pcs ${line.pcs || 0} but no meters`);
+        const cell = document.querySelectorAll('.erp-job-issue-table tbody tr')[idx]?.querySelector('[data-col="cut"]')
+          || document.querySelectorAll('.erp-job-issue-table tbody tr')[idx]?.querySelector('[data-col="qty"]');
+        cell?.focus();
+      } else {
+        notifyWarning('Add at least one line — pick an Item and enter quantity');
+      }
       return;
     }
 
@@ -942,6 +988,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
           lotId: line.lotId,
           workerId: header.partyId,
           processType: 'Process Charge',
+          workKind: 'Job',
           issueQty: Number(line.qty) || 0,
           issuePcs: Number(line.pcs) || 0,
           weaver: '',
@@ -1766,6 +1813,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
 
       {/* Quick Challan Number Find Modal with + / - and Enter -> Edit */}
       {findOpen && (
+        <ErpTopLayer>
         <div
           className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
           onClick={() => setFindOpen(false)}
@@ -1889,6 +1937,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
             </div>
           </div>
         </div>
+        </ErpTopLayer>
       )}
 
       <PuBillLookupModal

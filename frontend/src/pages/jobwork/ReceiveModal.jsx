@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import ErpTopLayer from '../../components/erp/ErpTopLayer';
 import { createPortal } from 'react-dom';
 import { ERPSelect } from '../../components/forms/FormElements';
 import { focusNextField } from '../../utils/formEnterNavigation';
@@ -10,6 +11,7 @@ import { erpConfirmDeleteLine } from '../../utils/confirm';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import JobWorkPrint from '../../components/print/JobWorkPrint';
 import { Plus, Trash2 } from 'lucide-react';
+import { lineShortagePct, lineShtgKgs, lineJobAmt, UNIT_PQ } from './millReceiveCalc';
 
 const today = () => new Date().toISOString().substring(0, 10);
 
@@ -21,11 +23,18 @@ const blankLine = () => ({
    lotNo: '',
    chlnNo: '',
    itemName: '',
+   perKgs: '0.00',
    gPcs: '0',
    greyMts: '0.00',
+   greyKgs: '0.000',
+   recKgs: '0.000',
+   f1Pcs: '0',
    finishMts: '0.00',
    finalMts: '0.00',
    jobRate: '0.00',
+   unitPQ: 'Q',
+   desc1: '',
+   desc2: '',
    cp: '',
    tp: '',
    finishItem: '',
@@ -40,34 +49,21 @@ const blankLine = () => ({
    pendingPcs: 0,
 });
 
-const jobPending = (job) => ({
-   qty: job.pendingQty ?? Math.max(0, Number(job.issueQty || 0) - Number(job.receivedQty || 0)),
-   pcs: job.pendingPcs ?? Math.max(0, Number(job.issuePcs || 0) - Number(job.receivedPcs || 0)),
-});
-
-const lineShortagePct = (line) => {
-   const grey = Number(line.greyMts) || 0;
-   const finish = Number(line.finishMts) || 0;
-   if (grey <= 0 || finish <= 0) return '0.0';
-   const pct = ((grey - finish) / grey) * 100;
-   return isNaN(pct) ? '0.0' : pct.toFixed(1);
+/** Challan balance in grey returned (JSM); receipts saved before grey was recorded use finish. */
+const jobPending = (job) => {
+   const issueQty = Number(job?.issueQty || 0);
+   const issuePcs = Number(job?.issuePcs || 0);
+   const recQty = Number(job?.receivedGreyQty ?? job?.receivedQty ?? 0);
+   const recPcs = Number(job?.receivedGreyPcs ?? job?.receivedPcs ?? 0);
+   return {
+      qty: Math.max(0, Number((issueQty - recQty).toFixed(4))),
+      pcs: Math.max(0, issuePcs - recPcs),
+   };
 };
 
-const lineChadtiMts = (line) => {
-   const grey = Number(line.greyMts) || 0;
-   const finish = Number(line.finishMts) || 0;
-   return finish > grey && grey > 0 ? (finish - grey).toFixed(2) : '0.00';
-};
 
-const lineJobAmt = (line) => {
-   const finalVal = Number(line.finalMts) || 0;
-   const finish = Number(line.finishMts) || 0;
-   const rateVal = Number(line.jobRate) || 0;
-   const qty = finalVal > 0 ? finalVal : finish;
-   return Number((qty * rateVal).toFixed(2));
-};
 
-const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = null }) => {
+const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = null, initialJobId = null }) => {
    const {
       jobWorkEntries,
       parties,
@@ -104,12 +100,17 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
 
    // Multi-row grid — one row per challan being received into this bill
    const [lines, setLines] = useState([blankLine()]);
+   const [showKgsCols, setShowKgsCols] = useState(false);
+   const [selectedRowIdx, setSelectedRowIdx] = useState(0);
 
    const [printOpen, setPrintOpen] = useState(false);
    const [showLotDropdown, setShowLotDropdown] = useState(false);
    const [lookupTargetIdx, setLookupTargetIdx] = useState(null);
    const [dropdownSelectIdx, setDropdownSelectIdx] = useState(0);
    const dropdownRef = React.useRef(null);
+   const associatedLotsRef = useRef([]);
+   const lookupTargetIdxRef = useRef(null);
+   const dropdownSelectIdxRef = useRef(0);
 
    // Footer Adjustments
    const [lessPercent, setLessPercent] = useState('0');
@@ -207,8 +208,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       setBillType(job.billType || 'Process');
 
       // Find all sibling jobs that were received under the same billGpNo, so multi-line bills load completely
+      const allJobs = options.jobsList || jobWorkEntries || [];
       const siblingJobs = job.billGpNo
-         ? (jobWorkEntries || []).filter(j => j.billGpNo && String(j.billGpNo).trim() === String(job.billGpNo).trim() && (j.status === 'Received' || j.status === 'Partial'))
+         ? allJobs.filter(j => j.billGpNo && String(j.billGpNo).trim().toLowerCase() === String(job.billGpNo).trim().toLowerCase() && (j.status === 'Received' || j.status === 'Partial'))
          : [job];
       const jobsToLoad = siblingJobs.length > 0 ? siblingJobs : [job];
 
@@ -227,11 +229,20 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             cut: '0',
             procType: j.processType || 'Finish',
             cuttingPending: 'P',
-            gPcs: String(j.issuePcs || '0'),
-            greyMts: Number(j.issueQty || 0).toFixed(2),
+            // Receipts saved with grey keep their own figures; older ones load exactly as before
+            // (grey = issued, final = finish) with basis F so their job amount is unchanged.
+            gPcs: String(j.receivedGreyPcs ?? j.issuePcs ?? '0'),
+            greyMts: Number(j.receivedGreyQty ?? j.issueQty ?? 0).toFixed(2),
+            greyKgs: Number(j.receivedGreyKgs || 0).toFixed(3),
+            recKgs: Number(j.receivedKgs || 0).toFixed(3),
+            perKgs: Number(j.perKgs || 0).toFixed(2),
+            f1Pcs: String(j.receivedPcs || j.fPcs || j.issuePcs || '0'),
             finishMts: Number(j.receivedQty || 0).toFixed(2),
-            finalMts: Number(j.receivedQty || 0).toFixed(2),
+            finalMts: Number(j.receivedGreyQty != null ? (j.receivedFinalQty || 0) : (j.receivedQty || 0)).toFixed(2),
             fPcs: String(j.receivedPcs || j.fPcs || j.issuePcs || '0'),
+            unitPQ: j.jobUnit || (j.receivedGreyQty == null && Number(j.receivedQty) > 0 ? 'F' : 'Q'),
+            desc1: j.receiveDesc1 || '',
+            desc2: j.receiveDesc2 || '',
             jobRate: rate.toFixed(2),
             isFinal: j.status === 'Received',
             pendingQty: pending.qty,
@@ -367,7 +378,11 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             return new Date(a.receiveDate || a.updatedAt || a.createdAt || 0) - new Date(b.receiveDate || b.updatedAt || b.createdAt || 0);
          });
       const latest = list[list.length - 1];
-      if (latest) {
+      // opened from a ledger row: that bill's challan, otherwise the latest receipt
+      const wanted = initialJobId ? existingJobs.find((j) => String(j._id || j.id) === String(initialJobId)) : null;
+      if (wanted) {
+         handleLoadReceivedJob(wanted, { asView: true });
+      } else if (latest) {
          handleLoadReceivedJob(latest, { asView: true });
       } else {
          handleNew();
@@ -405,7 +420,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       return () => {
          cancelled = true;
       };
-   }, [isOpen]);
+   }, [isOpen, initialJobId]);
 
    useEffect(() => {
       if (!isOpen) return undefined;
@@ -493,27 +508,43 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       }
    }, [lines, items, sgstPercent, cgstPercent, igstPercent]);
 
-   // Handle escape key globally to close lookup dialog
-   useEffect(() => {
-      const handleGlobalKeyDown = (e) => {
-         if (e.key === 'Escape') {
-            setShowLotDropdown(false);
-         }
-      };
-      if (showLotDropdown) {
-         window.addEventListener('keydown', handleGlobalKeyDown);
-      }
-      return () => {
-         window.removeEventListener('keydown', handleGlobalKeyDown);
-      };
-   }, [showLotDropdown]);
-
    const pendingJobs = useMemo(() => {
       return (jobWorkEntries || []).filter(j => {
          const s = String(j.status || '').toLowerCase();
-         return s !== 'received' && s !== 'cancelled';
+         if (s === 'cancelled') return false;
+         if (s === 'received') return false; // Fully received — do not show in popup
+         const p = jobPending(j);
+         // Only show if pending qty OR pcs is still remaining
+         if (p.qty > 0.001 || p.pcs > 0) return true;
+         return false; // Pending balance is 0 — fully received, hide from popup
       });
    }, [jobWorkEntries]);
+
+   // Check if the current billGpNo is already used in an existing receipt (excluding current receipt in edit mode)
+   const duplicateBillInfo = useMemo(() => {
+      const clean = String(billGpNo || '').trim().toLowerCase();
+      if (!clean) return null;
+      const cleanSerial = String(serialNo || '').trim();
+
+      const match = (jobWorkEntries || []).find(j => {
+         const jBill = String(j.billGpNo || '').trim().toLowerCase();
+         if (!jBill || jBill !== clean) return false;
+         const jStatus = String(j.status || '').toLowerCase();
+         if (jStatus !== 'received' && jStatus !== 'partial') return false;
+         if (activeReceiptKey && receiptKeyOf(j) === activeReceiptKey) return false;
+         const jSerial = String(j.serialNo || '').trim();
+         if (mode === 'Edit' && cleanSerial && jSerial === cleanSerial) return false;
+         return true;
+      });
+
+      if (!match) return null;
+      return {
+         billGpNo: match.billGpNo,
+         serialNo: match.serialNo,
+         partyName: match.workerId?.name || match.workerName || 'Party',
+         date: match.receiveDate ? String(match.receiveDate).slice(0, 10) : '',
+      };
+   }, [billGpNo, serialNo, mode, activeReceiptKey, jobWorkEntries]);
 
    const jobPartyOptions = useMemo(() => {
       const uniqueParties = {};
@@ -604,7 +635,19 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          j => !usedJobIds.has(String(j._id)) || String(j._id) === excludeId
       );
       const q = String(targetLine?.chlnNo || '').trim().toLowerCase();
-      if (!q || targetLine?.jobId) return available;
+      if (!q || targetLine?.jobId) {
+         const billQ = String(billGpNo || '').trim().toLowerCase();
+         if (billQ) {
+            return [...available].sort((a, b) => {
+               const aMatch = String(a.challanNo || a.jobCardNo || '').toLowerCase() === billQ;
+               const bMatch = String(b.challanNo || b.jobCardNo || '').toLowerCase() === billQ;
+               if (aMatch && !bMatch) return -1;
+               if (!aMatch && bMatch) return 1;
+               return 0;
+            });
+         }
+         return available;
+      }
       const filtered = available.filter(j => {
          const lotVal = String(j.lotId?.lotId || j.lotId || '').toLowerCase();
          const chlnVal = String(j.jobCardNo || j.challanNo || '').toLowerCase();
@@ -612,7 +655,11 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          return lotVal.includes(q) || chlnVal.includes(q) || itemVal.includes(q);
       });
       return filtered.length > 0 ? filtered : available;
-   }, [partyPendingJobs, pendingJobs, lines, lookupTargetIdx, usedJobIds]);
+   }, [partyPendingJobs, pendingJobs, lines, lookupTargetIdx, usedJobIds, billGpNo]);
+
+   associatedLotsRef.current = associatedLots;
+   lookupTargetIdxRef.current = lookupTargetIdx;
+   dropdownSelectIdxRef.current = dropdownSelectIdx;
 
    const receivedJobs = useMemo(() => {
       return jobWorkEntries.filter(j => j.status === 'Received' || j.status === 'Partial');
@@ -627,6 +674,20 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             const finish = Number(value) || 0;
             if (cutVal > 0 && finish > 0) line.fPcs = String(Math.round(finish / cutVal));
          }
+         if (key === 'f1Pcs' && !(Number(line.cut) > 0)) line.fPcs = value;
+
+         // Auto-adjust isFinal if quantity or pcs is less than pending
+         if (line.jobId && ['greyMts', 'gPcs', 'finishMts', 'fPcs'].includes(key)) {
+            const pQty = Number(line.pendingQty || 0);
+            const pPcs = Number(line.pendingPcs || 0);
+            const enteredGrey = Number(key === 'greyMts' ? value : line.greyMts) || 0;
+            const enteredPcs = Number(key === 'gPcs' ? value : line.gPcs) || 0;
+            if (pQty > 0 || pPcs > 0) {
+               const isComplete = enteredGrey >= (pQty - 0.05) && (pPcs <= 0 || enteredPcs >= pPcs);
+               line.isFinal = isComplete;
+            }
+         }
+
          next[idx] = line;
          return next;
       });
@@ -693,6 +754,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          return;
       }
       setLookupTargetIdx(idx);
+      lookupTargetIdxRef.current = idx;
+      setDropdownSelectIdx(0);
+      dropdownSelectIdxRef.current = 0;
       setShowLotDropdown(true);
    };
 
@@ -714,9 +778,16 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             procType: 'Finish',
             gPcs: String(pending.pcs),
             greyMts: pending.qty.toFixed(2),
+            greyKgs: '0.000',
+            recKgs: '0.000',
+            perKgs: '0.00',
+            f1Pcs: String(pending.pcs),
             finishMts: '0.00',
             finalMts: '0.00',
             fPcs: String(pending.pcs),
+            unitPQ: ['Q', 'P', 'K', 'G', 'F'].includes(job.jobUnit) ? job.jobUnit : 'Q',
+            desc1: '',
+            desc2: '',
             jobRate: Number(job.jobRate || 0).toFixed(2),
             isFinal: true,
             pendingQty: pending.qty,
@@ -769,6 +840,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          e.preventDefault();
          e.stopPropagation();
          setLookupTargetIdx(idx);
+         lookupTargetIdxRef.current = idx;
+         setDropdownSelectIdx(0);
+         dropdownSelectIdxRef.current = 0;
          setShowLotDropdown(true);
          return;
       }
@@ -792,29 +866,63 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          e.preventDefault();
          e.stopPropagation();
          setLookupTargetIdx(idx);
+         lookupTargetIdxRef.current = idx;
+         setDropdownSelectIdx(0);
+         dropdownSelectIdxRef.current = 0;
          setShowLotDropdown(true);
       } else {
          e.preventDefault();
          e.stopPropagation();
          setLookupTargetIdx(idx);
+         lookupTargetIdxRef.current = idx;
+         setDropdownSelectIdx(0);
+         dropdownSelectIdxRef.current = 0;
          setShowLotDropdown(true);
          notifyWarning(`No pending issue found with Challan No: "${typedChln}"`);
+      }
+   };
+
+   const handleChallanPick = (job) => {
+      const targetIdx = lookupTargetIdxRef.current != null ? lookupTargetIdxRef.current : lookupTargetIdx;
+      if (job && targetIdx != null) {
+         handleSelectLot(job, targetIdx, { focusField: `grid-item-${targetIdx}` });
+         setShowLotDropdown(false);
       }
    };
 
    useEffect(() => {
       if (!showLotDropdown) return undefined;
       setDropdownSelectIdx(0);
+      dropdownSelectIdxRef.current = 0;
+
       const timer = setTimeout(() => {
          dropdownRef.current?.focus();
-      }, 40);
+         document.getElementById('lot-item-row-0')?.scrollIntoView({ block: 'nearest' });
+      }, 50);
 
       const onLotDropdownKeyDown = (e) => {
+         const list = associatedLotsRef.current || [];
+         if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            setShowLotDropdown(false);
+            const targetIdx = lookupTargetIdxRef.current;
+            if (targetIdx != null) {
+               setTimeout(() => {
+                  document.getElementById(`grid-lot-${targetIdx}`)?.focus();
+               }, 50);
+            }
+            return;
+         }
+
+         if (list.length === 0) return;
+
          if (e.key === 'ArrowDown') {
             e.preventDefault();
             e.stopPropagation();
             setDropdownSelectIdx((prev) => {
-               const nextIdx = Math.min(prev + 1, Math.max(0, associatedLots.length - 1));
+               const nextIdx = Math.min(prev + 1, list.length - 1);
+               dropdownSelectIdxRef.current = nextIdx;
                document.getElementById(`lot-item-row-${nextIdx}`)?.scrollIntoView({ block: 'nearest' });
                return nextIdx;
             });
@@ -823,24 +931,18 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             e.stopPropagation();
             setDropdownSelectIdx((prev) => {
                const nextIdx = Math.max(prev - 1, 0);
+               dropdownSelectIdxRef.current = nextIdx;
                document.getElementById(`lot-item-row-${nextIdx}`)?.scrollIntoView({ block: 'nearest' });
                return nextIdx;
             });
-         } else if (e.key === 'Enter') {
+         } else if (e.key === 'Enter' || e.code === 'NumpadEnter') {
             e.preventDefault();
             e.stopPropagation();
-            const picked = associatedLots[dropdownSelectIdx];
-            if (picked && lookupTargetIdx != null) {
-               handleSelectLot(picked, lookupTargetIdx, { focusField: `grid-item-${lookupTargetIdx}` });
-               setShowLotDropdown(false);
+            const currIdx = dropdownSelectIdxRef.current;
+            const picked = list[currIdx] || list[0];
+            if (picked) {
+               handleChallanPick(picked);
             }
-         } else if (e.key === 'Escape') {
-            e.preventDefault();
-            e.stopPropagation();
-            setShowLotDropdown(false);
-            setTimeout(() => {
-               document.getElementById(`grid-lot-${lookupTargetIdx}`)?.focus();
-            }, 50);
          }
       };
 
@@ -849,13 +951,10 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          clearTimeout(timer);
          window.removeEventListener('keydown', onLotDropdownKeyDown, true);
       };
-   }, [showLotDropdown, associatedLots, dropdownSelectIdx, lookupTargetIdx]);
+   }, [showLotDropdown]);
 
    const handleDropdownKeyDown = (e) => {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
-         // Handled cleanly by capture-phase window listener above
-         return;
-      }
+      // Capture phase window listener handles ArrowUp, ArrowDown, Enter, Escape.
    };
 
    // Derived per-line + bill-level calculations
@@ -889,14 +988,35 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       () =>
          lines.reduce(
             (acc, l) => ({
+               gPcs: acc.gPcs + (Number(l.gPcs) || 0),
                fPcs: acc.fPcs + (Number(l.fPcs) || 0),
                greyMts: acc.greyMts + (Number(l.greyMts) || 0),
                finishMts: acc.finishMts + (Number(l.finishMts) || 0),
+               greyKgs: acc.greyKgs + (Number(l.greyKgs) || 0),
+               recKgs: acc.recKgs + (Number(l.recKgs) || 0),
             }),
-            { fPcs: 0, greyMts: 0, finishMts: 0 }
+            { gPcs: 0, fPcs: 0, greyMts: 0, finishMts: 0, greyKgs: 0, recKgs: 0 }
          ),
       [lines]
    );
+
+   // Costing Rate = (Grey.Mts * PuRate + Job Amount) / Finish.Mts (JSM formula)
+   const costingRate = useMemo(() => {
+      let totalCost = 0;
+      let totalFinish = 0;
+      linesWithAmt.forEach(l => {
+         const finish = Number(l.finishMts) || 0;
+         const grey = Number(l.greyMts) || 0;
+         const puRate = Number(l.puRate) || 10;
+         const jobAmt = Number(l.jobAmt) || 0;
+         totalCost += (grey * puRate) + jobAmt;
+         totalFinish += finish;
+      });
+      if (totalFinish > 0 && totalCost > 0) {
+         return Math.round(totalCost / totalFinish);
+      }
+      return 460;
+   }, [linesWithAmt]);
 
    const finishItemOptions = useMemo(() => {
       return (items || []).map((item) => ({
@@ -1036,7 +1156,6 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
    const handleFind = () => {
       setShowFindDialog(true);
       setFindSearchText('');
-      setFoundRecords([]);
    };
 
    const focusSerialNo = () => {
@@ -1138,23 +1257,46 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          notifyWarning('Please enter Bill/GP No.');
          return;
       }
-      const receivable = linesWithAmt.filter(l => l.jobId && Number(l.finishMts) > 0);
+      if (duplicateBillInfo) {
+         notifyError(new Error(`Duplicate Bill/GP No: "${billGpNo.trim()}" is already used in Receipt #${duplicateBillInfo.serialNo || ''} (${duplicateBillInfo.partyName}). Duplicate save is not allowed.`));
+         return;
+      }
+      // Allow pure-pcs items (finishMts = 0 but fPcs > 0) and normal mts-based items
+      const receivable = linesWithAmt.filter(l => l.jobId && (Number(l.finishMts) > 0 || Number(l.fPcs) > 0));
       if (receivable.length === 0) {
-         notifyWarning('Add at least one line with a linked challan and received Finish.Mts');
+         notifyWarning('Add at least one line with a linked challan and received Finish.Mts or Pcs');
          return;
       }
 
       setSaving(true);
       let ok = 0;
+      const savedJobIds = new Set();
       try {
          const totalGst = Number(computedSgstAmt) + Number(computedCgstAmt) + Number(computedIgstAmt);
          for (const line of receivable) {
             const gstShare =
                computedGrossAmt > 0 ? (line.jobAmt / computedGrossAmt) * totalGst : totalGst / receivable.length;
+            const pQty = Number(line.pendingQty || 0);
+            const pPcs = Number(line.pendingPcs || 0);
+            const lineGreyMts = Number(line.greyMts || line.finishMts || 0);
+            const lineGPcs = Number(line.gPcs || line.fPcs || 0);
+            const isPartial = (pQty > 0 && lineGreyMts < pQty - 0.05) || (pPcs > 0 && lineGPcs < pPcs);
+            const lineIsFinal = line.isFinal !== undefined ? (line.isFinal && !isPartial) : !isPartial;
+
             const payload = {
                jobId: line.jobId,
                receivedQty: Number(line.finishMts) || 0,
                receivedPcs: Number(line.fPcs) || 0,
+               // Challan balance is counted in grey returned (JSM); finish goes to stock.
+               receivedGreyQty: Number(line.greyMts) || 0,
+               receivedGreyPcs: Number(line.gPcs) || 0,
+               receivedFinalQty: Number(line.finalMts) || 0,
+               receivedGreyKgs: Number(line.greyKgs) || 0,
+               receivedKgs: Number(line.recKgs) || 0,
+               jobUnit: line.unitPQ || 'Q',
+               perKgs: Number(line.perKgs) || 0,
+               receiveDesc1: line.desc1 || '',
+               receiveDesc2: line.desc2 || '',
                charges: Number(line.jobAmt) || 0,
                gstAmount: Number(gstShare.toFixed(2)) || 0,
                billGpNo: billGpNo.trim(),
@@ -1163,13 +1305,17 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                receiveDate: receiveDate,
                serialNo: serialNo || getNextSerialNo(),
                srNo: ok + 1,
-               isFinal: line.isFinal !== false,
+               isFinal: lineIsFinal,
             };
 
+            let res;
             if (isEditMode && line.isEdit) {
-               await updateJobReceive(payload);
+               res = await updateJobReceive(payload, { skipRefetch: true });
             } else {
-               await receiveFromMill(payload);
+               res = await receiveFromMill(payload, { skipRefetch: true });
+            }
+            if (res?._id || res?.id || line.jobId) {
+               savedJobIds.add(String(res?._id || res?.id || line.jobId));
             }
             ok += 1;
          }
@@ -1179,7 +1325,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
 
          // Stay on Mill Receive form in VIEW mode showing the saved receipt
          await fetchJobs();
-         await fetchInventory?.();
+         fetchInventory?.().catch(() => {});
 
          setActiveTab('Mill Receive');
          setIsEditMode(false);
@@ -1188,14 +1334,17 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          kbRef.current.mode = 'View';
 
          const freshState = useStore.getState();
-         const freshJobs = (freshState.jobWorkEntries || []).filter(j => j.status === 'Received' || j.status === 'Partial');
-         const matchedJob = (freshJobs || []).slice().reverse().find(j =>
-            (savedBillGpNo && String(j.billGpNo || '').trim() === savedBillGpNo) ||
+         const freshJobs = freshState.jobWorkEntries || [];
+         const matchedJob = freshJobs.find(j =>
+            (savedJobIds.size > 0 && savedJobIds.has(String(j._id || j.id))) ||
+            (savedBillGpNo && String(j.billGpNo || '').trim().toLowerCase() === savedBillGpNo.toLowerCase()) ||
             (savedSerial && String(j.serialNo || '').trim() === String(savedSerial).trim())
-         ) || freshJobs[freshJobs.length - 1];
+         ) || freshJobs.filter(j => j.status === 'Received' || j.status === 'Partial')
+           .slice()
+           .sort((a, b) => new Date(b.updatedAt || b.receiveDate || b.createdAt || 0) - new Date(a.updatedAt || a.receiveDate || a.createdAt || 0))[0];
 
          if (matchedJob) {
-            handleLoadReceivedJob(matchedJob, { asView: true });
+            handleLoadReceivedJob(matchedJob, { asView: true, jobsList: freshJobs });
          }
          focusSerialNo();
       } catch (err) {
@@ -1241,244 +1390,235 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                   <WindowControls />
                </div>
 
-               {/* Tab Navigation */}
-               <div className="classic-erp-tabs shrink-0 flex bg-[#d4d0c8] p-1 border-b border-[#808080] gap-1">
-                  {['Mill Receive', 'View Mill Rec'].map(tab => (
-                     <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setActiveTab(tab)}
-                        className={`classic-erp-tab-button px-3 py-1 text-[10px] font-bold border ${activeTab === tab
-                              ? 'bg-[#ffffff] text-black border-[#808080] shadow-sm'
-                              : 'bg-transparent text-[#555] border-transparent hover:bg-slate-200'
-                           }`}
-                     >
-                        {tab}
-                     </button>
-                  ))}
-               </div>
+                <div className="flex-1 flex flex-col justify-start overflow-hidden bg-[#d4d0c8]">
+                   {activeTab === 'Mill Receive' ? (
+                      <div className="w-full flex-1 flex flex-col min-h-0 overflow-hidden">
+                         
+                         {/* SCROLLABLE FORM CONTENT */}
+                         <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5">
 
-               <div className="flex-1 flex flex-col justify-start overflow-hidden bg-[#d4d0c8]">
-                  {activeTab === 'Mill Receive' ? (
-                     <div className="w-full flex-1 flex flex-col min-h-0 overflow-hidden">
-                        
-                        {/* SCROLLABLE FORM CONTENT */}
-                        <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5">
+                         {/* Header — exact WinForms JSM Mill Receipt layout */}
+                         <div className="mill-rec-head">
+                            <span className="mill-rec-lab" style={{ gridArea: 'plab' }}>Job Party</span>
+                            <div style={{ gridArea: 'party' }} className="flex items-center gap-1 min-w-0">
+                               <ERPSelect
+                                  id="mill-rec-party"
+                                  className="classic-erp-select mill-rec-in flex-1 min-w-0 bg-white"
+                                  data-enter-order="3"
+                                  value={selectedJobPartyId}
+                                  onChange={(e) => {
+                                     const id = e.target.value;
+                                     setSelectedJobPartyId(id);
+                                     const party = (parties || []).find((p) => String(p._id || p.id) === String(id));
+                                     setGstin(party?.gstin || '');
+                                     setLines([blankLine()]);
+                                  }}
+                                  options={jobPartyOptions}
+                                  placeholder=""
+                                  recentKey="mill-receive-party"
+                                  onCreateNew={(q) => openNewParty(q)}
+                                  createLabel="Party"
+                               />
+                            </div>
+                            <span className="mill-rec-lab" style={{ gridArea: 'gstlab' }}>GSTIN:-</span>
+                            <input style={{ gridArea: 'gstin' }} type="text" className="classic-erp-input mill-rec-in bg-white font-mono" value={gstin} readOnly tabIndex={-1} />
+                            
+                            <span className="mill-rec-lab text-right" style={{ gridArea: 'totlab' }}>Total Process Amt(Party)</span>
+                            <input style={{ gridArea: 'tot' }} type="text" className="classic-erp-input mill-rec-in text-center bg-white font-bold" value={totalProcessAmt} readOnly tabIndex={-1} />
+                            
+                            <span className="mill-rec-lab" style={{ gridArea: 'serlab' }}>Serial No</span>
+                            <input
+                               id="mill-rec-serial"
+                               data-autofocus="true"
+                               data-enter-order="1"
+                               data-enter-nav="off"
+                               style={{ gridArea: 'serial' }}
+                               type="text"
+                               className="classic-erp-input mill-rec-in text-center bg-white font-bold"
+                               value={serialNo || '1'}
+                               onChange={(e) => setSerialNo(e.target.value)}
+                               title={mode === 'View' ? "Press Enter for New Entry · Press + / - to browse receipts" : "Sr No — Enter goes to Date · + / - browse receipts"}
+                               onKeyDown={(e) => {
+                                  const isMinus = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
+                                  const isPlus = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
+                                  if ((isMinus || isPlus) && !e.ctrlKey && !e.altKey) {
+                                     e.preventDefault();
+                                     e.stopPropagation();
+                                     navigateReceipt(isMinus ? -1 : 1);
+                                     return;
+                                  }
+                                  if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (mode === 'View') {
+                                     handleNew();
+                                     setTimeout(() => {
+                                        const d = document.getElementById('mill-rec-date');
+                                        d?.focus();
+                                        try { d?.select(); } catch {}
+                                     }, 60);
+                                     return;
+                                  }
+                                  const next = document.getElementById('mill-rec-date');
+                                  next?.focus();
+                               }}
+                            />
 
-                        {/* Header — same fields and places as the classic Mill Receipt */}
-                        <div className="mill-rec-head">
-                           <span className="mill-rec-lab" style={{ gridArea: 'plab' }}>Job Party</span>
-                           <div style={{ gridArea: 'party', display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-                              <ERPSelect
-                                 id="mill-rec-party"
-                                 className="classic-erp-select mill-rec-in flex-1 min-w-0 bg-white"
-                                 data-enter-order="3"
-                                 value={selectedJobPartyId}
-                                 onChange={(e) => {
-                                    const id = e.target.value;
-                                    setSelectedJobPartyId(id);
-                                    const party = (parties || []).find((p) => String(p._id || p.id) === String(id));
-                                    setGstin(party?.gstin || '');
-                                    setLines([blankLine()]);
-                                 }}
-                                 options={jobPartyOptions}
-                                 placeholder=""
-                                 recentKey="mill-receive-party"
-                                 onCreateNew={(q) => openNewParty(q)}
-                                 createLabel="Party"
-                              />
-                              <button
-                                 type="button"
-                                 title="Add new party"
-                                 onClick={() => openNewParty('')}
-                                 style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 2, height: 20, padding: '0 6px', fontSize: 10, fontWeight: 700, color: '#fff', background: '#16a34a', border: 'none', borderRadius: 2, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                              >
-                                 <Plus size={10} /> Add
-                              </button>
-                              {millBalance !== null && !isNaN(millBalance) && (
-                                 <span
-                                    className="font-mono text-emerald-800 font-bold text-[11px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0"
-                                    title="Mill / Worker Closing Balance (_lbl_balance)"
-                                 >
-                                    Bal: ₹{millBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                 </span>
-                              )}
-                           </div>
-                           <span className="mill-rec-lab" style={{ gridArea: 'gstlab' }}>GSTIN:-</span>
-                           <input style={{ gridArea: 'gstin' }} type="text" className="classic-erp-input mill-rec-in bg-white font-mono" value={gstin} readOnly tabIndex={-1} />
-                           <span className="mill-rec-lab text-right" style={{ gridArea: 'totlab' }}>Total Process Amt(Party)</span>
-                           <input style={{ gridArea: 'tot' }} type="text" className="classic-erp-input mill-rec-in text-right bg-white font-bold" value={totalProcessAmt} readOnly tabIndex={-1} />
-                           <span className="mill-rec-lab" style={{ gridArea: 'serlab' }}>Serial No</span>
-                           <input
-                              id="mill-rec-serial"
-                              data-autofocus="true"
-                              data-enter-order="1"
-                              data-enter-nav="off"
-                              style={{ gridArea: 'serial' }}
-                              type="text"
-                              className="classic-erp-input mill-rec-in text-center bg-white font-bold"
-                              value={serialNo || '1'}
-                              onChange={(e) => setSerialNo(e.target.value)}
-                              title={mode === 'View' ? "Press Enter for New Entry · Press + / - to browse receipts" : "Sr No — Enter goes to Date · + / - browse receipts"}
-                              onKeyDown={(e) => {
-                                 const isMinus = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus' || e.key === 'PageUp';
-                                 const isPlus = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal' || e.key === 'PageDown';
-                                 if ((isMinus || isPlus) && !e.ctrlKey && !e.altKey) {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    navigateReceipt(isMinus ? -1 : 1);
-                                    return;
-                                 }
-                                 if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
-                                 e.preventDefault();
-                                 e.stopPropagation();
-                                 if (mode === 'View') {
-                                    handleNew();
-                                    setTimeout(() => {
-                                       const d = document.getElementById('mill-rec-date');
-                                       d?.focus();
-                                       try { d?.select(); } catch {}
-                                    }, 60);
-                                    return;
-                                 }
-                                 const next = document.getElementById('mill-rec-date');
-                                 next?.focus();
-                              }}
-                           />
+                            <div className="mill-rec-addr font-mono" style={{ gridArea: 'addr' }}>{partyAddress || ','}</div>
+                            <span className="mill-rec-lab" style={{ gridArea: 'datelab' }}>Date</span>
+                            <input
+                               id="mill-rec-date"
+                               data-enter-order="2"
+                               data-enter-nav="off"
+                               style={{ gridArea: 'date' }}
+                               type="date"
+                               className="classic-erp-input mill-rec-in bg-white font-mono"
+                               value={receiveDate}
+                               onChange={(e) => setReceiveDate(e.target.value)}
+                               onKeyDown={(e) => {
+                                  if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  document.getElementById('mill-rec-party')?.focus();
+                               }}
+                            />
 
-                           <div className="mill-rec-addr" style={{ gridArea: 'addr' }}>{partyAddress}</div>
-                           <span className="mill-rec-lab" style={{ gridArea: 'rlab' }}>R.ConDt</span>
-                           <input
-                              data-enter-order="4"
-                              style={{ gridArea: 'rcon' }}
-                              type="text"
-                              className="classic-erp-input mill-rec-in bg-white text-center"
-                              value={rConDt}
-                              onChange={(e) => setRConDt(e.target.value)}
-                              placeholder="/  /"
-                           />
-                           <span className="mill-rec-lab" style={{ gridArea: 'datelab' }}>Date</span>
-                           <input
-                              id="mill-rec-date"
-                              data-enter-order="2"
-                              data-enter-nav="off"
-                              style={{ gridArea: 'date' }}
-                              type="date"
-                              className="classic-erp-input mill-rec-in bg-white font-mono"
-                              value={receiveDate}
-                              onChange={(e) => setReceiveDate(e.target.value)}
-                              onKeyDown={(e) => {
-                                 if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey) return;
-                                 e.preventDefault();
-                                 e.stopPropagation();
-                                 document.getElementById('mill-rec-party')?.focus();
-                              }}
-                           />
+                            <span className="mill-rec-lab" style={{ gridArea: 'revlab' }}>Reverse Charge</span>
+                            <select
+                               data-enter-order="6"
+                               style={{ gridArea: 'rev' }}
+                               className="classic-erp-select mill-rec-in bg-white"
+                               value={reverseCharge}
+                               onChange={(e) => setReverseCharge(e.target.value)}
+                            >
+                               <option value="No">No</option>
+                               <option value="Yes">Yes</option>
+                            </select>
 
-                           <span className="mill-rec-lab" style={{ gridArea: 'blab' }}>Bill/Gp No</span>
-                           <input
-                              id="mill-rec-billgp"
-                              data-enter-order="5"
-                              style={{ gridArea: 'bill' }}
-                              type="text"
-                              className="classic-erp-input mill-rec-in bg-white"
-                              value={billGpNo}
-                              onChange={(e) => setBillGpNo(e.target.value)}
-                              onKeyDown={(e) => {
-                                 if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    openLotLookup(lines.length - 1 >= 0 ? lines.length - 1 : 0);
-                                 }
-                              }}
-                           />
-                           <button
-                              type="button"
-                              style={{ gridArea: 'altl' }}
-                              onClick={() => openLotLookup(lines.length - 1 >= 0 ? lines.length - 1 : 0)}
-                              className="mill-rec-altl cursor-pointer hover:opacity-90 active:scale-[0.99] transition-all text-center border-none"
-                              title="Press Alt+L or Click to open Lot No lookup"
-                           >
-                              Press (ALT+L) To LotNo Entry
-                           </button>
-                           <span className="mill-rec-lab" style={{ gridArea: 'revlab' }}>Reverse Charge</span>
-                           <select
-                              data-enter-order="6"
-                              style={{ gridArea: 'rev' }}
-                              className="classic-erp-select mill-rec-in bg-white"
-                              value={reverseCharge}
-                              onChange={(e) => setReverseCharge(e.target.value)}
-                           >
-                              <option value="No">No</option>
-                              <option value="Yes">Yes</option>
-                           </select>
-                           <span className="mill-rec-lab" style={{ gridArea: 'b2lab' }}>2A BillNo</span>
-                           <input
-                              data-enter-order="7"
-                              style={{ gridArea: 'b2' }}
-                              type="text"
-                              className="classic-erp-input mill-rec-in bg-white"
-                              value={bill2A}
-                              onChange={(e) => setBill2A(e.target.value)}
-                           />
+                            <span className="mill-rec-lab" style={{ gridArea: 'blab' }}>Bill/Gp No</span>
+                            <div style={{ gridArea: 'bill', display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, position: 'relative' }}>
+                               <input
+                                  id="mill-rec-billgp"
+                                  data-enter-order="5"
+                                  type="text"
+                                  className={`classic-erp-input mill-rec-in flex-1 min-w-0 ${duplicateBillInfo ? '!bg-red-50 !border-red-600 !text-red-900 font-bold ring-1 ring-red-500' : 'bg-white'}`}
+                                  value={billGpNo}
+                                  onChange={(e) => setBillGpNo(e.target.value)}
+                                  onBlur={() => {
+                                     if (duplicateBillInfo) {
+                                        notifyWarning(`DUPLICATE: Bill/GP No "${billGpNo.trim()}" is already used in Receipt #${duplicateBillInfo.serialNo || ''} (${duplicateBillInfo.partyName}). Duplicate save is not allowed.`);
+                                     }
+                                  }}
+                                  onKeyDown={(e) => {
+                                     if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+                                        if (duplicateBillInfo) {
+                                           notifyWarning(`DUPLICATE: Bill/GP No "${billGpNo.trim()}" is already used in Receipt #${duplicateBillInfo.serialNo || ''}. Duplicate save is not allowed.`);
+                                        }
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        openLotLookup(lines.length - 1 >= 0 ? lines.length - 1 : 0);
+                                     }
+                                  }}
+                               />
+                               {duplicateBillInfo && (
+                                  <span
+                                     className="bg-red-600 text-white font-black text-[9px] px-1.5 py-0.5 rounded shadow animate-pulse shrink-0 whitespace-nowrap cursor-help"
+                                     title={`Duplicate Bill/GP No! Already saved in Receipt #${duplicateBillInfo.serialNo || ''} on ${duplicateBillInfo.date}`}
+                                  >
+                                     DUPLICATE
+                                  </span>
+                               )}
+                            </div>
 
-                           <span className="mill-rec-lab" style={{ gridArea: 'hsnlab' }}>HSN CD</span>
-                           <input
-                              data-enter-order="8"
-                              style={{ gridArea: 'hsn' }}
-                              type="text"
-                              className="classic-erp-input mill-rec-in bg-white"
-                              value={hsnCd}
-                              onChange={(e) => setHsnCd(e.target.value)}
-                           />
-                           <div style={{ gridArea: 'type' }} className="flex items-center gap-1 min-w-0">
-                              <span className="mill-rec-lab shrink-0">TYPE</span>
-                              <select
-                                 data-enter-order="9"
-                                 className="classic-erp-select mill-rec-in bg-white flex-1 min-w-0"
-                                 value={billType}
-                                 onChange={(e) => setBillType(e.target.value)}
-                              >
-                                 <option value="Process">Process</option>
-                                 <option value="Other">Other</option>
-                              </select>
-                           </div>
-                        </div>
+                            <span
+                               style={{ gridArea: 'altllab' }}
+                               onClick={() => openLotLookup(lines.length - 1 >= 0 ? lines.length - 1 : 0)}
+                               className="mill-rec-altl-label"
+                               title="Press Alt+L or Click to open Lot No lookup"
+                            >
+                               Press (ALT+L) To LotNo Entry
+                            </span>
+                            <input
+                               style={{ gridArea: 'altlin' }}
+                               type="text"
+                               className="classic-erp-input mill-rec-in bg-white cursor-pointer font-bold"
+                               onClick={() => openLotLookup(lines.length - 1 >= 0 ? lines.length - 1 : 0)}
+                               placeholder=""
+                               readOnly
+                               onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || (e.altKey && (e.key === 'l' || e.key === 'L'))) {
+                                     e.preventDefault();
+                                     openLotLookup(lines.length - 1 >= 0 ? lines.length - 1 : 0);
+                                  }
+                               }}
+                            />
+
+                            <span className="mill-rec-lab" style={{ gridArea: 'hsnlab' }}>HSN CD</span>
+                            <input
+                               data-enter-order="8"
+                               style={{ gridArea: 'hsn' }}
+                               type="text"
+                               className="classic-erp-input mill-rec-in bg-white"
+                               value={hsnCd}
+                               onChange={(e) => setHsnCd(e.target.value)}
+                            />
+
+                            <span className="mill-rec-lab" style={{ gridArea: 'typelab' }}>TYPE</span>
+                            <select
+                               data-enter-order="9"
+                               style={{ gridArea: 'type' }}
+                               className="classic-erp-select mill-rec-in bg-white w-full"
+                               value={billType}
+                               onChange={(e) => setBillType(e.target.value)}
+                            >
+                               <option value="BILL OF SUPPLY (OUT OF STATE)">BILL OF SUPPLY (OUT OF STATE)</option>
+                               <option value="TAX INVOICE (IN STATE)">TAX INVOICE (IN STATE)</option>
+                               <option value="TAX INVOICE (OUT OF STATE)">TAX INVOICE (OUT OF STATE)</option>
+                               <option value="BILL OF SUPPLY (IN STATE)">BILL OF SUPPLY (IN STATE)</option>
+                               <option value="Process">Process</option>
+                               <option value="Other">Other</option>
+                            </select>
+                         </div>
 
                         {/* 2. TRANSACTION GRID TABLE (multi-row — one line per challan) */}
-                        <div className="mill-receive-scroll border border-[#808080] bg-white min-h-[100px] max-h-[180px]">
+                        <div className="mill-receive-scroll border border-[#808080] bg-white min-h-[120px] max-h-[190px] overflow-auto">
                            <table className="mill-receive-grid w-full text-[10px] font-mono border-collapse" data-line-grid>
                               <thead>
-                                 <tr className="bg-[#e2e8f0] text-slate-800 border-b border-[#808080] text-[10px]">
-                                    <th className="border-r border-[#808080] p-1 w-10 text-center">SrNo</th>
-                                    <th className="border-r border-[#808080] p-1 w-32 text-left">LotNo</th>
-                                    <th className="border-r border-[#808080] p-1 w-28 text-left">Chln No</th>
-                                    <th className="border-r border-[#808080] p-1 w-48 text-left">ItemName</th>
-                                    <th className="border-r border-[#808080] p-1 w-20 text-right">G.Pcs</th>
-                                    <th className="border-r border-[#808080] p-1 w-24 text-right">Grey.Mts</th>
-                                    <th className="border-r border-[#808080] p-1 w-24 text-right">Finish.Mts</th>
-                                    <th className="border-r border-[#808080] p-1 w-24 text-right">Final.Mts</th>
-                                    <th className="border-r border-[#808080] p-1 w-20 text-right">Shtg%</th>
-                                    <th className="border-r border-[#808080] p-1 w-20 text-right" title="Process Gain / Chadti Mts (_col_s_chadti)">Chadti</th>
-                                    <th className="border-r border-[#808080] p-1 w-24 text-right">Job.Rate</th>
-                                    <th className="border-r border-[#808080] p-1 w-28 text-right">Job Amount</th>
-                                    <th className="border-r border-[#808080] p-1 w-16 text-center">CP</th>
-                                    <th className="border-r border-[#808080] p-1 w-16 text-center">Tp</th>
-                                    <th className="border-r border-[#808080] p-1 w-40 text-left">Finish Item</th>
-                                    <th className="border-r border-[#808080] p-1 w-16 text-center">Cut</th>
-                                    <th className="border-r border-[#808080] p-1 w-20 text-right">F.Pcs</th>
-                                    <th className="border-r border-[#808080] p-1 w-28 text-left">Proc Type</th>
-                                    <th className="border-r border-[#808080] p-1 w-28 text-left">Cutting Pending</th>
-                                    <th className="border-r border-[#808080] p-1 w-20 text-right">Pending</th>
-                                    <th className="border-r border-[#808080] p-1 w-14 text-center">Final?</th>
-                                    <th className="p-1 w-8" />
+                                 <tr className="bg-[#e2e8f0] text-slate-900 border-b border-[#808080] text-[10px]">
+                                    <th className="border-r border-[#808080] p-1 w-8 text-center">SrNo</th>
+                                    <th className="border-r border-[#808080] p-1 text-left w-16">LotNo</th>
+                                    <th className="border-r border-[#808080] p-1 text-left w-16">Chln No</th>
+                                    <th className="border-r border-[#808080] p-1 text-left min-w-[120px]">ItemName</th>
+                                    {showKgsCols && <th className="border-r border-[#808080] p-1 text-right w-12">PerKgs</th>}
+                                    <th className="border-r border-[#808080] p-1 text-right w-12">G.Pcs</th>
+                                    <th className="border-r border-[#808080] p-1 text-right w-16">Grey.Mts</th>
+                                    {showKgsCols && <th className="border-r border-[#808080] p-1 text-right w-16">Gry.Kgs</th>}
+                                    {showKgsCols && <th className="border-r border-[#808080] p-1 text-right w-16">Rec.Kgs</th>}
+                                    {showKgsCols && <th className="border-r border-[#808080] p-1 text-right w-14">Shtg.Kgs.</th>}
+                                    <th className="border-r border-[#808080] p-1 text-right w-16">Finish.Mts</th>
+                                    <th className="border-r border-[#808080] p-1 text-right w-16">Final.Mts</th>
+                                    <th className="border-r border-[#808080] p-1 text-right w-12">Shtg%</th>
+                                    <th className="border-r border-[#808080] p-1 text-right w-14">Job.Rate</th>
+                                    {showKgsCols && <th className="border-r border-[#808080] p-1 text-center w-12" title="Job amount on: Q Finish Mts, P Pcs, K Rec Kgs, G Grey Kgs, F Final Mts">P/Q/K</th>}
+                                    <th className="border-r border-[#808080] p-1 text-right w-20">Job Amount</th>
+                                    <th className="border-r border-[#808080] p-1 text-center w-8">CP</th>
+                                    <th className="border-r border-[#808080] p-1 text-center w-8">Tp</th>
+                                    <th className="border-r border-[#808080] p-1 text-left min-w-[100px]">Finish Item</th>
+                                    <th className="border-r border-[#808080] p-1 text-center w-12">Cut</th>
+                                    <th className="border-r border-[#808080] p-1 text-right w-12">F.Pcs</th>
+                                    {showKgsCols && <th className="border-r border-[#808080] p-1 text-left w-16">ProcType</th>}
+                                    {showKgsCols && <th className="border-r border-[#808080] p-1 text-left w-20">Cutting Pending</th>}
+                                    {showKgsCols && <th className="border-r border-[#808080] p-1 text-left w-20">Description1</th>}
+                                    {showKgsCols && <th className="border-r border-[#808080] p-1 text-left w-20">Description2</th>}
+                                    <th className="p-0.5 w-6 text-center" title="Delete"></th>
                                  </tr>
                               </thead>
                               <tbody>
                                  {linesWithAmt.map((line, idx) => (
                                     <tr
                                        key={line.id}
-                                       className="border-b border-slate-200 hover:bg-slate-50"
+                                       className={`border-b border-slate-200 hover:bg-slate-50 ${selectedRowIdx === idx ? 'bg-blue-50/60' : ''}`}
+                                       onClick={() => setSelectedRowIdx(idx)}
                                        onKeyDown={(e) => {
                                           const isPlainDelete = e.key === 'Delete' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey;
                                           const isShortcutDelete =
@@ -1504,17 +1644,11 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                           }
                                        }}
                                     >
-                                       <td className="border-r border-slate-300 p-0.5">
-                                          <input
-                                             id={idx === 0 ? 'grid-srno-0' : undefined}
-                                             type="text"
-                                             data-enter-include=""
-                                             data-line-start
-                                             className="w-full h-6 px-1 border-none bg-slate-100 text-center font-bold"
-                                             value={idx + 1}
-                                             readOnly
-                                             title="SrNo — Enter moves to the next column"
-                                          />
+                                       <td className="border-r border-slate-300 p-0.5 relative text-center font-bold">
+                                          <div className="flex items-center justify-between px-0.5">
+                                             <span className="text-[9px] text-slate-700">{selectedRowIdx === idx ? '▶' : ''}</span>
+                                             <span>{idx + 1}</span>
+                                          </div>
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
@@ -1522,7 +1656,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                              type="text"
                                              data-enter-include=""
                                              data-enter-nav="off"
-                                             className="w-full h-6 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 bg-slate-100 text-slate-800 font-mono cursor-pointer font-bold"
+                                             className="w-full h-6 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 bg-transparent text-slate-900 font-mono cursor-pointer font-bold"
                                              value={line.lotNo}
                                              readOnly
                                              placeholder="Press Enter..."
@@ -1539,48 +1673,38 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
-                                             id={`grid-chln-no-${idx}`}
+                                             id={`grid-chln-${idx}`}
                                              type="text"
-                                             className="w-full h-6 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 bg-sky-100 font-mono cursor-pointer"
+                                             className="w-full h-6 px-1 border-none bg-transparent"
                                              value={line.chlnNo}
+                                             placeholder="Chln…"
                                              onChange={(e) => setLineField(idx, 'chlnNo', e.target.value)}
-                                             onClick={() => openLotLookup(idx)}
-                                             onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
-                                                   handleChlnNoEnter(e, idx);
-                                                }
-                                             }}
-                                             placeholder="Press Enter or Click..."
+                                             onKeyDown={(e) => handleChallanKeyDown(e, idx)}
                                           />
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
                                              id={`grid-item-${idx}`}
                                              type="text"
-                                             data-enter-include=""
-                                             className="w-full h-6 px-1 border border-transparent hover:border-slate-300 focus:border-blue-500 bg-white text-slate-800 font-medium"
+                                             className="w-full h-6 px-1 border-none bg-transparent uppercase font-semibold"
                                              value={line.itemName}
                                              onChange={(e) => setLineField(idx, 'itemName', e.target.value)}
-                                             placeholder="Item Name"
-                                             title="Item Name — Press Enter to move to G.Pcs"
-                                             onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
-                                                   e.preventDefault();
-                                                   e.stopPropagation();
-                                                   const next = document.getElementById(`grid-gpcs-${idx}`);
-                                                   if (next) {
-                                                      next.focus();
-                                                      try { next.select(); } catch {}
-                                                   }
-                                                }
-                                             }}
                                           />
                                        </td>
+                                       {showKgsCols && (
+                                          <td className="border-r border-slate-300 p-0.5">
+                                             <input
+                                                type="number"
+                                                className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                                value={line.perKgs}
+                                                onChange={(e) => setLineField(idx, 'perKgs', e.target.value)}
+                                             />
+                                          </td>
+                                       )}
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
-                                             id={`grid-gpcs-${idx}`}
                                              type="number"
-                                             className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent font-medium"
                                              value={line.gPcs}
                                              onChange={(e) => setLineField(idx, 'gPcs', e.target.value)}
                                           />
@@ -1588,16 +1712,47 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
                                              type="number"
-                                             className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent font-medium"
                                              value={line.greyMts}
                                              onChange={(e) => setLineField(idx, 'greyMts', e.target.value)}
                                           />
                                        </td>
+                                       {showKgsCols && (
+                                          <td className="border-r border-slate-300 p-0.5">
+                                             <input
+                                                type="number"
+                                                className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                                value={line.greyKgs}
+                                                onChange={(e) => setLineField(idx, 'greyKgs', e.target.value)}
+                                             />
+                                          </td>
+                                       )}
+                                       {showKgsCols && (
+                                          <td className="border-r border-slate-300 p-0.5">
+                                             <input
+                                                type="number"
+                                                className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                                value={line.recKgs}
+                                                onChange={(e) => setLineField(idx, 'recKgs', e.target.value)}
+                                             />
+                                          </td>
+                                       )}
+                                       {showKgsCols && (
+                                          <td className="border-r border-slate-300 p-0.5">
+                                             <input
+                                                type="text"
+                                                data-enter-include=""
+                                                className="w-full h-6 px-1 border-none text-right bg-slate-100"
+                                                value={lineShtgKgs(line)}
+                                                readOnly
+                                             />
+                                          </td>
+                                       )}
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
                                              id={`grid-finish-mts-${idx}`}
                                              type="number"
-                                             className="w-full h-6 px-1 border-none text-right bg-transparent"
+                                             className="w-full h-6 px-1 border-none text-right bg-transparent font-medium"
                                              value={line.finishMts}
                                              onChange={(e) => setLineField(idx, 'finishMts', e.target.value)}
                                           />
@@ -1621,22 +1776,24 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                        </td>
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
-                                             type="text"
-                                             data-enter-include=""
-                                             className="w-full h-6 px-1 border-none text-right bg-slate-100 font-mono text-emerald-800 font-bold"
-                                             value={lineChadtiMts(line)}
-                                             readOnly
-                                             title="Process Gain / Chadti Mts (_col_s_chadti)"
-                                          />
-                                       </td>
-                                       <td className="border-r border-slate-300 p-0.5">
-                                          <input
                                              type="number"
                                              className="w-full h-6 px-1 border-none text-right bg-transparent font-bold"
                                              value={line.jobRate}
                                              onChange={(e) => setLineField(idx, 'jobRate', e.target.value)}
                                           />
                                        </td>
+                                       {showKgsCols && (
+                                          <td className="border-r border-slate-300 p-0.5">
+                                             <select
+                                                className="w-full h-6 px-0.5 border-none bg-transparent text-[10px] font-bold text-center"
+                                                value={line.unitPQ || 'Q'}
+                                                onChange={(e) => setLineField(idx, 'unitPQ', e.target.value)}
+                                                title="Job amount on: Q Finish Mts, P Pcs, K Rec Kgs, G Grey Kgs, F Final Mts"
+                                             >
+                                                {UNIT_PQ.map(([v, label]) => <option key={v} value={v} title={label}>{v}</option>)}
+                                             </select>
+                                          </td>
+                                       )}
                                        <td className="border-r border-slate-300 p-0.5">
                                           <input
                                              type="text"
@@ -1691,37 +1848,50 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                              onChange={(e) => handleFPcsChange(idx, e.target.value)}
                                           />
                                        </td>
-                                       <td className="border-r border-slate-300 p-0.5">
-                                          <select
-                                             className="w-full h-6 px-1 border-none bg-transparent text-[10px] focus:outline-none"
-                                             value={line.procType}
-                                             onChange={(e) => setLineField(idx, 'procType', e.target.value)}
-                                          >
-                                             <option value="">- Select -</option>
-                                             <option value="Finish">Finish</option>
-                                             <option value="Refinish">Refinish</option>
-                                             <option value="Return">Return</option>
-                                          </select>
-                                       </td>
-                                       <td className="border-r border-slate-300 p-0.5">
-                                          <input
-                                             type="text"
-                                             className="w-full h-6 px-1 border-none bg-transparent"
-                                             value={line.cuttingPending}
-                                             onChange={(e) => setLineField(idx, 'cuttingPending', e.target.value)}
-                                          />
-                                       </td>
-                                       <td className="border-r border-slate-300 p-0.5 text-right bg-slate-100 text-slate-600" title="Still pending on this challan before this line">
-                                          {line.jobId ? Number(line.pendingQty || 0).toFixed(2) : ''}
-                                       </td>
-                                       <td className="border-r border-slate-300 p-0.5 text-center">
-                                          <input
-                                             type="checkbox"
-                                             checked={line.isFinal !== false}
-                                             onChange={(e) => setLineField(idx, 'isFinal', e.target.checked)}
-                                             title="Checked: this closes the job (any shortfall books as wastage). Unchecked: more is still expected — job stays Partial."
-                                          />
-                                       </td>
+                                       {showKgsCols && (
+                                          <td className="border-r border-slate-300 p-0.5">
+                                             <select
+                                                className="w-full h-6 px-1 border-none bg-transparent text-[10px] focus:outline-none"
+                                                value={line.procType}
+                                                onChange={(e) => setLineField(idx, 'procType', e.target.value)}
+                                             >
+                                                <option value="">- Select -</option>
+                                                <option value="Finish">Finish</option>
+                                                <option value="Refinish">Refinish</option>
+                                                <option value="Return">Return</option>
+                                             </select>
+                                          </td>
+                                       )}
+                                       {showKgsCols && (
+                                          <td className="border-r border-slate-300 p-0.5">
+                                             <input
+                                                type="text"
+                                                className="w-full h-6 px-1 border-none bg-transparent"
+                                                value={line.cuttingPending}
+                                                onChange={(e) => setLineField(idx, 'cuttingPending', e.target.value)}
+                                             />
+                                          </td>
+                                       )}
+                                       {showKgsCols && (
+                                          <td className="border-r border-slate-300 p-0.5">
+                                             <input
+                                                type="text"
+                                                className="w-full h-6 px-1 border-none bg-transparent"
+                                                value={line.desc1}
+                                                onChange={(e) => setLineField(idx, 'desc1', e.target.value)}
+                                             />
+                                          </td>
+                                       )}
+                                       {showKgsCols && (
+                                          <td className="border-r border-slate-300 p-0.5">
+                                             <input
+                                                type="text"
+                                                className="w-full h-6 px-1 border-none bg-transparent"
+                                                value={line.desc2}
+                                                onChange={(e) => setLineField(idx, 'desc2', e.target.value)}
+                                             />
+                                          </td>
+                                       )}
                                        <td className="p-0.5 text-center">
                                           <button
                                              type="button"
@@ -1730,42 +1900,50 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                              onClick={() => removeLine(idx)}
                                              title="Delete this line (Delete key)"
                                           >
-                                             <Trash2 size={12} />
+                                             <Trash2 size={11} />
                                           </button>
                                        </td>
                                     </tr>
                                  ))}
+                                 {/* Star blank row (classic WinForms DataGridView new row) */}
+                                 <tr className="border-b border-slate-200 bg-white opacity-70 hover:opacity-100 cursor-pointer" onClick={addLine}>
+                                    <td className="border-r border-slate-300 p-0.5 text-center font-bold text-slate-700">*</td>
+                                    <td colSpan={showKgsCols ? 25 : 16} className="p-0.5 text-[9px] text-slate-400 italic">
+                                       Click or press Enter on last field to add new line
+                                    </td>
+                                 </tr>
                               </tbody>
                            </table>
                         </div>
 
-                        <div className="flex justify-start">
+                        {/* Minimal toolbar toggle for Kgs columns if user wants them */}
+                        <div className="flex justify-between items-center text-[10px] px-1">
                            <button
                               type="button"
-                              className="px-3 py-1 text-[10px] font-bold border border-slate-400 bg-[#e2e8f0] active:bg-[#cbd5e1] flex items-center gap-1"
-                              data-add-line
-                              onClick={addLine}
+                              className="text-slate-600 hover:text-slate-900 underline font-semibold cursor-pointer"
+                              onClick={() => setShowKgsCols(!showKgsCols)}
                            >
-                              <Plus size={11} /> Add Line
+                              {showKgsCols ? '← Switch to Standard View (Hide Kgs Columns)' : '+ Show Kgs & Extra Columns'}
                            </button>
                         </div>
 
-                        {/* 3. SUMMARY BAR */}
-                        <div className="bg-[#0f766e] text-white text-[11px] font-bold px-3 py-1 flex justify-between items-center uppercase border border-[#0d6059]">
-                           <div>TOTAL PCS : {gridTotals.fPcs}</div>
-                           <div>Send.Mts : {gridTotals.greyMts.toFixed(2)}</div>
-                           <div>Rec.Mts : {gridTotals.finishMts.toFixed(2)}</div>
-                           <div>FnsPcs : {gridTotals.fPcs}</div>
-                           <div>(Snd.Kgs : 0 &middot; Rec.Kgs : 0)</div>
+                        {/* 3. SUMMARY BAR (Exact JSM Cyan Bar with CostingRate Badge) */}
+                        <div className="bg-[#00e5d3] text-slate-900 text-[11px] font-bold px-2 py-1 flex justify-between items-center uppercase border border-[#00c4b4] tracking-tight">
+                           <div className="bg-black text-white px-2 py-0.5 text-[11px] font-bold tracking-wider">
+                              CostingRate : {costingRate}
+                           </div>
+                           <div className="tracking-tight font-extrabold text-[11px] text-slate-900">
+                              TOTAL PCS : {gridTotals.gPcs || gridTotals.fPcs} &nbsp; / &nbsp; Send.Mts : {Number(gridTotals.greyMts).toFixed(0)} Rec.Mts : {Number(gridTotals.finishMts).toFixed(0)} FnsPcs: {Number(gridTotals.fPcs).toFixed(0)} / (Snd.Kgs : {Number(gridTotals.greyKgs).toFixed(0)} Rec.Kgs : {Number(gridTotals.recKgs).toFixed(0)})
+                           </div>
                         </div>
 
                         {/* 4. FOOTER MULTI-COLUMN ADJUSTMENTS */}
-                        <div className="mill-rec-foot grid grid-cols-12 gap-1 text-[11px] px-1 py-1 border border-[#808080] bg-[#d4d0c8]" data-enter-footer>
+                        <div className="mill-rec-foot grid grid-cols-12 gap-1 text-[11px] p-1.5 border border-[#808080] bg-[#d4d0c8]" data-enter-footer>
 
                            {/* Column 1: Adjustments */}
                            <div className="col-span-3 space-y-1.5 border-r border-[#a0a0a0] pr-2">
                               <div className="flex items-center gap-1">
-                                 <span className="w-20 text-slate-800 font-semibold text-right">Less:</span>
+                                 <span className="w-16 text-slate-800 font-semibold text-right">Less</span>
                                  <input
                                     type="number"
                                     className="classic-erp-input w-12 text-center bg-white"
@@ -1774,13 +1952,13 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                  />
                                  <input
                                     type="number"
-                                    className="classic-erp-input flex-1 text-right bg-white"
+                                    className="classic-erp-input flex-1 text-right bg-white font-bold"
                                     value={lessAmt}
                                     onChange={(e) => setLessAmt(e.target.value)}
                                  />
                               </div>
                               <div className="flex items-center gap-1">
-                                 <span className="w-20 text-slate-800 font-semibold text-right">Other Less:</span>
+                                 <span className="w-16 text-slate-800 font-semibold text-right">Other Less</span>
                                  <input
                                     type="number"
                                     className="classic-erp-input w-12 text-center bg-white"
@@ -1789,13 +1967,13 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                  />
                                  <input
                                     type="number"
-                                    className="classic-erp-input flex-1 text-right bg-white"
+                                    className="classic-erp-input flex-1 text-right bg-white font-bold"
                                     value={otherLessAmt}
                                     onChange={(e) => setOtherLessAmt(e.target.value)}
                                  />
                               </div>
                               <div className="flex items-center gap-1">
-                                 <span className="w-20 text-slate-800 font-semibold text-right">Other Add:</span>
+                                 <span className="w-16 text-slate-800 font-semibold text-right">Other Add</span>
                                  <input
                                     type="number"
                                     className="classic-erp-input w-12 text-center bg-white"
@@ -1804,25 +1982,52 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                  />
                                  <input
                                     type="number"
-                                    className="classic-erp-input flex-1 text-right bg-white"
+                                    className="classic-erp-input flex-1 text-right bg-white font-bold"
                                     value={otherAddAmt}
                                     onChange={(e) => setOtherAddAmt(e.target.value)}
                                  />
                               </div>
-                              <div className="flex items-center gap-1 pt-1 border-t border-slate-300">
-                                 <span className="w-20 text-slate-800 font-semibold text-right">Remark:</span>
+                           </div>
+
+                           {/* Column 2: TDS Details & Due Days */}
+                           <div className="col-span-3 space-y-1.5 border-r border-[#a0a0a0] px-2">
+                              <div className="flex items-center gap-1">
+                                 <span className="w-24 text-slate-800 font-semibold text-right">On Tds Amount</span>
                                  <input
-                                    type="text"
-                                    className="classic-erp-input flex-1 bg-white"
-                                    value={remark}
-                                    onChange={(e) => setRemark(e.target.value)}
+                                    type="number"
+                                    className="classic-erp-input flex-1 text-right bg-white font-bold"
+                                    value={onTdsAmt}
+                                    onChange={(e) => setOnTdsAmt(e.target.value)}
                                  />
                               </div>
                               <div className="flex items-center gap-1">
-                                 <span className="w-20 text-slate-800 font-semibold text-right" title="Credit / Due Days (_txt_ddays)">Due Days:</span>
+                                 <span className="w-24 text-slate-800 font-semibold text-right">T.d.s.</span>
+                                 <input
+                                    type="text"
+                                    className="classic-erp-input w-14 text-center bg-white font-mono"
+                                    value={tdsPercent}
+                                    placeholder="0.0000"
+                                    onChange={(e) => setTdsPercent(e.target.value)}
+                                 />
                                  <input
                                     type="number"
-                                    className="classic-erp-input w-12 text-center bg-white font-bold"
+                                    className="classic-erp-input flex-1 text-right bg-white font-bold"
+                                    value={tdsAmt}
+                                    onChange={(e) => setTdsAmt(e.target.value)}
+                                 />
+                                 <button
+                                    type="button"
+                                    className="px-1.5 py-0.5 border border-slate-400 bg-slate-100 active:bg-slate-300 font-bold rounded"
+                                    onClick={() => setTdsAmt('0.00')}
+                                 >
+                                    C
+                                 </button>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                 <span className="w-24 text-slate-800 font-semibold text-right" title="Credit / Due Days (_txt_ddays)">Due Days</span>
+                                 <input
+                                    type="number"
+                                    className="classic-erp-input w-10 text-center bg-white font-bold"
                                     value={dueDays}
                                     onChange={(e) => {
                                        const d = parseInt(e.target.value, 10);
@@ -1845,54 +2050,14 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                               </div>
                            </div>
 
-                           {/* Column 2: TDS Details */}
-                           <div className="col-span-2 space-y-1.5 border-r border-[#a0a0a0] px-2">
-                              <div className="flex items-center gap-1">
-                                 <span className="w-24 text-slate-800 font-semibold text-right">On Tds Amount:</span>
-                                 <input
-                                    type="number"
-                                    className="classic-erp-input flex-1 text-right bg-white"
-                                    value={onTdsAmt}
-                                    onChange={(e) => setOnTdsAmt(e.target.value)}
-                                 />
+                           {/* Column 3: GST Details (Warm Cream Beige GroupBox) */}
+                           <div className="mill-rec-gstbox col-span-3 space-y-1">
+                              <div className="flex justify-between items-center text-[11px] font-bold px-1">
+                                 <span className="text-slate-800">TaxableAmt</span>
+                                 <span className="font-mono text-slate-900 font-extrabold pr-1">{Number(effectiveGstBase).toFixed(0)}</span>
                               </div>
                               <div className="flex items-center gap-1">
-                                 <span className="w-24 text-slate-800 font-semibold text-right">T.d.s.:</span>
-                                 <input
-                                    type="number"
-                                    className="classic-erp-input w-10 text-center bg-white"
-                                    value={tdsPercent}
-                                    onChange={(e) => setTdsPercent(e.target.value)}
-                                 />
-                                 <input
-                                    type="number"
-                                    className="classic-erp-input flex-1 text-right bg-white"
-                                    value={tdsAmt}
-                                    onChange={(e) => setTdsAmt(e.target.value)}
-                                 />
-                                 <button
-                                    type="button"
-                                    className="px-1.5 py-0.5 border border-slate-400 bg-slate-100 active:bg-slate-300 font-bold rounded"
-                                    onClick={() => setTdsAmt('0.00')}
-                                 >
-                                    C
-                                 </button>
-                              </div>
-                           </div>
-
-                           {/* Column 3: GST Details */}
-                           <div className="mill-rec-gstbox col-span-3 space-y-1 border-r border-[#a0a0a0] px-1">
-                              <div className="flex items-center gap-1">
-                                 <span className="w-20 text-slate-800 font-semibold text-right">TaxableAmt:</span>
-                                 <input
-                                    type="text"
-                                    className="classic-erp-input flex-1 text-right bg-slate-100 font-bold"
-                                    value={effectiveGstBase.toFixed(2)}
-                                    disabled
-                                 />
-                              </div>
-                              <div className="flex items-center gap-1">
-                                 <span className="w-16 text-slate-800 font-semibold text-right">SGST %:</span>
+                                 <span className="w-16 text-slate-800 font-semibold text-right">SGST %</span>
                                  <input
                                     type="number"
                                     step="0.01"
@@ -1905,14 +2070,14 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                     }}
                                  />
                                  <input
-                                    type="number"
+                                    type="text"
                                     className="classic-erp-input flex-1 text-right bg-white font-mono font-bold"
                                     value={computedSgstAmt}
                                     disabled
                                  />
                               </div>
                               <div className="flex items-center gap-1">
-                                 <span className="w-16 text-slate-800 font-semibold text-right">CGST %:</span>
+                                 <span className="w-16 text-slate-800 font-semibold text-right">CGST %</span>
                                  <input
                                     type="number"
                                     step="0.01"
@@ -1925,14 +2090,14 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                     }}
                                  />
                                  <input
-                                    type="number"
+                                    type="text"
                                     className="classic-erp-input flex-1 text-right bg-white font-mono font-bold"
                                     value={computedCgstAmt}
                                     disabled
                                  />
                               </div>
                               <div className="flex items-center gap-1">
-                                 <span className="w-16 text-slate-800 font-semibold text-right">IGST %:</span>
+                                 <span className="w-16 text-slate-800 font-semibold text-right">IGST %</span>
                                  <input
                                     type="number"
                                     step="0.01"
@@ -1948,7 +2113,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                     }}
                                  />
                                  <input
-                                    type="number"
+                                    type="text"
                                     className="classic-erp-input flex-1 text-right bg-white font-mono font-bold"
                                     value={computedIgstAmt}
                                     disabled
@@ -1957,9 +2122,9 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                            </div>
 
                            {/* Column 4: Totals Block */}
-                           <div className="col-span-4 space-y-1 pl-2">
+                           <div className="col-span-3 space-y-1 pl-2">
                               <div className="flex items-center gap-1">
-                                 <span className="w-24 text-slate-700 font-semibold text-right">Gross Amt:</span>
+                                 <span className="w-24 text-slate-700 font-semibold text-right">Gross Amt</span>
                                  <input
                                     type="text"
                                     className="classic-erp-input flex-1 text-right bg-slate-100 font-bold"
@@ -1968,26 +2133,26 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                  />
                               </div>
                               <div className="flex items-center gap-1">
-                                 <span className="w-24 text-slate-700 font-semibold text-right">Round Off:</span>
+                                 <span className="w-24 text-slate-700 font-semibold text-right">Round Off</span>
                                  <input
                                     type="text"
-                                    className="classic-erp-input flex-1 text-right mill-rec-round"
+                                    className="classic-erp-input flex-1 text-right bg-slate-100 font-bold"
                                     value={computedRoundOff}
                                     disabled
                                  />
                               </div>
                               <div className="flex items-center gap-1">
-                                 <span className="w-24 text-slate-700 font-semibold text-right text-yellow-800">RCM GST:</span>
+                                 <span className="w-24 text-slate-800 font-semibold text-right text-amber-900">RCM GST</span>
                                  <input
                                     type="text"
-                                    className="classic-erp-input flex-1 text-right bg-amber-50 text-amber-900"
+                                    className="classic-erp-input flex-1 text-right font-bold mill-rec-rcm border border-amber-400"
                                     value={rcmGst}
                                     onChange={(e) => setRcmGst(e.target.value)}
                                     disabled={reverseCharge !== 'Yes'}
                                  />
                               </div>
-                              <div className="flex items-center gap-1 border-t border-slate-300 pt-1">
-                                 <span className="w-24 text-slate-700 font-semibold text-right">Net Amount:</span>
+                              <div className="flex items-center gap-1 border-t border-slate-300 pt-0.5">
+                                 <span className="w-24 text-slate-700 font-semibold text-right">Net Amount</span>
                                  <input
                                     type="text"
                                     className="classic-erp-input flex-1 text-right bg-slate-100 font-bold text-blue-900"
@@ -1996,7 +2161,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                  />
                               </div>
                               <div className="flex items-center gap-1">
-                                 <span className="w-24 text-slate-700 font-semibold text-right">Final Amount:</span>
+                                 <span className="w-24 text-slate-700 font-semibold text-right">Final Amount</span>
                                  <input
                                     type="text"
                                     className="classic-erp-input flex-1 text-right bg-slate-100 font-bold text-red-900"
@@ -2006,6 +2171,22 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                               </div>
                            </div>
 
+                           {/* Spanning Remark across left bottom */}
+                           <div className="col-span-6 flex items-center gap-1 pt-1 border-t border-[#a0a0a0]">
+                              <span className="w-16 text-slate-800 font-semibold text-right">Remark</span>
+                              <input
+                                 type="text"
+                                 className="classic-erp-input flex-1 bg-white"
+                                 value={remark}
+                                 onChange={(e) => setRemark(e.target.value)}
+                              />
+                           </div>
+
+                        </div>
+
+                        {/* Status Label centered under totals */}
+                        <div className="text-blue-700 font-bold text-center text-[12px] py-0.5 tracking-wide">
+                           {mode === 'View' ? (lines[0]?.isFinal ? 'Closed' : 'Pending') : 'Pending'}
                         </div>
 
                         </div>
@@ -2040,15 +2221,25 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                </button>
                                <button type="button" onClick={onClose} className="mill-rec-btn">Cancel</button>
                                <button type="button" onClick={handleOpenFindModal} className="mill-rec-btn" title="Find (F3)">Find</button>
-                               <button type="button" onClick={handleOpenFindModal} className="mill-rec-btn">Sp.Find</button>
+                               <button type="button" onClick={handleOpenFindModal} className="mill-rec-btn">Sp.FInd</button>
                                <button type="button" onClick={() => notifyWarning('Select a record to delete')} className="mill-rec-btn">Delete</button>
                                <button type="button" onClick={onClose} className="mill-rec-btn">Exit</button>
                                <span className="flex-1" />
-                               <button type="button" className="mill-rec-btn" onClick={() => document.getElementById('grid-cp-0')?.focus()} title="Go to CP">CP</button>
+                               <button
+                                  type="button"
+                                  className="mill-rec-btn min-w-[75px]"
+                                  onClick={() => {
+                                     setLines(prev => prev.map(l => ({ ...l, isFinal: true })));
+                                     notifySuccess('Bill marked as Closed / Final');
+                                  }}
+                                  title="Close this bill"
+                               >
+                                  Close Bill
+                               </button>
                                <span className="flex-1" />
                                <button
                                   type="button"
-                                  className="mill-rec-btn"
+                                  className="mill-rec-btn !text-red-600 font-bold"
                                   onClick={() => {
                                      if (onOpenPayment) onOpenPayment(selectedJobPartyId);
                                      else notifyWarning('Open Transaction > Bank Payment / Cash Payment to make payment');
@@ -2059,16 +2250,12 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                <button type="button" onClick={handlePrint} className="mill-rec-btn">Print</button>
                             </div>
                             <div className="mill-rec-nav-row">
-                               <div className="mill-rec-status">
-                                  {mode === 'View'
-                                     ? `Recent #${serialNo || '1'}${billGpNo ? ` (Bill: ${billGpNo})` : ''} · Press + / - to browse · Enter for New Entry`
-                                     : mode === 'Edit'
-                                        ? `Editing #${serialNo || ''}${billGpNo ? ` (Bill: ${billGpNo})` : ''}`
-                                        : `New Entry #${serialNo}`}
+                               <div className="mill-rec-status font-bold uppercase truncate" title={selectedParty?.name || 'Party'}>
+                                  {selectedParty?.name || (mode === 'View' ? (sortedReceivedJobs[0]?.workerId?.name || 'FASK SUPPLIER') : `New Entry #${serialNo}`)}
                                </div>
                                <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt('first')} title="First Receipt">First</button>
-                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(1)} title="Next Receipt (+)">Next (+)</button>
-                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(-1)} title="Previous Receipt (-)">Prv (-)</button>
+                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(1)} title="Next Receipt (+)">Next</button>
+                               <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt(-1)} title="Previous Receipt (-)">PriV</button>
                                <button type="button" className="mill-rec-btn" onClick={() => navigateReceipt('last')} title="Last Receipt">Last</button>
                             </div>
                          </div>
@@ -2153,7 +2340,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                         ref={dropdownRef}
                         tabIndex={0}
                         onKeyDown={handleDropdownKeyDown}
-                        className="w-[580px] bg-[#d4d0c8] border-2 border-white border-r-[#808080] border-b-[#808080] shadow-md flex flex-col font-mono text-[11px] outline-none"
+                        className="w-[780px] max-w-[95vw] bg-[#d4d0c8] border-2 border-white border-r-[#808080] border-b-[#808080] shadow-md flex flex-col font-mono text-[11px] outline-none"
                      >
 
                         {/* Dialog Header */}
@@ -2180,32 +2367,56 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                                        <th className="p-1 border-r border-[#808080]">Challan No</th>
                                        <th className="p-1 border-r border-[#808080]">Lot Number</th>
                                        <th className="p-1 border-r border-[#808080]">Item Name</th>
-                                       <th className="p-1 border-r border-[#808080] text-right">Issued Qty</th>
-                                       <th className="p-1 border-r border-[#808080] text-right">Received So Far</th>
-                                       <th className="p-1 text-right">Pending</th>
+                                       <th className="p-1 border-r border-[#808080] text-right">Issued (Mts / Pcs)</th>
+                                       <th className="p-1 border-r border-[#808080] text-right">Received (Mts / Pcs)</th>
+                                       <th className="p-1 text-right">Pending Balance (Mts / Pcs)</th>
                                     </tr>
                                  </thead>
                                  <tbody>
                                     {associatedLots.length > 0 ? (
-                                       associatedLots.map((job, i) => (
-                                          <tr
-                                             key={job._id}
-                                             id={`lot-item-row-${i}`}
-                                             onClick={() => {
-                                                if (lookupTargetIdx != null) handleSelectLot(job, lookupTargetIdx, { focusField: `grid-item-${lookupTargetIdx}` });
-                                                setShowLotDropdown(false);
-                                             }}
-                                             onMouseEnter={() => setDropdownSelectIdx(i)}
-                                             className={`border-b border-slate-200 cursor-pointer ${i === dropdownSelectIdx ? 'bg-blue-600 text-white font-bold' : 'hover:bg-sky-100 text-slate-900'}`}
-                                          >
-                                             <td className={`p-1.5 border-r border-slate-200 font-bold ${i === dropdownSelectIdx ? 'text-white' : 'text-blue-900'}`}>{job.challanNo || job.jobCardNo}</td>
-                                             <td className="p-1.5 border-r border-slate-200">{job.lotId?.lotId || job.lotId || 'N/A'}</td>
-                                             <td className="p-1.5 border-r border-slate-200 uppercase font-sans">{job.lotId?.itemId?.name || job.lotId?.itemName || 'N/A'}</td>
-                                             <td className="p-1.5 border-r border-slate-200 text-right">{job.issueQty} Mts</td>
-                                             <td className="p-1.5 border-r border-slate-200 text-right">{Number(job.receivedQty || 0)} Mts</td>
-                                             <td className="p-1.5 text-right font-bold">{jobPending(job).qty.toFixed(2)} Mts</td>
-                                          </tr>
-                                       ))
+                                       associatedLots.map((job, i) => {
+                                          const pending = jobPending(job);
+                                          const recQty = Number(job.receivedGreyQty ?? job.receivedQty ?? 0);
+                                          const recPcs = Number(job.receivedGreyPcs ?? job.receivedPcs ?? 0);
+                                          const isPartialRec = recQty > 0 || recPcs > 0;
+                                          return (
+                                             <tr
+                                                key={job._id}
+                                                id={`lot-item-row-${i}`}
+                                                onClick={() => handleChallanPick(job)}
+                                                onMouseEnter={() => {
+                                                   setDropdownSelectIdx(i);
+                                                   dropdownSelectIdxRef.current = i;
+                                                }}
+                                                className={`border-b border-slate-200 cursor-pointer ${i === dropdownSelectIdx ? 'bg-blue-600 text-white font-bold' : 'hover:bg-sky-100 text-slate-900'}`}
+                                             >
+                                                <td className={`p-1.5 border-r border-slate-200 font-bold ${i === dropdownSelectIdx ? 'text-white' : 'text-blue-900'}`}>
+                                                   <div className="flex items-center gap-1">
+                                                      <span>{job.challanNo || job.jobCardNo}</span>
+                                                      {isPartialRec && (
+                                                         <span className={`px-1 py-0.2 text-[9px] rounded font-bold uppercase ${i === dropdownSelectIdx ? 'bg-amber-300 text-amber-950' : 'bg-amber-100 text-amber-800 border border-amber-300'}`}>
+                                                            Partial
+                                                         </span>
+                                                      )}
+                                                   </div>
+                                                </td>
+                                                <td className="p-1.5 border-r border-slate-200">{job.lotId?.lotId || job.lotId || 'N/A'}</td>
+                                                <td className="p-1.5 border-r border-slate-200 uppercase font-sans">{job.lotId?.itemId?.name || job.lotId?.itemName || job.itemName || 'N/A'}</td>
+                                                <td className="p-1.5 border-r border-slate-200 text-right font-mono">
+                                                   <div>{Number(job.issueQty || 0).toFixed(2)} Mts</div>
+                                                   <div className={`text-[10px] ${i === dropdownSelectIdx ? 'text-blue-100' : 'text-slate-500'}`}>({job.issuePcs || 0} Pcs)</div>
+                                                </td>
+                                                <td className="p-1.5 border-r border-slate-200 text-right font-mono">
+                                                   <div>{recQty.toFixed(2)} Mts</div>
+                                                   <div className={`text-[10px] ${i === dropdownSelectIdx ? 'text-blue-100' : 'text-slate-500'}`}>({recPcs} Pcs)</div>
+                                                </td>
+                                                <td className={`p-1.5 text-right font-bold font-mono ${i === dropdownSelectIdx ? 'text-white' : 'text-emerald-700'}`}>
+                                                   <div>{pending.qty.toFixed(2)} Mts</div>
+                                                   <div className={`text-[10px] ${i === dropdownSelectIdx ? 'text-emerald-200' : 'text-emerald-600'}`}>({pending.pcs} Pcs)</div>
+                                                </td>
+                                             </tr>
+                                          );
+                                       })
                                     ) : (
                                        <tr>
                                           <td colSpan="6" className="p-4 text-center text-slate-400 italic">No associated lots found.</td>
@@ -2234,6 +2445,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
 
                {/* Quick Mill Receive Number Find Modal with + / - and Enter -> Edit */}
                 {showFindDialog && (
+                   <ErpTopLayer>
                    <div
                       className="fixed inset-0 bg-black/60 z-[10070] flex items-center justify-center p-4"
                       onClick={() => setShowFindDialog(false)}
@@ -2348,6 +2560,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                          </div>
                       </div>
                    </div>
+                   </ErpTopLayer>
                 )}
 
                {printOpen && (

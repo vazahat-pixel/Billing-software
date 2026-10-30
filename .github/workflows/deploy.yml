@@ -1,0 +1,131 @@
+# Push to main -> checks -> tests -> build -> live on app.dealingindia.com (and the desktop
+# auto-update feed when desktop/package.json "version" is new). Needs repo secrets:
+#   DEPLOY_HOST (200.97.175.23), DEPLOY_USER (root), DEPLOY_SSH_KEY (private key allowed on the server)
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Block injected / obfuscated code
+        run: bash scripts/ci/check-no-obfuscation.sh
+
+  test:
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - name: Unit + JSM golden tests (in-memory, never production)
+        working-directory: backend
+        env:
+          MONGO_URI: ""
+        run: node --test tests/golden/*.test.js tests/unit/*.test.js
+
+  frontend:
+    needs: guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx vite build
+        working-directory: frontend
+      - run: tar czf frontend-dist.tgz -C frontend/dist --exclude=downloads .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend-dist.tgz
+          retention-days: 3
+
+  desktop:
+    needs: [guard, test]
+    runs-on: windows-latest
+    outputs:
+      built: ${{ steps.ver.outputs.new }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Is desktop version new?
+        id: ver
+        shell: bash
+        run: |
+          v=$(node -p "require('./desktop/package.json').version")
+          live=$(curl -fs https://app.dealingindia.com/downloads/updates/latest.yml | sed -n 's/^version: //p' || true)
+          echo "local=$v live=$live"
+          if [ "$v" != "$live" ]; then echo "new=true" >> "$GITHUB_OUTPUT"; else echo "new=false" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-node@v4
+        if: steps.ver.outputs.new == 'true'
+        with:
+          node-version: "22"
+      - name: Build installer
+        if: steps.ver.outputs.new == 'true'
+        shell: bash
+        run: |
+          (cd frontend && npm ci)
+          (cd desktop && npm ci && npm run dist:win)
+      - uses: actions/upload-artifact@v4
+        if: steps.ver.outputs.new == 'true'
+        with:
+          name: desktop-updates
+          path: frontend/public/downloads/updates/
+          retention-days: 3
+
+  deploy:
+    needs: [test, frontend, desktop]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: inbox
+      - uses: actions/download-artifact@v4
+        if: needs.desktop.outputs.built == 'true'
+        with:
+          name: desktop-updates
+          path: inbox/updates
+      - name: Upload build to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "inbox/*"
+          target: /tmp/billing-deploy
+          strip_components: 1
+          rm: true
+      - name: Go live
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 20m
+          script: |
+            set -e
+            cd /opt/Billing-software
+            PREV=$(git rev-parse --short HEAD)
+            git fetch origin ${{ github.sha }}
+            git checkout -f ${{ github.sha }}
+            bash scripts/ci/server-deploy.sh "$PREV"

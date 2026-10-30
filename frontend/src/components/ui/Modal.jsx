@@ -34,14 +34,23 @@ const Modal = ({
 
   useEffect(() => {
     if (!isOpen || !enableEscape || !onClose) return undefined;
+    const isTopmost = () => {
+      const zs = [...document.querySelectorAll('[data-erp-modal-z]')].map((el) => Number(el.dataset.erpModalZ) || 0);
+      return zs.length > 0 && Number(zIndex) >= Math.max(...zs);
+    };
     const onKey = (e) => {
       if (e.key !== 'Escape') return;
       if (e.target.closest('[data-command-palette]')) return;
       if (e.target.closest('.erp-combobox-dropdown')) return;
-      // Floating windows: Esc should not always kill the bill — only when focus inside
+      // F3 find / after-save popups handle their own Esc; it must not also close the bill.
+      if (e.target.closest('[data-erp-top-layer]')) return;
+      // Floating windows: Esc should not always kill the bill — only when focus inside,
+      // or when nothing has focus (e.g. after a save) and this is the topmost window.
       if (inertBackdrop) {
         const root = contentRef.current;
-        if (root && !root.contains(document.activeElement) && document.activeElement !== root) {
+        const active = document.activeElement;
+        const nothingFocused = !active || active === document.body;
+        if (root && !root.contains(active) && active !== root && !(nothingFocused && isTopmost())) {
           return;
         }
       }
@@ -50,7 +59,7 @@ const Modal = ({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose, enableEscape, inertBackdrop]);
+  }, [isOpen, onClose, enableEscape, inertBackdrop, zIndex]);
 
   useEffect(() => {
     if (!isOpen || inertBackdrop) return undefined;
@@ -86,6 +95,7 @@ const Modal = ({
                 : 'z-[1200] flex justify-center overflow-hidden erp-modal-safe'
           )}
           style={{ zIndex }}
+          data-erp-modal-z={zIndex}
         >
           {!inertBackdrop && (
             <motion.div
