@@ -63,7 +63,7 @@ const jobPending = (job) => {
 
 
 
-const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = null }) => {
+const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = null, initialJobId = null }) => {
    const {
       jobWorkEntries,
       parties,
@@ -378,7 +378,11 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
             return new Date(a.receiveDate || a.updatedAt || a.createdAt || 0) - new Date(b.receiveDate || b.updatedAt || b.createdAt || 0);
          });
       const latest = list[list.length - 1];
-      if (latest) {
+      // opened from a ledger row: that bill's challan, otherwise the latest receipt
+      const wanted = initialJobId ? existingJobs.find((j) => String(j._id || j.id) === String(initialJobId)) : null;
+      if (wanted) {
+         handleLoadReceivedJob(wanted, { asView: true });
+      } else if (latest) {
          handleLoadReceivedJob(latest, { asView: true });
       } else {
          handleNew();
@@ -416,7 +420,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
       return () => {
          cancelled = true;
       };
-   }, [isOpen]);
+   }, [isOpen, initialJobId]);
 
    useEffect(() => {
       if (!isOpen) return undefined;

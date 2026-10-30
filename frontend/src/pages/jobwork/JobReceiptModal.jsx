@@ -66,7 +66,7 @@ const emptyFooter = () => ({
   rcmCharge: '',
 });
 
-const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = null }) => {
+const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = null, initialJobId = null }) => {
   const { jobWorkEntries, parties, fetchJobs, fetchParties, receiveFromMill } = useStore();
 
   const [mode, setMode] = useState('Add');
@@ -256,7 +256,10 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
         return new Date(a.receiveDate || a.issueDate || a.createdAt || 0) - new Date(b.receiveDate || b.issueDate || b.createdAt || 0);
       });
     const latest = list[list.length - 1];
-    if (latest) loadReceipt(latest._id || latest.id, 'View');
+    // opened from a ledger row: that bill's challan, otherwise the latest receipt
+    const wanted = initialJobId ? existingJobs.find((j) => String(j._id || j.id) === String(initialJobId)) : null;
+    if (wanted) loadReceipt(wanted._id || wanted.id, 'View');
+    else if (latest) loadReceipt(latest._id || latest.id, 'View');
 
     const backgroundTasks = [];
     if (!hasMasters) backgroundTasks.push(fetchParties?.());
@@ -286,7 +289,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
     return () => {
       cancelled = true;
     };
-  }, [isOpen]);
+  }, [isOpen, initialJobId]);
 
   useEffect(() => {
     if (isOpen && selectedBook) {

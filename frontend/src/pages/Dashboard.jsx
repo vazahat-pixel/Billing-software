@@ -430,6 +430,7 @@ const Dashboard = () => {
    const [purchaseInitialData, setPurchaseInitialData] = useState(null);
    const [salesInitialData, setSalesInitialData] = useState(null);
    const [voucherInitialId, setVoucherInitialId] = useState(null);
+   const [jobInitialId, setJobInitialId] = useState(null); // mill / job receipt opened from a ledger row
    const [finalReportKind, setFinalReportKind] = useState('groupList');
    const [fasCheckKind, setFasCheckKind] = useState('interest');
    const [stockLedgerKind, setStockLedgerKind] = useState('stockMts');
@@ -2226,8 +2227,9 @@ const Dashboard = () => {
          />
          <ReceiveModal
             isOpen={modals.millRec}
-            onClose={() => toggleModal('millRec', false)}
+            onClose={() => { setJobInitialId(null); toggleModal('millRec', false); }}
             selectedBook={selectedBooks.millRec?.name}
+            initialJobId={jobInitialId}
             onOpenPayment={(partyId) => {
                setVoucherInitialId(null);
                openModalDirect('payment');
@@ -2244,8 +2246,9 @@ const Dashboard = () => {
          />
          <JobReceiptModal
             isOpen={modals.jobRec}
-            onClose={() => toggleModal('jobRec', false)}
+            onClose={() => { setJobInitialId(null); toggleModal('jobRec', false); }}
             selectedBook={selectedBooks.jobRec?.name}
+            initialJobId={jobInitialId}
             onOpenPayment={(partyId) => {
                setVoucherInitialId(null);
                openModalDirect('payment');
@@ -2274,6 +2277,21 @@ const Dashboard = () => {
                   openModalDirect('payment');
                   focusErpWindow('cashbank-bank-Payment');
                }
+            }}
+            onOpenJob={(data) => {
+               const refId = ledgerRefId(data?.row);
+               const docNo = String(data?.docNo || data?.row?.billVoucherNo || '');
+               const jobs = useStore.getState().jobWorkEntries || [];
+               const found = jobs.find((j) => refId && idOf(j._id || j.id) === refId)
+                  || jobs.find((j) => docNo && (String(j.billGpNo || '') === docNo || String(j.jobCardNo || '') === docNo));
+               if (!found) {
+                  toast.info(`Bill #${docNo}`);
+                  return;
+               }
+               const isJobWork = String(found.processType || '') === 'Job Work';
+               setJobInitialId(idOf(found._id || found.id));
+               minimizeErpWindow('ledger');
+               openModalDirect(isJobWork ? 'jobRec' : 'millRec');
             }}
             onOpenReceipt={(data) => {
                const docNo = data?.voucherNo || data?.docNo || data?.row?.billVoucherNo || '';

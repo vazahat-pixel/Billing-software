@@ -393,9 +393,11 @@ function buildPlan(tables, { companyId }) {
   applyReceipts('I_MILL_IT', millGp, 'Mill'); applyReceipts('I_JOB_REC_IT', jobGp, 'Job');
   // bill level amounts (GST, add/less, TDS) go on the first challan of each bill
   const seenBill = new Set();
+  const billJob = new Map(); // "Mill|path|ENT_NO" -> the challan that carries the bill (ledger rows open it)
   for (const b of receiptBills) {
     const k = `${b.kind}|${str(b.header.CO_PATH)}|${num(b.header.ENT_NO)}`;
     if (seenBill.has(k)) continue; seenBill.add(k);
+    billJob.set(k, b.doc._id);
     const gst = num(b.header.SGST_AMT) + num(b.header.CGST_AMT) + num(b.header.IGST_AMT);
     const taxable = num(b.header.TAXABLE_AMT) || num(b.header.SUB_TOT);
     b.doc.processCharges = r2(taxable); b.doc.processGstAmount = r2(gst); b.doc.roundOff = num(b.header.ROUND_OFF);
@@ -576,7 +578,9 @@ function buildPlan(tables, { companyId }) {
     entries.get(k).rows.push(t);
   }
   const refOf = (e) => ({ '1SL': keys.Sales[`${e.path}:T_SALES:${e.ent}`], '1PU': keys.Purchase[`${e.path}:T_PURCHASE:${e.ent}`], '1CB': keys.PaymentVoucher[`${e.path}:T_CASH_MN:${e.ent}`],
-    '1JVGST': keys.DebitCreditNote[`${e.path}:T_JV_GST:${e.ent}`], '1SL_RT': keys.ReturnInvoice[`${e.path}:T_SL_RETU:${e.ent}`] }[e.sp] || null);
+    '1JVGST': keys.DebitCreditNote[`${e.path}:T_JV_GST:${e.ent}`], '1SL_RT': keys.ReturnInvoice[`${e.path}:T_SL_RETU:${e.ent}`],
+    // 1JB = mill (process) bill (I_MILL_GP), 1WK = job work bill (I_JOB_RECEIPT)
+    '1JB': billJob.get(`Mill|${e.path}|${e.ent}`), '1WK': billJob.get(`Job|${e.path}|${e.ent}`) }[e.sp] || null);
   let entrySeq = 0;
   const expectedBal = new Map(); // ledger code -> signed (Dr +)
   for (const e of [...entries.values()].sort((a, b) => (a.date - b.date) || (yearIdx.get(a.path) - yearIdx.get(b.path)) || (a.ent - b.ent))) {
