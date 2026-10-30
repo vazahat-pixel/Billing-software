@@ -1,8 +1,19 @@
-version: 1.0.6
+version: 1.0.9
 files:
-  - url: TextileERP-Setup-1.0.6.exe
-    sha512: i5cLjzug9/dlCMgOov+0CcL0fdDw5sgO9BwdNTqQu/8N0S5QEIPxp9xqjUb6LtqUpmh5JrfvEn67zAW+V47Ihw==
-    size: 90100899
-path: TextileERP-Setup-1.0.6.exe
-sha512: i5cLjzug9/dlCMgOov+0CcL0fdDw5sgO9BwdNTqQu/8N0S5QEIPxp9xqjUb6LtqUpmh5JrfvEn67zAW+V47Ihw==
-releaseDate: '2026-10-29T06:54:14.016Z'
+  - url: TextileERP-Setup-1.0.9.exe
+    sha512: xhcUQ7ONRh4MT2cOe9RpFXTKv9Ou91koflPVFZ3LjYIIsLKPmN/ZcYAJ0J/g75z4+gFQ5C920Ze7XYnbzn68bQ==
+    size: 90114864
+path: TextileERP-Setup-1.0.9.exe
+sha512: xhcUQ7ONRh4MT2cOe9RpFXTKv9Ou91koflPVFZ3LjYIIsLKPmN/ZcYAJ0J/g75z4+gFQ5C920Ze7XYnbzn68bQ==
+releaseNotes: |
+  - Sales: all bills load (not only the last 100); the form opens on the latest bill again after viewing an old one.
+  - ← / → move between the buttons at the bottom of every form (New, Save, Find, Edit ...).
+  - F3 on every master (Account, Item, Book, Group, Station, Transport ...) opens the list of all saved entries.
+  - Ledger: every row opens its own form (receipt, payment, discount, sales, purchase, mill / job bill, journal).
+  - LR Entry list in bill-number order, with arrow keys.
+  - Process Stock report as in JSM: each challan with its receipts and the balance still at the mill.
+  - Balance Sheet and P&L grouped by your JSM heads (Unsecured Loan, Suspense Account, Creditors for Salary ...), with the opening stock.
+  - GSTR-3B: mill and job work bills now counted in ITC, shown per source.
+  - Outstanding: Process and JobWork show the mill / job work bills.
+  - Import from JSM: city, transport and broker of parties; bank accounts stay bank accounts; JSM purchase numbers; numbering continues after the import.
+releaseDate: '2026-10-30T09:53:07.052Z'
