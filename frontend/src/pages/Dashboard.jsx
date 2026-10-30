@@ -104,6 +104,7 @@ const CuttingBeamEntryModal = lazy(() => import('./inventory/CuttingBeamEntryMod
 const JobWorkerMaster = lazy(() => import('./masters/JobWorkerMaster'));
 const InventoryPage = lazy(() => import('./inventory/InventoryPage'));
 const Gst3bMonthlyModal = lazy(() => import('./gst/Gstr3bJsmReport'));
+const GstinJsmReport = lazy(() => import('./gst/GstinJsmReport'));
 const Gstr1Modal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gstr1Modal })));
 const Gst2bMatchingModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst2bMatchingModal })));
 const Gst3bDetailModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst3bDetailModal })));
@@ -459,6 +460,7 @@ const Dashboard = () => {
       accountGroupMaster: false,
       itemMaster: false,
       gst3bMonthly: false,
+      gstinJsm: false,
       gstr1: false,
       gst2bMatching: false,
       gst3bDetail: false,
@@ -818,6 +820,7 @@ const Dashboard = () => {
    };
 
    const [jsmReportForm, setJsmReportForm] = useState(null);
+   const [gstinJsmKind, setGstinJsmKind] = useState('gstinPurchase');
 
    const openReportLeaf = (leafId) => {
       openReportsHub('summary', leafId);
@@ -1169,6 +1172,7 @@ const Dashboard = () => {
                const ext = typeof node === 'string' ? node : node?.external;
                if (ext === 'jsmReport') setJsmReportForm(node.jsmForm);
                else if (ext === 'gstReports' && node?.reportKind === 'gst3b') toggleModal('gst3bMonthly', true);
+               else if (ext === 'gstReports' && /^gstin(Sales|Purchase|Process|Jobwork|Journal|Expense)$/.test(node?.reportKind || '')) { setGstinJsmKind(node.reportKind); toggleModal('gstinJsm', true); }
                else if (ext === 'gstReports') openGstReport(node?.reportKind || 'gstr1');
                else if (ext === 'gstr1') openGstReport('gstr1');
                else if (ext === 'finalReport') {
@@ -2488,6 +2492,7 @@ const Dashboard = () => {
                   mode="beam"
                />
             )}
+            {modals.gstinJsm && <GstinJsmReport isOpen kind={gstinJsmKind} onClose={() => toggleModal('gstinJsm', false)} />}
             {modals.gst3bMonthly && <Gst3bMonthlyModal isOpen onClose={() => toggleModal('gst3bMonthly', false)} />}
             {modals.gstr1 && <Gstr1Modal isOpen onClose={() => toggleModal('gstr1', false)} />}
             {modals.gstReports && (
