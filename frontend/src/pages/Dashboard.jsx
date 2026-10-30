@@ -105,9 +105,9 @@ const JobWorkerMaster = lazy(() => import('./masters/JobWorkerMaster'));
 const InventoryPage = lazy(() => import('./inventory/InventoryPage'));
 const Gst3bMonthlyModal = lazy(() => import('./gst/Gstr3bJsmReport'));
 const GstinJsmReport = lazy(() => import('./gst/GstinJsmReport'));
-const Gstr1Modal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gstr1Modal })));
+const Gstr1Modal = lazy(() => import('./gst/Gstr1JsmReport'));
 const Gst2bMatchingModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst2bMatchingModal })));
-const Gst3bDetailModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst3bDetailModal })));
+const Gst3bDetailModal = lazy(() => import('./gst/AllInwardOutward3bModal'));
 const Gstr1ErrorChekModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gstr1ErrorChekModal })));
 const GstComplianceModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.GstComplianceModal })));
 const GstReportsHub = lazy(() => import('./gst/GstReportsHub'));
@@ -1997,8 +1997,8 @@ const Dashboard = () => {
                                key={ic.id}
                                type="button"
                                className="erp-jsm-desk__icon"
-                               onDoubleClick={() => (ic.id === 'gst3bDetail' ? openGstReport('gst3b') : toggleModal(ic.id, true))}
-                               onClick={() => (ic.id === 'gst3bDetail' ? openGstReport('gst3b') : toggleModal(ic.id, true))}
+                               onDoubleClick={() => toggleModal(ic.id, true)}
+                               onClick={() => toggleModal(ic.id, true)}
                             >
                                <span className="erp-jsm-desk__glyph" aria-hidden>{ic.glyph}</span>
                                <span className="erp-jsm-desk__label">{ic.label}</span>
