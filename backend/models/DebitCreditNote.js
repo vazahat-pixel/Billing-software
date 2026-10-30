@@ -47,6 +47,8 @@ const DebitCreditNoteSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  /** JSM EXP_INC of an imported GST journal: 'E' = expense bill with GST (input tax), 'I' income, 'D' / 'C' notes. */
+  expInc: { type: String, default: '' },
   /** Operator-facing voucher number from the reference screen (V.NO). */
   vNo: { type: String, default: '' },
   partyLedgerId: {

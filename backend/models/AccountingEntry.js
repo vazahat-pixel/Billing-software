@@ -69,6 +69,8 @@ const AccountingEntrySchema = new mongoose.Schema({
       ref: 'CostCenter',
       default: null,
     },
+    /** Account on the other side of this line as JSM recorded it (imported entries); the ledger shows its name. */
+    contraName: { type: String, default: undefined },
   }],
   narration: String,
   totalDebit: {

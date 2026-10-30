@@ -899,6 +899,15 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
                           <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.sgst)}</td>
                           <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.cess)}</td>
                         </tr>
+                        {(reportData?.itcBySource || []).map((s) => (
+                          <tr key={s.source} className="text-[var(--text-muted)]">
+                            <td className="px-3 py-1.5 pl-8">{s.source === 'JobWork' ? 'Job Work' : s.source} bills ({s.count})</td>
+                            <td className="px-3 py-1.5 text-right font-mono">{money(s.igst)}</td>
+                            <td className="px-3 py-1.5 text-right font-mono">{money(s.cgst)}</td>
+                            <td className="px-3 py-1.5 text-right font-mono">{money(s.sgst)}</td>
+                            <td className="px-3 py-1.5 text-right font-mono">{money(s.cess)}</td>
+                          </tr>
+                        ))}
                         <tr className="bg-[var(--bg-base)] font-bold">
                           <td className="px-3 py-2">Net ITC Available (A - B)</td>
                           <td className="px-3 py-2 text-right font-mono">{money(reportData?.inward?.igst)}</td>

@@ -147,7 +147,7 @@ function buildPlan(tables, { companyId }) {
     }
     const ledger = {
       _id: oid(), companyId, name: unique(str(r.AC_NAME) || `ACCOUNT ${code}`, ledgerNames), code: String(code),
-      group: a.info.group, subGroup: a.info.heads.slice(0, 80), nature: ['Assets', 'Expenses'].includes(a.info.group) ? 'Dr' : 'Cr',
+      group: a.info.group, subGroup: a.info.heads.slice(0, 80), jsmHead: String(a.info.heads.split(' > ')[0] || '').toUpperCase(), nature: ['Assets', 'Expenses'].includes(a.info.group) ? 'Dr' : 'Cr',
       openingBalance: Math.abs(num(r.OP_BAL)), openingBalanceType: sideDr ? 'Dr' : 'Cr',
       accountType: party ? 'Party' : (a.isBook && /CASH|BANK/i.test(a.info.heads + str(r.AC_NAME)) ? (/BANK/i.test(a.info.heads + str(r.AC_NAME)) ? 'Bank' : 'Cash') : a.info.acct),
       linkedPartyId: party ? party._id : null, isActive: true, allowManualEntry: true, isSystemLedger: false,
@@ -446,6 +446,9 @@ function buildPlan(tables, { companyId }) {
     const gst = num(b.header.SGST_AMT) + num(b.header.CGST_AMT) + num(b.header.IGST_AMT);
     const taxable = num(b.header.TAXABLE_AMT) || num(b.header.SUB_TOT);
     b.doc.processCharges = r2(taxable); b.doc.processGstAmount = r2(gst); b.doc.roundOff = num(b.header.ROUND_OFF);
+    // the bill's own GST split and date (GSTR-3B takes mill and job work bills into ITC, as JSM does)
+    b.doc.processCgst = r2(num(b.header.CGST_AMT)); b.doc.processSgst = r2(num(b.header.SGST_AMT)); b.doc.processIgst = r2(num(b.header.IGST_AMT));
+    b.doc.processBillDate = date(b.header.BILL_DATE) || b.doc.receiveDate; b.doc.processBillNo = str(b.header.NCBILL_NO);
     b.doc.gstType = num(b.header.IGST_AMT) > 0 ? 'IGST' : 'CGST+SGST';
     b.doc.billNet = r2(num(b.header.NET_TOT));
   }
@@ -606,7 +609,7 @@ function buildPlan(tables, { companyId }) {
     if (!pa) continue;
     const at = date(n.ENT_DATE) || new Date(); const id = oid();
     const cg = num(n.SGST_AMT); const sg = num(n.CGST_AMT); const ig = num(n.IGST_AMT);
-    const doc = { _id: id, companyId, noteType, noteSide: side, noteNo: uniqueNo(str(n.VOU_NO) || String(num(n.ENT_NO)), noteNos, [noteType[0] + side[0], path]), vNo: str(n.VOU_NO), partyLedgerId: pa.ledgerId, partyId: pa.partyId, partyName: str(pa.row.AC_NAME),
+    const doc = { _id: id, companyId, noteType, noteSide: side, expInc: str(n.EXP_INC).toUpperCase(), noteNo: uniqueNo(str(n.VOU_NO) || String(num(n.ENT_NO)), noteNos, [noteType[0] + side[0], path]), vNo: str(n.VOU_NO), partyLedgerId: pa.ledgerId, partyId: pa.partyId, partyName: str(pa.row.AC_NAME),
       date: at, billNo: str(n.NCBILL_NO), billDate: date(n.BILL_DATE), amount: r2(num(n.DR_AMOUNT) || num(n.CR_AMOUNT)), taxableAmount: r2(num(n.DR_AMOUNT) || num(n.CR_AMOUNT)),
       gstRate: num(n.TOTGST_PER), cgst: cg, sgst: sg, igst: ig, gstAmount: r2(cg + sg + ig), roundOff: num(n.ROUND_OFF), netAmount: r2(num(n.NET_AMOUNT)), finalAmount: r2(num(n.FINAL_AMT)),
       reasonCode: str(n.Reason_IssNote), reason: str(n.Reason_IssNote), quc: str(n.QUC), hsnSac: str(n.HSN_CODE), narration: str(n.REMARK_1), status: 'Posted', isReversed: false, createdAt: at, updatedAt: at };
@@ -636,8 +639,11 @@ function buildPlan(tables, { companyId }) {
       if (!led) { warn(`Ledger posting ${e.sp} ${e.ent} (${e.path}): account ${code} not found`); continue; }
       // JSM can store a negative amount in either column (a round-off of -0.26 in DR is a 0.26 credit): net them
       const signed = r2(dr - cr);
-      if (signed >= 0.005) lines.push({ ledgerId: led.ledgerId, ledgerName: led.ledgerName, type: 'Dr', amount: signed });
-      else if (signed <= -0.005) lines.push({ ledgerId: led.ledgerId, ledgerName: led.ledgerName, type: 'Cr', amount: -signed });
+      // TR_CODE is the account on the other side of this row: JSM's ledger shows its name (bank or discount ...)
+      const contraName = str(t.TR_CODE) && str(t.TR_CODE) !== code ? accName(t.TR_CODE) : '';
+      const extra = contraName ? { contraName } : {};
+      if (signed >= 0.005) lines.push({ ledgerId: led.ledgerId, ledgerName: led.ledgerName, type: 'Dr', amount: signed, ...extra });
+      else if (signed <= -0.005) lines.push({ ledgerId: led.ledgerId, ledgerName: led.ledgerName, type: 'Cr', amount: -signed, ...extra });
       expectedBal.set(code, r2((expectedBal.get(code) || 0) + dr - cr));
     }
     if (lines.length < 2) { if (lines.length) warn(`Ledger posting ${e.sp} ${e.ent} (${e.path}) has a single line; skipped`); continue; }

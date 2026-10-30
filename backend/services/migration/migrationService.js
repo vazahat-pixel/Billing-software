@@ -217,8 +217,9 @@ async function apply(run, { years } = {}) {
 
     // masters that already exist under the same name are reused, not duplicated
     const reused = new Map();
+    const ledgerTakeOver = [];
     for (const [name, nameField, byId] of [['Party', 'name'], ['Item', 'name'], ['LedgerMaster', 'name']]) {
-      const existing = await model(name).collection.find({ companyId: run.companyId }, { projection: { name: 1, gstin: 1, accd: 1 } }).toArray();
+      const existing = await model(name).collection.find({ companyId: run.companyId }, { projection: { name: 1, gstin: 1, accd: 1, openingBalance: 1, openingBalanceType: 1, jsmHead: 1, code: 1 } }).toArray();
       if (!existing.length) continue;
       const have = new Map(existing.map((e) => [String(e.name).toLowerCase(), e]));
       // a party already here with the same JSM account code or GSTIN is the same account / firm (both are unique per company)
@@ -230,7 +231,15 @@ async function apply(run, { years } = {}) {
         // a same-name party with a different JSM code is another account: keep this one under a distinct name
         const nameOk = byName && !(name === 'Party' && Number(byName.accd) > 0 && Number(d.accd) > 0 && Number(byName.accd) !== Number(d.accd));
         const hit = (Number(d.accd) > 0 && haveAccd.get(Number(d.accd))) || (d.gstin && haveGstin.get(String(d.gstin).toUpperCase())) || (nameOk && byName._id);
-        if (hit) { dropped.set(String(d._id), hit); return false; }
+        if (hit) {
+          dropped.set(String(d._id), hit);
+          // an account already here (Round Off, TDS, Discount ... made at sign-up) takes JSM's opening, head and code
+          if (name === 'LedgerMaster') {
+            const was = existing.find((e) => String(e._id) === String(hit));
+            if (was && !Number(was.openingBalance)) ledgerTakeOver.push({ _id: hit, before: { openingBalance: was.openingBalance || 0, openingBalanceType: was.openingBalanceType || 'Dr', jsmHead: was.jsmHead || '', code: was.code || '' }, after: { openingBalance: d.openingBalance || 0, openingBalanceType: d.openingBalanceType || 'Dr', jsmHead: d.jsmHead || '', code: d.code || '' } });
+          }
+          return false;
+        }
         if (byName) d[nameField] = `${d[nameField]} (${d.accd || 2})`;
         return true;
       });
@@ -249,6 +258,11 @@ async function apply(run, { years } = {}) {
 
     await makeUnique(plan.docs, run.companyId, plan.warnings);
     await insertAll(run, plan.docs);
+    if (ledgerTakeOver.length) {
+      run.restores = { LedgerMaster: ledgerTakeOver.map((t) => ({ _id: String(t._id), before: t.before })) };
+      await run.save();
+      for (const t of ledgerTakeOver) await model('LedgerMaster').collection.updateOne({ _id: t._id }, { $set: t.after });
+    }
     await bumpCounters(run.companyId, plan.docs);
     run.status = 'applied'; run.appliedAt = new Date(); run.summary = summarise(plan); run.progress = { stage: 'done', done: 1, total: 1 };
     run.expectedInternal = undefined;
@@ -288,6 +302,9 @@ async function undo(run, { keepStatus = false } = {}) {
     for (let i = 0; i < ids.length; i += BATCH) await model(name).collection.deleteMany({ _id: { $in: ids.slice(i, i + BATCH) }, companyId: run.companyId });
   }
   await MigrationRunDocs.deleteMany({ runId: run._id });
+  for (const r of run.restores?.LedgerMaster || []) {
+    await model('LedgerMaster').collection.updateOne({ _id: new mongoose.Types.ObjectId(String(r._id)), companyId: run.companyId }, { $set: r.before });
+  }
   const Counter = model('Counter');
   const series = ['sales', 'purchase', 'receipt', 'payment', 'note', 'salesReturn', 'purchaseReturn', 'job'];
   await Counter.collection.deleteMany({ _id: { $in: series.map((m) => `BILLNO-${m}-${run.companyId}`) }, seq: { $lte: 1e9 } }).catch(() => {});

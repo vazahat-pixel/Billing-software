@@ -447,6 +447,13 @@ class ReportService {
     const masterCompanyId = await companyGroupService.masterId(companyId);
     const partyFilter = { companyId: masterCompanyId, type: { $in: partyTypes } };
     if (partyIds.length) partyFilter._id = { $in: partyIds };
+    if (isJob) {
+      // mill / job work bills: the parties that have them, whatever their type (a mill is often a creditor in JSM)
+      delete partyFilter.type;
+      const workers = (await Job.distinct('workerId', { companyId, status: { $ne: 'Cancelled' } })).map(String);
+      const wanted = partyIds.length ? workers.filter((w) => partyIds.map(String).includes(w)) : workers;
+      partyFilter._id = { $in: wanted };
+    }
     if (states.length) partyFilter.state = { $in: states };
     if (msmeTypes.length) partyFilter.msmeType = { $in: msmeTypes };
     if (mainGroups.length) partyFilter.mainGroupId = { $in: mainGroups };
@@ -460,9 +467,8 @@ class ReportService {
     if (isJob) {
       const jobFilter = { companyId, status: { $ne: 'Cancelled' } };
       jobFilter.workerId = { $in: selectedPartyIds };
-      const dateQuery = buildDateQuery(billDateFrom, billDateTo, 'issueDate');
-      Object.assign(jobFilter, dateQuery);
       const jobs = await Job.find(jobFilter).lean();
+      const dayOf = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '');
 
       const byParty = new Map();
       for (const p of parties) {
@@ -480,15 +486,21 @@ class ReportService {
         const bucket = byParty.get(pid);
         if (!bucket) continue;
 
-        const charges = round2((j.processCharges || 0) + (j.processGstAmount || 0));
-        const total = charges > 0 ? charges : round2(j.issueQty || 0);
+        // Process = mill challans, JobWork = job work challans; only a challan that carries a bill is outstanding
+        const jobWork = j.workKind === 'Job' || (!j.workKind && j.processType === 'Job Work');
+        if (jobWork !== isJobWork) continue;
+        const total = round2((j.processCharges || 0) + (j.processGstAmount || 0) + (j.roundOff || 0));
+        if (total <= 0.01) continue;
+        const billDate = j.processBillDate || j.receiveDate || j.issueDate || j.createdAt;
+        if (billDateFrom && dayOf(billDate) < dayOf(billDateFrom)) continue;
+        if (billDateTo && dayOf(billDate) > dayOf(billDateTo)) continue;
         const paid = round2(j.chargesPaidAmount || 0);
         const outstanding = round2(total - paid);
 
         if (status === 'Pending' && outstanding <= 0.01) continue;
         if (status === 'Paid' && outstanding > 0.01) continue;
 
-        const ageInDays = Math.max(0, Math.floor((asOnDate - new Date(j.issueDate || j.createdAt || Date.now())) / 86400000));
+        const ageInDays = Math.max(0, Math.floor((asOnDate - new Date(billDate || Date.now())) / 86400000));
         if (dueDaysMin != null && ageInDays < Number(dueDaysMin)) continue;
 
         bucket.partyTotal = round2(bucket.partyTotal + outstanding);
@@ -502,8 +514,8 @@ class ReportService {
 
         bucket.invoices.push({
           billId: j._id,
-          docNo: j.challanNo || j.jobCardNo || 'JC',
-          date: j.issueDate || j.createdAt,
+          docNo: j.processBillNo || j.billGpNo || j.challanNo || j.jobCardNo || 'JC',
+          date: billDate,
           dueDate: null,
           creditDays: 0,
           total,
@@ -724,8 +736,12 @@ class ReportService {
 
     const companyGroupService = require('./companyGroupService');
     const masterCompanyId = await companyGroupService.masterId(companyId);
+    // mill / job work: the parties that have challans, whatever their type
+    const partyScope = isJob
+      ? { companyId: masterCompanyId, _id: { $in: await Job.distinct('workerId', { companyId, status: { $ne: 'Cancelled' } }) } }
+      : { companyId: masterCompanyId, type: { $in: partyTypes } };
     const [parties, brokers, stations, hastes, bookIds, states, mainGroups] = await Promise.all([
-      Party.find({ companyId: masterCompanyId, type: { $in: partyTypes } })
+      Party.find(partyScope)
         .select('name address city state msmeType accd')
         .sort({ name: 1 })
         .lean(),
@@ -733,11 +749,11 @@ class ReportService {
         .select('name')
         .sort({ name: 1 })
         .lean(),
-      Party.distinct('city', { companyId: masterCompanyId, type: { $in: partyTypes }, city: { $nin: [null, ''] } }),
+      Party.distinct('city', { ...partyScope, city: { $nin: [null, ''] } }),
       isReceivable ? DocModel.distinct('haste', { companyId, haste: { $nin: [null, ''] } }) : [],
       isJob ? ['MILL', 'JOB'] : DocModel.distinct('bookId', { companyId, bookId: { $nin: [null, ''] } }),
-      Party.distinct('state', { companyId: masterCompanyId, type: { $in: partyTypes }, state: { $nin: [null, ''] } }),
-      Party.distinct('mainGroupId', { companyId: masterCompanyId, type: { $in: partyTypes }, mainGroupId: { $nin: [null, ''] } }),
+      Party.distinct('state', { ...partyScope, state: { $nin: [null, ''] } }),
+      Party.distinct('mainGroupId', { ...partyScope, mainGroupId: { $nin: [null, ''] } }),
     ]);
 
     return {

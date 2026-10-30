@@ -50,6 +50,12 @@ const JobSchema = new mongoose.Schema({
   toleranceWastagePct: { type: Number, default: 3, min: 0 },
   processCharges: { type: Number, default: 0, min: 0 },
   processGstAmount: { type: Number, default: 0, min: 0 },
+  // a mill / job work bill's own GST split, date and number (set by the JSM import; GSTR-3B ITC reads them)
+  processCgst: { type: Number, default: 0 },
+  processSgst: { type: Number, default: 0 },
+  processIgst: { type: Number, default: 0 },
+  processBillDate: { type: Date, default: null },
+  processBillNo: { type: String, default: '' },
   roundOff: { type: Number, default: 0 },
   /** Bill-wise settlement of Job Work Charges via Payment voucher (mirrors Purchase.paidAmount). */
   chargesPaidAmount: { type: Number, default: 0, min: 0 },

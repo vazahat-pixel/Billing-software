@@ -34,6 +34,8 @@ const LedgerMasterSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  /** The account's own head in JSM's Account Head master (e.g. UNSECURED LOAN); final reports group by it. Set by the JSM import. */
+  jsmHead: { type: String, trim: true, default: '' },
   accountGroupId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'AccountGroup',

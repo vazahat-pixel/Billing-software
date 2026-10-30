@@ -116,4 +116,41 @@ describe('JSM import: two accounts with the same GSTIN (isolated DB)', { skip: f
     const rep = unwrapBody(await api3('post', `/runs/${runId}/reconcile`, {}));
     assert.equal(rep.mismatched, 0, JSON.stringify(rep.checks.filter((c) => !c.ok).slice(0, 6)));
   });
+
+  it('an account already in the company (TDS, Round Off ...) takes JSM opening and head; undo puts it back', async () => {
+    const reg = await request(app).post('/api/auth/register').send({ name: 'Ob Owner', email: `ob-${Date.now()}@example.com`, password: 'TestPass123!', companyName: 'Opening Co' });
+    const h4 = authHeader(reg.body.token);
+    const api4 = (m, pth, body) => { const r = request(app)[m](`/api/migration${pth}`).set(h4); return body === undefined ? r : r.send(body); };
+    const buf = fs.readFileSync(FIXTURE);
+    const runId = unwrapBody(await api4('post', '/runs', {})).id;
+    const cid = (await require('../../models/MigrationRun').MigrationRun.findById(runId).lean()).companyId;
+    // a JSM account with an opening balance, already present here (by name) with opening 0
+    const { loadPackage } = require('../../services/migration/packageReader');
+    const { buildPlan } = require('../../services/migration/jsmMapper');
+    const pkg = await loadPackage(FIXTURE);
+    const keep = (rows) => rows.filter((r) => !r.CO_PATH || YEARS.includes(String(r.CO_PATH).trim()));
+    const tables = Object.fromEntries(Object.entries(pkg.tables).map(([k, v]) => [k, keep(v)]));
+    const target = buildPlan(tables, { companyId: cid }).docs.LedgerMaster.find((l) => l.openingBalance > 0 && !l.linkedPartyId);
+    assert.ok(target, 'a JSM account with an opening balance');
+    const Ledger = require('../../models/LedgerMaster').collection;
+    const { insertedId } = await Ledger.insertOne({ companyId: cid, name: target.name, group: target.group, accountType: 'System', openingBalance: 0, openingBalanceType: 'Dr', isActive: true, isDeleted: false });
+
+    await request(app).put(`/api/migration/runs/${runId}/chunk?index=0`).set(h4).set('Content-Type', 'application/octet-stream').send(buf);
+    assert.equal(unwrapBody(await api4('post', `/runs/${runId}/complete`, { bytes: buf.length })).status, 'uploaded');
+    assert.equal((await api4('post', `/runs/${runId}/apply`, { years: YEARS })).status, 200);
+    let r;
+    for (let i = 0; i < 200; i += 1) { r = unwrapBody(await api4('get', `/runs/${runId}`)); if (['applied', 'failed'].includes(r.status)) break; await new Promise((x) => setTimeout(x, 300)); }
+    assert.equal(r.status, 'applied', r.error);
+    const after = await Ledger.findOne({ _id: insertedId });
+    assert.equal(after.openingBalance, target.openingBalance);
+    assert.equal(after.openingBalanceType, target.openingBalanceType);
+    assert.equal(after.jsmHead, target.jsmHead);
+    const rep = unwrapBody(await api4('post', `/runs/${runId}/reconcile`, {}));
+    assert.equal(rep.mismatched, 0, JSON.stringify(rep.checks.filter((c) => !c.ok).slice(0, 6)));
+
+    assert.equal((await api4('post', `/runs/${runId}/undo`, {})).status, 200);
+    const back = await Ledger.findOne({ _id: insertedId });
+    assert.equal(back.openingBalance, 0);
+    assert.equal(back.jsmHead || '', '');
+  });
 });

@@ -13,6 +13,8 @@ const MigrationRunSchema = new mongoose.Schema({
   progress: { stage: { type: String, default: '' }, done: { type: Number, default: 0 }, total: { type: Number, default: 0 } },
   summary: { type: mongoose.Schema.Types.Mixed, default: null }, // counts, warnings, expected totals
   reconciliation: { type: mongoose.Schema.Types.Mixed, default: null },
+  // accounts that were already here and took JSM's opening / head / code: their earlier values, put back by undo
+  restores: { type: mongoose.Schema.Types.Mixed, default: null },
   error: { type: String, default: '' },
   appliedAt: { type: Date, default: null },
   undoneAt: { type: Date, default: null },
