@@ -1275,6 +1275,7 @@ const Dashboard = () => {
                { label: 'Add Column In Reports', action: () => openSettings('reports') },
                { label: 'Sp Find Column Setting', action: () => openSettings('columns') },
                { label: 'Change PassWord', action: () => openSettings('users'), separatorBefore: true },
+               { label: 'App Lock (PIN)', action: () => openSettings('appLock') },
                { label: 'Theme', action: () => openSettings('appearance') },
             ],
          },

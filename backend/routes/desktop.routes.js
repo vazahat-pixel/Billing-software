@@ -12,6 +12,48 @@ router.get('/activation-status', ctrl.activationStatus);
 router.post('/validate-pack', ctrl.validatePack);
 router.post('/activate', ctrl.activateDesktop);
 
+/** Auto-activate: first run — verify cloud credentials, pull company, create local user */
+router.post('/auto-activate', async (req, res, next) => {
+  try {
+    const autoActivation = require('../services/autoActivationService');
+    const { email, password, deviceId, deviceName } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'email and password required' });
+    }
+    const result = await autoActivation.autoActivate({ email, password, deviceId, deviceName });
+    return res.json({
+      success: true,
+      message: 'Device activated',
+      data: {
+        token: result.token,
+        refreshToken: result.refreshToken,
+        activated: true,
+        user: {
+          id: result.localUser._id,
+          name: result.localUser.name,
+          email: result.localUser.email,
+          role: result.localUser.role,
+          companyRole: result.localUser.companyRole,
+          companyId: result.localUser.companyId,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Check activation status — frontend uses this on startup to decide login vs auto-activate flow */
+router.get('/is-activated', async (req, res, next) => {
+  try {
+    const autoActivation = require('../services/autoActivationService');
+    const activated = await autoActivation.isActivated();
+    return res.json({ success: true, data: { activated } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** Hybrid: verify salted local credentials when offline (no plaintext stored) */
 router.post('/offline-login', async (req, res, next) => {
   try {

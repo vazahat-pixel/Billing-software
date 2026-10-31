@@ -3,6 +3,7 @@ import useStore from '../../store/useStore';
 import { initSyncListener } from '../../utils/syncQueue';
 import { subscribeNetworkStatus, isOffline as isNetworkOffline } from '../../utils/networkStatus';
 import SessionExpiredModal from './SessionExpiredModal';
+import AppLockScreen from '../AppLock/AppLockScreen';
 import { useLocalApiAsSourceOfTruth, isDesktopShell } from '../../utils/desktopMode';
 import { notifySuccess, notifyWarning } from '../../utils/notify';
 
@@ -171,6 +172,7 @@ const AuthBootstrap = ({ children }) => {
     <div className="erp-motion-fade-in min-h-full">
       {children}
       <SessionExpiredModal />
+      {token ? <AppLockScreen /> : null}
     </div>
   );
 };

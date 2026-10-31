@@ -512,20 +512,64 @@ app.on('before-quit', async (e) => {
       /* ignore probe errors on shutdown */
     }
     if (pending > 0) {
-      const { response } = await dialog.showMessageBox(mainWindow || undefined, {
-        type: 'warning',
-        title: 'Entries not uploaded yet',
-        message: `${pending} offline entr${pending === 1 ? 'y has' : 'ies have'} not been uploaded to the cloud yet.`,
-        detail: 'Turn the internet ON and keep Textile ERP open until they upload. If you quit now they stay safe on this computer and upload the next time you open the app with internet.\n\nInternet ON karke app khula rakhein jab tak entries cloud par na chali jaayein. Abhi band karenge to entries is computer mein safe rahengi aur agli baar internet ke saath app kholne par upload hongi.',
-        buttons: ['Keep app open', 'Quit anyway'],
-        defaultId: 0,
-        cancelId: 0,
-      });
-      if (response !== 1) {
-        // Quit cancelled: back to normal, so closing the window hides it again instead of exiting.
-        app.isQuiting = false;
-        mainWindow?.show();
-        return;
+      // Try uploading immediately if we appear to have internet
+      let uploadedNow = 0;
+      const base = resolveApiBaseUrl();
+      const isOnline = await fetch(`${base}/health/ready`, { signal: AbortSignal.timeout(2000) })
+        .then((r) => r.ok)
+        .catch(() => false);
+
+      if (isOnline) {
+        // Trigger sync and wait up to 8 seconds
+        try {
+          const syncAgent = require('./syncAgent');
+          syncAgent.triggerSync?.();
+          await new Promise((res) => setTimeout(res, 8000));
+          // Re-check pending after sync attempt
+          const r2 = await fetch(
+            base.endsWith('/api') ? `${base}/sync/status` : `${base}/api/sync/status`,
+            { signal: AbortSignal.timeout(2000) }
+          );
+          if (r2.ok) {
+            const j2 = await r2.json();
+            uploadedNow = pending - Number(j2?.data?.pendingOutbox || 0);
+            pending = Number(j2?.data?.pendingOutbox || 0);
+          }
+        } catch { /* ignore */ }
+      }
+
+      if (pending > 0) {
+        const detail = isOnline
+          ? `${uploadedNow > 0 ? `${uploadedNow} entr${uploadedNow === 1 ? 'y' : 'ies'} uploaded. ` : ''}${pending} still pending — click Retry to upload them now before closing.\n\n` +
+            `Entries is computer mein SAFE hain aur agli baar internet ke saath kholne par upload hongi.`
+          : `Internet nahi mila. Entries is computer mein SAFE hain — koi bhi data DELETE nahi hoga.\n\n` +
+            `Internet ON karke "Retry" press karein, ya "Close anyway" press karein — data agli baar upload hoga.`;
+
+        const { response } = await dialog.showMessageBox(mainWindow || undefined, {
+          type: 'warning',
+          title: 'Entries not uploaded yet',
+          message: `${pending} entr${pending === 1 ? 'y has' : 'ies have'} not been uploaded to the cloud yet.`,
+          detail,
+          buttons: ['Keep app open', 'Retry upload', 'Close anyway'],
+          defaultId: 0,
+          cancelId: 0,
+        });
+        if (response === 0) {
+          // Keep open
+          app.isQuiting = false;
+          mainWindow?.show();
+          return;
+        }
+        if (response === 1) {
+          // Retry: trigger sync and close after a longer wait
+          try {
+            const syncAgent = require('./syncAgent');
+            syncAgent.triggerSync?.();
+            await new Promise((res) => setTimeout(res, 12000));
+          } catch { /* ignore */ }
+          // Fall through to graceful shutdown
+        }
+        // response === 2: "Close anyway" — data is already safe in local DB, just quit
       }
     }
   }

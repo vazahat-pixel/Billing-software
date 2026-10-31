@@ -1,6 +1,7 @@
 import api from '../api/client';
 import { saveOfflineCredential, tryOfflineLogin } from './offlineAuth';
 import { getDeviceIdentity } from './deviceIdentity';
+import { isDesktopLocalMode } from './desktopMode';
 
 /**
  * Login online when possible; fall back to verified offline credentials
@@ -20,6 +21,61 @@ export const loginWithOfflineSupport = async ({
     }
     return user;
   };
+
+  // Desktop hybrid mode: first check if local DB needs activation (empty DB),
+  // then do normal local login. Falls back to offline IndexedDB when offline.
+  if (isDesktopLocalMode()) {
+    const browserHasNoInternet = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    if (browserHasNoInternet) {
+      // Fully offline: use IndexedDB-cached credentials
+      const session = await tryOfflineLogin(emailNorm, password, { adminOnly });
+      return { token: session.token, user: assertRole(session.user) };
+    }
+
+    // Online + desktop local: try normal local API login first
+    try {
+      const response = await api.post('/auth/login', { email: emailNorm, password, ...(totpCode ? { totpCode } : {}) }, { skipAuthRedirect: true, forceNetwork: true });
+      const body = response.data || {};
+      if (body.requires2fa || body.code === 'TOTP_REQUIRED') {
+        const err = new Error(body.message || 'Two-factor code required');
+        err.requires2fa = true;
+        throw err;
+      }
+      const payload = body.data && (body.data.token || body.data.user) ? body.data : body;
+      if (payload.token && payload.user) {
+        assertRole(payload.user);
+        try { await saveOfflineCredential(emailNorm, password, { token: payload.token, user: payload.user }); } catch { /* ignore */ }
+        return { token: payload.token, user: payload.user };
+      }
+    } catch (localErr) {
+      if (localErr.requires2fa) throw localErr;
+      // 401 = user not found → try auto-activate (first run on this device)
+      const isNotFound = !localErr.response || localErr.response?.status === 401 || localErr.response?.status === 404;
+      if (!isNotFound) throw localErr;
+    }
+
+    // Auto-activate: local DB has no user yet — provision from cloud credentials
+    try {
+      let identity = {};
+      try { identity = await getDeviceIdentity(); } catch { /* ok */ }
+      const actRes = await api.post('/desktop/auto-activate', {
+        email: emailNorm,
+        password,
+        deviceId: identity.deviceId,
+        deviceName: identity.deviceName || 'Textile ERP Desktop',
+      }, { skipAuthRedirect: true, forceNetwork: true });
+      const actBody = actRes.data?.data || actRes.data || {};
+      if (actBody.token && actBody.user) {
+        assertRole(actBody.user);
+        try { await saveOfflineCredential(emailNorm, password, { token: actBody.token, user: actBody.user }); } catch { /* ignore */ }
+        return { token: actBody.token, user: actBody.user };
+      }
+    } catch (actErr) {
+      if (actErr.requires2fa) throw actErr;
+      throw new Error(actErr.response?.data?.message || actErr.message || 'Login failed');
+    }
+  }
 
   // Only use offline login when the browser itself has NO internet
   const browserHasNoInternet = typeof navigator !== 'undefined' && !navigator.onLine;

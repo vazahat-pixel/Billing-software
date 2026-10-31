@@ -124,6 +124,9 @@ async function startApi(opts) {
     DEVICE_BINDING_ENFORCE:
       process.env.DEVICE_BINDING_ENFORCE || (isHybrid ? 'true' : 'false'),
     PLAN_LIMIT_ENFORCE: process.env.PLAN_LIMIT_ENFORCE || 'false',
+    // Long-lived tokens so the user never has to log in again on this machine.
+    JWT_ACCESS_EXPIRES: process.env.JWT_ACCESS_EXPIRES || '365d',
+    JWT_REFRESH_DAYS: process.env.JWT_REFRESH_DAYS || '3650',
   };
 
   if (String(process.env.DESKTOP_API_INPROCESS || '').toLowerCase() === 'true') {
