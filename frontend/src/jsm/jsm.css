@@ -39,6 +39,8 @@
 .jsmg-grid .is-num { text-align: right; }
 .jsmg-grid tr.header, .jsmg-grid tr.total, .jsmg-grid tr.grand { font-size: 8pt; }
 .jsmg-grid tr.is-selected td { background: #0078d7 !important; color: #fff !important; }
+.jsmg-grid tr.jsmg-row--clickable { cursor: pointer; }
+.jsmg-grid tr.jsmg-row--clickable:hover td { background: #eff6ff; }
 .jsmg-rowhead { background: #f0f0f0; text-align: center; font-size: 8pt; }
 .jsmg-bar { position: relative; height: 50px; flex: none; background: lightgray; border-top: 1px solid #fff; }
 .jsmg-button { position: absolute; top: 13px; height: 30px; background: ghostwhite; color: #000; border: 1px solid #adadad;

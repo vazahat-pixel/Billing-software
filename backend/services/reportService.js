@@ -1128,6 +1128,7 @@ class ReportService {
     const rows = [];
     purchases.forEach((p) => {
       rows.push({
+        _id: p._id,
         date: p.date,
         docType: 'Purchase',
         docNo: p.invoiceNo || p.billNo,
@@ -1169,6 +1170,7 @@ class ReportService {
 
     return sales
       .map((s) => ({
+        _id: s._id,
         date: s.date,
         docType: 'Sales',
         docNo: s.invoiceNo,

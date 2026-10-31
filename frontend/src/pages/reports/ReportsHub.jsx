@@ -41,7 +41,7 @@ const Kpi = ({ label, value, sub }) => (
   </div>
 );
 
-const ReportTable = ({ columns, rows, emptyText, onExport, exportLabel }) => (
+const ReportTable = ({ columns, rows, emptyText, onExport, exportLabel, onRowClick }) => (
   <div>
     {onExport && (
       <div className="flex justify-end mb-2">
@@ -71,7 +71,11 @@ const ReportTable = ({ columns, rows, emptyText, onExport, exportLabel }) => (
               </tr>
             ) : (
               rows.map((row, i) => (
-                <tr key={row._key || i} className="hover:bg-[var(--bg-base)]">
+                <tr
+                  key={row._key || i}
+                  className={`hover:bg-[var(--bg-base)]${onRowClick && row._id ? ' cursor-pointer' : ''}`}
+                  onClick={onRowClick && row._id ? () => onRowClick(row) : undefined}
+                >
                   {columns.map((c) => (
                     <td key={c.key} className={`px-2.5 py-1 align-middle leading-none ${c.align === 'right' ? 'text-right font-medium tabular-nums whitespace-nowrap' : ''}`}>
                       {c.render ? c.render(row) : row[c.key]}
@@ -381,7 +385,7 @@ function TreeNode({ node, depth, expanded, selectedId, onToggle, onSelect }) {
   );
 }
 
-const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = null, onOpenExternal, popupOnly = false }) => {
+const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = null, onOpenExternal, popupOnly = false, onOpenDoc }) => {
   const { fetchReportsBundle, fetchTrialBalance, fetchParties, parties } = useStore();
   const [fromDate, setFromDate] = useState(firstOfMonth);
   const [toDate, setToDate] = useState(lastOfMonth);
@@ -1062,6 +1066,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
             ]}
             rows={rows.map((r, i) => ({ ...r, _key: i }))}
             emptyText="No TDS entries in period"
+            onRowClick={onOpenDoc && ((r) => r.docType === 'Purchase' && onOpenDoc({ id: r._id, type: 'purchase' }))}
             onExport={() =>
               downloadCsv(
                 'tds-register.csv',
@@ -1088,6 +1093,7 @@ const ReportsHub = ({ isOpen, onClose, initialTab = 'summary', initialLeafId = n
             ]}
             rows={rows.map((r, i) => ({ ...r, _key: i }))}
             emptyText="No TCS entries in period"
+            onRowClick={onOpenDoc && ((r) => onOpenDoc({ id: r._id, type: 'sales' }))}
             onExport={() =>
               downloadCsv(
                 'tcs-register.csv',

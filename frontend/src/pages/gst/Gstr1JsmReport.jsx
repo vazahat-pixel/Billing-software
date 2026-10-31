@@ -106,10 +106,13 @@ const flat = (data, tab) => {
   }
 };
 
-const Grid = ({ cols, rows }) => {
+const SALES_TABS = new Set(['B2B', 'B2CL', 'B2CS']);
+
+const Grid = ({ cols, rows, tab, onOpenInvoice }) => {
   const th = 'px-1.5 py-[2px] border border-[#888] text-left text-[11px] font-bold whitespace-nowrap bg-[#e0e0e0] text-black';
   const td = (num) => `px-1.5 py-[1px] border border-[#ccc] text-[11px] whitespace-nowrap${num ? ' text-right tabular-nums' : ''}`;
   if (!rows.length) return <div className="p-4 text-[12px] text-[#555]">No records found.</div>;
+  const clickable = onOpenInvoice && SALES_TABS.has(tab);
   return (
     <div className="overflow-auto flex-1 min-h-0">
       <table className="border-collapse w-max min-w-full">
@@ -118,7 +121,11 @@ const Grid = ({ cols, rows }) => {
         </thead>
         <tbody>
           {rows.map((r, i) => (
-            <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#f7f7f7]'}>
+            <tr
+              key={i}
+              className={`${i % 2 === 0 ? 'bg-white' : 'bg-[#f7f7f7]'}${clickable && r.invoiceNo ? ' cursor-pointer hover:bg-blue-50' : ''}`}
+              onClick={clickable && r.invoiceNo ? () => onOpenInvoice(r.invoiceNo) : undefined}
+            >
               {cols.map((c) => {
                 const v = r[c.key];
                 const disp = c.fmt ? c.fmt(v) : (v ?? '');
@@ -133,7 +140,7 @@ const Grid = ({ cols, rows }) => {
 };
 
 /** JSM-style GSTR-1 window: header bar + B2B/B2CL/… tabs + JSM column names + Generate Excel / Exit */
-const Gstr1JsmReport = ({ isOpen, onClose }) => {
+const Gstr1JsmReport = ({ isOpen, onClose, onOpenInvoice }) => {
   const { fetchGstr1 } = useStore();
   const today = useMemo(() => new Date(), []);
   const [from, setFrom] = useState(() => iso(fyStart(today)));
@@ -214,7 +221,7 @@ const Gstr1JsmReport = ({ isOpen, onClose }) => {
               {loading ? 'Loading data…' : 'Press LoadData to fetch GSTR-1 data'}
             </div>
           ) : (
-            <Grid cols={cols} rows={rows} />
+            <Grid cols={cols} rows={rows} tab={tab} onOpenInvoice={onOpenInvoice} />
           )}
         </div>
 

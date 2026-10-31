@@ -1399,6 +1399,51 @@ const Dashboard = () => {
       { id: 'desk', label: 'Desk', title: 'CA Desk', small: true },
    ];
    const showKeyHelp = () => toast.info('1 Sales · 2 Pur · 3 Rec · 4 Pay · Z Trail · 5 M.Iss · 6 M.Rec · 7 J.Iss · 8 J.Rec · 9 Debt O/s · Alt menu · F9 toolbar · F2 year · F3 company. Inside a bill: Enter next field, Ctrl+Enter save, Esc close.');
+   const onOpenJobById = (id) => {
+      const jobs = useStore.getState().jobWorkEntries || [];
+      const found = jobs.find((j) => idOf(j._id || j.id) === String(id));
+      if (!found) { toast.info('This record could not be opened'); return; }
+      const isJobWork = String(found.processType || '') === 'Job Work';
+      setJobInitialId(idOf(found._id || found.id));
+      toggleModal(isJobWork ? 'jobRec' : 'millRec', true);
+      setTimeout(() => focusErpWindow(isJobWork ? 'jobRec' : 'millRec'), 40);
+   };
+   const onOpenJsmReportRow = (row) => {
+      if (row?.ENT_NO) onOpenJobById(row.ENT_NO);
+   };
+   const onOpenGstr1Invoice = async (invoiceNo) => {
+      try {
+         const found = await resolveSaleDoc(sales, '', invoiceNo);
+         if (!found) { toast.error('Bill could not be opened'); return; }
+         setSalesInitialData(found);
+         toggleModal('sales', true);
+         setTimeout(() => focusErpWindow('sales'), 40);
+      } catch {
+         toast.error('Bill could not be opened');
+      }
+   };
+   const onOpenGstinRow = async ({ id, sourceType }) => {
+      try {
+         if (sourceType === 'sales') {
+            const found = await resolveSaleDoc(sales, id, '');
+            if (!found) { toast.error('Bill could not be opened'); return; }
+            setSalesInitialData(found);
+            toggleModal('sales', true);
+            setTimeout(() => focusErpWindow('sales'), 40);
+         } else if (sourceType === 'purchase') {
+            const found = await resolvePurchaseDoc(purchases, id, '');
+            if (!found) { toast.error('Bill could not be opened'); return; }
+            setPurchaseInitialData(found);
+            toggleModal('purchase', true);
+            setTimeout(() => focusErpWindow('purchase'), 40);
+         } else if (sourceType === 'job') {
+            onOpenJobById(id);
+         }
+      } catch {
+         toast.error('Bill could not be opened');
+      }
+   };
+
    const [ledgerOpenSeed, setLedgerOpenSeed] = useState(null);
    const onOpenReportLedger = ({ ledgerId, name }) => {
       if (!ledgerId && !name) return;
@@ -2533,9 +2578,9 @@ const Dashboard = () => {
                   mode="beam"
                />
             )}
-            {modals.gstinJsm && <GstinJsmReport isOpen kind={gstinJsmKind} onClose={() => toggleModal('gstinJsm', false)} />}
+            {modals.gstinJsm && <GstinJsmReport isOpen kind={gstinJsmKind} onClose={() => toggleModal('gstinJsm', false)} onOpenRow={onOpenGstinRow} />}
             {modals.gst3bMonthly && <Gst3bMonthlyModal isOpen onClose={() => toggleModal('gst3bMonthly', false)} />}
-            {modals.gstr1 && <Gstr1Modal isOpen onClose={() => toggleModal('gstr1', false)} />}
+            {modals.gstr1 && <Gstr1Modal isOpen onClose={() => toggleModal('gstr1', false)} onOpenInvoice={onOpenGstr1Invoice} />}
             {modals.gstReports && (
                <GstReportsHub
                   isOpen
@@ -2796,6 +2841,7 @@ const Dashboard = () => {
                   isOpen={Boolean(jsmReportForm)}
                   onClose={() => setJsmReportForm(null)}
                   companyName={user?.companyName || user?.company?.name || companySettings?.legalName || companyMeta?.name || ''}
+                  onOpenRow={onOpenJsmReportRow}
                />
             </Suspense>
          )}
@@ -2805,6 +2851,25 @@ const Dashboard = () => {
             initialTab={modals.reportsTab}
             initialLeafId={modals.reportsLeafId}
             popupOnly={Boolean(modals.reportsLeafId)}
+            onOpenDoc={async ({ id, type }) => {
+               try {
+                  if (type === 'purchase') {
+                     const found = await resolvePurchaseDoc(purchases, id, '');
+                     if (!found) { toast.error('Bill could not be opened'); return; }
+                     setPurchaseInitialData(found);
+                     toggleModal('purchase', true);
+                     setTimeout(() => focusErpWindow('purchase'), 40);
+                  } else if (type === 'sales') {
+                     const found = await resolveSaleDoc(sales, id, '');
+                     if (!found) { toast.error('Bill could not be opened'); return; }
+                     setSalesInitialData(found);
+                     toggleModal('sales', true);
+                     setTimeout(() => focusErpWindow('sales'), 40);
+                  }
+               } catch {
+                  toast.error('Bill could not be opened');
+               }
+            }}
             onOpenExternal={(node) => {
                const ext = typeof node === 'string' ? node : node?.external;
                setModals(prev => ({ ...prev, reportsHub: false, reportsLeafId: null }));

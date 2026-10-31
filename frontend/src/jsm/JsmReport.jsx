@@ -24,7 +24,7 @@ export function hasJsmReport(formName) {
 }
 
 /** A JSM report: its parameter screen, then JSM's "Report Control" grid. */
-export default function JsmReport({ formName, isOpen, onClose, companyName = '' }) {
+export default function JsmReport({ formName, isOpen, onClose, companyName = '', onOpenRow }) {
   const config = JSM_REPORTS[formName];
   const [blueprint, setBlueprint] = useState(null);
   const [lists, setLists] = useState({});
@@ -126,6 +126,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '' 
                 fallbackColumns={config.fallbackColumns}
                 companyName={companyName}
                 onClose={() => setResult(null)}
+                onOpenRow={onOpenRow}
               />
             </div>
           </div>

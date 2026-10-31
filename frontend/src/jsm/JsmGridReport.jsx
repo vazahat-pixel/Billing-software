@@ -21,7 +21,7 @@ function Btn({ b, onClick }) {
   );
 }
 
-export default function JsmGridReport({ result, layouts, fallbackColumns, companyName, onClose }) {
+export default function JsmGridReport({ result, layouts, fallbackColumns, companyName, onClose, onOpenRow }) {
   const { rows = [], grid = {} } = result || {};
   const allColumns = useMemo(
     () => layoutColumns(layouts, grid.layout, grid.variant, {
@@ -79,9 +79,12 @@ export default function JsmGridReport({ result, layouts, fallbackColumns, compan
             {lines.map((l, i) => (
               <tr
                 key={i}
-                className={`${l.type}${i === selected ? ' is-selected' : ''}`}
+                className={`${l.type}${i === selected ? ' is-selected' : ''}${onOpenRow && l.type === 'detail' && l.row?.ENT_NO ? ' jsmg-row--clickable' : ''}`}
                 style={l.style}
-                onClick={() => setSelected(i)}
+                onClick={() => {
+                  setSelected(i);
+                  if (onOpenRow && l.type === 'detail' && l.row?.ENT_NO) onOpenRow(l.row);
+                }}
               >
                 <td className="jsmg-rowhead">{i === selected ? '▶' : ''}</td>
                 {l.cells.map((v, k) => (

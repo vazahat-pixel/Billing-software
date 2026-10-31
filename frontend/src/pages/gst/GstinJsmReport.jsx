@@ -28,7 +28,9 @@ const COLS = ['BILL.NO', 'BILL.DT', 'PARTY', 'TAXABLE.AMT', 'SGST.AMT', 'CGST.AM
 const sumRows = (rows) => rows.reduce((a, r) => ({ t: a.t + (r.taxableAmount || 0), s: a.s + (r.sgst || 0), c: a.c + (r.cgst || 0), i: a.i + (r.igst || 0), b: a.b + (r.netAmount || 0) }), { t: 0, s: 0, c: 0, i: 0, b: 0 });
 
 /** JSM's "GSTIN All ... Reports": dialog (From / To, GroupBy) then a REGISTER > GSTIN_NO grouped grid with totals. */
-const GstinJsmReport = ({ isOpen, onClose, kind = 'gstinPurchase' }) => {
+const SOURCE_TYPE = { salesDetail: 'sales', purchaseDetail: 'purchase', process: 'job', jobwork: 'job' };
+
+const GstinJsmReport = ({ isOpen, onClose, kind = 'gstinPurchase', onOpenRow }) => {
   const cfg = KINDS[kind] || KINDS.gstinPurchase;
   const today = useMemo(() => new Date(), []);
   const [from, setFrom] = useState(() => iso(fyStart(today)));
@@ -47,7 +49,7 @@ const GstinJsmReport = ({ isOpen, onClose, kind = 'gstinPurchase' }) => {
     try {
       const out = [];
       for (const [reg, fn] of cfg.fetch) {
-        const rows = flat(await gstinReportApi[fn]({ fromDate: from, toDate: to }));
+        const rows = flat(await gstinReportApi[fn]({ fromDate: from, toDate: to })).map((r) => ({ ...r, _sourceType: SOURCE_TYPE[fn] }));
         // purchase / sales rows carry their own book; keep them under that register name when present
         const by = new Map();
         rows.forEach((r) => {
@@ -112,7 +114,11 @@ const GstinJsmReport = ({ isOpen, onClose, kind = 'gstinPurchase' }) => {
                           <React.Fragment key={g || 'none'}>
                             <tr className="bg-[#eef3d6]"><td colSpan={9} className={cell}>GSTIN_NO - {g}</td></tr>
                             {!summary && list.map((r, i) => (
-                              <tr key={`${r._id || i}-${i}`} className="hover:bg-[#fff6dd]">
+                              <tr
+                                key={`${r._id || i}-${i}`}
+                                className={`hover:bg-[#fff6dd]${onOpenRow && r._id ? ' cursor-pointer' : ''}`}
+                                onClick={onOpenRow && r._id ? () => onOpenRow({ id: r._id, sourceType: r._sourceType }) : undefined}
+                              >
                                 <td className={cell}>{billNo(r)}</td><td className={cell}>{dmy(r.date)}</td><td className={cell}>{r.partyName}</td>
                                 <td className={num}>{n2(r.taxableAmount)}</td><td className={num}>{n2(r.sgst)}</td><td className={num}>{n2(r.cgst)}</td><td className={num}>{n2(r.igst)}</td>
                                 <td className={cell}>{r.reverseCharge === 'Y' ? 'Yes' : 'No'}</td><td className={num}>{n2(r.netAmount)}</td>
