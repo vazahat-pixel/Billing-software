@@ -34,19 +34,14 @@ async function setAgentContext(patch) {
   );
 }
 
-async function centralFetch(path, { method = 'GET', body, token, deviceId, operationId } = {}) {
+async function centralFetch(path, { method = 'GET', body, token, deviceId } = {}) {
   const base = centralBase();
   if (!base) throw new Error('CENTRAL_API_BASE_URL not configured');
   const headers = {
     'Content-Type': 'application/json',
     'X-Device-Id': deviceId || '',
-    // Tells a local API (when the target is one) that this came from sync, so it is not re-queued.
-    'X-From-Sync': 'true',
   };
   if (token) headers.Authorization = `Bearer ${token}`;
-  // Exactly-once on the cloud: middlewares/idempotency.middleware stores the first reply under this
-  // key and returns it again if a retry arrives, so a lost response cannot post the entry twice.
-  if (operationId) headers['Idempotency-Key'] = operationId;
   const res = await fetch(`${base}${path}`, {
     method,
     headers,
@@ -75,63 +70,6 @@ async function renewLeaseIfNeeded(ctx) {
   await numberLeaseService.cacheLeaseLocally(ctx.companyId, lease);
 }
 
-/**
- * Replay rows (entityType 'rest') carry a request the cloud should run through its own controller,
- * so they go to that endpoint one at a time and in sequence order, not to /sync/push. A row whose
- * ids are not on the cloud yet is left PENDING and picked up on a later tick, once the create it
- * depends on has been pushed.
- */
-async function pushReplays(ctx, rows) {
-  const syncIdMapService = require('./syncIdMapService');
-  const { buildReplayRequest } = require('./syncIdMapCore');
-
-  let pushed = 0;
-  let deferred = 0;
-
-  for (const row of rows) {
-    const idMap = await syncIdMapService.loadMap(ctx.companyId);
-    const unsynced = await syncIdMapService.unsyncedLocalIds(ctx.companyId);
-    unsynced.delete(String(row.entityId)); // its own id must not block it
-
-    const req = buildReplayRequest(row, idMap, unsynced);
-    if (!req.ready) {
-      deferred += 1;
-      await syncOutboxService.markFailed(row.operationId, row.companyId, {
-        errorCode: 'WAITING',
-        errorMessage: `waiting for ${req.waitingOn.join(', ')} to reach the cloud`,
-      });
-      continue;
-    }
-
-    await syncOutboxService.markSyncing(row.operationId, row.companyId);
-    try {
-      const result = await centralFetch(req.path, {
-        method: req.method,
-        body: req.body,
-        token: ctx.token,
-        deviceId: ctx.deviceId,
-        operationId: row.operationId,
-      });
-      const serverId = result?._id || result?.id || '';
-      if (row.entityId && serverId) {
-        await syncIdMapService.recordMapping(ctx.companyId, 'rest', row.entityId, serverId);
-      }
-      await syncOutboxService.markSynced(row.operationId, ctx.companyId, { serverEntityId: serverId });
-      pushed += 1;
-    } catch (err) {
-      // 4xx other than 409 will not fix itself by retrying, but we still keep the row so the
-      // owner can see it instead of the entry disappearing.
-      await syncOutboxService.markFailed(row.operationId, row.companyId, {
-        errorCode: String(err.status || 'NETWORK'),
-        errorMessage: err.message,
-        conflict: err.status === 409,
-      });
-    }
-  }
-
-  return { pushed, deferred };
-}
-
 async function pushPending(ctx) {
   const pending = await syncOutboxService.listPending({
     companyId: ctx.companyId,
@@ -139,20 +77,8 @@ async function pushPending(ctx) {
   });
   if (!pending.length) return { pushed: 0 };
 
-  // Typed rows go to /sync/push; REST replays run against their own endpoint.
-  const replayRows = pending.filter((r) => String(r.entityType) === 'rest');
-  const typedRows = pending.filter((r) => String(r.entityType) !== 'rest');
-
-  // Creates first: a replay usually depends on them having a cloud id.
-  let replayResult = { pushed: 0, deferred: 0 };
-
-  if (!typedRows.length) {
-    replayResult = await pushReplays(ctx, replayRows);
-    return { pushed: replayResult.pushed, deferred: replayResult.deferred };
-  }
-
   const operations = [];
-  for (const row of typedRows) {
+  for (const row of pending) {
     await syncOutboxService.markSyncing(row.operationId, row.companyId);
     operations.push({
       operationId: row.operationId,
@@ -171,18 +97,11 @@ async function pushPending(ctx) {
       deviceId: ctx.deviceId,
       body: { deviceId: ctx.deviceId, operations },
     });
-    const syncIdMapService = require('./syncIdMapService');
     for (const acc of result.acceptedOperations || []) {
       await syncOutboxService.markSynced(acc.operationId, ctx.companyId, {
         serverEntityId: acc.entityId,
         serverInvoiceNo: acc.invoiceNo,
       });
-      // The cloud minted its own _id — remember it, or a later receipt or edit against this
-      // document would be replayed with an id the cloud has never seen.
-      const local = typedRows.find((r) => r.operationId === acc.operationId);
-      if (local?.entityId && acc.entityId) {
-        await syncIdMapService.recordMapping(ctx.companyId, local.entityType, local.entityId, acc.entityId);
-      }
     }
     for (const fail of result.failedOperations || []) {
       console.warn('[syncAgentWorker] push failed operation:', JSON.stringify(fail));
@@ -198,20 +117,14 @@ async function pushPending(ctx) {
         conflict: true,
       });
     }
-    // Now that the creates have cloud ids, the replays that depend on them can go.
-    if (replayRows.length) replayResult = await pushReplays(ctx, replayRows);
-
     await setAgentContext({
       lastSyncedAt: new Date().toISOString(),
       lastError: null,
       syncState: 'synced',
     });
-    return {
-      pushed: (result.acceptedOperations || []).length + replayResult.pushed,
-      deferred: replayResult.deferred,
-    };
+    return { pushed: (result.acceptedOperations || []).length };
   } catch (err) {
-    for (const row of typedRows) {
+    for (const row of pending) {
       await syncOutboxService.markFailed(row.operationId, row.companyId, {
         errorCode: String(err.status || 'NETWORK'),
         errorMessage: err.message,

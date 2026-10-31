@@ -21,10 +21,8 @@ const SyncOutboxSchema = new mongoose.Schema(
     entityType: { type: String, required: true, index: true },
     entityId: { type: mongoose.Schema.Types.Mixed, default: null },
     operationType: {
-      // 'replay' carries a whole request (method, path, body) that the cloud re-runs through its own
-      // controller — used for entries whose logic lives in a controller rather than a service.
       type: String,
-      enum: ['create', 'update', 'delete', 'replay'],
+      enum: ['create', 'update', 'delete'],
       required: true,
     },
     payload: { type: mongoose.Schema.Types.Mixed, default: {} },
