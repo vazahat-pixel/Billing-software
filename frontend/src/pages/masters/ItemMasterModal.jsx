@@ -372,7 +372,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
   const isFormLocked = readOnly || mode === 'VIEW';
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[820px]">
+    <Modal isOpen={isOpen} onClose={onClose} bare className="max-w-[840px]">
       <div 
         className="classic-erp-window flex flex-col max-h-[92vh] bg-[#f8fafc] select-none text-slate-800 border-2 border-slate-700 shadow-2xl rounded-sm"
         tabIndex={0}
@@ -559,15 +559,18 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
           ) : (
             /* ================= COMPACT & CLEAN FORM ================= */
             <div 
-              className="flex gap-4 p-3 bg-white border border-slate-300 rounded shadow-xs" 
+              className="flex gap-4 p-4 bg-white border border-slate-300 rounded shadow-xs" 
               onKeyDown={handleFormEnterKeyDown}
               data-form-enter-nav
             >
-              {/* LEFT COLUMN: Exactly user's selected fields, compactly arranged */}
-              <div className="flex-1 flex flex-col gap-2 min-w-0">
+              {/* LEFT COLUMN: Clean left-aligned form fields matching classic desktop ERP layout */}
+              <div 
+                className="flex-1 flex flex-col min-w-0"
+                style={{ gap: '10px', alignItems: 'stretch' }}
+              >
                 {/* Row 1: Item Name */}
-                <div className="flex items-center gap-2">
-                  <span className="w-32 text-[11px] font-semibold text-slate-800 shrink-0">Item Name</span>
+                <div className="flex items-center gap-2 w-full">
+                  <span className="w-36 text-[11px] font-semibold text-slate-800 shrink-0">Item Name</span>
                   <input
                     ref={itemNameRef}
                     data-enter-order="1"
@@ -581,8 +584,8 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                 </div>
 
                 {/* Row 2: ItemCode & Hsn Code */}
-                <div className="flex items-center gap-2">
-                  <span className="w-32 text-[11px] font-semibold text-slate-800 shrink-0">ItemCode</span>
+                <div className="flex items-center gap-2 w-full">
+                  <span className="w-36 text-[11px] font-semibold text-slate-800 shrink-0">ItemCode</span>
                   <input
                     data-enter-order="2"
                     type="text"
@@ -605,14 +608,14 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                 </div>
 
                 {/* Row 3: Category & Unit */}
-                <div className="flex items-center gap-2">
-                  <span className="w-32 text-[11px] font-semibold text-slate-800 shrink-0">Category</span>
+                <div className="flex items-center gap-2 w-full">
+                  <span className="w-36 text-[11px] font-semibold text-slate-800 shrink-0">Category</span>
                   <select
                     data-enter-order="4"
                     value={formData.group}
                     onChange={(e) => setField('group', e.target.value)}
                     disabled={isFormLocked}
-                    className="w-44 h-7 border border-slate-400 bg-white px-2 text-xs font-semibold uppercase rounded-none focus:border-blue-600 focus:bg-amber-50/40 outline-none disabled:bg-slate-100"
+                    className="w-48 h-7 border border-slate-400 bg-white px-2 text-xs font-semibold uppercase rounded-none focus:border-blue-600 focus:bg-amber-50/40 outline-none disabled:bg-slate-100"
                   >
                     {CATEGORY_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
@@ -624,7 +627,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                     value={formData.unit}
                     onChange={(e) => setField('unit', e.target.value)}
                     disabled={isFormLocked}
-                    className="w-24 h-7 border border-slate-400 bg-white px-2 text-xs font-semibold uppercase rounded-none focus:border-blue-600 focus:bg-amber-50/40 outline-none disabled:bg-slate-100"
+                    className="w-28 h-7 border border-slate-400 bg-white px-2 text-xs font-semibold uppercase rounded-none focus:border-blue-600 focus:bg-amber-50/40 outline-none disabled:bg-slate-100"
                   >
                     {UNIT_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
@@ -633,8 +636,8 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                 </div>
 
                 {/* Row 4: Op.Pcs & Cut */}
-                <div className="flex items-center gap-2">
-                  <span className="w-32 text-[11px] font-semibold text-slate-800 shrink-0">Op.Pcs</span>
+                <div className="flex items-center gap-2 w-full">
+                  <span className="w-36 text-[11px] font-semibold text-slate-800 shrink-0">Op.Pcs</span>
                   <input
                     data-enter-order="6"
                     type="number"
@@ -656,8 +659,8 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                 </div>
 
                 {/* Row 5: Op.Qty, Op.Rate, Op.Value */}
-                <div className="flex items-center gap-2">
-                  <span className="w-32 text-[11px] font-semibold text-slate-800 shrink-0">Op.Qty</span>
+                <div className="flex items-center gap-2 w-full">
+                  <span className="w-36 text-[11px] font-semibold text-slate-800 shrink-0">Op.Qty</span>
                   <input
                     data-enter-order="8"
                     type="number"
@@ -684,13 +687,13 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                     type="number"
                     disabled
                     value={formData.opValue}
-                    className="w-28 h-7 border border-slate-300 bg-slate-100 px-2 text-xs font-mono font-bold text-right rounded-none text-emerald-800"
+                    className="w-24 h-7 border border-slate-300 bg-slate-100 px-2 text-xs font-mono font-bold text-right rounded-none text-emerald-800"
                   />
                 </div>
 
                 {/* Row 6: Pu.Rate, Sl.Rate, MRP */}
-                <div className="flex items-center gap-2">
-                  <span className="w-32 text-[11px] font-semibold text-slate-800 shrink-0">Pu.Rate</span>
+                <div className="flex items-center gap-2 w-full">
+                  <span className="w-36 text-[11px] font-semibold text-slate-800 shrink-0">Pu.Rate</span>
                   <input
                     data-enter-order="10"
                     type="number"
@@ -710,7 +713,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                     disabled={isFormLocked}
                     className="w-24 h-7 border border-slate-400 bg-white px-2 text-xs font-mono font-bold text-right text-blue-900 rounded-none focus:border-blue-600 focus:bg-amber-50/40 outline-none disabled:bg-slate-100"
                   />
-                  <span className="w-14 text-[11px] font-semibold text-slate-800 text-right pr-2 shrink-0">MRP</span>
+                  <span className="w-16 text-[11px] font-semibold text-slate-800 text-right pr-2 shrink-0">MRP</span>
                   <input
                     data-enter-order="12"
                     type="number"
@@ -723,8 +726,8 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                 </div>
 
                 {/* Row 7: Eway Bill Prod.Name */}
-                <div className="flex items-center gap-2">
-                  <span className="w-32 text-[11px] font-semibold text-slate-800 shrink-0">Eway Bill Prod.Name</span>
+                <div className="flex items-center gap-2 w-full">
+                  <span className="w-36 text-[11px] font-semibold text-slate-800 shrink-0">Eway Bill Prod.Name</span>
                   <input
                     data-enter-order="13"
                     type="text"
@@ -736,8 +739,8 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                 </div>
 
                 {/* Row 8: Description */}
-                <div className="flex items-center gap-2">
-                  <span className="w-32 text-[11px] font-semibold text-slate-800 shrink-0">Description</span>
+                <div className="flex items-center gap-2 w-full">
+                  <span className="w-36 text-[11px] font-semibold text-slate-800 shrink-0">Description</span>
                   <input
                     data-enter-order="14"
                     type="text"
@@ -749,8 +752,8 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                 </div>
 
                 {/* Row 9: GST TAX RATE */}
-                <div className="flex items-center gap-2">
-                  <span className="w-32 text-[11px] font-bold text-slate-800 shrink-0">GST TAX RATE</span>
+                <div className="flex items-center gap-2 w-full">
+                  <span className="w-36 text-[11px] font-bold text-slate-800 shrink-0">GST TAX RATE</span>
                   <select
                     data-enter-order="15"
                     value={formData.gstTaxLabel}
@@ -765,8 +768,8 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                 </div>
 
                 {/* Row 10: Hindi Name */}
-                <div className="flex items-center gap-2">
-                  <span className="w-32 text-[11px] font-semibold text-slate-800 shrink-0">Hindi Name</span>
+                <div className="flex items-center gap-2 w-full">
+                  <span className="w-36 text-[11px] font-semibold text-slate-800 shrink-0">Hindi Name</span>
                   <input
                     data-enter-order="16"
                     type="text"
@@ -780,8 +783,11 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
               </div>
 
               {/* RIGHT COLUMN: Clean Image box with Browse & Remove Image */}
-              <div className="w-48 flex flex-col gap-2 shrink-0 border-l border-slate-200 pl-3">
-                <div className="flex gap-1">
+              <div 
+                className="w-48 flex flex-col shrink-0 border-l border-slate-200 pl-3"
+                style={{ gap: '8px' }}
+              >
+                <div className="flex gap-1 w-full">
                   <input
                     ref={fileRef}
                     type="file"
@@ -799,7 +805,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                     onClick={() => fileRef.current?.click()}
                     className="flex-1 h-7 border border-slate-400 bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-semibold rounded-none disabled:opacity-40"
                   >
-                    Brows Image
+                    Browse Image
                   </button>
                   <button
                     type="button"
@@ -813,7 +819,7 @@ const ItemMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null
                   </button>
                 </div>
 
-                <div className="w-full h-44 border border-slate-400 bg-white flex items-center justify-center overflow-hidden rounded-none shadow-inner">
+                <div className="w-full h-48 border border-slate-400 bg-white flex items-center justify-center overflow-hidden rounded-none shadow-inner">
                   {formData.imageUrl ? (
                     <img
                       src={formData.imageUrl}
