@@ -84,7 +84,13 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '' 
 
   return (
     <>
-      <ErpWindowedModal isOpen={!result} onClose={onClose} title={form?.title || 'Report'} windowId={`jsm-${formName}`}>
+      <ErpWindowedModal
+        isOpen={!result}
+        onClose={onClose}
+        title={form?.title || 'Report'}
+        windowId={`jsm-${formName}`}
+        initialSize={form?.width && form?.height ? { w: form.width + 24, h: form.height + 56 } : undefined}
+      >
         {({ WindowControls }) => (
           <div className="jsm-window">
             <div className="jsm-titlebar">

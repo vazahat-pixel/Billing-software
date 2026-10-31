@@ -23,10 +23,13 @@ export function minimizeErpWindow(windowId) {
   window.dispatchEvent(new CustomEvent('erp-window-minimize', { detail: { id: windowId } }));
 }
 
-const floatingSize = () => {
-  if (typeof window === 'undefined') return { w: 1100, h: 640 };
+const floatingSize = (initialSize) => {
+  if (typeof window === 'undefined') return { w: initialSize?.w || 1100, h: initialSize?.h || 640 };
   const maxW = Math.max(320, window.innerWidth - 24);
   const maxH = Math.max(280, window.innerHeight - TOP_CHROME - 28);
+  if (initialSize?.w && initialSize?.h) {
+    return { w: Math.min(maxW, initialSize.w), h: Math.min(maxH, initialSize.h) };
+  }
   return {
     w: Math.min(maxW, 1180),
     h: Math.min(maxH, 660),
@@ -47,11 +50,11 @@ const floatingPos = (box) => {
  * @param {{ id?: string, title?: string, onClose?: () => void }} options
  */
 export default function useErpWindow(isOpen, options = {}) {
-  const { id = 'window', title = 'Window', onClose, defaultMode = 'normal' } = options;
+  const { id = 'window', title = 'Window', onClose, defaultMode = 'normal', initialSize } = options;
   const [mode, setMode] = useState(defaultMode);
   const [z, setZ] = useState(1200);
-  const [box, setBox] = useState(floatingSize);
-  const [pos, setPos] = useState(() => floatingPos(floatingSize(), id));
+  const [box, setBox] = useState(() => floatingSize(initialSize));
+  const [pos, setPos] = useState(() => floatingPos(floatingSize(initialSize)));
   const resizing = useRef(null);
   const dragging = useRef(null);
   const onCloseRef = useRef(onClose);

@@ -13,13 +13,14 @@ export default function ErpWindowedModal({
   title = 'Window',
   windowId,
   defaultMode = 'normal',
+  initialSize,
   bare = true,
   className,
   children,
   ...modalProps
 }) {
   const id = windowId || title || 'window';
-  const win = useErpWindow(isOpen, { id, title, onClose, defaultMode });
+  const win = useErpWindow(isOpen, { id, title, onClose, defaultMode, initialSize });
 
   const WindowControls = () => (
     <ErpWindowControls

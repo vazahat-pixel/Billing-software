@@ -64,12 +64,12 @@ const HSN_COLS = [
   { key: 'iamt',  label: 'IGST',       w: 100, num: true, fmt: n2 },
 ];
 const DOCS_COLS = [
-  { key: 'num',   label: 'DOC_TYPE',   w: 200 },
-  { key: 'from',  label: 'FROM',       w: 100 },
-  { key: 'to',    label: 'TO',         w: 100 },
-  { key: 'totnum',label: 'TOTAL',      w: 80, num: true },
-  { key: 'cancel',label: 'CANCELLED',  w: 80, num: true },
-  { key: 'net',   label: 'NET_ISSUED', w: 80, num: true },
+  { key: 'docType', label: 'DOC_TYPE',   w: 200 },
+  { key: 'from',    label: 'FROM',       w: 100 },
+  { key: 'to',      label: 'TO',         w: 100 },
+  { key: 'totnum',  label: 'TOTAL',      w: 80, num: true },
+  { key: 'cancel',  label: 'CANCELLED',  w: 80, num: true },
+  { key: 'net_issue', label: 'NET_ISSUED', w: 80, num: true },
 ];
 const EXP_COLS = [
   { key: 'exportType', label: 'EXP_TYPE', w: 80  },
@@ -78,7 +78,7 @@ const EXP_COLS = [
   { key: 'taxRate',    label: 'TAX_RATE', w: 80, num: true },
   { key: 'taxableAmount', label: 'TAXABLE', w: 110, num: true, fmt: n2 },
   { key: 'igst',       label: 'IGST',    w: 100, num: true, fmt: n2 },
-  { key: 'netAmount',  label: 'BILL_AMT',w: 110, num: true, fmt: n2 },
+  { key: 'invoiceValue', label: 'BILL_AMT',w: 110, num: true, fmt: n2 },
 ];
 const EXEMP_COLS = [
   { key: 'description', label: 'DESCRIPTION', w: 300 },
@@ -90,17 +90,18 @@ const EXEMP_COLS = [
 const COLS_MAP = { B2B: B2B_COLS, B2CL: B2CL_COLS, B2CS: B2CS_COLS, CDNR: CDNR_COLS, CDNU: CDNR_COLS, HSN: HSN_COLS, 'HSN B2C': HSN_COLS, DOCS: DOCS_COLS, EXP: EXP_COLS, EXEMP: EXEMP_COLS };
 
 const flat = (data, tab) => {
-  const p = data?.payload || {};
+  const p = data?.payload || data || {};
   switch (tab) {
-    case 'B2B': return (p.b2b || []).flatMap((inv) => (inv.inv || []).flatMap((i) => (i.itms || []).map((it) => ({ ...inv, ...i, ...it.itm_det, invoiceNo: i.inum, date: i.idt, gstin: inv.ctin, partyName: inv.cname || inv.partyName || '', stateName: i.pos || inv.pos || '', invType: i.inv_typ || 'Regular B2B', reverseCharge: i.rchrg || 'N' }))));
-    case 'B2CL': return (p.b2cl || []).flatMap((s) => (s.inv || []).flatMap((i) => (i.itms || []).map((it) => ({ ...i, ...it.itm_det, invoiceNo: i.inum, date: i.idt, stateName: s.pos || '' }))));
+    case 'B2B': return p.b2bRows || [];
+    case 'B2CL': return p.b2clRows || [];
     case 'B2CS': return p.b2cs || [];
-    case 'CDNR': return (p.cdnr || []).flatMap((c) => (c.nt || []).flatMap((n) => (n.itms || []).map((it) => ({ ...n, ...it.itm_det, gstin: c.ctin, partyName: c.cname || c.partyName || '', noteNo: n.nt_num, noteDate: n.nt_dt, noteType: n.ntty }))));
-    case 'CDNU': return (p.cdnur || []).flatMap((n) => (n.itms || []).map((it) => ({ ...n, ...it.itm_det, noteNo: n.nt_num, noteDate: n.nt_dt, noteType: n.ntty })));
-    case 'HSN': case 'HSN B2C': return (p.hsn?.data || []);
-    case 'DOCS': return (p.doc_issue?.doc_det || []).flatMap((d) => (d.docs || []).map((doc) => ({ num: d.doc_num, ...doc })));
-    case 'EXP': return (p.exp || []).flatMap((e) => (e.inv || []).flatMap((i) => (i.itms || []).map((it) => ({ ...i, ...it.itm_det, exportType: e.exp_typ, invoiceNo: i.inum, date: i.idt }))));
-    case 'EXEMP': return p.nil?.inv || [];
+    case 'CDNR': return p.cdnrRows || [];
+    case 'CDNU': return p.cdnuRows || [];
+    case 'HSN': return p.hsnRows || p.hsn?.data || [];
+    case 'HSN B2C': return p.hsnB2cRows || p.hsn?.data || [];
+    case 'DOCS': return p.docsRows || [];
+    case 'EXP': return p.expRows || [];
+    case 'EXEMP': return p.exempRows || [];
     default: return [];
   }
 };
