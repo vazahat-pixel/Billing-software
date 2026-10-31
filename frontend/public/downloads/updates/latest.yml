@@ -1,8 +1,14 @@
-version: 1.0.6
+version: 1.0.11
 files:
-  - url: TextileERP-Setup-1.0.6.exe
-    sha512: i5cLjzug9/dlCMgOov+0CcL0fdDw5sgO9BwdNTqQu/8N0S5QEIPxp9xqjUb6LtqUpmh5JrfvEn67zAW+V47Ihw==
-    size: 90100899
-path: TextileERP-Setup-1.0.6.exe
-sha512: i5cLjzug9/dlCMgOov+0CcL0fdDw5sgO9BwdNTqQu/8N0S5QEIPxp9xqjUb6LtqUpmh5JrfvEn67zAW+V47Ihw==
-releaseDate: '2026-10-29T06:54:14.016Z'
+  - url: TextileERP-Setup-1.0.11.exe
+    sha512: dTDZ+7cEhVPMLZrbPsTuhZOmIjeThJ7goDMWNQxd8L11hUjRDPGxtXiLfwn2O4se6GZwWy3yT/u93DhehmxkVQ==
+    size: 90122055
+path: TextileERP-Setup-1.0.11.exe
+sha512: dTDZ+7cEhVPMLZrbPsTuhZOmIjeThJ7goDMWNQxd8L11hUjRDPGxtXiLfwn2O4se6GZwWy3yT/u93DhehmxkVQ==
+releaseNotes: |
+  - GSTR-1 fixed: the report was showing "No records found" on every tab due to a data-shape bug; also fixed B2CS showing blank tax rate/taxable/CGST/SGST/IGST.
+  - Reports menu (Fas Reports, Final Reports, Sales, Purchase, …) now opens a right-side flyout like JSM, at every nesting level, instead of a stacked dropdown.
+  - GSTR-1 and GSTR-3B detail report windows can now be scrolled when there are many rows.
+  - JSM report windows (Process Stock, Trial Balance, etc.) no longer leave a large empty area — they size to the real JSM form.
+  - Click-through added: Outstanding, Trial Balance, Profit & Loss, Balance Sheet, Group List, Process/JobWork Stock reports, GSTR-1, GSTIN registers, TDS and TCS registers — clicking a row now opens the Sales/Purchase/Ledger/Mill-Job record it came from.
+releaseDate: '2026-10-31T08:17:28.281Z'

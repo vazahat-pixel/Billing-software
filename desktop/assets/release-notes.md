@@ -1,5 +1,5 @@
-- Screens now follow JSM: menu order (Master, Transaction, Inventory, Reports, Others Reports, Utilities, Setup System, Company), the black quick toolbar (1 Sales, 2 Pur, 3 Rec, 4 Pay, Ledger, Z Trail, 5 M.Iss, 6 M.Rec, 7 J.Iss, 8 J.Rec, 9 Debt O/s), the home desktop with the 3B / GSTR-1 / 2B shortcuts, and the status line at the bottom.
-- Keys 1-9 and Z open the toolbar screens from the home screen; Alt alone moves to the menu bar.
-- GSTR-3B Monthly Return as JSM prints it: From / To dates, Screen / Print / Excel, sales, returns, notes and purchases by book.
-- GSTIN Sales / Purchase / Process / JobWork / Journal / Expense reports as JSM: register, GSTIN-wise totals and grand total.
-- Setup System > Setting and Others Reports menus arranged as in JSM.
+- GSTR-1 fixed: the report was showing "No records found" on every tab due to a data-shape bug; also fixed B2CS showing blank tax rate/taxable/CGST/SGST/IGST.
+- Reports menu (Fas Reports, Final Reports, Sales, Purchase, …) now opens a right-side flyout like JSM, at every nesting level, instead of a stacked dropdown.
+- GSTR-1 and GSTR-3B detail report windows can now be scrolled when there are many rows.
+- JSM report windows (Process Stock, Trial Balance, etc.) no longer leave a large empty area — they size to the real JSM form.
+- Click-through added: Outstanding, Trial Balance, Profit & Loss, Balance Sheet, Group List, Process/JobWork Stock reports, GSTR-1, GSTIN registers, TDS and TCS registers — clicking a row now opens the Sales/Purchase/Ledger/Mill-Job record it came from.
