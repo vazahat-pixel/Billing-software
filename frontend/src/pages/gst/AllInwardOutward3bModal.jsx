@@ -198,7 +198,7 @@ const AllInwardOutward3bModal = ({ isOpen, onClose }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Report Control — All Inward &amp; Outward Supply 3B" className="max-w-[1300px] w-full h-[min(92vh,840px)] p-0">
-      <div className="flex flex-col h-full bg-white text-black text-[11px]">
+      <div className="flex flex-col h-full min-h-0 bg-white text-black text-[11px]">
         <div className="flex-1 overflow-auto min-h-0">
           <table className="border-collapse w-max min-w-full">
             <thead className="sticky top-0 z-10">
@@ -254,7 +254,7 @@ const AllInwardOutward3bModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* Bottom bar */}
-        <div className="flex items-center gap-2 px-2 py-1 border-t border-[#888] bg-[#d4d0c8]">
+        <div className="shrink-0 flex items-center gap-2 px-2 py-1 border-t border-[#888] bg-[#d4d0c8]">
           <button type="button" className="h-6 px-3 border border-[#666] bg-[#d4d0c8] text-[11px] hover:bg-[#e8e8e8]">ColumnSet</button>
           <button type="button" className="flex-1 h-6 border border-[#666] bg-[#90d890] text-[11px] text-left px-2">Total Lenth</button>
           <button type="button" onClick={exportExcel} className="h-6 px-3 border border-[#666] bg-[#d4d0c8] text-[11px] hover:bg-[#e8e8e8]">Excel</button>

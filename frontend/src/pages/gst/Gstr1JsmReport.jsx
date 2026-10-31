@@ -182,9 +182,9 @@ const Gstr1JsmReport = ({ isOpen, onClose, onOpenInvoice }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="GSTR1_V3_2_2" className="max-w-[1300px] w-full h-[min(92vh,840px)] p-0">
-      <div className="flex flex-col h-full bg-[#f0f0f0] text-black text-[11px]">
+      <div className="flex flex-col h-full min-h-0 bg-[#f0f0f0] text-black text-[11px]">
         {/* JSM-style top filter bar */}
-        <div className="flex flex-wrap items-center gap-2 px-2 py-1 bg-[#d4d0c8] border-b border-[#888]">
+        <div className="shrink-0 flex flex-wrap items-center gap-2 px-2 py-1 bg-[#d4d0c8] border-b border-[#888]">
           <select className="h-6 border border-[#999] bg-white px-1 text-[11px]"><option>None</option></select>
           <label className="font-bold">From</label>
           <input type="date" className="h-6 border border-[#999] bg-white px-1 text-[11px]" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -206,7 +206,7 @@ const Gstr1JsmReport = ({ isOpen, onClose, onOpenInvoice }) => {
         </div>
 
         {/* Tab bar */}
-        <div className="flex items-end px-2 pt-1 border-b border-[#777] bg-[#d4d0c8]">
+        <div className="shrink-0 flex items-end px-2 pt-1 border-b border-[#777] bg-[#d4d0c8]">
           {TABS.map((t) => (
             <button key={t} type="button" onClick={() => setTab(t)} className={tab === t ? activeHdr : inactiveHdr}>
               {t}
@@ -226,7 +226,7 @@ const Gstr1JsmReport = ({ isOpen, onClose, onOpenInvoice }) => {
         </div>
 
         {/* Bottom bar */}
-        <div className="flex items-center gap-2 px-2 py-1 bg-[#d4d0c8] border-t border-[#888]">
+        <div className="shrink-0 flex items-center gap-2 px-2 py-1 bg-[#d4d0c8] border-t border-[#888]">
           <button type="button" className="h-6 px-3 border border-[#666] bg-[#d4d0c8] text-[11px] hover:bg-[#e8e8e8]" onClick={() => toast.info('Email not configured')}>Email Send</button>
           <div className="flex items-center gap-1 mx-2">
             <label className="flex items-center gap-0.5"><input type="radio" name="xl_type" defaultChecked /> Regular</label>
