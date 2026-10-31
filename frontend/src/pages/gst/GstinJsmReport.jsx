@@ -116,8 +116,8 @@ const GstinJsmReport = ({ isOpen, onClose, kind = 'gstinPurchase', onOpenRow }) 
                             {!summary && list.map((r, i) => (
                               <tr
                                 key={`${r._id || i}-${i}`}
-                                className={`hover:bg-[#fff6dd]${onOpenRow && r._id ? ' cursor-pointer' : ''}`}
-                                onClick={onOpenRow && r._id ? () => onOpenRow({ id: r._id, sourceType: r._sourceType }) : undefined}
+                                className={`hover:bg-[#fff6dd]${onOpenRow && r._id && r._sourceType ? ' cursor-pointer' : ''}`}
+                                onClick={onOpenRow && r._id && r._sourceType ? () => onOpenRow({ id: r._id, sourceType: r._sourceType }) : undefined}
                               >
                                 <td className={cell}>{billNo(r)}</td><td className={cell}>{dmy(r.date)}</td><td className={cell}>{r.partyName}</td>
                                 <td className={num}>{n2(r.taxableAmount)}</td><td className={num}>{n2(r.sgst)}</td><td className={num}>{n2(r.cgst)}</td><td className={num}>{n2(r.igst)}</td>

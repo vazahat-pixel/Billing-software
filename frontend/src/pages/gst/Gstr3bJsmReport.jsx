@@ -114,9 +114,9 @@ const Gstr3bJsmReport = ({ isOpen, onClose }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="GSTR-3B MONTHLY RETURN" className="max-w-4xl w-full p-0">
-      <div className="p-3 bg-[var(--bg-base)] flex flex-col gap-2 min-h-[320px]">
-        <div className="flex flex-wrap items-center gap-2 text-[12px]">
+    <Modal isOpen={isOpen} onClose={onClose} title="GSTR-3B MONTHLY RETURN" className="max-w-4xl w-full h-[min(92vh,760px)] p-0">
+      <div className="p-3 bg-[var(--bg-base)] flex flex-col gap-2 min-h-0 h-full">
+        <div className="shrink-0 flex flex-wrap items-center gap-2 text-[12px]">
           <select className="erp-input h-7" value="None" disabled aria-label="Filter"><option>None</option></select>
           <select className="erp-input h-7" value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Return type">
             <option>Regular</option><option>Composition</option>
@@ -127,7 +127,7 @@ const Gstr3bJsmReport = ({ isOpen, onClose }) => {
           <input type="date" className="erp-input h-7" value={to} onChange={(e) => setTo(e.target.value)} />
           <label className="flex items-center gap-1"><input type="checkbox" checked={withRcm} onChange={(e) => setWithRcm(e.target.checked)} /> With Rcm</label>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="shrink-0 flex flex-wrap gap-2">
           <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" disabled={!text} onClick={excel}>Excel</button>
           <button type="button" className="erp-btn erp-btn-secondary h-7 px-3 text-[11px]" disabled={!text} onClick={() => { window.location.href = `mailto:?subject=GSTR-3B&body=${encodeURIComponent(text.slice(0, 1800))}`; }}>Mail</button>
           <button type="button" className="erp-btn erp-btn-primary h-7 px-3 text-[11px]" disabled={loading} onClick={run}>{loading ? 'Loading…' : 'Screen'}</button>
