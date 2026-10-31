@@ -1,0 +1,7 @@
+{
+  "mode": "hybrid",
+  "centralApiBaseUrl": "https://app.dealingindia.com/api",
+  "apiBaseUrl": "https://app.dealingindia.com/api",
+  "apiPort": 5050,
+  "mongoPort": 27028
+}
