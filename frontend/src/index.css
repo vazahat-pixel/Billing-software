@@ -243,9 +243,8 @@
   left: 0;
   margin-top: 6px;
   width: 16rem;
-  max-height: min(22rem, calc(100vh - 9.5rem));
-  overflow-x: hidden;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
   overscroll-behavior: contain;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(12px);
