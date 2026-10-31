@@ -41,7 +41,7 @@ const TITLES = {
   bs: 'Balance Sheet',
 };
 
-export default function FinalReportsModal({ isOpen, onClose, kind = 'groupList' }) {
+export default function FinalReportsModal({ isOpen, onClose, kind = 'groupList', onOpenLedger }) {
   const company = useConfigStore((s) => s.company);
   const [phase, setPhase] = useState('filter');
   const [busy, setBusy] = useState(false);
@@ -301,11 +301,11 @@ export default function FinalReportsModal({ isOpen, onClose, kind = 'groupList' 
                 period={sheetPeriod(kind, report, { from, to, asOn, bsFrom, bsTo })}
               />
               {kind === 'groupList' && (
-                <GroupSheet data={report} withAddress={withAddress} withPan={withPan} withBroker={withBroker} />
+                <GroupSheet data={report} withAddress={withAddress} withPan={withPan} withBroker={withBroker} onOpenLedger={onOpenLedger} />
               )}
-              {kind === 'trial' && <TrialSheet data={report} />}
-              {kind === 'pl' && <PlSheet data={report} showPercent={showPercent || netSalesPct} />}
-              {kind === 'bs' && <BsSheet data={report} />}
+              {kind === 'trial' && <TrialSheet data={report} onOpenLedger={onOpenLedger} />}
+              {kind === 'pl' && <PlSheet data={report} showPercent={showPercent || netSalesPct} onOpenLedger={onOpenLedger} />}
+              {kind === 'bs' && <BsSheet data={report} onOpenLedger={onOpenLedger} />}
             </article>
           </div>
         </div>
@@ -510,7 +510,7 @@ function BsFilter({ from, setFrom, to, setTo, layout, setLayout, order, setOrder
   );
 }
 
-function GroupSheet({ data, withAddress, withPan, withBroker }) {
+function GroupSheet({ data, withAddress, withPan, withBroker, onOpenLedger }) {
   const extra = [withAddress && 'Address', withPan && 'Pan No', withBroker && 'Broker'].filter(Boolean);
   return (
     <table className="jsm-table">
@@ -527,7 +527,11 @@ function GroupSheet({ data, withAddress, withPan, withBroker }) {
           <React.Fragment key={g.name}>
             <tr className="jsm-gh"><td colSpan={3 + extra.length}>{g.name}</td></tr>
             {g.lines.map((l) => (
-              <tr key={l.ledgerId}>
+              <tr
+                key={l.ledgerId}
+                className={onOpenLedger ? 'jsm-clickable-row' : undefined}
+                onClick={onOpenLedger ? () => onOpenLedger({ ledgerId: l.ledgerId, name: l.name }) : undefined}
+              >
                 <td className="pad">{l.name}</td>
                 {withAddress && <td>{l.address}</td>}
                 {withPan && <td>{l.pan}</td>}
@@ -556,7 +560,7 @@ function GroupSheet({ data, withAddress, withPan, withBroker }) {
   );
 }
 
-function TrialSheet({ data }) {
+function TrialSheet({ data, onOpenLedger }) {
   if (data.mode === 'single') {
     return (
       <table className="jsm-table">
@@ -568,7 +572,11 @@ function TrialSheet({ data }) {
             <React.Fragment key={g.name}>
               <tr className="jsm-gh"><td colSpan={3}>{g.name}</td></tr>
               {g.lines.map((l) => (
-                <tr key={l.ledgerId || l.name}>
+                <tr
+                  key={l.ledgerId || l.name}
+                  className={onOpenLedger ? 'jsm-clickable-row' : undefined}
+                  onClick={onOpenLedger ? () => onOpenLedger({ ledgerId: l.ledgerId, name: l.name }) : undefined}
+                >
                   <td className="pad">{l.name}</td>
                   <td className="num">{l.debit ? inr(l.debit) : ''}</td>
                   <td className="num">{l.credit ? inr(l.credit) : ''}</td>
@@ -598,8 +606,8 @@ function TrialSheet({ data }) {
   return (
     <>
       <div className="jsm-two">
-        <SideBlock title="LIABILITIES" amountHead="CREDIT" groups={data.left || []} />
-        <SideBlock title="ASSETS" amountHead="DEBIT" groups={data.right || []} />
+        <SideBlock title="LIABILITIES" amountHead="CREDIT" groups={data.left || []} onOpenLedger={onOpenLedger} />
+        <SideBlock title="ASSETS" amountHead="DEBIT" groups={data.right || []} onOpenLedger={onOpenLedger} />
       </div>
       <div className="jsm-foot-totals">
         <span>Credit Total : {inr(data.creditTotal)}</span>
@@ -610,7 +618,7 @@ function TrialSheet({ data }) {
   );
 }
 
-function SideBlock({ title, amountHead, groups }) {
+function SideBlock({ title, amountHead, groups, onOpenLedger }) {
   return (
     <div className="jsm-side">
       <div className="jsm-side-head"><span>{title}</span><span>{amountHead}</span></div>
@@ -618,7 +626,11 @@ function SideBlock({ title, amountHead, groups }) {
         <div key={g.name}>
           <div className="jsm-group">{g.name}</div>
           {(g.lines || []).map((l) => (
-            <div className="jsm-line" key={`${g.name}-${l.name}`}>
+            <div
+              className={`jsm-line${onOpenLedger ? ' jsm-clickable-row' : ''}`}
+              key={`${g.name}-${l.name}`}
+              onClick={onOpenLedger ? () => onOpenLedger({ ledgerId: l.ledgerId, name: l.name }) : undefined}
+            >
               <span>{l.name}{l.station ? `   ${l.station}` : ''}</span>
               <span>{inr(l.amount)}</span>
             </div>
@@ -630,17 +642,17 @@ function SideBlock({ title, amountHead, groups }) {
   );
 }
 
-function PlSheet({ data, showPercent }) {
+function PlSheet({ data, showPercent, onOpenLedger }) {
   const sales = data.netSales || 0;
   return (
     <div className="jsm-green">
-      <PlBlock title="TRADING ACCOUNT" block={data.trading} sales={sales} showPercent={showPercent} gross />
-      <PlBlock title="PROFIT & LOSS ACCOUNT" block={data.profitLoss} sales={sales} showPercent={showPercent} />
+      <PlBlock title="TRADING ACCOUNT" block={data.trading} sales={sales} showPercent={showPercent} gross onOpenLedger={onOpenLedger} />
+      <PlBlock title="PROFIT & LOSS ACCOUNT" block={data.profitLoss} sales={sales} showPercent={showPercent} onOpenLedger={onOpenLedger} />
     </div>
   );
 }
 
-function PlBlock({ title, block, sales, showPercent, gross }) {
+function PlBlock({ title, block, sales, showPercent, gross, onOpenLedger }) {
   const left = block?.left || [];
   const right = block?.right || [];
   const n = Math.max(left.length, right.length, 1);
@@ -661,11 +673,11 @@ function PlBlock({ title, block, sales, showPercent, gross }) {
       <tbody>
         {rows.map((row, i) => (
           <tr key={i}>
-            <td>{row.l?.name || ''}</td>
-            <td className="num">{row.l ? inr(row.l.amount) : ''}</td>
+            <td className={onOpenLedger && row.l ? 'jsm-clickable-row' : undefined} onClick={onOpenLedger && row.l ? () => onOpenLedger({ ledgerId: row.l.ledgerId, name: row.l.name }) : undefined}>{row.l?.name || ''}</td>
+            <td className={`num${onOpenLedger && row.l ? ' jsm-clickable-row' : ''}`} onClick={onOpenLedger && row.l ? () => onOpenLedger({ ledgerId: row.l.ledgerId, name: row.l.name }) : undefined}>{row.l ? inr(row.l.amount) : ''}</td>
             {showPercent && <td className="num">{row.l ? pct(row.l.amount, sales) : ''}</td>}
-            <td>{row.r?.name || ''}</td>
-            <td className="num">{row.r ? inr(row.r.amount) : ''}</td>
+            <td className={onOpenLedger && row.r ? 'jsm-clickable-row' : undefined} onClick={onOpenLedger && row.r ? () => onOpenLedger({ ledgerId: row.r.ledgerId, name: row.r.name }) : undefined}>{row.r?.name || ''}</td>
+            <td className={`num${onOpenLedger && row.r ? ' jsm-clickable-row' : ''}`} onClick={onOpenLedger && row.r ? () => onOpenLedger({ ledgerId: row.r.ledgerId, name: row.r.name }) : undefined}>{row.r ? inr(row.r.amount) : ''}</td>
           </tr>
         ))}
         <tr className="jsm-tot">
@@ -708,7 +720,7 @@ function PlBlock({ title, block, sales, showPercent, gross }) {
   );
 }
 
-function BsSheet({ data }) {
+function BsSheet({ data, onOpenLedger }) {
   if (data.layout === 'single') {
     return (
       <table className="jsm-table">
@@ -719,7 +731,11 @@ function BsSheet({ data }) {
             <React.Fragment key={g.name}>
               <tr className="jsm-gh"><td colSpan={2}>{g.name}</td></tr>
               {g.lines.map((l) => (
-                <tr key={l.name}><td className="pad">{l.name}{l.station ? `  ${l.station}` : ''}</td><td className="num">{inr(l.amount)}</td></tr>
+                <tr
+                  key={l.name}
+                  className={onOpenLedger ? 'jsm-clickable-row' : undefined}
+                  onClick={onOpenLedger ? () => onOpenLedger({ ledgerId: l.ledgerId, name: l.name }) : undefined}
+                ><td className="pad">{l.name}{l.station ? `  ${l.station}` : ''}</td><td className="num">{inr(l.amount)}</td></tr>
               ))}
               <tr className="jsm-tot"><td>{g.name}</td><td className="num">{inr(g.total)}</td></tr>
             </React.Fragment>
@@ -729,7 +745,11 @@ function BsSheet({ data }) {
             <React.Fragment key={g.name}>
               <tr className="jsm-gh"><td colSpan={2}>{g.name}</td></tr>
               {g.lines.map((l) => (
-                <tr key={l.name}><td className="pad">{l.name}{l.station ? `  ${l.station}` : ''}</td><td className="num">{inr(l.amount)}</td></tr>
+                <tr
+                  key={l.name}
+                  className={onOpenLedger ? 'jsm-clickable-row' : undefined}
+                  onClick={onOpenLedger ? () => onOpenLedger({ ledgerId: l.ledgerId, name: l.name }) : undefined}
+                ><td className="pad">{l.name}{l.station ? `  ${l.station}` : ''}</td><td className="num">{inr(l.amount)}</td></tr>
               ))}
               <tr className="jsm-tot"><td>{g.name}</td><td className="num">{inr(g.total)}</td></tr>
             </React.Fragment>
@@ -745,8 +765,8 @@ function BsSheet({ data }) {
   return (
     <div className="jsm-green">
       <div className="jsm-two">
-        <SideBlock title="LIABILITIES" amountHead="RS." groups={data.left || []} />
-        <SideBlock title="ASSETS" amountHead="RS." groups={data.right || []} />
+        <SideBlock title="LIABILITIES" amountHead="RS." groups={data.left || []} onOpenLedger={onOpenLedger} />
+        <SideBlock title="ASSETS" amountHead="RS." groups={data.right || []} onOpenLedger={onOpenLedger} />
       </div>
       <div className="jsm-bs-mid">
         <span>{inr(data.leftSub)}</span>
@@ -876,6 +896,9 @@ const finalCss = `
 .jsm-gh td, .jsm-group { font-weight: 800; text-decoration: underline; }
 .jsm-tot td { font-weight: 700; }
 .jsm-grand td { font-weight: 800; border-top: 2px solid #111; }
+.jsm-clickable-row { cursor: pointer; }
+.jsm-table tr.jsm-clickable-row:hover td, td.jsm-clickable-row:hover { background: #dbeafe; }
+.jsm-line.jsm-clickable-row:hover { background: #dbeafe; }
 .jsm-two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .jsm-side-head, .jsm-line, .jsm-foot-totals, .jsm-bs-mid, .jsm-net-row, .jsm-bs-total { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
 .jsm-side-head { font-weight: 800; border-bottom: 1px solid #111; }

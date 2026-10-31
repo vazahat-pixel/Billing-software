@@ -871,7 +871,7 @@ const Dashboard = () => {
             s: () => toggleModal('sales', true),
             p: () => toggleModal('purchase', true),
             r: () => openReportsHub('summary'),
-            l: () => toggleModal('ledger', true),
+            l: () => { setLedgerOpenSeed(null); toggleModal('ledger', true); },
             b: () => toggleModal('receipt', true),
             y: () => toggleModal('payment', true),
             m: () => toggleModal('millIssue', true),
@@ -1399,6 +1399,14 @@ const Dashboard = () => {
       { id: 'desk', label: 'Desk', title: 'CA Desk', small: true },
    ];
    const showKeyHelp = () => toast.info('1 Sales · 2 Pur · 3 Rec · 4 Pay · Z Trail · 5 M.Iss · 6 M.Rec · 7 J.Iss · 8 J.Rec · 9 Debt O/s · Alt menu · F9 toolbar · F2 year · F3 company. Inside a bill: Enter next field, Ctrl+Enter save, Esc close.');
+   const [ledgerOpenSeed, setLedgerOpenSeed] = useState(null);
+   const onOpenReportLedger = ({ ledgerId, name }) => {
+      if (!ledgerId && !name) return;
+      setLedgerOpenSeed({ ledgerId: ledgerId || null, name: name || '' });
+      toggleModal('ledger', true);
+      setTimeout(() => focusErpWindow('ledger'), 40);
+   };
+
    const onOpenOutstandingBill = async ({ billId, billType, type: osType }) => {
       const isSales = billType ? billType === 'SalesInvoice' : osType === 'receivable';
       const isPurchase = billType ? billType === 'PurchaseBill' : osType === 'payable';
@@ -1487,7 +1495,7 @@ const Dashboard = () => {
             <div className="mt-auto pt-2 border-t border-[var(--border)] mx-1.5">
                {!isCaUser && <button
                   type="button"
-                  onClick={() => { setActiveMenuKey('ledger'); toggleModal('ledger', true); }}
+                  onClick={() => { setActiveMenuKey('ledger'); setLedgerOpenSeed(null); toggleModal('ledger', true); }}
                   className={`w-full flex items-center gap-2 h-8 px-2 rounded-lg text-left transition-colors cursor-pointer ${
                      activeMenuKey === 'ledger'
                         ? 'bg-[var(--accent)] text-white shadow-sm'
@@ -2261,7 +2269,13 @@ const Dashboard = () => {
          <ProcessUpdateModal isOpen={modals.updateJob} onClose={() => toggleModal('updateJob', false)} />
          <LedgerModal
             isOpen={modals.ledger}
-            onClose={() => toggleModal('ledger', false)}
+            onClose={() => {
+               setLedgerOpenSeed(null);
+               toggleModal('ledger', false);
+            }}
+            initialLedgerId={ledgerOpenSeed?.ledgerId || null}
+            initialAccountText={ledgerOpenSeed?.name || ''}
+            autoRun
             onOpenJournal={() => {
                minimizeErpWindow('ledger');
                openModalDirect('journal');
@@ -2449,6 +2463,7 @@ const Dashboard = () => {
                isOpen
                kind={finalReportKind}
                onClose={() => setModals(prev => ({ ...prev, finalReport: false }))}
+               onOpenLedger={onOpenReportLedger}
             />
          )}
          {modals.fasCheck && (
