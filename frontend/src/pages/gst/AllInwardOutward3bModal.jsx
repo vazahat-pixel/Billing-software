@@ -112,9 +112,9 @@ const AllInwardOutward3bModal = ({ isOpen, onClose }) => {
   if (!books) {
     return (
       <Modal isOpen={isOpen} onClose={onClose} title="All INWARD &amp; OUTWARD SUPPLY - 3B" className="max-w-3xl w-full p-0">
-        <div className="bg-[#d4d0c8] text-black text-[11px] flex flex-col">
+        <div className="bg-[#d4d0c8] text-black text-[11px] flex flex-col max-h-[calc(90vh-60px)] min-h-0 overflow-y-auto">
           {/* Header */}
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-[#888]">
+          <div className="shrink-0 flex flex-wrap items-center gap-2 px-3 py-2 border-b border-[#888]">
             <label className="font-bold">From</label>
             <input type="date" className="h-6 border border-[#999] bg-white px-1 text-[11px]" value={from} onChange={(e) => setFrom(e.target.value)} />
             <label className="font-bold">To</label>
@@ -127,34 +127,38 @@ const AllInwardOutward3bModal = ({ isOpen, onClose }) => {
             </div>
           </div>
           {/* Select All row */}
-          <div className="flex justify-end px-3 py-1 border-b border-[#888]">
-            <label className="flex items-center gap-1"><input type="checkbox" onChange={(e) => toggleAll(e.target.checked)} defaultChecked /> Select/UnSelect All</label>
+          <div className="shrink-0 flex justify-end px-3 py-1 border-b border-[#888] bg-[#dcd8d0]">
+            <label className="flex items-center gap-1 cursor-pointer select-none">
+              <input type="checkbox" onChange={(e) => toggleAll(e.target.checked)} defaultChecked /> Select/UnSelect All
+            </label>
           </div>
           {/* Filter tabs */}
-          <div className="flex border-b border-[#888] bg-[#c8c8c8]">
+          <div className="shrink-0 flex border-b border-[#888] bg-[#c8c8c8]">
             {FILTER_TABS.map((t) => (
               <button key={t} type="button" onClick={() => setFilterTab(t)}
-                className={`px-3 py-1 border-r border-[#999] text-[11px] font-bold${filterTab === t ? ' bg-white' : ' bg-[#c8c8c8] text-[#555]'}`}>{t}</button>
+                className={`px-3 py-1 border-r border-[#999] text-[11px] font-bold cursor-pointer${filterTab === t ? ' bg-white' : ' bg-[#c8c8c8] text-[#555]'}`}>{t}</button>
             ))}
           </div>
-          {/* Party list */}
-          <div className="flex-1 h-48 overflow-y-auto border-b border-[#888] bg-white px-2 py-1">
+          {/* Party list - fixed height with internal scrollbar so it never overflows */}
+          <div className="h-48 max-h-48 min-h-[140px] overflow-y-auto border-b border-[#888] bg-white px-2 py-1 shrink-0">
             {filterTab === 'Party' && parties.map((p) => {
               const id = p._id || p.id;
               return (
-                <div key={id} className="flex items-center gap-1 py-0.5 text-[11px]">
-                  <input type="checkbox" checked={selectedParties.has(id)} onChange={() => toggleParty(id)} />
-                  <span>{p.name || p.partyName}</span>
+                <div key={id} className="flex items-center gap-1 py-0.5 text-[11px] hover:bg-[#eef2ff]">
+                  <input type="checkbox" id={`p-${id}`} checked={selectedParties.has(id)} onChange={() => toggleParty(id)} className="cursor-pointer" />
+                  <label htmlFor={`p-${id}`} className="cursor-pointer select-none truncate">{p.name || p.partyName}</label>
                 </div>
               );
             })}
             {filterTab !== 'Party' && <div className="text-[11px] text-[#555] p-2">Filter by {filterTab} — select All to include all.</div>}
           </div>
           {/* Bottom bar */}
-          <div className="flex items-center gap-3 px-3 py-2 border-t border-[#888]">
+          <div className="shrink-0 flex flex-wrap items-center gap-3 px-3 py-2 border-t border-[#888]">
             <label className="font-bold">Printout Pattern</label>
             <select className="h-6 border border-[#999] bg-white px-1 text-[11px]"><option>1-Continue</option></select>
-            <label className="flex items-center gap-1 ml-4"><input type="checkbox" checked={summary} onChange={(e) => setSummary(e.target.checked)} /> Summary Reports</label>
+            <label className="flex items-center gap-1 ml-4 cursor-pointer select-none">
+              <input type="checkbox" checked={summary} onChange={(e) => setSummary(e.target.checked)} /> Summary Reports
+            </label>
             <div className="ml-auto flex items-center gap-2">
               <label className="font-bold">GroupBy 1</label>
               <select className="h-6 border border-[#999] bg-white px-1 text-[11px]" value={groupBy1} onChange={(e) => setGroupBy1(e.target.value)}>
@@ -166,11 +170,23 @@ const AllInwardOutward3bModal = ({ isOpen, onClose }) => {
               </select>
             </div>
           </div>
-          <div className="flex justify-end gap-2 px-3 pb-2">
-            <button type="button" onClick={run} disabled={loading} className="h-7 px-6 border border-[#666] bg-[#d4d0c8] font-bold text-[11px] hover:bg-[#e8e8e8]">
+          {/* Action buttons row - always visible */}
+          <div className="shrink-0 flex justify-end gap-2 px-3 py-2 border-t border-[#aaa] bg-[#d4d0c8]">
+            <button
+              type="button"
+              onClick={run}
+              disabled={loading}
+              className="h-7 px-6 border border-[#666] bg-[#d4d0c8] font-bold text-[11px] hover:bg-white active:bg-[#bbb] shadow-sm cursor-pointer disabled:opacity-50"
+            >
               {loading ? 'Loading…' : 'Ok'}
             </button>
-            <button type="button" onClick={onClose} className="h-7 px-6 border border-[#666] bg-[#d4d0c8] text-[11px] hover:bg-[#e8e8e8]">Exit</button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-7 px-6 border border-[#666] bg-[#d4d0c8] text-[11px] hover:bg-white active:bg-[#bbb] shadow-sm cursor-pointer"
+            >
+              Exit
+            </button>
           </div>
         </div>
       </Modal>
