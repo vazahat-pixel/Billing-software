@@ -7,7 +7,7 @@
 const Job = require('../../../models/Job');
 const Book = require('../../../models/Book');
 require('../../../models/Party');
-const { MONTHS, round } = require('../jcEngine');
+const { MONTHS, round, ofKind } = require('../jcEngine');
 
 async function loadMillReceiptSummaryRows(companyId, bookModule = 'millRec') {
   const [jobs, book] = await Promise.all([
@@ -17,7 +17,11 @@ async function loadMillReceiptSummaryRows(companyId, bookModule = 'millRec') {
     Book.findOne({ companyId, module: bookModule }).sort({ createdAt: 1 }).lean(),
   ]);
   const bookName = book?.name || (bookModule === 'jobRec' ? 'JOB RECEIPT' : 'MILL RECEIPT');
-  return jobs.map((j) => {
+
+  // Job Receipt and Mill Receipt are separate registers in JSM — each report shows only its own side.
+  const mine = ofKind(jobs, bookModule === 'jobRec' ? 'Job' : 'Mill');
+
+  return mine.map((j) => {
     const date = j.receiveDate ? new Date(j.receiveDate) : (j.issueDate ? new Date(j.issueDate) : null);
     const qty = Number(j.receivedQty || 0);
     const gross = Number(j.processCharges || 0) || round(qty * Number(j.jobRate || 0));

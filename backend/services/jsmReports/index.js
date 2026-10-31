@@ -9,6 +9,7 @@ const REPORTS = {
   Rpt_JobWork_Receipt_Summary: require('./reports/jobReceiptSummary'),
   Rpt_JobWork_Receipt_Detail: require('./reports/jobReceiptDetail'),
   Rpt_Process_Stock_New_Gst: require('./reports/processStock'),
+  Rpt_JobWork_Stock_Report: require('./reports/jobStock'),
 };
 
 function get(reportId) {

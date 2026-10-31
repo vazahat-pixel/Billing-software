@@ -11,7 +11,7 @@ const Company = require('../../../models/Company');
 require('../../../models/Party');
 require('../../../models/InventoryLot');
 require('../../../models/Item');
-const { MONTHS, round } = require('../jcEngine');
+const { MONTHS, round, ofKind } = require('../jcEngine');
 
 function splitRemark(remark) {
   const lines = String(remark || '').split(/\r?\n/);
@@ -30,7 +30,10 @@ async function loadMillIssueRows(companyId, bookModule = 'millIssue') {
   const bookName = book?.name || (bookModule === 'jobIssue' ? 'JOB ISSUE' : 'MILL ISSUE');
   const coShort = company?.coCode || '';
 
-  return jobs.map((j) => {
+  // Job Issue and Mill Issue are separate registers in JSM — each report shows only its own side.
+  const mine = ofKind(jobs, bookModule === 'jobIssue' ? 'Job' : 'Mill');
+
+  return mine.map((j) => {
     const date = j.issueDate ? new Date(j.issueDate) : null;
     const [remark1, remark2] = splitRemark(j.remark);
     const issQty = Number(j.issueQty || 0);

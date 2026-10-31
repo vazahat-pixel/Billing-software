@@ -86,6 +86,8 @@ async function loadProcessStockRows(companyId, { kind = 'Mill', recTo = '' } = {
       BROKER: brokers.get(String(j.workerId?.brokerId || '')) || '', TRANSPORT: j.transport || '', REGISTER: register, BOOK: register,
       ISS_PCS: issPcs, ISS_QTY: issQty, ISS_KGS: issKgs, PU_RATE: puRate, PU_AMOUNT: round(issQty * puRate),
       REMARK_1: remark1, REMARK_2: remark2, LAST_YEAR: j.lastYear || '',
+      // Job work stock report also shows the job rate and the party's range.
+      JOB_RATE: Number(j.jobRate || 0), RANGE: String(j.range || j.workerId?.range || ''),
       TOT_REC_PCS: recPcs, TOT_GRY_REC_QTY: recGrey, TOT_BAL_PCS: balPcs, TOT_BAL_QTY: balQty, TOT_BAL_AMT: round(balQty * puRate),
       TOT_REC_KGS: recKgs, TOT_SHORT_KGS: 0, TOT_BAL_KGS: round(issKgs - recKgs, 3), TOT_KGS_AMT: round((issKgs - recKgs) * puRate),
       PENDING: balQty > 0.005 || balPcs > 0 ? 'PENDING' : 'CLEAR', UNIT_NAME: 'QTY',

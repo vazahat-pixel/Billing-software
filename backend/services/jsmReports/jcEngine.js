@@ -99,6 +99,17 @@ function monthName(date) {
   return MONTHS[new Date(date).getUTCMonth()];
 }
 
+/**
+ * Mill vs job work. JSM keeps these in separate tables (I_MILL_CH vs I_JOB_ISSUE); MERN keeps both
+ * as Job documents, so the report sources must split them or each report shows the other's challans.
+ * Challans saved before workKind existed fall back to processType.
+ */
+const isJobWork = (j) => j.workKind === 'Job' || (!j.workKind && j.processType === 'Job Work');
+
+/** Keep only the challans belonging to one side. kind: 'Job' | 'Mill'. */
+const ofKind = (jobs, kind) => jobs.filter((j) => (kind === 'Job' ? isJobWork(j) : !isJobWork(j)));
+
 module.exports = {
   MONTHS, round, isBlank, sqlCompare, orderRows, inList, inDateRange, dayKey, groupBy, monthName,
+  isJobWork, ofKind,
 };
