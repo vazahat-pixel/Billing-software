@@ -94,7 +94,15 @@ const flat = (data, tab) => {
   switch (tab) {
     case 'B2B': return p.b2bRows || [];
     case 'B2CL': return p.b2clRows || [];
-    case 'B2CS': return p.b2cs || [];
+    case 'B2CS': return (p.b2cs || []).map((r) => ({
+      ...r,
+      pos: r.pos_name || r.pos,
+      taxRate: r.rt,
+      taxableAmount: r.txval,
+      cgst: r.camt,
+      sgst: r.samt,
+      igst: r.iamt,
+    }));
     case 'CDNR': return p.cdnrRows || [];
     case 'CDNU': return p.cdnuRows || [];
     case 'HSN': return p.hsnRows || p.hsn?.data || [];
