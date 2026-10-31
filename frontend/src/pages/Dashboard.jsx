@@ -1399,6 +1399,30 @@ const Dashboard = () => {
       { id: 'desk', label: 'Desk', title: 'CA Desk', small: true },
    ];
    const showKeyHelp = () => toast.info('1 Sales · 2 Pur · 3 Rec · 4 Pay · Z Trail · 5 M.Iss · 6 M.Rec · 7 J.Iss · 8 J.Rec · 9 Debt O/s · Alt menu · F9 toolbar · F2 year · F3 company. Inside a bill: Enter next field, Ctrl+Enter save, Esc close.');
+   const onOpenOutstandingBill = async ({ billId, billType, type: osType }) => {
+      const isSales = billType ? billType === 'SalesInvoice' : osType === 'receivable';
+      const isPurchase = billType ? billType === 'PurchaseBill' : osType === 'payable';
+      try {
+         if (isSales) {
+            const found = await resolveSaleDoc(sales, billId, '');
+            if (!found) { toast.error('Bill could not be opened'); return; }
+            setSalesInitialData(found);
+            toggleModal('sales', true);
+            setTimeout(() => focusErpWindow('sales'), 40);
+         } else if (isPurchase) {
+            const found = await resolvePurchaseDoc(purchases, billId, '');
+            if (!found) { toast.error('Bill could not be opened'); return; }
+            setPurchaseInitialData(found);
+            toggleModal('purchase', true);
+            setTimeout(() => focusErpWindow('purchase'), 40);
+         } else {
+            toast.info('Open this bill from Mill / Job Receive records.');
+         }
+      } catch {
+         toast.error('Bill could not be opened');
+      }
+   };
+
    const runToolbarItem = (t) => {
       setActiveMenuKey(t.id);
       if (t.id === 'zTrial') setModals(prev => ({ ...prev, zTrial: true }));
@@ -1651,8 +1675,8 @@ const Dashboard = () => {
                                                    </button>
                                                    {flyoutOpen && (
                                                       <div
-                                                         className={section === 'Reports' ? 'erp-menu-nest' : 'erp-menu-flyout erp-menu-flyout--open'}
-                                                         ref={section === 'Reports' ? undefined : keepFlyoutOnScreen}
+                                                         className="erp-menu-flyout erp-menu-flyout--open"
+                                                         ref={keepFlyoutOnScreen}
                                                       >
                                                          {kids.map((child, cIdx) => renderMenuNode(child, `${keyPrefix}-${cIdx}`))}
                                                       </div>
@@ -2370,6 +2394,7 @@ const Dashboard = () => {
                type={outstandingSeed?.osType || 'receivable'}
                directPartyId={outstandingSeed?.partyId || ''}
                directPartyName={outstandingSeed?.partyName || ''}
+               onOpenBill={onOpenOutstandingBill}
             />
          )}
          {modals.partyOsReport && outstandingSeed?.partyId && (
@@ -2378,6 +2403,7 @@ const Dashboard = () => {
                type={outstandingSeed.osType || 'receivable'}
                directPartyId={outstandingSeed.partyId}
                directPartyName={outstandingSeed.partyName || ''}
+               onOpenBill={onOpenOutstandingBill}
                onClose={() => {
                   setOutstandingSeed(null);
                   setModals((prev) => ({ ...prev, partyOsReport: false }));

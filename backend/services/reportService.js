@@ -646,6 +646,7 @@ class ReportService {
 
       bucket.invoices.push({
         billId: doc._id,
+        billType: isReceivable ? 'SalesInvoice' : 'PurchaseBill',
         docNo,
         date: doc.date,
         dueDate: doc.dueDate || (doc.creditDays ? new Date(new Date(doc.date).getTime() + doc.creditDays * 86400000) : null),

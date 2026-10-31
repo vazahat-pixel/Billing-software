@@ -109,6 +109,7 @@ const OutstandingReportModal = ({
   type = 'receivable',
   directPartyId = '',
   directPartyName = '',
+  onOpenBill,
 }) => {
   const { fetchOutstandingReportFiltered, fetchOutstandingFilterOptions } = useStore();
   const partyDirect = Boolean(directPartyId);
@@ -1241,7 +1242,14 @@ const OutstandingReportModal = ({
                           )}
                           {!summaryOnly &&
                             recs.map((r, i) => (
-                              <tr key={`${key}-${i}`} className="jsm-bill-data-row">
+                              <tr
+                                key={`${key}-${i}`}
+                                className={`jsm-bill-data-row${onOpenBill && r.billId ? ' jsm-bill-data-row--clickable' : ''}`}
+                                title={onOpenBill && r.billId ? 'Open this bill' : undefined}
+                                onClick={() => {
+                                  if (onOpenBill && r.billId) onOpenBill({ billId: r.billId, billType: r.billType, type: curType, row: r });
+                                }}
+                              >
                                 {visCols.map((c) => (
                                   <td key={c.key} className={c.num ? 'num' : ''}>
                                     {cellVal(c, r)}
@@ -1931,6 +1939,12 @@ const jsmCss = `
 }
 .jsm-bill-data-row:hover td {
   background-color: #eff6ff;
+}
+.jsm-bill-data-row--clickable {
+  cursor: pointer;
+}
+.jsm-bill-data-row--clickable:hover td {
+  background-color: #dbeafe;
 }
 .jsm-party-total-row td {
   background-color: #f8fafc;
