@@ -1,0 +1,78 @@
+// Run: node --test src/jsm/reports/layoutCoverage.node.test.js
+//
+// Every JSM report must end up with columns on screen.
+//
+// STP_REPORT (captured as blueprint/layouts.json) does not hold a row for every view — JSM creates
+// those at run time via StpInsert_Column. When a report names a layout that is not captured AND the
+// screen config supplies no fallbackColumns, the grid renders with zero columns: the report opens,
+// finds its rows, and shows an empty table. That is what happened to the JobWork Send report.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const layouts = JSON.parse(fs.readFileSync(path.join(here, '..', 'blueprint', 'layouts.json'), 'utf8'));
+
+/** Layout names each backend report declares, read from the source so the test cannot drift. */
+function declaredLayouts() {
+  const dir = path.resolve(here, '..', '..', '..', '..', 'backend', 'services', 'jsmReports', 'reports');
+  const out = [];
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.js'))) {
+    const src = fs.readFileSync(path.join(dir, file), 'utf8');
+    for (const m of src.matchAll(/layout:\s*'([A-Z0-9_]+)'/g)) {
+      out.push({ report: file.replace(/\.js$/, ''), layout: m[1] });
+    }
+  }
+  return out;
+}
+
+/** fallbackColumns keys declared by the matching frontend screen config, read as text. */
+function fallbacksFor(report) {
+  const file = path.join(here, `${report}.js`);
+  if (!fs.existsSync(file)) return new Set();
+  const src = fs.readFileSync(file, 'utf8');
+  const block = src.indexOf('fallbackColumns');
+  if (block < 0) return new Set();
+  return new Set([...src.slice(block).matchAll(/([A-Z][A-Z0-9_]{6,}):\s*\[/g)].map((m) => m[1]));
+}
+
+test('every layout a report declares is either captured or has fallback columns', () => {
+  const missing = [];
+  for (const { report, layout } of declaredLayouts()) {
+    if (Object.prototype.hasOwnProperty.call(layouts, layout)) continue;
+    if (fallbacksFor(report).has(layout)) continue;
+    missing.push(`${report} -> ${layout}`);
+  }
+  assert.deepEqual(missing, [], `these reports would render an empty grid:\n  ${missing.join('\n  ')}`);
+});
+
+test('the two run-time-created views are the only uncaptured ones, and both have fallbacks', () => {
+  const uncaptured = declaredLayouts()
+    .filter(({ layout }) => !Object.prototype.hasOwnProperty.call(layouts, layout))
+    .map(({ layout }) => layout);
+
+  assert.deepEqual(
+    [...new Set(uncaptured)].sort(),
+    ['JSM_VW_JOBWORK_ISSUE_REPORT', 'JSM_VW_PROCESS_ISSUE_SUM_REPORT'],
+    'a newly uncaptured layout appeared — give it fallbackColumns or capture it'
+  );
+  assert.ok(fallbacksFor('jobSend').has('JSM_VW_JOBWORK_ISSUE_REPORT'));
+  assert.ok(fallbacksFor('processSend').has('JSM_VW_PROCESS_ISSUE_SUM_REPORT'));
+});
+
+test('captured jobwork and process layouts expose columns for their variants', () => {
+  const variants = (name) => {
+    const vs = new Set();
+    for (const fields of Object.values(layouts[name])) {
+      for (const f of fields) for (const v of Object.keys(f.variants || {})) vs.add(v);
+    }
+    return vs;
+  };
+  for (const name of ['JSM_VW_JOBWORK_STOCK_REPORT', 'JSM_VW_JOBWORK_RECEIPT_DETAIL', 'JSM_VW_PROCESS_STOCK_DTL']) {
+    assert.ok(layouts[name], `${name} must be captured`);
+    assert.ok(variants(name).size > 0, `${name} has no variant columns`);
+  }
+});

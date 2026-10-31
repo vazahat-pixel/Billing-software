@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test:unit": "node --test \"src/**/*.node.test.js\"",
     "preview": "vite preview",
     "generate:icons": "node scripts/generate-icons.mjs",
     "test:e2e": "playwright test",
