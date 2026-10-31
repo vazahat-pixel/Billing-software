@@ -72,6 +72,11 @@ router.use(blockWritesWhenReadOnly);
 // Exactly-once writes for the offline sync queue (only requests carrying an Idempotency-Key).
 router.use(require('../middlewares/idempotency.middleware'));
 
+// Desktop hybrid only: queue a replay of entries whose logic lives in controllers (receipts,
+// payments, journal, notes, returns, bill edits/deletes) so the cloud runs the same controller
+// later. No-op unless DESKTOP_HYBRID and DESKTOP_LOCAL are both true.
+router.use(require('../middlewares/hybridReplayOutbox'));
+
 // --- Ungated: platform surface, not a sellable module -----------------------
 // /dashboard, /admin, /config, /users, /integrity, /stage*, /developer must stay
 // reachable even for a company whose modules are switched off, otherwise the
