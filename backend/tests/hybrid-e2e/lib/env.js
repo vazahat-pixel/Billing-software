@@ -300,5 +300,7 @@ module.exports = {
   cloneDatabase,
   findFreePort,
   waitHealth,
+  spawnApi,
+  stopProc,
   BACKEND_ROOT,
 };

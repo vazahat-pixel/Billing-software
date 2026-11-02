@@ -53,7 +53,7 @@ export const newOperationId = () =>
   (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : generateLocalId());
 
 /** Tell listeners (status bar, desktop close warning) that the queue changed. */
-const announce = async () => {
+export const announce = async () => {
   if (typeof window === 'undefined') return;
   try {
     const all = await getSyncQueueItems(null);

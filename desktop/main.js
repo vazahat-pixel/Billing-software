@@ -334,8 +334,57 @@ ipcMain.handle('desktop:notify', (_e, { title, body }) => {
   return true;
 });
 
+/**
+ * A PC installed before offline mode ran in "remote" mode, where offline entries wait in the
+ * window's own queue. Its saved config keeps it there after updating. It moves to the new offline
+ * mode only once that queue has reported EMPTY — the new mode does not read the old queue, so
+ * switching earlier could strand an entry. Then the owner is asked to restart.
+ */
+let mirrorSwitchOffered = false;
+function shouldMoveToMirror() {
+  const userCfgPath = path.join(app.getPath('userData'), 'config.json');
+  const userCfg = readJsonSafe(userCfgPath);
+  const shipped = readJsonSafe(path.join(process.resourcesPath || __dirname, 'config.json')) || readJsonSafe(path.join(__dirname, 'config.json'));
+  return (
+    String(shipped?.mode || '').toLowerCase() === 'hybrid' &&
+    String(userCfg?.mode || '').toLowerCase() === 'remote' &&
+    !userCfg?.mirrorSwitchedAt
+  );
+}
+
+async function offerMirrorSwitch() {
+  if (mirrorSwitchOffered || rendererPendingSync > 0 || !shouldMoveToMirror()) return;
+  mirrorSwitchOffered = true;
+  const userCfgPath = path.join(app.getPath('userData'), 'config.json');
+  const userCfg = readJsonSafe(userCfgPath) || {};
+  writeJsonSafe(userCfgPath, {
+    ...userCfg,
+    mode: 'hybrid',
+    apiBaseUrl: userCfg.centralApiBaseUrl || userCfg.apiBaseUrl,
+    mirrorSwitchedAt: new Date().toISOString(),
+  });
+  const { response } = await dialog.showMessageBox(mainWindow || undefined, {
+    type: 'info',
+    title: 'Offline mode is ready',
+    message: 'This computer can now work fully without internet.',
+    detail:
+      'All your entries are already on the cloud. Restart Textile ERP to switch on offline mode. ' +
+      'The first start needs internet once to download your company; after that sale, purchase, mill, job, ' +
+      'vouchers and reports all work offline, and everything uploads by itself when the internet is back.\n\n' +
+      'Offline mode taiyar hai. Restart karein — pehli baar internet chahiye, uske baad bina internet ke kaam chalega.',
+    buttons: ['Restart now', 'Next time I open the app'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response === 0) {
+    app.relaunch();
+    app.quit();
+  }
+}
+
 ipcMain.on('desktop:pending-sync', (_e, count) => {
   rendererPendingSync = Math.max(0, Number(count) || 0);
+  if (rendererPendingSync === 0) offerMirrorSwitch().catch(() => {});
 });
 ipcMain.handle('desktop:version', () => app.getVersion());
 ipcMain.handle('desktop:platform', () => process.platform);
@@ -495,82 +544,56 @@ app.on('before-quit', async (e) => {
   e.preventDefault();
 
   if (!app._forceQuitConfirmed) {
-    // Entries waiting to upload: the renderer's offline queue (remote mode) plus the local
-    // outbox (hybrid mode). Nothing is lost on quit — they upload the next time the app is opened.
-    let pending = rendererPendingSync;
-    try {
-      const base = resolveApiBaseUrl();
-      if (base) {
-        const url = base.endsWith('/api') ? `${base}/sync/status` : `${base}/api/sync/status`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(1500) });
-        if (res.ok) {
-          const json = await res.json();
-          pending += Number(json?.data?.pendingOutbox || 0);
-        }
-      }
-    } catch {
-      /* ignore probe errors on shutdown */
-    }
-    if (pending > 0) {
-      // Try uploading immediately if we appear to have internet
-      let uploadedNow = 0;
-      const base = resolveApiBaseUrl();
-      const isOnline = await fetch(`${base}/health/ready`, { signal: AbortSignal.timeout(2000) })
-        .then((r) => r.ok)
-        .catch(() => false);
+    // Entries waiting to upload: the renderer's offline queue (remote mode) plus, on a mirrored
+    // desktop, every document changed on this PC since the last upload. Closing never deletes
+    // anything — whatever is still waiting uploads the next time the app opens with internet.
+    const api = resolveApiBaseUrl();
+    const localUrl = (p) => (api.endsWith('/api') ? `${api}${p}` : `${api}/api${p}`);
+    const mirror = async (p, method = 'GET', ms = 2000) => {
+      const res = await fetch(localUrl(p), { method, signal: AbortSignal.timeout(ms) });
+      if (!res.ok) return null; // not a mirrored desktop
+      return (await res.json())?.data || null;
+    };
 
-      if (isOnline) {
-        // Trigger sync and wait up to 8 seconds
-        try {
-          const syncAgent = require('./syncAgent');
-          syncAgent.triggerSync?.();
-          await new Promise((res) => setTimeout(res, 8000));
-          // Re-check pending after sync attempt
-          const r2 = await fetch(
-            base.endsWith('/api') ? `${base}/sync/status` : `${base}/api/sync/status`,
-            { signal: AbortSignal.timeout(2000) }
-          );
-          if (r2.ok) {
-            const j2 = await r2.json();
-            uploadedNow = pending - Number(j2?.data?.pendingOutbox || 0);
-            pending = Number(j2?.data?.pendingOutbox || 0);
-          }
-        } catch { /* ignore */ }
-      }
+    let state = await mirror('/desktop/sync-pending').catch(() => null);
+    const isMirror = !!state;
+    let pending = rendererPendingSync + Number(state?.pending || 0);
 
-      if (pending > 0) {
-        const detail = isOnline
-          ? `${uploadedNow > 0 ? `${uploadedNow} entr${uploadedNow === 1 ? 'y' : 'ies'} uploaded. ` : ''}${pending} still pending — click Retry to upload them now before closing.\n\n` +
-            `Entries is computer mein SAFE hain aur agli baar internet ke saath kholne par upload hongi.`
-          : `Internet nahi mila. Entries is computer mein SAFE hain — koi bhi data DELETE nahi hoga.\n\n` +
-            `Internet ON karke "Retry" press karein, ya "Close anyway" press karein — data agli baar upload hoga.`;
-
-        const { response } = await dialog.showMessageBox(mainWindow || undefined, {
-          type: 'warning',
-          title: 'Entries not uploaded yet',
-          message: `${pending} entr${pending === 1 ? 'y has' : 'ies have'} not been uploaded to the cloud yet.`,
-          detail,
-          buttons: ['Keep app open', 'Retry upload', 'Close anyway'],
-          defaultId: 0,
-          cancelId: 0,
-        });
-        if (response === 0) {
-          // Keep open
-          app.isQuiting = false;
-          mainWindow?.show();
-          return;
-        }
-        if (response === 1) {
-          // Retry: trigger sync and close after a longer wait
-          try {
-            const syncAgent = require('./syncAgent');
-            syncAgent.triggerSync?.();
-            await new Promise((res) => setTimeout(res, 12000));
-          } catch { /* ignore */ }
-          // Fall through to graceful shutdown
-        }
-        // response === 2: "Close anyway" — data is already safe in local DB, just quit
+    while (pending > 0) {
+      // Upload first; only ask if something is still left.
+      if (isMirror) {
+        const after = await mirror('/desktop/sync-now', 'POST', 90000).catch(() => null);
+        if (after) state = after;
+      } else {
+        await new Promise((r) => setTimeout(r, 4000)); // renderer queue drains on its own
       }
+      pending = rendererPendingSync + Number(state?.pending || 0);
+      if (pending <= 0) break;
+
+      const online = isMirror ? state?.online !== false : true;
+      const detail = online
+        ? `${pending} entr${pending === 1 ? 'y is' : 'ies are'} still waiting. ${state?.lastError ? `Reason: ${state.lastError}\n\n` : ''}` +
+          'Entries is computer mein SAFE hain. "Retry upload" dabakar dobara bhejein, ya "Close anyway" — agli baar app kholne par upload ho jayengi.'
+        : 'Internet nahi mila. Entries is computer mein SAFE hain — koi bhi data DELETE nahi hoga.\n\n' +
+          'Internet ON karke "Retry upload" dabayein, ya "Close anyway" — agli baar internet ke saath app kholne par upload ho jayengi.';
+
+      const { response } = await dialog.showMessageBox(mainWindow || undefined, {
+        type: 'warning',
+        title: 'Entries not uploaded yet',
+        message: `${pending} entr${pending === 1 ? 'y has' : 'ies have'} not reached the cloud yet.`,
+        detail,
+        buttons: ['Keep app open', 'Retry upload', 'Close anyway'],
+        defaultId: 1,
+        cancelId: 0,
+      });
+      if (response === 0) {
+        // Quit cancelled: back to normal, so closing the window hides it again instead of exiting.
+        app.isQuiting = false;
+        mainWindow?.show();
+        return;
+      }
+      if (response === 2) break; // Close anyway — everything stays in the local database
+      // response === 1: Retry — loop uploads again and re-checks
     }
   }
 

@@ -102,6 +102,14 @@ async function runAll() {
     results.push({ module: 'web_desktop', passed: null, skipped: true });
   }
 
+  // ── PHASE 5: Desktop mirror (what the installed desktop actually ships) ───
+  header('PHASE 5: DESKTOP MIRROR CERTIFICATION (empty desktop, no cloning)');
+  const mirrorCode = await runScript(path.join(__dirname, 'modules', 'mirror', 'run.js'));
+  results.push({ module: 'desktop_mirror', passed: mirrorCode === 0 });
+  if (mirrorCode !== 0) totalFailed++;
+  else totalPassed++;
+  console.log(`[5/5] Desktop mirror certification ${mirrorCode === 0 ? 'PASSED' : 'FAILED'}.\n`);
+
   // ── Final summary ────────────────────────────────────────────────────────
   console.log('\n' + '='.repeat(60));
   console.log('  HYBRID ERP FULL CROSS-MODULE CERTIFICATION RESULT');

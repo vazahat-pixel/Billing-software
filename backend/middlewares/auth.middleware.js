@@ -33,6 +33,10 @@ const authMiddleware = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // The office desktop's sync login may only sync — it cannot be used to open bills or settings.
+    if (decoded.scp === 'sync' && !/^\/api\/sync(\/|$|\?)/.test(String(req.originalUrl || ''))) {
+      return next(AppError.forbidden('This login can only be used for desktop sync.'));
+    }
     const user = await User.findById(decoded.id).select('-password');
     if (!user) {
       return next(AppError.unauthorized('User not found'));

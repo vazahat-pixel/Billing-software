@@ -15,7 +15,6 @@ const https = require('https');
 const http = require('http');
 const { URL } = require('url');
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 
 const User = require('../models/User');
 const Company = require('../models/Company');
@@ -83,7 +82,11 @@ exports.autoActivate = async function autoActivate({ email, password, deviceId, 
   // 1. Verify credentials against the cloud.
   const loginRes = await cloudFetch('/auth/login', {
     method: 'POST',
-    body: { email, password, deviceId, deviceName },
+    // A mirrored desktop asks for its own sync login, which other logins cannot end.
+    body: {
+      email, password, deviceId, deviceName, isDesktop: true,
+      syncAgent: String(process.env.DESKTOP_REPLICATION || '').toLowerCase() === 'true',
+    },
   }).catch((err) => {
     throw new Error(`Cannot reach cloud for activation: ${err.message}`);
   });
@@ -94,51 +97,65 @@ exports.autoActivate = async function autoActivate({ email, password, deviceId, 
   }
 
   const cloudToken = loginRes.data?.data?.token || loginRes.data?.token;
+  const cloudRefresh = loginRes.data?.data?.refreshToken || loginRes.data?.refreshToken || '';
   const cloudUser = loginRes.data?.data?.user || loginRes.data?.user;
   if (!cloudToken || !cloudUser) {
     throw AppError.badRequest('Unexpected cloud login response — token or user missing');
   }
 
-  // 2. Pull company settings from cloud.
-  const settingsRes = await cloudFetch('/company/settings', { token: cloudToken }).catch(() => null);
+  // Connecting a desktop copies the whole company to it, so the first sign-in must be by
+  // someone allowed to see all of it.
+  const isMirror = String(process.env.DESKTOP_REPLICATION || '').toLowerCase() === 'true';
+  const elevated = cloudUser.role === 'super_admin' || ['owner', 'admin'].includes(String(cloudUser.companyRole || ''));
+  if (isMirror && !elevated) {
+    throw AppError.forbidden('The first sign-in on this computer must be by the Owner or an Admin of the company.');
+  }
+
+  // 2. Pull company settings from cloud. (A mirrored desktop's sync login cannot read them, and
+  //    does not need to: the download brings the cloud's own settings document.)
+  const settingsRes = isMirror ? null : await cloudFetch('/company/settings', { token: cloudToken }).catch(() => null);
   const cloudSettings = settingsRes?.data?.data || settingsRes?.data || null;
 
-  // 3. Create the Company document locally.
   const companyId = cloudUser.companyId
     ? new mongoose.Types.ObjectId(String(cloudUser.companyId))
     : new mongoose.Types.ObjectId();
+  const userId = cloudUser.id || cloudUser._id
+    ? new mongoose.Types.ObjectId(String(cloudUser.id || cloudUser._id))
+    : new mongoose.Types.ObjectId();
 
-  let company = await Company.findById(companyId);
-  if (!company) {
-    company = await Company.create({
+  // 3. A placeholder Company so the local login works straight away. It is written without the
+  //    model's validation because the plan and owner fields are only known to the cloud; on a
+  //    mirrored desktop the download replaces it with the cloud's real Company document.
+  if (!(await Company.exists({ _id: companyId }))) {
+    await Company.collection.insertOne({
       _id: companyId,
       name: cloudUser.companyName || cloudSettings?.legalName || 'Company',
-      plan: cloudUser.plan || 'basic',
+      ownerId: userId,
       isActive: true,
       createdAt: new Date(),
+      updatedAt: new Date(),
     });
   }
 
-  // 4. Create CompanySettings if we got them.
-  if (cloudSettings && Object.keys(cloudSettings).length > 0) {
+  // 4. Create CompanySettings if we got them. A mirrored desktop gets the cloud's own settings
+  //    document in the download that follows, so it must not make a second one here.
+  if (!isMirror && cloudSettings && Object.keys(cloudSettings).length > 0) {
     await CompanySettings.findOneAndUpdate(
-      { company: companyId },
-      { $setOnInsert: { company: companyId, ...cloudSettings } },
+      { companyId },
+      { $setOnInsert: { companyId, ...cloudSettings } },
       { upsert: true, new: true }
     );
   }
 
-  // 5. Create the local User with hashed password for offline login.
-  const passwordHash = await bcrypt.hash(password, 10);
-  const userId = cloudUser.id || cloudUser._id
-    ? new mongoose.Types.ObjectId(String(cloudUser.id || cloudUser._id))
-    : new mongoose.Types.ObjectId();
+  // 5. Create the local User for offline login. The User model hashes the password on save, so
+  //    it is given in plain here — hashing it first would store a hash of the hash and the
+  //    password would never match.
 
   const localUser = await User.create({
     _id: userId,
     name: cloudUser.name || email,
     email: email.trim().toLowerCase(),
-    password: passwordHash,
+    password,
     role: cloudUser.role || 'user',
     companyRole: cloudUser.companyRole || 'owner',
     companyId,
@@ -153,6 +170,19 @@ exports.autoActivate = async function autoActivate({ email, password, deviceId, 
     ip: '127.0.0.1',
   };
   const sessionBundle = await sessionService.createSession(localUser, fakeReq);
+
+  if (isMirror) {
+    const syncAgentWorker = require('./syncAgentWorker');
+    await syncAgentWorker.seedAgentSession({
+      companyId: String(companyId),
+      token: cloudToken,
+      refreshToken: cloudRefresh,
+      deviceId: deviceId || '',
+      elevated: true,
+    });
+    // Download the company now; the screen shows progress and entries wait until it is done.
+    require('./replication/desktopSync').tick().catch(() => {});
+  }
 
   return {
     localUser,

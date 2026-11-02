@@ -72,6 +72,11 @@ router.use(blockWritesWhenReadOnly);
 // Exactly-once writes for the offline sync queue (only requests carrying an Idempotency-Key).
 router.use(require('../middlewares/idempotency.middleware'));
 
+// Cloud: "Desktop-only entries" — web is view-only for business data while the owner keeps it ON.
+router.use(require('../middlewares/desktopOnlyLock'));
+// Desktop: no entries until the company has finished downloading from the cloud.
+router.use(require('../middlewares/mirrorSnapshotGuard'));
+
 // --- Ungated: platform surface, not a sellable module -----------------------
 // /dashboard, /admin, /config, /users, /integrity, /stage*, /developer must stay
 // reachable even for a company whose modules are switched off, otherwise the

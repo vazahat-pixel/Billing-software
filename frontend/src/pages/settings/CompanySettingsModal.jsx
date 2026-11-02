@@ -4,6 +4,7 @@ import ThemePicker from '../../components/ui/ThemePicker';
 import UserRightsPanel from './UserRightsPanel';
 import CaAccessPanel from './CaAccessPanel';
 import AppLockSettings from '../../components/AppLock/AppLockSettings';
+import DesktopOnlyEntriesSettings from '../../components/desktop/DesktopOnlyEntriesSettings';
 import { ERPInput, ERPSelect } from '../../components/forms/FormElements';
 import { configApi } from '../../api';
 import { useConfig } from '../../context/ConfigContext';
@@ -1191,6 +1192,7 @@ const CompanySettingsModal = ({ isOpen, onClose, initialTab = 'appearance', init
     if (activeTab === 'offline') return renderOffline();
     if (activeTab === 'users') return <UserRightsPanel active />;
     if (activeTab === 'appLock') return <AppLockSettings canEdit={canEdit} />;
+    if (activeTab === 'desktopOnly') return <DesktopOnlyEntriesSettings canEdit={canEdit} />;
     if (activeTab === 'caAccess') {
       return (
         <CaAccessPanel

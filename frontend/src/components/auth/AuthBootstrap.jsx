@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import useStore from '../../store/useStore';
-import { initSyncListener } from '../../utils/syncQueue';
+import { initSyncListener, announce as announceSyncQueue } from '../../utils/syncQueue';
 import { subscribeNetworkStatus, isOffline as isNetworkOffline } from '../../utils/networkStatus';
 import SessionExpiredModal from './SessionExpiredModal';
 import AppLockScreen from '../AppLock/AppLockScreen';
+import MirrorDownloadOverlay from '../desktop/MirrorDownloadOverlay';
 import { useLocalApiAsSourceOfTruth, isDesktopShell } from '../../utils/desktopMode';
 import { notifySuccess, notifyWarning } from '../../utils/notify';
 
@@ -11,6 +12,12 @@ const AuthBootstrap = ({ children }) => {
   const { sessionReady, bootstrapMasters, token } = useStore();
   const mastersBootedRef = useRef(false);
   const desktopLocal = useLocalApiAsSourceOfTruth();
+
+  // Desktop: tell the app how many offline entries are waiting, even before sign-in. It only moves
+  // this PC to the new offline mode once that count is 0, so nothing in the old queue is stranded.
+  useEffect(() => {
+    if (isDesktopShell()) announceSyncQueue();
+  }, []);
 
   useEffect(() => {
     if (!sessionReady || !token) {
@@ -173,6 +180,7 @@ const AuthBootstrap = ({ children }) => {
       {children}
       <SessionExpiredModal />
       {token ? <AppLockScreen /> : null}
+      {token && desktopLocal ? <MirrorDownloadOverlay /> : null}
     </div>
   );
 };

@@ -43,6 +43,37 @@ router.post('/auto-activate', async (req, res, next) => {
   }
 });
 
+/**
+ * For the desktop app's own window (close button), which has no login token. Only on a mirrored
+ * desktop, whose API listens on 127.0.0.1. Returns a count, never data.
+ */
+const isMirrorDesktop = () =>
+  String(process.env.DESKTOP_REPLICATION || '').toLowerCase() === 'true' &&
+  String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+
+router.get('/sync-pending', async (req, res, next) => {
+  try {
+    if (!isMirrorDesktop()) return res.status(404).json({ success: false, message: 'Not a mirrored desktop' });
+    const desktop = require('../services/replication/desktopSync');
+    const s = await desktop.status();
+    return res.json({ success: true, data: { pending: s.pending, online: s.online, lastError: s.lastError, snapshot: s.snapshot?.state } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/sync-now', async (req, res, next) => {
+  try {
+    if (!isMirrorDesktop()) return res.status(404).json({ success: false, message: 'Not a mirrored desktop' });
+    const desktop = require('../services/replication/desktopSync');
+    await desktop.tick();
+    const s = await desktop.status();
+    return res.json({ success: true, data: { pending: s.pending, online: s.online, lastError: s.lastError } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** Check activation status — frontend uses this on startup to decide login vs auto-activate flow */
 router.get('/is-activated', async (req, res, next) => {
   try {

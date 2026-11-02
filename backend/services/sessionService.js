@@ -10,6 +10,9 @@ const logger = require('../utils/logger');
 
 const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
+/** Life of the office desktop's sync login, restarted on every sync. */
+const DEVICE_SYNC_DAYS = 365;
+
 function clientMeta(req = {}) {
   return {
     ip: req.ip || req.headers?.['x-forwarded-for'] || '',
@@ -34,7 +37,7 @@ class SessionService {
     return Number(process.env.JWT_REFRESH_DAYS || cfg?.session?.refreshTokenTtlDays || 30);
   }
 
-  signAccess(user, sessionId) {
+  signAccess(user, sessionId, { syncOnly = false } = {}) {
     return jwt.sign(
       {
         id: user._id,
@@ -42,19 +45,51 @@ class SessionService {
         companyId: user.companyId,
         sid: sessionId,
         typ: 'access',
+        ...(syncOnly ? { scp: 'sync' } : {}),
       },
       process.env.JWT_SECRET,
       { expiresIn: this.accessTtl() }
     );
   }
 
-  async createSession(user, req = {}) {
+  /**
+   * @param {object} opts  kind: 'device-sync' for the office desktop's sync login (see UserSession.kind)
+   */
+  async createSession(user, req = {}, opts = {}) {
     const cfg = await securityConfigService.getOrCreate(user.companyId);
     const meta = clientMeta(req);
     const sessionId = crypto.randomBytes(24).toString('hex');
     const refreshRaw = crypto.randomBytes(48).toString('hex');
-    const days = this.refreshDays(cfg);
+    const deviceSync = opts.kind === 'device-sync';
+    const days = deviceSync ? DEVICE_SYNC_DAYS : this.refreshDays(cfg);
     const expiresAt = new Date(Date.now() + days * 24 * 3600 * 1000);
+
+    if (deviceSync) {
+      // Re-connecting the same PC replaces its earlier sync login; nothing else is touched.
+      await UserSession.updateMany(
+        { userId: user._id, kind: 'device-sync', deviceId: meta.deviceId || '', status: 'active' },
+        { status: 'revoked', revokedAt: new Date(), revokeReason: 'device_reconnected' }
+      );
+      const session = await UserSession.create({
+        companyId: user.companyId || null,
+        userId: user._id,
+        sessionId,
+        refreshTokenHash: hashToken(refreshRaw),
+        deviceId: meta.deviceId,
+        deviceName: meta.deviceName,
+        deviceFingerprint: meta.deviceFingerprint,
+        trusted: true,
+        rememberDevice: true,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        kind: 'device-sync',
+        expiresAt,
+        lastActiveAt: new Date(),
+        status: 'active',
+      });
+      const accessToken = this.signAccess(user, sessionId, { syncOnly: true });
+      return { session, accessToken, refreshToken: refreshRaw, expiresAt };
+    }
 
     // Single active session policy.
     // A single-device licence implies a single session: allowing two live
@@ -75,14 +110,16 @@ class SessionService {
       }
     }
 
+    // The office desktop's sync login is not a person at a screen: it is neither ended by nor
+    // counted against these limits.
     if (singleSession) {
       await UserSession.updateMany(
-        { userId: user._id, status: 'active' },
+        { userId: user._id, status: 'active', kind: { $ne: 'device-sync' } },
         { status: 'forced', revokedAt: new Date(), revokeReason: 'single_session_policy' }
       );
     } else {
       const max = cfg.session?.maxSessions || 5;
-      const active = await UserSession.find({ userId: user._id, status: 'active' })
+      const active = await UserSession.find({ userId: user._id, status: 'active', kind: { $ne: 'device-sync' } })
         .sort({ lastActiveAt: 1 });
       if (active.length >= max) {
         const overflow = active.slice(0, active.length - max + 1);
@@ -149,9 +186,10 @@ class SessionService {
     if (!user || !user.isActive) throw AppError.unauthorized('User inactive');
 
     const cfg = await securityConfigService.getOrCreate(user.companyId);
-    // Idle timeout
+    const deviceSync = session.kind === 'device-sync';
+    // Idle timeout — not for the desktop's sync login, which is idle whenever the PC is offline.
     const idleMin = cfg.session?.idleTimeoutMinutes || 60;
-    if (session.lastActiveAt && Date.now() - new Date(session.lastActiveAt).getTime() > idleMin * 60 * 1000) {
+    if (!deviceSync && session.lastActiveAt && Date.now() - new Date(session.lastActiveAt).getTime() > idleMin * 60 * 1000) {
       session.status = 'expired';
       session.revokeReason = 'idle_timeout';
       await session.save();
@@ -164,6 +202,8 @@ class SessionService {
       session.refreshTokenHash = hashToken(newRefresh);
     }
     session.lastActiveAt = new Date();
+    // A desktop that keeps syncing keeps its login: the year starts again from today.
+    if (deviceSync) session.expiresAt = new Date(Date.now() + DEVICE_SYNC_DAYS * 24 * 3600 * 1000);
     const meta = clientMeta(req);
     if (meta.ip) session.ip = meta.ip;
     await session.save();
@@ -178,6 +218,7 @@ class SessionService {
         masterCompanyId: scope.masterCompanyId,
         sid: session.sessionId,
         typ: 'access',
+        ...(deviceSync ? { scp: 'sync' } : {}),
       },
       process.env.JWT_SECRET,
       { expiresIn: this.accessTtl() }

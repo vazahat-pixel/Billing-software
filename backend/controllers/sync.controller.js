@@ -24,9 +24,12 @@ exports.status = asyncHandler(async (req, res) => {
   if (deviceId && companyId) {
     deviceState = await SyncDeviceState.findOne({ companyId, deviceId }).lean();
   }
-  const pending = String(process.env.DESKTOP_HYBRID || '') === 'true'
-    ? await syncOutboxService.pendingCount(companyId)
-    : 0;
+  const isMirror =
+    String(process.env.DESKTOP_REPLICATION || '').toLowerCase() === 'true' &&
+    String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
+  let pending = 0;
+  if (isMirror) pending = await require('../services/replication/desktopSync').pendingCount();
+  else if (String(process.env.DESKTOP_HYBRID || '') === 'true') pending = await syncOutboxService.pendingCount(companyId);
   const lease = companyId
     ? await numberLeaseService.getLocalLeaseStatus(companyId, 'sales')
     : { available: 0 };

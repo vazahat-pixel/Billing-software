@@ -22,40 +22,43 @@ export const loginWithOfflineSupport = async ({
     return user;
   };
 
-  // Desktop hybrid mode: first check if local DB needs activation (empty DB),
-  // then do normal local login. Falls back to offline IndexedDB when offline.
+  // Desktop (local / mirrored): the API runs on this PC, so it answers with or without internet.
+  // Never fall back to the browser's cached CLOUD login here — the local API cannot accept it.
   if (isDesktopLocalMode()) {
-    const browserHasNoInternet = typeof navigator !== 'undefined' && !navigator.onLine;
-
-    if (browserHasNoInternet) {
-      // Fully offline: use IndexedDB-cached credentials
-      const session = await tryOfflineLogin(emailNorm, password, { adminOnly });
-      return { token: session.token, user: assertRole(session.user) };
-    }
-
-    // Online + desktop local: try normal local API login first
+    let activated = true;
     try {
-      const response = await api.post('/auth/login', { email: emailNorm, password, ...(totpCode ? { totpCode } : {}) }, { skipAuthRedirect: true, forceNetwork: true });
-      const body = response.data || {};
-      if (body.requires2fa || body.code === 'TOTP_REQUIRED') {
-        const err = new Error(body.message || 'Two-factor code required');
-        err.requires2fa = true;
-        throw err;
-      }
-      const payload = body.data && (body.data.token || body.data.user) ? body.data : body;
-      if (payload.token && payload.user) {
-        assertRole(payload.user);
-        try { await saveOfflineCredential(emailNorm, password, { token: payload.token, user: payload.user }); } catch { /* ignore */ }
-        return { token: payload.token, user: payload.user };
-      }
-    } catch (localErr) {
-      if (localErr.requires2fa) throw localErr;
-      // 401 = user not found → try auto-activate (first run on this device)
-      const isNotFound = !localErr.response || localErr.response?.status === 401 || localErr.response?.status === 404;
-      if (!isNotFound) throw localErr;
+      const st = await api.get('/desktop/is-activated', { skipAuthRedirect: true, forceNetwork: true });
+      activated = !!(st.data?.data?.activated);
+    } catch {
+      activated = true; // older local API without this route: treat as set up
     }
 
-    // Auto-activate: local DB has no user yet — provision from cloud credentials
+    if (activated) {
+      // Set-up PC: normal local sign-in. A wrong password is reported as such.
+      try {
+        const response = await api.post('/auth/login', { email: emailNorm, password, ...(totpCode ? { totpCode } : {}) }, { skipAuthRedirect: true, forceNetwork: true });
+        const body = response.data || {};
+        if (body.requires2fa || body.code === 'TOTP_REQUIRED') {
+          const err = new Error(body.message || 'Two-factor code required');
+          err.requires2fa = true;
+          throw err;
+        }
+        const payload = body.data && (body.data.token || body.data.user) ? body.data : body;
+        if (!payload.token || !payload.user) throw new Error(body.message || 'Login failed: invalid server response');
+        assertRole(payload.user);
+        return { token: payload.token, user: payload.user };
+      } catch (localErr) {
+        if (localErr.requires2fa) throw localErr;
+        if (localErr.response?.data?.requires2fa || localErr.response?.data?.code === 'TOTP_REQUIRED') {
+          const e = new Error(localErr.response.data.message || 'Two-factor code required');
+          e.requires2fa = true;
+          throw e;
+        }
+        throw new Error(localErr.response?.data?.message || localErr.message || 'Login failed. Please check your credentials.');
+      }
+    }
+
+    // First sign-in on this PC: connect it to the cloud company (needs internet this one time).
     try {
       let identity = {};
       try { identity = await getDeviceIdentity(); } catch { /* ok */ }
@@ -66,14 +69,16 @@ export const loginWithOfflineSupport = async ({
         deviceName: identity.deviceName || 'Textile ERP Desktop',
       }, { skipAuthRedirect: true, forceNetwork: true });
       const actBody = actRes.data?.data || actRes.data || {};
-      if (actBody.token && actBody.user) {
-        assertRole(actBody.user);
-        try { await saveOfflineCredential(emailNorm, password, { token: actBody.token, user: actBody.user }); } catch { /* ignore */ }
-        return { token: actBody.token, user: actBody.user };
-      }
+      if (!actBody.token || !actBody.user) throw new Error('Unexpected reply while connecting this computer');
+      assertRole(actBody.user);
+      return { token: actBody.token, user: actBody.user };
     } catch (actErr) {
       if (actErr.requires2fa) throw actErr;
-      throw new Error(actErr.response?.data?.message || actErr.message || 'Login failed');
+      const msg = actErr.response?.data?.message || actErr.message || 'Login failed';
+      if (/reach cloud|timed out|ENOTFOUND|ECONNREFUSED|fetch failed|getaddrinfo/i.test(msg)) {
+        throw new Error('This computer needs internet once for its first sign-in, to download your company. Connect to the internet and try again.');
+      }
+      throw new Error(msg);
     }
   }
 

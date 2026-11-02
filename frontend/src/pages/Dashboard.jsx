@@ -1276,6 +1276,7 @@ const Dashboard = () => {
                { label: 'Sp Find Column Setting', action: () => openSettings('columns') },
                { label: 'Change PassWord', action: () => openSettings('users'), separatorBefore: true },
                { label: 'App Lock (PIN)', action: () => openSettings('appLock') },
+               { label: 'Desktop-only Entries', action: () => openSettings('desktopOnly') },
                { label: 'Theme', action: () => openSettings('appearance') },
             ],
          },

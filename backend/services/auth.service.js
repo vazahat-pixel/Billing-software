@@ -353,7 +353,13 @@ exports.login = async (email, password, req = null) => {
         }
     }
 
-    const sessionBundle = await sessionService.createSession(user, req || {});
+    // An office desktop connecting for sync gets its own long-lived, sync-only login (see
+    // UserSession.kind). Only on the cloud, and only for someone allowed to mirror the company.
+    const wantsDeviceSync =
+        req?.body?.syncAgent === true &&
+        String(process.env.DESKTOP_LOCAL || '').toLowerCase() !== 'true' &&
+        (user.role === 'super_admin' || ['owner', 'admin'].includes(String(user.companyRole || '')));
+    const sessionBundle = await sessionService.createSession(user, req || {}, wantsDeviceSync ? { kind: 'device-sync' } : {});
     const suspicious = await sessionService.detectSuspicious(user, req || {});
     await sessionService.recordLogin(user, 'login_success', req || {}, {
         sessionId: sessionBundle.session.sessionId,
@@ -419,8 +425,11 @@ exports.login = async (email, password, req = null) => {
     }
 
     // Hybrid desktop: seed sync agent with a CENTRAL token (local JWT is not valid on central)
+    const isMirrorDesktop =
+        String(process.env.DESKTOP_REPLICATION || '').toLowerCase() === 'true' &&
+        String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true';
     if (
-        String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' &&
+        (String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' || isMirrorDesktop) &&
         resolvedCompanyId
     ) {
         try {
@@ -444,6 +453,7 @@ exports.login = async (email, password, req = null) => {
                             password: req.body.password,
                             deviceId,
                             isDesktop: true,
+                            syncAgent: isMirrorDesktop,
                             deviceName: req.body.deviceName || 'Desktop Hybrid',
                         }),
                     });
@@ -459,12 +469,29 @@ exports.login = async (email, password, req = null) => {
             }
             // Never overwrite a good central token with a local-only JWT when central is offline
             const existing = await syncAgentWorker.getAgentContext();
-            await syncAgentWorker.seedAgentSession({
-                companyId: resolvedCompanyId,
-                token: agentToken || existing.token || token,
-                refreshToken: agentRefresh || existing.refreshToken || sessionBundle.refreshToken,
-                deviceId,
-            });
+            if (isMirrorDesktop) {
+                // Mirroring needs an Owner/Admin cloud login. Keep the one we have when a lower
+                // role signs in on this PC, and never store the local token as the cloud one.
+                const elevated = user.role === 'super_admin' || ['owner', 'admin'].includes(String(user.companyRole || ''));
+                const keepExisting = existing.token && existing.elevated && !elevated;
+                if (agentToken && !keepExisting) {
+                    await syncAgentWorker.seedAgentSession({
+                        companyId: resolvedCompanyId,
+                        token: agentToken,
+                        refreshToken: agentRefresh || '',
+                        deviceId,
+                        elevated,
+                    });
+                }
+                require('./replication/desktopSync').tick().catch(() => {});
+            } else {
+                await syncAgentWorker.seedAgentSession({
+                    companyId: resolvedCompanyId,
+                    token: agentToken || existing.token || token,
+                    refreshToken: agentRefresh || existing.refreshToken || sessionBundle.refreshToken,
+                    deviceId,
+                });
+            }
             const offlineSession = require('./offlineSessionService');
             await offlineSession.storeLocalSession({
                 companyId: resolvedCompanyId,

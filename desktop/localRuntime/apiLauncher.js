@@ -101,8 +101,14 @@ async function startApi(opts) {
     PORT: String(port),
     MONGO_URI: mongoUri,
     DESKTOP_LOCAL: 'true',
-    DESKTOP_HYBRID: isHybrid ? 'true' : (process.env.DESKTOP_HYBRID || 'false'),
-    HYBRID_SYNC_ENABLED: isHybrid ? 'true' : (process.env.HYBRID_SYNC_ENABLED || 'false'),
+    // "hybrid" on the desktop now means mirroring: this PC and the cloud hold the same documents
+    // (services/replication). The older operation-push path stays off, so its outbox and invoice
+    // leases are never used — numbering is the normal book-wise series, copied from the cloud.
+    DESKTOP_REPLICATION: isHybrid ? 'true' : 'false',
+    DESKTOP_HYBRID: 'false',
+    HYBRID_SYNC_ENABLED: 'false',
+    // Only this computer may talk to the local API.
+    HOST: '127.0.0.1',
     CENTRAL_API_BASE_URL: opts.centralApiBaseUrl || process.env.CENTRAL_API_BASE_URL || '',
     MONGO_REPLICA_SET: opts.replicaSet ? 'true' : 'false',
     ALLOW_PUBLIC_REGISTER: 'false',
@@ -121,8 +127,9 @@ async function startApi(opts) {
     // Hybrid production: enforce module + device gates on local replica too
     MODULE_GATE_ENFORCE:
       process.env.MODULE_GATE_ENFORCE || (isHybrid ? 'true' : 'false'),
-    DEVICE_BINDING_ENFORCE:
-      process.env.DEVICE_BINDING_ENFORCE || (isHybrid ? 'true' : 'false'),
+    // Device binding is enforced by the cloud when this PC signs in there; the local copy has no
+    // device registry of its own.
+    DEVICE_BINDING_ENFORCE: process.env.DEVICE_BINDING_ENFORCE || 'false',
     PLAN_LIMIT_ENFORCE: process.env.PLAN_LIMIT_ENFORCE || 'false',
     // Long-lived tokens so the user never has to log in again on this machine.
     JWT_ACCESS_EXPIRES: process.env.JWT_ACCESS_EXPIRES || '365d',

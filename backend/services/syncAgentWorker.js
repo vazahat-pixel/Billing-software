@@ -165,7 +165,18 @@ async function pullIncremental(ctx) {
   }
 }
 
+function isMirrorDesktop() {
+  return (
+    String(process.env.DESKTOP_REPLICATION || '').toLowerCase() === 'true' &&
+    String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true'
+  );
+}
+
 async function tick() {
+  if (isMirrorDesktop()) {
+    if (!centralBase()) return;
+    return require('./replication/desktopSync').tick();
+  }
   if (!isHybridDesktop()) return;
   if (!centralBase()) return;
   if (running) {
@@ -201,9 +212,15 @@ async function tick() {
 }
 
 function startSyncAgentWorker(intervalMs = Number(process.env.SYNC_AGENT_INTERVAL_MS || 20000)) {
-  if (!isHybridDesktop()) return;
+  if (!isHybridDesktop() && !isMirrorDesktop()) return;
   if (timer) return;
-  console.log('[syncAgentWorker] starting hybrid sync agent');
+  console.log(`[syncAgentWorker] starting ${isMirrorDesktop() ? 'desktop mirror' : 'hybrid'} sync agent`);
+  if (isMirrorDesktop()) {
+    // Watch for local changes from boot, so nothing made before the first tick is missed.
+    require('./replication/desktopSync').isSnapshotDone()
+      .then((done) => (done ? require('./replication/desktopCapture').start() : null))
+      .catch((err) => console.warn('[syncAgentWorker] mirror capture not started:', err.message));
+  }
   timer = setInterval(() => {
     tick().catch(() => {});
   }, intervalMs);
@@ -221,12 +238,13 @@ function stopSyncAgentWorker() {
 }
 
 /** Called from auth login success on desktop hybrid to seed agent credentials */
-async function seedAgentSession({ companyId, token, deviceId, refreshToken }) {
+async function seedAgentSession({ companyId, token, deviceId, refreshToken, elevated }) {
   await setAgentContext({
     companyId: String(companyId),
     token,
     refreshToken: refreshToken || '',
     deviceId: String(deviceId || ''),
+    ...(elevated === undefined ? {} : { elevated: !!elevated }),
   });
 }
 

@@ -1,7 +1,7 @@
 import {
   Palette, FileText, Building2, Users, Receipt, Bell, Sliders, LayoutGrid, Columns, ToggleLeft, Tags,
   Paintbrush, UserCircle, Package, Wallet, CreditCard, Shield, BarChart3,
-  Zap, BookOpen, Scale, Boxes, Wifi, Printer, Lock,
+  Zap, BookOpen, Scale, Boxes, Wifi, Printer, Lock, Monitor,
 } from 'lucide-react';
 
 export const BILL_MODULES = [
@@ -71,6 +71,7 @@ export const NAV_SECTIONS = [
       { id: 'permissions', label: 'Role Permissions', icon: Shield },
       { id: 'users', label: 'Users & Roles', icon: Users },
       { id: 'appLock', label: 'App Lock (PIN)', icon: Lock },
+      { id: 'desktopOnly', label: 'Desktop-only Entries', icon: Monitor },
     ],
   },
   {

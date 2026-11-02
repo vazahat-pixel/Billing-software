@@ -24,6 +24,9 @@ const UserSessionSchema = new mongoose.Schema({
     default: 'active',
     index: true,
   },
+  // 'device-sync': the office desktop's own cloud login, used only by its sync. Not ended by other
+  // logins, by the idle timeout or by the session cap — only by an admin, or by re-connecting the PC.
+  kind: { type: String, enum: ['interactive', 'device-sync'], default: 'interactive', index: true },
   lastActiveAt: { type: Date, default: Date.now, index: true },
   expiresAt: { type: Date, required: true },
   revokedAt: { type: Date, default: null },

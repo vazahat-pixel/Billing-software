@@ -23,7 +23,10 @@ const subscriptionMiddleware = async (req, res, next) => {
   // Hybrid desktop keeps commercialPolicy intact so MODULE_GATE / PLAN_LIMIT can
   // still hard-enforce saas_enforced tenants (do not rewrite to legacy_open).
   if (String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true') {
-    const isHybrid = String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true';
+    // A mirrored desktop keeps the cloud's plan rules too (its Company copy comes from the cloud).
+    const isHybrid =
+      String(process.env.DESKTOP_HYBRID || '').toLowerCase() === 'true' ||
+      String(process.env.DESKTOP_REPLICATION || '').toLowerCase() === 'true';
     if (req.user?.companyId) {
       try {
         const company = await Company.findById(req.user.companyId);
