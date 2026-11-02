@@ -39,15 +39,27 @@ const ALLOWED_ROOT_FILES = new Set([
   'package-lock.json',
 ]);
 
-// These sub-paths (relative to dest) must NEVER appear — build fails immediately if they do.
-const FORBIDDEN_PATTERNS = [
+/**
+ * Paths, relative to the bundled backend root, that must never ship. Checked as exact paths (a
+ * directory also covers everything under it) — NOT as file names at any depth: the Oct-2026
+ * injection was a loader at the backend root called api.js, while plenty of legitimate npm
+ * packages contain their own api.js (razorpay/dist/api.js, for one). A name-based match flagged
+ * those and blocked every build.
+ *
+ * Installed dependencies are not walked: they come from package-lock.json, and our own source is
+ * what an attacker would plant a loader in. Obfuscated code in tracked files is caught separately
+ * by scripts/ci/check-no-obfuscation.sh.
+ */
+const FORBIDDEN_PATHS = [
   'api.js',
   '.env',
   '.env.production',
   '.env.local',
   'backups',
   'data',
-  'node_modules' + path.sep + '.cache',  // cache dirs only; node_modules itself is installed fresh
+  'scratch',
+  'developer',
+  'qa',
 ];
 
 function copyDir(from, to) {
@@ -99,21 +111,32 @@ if (fs.existsSync(bundledDownloads)) {
 }
 
 // ── Security gate — abort if any forbidden path crept in ──────────────────────
-function walkAndCheck(dir, relBase) {
-  for (const name of fs.readdirSync(dir)) {
-    const abs = path.join(dir, name);
-    const rel = relBase ? `${relBase}/${name}` : name;
-    for (const pat of FORBIDDEN_PATTERNS) {
-      if (name === pat || rel === pat || rel.startsWith(pat + '/')) {
-        console.error(`\n❌  SECURITY GATE: forbidden path found in bundled backend: ${abs}`);
-        console.error('    This must not be shipped. Fix the allowlist and rebuild.\n');
-        process.exit(2);
-      }
+function securityGate() {
+  const bad = [];
+  for (const rel of FORBIDDEN_PATHS) {
+    const abs = path.join(dest, rel);
+    if (fs.existsSync(abs)) bad.push(abs);
+  }
+  // Our own source must not contain a planted loader at any depth either; dependencies are skipped.
+  const walk = (dir, relBase) => {
+    for (const name of fs.readdirSync(dir)) {
+      if (name === 'node_modules') continue;
+      const abs = path.join(dir, name);
+      const rel = relBase ? `${relBase}/${name}` : name;
+      if (fs.statSync(abs).isDirectory()) walk(abs, rel);
+      else if (name === 'api.js' || name.startsWith('.env')) bad.push(abs);
     }
-    if (fs.statSync(abs).isDirectory()) walkAndCheck(abs, rel);
+  };
+  walk(dest, '');
+
+  if (bad.length) {
+    console.error('\n❌  SECURITY GATE: these must not be shipped:');
+    for (const b of bad) console.error(`      ${b}`);
+    console.error('    Fix the allowlist (desktop/scripts/prepare-backend.cjs) and rebuild.\n');
+    process.exit(2);
   }
 }
-walkAndCheck(dest, '');
+securityGate();
 
 // ── Install production dependencies into the bundled backend ──────────────────
 // node_modules must be present so the spawned Express process can run offline.
@@ -127,7 +150,7 @@ execFileSync(npmCmd, ['install', '--omit=dev'], {
   shell: process.platform === 'win32',
 });
 
-// Gate again after npm install — malicious postinstall scripts are rare but not impossible.
-walkAndCheck(dest, '');
+// Gate again after npm install — a postinstall script must not plant anything in our source.
+securityGate();
 
 console.log('\nBackend ready at', dest, '(allowlist-only, prod deps installed, security gate passed)');
