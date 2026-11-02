@@ -49,18 +49,28 @@ test('every layout a report declares is either captured or has fallback columns'
   assert.deepEqual(missing, [], `these reports would render an empty grid:\n  ${missing.join('\n  ')}`);
 });
 
-test('the two run-time-created views are the only uncaptured ones, and both have fallbacks', () => {
+test('only the run-time-created summary view is uncaptured, and it has fallback columns', () => {
   const uncaptured = declaredLayouts()
     .filter(({ layout }) => !Object.prototype.hasOwnProperty.call(layouts, layout))
     .map(({ layout }) => layout);
 
   assert.deepEqual(
     [...new Set(uncaptured)].sort(),
-    ['JSM_VW_JOBWORK_ISSUE_REPORT', 'JSM_VW_PROCESS_ISSUE_SUM_REPORT'],
-    'a newly uncaptured layout appeared — give it fallbackColumns or capture it'
+    ['JSM_VW_PROCESS_ISSUE_SUM_REPORT'],
+    'a newly uncaptured layout appeared — give it fallbackColumns or capture it from STP_REPORT'
   );
-  assert.ok(fallbacksFor('jobSend').has('JSM_VW_JOBWORK_ISSUE_REPORT'));
   assert.ok(fallbacksFor('processSend').has('JSM_VW_PROCESS_ISSUE_SUM_REPORT'));
+});
+
+test('JobWork Send uses JSM\'s own captured columns, not a hand-written list', () => {
+  assert.ok(layouts.JSM_VW_JOBWORK_ISSUE_REPORT, 'layout must be captured');
+  assert.equal(fallbacksFor('jobSend').size, 0, 'a guessed column list would hide JSM\'s real one');
+
+  const shown = layouts.JSM_VW_JOBWORK_ISSUE_REPORT.S
+    .filter((f) => f.variants && f.variants['1'])
+    .sort((a, b) => a.variants['1'].order - b.variants['1'].order)
+    .map((f) => f.field);
+  assert.deepEqual(shown, ['NCCHLN_NO', 'CHLN_DATE', 'PARTY', 'ITEM', 'ISS_PCS', 'ISS_QTY', 'REMARK_1']);
 });
 
 test('captured jobwork and process layouts expose columns for their variants', () => {
