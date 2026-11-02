@@ -105,6 +105,12 @@ async function applyBatch(companyId, payloadString) {
 
     try {
       if (item.op === 'delete') {
+        // Counters are never deleted by the app; deleting one would restart bill numbering at 1
+        // and hand out numbers the company has already issued.
+        if (coll === 'counters') {
+          reject('NOT_ALLOWED', 'a number counter cannot be deleted');
+          continue;
+        }
         // Scope check on the stored copy, so a desktop can only delete its own group's documents.
         const filter = { _id: item.id };
         const existing = await db().collection(coll).findOne(filter);

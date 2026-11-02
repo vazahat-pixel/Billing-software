@@ -488,6 +488,18 @@ async function main() {
       });
     });
 
+    await test('A number counter cannot be deleted through sync', async () => {
+      // Deleting one would restart bill numbering at 1 and reissue numbers already used.
+      const id = `BILLNO-sales-${fx.companyId}`;
+      const before = await withDb(centralUri, (db) => db.collection('counters').findOne({ _id: id }));
+      assert(before, 'sales counter should exist on the cloud');
+      const payload = EJSON.stringify([{ key: 'k3', coll: 'counters', op: 'delete', id }], { relaxed: false });
+      const r = await central.post('/sync/mirror/apply', { token: webToken, body: { payload } });
+      assert(data(r).results[0].code === 'NOT_ALLOWED', `not refused: ${JSON.stringify(data(r))}`);
+      const after = await withDb(centralUri, (db) => db.collection('counters').findOne({ _id: id }));
+      assert(after && after.seq === before.seq, 'counter was changed');
+    });
+
     await test('A desktop cannot upload billing or plan data', async () => {
       const sub = { _id: new BSON.ObjectId(), companyId: new BSON.ObjectId(fx.companyId), status: 'active', planCode: 'enterprise' };
       const payload = EJSON.stringify([{ key: 'k2', coll: 'subscriptions', op: 'upsert', id: sub._id, doc: sub }], { relaxed: false });
