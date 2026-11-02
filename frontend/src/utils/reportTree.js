@@ -70,6 +70,9 @@ export const REPORT_TREE = [
           { id: 'purchase-summary', label: 'Purchase Summary', reportKey: 'purchaseSummary' },
           { id: 'purchase-detail', label: 'Purchase ItemDetail', reportKey: 'purchaseDetail' },
           { id: 'purchase-item-wise', label: 'Item Wise Summary', reportKey: 'purchaseItemWise' },
+          // JSM's own purchase register (form Rpt_Jsm_Purchase), in its menu position.
+          { id: 'purchase-jsm-summary', label: 'Summary', reportKey: 'purchaseSummary', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Purchase' },
+          { id: 'purchase-jsm-detail', label: 'Detail', reportKey: 'purchaseDetail', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Purchase_Detail' },
           { id: 'purchase-order', label: 'Purchase Order', reportKey: 'purchaseOrder' },
           { id: 'purchase-outstanding', label: 'Purchase Outstanding', external: 'outstandingPurchaseFull' },
         ],

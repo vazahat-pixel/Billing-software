@@ -26,6 +26,10 @@ export function hasJsmReport(formName) {
 /** A JSM report: its parameter screen, then JSM's "Report Control" grid. */
 export default function JsmReport({ formName, isOpen, onClose, companyName = '', onOpenRow }) {
   const config = JSM_REPORTS[formName];
+  // Two menu entries can share one JSM form (a register's Summary and Detail): the config then
+  // names which blueprint screen to draw and which backend report to ask.
+  const screenForm = config?.blueprintForm || formName;
+  const apiForm = config?.apiForm || formName;
   const [blueprint, setBlueprint] = useState(null);
   const [lists, setLists] = useState({});
   const [state, setState] = useState({});
@@ -40,7 +44,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
     setError('');
     setState(config.defaults(financialYear()));
     loadBlueprint().then((bp) => live && setBlueprint(bp));
-    jsmReportApi.options(formName)
+    jsmReportApi.options(apiForm)
       .then((opts) => {
         if (!live) return;
         const next = {};
@@ -49,10 +53,10 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
       })
       .catch((e) => live && setError(e?.message || 'Could not load lists'));
     return () => { live = false; };
-  }, [isOpen, formName, config]);
+  }, [isOpen, formName, config, apiForm]);
 
   if (!isOpen || !config) return null;
-  const form = blueprint?.forms?.[formName];
+  const form = blueprint?.forms?.[screenForm];
 
   const activeListView = () => {
     const tabControl = form?.controls.find((c) => c.type === 'TabControl');
@@ -73,7 +77,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
       setBusy(true);
       setError('');
       try {
-        setResult(await jsmReportApi.run(formName, config.toParams(state)));
+        setResult(await jsmReportApi.run(apiForm, config.toParams(state)));
       } catch (e) {
         setError(e?.response?.data?.message || e?.message || 'Report failed');
       } finally {
