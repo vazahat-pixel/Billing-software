@@ -9,9 +9,10 @@ import jobStock from './jobStock';
 import { BILL_REGISTERS } from './billRegisters';
 import { OUTSTANDING_REPORTS } from './outstandingReports';
 import { ITEM_WISE_REPORTS } from './itemWiseSummary';
+import salesHaste from './salesHaste';
 
 /** JSM report screens rebuilt so far, keyed by JSM form name. */
 export const JSM_REPORTS = Object.fromEntries([
   processSend, jobSend, processReceiptDetail, jobReceiptDetail, processReceiptSummary, jobReceiptSummary,
-  processStock, jobStock, ...BILL_REGISTERS, ...OUTSTANDING_REPORTS, ...ITEM_WISE_REPORTS,
+  processStock, jobStock, ...BILL_REGISTERS, ...OUTSTANDING_REPORTS, ...ITEM_WISE_REPORTS, salesHaste,
 ].map((r) => [r.form, r]));

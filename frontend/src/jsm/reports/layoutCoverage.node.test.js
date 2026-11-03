@@ -49,17 +49,19 @@ test('every layout a report declares is either captured or has fallback columns'
   assert.deepEqual(missing, [], `these reports would render an empty grid:\n  ${missing.join('\n  ')}`);
 });
 
-test('only the run-time-created summary view is uncaptured, and it has fallback columns', () => {
+test('only the known no-layout screens are uncaptured, and each has fallback columns', () => {
   const uncaptured = declaredLayouts()
     .filter(({ layout }) => !Object.prototype.hasOwnProperty.call(layouts, layout))
     .map(({ layout }) => layout);
 
   assert.deepEqual(
     [...new Set(uncaptured)].sort(),
-    ['JSM_VW_PROCESS_ISSUE_SUM_REPORT'],
+    ['JSM_VW_PROCESS_ISSUE_SUM_REPORT', 'JSM_VW_SALES_HASTE_REPORT'],
     'a newly uncaptured layout appeared — give it fallbackColumns or capture it from STP_REPORT'
   );
   assert.ok(fallbacksFor('processSend').has('JSM_VW_PROCESS_ISSUE_SUM_REPORT'));
+  // Rpt_Sales_Haste has no STP_REPORT row at all — its columns come from the owner's printed output.
+  assert.ok(fallbacksFor('salesHaste').has('JSM_VW_SALES_HASTE_REPORT'));
 });
 
 test('JobWork Send uses JSM\'s own captured columns, not a hand-written list', () => {

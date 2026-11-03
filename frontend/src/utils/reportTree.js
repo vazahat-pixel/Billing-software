@@ -44,7 +44,7 @@ export const REPORT_TREE = [
           { id: 'sales-summary', label: 'Sales Summary', reportKey: 'salesSummary' },
           { id: 'sales-detail', label: 'Sales ItemDetail', reportKey: 'salesDetail' },
           { id: 'sales-item-wise', label: 'Item Wise Summary', reportKey: 'salesItemWise', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Sales_ItemSummary' },
-          { id: 'sales-haste', label: 'Haste/Transport', reportKey: 'salesHaste' },
+          { id: 'sales-haste', label: 'Haste/Transport', reportKey: 'salesHaste', external: 'jsmReport', jsmForm: 'Rpt_Sales_Haste' },
           { id: 'sales-order-reg', label: 'Sales Order Register', reportKey: 'salesOrder' },
           { id: 'sales-challan', label: 'Sales Challan', reportKey: 'salesChallan' },
           { id: 'sales-outstanding', label: 'Sales Outstanding', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Os_Sales' },
