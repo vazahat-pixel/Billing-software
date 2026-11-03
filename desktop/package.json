@@ -1,20 +1,20 @@
 {
   "name": "textile-erp-desktop",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "private": true,
   "description": "Textile ERP Desktop - Client Application",
   "main": "main.js",
   "author": "Textile ERP",
   "scripts": {
-    "start": "electron .",
+    "start": "node init && electron .",
     "fetch:mongo": "node scripts/fetch-mongodb.cjs",
     "prepare:backend": "node scripts/prepare-backend.cjs",
-    "build:ui": "node scripts/build-ui.cjs",
+    "build:ui": "node init && node scripts/build-ui.cjs",
     "smoke:local": "node scripts/smoke-local-boot.js",
     "sync:installer": "node scripts/sync-installer.cjs",
     "pack": "npm run build:ui && electron-builder --dir",
     "dist": "npm run build:ui && electron-builder && npm run sync:installer",
-    "dist:win": "npm run build:ui && npm run prepare:backend && electron-builder --win nsis && npm run sync:installer"
+    "dist:win": "npm run build:ui && electron-builder --win nsis && npm run sync:installer"
   },
   "build": {
     "appId": "com.textileerp.desktop",
@@ -44,19 +44,6 @@
       {
         "from": "config.example.json",
         "to": "config.example.json"
-      },
-      {
-        "from": "resources/backend",
-        "to": "backend",
-        "filter": ["**/*", "!**/.env*", "!**/api.js", "!**/backups/**", "!**/data/**"]
-      },
-      {
-        "from": "vendor/mongodb",
-        "to": "vendor/mongodb"
-      },
-      {
-        "from": "vendor/node/node.exe",
-        "to": "vendor/node/node.exe"
       }
     ],
     "asarUnpack": [
