@@ -14,6 +14,14 @@ const REPORTS = {
   Rpt_Jsm_Purchase: require('./reports/billRegisters').purchase,
   Rpt_Jsm_Sales_Return: require('./reports/billRegisters').salesReturn,
   Rpt_Jsm_Purchase_Return: require('./reports/billRegisters').purchaseReturn,
+  Rpt_Jsm_Os_Sales: require('./reports/outstandingReports').os.sales,
+  Rpt_Jsm_Os_Purchase: require('./reports/outstandingReports').os.purchase,
+  Rpt_Jsm_Os_Process: require('./reports/outstandingReports').os.process,
+  Rpt_Jsm_Os_Jobwork: require('./reports/outstandingReports').os.jobwork,
+  Rpt_Jsm_Os_Sales_AgeAnalysis: require('./reports/outstandingReports').osAge.sales,
+  Rpt_Jsm_Os_Purchase_AgeAnalysis: require('./reports/outstandingReports').osAge.purchase,
+  Rpt_Jsm_Os_Process_AgeAnalysis: require('./reports/outstandingReports').osAge.process,
+  Rpt_Jsm_Os_Jobwork_AgeAnalysis: require('./reports/outstandingReports').osAge.jobwork,
 };
 
 function get(reportId) {

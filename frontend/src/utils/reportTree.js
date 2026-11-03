@@ -47,7 +47,7 @@ export const REPORT_TREE = [
           { id: 'sales-haste', label: 'Haste/Transport', reportKey: 'salesHaste' },
           { id: 'sales-order-reg', label: 'Sales Order Register', reportKey: 'salesOrder' },
           { id: 'sales-challan', label: 'Sales Challan', reportKey: 'salesChallan' },
-          { id: 'sales-outstanding', label: 'Sales Outstanding', external: 'outstandingSalesFull' },
+          { id: 'sales-outstanding', label: 'Sales Outstanding', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Os_Sales' },
         ],
       },
       {
@@ -77,7 +77,7 @@ export const REPORT_TREE = [
           { id: 'purchase-jsm-summary', label: 'Summary', reportKey: 'purchaseSummary', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Purchase' },
           { id: 'purchase-jsm-detail', label: 'Detail', reportKey: 'purchaseDetail', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Purchase_Detail' },
           { id: 'purchase-order', label: 'Purchase Order', reportKey: 'purchaseOrder' },
-          { id: 'purchase-outstanding', label: 'Purchase Outstanding', external: 'outstandingPurchaseFull' },
+          { id: 'purchase-outstanding', label: 'Purchase Outstanding', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Os_Purchase' },
         ],
       },
       {

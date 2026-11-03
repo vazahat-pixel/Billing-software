@@ -1194,23 +1194,25 @@ const Dashboard = () => {
       // Same order and sub-menus as JSM's Others Reports; the MERN-only hubs sit at the end.
       'Others Reports': [
          {
+            // JSM's own Debitor/Creditor/Process/Jobwork O/s screens (Rpt_Jsm_Os_*), not the
+            // generic modal — "Zoom" is JSM's name for this detail-grid view.
             label: 'Outstanding Zoom',
             children: [
-               { label: 'Debitors', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
-               { label: 'Creditors', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
-               { label: 'Process', action: () => setModals(prev => ({ ...prev, outstandingProcessFull: true })) },
-               { label: 'JobWork', action: () => setModals(prev => ({ ...prev, outstandingJobworkFull: true })) },
-               { label: 'Age Analysis', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
+               { label: 'Debitors', action: () => setJsmReportForm('Rpt_Jsm_Os_Sales') },
+               { label: 'Creditors', action: () => setJsmReportForm('Rpt_Jsm_Os_Purchase') },
+               { label: 'Process', action: () => setJsmReportForm('Rpt_Jsm_Os_Process') },
+               { label: 'JobWork', action: () => setJsmReportForm('Rpt_Jsm_Os_Jobwork') },
+               { label: 'Age Analysis', action: () => setJsmReportForm('Rpt_Jsm_Os_Sales_AgeAnalysis') },
                { label: 'Os New Format Testing', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
             ],
          },
          {
             label: 'Outstanding',
             children: [
-               { label: 'Debitors', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
-               { label: 'Creditors', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
-               { label: 'Process', action: () => setModals(prev => ({ ...prev, outstandingProcessFull: true })) },
-               { label: 'JobWork', action: () => setModals(prev => ({ ...prev, outstandingJobworkFull: true })) },
+               { label: 'Debitors', action: () => setJsmReportForm('Rpt_Jsm_Os_Sales') },
+               { label: 'Creditors', action: () => setJsmReportForm('Rpt_Jsm_Os_Purchase') },
+               { label: 'Process', action: () => setJsmReportForm('Rpt_Jsm_Os_Process') },
+               { label: 'JobWork', action: () => setJsmReportForm('Rpt_Jsm_Os_Jobwork') },
                { label: 'Update O/s. Bill', action: () => setModals(prev => ({ ...prev, outstanding: true })) },
                { label: 'UnAdjust Setup', action: () => setModals(prev => ({ ...prev, outstanding: true })) },
             ],
