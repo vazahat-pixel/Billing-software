@@ -52,6 +52,21 @@
   border: 1px solid #828790; padding: 6px; display: grid; gap: 2px; font: 9pt Arial, sans-serif; z-index: 3; }
 .jsmg-print-head { display: none; }
 
+/* JSM's "GridReports" window: two independent column stacks side by side (P&L, Balance Sheet). */
+.jsmg-two-col { flex: 1; min-height: 0; overflow: auto; background: #e6ffe6; display: flex; gap: 2px; padding: 2px; }
+.jsmg-side-table { flex: 1; min-width: 0; border-collapse: collapse; background: #e6ffe6; font: 9.75pt Tahoma, sans-serif; align-self: flex-start; }
+.jsmg-side-table th { background: #fff; border: 1px solid #a0c0a0; padding: 2px 6px; text-align: left; font-weight: 700; }
+.jsmg-side-table th.is-num { text-align: right; }
+.jsmg-side-table td { padding: 1px 6px; white-space: nowrap; }
+.jsmg-side-table .is-num { text-align: right; }
+.jsmg-side-table tr.header td { font-weight: 700; padding-top: 6px; }
+.jsmg-side-table tr.total td, .jsmg-side-table tr.grand td { font-weight: 700; }
+.jsmg-two-col-footer { flex: none; background: #e6ffe6; padding: 4px 2px; font: bold 9.75pt Tahoma, sans-serif; }
+.jsmg-two-col-footer > div { display: flex; }
+.jsmg-two-col-footer > div > span { flex: 1; min-width: 0; padding: 1px 6px; text-align: right; }
+.jsmg-two-col-footer > div > span:nth-child(odd) { text-align: left; }
+.jsmg-two-col-total { border-top: 2px solid #000; margin-top: 2px; padding-top: 2px; background: #ffff00; }
+
 @media print {
   body * { visibility: hidden; }
   .jsmg-window, .jsmg-window * { visibility: visible; }
@@ -61,4 +76,6 @@
   .jsmg-print-company { font-weight: 700; font-size: 12pt; }
   .jsmg-grid { overflow: visible; background: #fff; }
   .jsmg-grid th { position: static; }
+  .jsmg-two-col { overflow: visible; background: #fff; }
+  .jsmg-side-table { background: #fff; }
 }

@@ -25,6 +25,12 @@ const REPORTS = {
   Rpt_Jsm_Sales_ItemSummary: require('./reports/itemWiseSummary').salesItemWise,
   Rpt_Jsm_Purchase_ItemSummary: require('./reports/itemWiseSummary').purchaseItemWise,
   Rpt_Sales_Haste: require('./reports/salesHaste'),
+  A_AccountLedgerSingleSide: require('./reports/ledger'),
+  A_AccountLedgerDoubleSide: require('./reports/ledger'),
+  Rpt_Trail_Bal_101: require('./reports/trialBalance'),
+  Rpt_cashbank1: require('./reports/cashBank'),
+  A_Final_BalanceSheet: require('./reports/balanceSheet'),
+  A_Final_ProfitAndLoss: require('./reports/profitAndLoss'),
 };
 
 function get(reportId) {

@@ -53,7 +53,10 @@ fs.writeFileSync(desktopPkgPath, desktopPkgNew);
 console.log(`desktop/package.json version: ${before} -> ${version}`);
 
 // 2. Security gate — never release if something looks like the Oct-2026 injection pattern.
-run('bash', ['scripts/ci/check-no-obfuscation.sh'], root);
+const bashCmd = process.platform === 'win32' && fs.existsSync('C:\\Program Files\\Git\\bin\\bash.exe')
+  ? 'C:\\Program Files\\Git\\bin\\bash.exe'
+  : 'bash';
+run(bashCmd, ['scripts/ci/check-no-obfuscation.sh'], root);
 
 // 3. Build the desktop installer. This step itself runs build:ui (bundles the React app into
 //    desktop/renderer) then electron-builder (produces the NSIS installer + fresh latest.yml)

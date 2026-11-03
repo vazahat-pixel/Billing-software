@@ -102,3 +102,5 @@ temp_interactive_push.bat
 
 # local-only test data exported from a real JSM database (never commit)
 backend/tests/fixtures/migration/*.gz
+*.webm
+*.mp4

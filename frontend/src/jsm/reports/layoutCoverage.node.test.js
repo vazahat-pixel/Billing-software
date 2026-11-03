@@ -56,7 +56,10 @@ test('only the known no-layout screens are uncaptured, and each has fallback col
 
   assert.deepEqual(
     [...new Set(uncaptured)].sort(),
-    ['JSM_VW_PROCESS_ISSUE_SUM_REPORT', 'JSM_VW_SALES_HASTE_REPORT'],
+    [
+      'JSM_VW_CASHBANK_DETAIL', 'JSM_VW_CASHBANK_DTLVNO',
+      'JSM_VW_PROCESS_ISSUE_SUM_REPORT', 'JSM_VW_SALES_HASTE_REPORT', 'JSM_VW_TR_BAL',
+    ],
     'a newly uncaptured layout appeared — give it fallbackColumns or capture it from STP_REPORT'
   );
   assert.ok(fallbacksFor('processSend').has('JSM_VW_PROCESS_ISSUE_SUM_REPORT'));

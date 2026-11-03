@@ -23,9 +23,14 @@ function categorizeLedger(ledger, partyType) {
   if (accountType === 'Tax') return 'DUTIES & TAXES';
 
   if (accountType === 'Party') {
+    // JSM keeps Broker (jobwork bill dalali) and Job Worker/Mill (process bill) apart from
+    // ordinary Supplier/Customer — confirmed against the owner's own JSM Trial Balance print
+    // (03/11/2026): BROKER sat under "CREDITORS FOR JOBWORK", the mills under "CREDITORS FOR
+    // PROCESS", separate from "SUNDRY CREDITORS".
+    if (partyType === 'Broker') return 'CREDITORS FOR JOBWORK';
     if (partyType === 'Job Worker') return 'CREDITORS FOR PROCESS';
     if (partyType === 'Customer') return 'SUNDRY DEBTORS';
-    if (partyType === 'Supplier' || partyType === 'Broker') return 'SUNDRY CREDITORS';
+    if (partyType === 'Supplier') return 'SUNDRY CREDITORS';
     return group === 'Assets' ? 'SUNDRY DEBTORS' : 'SUNDRY CREDITORS';
   }
 
@@ -157,8 +162,10 @@ class FinancialReportsService {
       return s + (b.type === 'Dr' ? b.balance : -b.balance);
     }, 0));
 
-    const directIncome = income.filter((b) => /direct/i.test(b.ledger.subGroup || ''));
-    const directExpense = expenses.filter((b) => /direct/i.test(b.ledger.subGroup || ''));
+    // Word-boundary match: "Indirect Expense" contains the substring "direct" too, so a plain
+    // /direct/i would wrongly count every indirect ledger as direct and inflate Gross Profit.
+    const directIncome = income.filter((b) => /\bdirect\b/i.test(b.ledger.subGroup || ''));
+    const directExpense = expenses.filter((b) => /\bdirect\b/i.test(b.ledger.subGroup || ''));
     const grossIncome = round2(directIncome.reduce((s, b) => s + (b.type === 'Cr' ? b.balance : -b.balance), 0));
     const grossExpense = round2(directExpense.reduce((s, b) => s + (b.type === 'Dr' ? b.balance : -b.balance), 0));
 
@@ -166,6 +173,14 @@ class FinancialReportsService {
       period: { from: from || null, to: to || null },
       income,
       expenses,
+      // The Trading / direct-vs-indirect split (additive; existing callers that only use the
+      // totals/grossProfit/netProfit figures are unaffected) — direct items make up the Trading
+      // Account, the rest make up the Profit & Loss Account below it, as JSM's own two-block
+      // GridReports print shows (confirmed against the owner's own JSM, 03/11/2026).
+      directIncome,
+      directExpense,
+      indirectIncome: income.filter((b) => !directIncome.includes(b)),
+      indirectExpense: expenses.filter((b) => !directExpense.includes(b)),
       totalIncome,
       totalExpenses,
       grossProfit: round2(grossIncome - grossExpense),

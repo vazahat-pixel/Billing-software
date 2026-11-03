@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ErpWindowedModal from '../components/erp/ErpWindowedModal';
 import JsmFormDialog from './JsmFormDialog';
 import JsmGridReport from './JsmGridReport';
+import JsmGridReportsTwoColumn from './JsmGridReportsTwoColumn';
 import { JSM_REPORTS } from './reports';
 import { jsmReportApi } from '../api/jsmReport.api';
 import { toDisplayDate } from './winforms';
@@ -132,14 +133,22 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
               <WindowControls />
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>
-              <JsmGridReport
-                result={result}
-                layouts={blueprint?.layouts}
-                fallbackColumns={config.fallbackColumns}
-                companyName={companyName}
-                onClose={() => setResult(null)}
-                onOpenRow={onOpenRow}
-              />
+              {config.renderer === 'twoColumn' ? (
+                <JsmGridReportsTwoColumn
+                  result={result}
+                  companyName={companyName}
+                  onClose={() => setResult(null)}
+                />
+              ) : (
+                <JsmGridReport
+                  result={result}
+                  layouts={blueprint?.layouts}
+                  fallbackColumns={config.fallbackColumns}
+                  companyName={companyName}
+                  onClose={() => setResult(null)}
+                  onOpenRow={onOpenRow}
+                />
+              )}
             </div>
           </div>
         )}

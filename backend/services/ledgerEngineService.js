@@ -158,6 +158,11 @@ class LedgerEngineService {
             docNo: d.voucherNo,
             chequeNo: d.chequeNo || '',
             remarks,
+            // bankName/billNos kept separately (additive) so a consumer that prints them as JSM
+            // does — the voucher's own line, then an indented "Bill No.:X" line — doesn't have to
+            // re-parse the combined `remarks` string.
+            bankName,
+            billNos,
             accBill: d.accBill || 'B',
             scCode: d.scCode || 'SCC',
           };
@@ -231,7 +236,7 @@ class LedgerEngineService {
     if (mongoose.Types.ObjectId.isValid(cleanId)) {
       ledger = await LedgerMaster.findOne({ _id: cleanId, companyId });
     }
-    if (!ledger) {
+    if (!ledger && mongoose.Types.ObjectId.isValid(cleanId)) {
       ledger = await LedgerMaster.findOne({ companyId, linkedPartyId: cleanId });
     }
     if (!ledger) {
@@ -359,6 +364,8 @@ class LedgerEngineService {
               billVoucherNo: src.docNo || entry.entryNo,
               chequeNo: src.chequeNo || '',
               remarks: src.remarks || opp.narration || '',
+              bankName: src.bankName || '',
+              billNos: src.billNos || '',
               accBill: src.accBill || (['SalesInvoice', 'PurchaseBill', 'Sales', 'Purchase'].includes(entry.voucherType || entry.refType) ? 'B' : (entry.voucherType === 'Contra' ? 'A' : 'B')),
               cp: src.scCode || 'SCC',
               contraShortCode: src.scCode || 'SCC',
@@ -419,6 +426,8 @@ class LedgerEngineService {
             billVoucherNo: src.docNo || entry.entryNo,
             chequeNo: src.chequeNo || '',
             remarks: src.remarks || '',
+            bankName: src.bankName || '',
+            billNos: src.billNos || '',
             accBill: src.accBill || (['SalesInvoice', 'PurchaseBill', 'Sales', 'Purchase'].includes(entry.voucherType || entry.refType) ? 'B' : (entry.voucherType === 'Contra' ? 'A' : 'B')),
             cp: src.scCode || 'SCC',
             contraShortCode: src.scCode || 'SCC',
