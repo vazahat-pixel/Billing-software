@@ -91,19 +91,27 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
       <ErpWindowedModal
         isOpen={!result}
         onClose={onClose}
-        title={form?.title || 'Report'}
+        title={config.title || form?.title || 'Report'}
         windowId={`jsm-${formName}`}
         initialSize={form?.width && form?.height ? { w: form.width + 24, h: form.height + 56 } : undefined}
       >
         {({ WindowControls }) => (
           <div className="jsm-window">
             <div className="jsm-titlebar">
-              <span>{form?.runtimeTitle || form?.title}</span>
+              <span>{config.title || form?.runtimeTitle || form?.title}</span>
               <WindowControls />
             </div>
             {error && <div className="jsm-error">{error}</div>}
             {form ? (
-              <JsmFormDialog form={form} state={state} onChange={setState} lists={lists} onButton={onButton} busy={busy} />
+              <JsmFormDialog
+                form={form}
+                state={state}
+                onChange={setState}
+                lists={lists}
+                onButton={onButton}
+                busy={busy}
+                overrides={config.overrides ? config.overrides(state) : undefined}
+              />
             ) : (
               <div style={{ padding: 16 }}>Loading…</div>
             )}

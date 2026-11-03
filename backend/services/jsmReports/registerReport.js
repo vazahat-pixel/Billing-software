@@ -64,18 +64,33 @@ function registerReport(spec) {
     return ['BILL_DATE', 'SRAL_NO'];
   }
 
-  /** Apply the screen's date window, number range and tab tick lists. */
-  function filter(rows, p) {
-    let out = inDateRange(rows, 'BILL_DATE', p.from, p.to);
+  /** Compare bill numbers the way people read them: 9 before 10, then text for the rest. */
+  function numCompare(a, b) {
+    const na = Number(a);
+    const nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb) && String(a).trim() !== '' && String(b).trim() !== '') return na - nb;
+    return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+  }
 
-    const field = p.orderBy === 'billno' ? 'NCBILL_NO' : 'SRAL_NO';
-    const from = String(p.numFrom ?? '').trim();
-    const to = String(p.numTo ?? '').trim();
-    if (from || to) {
-      out = out.filter((r) => {
-        const v = String(r[field] ?? '');
-        return (!from || v >= from) && (!to || v <= to);
-      });
+  /**
+   * Apply the screen's range and lists. On JSM's screen the date From/To and the number From/To sit in
+   * the same spot and the A / B / C radio swaps one for the other, so exactly one of them filters:
+   * A-Date the bill dates, B-Bill.No / C-Serial.No that number.
+   */
+  function filter(rows, p) {
+    let out = rows;
+    if (p.orderBy === 'billno' || p.orderBy === 'srno') {
+      const field = p.orderBy === 'billno' ? 'NCBILL_NO' : 'SRAL_NO';
+      const from = String(p.numFrom ?? '').trim();
+      const to = String(p.numTo ?? '').trim();
+      if (from || to) {
+        out = out.filter((r) => {
+          const v = String(r[field] ?? '').trim();
+          return (!from || numCompare(v, from) >= 0) && (!to || numCompare(v, to) <= 0);
+        });
+      }
+    } else {
+      out = inDateRange(out, 'BILL_DATE', p.from, p.to);
     }
 
     for (const [param, f] of Object.entries(LISTS)) out = inList(out, f, p[param]);
@@ -93,7 +108,10 @@ function registerReport(spec) {
     const category = categoryOf(p.category);
     const cat = ALL_CATEGORIES[category];
     const detail = p.detail === true || String(p.detail) === 'true';
-    const period = `DATE : FROM ${p.fromText || p.from || ''}  TO  ${p.toText || p.to || ''}`;
+    // Heads the grid with the range that actually filtered it.
+    const period = p.orderBy === 'billno' || p.orderBy === 'srno'
+      ? `${p.orderBy === 'billno' ? 'BILL.NO' : 'SR.NO'} : FROM ${p.numFrom ?? ''}  TO  ${p.numTo ?? ''}`
+      : `DATE : FROM ${p.fromText || p.from || ''}  TO  ${p.toText || p.to || ''}`;
     const pageWise = p.printout === '2-PageWise';
 
     const rows = filter(deps.rows || await spec.load(companyId), p);

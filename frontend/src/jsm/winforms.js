@@ -84,3 +84,15 @@ export function toIsoDate(display) {
   if (!m) return '';
   return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
 }
+
+/**
+ * JSM refills some combos while a screen is in use (Category Wise changes with the report mode), and
+ * the blueprint captured every fill back to back: "1-Register,2-PartyWise,5-MainGroup,1-Register,…".
+ * A combo never shows duplicates, so keep only the last fill — it starts at the last time the list's
+ * first entry appears.
+ */
+export function lastFill(items) {
+  if (!Array.isArray(items) || items.length < 2) return items;
+  const at = items.lastIndexOf(items[0]);
+  return at > 0 ? items.slice(at) : items;
+}

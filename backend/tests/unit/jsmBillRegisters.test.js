@@ -114,6 +114,23 @@ describe('screen behaviour', () => {
     assert.ok(bySr.rows.length && bySr.rows.every((x) => x.SRAL_NO === '1'));
   });
 
+  it('B-Bill.No / C-Serial.No replace the date range, they do not add to it', async () => {
+    // JSM swaps the date From/To for the number From/To, so the dates must not filter in this mode.
+    const r = await run({ detail: true, orderBy: 'srno', numFrom: '1', numTo: '2', from: '2030-01-01', to: '2030-12-31' });
+    assert.equal(new Set(r.rows.map((x) => x.CO_ENT_NO)).size, 2, 'both bills, whatever the hidden dates say');
+    assert.match(r.grid.period, /^SR\.NO : FROM 1 {2}TO {2}2$/);
+    // ...and in A-Date mode a number typed earlier must not filter.
+    const d = await run({ detail: true, orderBy: 'date', numFrom: '2', numTo: '2' });
+    assert.equal(new Set(d.rows.map((x) => x.CO_ENT_NO)).size, 2);
+    assert.match(d.grid.period, /^DATE : FROM/);
+  });
+
+  it('number ranges compare as numbers: 9 is inside 1 to 20', async () => {
+    const rows = [9, 10, 25].map((n) => ({ ...ROWS[0], CO_ENT_NO: `n${n}`, SRAL_NO: String(n) }));
+    const r = await regs.purchase.run('c1', { ...P, detail: true, orderBy: 'srno', numFrom: '1', numTo: '20' }, { rows });
+    assert.deepEqual([...new Set(r.rows.map((x) => x.SRAL_NO))].sort(), ['10', '9']);
+  });
+
   it('these JSM screens have no tick-list tabs', () => {
     for (const [form] of REGISTERS) {
       assert.equal(forms[form].controls.filter((c) => c.type === 'ListView').length, 0, form);

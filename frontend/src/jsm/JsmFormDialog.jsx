@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { accel, cssColor, cssFont } from './winforms';
+import { accel, cssColor, cssFont, lastFill } from './winforms';
 
 /**
  * Renders a JSM parameter screen from its blueprint (positions, captions, colors, fonts as in Jsm_Winsoft.exe).
@@ -76,7 +76,7 @@ export default function JsmFormDialog({
     return c.visible !== false;
   };
   const captionOf = (c) => overrides[c.name]?.text ?? c.runtime?.text ?? c.text ?? '';
-  const itemsOf = (c) => overrides[c.name]?.items || (c.runtime?.items?.length ? c.runtime.items : c.items) || [];
+  const itemsOf = (c) => overrides[c.name]?.items || (c.runtime?.items?.length ? lastFill(c.runtime.items) : c.items) || [];
 
   const set = (name, value) => onChange({ ...state, [name]: value });
 
