@@ -22,6 +22,8 @@ const REPORTS = {
   Rpt_Jsm_Os_Purchase_AgeAnalysis: require('./reports/outstandingReports').osAge.purchase,
   Rpt_Jsm_Os_Process_AgeAnalysis: require('./reports/outstandingReports').osAge.process,
   Rpt_Jsm_Os_Jobwork_AgeAnalysis: require('./reports/outstandingReports').osAge.jobwork,
+  Rpt_Jsm_Sales_ItemSummary: require('./reports/itemWiseSummary').salesItemWise,
+  Rpt_Jsm_Purchase_ItemSummary: require('./reports/itemWiseSummary').purchaseItemWise,
 };
 
 function get(reportId) {
