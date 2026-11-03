@@ -168,11 +168,62 @@ describe('footer adjustments become JSM Add / Less', () => {
     assert.deepEqual(addLessOf({ discountAmt: 15, discountSign: '+' }), { add: 15, less: 0 });
   });
 
-  it('round-off always reduces and freight / other charges always add', () => {
-    assert.deepEqual(addLessOf({ rdAmt: 3, freightAmount: 100, otherCharges: 7 }), { add: 107, less: 3 });
+  it('round-off always reduces and freight always adds, as the totals engine treats them', () => {
+    assert.deepEqual(addLessOf({ rdAmt: 3, freightAmount: 100 }), { add: 100, less: 3 });
+  });
+
+  it('otherCharges is NOT an Add — the totals engine leaves it out of the taxable amount', () => {
+    // Counting it would make GROSS.AMT smaller than the bill's real line total.
+    assert.deepEqual(addLessOf({ otherCharges: 7 }), { add: 0, less: 0 });
   });
 
   it('a bill with no adjustments has none', () => {
     assert.deepEqual(addLessOf({}), { add: 0, less: 0 });
   });
+});
+
+describe('reconciliation against the real purchase totals engine', () => {
+  const { recalcPurchaseTotals, lineTaxable } = require('../../utils/purchaseTotals');
+
+  /** Every footer adjustment the purchase screen offers, so none is silently dropped. */
+  const CASES = [
+    ['no adjustments', {}],
+    ['discount', { discountAmt: 40, discountSign: '-' }],
+    ['less', { lessAmt: 25, lessSign: '-' }],
+    ['add', { addAmt: 60, addSign: '+' }],
+    ['add entered as a minus', { addAmt: 60, addSign: '-' }],
+    ['octroi', { octroi: 12, octroiSign: '+' }],
+    ['round off', { rdAmt: 7 }],
+    ['freight', { freight: 150 }],
+    ['all together', { discountAmt: 40, discountSign: '-', lessAmt: 25, lessSign: '-', addAmt: 60, addSign: '+', octroi: 12, octroiSign: '+', rdAmt: 7, freight: 150 }],
+  ];
+
+  const items = [
+    { pcs: 3, mts: 30, rate: 12, amount: 360, dis1Amt: 10, unit: 'MTRS', gstPer: 5 },
+    { pcs: 2, mts: 20, rate: 15, amount: 300, addAmt: 5, unit: 'MTRS', gstPer: 5 },
+  ];
+
+  for (const [label, extras] of CASES) {
+    it(`GROSS.AMT + TOT.ADD - TOT.LESS equals the engine's taxable amount — ${label}`, () => {
+      const totals = recalcPurchaseTotals(items, { gstType: 'CGST+SGST', gstRate: 5, extras });
+
+      // The bill as it would be stored, then as the register reads it back.
+      const stored = {
+        taxableAmount: totals.taxableAmount,
+        discountAmt: extras.discountAmt, discountSign: extras.discountSign,
+        lessAmt: extras.lessAmt, lessSign: extras.lessSign,
+        addAmt: extras.addAmt, addSign: extras.addSign,
+        octroi: extras.octroi, octroiSign: extras.octroiSign,
+        rdAmt: extras.rdAmt, freightAmount: extras.freight,
+      };
+      const { add, less } = addLessOf(stored);
+      const subTot = Number(items.reduce((s, it) => s + lineTaxable(it), 0).toFixed(2));
+
+      assert.equal(
+        Number((subTot + add - less).toFixed(2)),
+        Number(Number(totals.taxableAmount).toFixed(2)),
+        `register does not reconcile to the bill (${label})`
+      );
+    });
+  }
 });

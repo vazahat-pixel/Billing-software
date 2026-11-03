@@ -22,28 +22,34 @@ const Company = require('../../../models/Company');
 require('../../../models/Party');
 require('../../../models/Item');
 const { MONTHS, round } = require('../jcEngine');
+const { lineTaxable } = require('../../../utils/purchaseTotals');
 
-/** The footer adjustments JSM shows as Add/Less, with the sign MERN stored them under. */
-const EXTRAS = [
+/**
+ * Split a purchase bill's footer adjustments into JSM's TOT.ADD and TOT.LESS.
+ *
+ * This mirrors utils/purchaseTotals.footerTaxableDelta term for term — the same fields, the same
+ * signs, and the same always-reduces / always-adds treatment of rdAmt and freight — so that
+ * SUB_TOT + T_ADD − T_LESS is the taxable amount that engine produced. Anything that engine does
+ * NOT put into the taxable delta (otherCharges, for one) must stay out of these totals, or
+ * GROSS.AMT would not be the bill's own line total any more.
+ */
+const SIGNED = [
   { amount: 'discountAmt', sign: 'discountSign', defaultSign: '-' },
   { amount: 'lessAmt', sign: 'lessSign', defaultSign: '-' },
   { amount: 'addAmt', sign: 'addSign', defaultSign: '+' },
   { amount: 'octroi', sign: 'octroiSign', defaultSign: '+' },
 ];
 
-/** Split the footer adjustments into JSM's two totals. */
 function addLessOf(p) {
   let add = 0;
   let less = 0;
-  for (const e of EXTRAS) {
+  for (const e of SIGNED) {
     const amt = Number(p[e.amount] || 0);
     if (!amt) continue;
-    const sign = p[e.sign] || e.defaultSign;
-    if (sign === '+') add += amt; else less += amt;
+    if ((p[e.sign] || e.defaultSign) === '+') add += amt; else less += amt;
   }
-  // rdAmt always reduces, freight always adds (purchaseTotals treats them that way).
   less += Number(p.rdAmt || 0);
-  add += Number(p.freightAmount || 0) + Number(p.otherCharges || 0);
+  add += Number(p.freightAmount || 0);
   return { add: round(add), less: round(less) };
 }
 
@@ -69,9 +75,10 @@ async function loadPurchaseRegisterRows(companyId) {
     const items = Array.isArray(p.items) ? p.items : [];
     const toPcs = items.reduce((s, it) => s + Number(it.pcs || 0), 0);
     const toQty = items.reduce((s, it) => s + Number(it.mts || 0), 0);
-    // SUB_TOT is the line total before the footer adjustments, so that
-    // SUB_TOT + T_ADD - T_LESS lands on the taxable amount the bill was saved with.
-    const subTot = round(Number(p.taxableAmount || 0) - add + less);
+    // GROSS.AMT is the bill's own line total, taken with the same lineTaxable the purchase totals
+    // engine uses — so SUB_TOT + T_ADD − T_LESS reproduces its taxable amount rather than being
+    // back-derived from it (which would hide a mismatch instead of showing one).
+    const subTot = round(items.reduce((s, it) => s + lineTaxable(it), 0));
 
     return {
       CO_PATH: coShort,
