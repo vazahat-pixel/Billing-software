@@ -1227,6 +1227,19 @@ const Dashboard = () => {
          { label: 'Master List', action: () => openReportsHub('masters') },
          { label: 'Letter Pad', action: () => openReportsHub('general') },
          { label: 'Zoom Item Ledger', action: () => openReportsHub('stockItem') },
+         {
+            // JSM's own sales register lives here, not under Reports › Sales.
+            label: 'Old Reports',
+            children: [
+               {
+                  label: 'Sales',
+                  children: [
+                     { label: 'SalesSummary', action: () => setJsmReportForm('Rpt_Jsm_Sales') },
+                     { label: 'SalesDetail', action: () => setJsmReportForm('Rpt_Jsm_Sales_Detail') },
+                  ],
+               },
+            ],
+         },
          { label: 'All Reports Hub', action: () => openReportsHub('summary'), separatorBefore: true },
          { label: 'CA Desk', key: 'caDashboard' },
       ],

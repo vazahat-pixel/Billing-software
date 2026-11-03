@@ -55,6 +55,9 @@ export const REPORT_TREE = [
         label: 'Sales Return',
         children: [
           { id: 'sales-return-reg', label: 'Sales Return Register', reportKey: 'salesReturn' },
+          // JSM's own sales-return register (form Rpt_Jsm_Sales_Return).
+          { id: 'sales-return-jsm-summary', label: 'Summary', reportKey: 'salesReturn', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Sales_Return' },
+          { id: 'sales-return-jsm-detail', label: 'Detail', reportKey: 'salesReturn', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Sales_Return_Detail' },
         ],
       },
     ],
@@ -82,6 +85,9 @@ export const REPORT_TREE = [
         label: 'Purchase Return',
         children: [
           { id: 'purchase-return-reg', label: 'Purchase Return Register', reportKey: 'purchaseReturn' },
+          // JSM's own purchase-return register (form Rpt_Jsm_Purchase_Return).
+          { id: 'purchase-return-jsm-summary', label: 'Summary', reportKey: 'purchaseReturn', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Purchase_Return' },
+          { id: 'purchase-return-jsm-detail', label: 'Detail', reportKey: 'purchaseReturn', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Purchase_Return_Detail' },
         ],
       },
       {

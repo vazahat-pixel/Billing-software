@@ -10,7 +10,10 @@ const REPORTS = {
   Rpt_JobWork_Receipt_Detail: require('./reports/jobReceiptDetail'),
   Rpt_Process_Stock_New_Gst: require('./reports/processStock'),
   Rpt_JobWork_Stock_Report: require('./reports/jobStock'),
-  Rpt_Jsm_Purchase: require('./reports/purchaseRegister'),
+  Rpt_Jsm_Sales: require('./reports/billRegisters').sales,
+  Rpt_Jsm_Purchase: require('./reports/billRegisters').purchase,
+  Rpt_Jsm_Sales_Return: require('./reports/billRegisters').salesReturn,
+  Rpt_Jsm_Purchase_Return: require('./reports/billRegisters').purchaseReturn,
 };
 
 function get(reportId) {
