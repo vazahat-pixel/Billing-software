@@ -72,6 +72,12 @@ async function run(companyId, p = {}) {
     throw err;
   }
 
+  // JSM prints the accounts in name order, not in the order they were ticked
+  // (`ORDER BY AC_NAME, ENT_DATE, …` — A_AccountLedgerSingleSide.LedgerExportToExcel). Its
+  // HeadWise and IndexWise orders put GRAC_HEAD / GRCHR_CODE ahead of the name; neither is
+  // wired here yet, so the screen always prints JSM's default Account order.
+  names.sort((a, b) => a.toUpperCase().localeCompare(b.toUpperCase()));
+
   const sections = [];
   for (const name of names) sections.push(await buildSection(companyId, name, p));
 

@@ -77,7 +77,8 @@ async function run(companyId, p = {}, deps = {}) {
       groupDisplays: [spec.label.toUpperCase()],
       primaryDetailColumn: 'NCBILL_NO',
       captions: { GROUP2: spec.label.toUpperCase() },
-      title: `${spec.label} wise Sales Report`,
+      // JSM's own printed heading for each mode ("Report : Haste Wise Sales Report", …).
+      title: `${spec.label} Wise Sales Report`,
       period: `DATE : FROM ${p.fromText || p.from || ''}  TO  ${p.toText || p.to || ''}`,
       pageWise: false,
     },

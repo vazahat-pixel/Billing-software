@@ -34,7 +34,7 @@ describe('mode A — Haste (the screen\'s own default)', () => {
 
   it('defaults to Haste when no mode is given', async () => {
     const r = await run({});
-    assert.equal(r.grid.title, 'Haste wise Sales Report');
+    assert.equal(r.grid.title, 'Haste Wise Sales Report');
   });
 });
 
