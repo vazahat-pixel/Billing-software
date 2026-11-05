@@ -132,6 +132,8 @@ function mapBill(doc, o) {
       IT_QTY: round(Number(it.mts || 0)),
       IT_RATE: round(Number(it.rate || 0)),
       IT_AMOUNT: round(Number(it.amount || 0)),
+      // JSM's UNIT_NAME: its Item Wise Summary divides by pieces or by quantity depending on it.
+      UNIT_NAME: it.unit || it.itemId?.unit || '',
       LOT_NO: it.lotNo || '',
       // JSM's T_SL_ITEM.IT_DISC1 / T_PU_ITEM.IT_DISC1 — a free-text line field. JSM's own
       // "Packers" report groups bills by this (confirmed from TMP_VW_PACKERS on the owner's JSM).

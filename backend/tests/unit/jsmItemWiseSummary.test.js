@@ -57,9 +57,14 @@ for (const [form, view] of [['Rpt_Jsm_Sales_ItemSummary', 'JSM_VW_SALES_SMRY_SHO
 }
 
 describe('categories beyond what JSM\'s layout disambiguates', () => {
-  it('Item+PartyWise (3) groups by the composite, same as the bill register\'s own category', async () => {
+  it('Party+Item (3) is two real levels — the party heads it, the item is the row', async () => {
+    // JSM: GROUP1=A.PARTY, GROUP2=A.ITEM_NAME (Generate_Reports), not one joined label.
     const r = await jsmReports.get('Rpt_Jsm_Sales_ItemSummary').run('c1', { ...P, category: '3-Party+Item' }, { rows: ROWS });
-    assert.deepEqual(r.rows.map((x) => x.GROUP2).sort(), ['GREY 60x60 / ALPHA', 'GREY 60x60 / BETA', 'POPLIN / BETA']);
+    assert.deepEqual(
+      r.rows.map((x) => [x.GROUP1, x.GROUP2]),
+      [['ALPHA', 'GREY 60x60'], ['BETA', 'GREY 60x60'], ['BETA', 'POPLIN']]
+    );
+    assert.deepEqual(r.grid.groupColumns, ['GROUP1']);
   });
 
   it('an unknown category falls back to 1 rather than guessing', async () => {
@@ -70,8 +75,16 @@ describe('categories beyond what JSM\'s layout disambiguates', () => {
 
 describe('Month Wise', () => {
   it('splits one item\'s total across the months its bills fell in', async () => {
+    // JSM's Month Wise form of 2-Item is GROUP1=A.ITEM_NAME, GROUP2=A.MONTH_NAME: the item heads
+    // the block and each month is a row under it.
     const r = await jsmReports.get('Rpt_Jsm_Sales_ItemSummary').run('c1', { ...P, category: '2-Item', monthWise: true }, { rows: ROWS });
-    const months = [...new Set(r.rows.filter((x) => x.GROUP2 === 'GREY 60x60').map((x) => x.GROUP3))].sort();
+    const months = [...new Set(r.rows.filter((x) => x.GROUP1 === 'GREY 60x60').map((x) => x.GROUP2))].sort();
     assert.deepEqual(months, ['June', 'May']);
+  });
+
+  it('a category JSM gives no Month Wise form to ignores the box, as JSM does', async () => {
+    const plain = await jsmReports.get('Rpt_Jsm_Sales_ItemSummary').run('c1', { ...P, category: '5-Broker+Party+Item' }, { rows: ROWS });
+    const ticked = await jsmReports.get('Rpt_Jsm_Sales_ItemSummary').run('c1', { ...P, category: '5-Broker+Party+Item', monthWise: true }, { rows: ROWS });
+    assert.deepEqual(ticked.rows, plain.rows);
   });
 });

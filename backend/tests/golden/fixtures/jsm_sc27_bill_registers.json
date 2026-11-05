@@ -37,7 +37,8 @@
        "IT_QTY": 0,
        "IT_RATE": 50,
        "IT_AMOUNT": 250,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -70,7 +71,8 @@
        "IT_QTY": 0,
        "IT_RATE": 50,
        "IT_AMOUNT": 25000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -103,7 +105,8 @@
        "IT_QTY": 81,
        "IT_RATE": 9,
        "IT_AMOUNT": 81,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       },
       {
        "SR_NO": 2,
@@ -112,7 +115,8 @@
        "IT_QTY": 64,
        "IT_RATE": 8,
        "IT_AMOUNT": 64,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -145,7 +149,8 @@
        "IT_QTY": 420,
        "IT_RATE": 10,
        "IT_AMOUNT": 4200,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -178,7 +183,8 @@
        "IT_QTY": 10,
        "IT_RATE": 200,
        "IT_AMOUNT": 1000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -211,7 +217,8 @@
        "IT_QTY": 60,
        "IT_RATE": 50,
        "IT_AMOUNT": 150,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -244,7 +251,8 @@
        "IT_QTY": 6,
        "IT_RATE": 200,
        "IT_AMOUNT": 1200,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -277,7 +285,8 @@
        "IT_QTY": 40,
        "IT_RATE": 100,
        "IT_AMOUNT": 200,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -310,7 +319,8 @@
        "IT_QTY": 200,
        "IT_RATE": 200,
        "IT_AMOUNT": 40000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       },
       {
        "SR_NO": 2,
@@ -319,7 +329,8 @@
        "IT_QTY": 350,
        "IT_RATE": 500,
        "IT_AMOUNT": 7000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       },
       {
        "SR_NO": 3,
@@ -328,7 +339,8 @@
        "IT_QTY": 780,
        "IT_RATE": 50,
        "IT_AMOUNT": 39000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "NETQTY"
       }
      ]
     },
@@ -361,7 +373,8 @@
        "IT_QTY": 300,
        "IT_RATE": 50,
        "IT_AMOUNT": 15000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -394,7 +407,8 @@
        "IT_QTY": 100,
        "IT_RATE": 10,
        "IT_AMOUNT": 950,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "NETQTY"
       }
      ]
     },
@@ -427,7 +441,8 @@
        "IT_QTY": 7,
        "IT_RATE": 20,
        "IT_AMOUNT": 140,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -460,7 +475,8 @@
        "IT_QTY": 110,
        "IT_RATE": 10,
        "IT_AMOUNT": 1100,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -493,7 +509,8 @@
        "IT_QTY": 0,
        "IT_RATE": 200,
        "IT_AMOUNT": 42000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       },
       {
        "SR_NO": 2,
@@ -502,7 +519,8 @@
        "IT_QTY": 320,
        "IT_RATE": 200,
        "IT_AMOUNT": 64000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       },
       {
        "SR_NO": 3,
@@ -511,7 +529,8 @@
        "IT_QTY": 0,
        "IT_RATE": 200,
        "IT_AMOUNT": 1800,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -544,7 +563,8 @@
        "IT_QTY": 0,
        "IT_RATE": 50,
        "IT_AMOUNT": 6500,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       },
       {
        "SR_NO": 2,
@@ -553,7 +573,8 @@
        "IT_QTY": 110,
        "IT_RATE": 50,
        "IT_AMOUNT": 5500,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       },
       {
        "SR_NO": 3,
@@ -562,7 +583,8 @@
        "IT_QTY": 0,
        "IT_RATE": 50,
        "IT_AMOUNT": 5000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "KGS"
       }
      ]
     },
@@ -595,7 +617,8 @@
        "IT_QTY": 0,
        "IT_RATE": 200,
        "IT_AMOUNT": 36000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -628,7 +651,8 @@
        "IT_QTY": 200,
        "IT_RATE": 300,
        "IT_AMOUNT": 60000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -661,7 +685,8 @@
        "IT_QTY": 200,
        "IT_RATE": 500,
        "IT_AMOUNT": 100000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -694,7 +719,8 @@
        "IT_QTY": 180,
        "IT_RATE": 200,
        "IT_AMOUNT": 36000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -727,7 +753,8 @@
        "IT_QTY": 0,
        "IT_RATE": 100,
        "IT_AMOUNT": 1000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -760,7 +787,8 @@
        "IT_QTY": 0,
        "IT_RATE": 50,
        "IT_AMOUNT": 19000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -793,7 +821,8 @@
        "IT_QTY": 320,
        "IT_RATE": 200,
        "IT_AMOUNT": 64000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -826,7 +855,8 @@
        "IT_QTY": 333,
        "IT_RATE": 333,
        "IT_AMOUNT": 7326,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -859,7 +889,8 @@
        "IT_QTY": 70,
        "IT_RATE": 200,
        "IT_AMOUNT": 600,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -892,7 +923,8 @@
        "IT_QTY": 0,
        "IT_RATE": 200,
        "IT_AMOUNT": 6000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       },
       {
        "SR_NO": 2,
@@ -901,7 +933,8 @@
        "IT_QTY": 0,
        "IT_RATE": 264,
        "IT_AMOUNT": 1056,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       },
       {
        "SR_NO": 3,
@@ -910,7 +943,8 @@
        "IT_QTY": 200,
        "IT_RATE": 200,
        "IT_AMOUNT": 40000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -943,7 +977,8 @@
        "IT_QTY": 40,
        "IT_RATE": 40,
        "IT_AMOUNT": 1600,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     }
@@ -5241,6 +5276,719 @@
       }
      ]
     }
+   ],
+   "itemScenarios": [
+    {
+     "category": 1,
+     "expected": [
+      {
+       "GROUP1": "",
+       "GROUP2": "GREY SALES",
+       "GROUP3": "",
+       "IT_PCS": "35",
+       "IT_QTY": "668.0000",
+       "IT_AMOUNT": "18785.00",
+       "AVG_RATE": "28.121257"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "SALES BOOK",
+       "GROUP3": "",
+       "IT_PCS": "1696",
+       "IT_QTY": "3833.0000",
+       "IT_AMOUNT": "613932.00",
+       "AVG_RATE": "160.170101"
+      }
+     ]
+    },
+    {
+     "category": 2,
+     "expected": [
+      {
+       "GROUP1": "",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "1050",
+       "IT_QTY": "1664.0000",
+       "IT_AMOUNT": "170114.00",
+       "AVG_RATE": "102.231971"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "DOBBY",
+       "GROUP3": "",
+       "IT_PCS": "291",
+       "IT_QTY": "1711.0000",
+       "IT_AMOUNT": "351703.00",
+       "AVG_RATE": "1208.601374"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "GRAY MICRO",
+       "GROUP3": "",
+       "IT_PCS": "80",
+       "IT_QTY": "886.0000",
+       "IT_AMOUNT": "20300.00",
+       "AVG_RATE": "22.911963"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "GRY SHIRT",
+       "GROUP3": "",
+       "IT_PCS": "30",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "6000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "SHIRT COTTON",
+       "GROUP3": "",
+       "IT_PCS": "70",
+       "IT_QTY": "240.0000",
+       "IT_AMOUNT": "42600.00",
+       "AVG_RATE": "608.571428"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "TEST FABRIC",
+       "GROUP3": "",
+       "IT_PCS": "210",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "42000.00",
+       "AVG_RATE": "200.000000"
+      }
+     ]
+    },
+    {
+     "category": 3,
+     "expected": [
+      {
+       "GROUP1": "ADDU CUSTOMER",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "380",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "19000.00",
+       "AVG_RATE": "50.000000"
+      },
+      {
+       "GROUP1": "ADDU CUSTOMER",
+       "GROUP2": "DOBBY",
+       "GROUP3": "",
+       "IT_PCS": "36",
+       "IT_QTY": "723.0000",
+       "IT_AMOUNT": "72982.00",
+       "AVG_RATE": "2027.277777"
+      },
+      {
+       "GROUP1": "ADDU CUSTOMER",
+       "GROUP2": "GRY SHIRT",
+       "GROUP3": "",
+       "IT_PCS": "30",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "6000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "ADDU CUSTOMER",
+       "GROUP2": "SHIRT COTTON",
+       "GROUP3": "",
+       "IT_PCS": "20",
+       "IT_QTY": "200.0000",
+       "IT_AMOUNT": "40000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "MAHESH TEX",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "149",
+       "IT_QTY": "1100.0000",
+       "IT_AMOUNT": "109500.00",
+       "AVG_RATE": "99.545454"
+      },
+      {
+       "GROUP1": "MAHESH TEX",
+       "GROUP2": "DOBBY",
+       "GROUP3": "",
+       "IT_PCS": "238",
+       "IT_QTY": "890.0000",
+       "IT_AMOUNT": "277500.00",
+       "AVG_RATE": "1165.966386"
+      },
+      {
+       "GROUP1": "MAHESH TEX",
+       "GROUP2": "GRAY MICRO",
+       "GROUP3": "",
+       "IT_PCS": "78",
+       "IT_QTY": "880.0000",
+       "IT_AMOUNT": "19100.00",
+       "AVG_RATE": "21.704545"
+      },
+      {
+       "GROUP1": "MAHESH TEX",
+       "GROUP2": "TEST FABRIC",
+       "GROUP3": "",
+       "IT_PCS": "210",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "42000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "NAVKAR TEX",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "516",
+       "IT_QTY": "564.0000",
+       "IT_AMOUNT": "41364.00",
+       "AVG_RATE": "73.340425"
+      },
+      {
+       "GROUP1": "NAVKAR TEX",
+       "GROUP2": "DOBBY",
+       "GROUP3": "",
+       "IT_PCS": "17",
+       "IT_QTY": "98.0000",
+       "IT_AMOUNT": "1221.00",
+       "AVG_RATE": "71.823529"
+      },
+      {
+       "GROUP1": "NAVKAR TEX",
+       "GROUP2": "GRAY MICRO",
+       "GROUP3": "",
+       "IT_PCS": "2",
+       "IT_QTY": "6.0000",
+       "IT_AMOUNT": "1200.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "RAJA TEX",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "5",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "250.00",
+       "AVG_RATE": "50.000000"
+      },
+      {
+       "GROUP1": "REALME CUSTOMER",
+       "GROUP2": "SHIRT COTTON",
+       "GROUP3": "",
+       "IT_PCS": "40",
+       "IT_QTY": "40.0000",
+       "IT_AMOUNT": "1600.00",
+       "AVG_RATE": "40.000000"
+      },
+      {
+       "GROUP1": "VISHAL TEXTILES",
+       "GROUP2": "SHIRT COTTON",
+       "GROUP3": "",
+       "IT_PCS": "10",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "1000.00",
+       "AVG_RATE": "100.000000"
+      }
+     ]
+    },
+    {
+     "category": 4,
+     "expected": [
+      {
+       "GROUP1": "",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "1050",
+       "IT_QTY": "1664.0000",
+       "IT_AMOUNT": "170114.00",
+       "AVG_RATE": "102.231971"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "DOBBY",
+       "GROUP3": "",
+       "IT_PCS": "291",
+       "IT_QTY": "1711.0000",
+       "IT_AMOUNT": "351703.00",
+       "AVG_RATE": "1208.601374"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "GRAY MICRO",
+       "GROUP3": "",
+       "IT_PCS": "80",
+       "IT_QTY": "886.0000",
+       "IT_AMOUNT": "20300.00",
+       "AVG_RATE": "22.911963"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "GRY SHIRT",
+       "GROUP3": "",
+       "IT_PCS": "30",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "6000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "SHIRT COTTON",
+       "GROUP3": "",
+       "IT_PCS": "70",
+       "IT_QTY": "240.0000",
+       "IT_AMOUNT": "42600.00",
+       "AVG_RATE": "608.571428"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "TEST FABRIC",
+       "GROUP3": "",
+       "IT_PCS": "210",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "42000.00",
+       "AVG_RATE": "200.000000"
+      }
+     ]
+    },
+    {
+     "category": 5,
+     "expected": [
+      {
+       "GROUP1": "",
+       "GROUP2": "ADDU CUSTOMER",
+       "GROUP3": "BLOUSE",
+       "IT_PCS": "380",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "19000.00",
+       "AVG_RATE": "50.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "ADDU CUSTOMER",
+       "GROUP3": "DOBBY",
+       "IT_PCS": "36",
+       "IT_QTY": "723.0000",
+       "IT_AMOUNT": "72982.00",
+       "AVG_RATE": "2027.277777"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "ADDU CUSTOMER",
+       "GROUP3": "GRY SHIRT",
+       "IT_PCS": "30",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "6000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "ADDU CUSTOMER",
+       "GROUP3": "SHIRT COTTON",
+       "IT_PCS": "20",
+       "IT_QTY": "200.0000",
+       "IT_AMOUNT": "40000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "MAHESH TEX",
+       "GROUP3": "BLOUSE",
+       "IT_PCS": "149",
+       "IT_QTY": "1100.0000",
+       "IT_AMOUNT": "109500.00",
+       "AVG_RATE": "99.545454"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "MAHESH TEX",
+       "GROUP3": "DOBBY",
+       "IT_PCS": "238",
+       "IT_QTY": "890.0000",
+       "IT_AMOUNT": "277500.00",
+       "AVG_RATE": "1165.966386"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "MAHESH TEX",
+       "GROUP3": "GRAY MICRO",
+       "IT_PCS": "78",
+       "IT_QTY": "880.0000",
+       "IT_AMOUNT": "19100.00",
+       "AVG_RATE": "21.704545"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "MAHESH TEX",
+       "GROUP3": "TEST FABRIC",
+       "IT_PCS": "210",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "42000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "NAVKAR TEX",
+       "GROUP3": "BLOUSE",
+       "IT_PCS": "516",
+       "IT_QTY": "564.0000",
+       "IT_AMOUNT": "41364.00",
+       "AVG_RATE": "73.340425"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "NAVKAR TEX",
+       "GROUP3": "DOBBY",
+       "IT_PCS": "17",
+       "IT_QTY": "98.0000",
+       "IT_AMOUNT": "1221.00",
+       "AVG_RATE": "71.823529"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "NAVKAR TEX",
+       "GROUP3": "GRAY MICRO",
+       "IT_PCS": "2",
+       "IT_QTY": "6.0000",
+       "IT_AMOUNT": "1200.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "RAJA TEX",
+       "GROUP3": "BLOUSE",
+       "IT_PCS": "5",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "250.00",
+       "AVG_RATE": "50.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "REALME CUSTOMER",
+       "GROUP3": "SHIRT COTTON",
+       "IT_PCS": "40",
+       "IT_QTY": "40.0000",
+       "IT_AMOUNT": "1600.00",
+       "AVG_RATE": "40.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "VISHAL TEXTILES",
+       "GROUP3": "SHIRT COTTON",
+       "IT_PCS": "10",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "1000.00",
+       "AVG_RATE": "100.000000"
+      }
+     ]
+    },
+    {
+     "category": 6,
+     "expected": [
+      {
+       "GROUP1": "",
+       "GROUP2": "ADDU CUSTOMER",
+       "GROUP3": "",
+       "IT_PCS": "466",
+       "IT_QTY": "923.0000",
+       "IT_AMOUNT": "137982.00",
+       "AVG_RATE": "296.098712"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "MAHESH TEX",
+       "GROUP3": "",
+       "IT_PCS": "675",
+       "IT_QTY": "2870.0000",
+       "IT_AMOUNT": "448100.00",
+       "AVG_RATE": "156.132404"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "NAVKAR TEX",
+       "GROUP3": "",
+       "IT_PCS": "535",
+       "IT_QTY": "668.0000",
+       "IT_AMOUNT": "43785.00",
+       "AVG_RATE": "65.546407"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "RAJA TEX",
+       "GROUP3": "",
+       "IT_PCS": "5",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "250.00",
+       "AVG_RATE": "50.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "REALME CUSTOMER",
+       "GROUP3": "",
+       "IT_PCS": "40",
+       "IT_QTY": "40.0000",
+       "IT_AMOUNT": "1600.00",
+       "AVG_RATE": "40.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "VISHAL TEXTILES",
+       "GROUP3": "",
+       "IT_PCS": "10",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "1000.00",
+       "AVG_RATE": "100.000000"
+      }
+     ]
+    },
+    {
+     "category": 7,
+     "expected": [
+      {
+       "GROUP1": "BLOUSE",
+       "GROUP2": "GREY SALES",
+       "GROUP3": "",
+       "IT_PCS": "16",
+       "IT_QTY": "564.0000",
+       "IT_AMOUNT": "16364.00",
+       "AVG_RATE": "29.014184"
+      },
+      {
+       "GROUP1": "BLOUSE",
+       "GROUP2": "SALES BOOK",
+       "GROUP3": "",
+       "IT_PCS": "1034",
+       "IT_QTY": "1100.0000",
+       "IT_AMOUNT": "153750.00",
+       "AVG_RATE": "139.772727"
+      },
+      {
+       "GROUP1": "DOBBY",
+       "GROUP2": "GREY SALES",
+       "GROUP3": "",
+       "IT_PCS": "17",
+       "IT_QTY": "98.0000",
+       "IT_AMOUNT": "1221.00",
+       "AVG_RATE": "71.823529"
+      },
+      {
+       "GROUP1": "DOBBY",
+       "GROUP2": "SALES BOOK",
+       "GROUP3": "",
+       "IT_PCS": "274",
+       "IT_QTY": "1613.0000",
+       "IT_AMOUNT": "350482.00",
+       "AVG_RATE": "1279.131386"
+      },
+      {
+       "GROUP1": "GRAY MICRO",
+       "GROUP2": "GREY SALES",
+       "GROUP3": "",
+       "IT_PCS": "2",
+       "IT_QTY": "6.0000",
+       "IT_AMOUNT": "1200.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "GRAY MICRO",
+       "GROUP2": "SALES BOOK",
+       "GROUP3": "",
+       "IT_PCS": "78",
+       "IT_QTY": "880.0000",
+       "IT_AMOUNT": "19100.00",
+       "AVG_RATE": "21.704545"
+      },
+      {
+       "GROUP1": "GRY SHIRT",
+       "GROUP2": "SALES BOOK",
+       "GROUP3": "",
+       "IT_PCS": "30",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "6000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "SHIRT COTTON",
+       "GROUP2": "SALES BOOK",
+       "GROUP3": "",
+       "IT_PCS": "70",
+       "IT_QTY": "240.0000",
+       "IT_AMOUNT": "42600.00",
+       "AVG_RATE": "608.571428"
+      },
+      {
+       "GROUP1": "TEST FABRIC",
+       "GROUP2": "SALES BOOK",
+       "GROUP3": "",
+       "IT_PCS": "210",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "42000.00",
+       "AVG_RATE": "200.000000"
+      }
+     ]
+    },
+    {
+     "category": 8,
+     "expected": [
+      {
+       "GROUP1": "",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "16",
+       "IT_QTY": "840.0000",
+       "IT_AMOUNT": "39150.00",
+       "AVG_RATE": "46.607142"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "DOBBY",
+       "GROUP3": "",
+       "IT_PCS": "10",
+       "IT_QTY": "200.0000",
+       "IT_AMOUNT": "40000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "GRAY MICRO",
+       "GROUP3": "",
+       "IT_PCS": "14",
+       "IT_QTY": "350.0000",
+       "IT_AMOUNT": "7000.00",
+       "AVG_RATE": "500.000000"
+      },
+      {
+       "GROUP1": "SURAT",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "654",
+       "IT_QTY": "824.0000",
+       "IT_AMOUNT": "111964.00",
+       "AVG_RATE": "135.878640"
+      },
+      {
+       "GROUP1": "SURAT",
+       "GROUP2": "DOBBY",
+       "GROUP3": "",
+       "IT_PCS": "245",
+       "IT_QTY": "788.0000",
+       "IT_AMOUNT": "238721.00",
+       "AVG_RATE": "974.371428"
+      },
+      {
+       "GROUP1": "SURAT",
+       "GROUP2": "GRAY MICRO",
+       "GROUP3": "",
+       "IT_PCS": "66",
+       "IT_QTY": "536.0000",
+       "IT_AMOUNT": "13300.00",
+       "AVG_RATE": "24.813432"
+      },
+      {
+       "GROUP1": "SURAT",
+       "GROUP2": "TEST FABRIC",
+       "GROUP3": "",
+       "IT_PCS": "210",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "42000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "UJJAIN",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "380",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "19000.00",
+       "AVG_RATE": "50.000000"
+      },
+      {
+       "GROUP1": "UJJAIN",
+       "GROUP2": "DOBBY",
+       "GROUP3": "",
+       "IT_PCS": "36",
+       "IT_QTY": "723.0000",
+       "IT_AMOUNT": "72982.00",
+       "AVG_RATE": "2027.277777"
+      },
+      {
+       "GROUP1": "UJJAIN",
+       "GROUP2": "GRY SHIRT",
+       "GROUP3": "",
+       "IT_PCS": "30",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "6000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "UJJAIN",
+       "GROUP2": "SHIRT COTTON",
+       "GROUP3": "",
+       "IT_PCS": "70",
+       "IT_QTY": "240.0000",
+       "IT_AMOUNT": "42600.00",
+       "AVG_RATE": "608.571428"
+      }
+     ]
+    },
+    {
+     "category": 9,
+     "expected": [
+      {
+       "GROUP1": "",
+       "GROUP2": "ADDU CUSTOMER",
+       "GROUP3": "",
+       "IT_PCS": "466",
+       "IT_QTY": "923.0000",
+       "IT_AMOUNT": "137982.00",
+       "AVG_RATE": "296.098712"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "MAHESH TEX",
+       "GROUP3": "",
+       "IT_PCS": "675",
+       "IT_QTY": "2870.0000",
+       "IT_AMOUNT": "448100.00",
+       "AVG_RATE": "156.132404"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "NAVKAR TEX",
+       "GROUP3": "",
+       "IT_PCS": "535",
+       "IT_QTY": "668.0000",
+       "IT_AMOUNT": "43785.00",
+       "AVG_RATE": "65.546407"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "RAJA TEX",
+       "GROUP3": "",
+       "IT_PCS": "5",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "250.00",
+       "AVG_RATE": "50.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "REALME CUSTOMER",
+       "GROUP3": "",
+       "IT_PCS": "40",
+       "IT_QTY": "40.0000",
+       "IT_AMOUNT": "1600.00",
+       "AVG_RATE": "40.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "VISHAL TEXTILES",
+       "GROUP3": "",
+       "IT_PCS": "10",
+       "IT_QTY": ".0000",
+       "IT_AMOUNT": "1000.00",
+       "AVG_RATE": "100.000000"
+      }
+     ]
+    }
    ]
   },
   "purchase": {
@@ -5274,7 +6022,8 @@
        "IT_QTY": 500,
        "IT_RATE": 10,
        "IT_AMOUNT": 5000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -5307,7 +6056,8 @@
        "IT_QTY": 1000,
        "IT_RATE": 10,
        "IT_AMOUNT": 10000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -5340,7 +6090,8 @@
        "IT_QTY": 1000,
        "IT_RATE": 5,
        "IT_AMOUNT": 4500,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "NETQTY"
       }
      ]
     },
@@ -5373,7 +6124,8 @@
        "IT_QTY": 1000,
        "IT_RATE": 9,
        "IT_AMOUNT": 8100,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "NETQTY"
       }
      ]
     },
@@ -5406,7 +6158,8 @@
        "IT_QTY": 50,
        "IT_RATE": 200,
        "IT_AMOUNT": 10000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -5439,7 +6192,8 @@
        "IT_QTY": 40,
        "IT_RATE": 200,
        "IT_AMOUNT": 8000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -5472,7 +6226,8 @@
        "IT_QTY": 100,
        "IT_RATE": 10,
        "IT_AMOUNT": 900,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "NETQTY"
       }
      ]
     },
@@ -5505,7 +6260,8 @@
        "IT_QTY": 100,
        "IT_RATE": 10,
        "IT_AMOUNT": 1000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -5538,7 +6294,8 @@
        "IT_QTY": 6,
        "IT_RATE": 200,
        "IT_AMOUNT": 120000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "KGS"
       },
       {
        "SR_NO": 2,
@@ -5547,7 +6304,8 @@
        "IT_QTY": 6,
        "IT_RATE": 200,
        "IT_AMOUNT": 1200,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       },
       {
        "SR_NO": 3,
@@ -5556,7 +6314,8 @@
        "IT_QTY": 10,
        "IT_RATE": 200,
        "IT_AMOUNT": 36000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "KGS"
       }
      ]
     },
@@ -5589,7 +6348,8 @@
        "IT_QTY": 50,
        "IT_RATE": 20,
        "IT_AMOUNT": 1000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -5622,7 +6382,8 @@
        "IT_QTY": 5,
        "IT_RATE": 300,
        "IT_AMOUNT": 1500,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -5655,7 +6416,8 @@
        "IT_QTY": 0,
        "IT_RATE": 90,
        "IT_AMOUNT": 45000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       },
       {
        "SR_NO": 2,
@@ -5664,7 +6426,8 @@
        "IT_QTY": 14000,
        "IT_RATE": 200,
        "IT_AMOUNT": 2800000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       },
       {
        "SR_NO": 3,
@@ -5673,7 +6436,8 @@
        "IT_QTY": 0,
        "IT_RATE": 20,
        "IT_AMOUNT": 1400,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "KGS"
       }
      ]
     },
@@ -5706,7 +6470,8 @@
        "IT_QTY": 80,
        "IT_RATE": 60,
        "IT_AMOUNT": 4800,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -5739,7 +6504,8 @@
        "IT_QTY": 200,
        "IT_RATE": 200,
        "IT_AMOUNT": 1200,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -5772,7 +6538,8 @@
        "IT_QTY": 90,
        "IT_RATE": 900,
        "IT_AMOUNT": 81000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -5805,7 +6572,8 @@
        "IT_QTY": 90,
        "IT_RATE": 900,
        "IT_AMOUNT": 81000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -5838,7 +6606,8 @@
        "IT_QTY": 0,
        "IT_RATE": 300,
        "IT_AMOUNT": 87000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "KGS"
       }
      ]
     },
@@ -5871,7 +6640,8 @@
        "IT_QTY": 1000,
        "IT_RATE": 15,
        "IT_AMOUNT": 15000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -5904,7 +6674,8 @@
        "IT_QTY": 5400,
        "IT_RATE": 10,
        "IT_AMOUNT": 54000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -5937,7 +6708,8 @@
        "IT_QTY": 210,
        "IT_RATE": 200,
        "IT_AMOUNT": 800,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -5970,7 +6742,8 @@
        "IT_QTY": 80,
        "IT_RATE": 90,
        "IT_AMOUNT": 270,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -6003,7 +6776,8 @@
        "IT_QTY": 20,
        "IT_RATE": 200,
        "IT_AMOUNT": 400,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     },
@@ -6036,7 +6810,8 @@
        "IT_QTY": 1450,
        "IT_RATE": 550,
        "IT_AMOUNT": 797500,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     },
@@ -6069,7 +6844,8 @@
        "IT_QTY": 40,
        "IT_RATE": 40,
        "IT_AMOUNT": 1600,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "PCS"
       }
      ]
     }
@@ -9481,6 +10257,402 @@
       }
      ]
     }
+   ],
+   "itemScenarios": [
+    {
+     "category": 1,
+     "expected": [
+      {
+       "GROUP1": "",
+       "GROUP2": "GREY PURCHASE",
+       "GROUP3": "",
+       "IT_PCS": "1406",
+       "IT_QTY": "10397.0000",
+       "IT_AMOUNT": "354000.00",
+       "AVG_RATE": "34.048283"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "OTHER PURCHASE",
+       "GROUP3": "",
+       "IT_PCS": "20",
+       "IT_QTY": "40.0000",
+       "IT_AMOUNT": "8000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "PURCHASE ACCOUNT",
+       "GROUP3": "",
+       "IT_PCS": "653",
+       "IT_QTY": "16090.0000",
+       "IT_AMOUNT": "3816170.00",
+       "AVG_RATE": "237.176507"
+      }
+     ]
+    },
+    {
+     "category": 2,
+     "expected": [
+      {
+       "GROUP1": "",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "1646",
+       "IT_QTY": "2926.0000",
+       "IT_AMOUNT": "1137470.00",
+       "AVG_RATE": "388.745727"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "DOBBY",
+       "GROUP3": "",
+       "IT_PCS": "20",
+       "IT_QTY": "181.0000",
+       "IT_AMOUNT": "89900.00",
+       "AVG_RATE": "496.685082"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "GRAY MICRO",
+       "GROUP3": "",
+       "IT_PCS": "222",
+       "IT_QTY": "16560.0000",
+       "IT_AMOUNT": "2860100.00",
+       "AVG_RATE": "172.711352"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "GRY SHIRT",
+       "GROUP3": "",
+       "IT_PCS": "56",
+       "IT_QTY": "5670.0000",
+       "IT_AMOUNT": "56800.00",
+       "AVG_RATE": "1014.285714"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "SHIRT COTTON",
+       "GROUP3": "",
+       "IT_PCS": "10",
+       "IT_QTY": "1000.0000",
+       "IT_AMOUNT": "15000.00",
+       "AVG_RATE": "15.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "TEST FABRIC",
+       "GROUP3": "",
+       "IT_PCS": "125",
+       "IT_QTY": "190.0000",
+       "IT_AMOUNT": "18900.00",
+       "AVG_RATE": "99.473684"
+      }
+     ]
+    },
+    {
+     "category": 3,
+     "expected": [
+      {
+       "GROUP1": "LALA SUPPLIER",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "17",
+       "IT_QTY": "1450.0000",
+       "IT_AMOUNT": "797500.00",
+       "AVG_RATE": "550.000000"
+      },
+      {
+       "GROUP1": "LALA SUPPLIER",
+       "GROUP2": "GRY SHIRT",
+       "GROUP3": "",
+       "IT_PCS": "2",
+       "IT_QTY": "20.0000",
+       "IT_AMOUNT": "400.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "MAHESH SIR",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "527",
+       "IT_QTY": "370.0000",
+       "IT_AMOUNT": "214470.00",
+       "AVG_RATE": "579.648648"
+      },
+      {
+       "GROUP1": "MAHESH SIR",
+       "GROUP2": "DOBBY",
+       "GROUP3": "",
+       "IT_PCS": "18",
+       "IT_QTY": "175.0000",
+       "IT_AMOUNT": "88700.00",
+       "AVG_RATE": "506.857142"
+      },
+      {
+       "GROUP1": "MAHESH SIR",
+       "GROUP2": "GRAY MICRO",
+       "GROUP3": "",
+       "IT_PCS": "108",
+       "IT_QTY": "14500.0000",
+       "IT_AMOUNT": "2805000.00",
+       "AVG_RATE": "193.448275"
+      },
+      {
+       "GROUP1": "MAHESH TEX",
+       "GROUP2": "TEST FABRIC",
+       "GROUP3": "",
+       "IT_PCS": "20",
+       "IT_QTY": "40.0000",
+       "IT_AMOUNT": "8000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "PADMAVATI PRINT",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "1102",
+       "IT_QTY": "1106.0000",
+       "IT_AMOUNT": "125500.00",
+       "AVG_RATE": "113.471971"
+      },
+      {
+       "GROUP1": "PADMAVATI PRINT",
+       "GROUP2": "DOBBY",
+       "GROUP3": "",
+       "IT_PCS": "2",
+       "IT_QTY": "6.0000",
+       "IT_AMOUNT": "1200.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "PADMAVATI PRINT",
+       "GROUP2": "GRAY MICRO",
+       "GROUP3": "",
+       "IT_PCS": "114",
+       "IT_QTY": "2060.0000",
+       "IT_AMOUNT": "55100.00",
+       "AVG_RATE": "26.747572"
+      },
+      {
+       "GROUP1": "PADMAVATI PRINT",
+       "GROUP2": "TEST FABRIC",
+       "GROUP3": "",
+       "IT_PCS": "105",
+       "IT_QTY": "150.0000",
+       "IT_AMOUNT": "10900.00",
+       "AVG_RATE": "72.666666"
+      },
+      {
+       "GROUP1": "RAJESH ENTERPRISE",
+       "GROUP2": "GRY SHIRT",
+       "GROUP3": "",
+       "IT_PCS": "14",
+       "IT_QTY": "5610.0000",
+       "IT_AMOUNT": "54800.00",
+       "AVG_RATE": "3914.285714"
+      },
+      {
+       "GROUP1": "RAJESH ENTERPRISE",
+       "GROUP2": "SHIRT COTTON",
+       "GROUP3": "",
+       "IT_PCS": "10",
+       "IT_QTY": "1000.0000",
+       "IT_AMOUNT": "15000.00",
+       "AVG_RATE": "15.000000"
+      },
+      {
+       "GROUP1": "VAZAHAT SUPPLIER",
+       "GROUP2": "GRY SHIRT",
+       "GROUP3": "",
+       "IT_PCS": "40",
+       "IT_QTY": "40.0000",
+       "IT_AMOUNT": "1600.00",
+       "AVG_RATE": "40.000000"
+      }
+     ]
+    },
+    {
+     "category": 4,
+     "expected": [
+      {
+       "GROUP1": "",
+       "GROUP2": "BLOUSE",
+       "GROUP3": "",
+       "IT_PCS": "1646",
+       "IT_QTY": "2926.0000",
+       "IT_AMOUNT": "1137470.00",
+       "AVG_RATE": "388.745727"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "DOBBY",
+       "GROUP3": "",
+       "IT_PCS": "20",
+       "IT_QTY": "181.0000",
+       "IT_AMOUNT": "89900.00",
+       "AVG_RATE": "496.685082"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "GRAY MICRO",
+       "GROUP3": "",
+       "IT_PCS": "222",
+       "IT_QTY": "16560.0000",
+       "IT_AMOUNT": "2860100.00",
+       "AVG_RATE": "172.711352"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "GRY SHIRT",
+       "GROUP3": "",
+       "IT_PCS": "56",
+       "IT_QTY": "5670.0000",
+       "IT_AMOUNT": "56800.00",
+       "AVG_RATE": "1014.285714"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "SHIRT COTTON",
+       "GROUP3": "",
+       "IT_PCS": "10",
+       "IT_QTY": "1000.0000",
+       "IT_AMOUNT": "15000.00",
+       "AVG_RATE": "15.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "TEST FABRIC",
+       "GROUP3": "",
+       "IT_PCS": "125",
+       "IT_QTY": "190.0000",
+       "IT_AMOUNT": "18900.00",
+       "AVG_RATE": "99.473684"
+      }
+     ]
+    },
+    {
+     "category": 5,
+     "expected": [
+      {
+       "GROUP1": "",
+       "GROUP2": "LALA SUPPLIER",
+       "GROUP3": "BLOUSE",
+       "IT_PCS": "17",
+       "IT_QTY": "1450.0000",
+       "IT_AMOUNT": "797500.00",
+       "AVG_RATE": "550.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "LALA SUPPLIER",
+       "GROUP3": "GRY SHIRT",
+       "IT_PCS": "2",
+       "IT_QTY": "20.0000",
+       "IT_AMOUNT": "400.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "MAHESH SIR",
+       "GROUP3": "BLOUSE",
+       "IT_PCS": "527",
+       "IT_QTY": "370.0000",
+       "IT_AMOUNT": "214470.00",
+       "AVG_RATE": "579.648648"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "MAHESH SIR",
+       "GROUP3": "DOBBY",
+       "IT_PCS": "18",
+       "IT_QTY": "175.0000",
+       "IT_AMOUNT": "88700.00",
+       "AVG_RATE": "506.857142"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "MAHESH SIR",
+       "GROUP3": "GRAY MICRO",
+       "IT_PCS": "108",
+       "IT_QTY": "14500.0000",
+       "IT_AMOUNT": "2805000.00",
+       "AVG_RATE": "193.448275"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "MAHESH TEX",
+       "GROUP3": "TEST FABRIC",
+       "IT_PCS": "20",
+       "IT_QTY": "40.0000",
+       "IT_AMOUNT": "8000.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "PADMAVATI PRINT",
+       "GROUP3": "BLOUSE",
+       "IT_PCS": "1102",
+       "IT_QTY": "1106.0000",
+       "IT_AMOUNT": "125500.00",
+       "AVG_RATE": "113.471971"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "PADMAVATI PRINT",
+       "GROUP3": "DOBBY",
+       "IT_PCS": "2",
+       "IT_QTY": "6.0000",
+       "IT_AMOUNT": "1200.00",
+       "AVG_RATE": "200.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "PADMAVATI PRINT",
+       "GROUP3": "GRAY MICRO",
+       "IT_PCS": "114",
+       "IT_QTY": "2060.0000",
+       "IT_AMOUNT": "55100.00",
+       "AVG_RATE": "26.747572"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "PADMAVATI PRINT",
+       "GROUP3": "TEST FABRIC",
+       "IT_PCS": "105",
+       "IT_QTY": "150.0000",
+       "IT_AMOUNT": "10900.00",
+       "AVG_RATE": "72.666666"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "RAJESH ENTERPRISE",
+       "GROUP3": "GRY SHIRT",
+       "IT_PCS": "14",
+       "IT_QTY": "5610.0000",
+       "IT_AMOUNT": "54800.00",
+       "AVG_RATE": "3914.285714"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "RAJESH ENTERPRISE",
+       "GROUP3": "SHIRT COTTON",
+       "IT_PCS": "10",
+       "IT_QTY": "1000.0000",
+       "IT_AMOUNT": "15000.00",
+       "AVG_RATE": "15.000000"
+      },
+      {
+       "GROUP1": "",
+       "GROUP2": "VAZAHAT SUPPLIER",
+       "GROUP3": "GRY SHIRT",
+       "IT_PCS": "40",
+       "IT_QTY": "40.0000",
+       "IT_AMOUNT": "1600.00",
+       "AVG_RATE": "40.000000"
+      }
+     ]
+    }
    ]
   },
   "salesReturn": {
@@ -9514,7 +10686,8 @@
        "IT_QTY": 15,
        "IT_RATE": 200,
        "IT_AMOUNT": 3000,
-       "IT_DISC1": ""
+       "IT_DISC1": "",
+       "UNIT_NAME": "QTY"
       }
      ]
     }
@@ -9786,7 +10959,8 @@
       }
      ]
     }
-   ]
+   ],
+   "itemScenarios": []
   },
   "purchaseReturn": {
    "rows": [],
@@ -9871,7 +11045,8 @@
      "category": 6,
      "expected": []
     }
-   ]
+   ],
+   "itemScenarios": []
   }
  }
 }

@@ -35,7 +35,9 @@ if (!SQLCMD) throw new Error('sqlcmd not found');
 function query(sql, cols) {
   const out = execFileSync(SQLCMD, ['-S', SERVER, '-E', '-d', DB, '-h', '-1', '-W', '-s', SEP, '-Q', `SET NOCOUNT ON; ${sql}`],
     { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
-  if (/^Msg \d+/m.test(out)) throw new Error(out);
+  // sqlcmd reports some failures as "Sqlcmd: Error:" rather than "Msg nnn" — without this an
+  // errored scenario is silently recorded as an empty expected result.
+  if (/^Msg \d+/m.test(out) || /^Sqlcmd: Error/m.test(out)) throw new Error(out);
   return out.split(/\r?\n/).filter((l) => l.includes(SEP)).map((line) => {
     const c = line.split(SEP);
     return Object.fromEntries(cols.map((k, i) => [k, (c[i] ?? '').trim()]));
@@ -54,7 +56,7 @@ const HEAD = {
   TO_PCS: 'TO_PCS', TO_QTY: 'TO_QTY', SUB_TOT: 'SUB_TOT', T_ADD: 'T_ADD', T_LESS: 'T_LESS',
   TAXABLE_AMT: 'TAXABLE_AMT', NET_TOT: 'NET_TOT',
 };
-const LINE = { SR_NO: 'SR_NO', ITEM_NAME: 'ITEM_NAME', IT_PCS: 'IT_PCS', IT_QTY: 'IT_QTY', IT_RATE: 'IT_RATE', IT_AMOUNT: 'IT_AMOUNT', IT_DISC1: 'IT_DISC1' };
+const LINE = { SR_NO: 'SR_NO', ITEM_NAME: 'ITEM_NAME', IT_PCS: 'IT_PCS', IT_QTY: 'IT_QTY', IT_RATE: 'IT_RATE', IT_AMOUNT: 'IT_AMOUNT', IT_DISC1: 'IT_DISC1', UNIT_NAME: 'UNIT_NAME' };
 const NUMERIC = new Set(['TO_PCS', 'TO_QTY', 'SUB_TOT', 'T_ADD', 'T_LESS', 'TAXABLE_AMT', 'NET_TOT', 'IT_PCS', 'IT_QTY', 'IT_RATE', 'IT_AMOUNT', 'SR_NO', 'BILL_NO', 'ENT_NO']);
 
 const sel = (c) => (c === 'BILL_DATE' ? 'CONVERT(varchar(10), BILL_DATE, 120)' : `ISNULL(CONVERT(varchar(100), ${c}), '')`);
@@ -141,6 +143,37 @@ function detail(view, billPair, cat, p) {
     ORDER BY ${GROUP_COL[cat]}, ${tieBreak(billPair, cat)}, A.SR_NO`, cols);
 }
 
+/**
+ * The Item Wise Summary screens (Rpt_Jsm_Sales_ItemSummary / _Purchase_ItemSummary) aggregate the
+ * same _DTL rows. JSM's own GROUP1/GROUP2/GROUP3 per category, and its AVG_RATE worked out on the
+ * summed row with a zero divisor treated as 1.
+ */
+const ITEM_CATS = {
+  1: ["''", 'A.BOOK', "''"],
+  2: ["''", 'A.ITEM_NAME', "''"],
+  3: ['A.PARTY', 'A.ITEM_NAME', "''"],
+  4: ['A.BROKER', 'A.ITEM_NAME', "''"],
+  5: ['A.BROKER', 'A.PARTY', 'A.ITEM_NAME'],
+  6: ["''", 'A.PARTY', "''"],
+  7: ['A.ITEM_NAME', 'A.BOOK', "''"],
+  8: ['A.STATION', 'A.ITEM_NAME', "''"],
+  9: ['A.BROKER', 'A.PARTY', "''"],
+};
+const AVG_RATE = `CASE UNIT_NAME WHEN 'PCS' THEN (IT_AMOUNT/CASE IT_PCS WHEN 0 THEN 1 ELSE IT_PCS END)
+  ELSE (IT_AMOUNT/CASE IT_QTY WHEN 0 THEN 1 ELSE IT_QTY END) END`;
+
+function itemSummary(view, cat, p) {
+  const [g1, g2, g3] = ITEM_CATS[cat];
+  const by = [g1, g2, g3].filter((g) => g !== "''").join(', ');
+  const cols = ['GROUP1', 'GROUP2', 'GROUP3', 'IT_PCS', 'IT_QTY', 'IT_AMOUNT', 'AVG_RATE'];
+  return query(`SELECT GROUP1, GROUP2, GROUP3, IT_PCS, IT_QTY, IT_AMOUNT, ${AVG_RATE} FROM (
+      SELECT ${g1} AS GROUP1, ${g2} AS GROUP2, ${g3} AS GROUP3,
+             SUM(A.IT_PCS) AS IT_PCS, SUM(A.IT_QTY) AS IT_QTY, SUM(A.IT_AMOUNT) AS IT_AMOUNT,
+             MIN(A.UNIT_NAME) AS UNIT_NAME
+      FROM ${view} A WHERE ${where(p)}${by ? ` GROUP BY ${by}` : ''}) X
+    ORDER BY GROUP1, GROUP2, GROUP3`, cols);
+}
+
 const SRAL_PAIR = ['A.SRAL_NO', 'A.NCBILL_NO'];
 const REGISTERS = [
   { key: 'sales', smry: 'JSM_VW_SALES_SMRY', dtl: 'JSM_VW_SALES_DTL', cats: [1, 2, 3, 4, 5, 6, 7], pair: ['A.BILL_NO', 'A.CBILL_NO', 'A.NCBILL_NO'] },
@@ -161,8 +194,11 @@ for (const r of REGISTERS) {
     if (CATS[cat]) scenarios.push({ mode: 'register', category: cat, expected: register(r.smry, r.pair, cat, P) });
     scenarios.push({ mode: 'detail', category: cat, expected: detail(r.dtl, r.pair, cat, P) });
   }
-  out.registers[r.key] = { rows, scenarios };
-  console.log(r.key.padEnd(15), rows.length, 'bills,', scenarios.length, 'scenarios');
+  const itemCats = r.key === 'sales' ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : (r.key === 'purchase' ? [1, 2, 3, 4, 5] : []);
+  const itemScenarios = itemCats.map((cat) => ({ category: cat, expected: itemSummary(r.dtl, cat, P) }));
+
+  out.registers[r.key] = { rows, scenarios, itemScenarios };
+  console.log(r.key.padEnd(15), rows.length, 'bills,', scenarios.length, 'scenarios,', itemScenarios.length, 'item-summary');
 }
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });

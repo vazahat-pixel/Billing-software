@@ -22,27 +22,40 @@
 const { loadSalesRegisterRows, loadPurchaseRegisterRows } = require('../sources/billRegister');
 const { orderRows, inList, inDateRange, groupBy, round, MONTHS } = require('../jcEngine');
 
+/**
+ * JSM's own GROUP1 / GROUP2 / GROUP3 per Category Wise option, straight out of the decompiled
+ * screens (Rpt_Jsm_Sales_ItemSummary / _Purchase_ItemSummary → Generate_Reports). These are real
+ * levels, not one joined label: GROUP1 is the group HEADER and GROUP2 (plus GROUP3 where the
+ * captured layout shows it) are the row's own columns.
+ *
+ * `month` is the same category with the screen's "Month Wise" box ticked — JSM has a month form
+ * only for the categories listed with one; the others ignore the box.
+ */
 const SALES_CATEGORIES = {
-  1: { fields: ['BOOK'], caption: 'BOOK' },
-  2: { fields: ['ITEM_NAME'], caption: 'ITEM' },
-  3: { fields: ['ITEM_NAME', 'PARTY'], caption: 'ITEM+PARTY' },
-  4: { fields: ['ITEM_NAME', 'BROKER'], caption: 'ITEM+BROKER' },
-  5: { fields: ['ITEM_NAME', 'BROKER', 'PARTY'], caption: 'ITEM+BROKER+PARTY' },
-  6: { fields: ['PARTY'], caption: 'PARTY' },
-  7: { fields: ['ITEM_NAME', 'BOOK'], caption: 'ITEM+BOOK' },
-  8: { fields: ['ITEM_NAME', 'STATION'], caption: 'ITEM+CITY' },
-  9: { fields: ['BROKER'], caption: 'BROKER' },
+  1: { plain: [null, 'BOOK'], month: ['BOOK', 'MONTH_NAME'], caption: 'BOOK', title: '' },
+  2: { plain: [null, 'ITEM_NAME'], month: ['ITEM_NAME', 'MONTH_NAME'], caption: 'ITEM', title: 'Item Wise ' },
+  3: { plain: ['PARTY', 'ITEM_NAME'], month: ['PARTY', 'ITEM_NAME', 'MONTH_NAME'], caption: 'ITEM', title: 'Party+Item Wise ' },
+  4: { plain: ['BROKER', 'ITEM_NAME'], month: ['BROKER', 'ITEM_NAME', 'MONTH_NAME'], caption: 'ITEM', title: 'Broker+Item Wise ' },
+  5: { plain: ['BROKER', 'PARTY', 'ITEM_NAME'], caption: 'PARTY', title: 'Broker+Party+Item Wise ' },
+  6: { plain: [null, 'PARTY'], month: ['PARTY', 'MONTH_NAME'], caption: 'PARTY', title: 'Party Wise ' },
+  7: { plain: ['ITEM_NAME', 'BOOK'], caption: 'BOOK', title: 'Item+Book Wise ' },
+  8: { plain: ['STATION', 'ITEM_NAME'], caption: 'ITEM', title: 'City+Item Wise ' },
+  9: { plain: ['BROKER', 'PARTY'], caption: 'PARTY', title: 'Broker Wise ' },
 };
 
 const PURCHASE_CATEGORIES = {
-  1: { fields: ['BOOK'], caption: 'BOOK' },
-  2: { fields: ['ITEM_NAME'], caption: 'ITEM' },
-  3: { fields: ['ITEM_NAME', 'PARTY'], caption: 'ITEM+PARTY' },
-  4: { fields: ['ITEM_NAME', 'BROKER'], caption: 'ITEM+BROKER' },
-  5: { fields: ['ITEM_NAME', 'BROKER', 'PARTY'], caption: 'ITEM+BROKER+PARTY' },
+  1: SALES_CATEGORIES[1],
+  2: SALES_CATEGORIES[2],
+  3: SALES_CATEGORIES[3],
+  4: SALES_CATEGORIES[4],
+  5: SALES_CATEGORIES[5],
 };
 
-const LISTS = { parties: 'PARTY', brokers: 'BROKER', books: 'BOOK', items: 'ITEM_NAME' };
+const LISTS = { parties: 'PARTY', brokers: 'BROKER', books: 'REGISTER', items: 'ITEM_NAME' };
+
+/** The levels above are named as JSM names them; this is where its name differs from ours. */
+const FIELD = { BOOK: 'REGISTER' };
+const valueOf = (row, level) => (level ? (row[FIELD[level] || level] || '') : '');
 const SUM = ['IT_PCS', 'IT_QTY', 'IT_AMOUNT'];
 
 function categoryOf(raw, categories) {
@@ -50,8 +63,17 @@ function categoryOf(raw, categories) {
   return categories[n] ? n : 1;
 }
 
-function groupValue(line, fields) {
-  return fields.map((f) => line[f] || '').filter(Boolean).join(' / ');
+/**
+ * JSM's own average rate, computed on the already-summed row (Generate_Reports):
+ *   CASE UNIT_NAME WHEN 'PCS' THEN IT_AMOUNT / (CASE IT_PCS WHEN 0 THEN 1 ELSE IT_PCS END)
+ *                              ELSE IT_AMOUNT / (CASE IT_QTY1 WHEN 0 THEN 1 ELSE IT_QTY1 END) END
+ * — the unit decides which quantity divides, and a zero divisor becomes 1, so the row shows the
+ * amount rather than a zero. IT_QTY1 is JSM's second quantity column; this software records the
+ * one quantity, so IT_QTY stands in for it.
+ */
+function avgRate(g) {
+  const divisor = String(g.UNIT_NAME || '').trim().toUpperCase() === 'PCS' ? g.IT_PCS : g.IT_QTY;
+  return round(g.IT_AMOUNT / (divisor || 1));
 }
 
 function itemWiseSummaryReport({ side, view, categories, noun }) {
@@ -61,6 +83,8 @@ function itemWiseSummaryReport({ side, view, categories, noun }) {
     const category = categoryOf(p.category, categories);
     const cat = categories[category];
     const monthWise = p.monthWise === true || String(p.monthWise) === 'true';
+    // JSM has a Month Wise form only for some categories; the rest ignore the box.
+    const levels = (monthWise && cat.month) ? cat.month : cat.plain;
 
     let bills = deps.rows || await load(companyId);
     bills = inDateRange(bills, 'BILL_DATE', p.from, p.to);
@@ -77,11 +101,12 @@ function itemWiseSummaryReport({ side, view, categories, noun }) {
           const want = new Set(p.items.map((s) => String(s).trim().toUpperCase()));
           if (!want.has(String(l.ITEM_NAME).trim().toUpperCase())) continue;
         }
-        const month = bill.BILL_DATE ? MONTHS[new Date(bill.BILL_DATE).getUTCMonth()] : '';
+        merged.MONTH_NAME = bill.BILL_DATE ? MONTHS[new Date(bill.BILL_DATE).getUTCMonth()] : '';
         lines.push({
-          GROUP1: side === 'sales' ? bill.BROKER : bill.PARTY,
-          GROUP2: groupValue(merged, cat.fields),
-          GROUP3: monthWise ? month : '',
+          GROUP1: valueOf(merged, levels[0]),
+          GROUP2: valueOf(merged, levels[1]),
+          GROUP3: valueOf(merged, levels[2]),
+          UNIT_NAME: l.UNIT_NAME || '',
           IT_PCS: l.IT_PCS,
           IT_QTY: l.IT_QTY,
           IT_AMOUNT: l.IT_AMOUNT,
@@ -89,11 +114,17 @@ function itemWiseSummaryReport({ side, view, categories, noun }) {
       }
     }
 
-    const groupKeys = monthWise ? ['GROUP2', 'GROUP3'] : ['GROUP2'];
-    const grouped = groupBy(lines, groupKeys, { sum: SUM });
+    // GROUP BY exactly the levels JSM names, in its order.
+    const groupKeys = ['GROUP1', 'GROUP2', 'GROUP3'].filter((_, i) => levels[i]);
+    const grouped = groupBy(lines, groupKeys, { sum: SUM }, (first) => ({ UNIT_NAME: first.UNIT_NAME }));
     for (const g of grouped) {
       for (const f of SUM) g[f] = round(g[f]);
-      g.AVG_RATE = g.IT_QTY ? round(g.IT_AMOUNT / g.IT_QTY) : (g.IT_PCS ? round(g.IT_AMOUNT / g.IT_PCS) : 0);
+      // JSM aggregates the unit as MIN(UNIT_NAME) before the rate is worked out.
+      const units = lines
+        .filter((l) => groupKeys.every((k) => l[k] === g[k]))
+        .map((l) => String(l.UNIT_NAME || ''));
+      g.UNIT_NAME = units.length ? units.reduce((a, b) => (a <= b ? a : b)) : '';
+      g.AVG_RATE = avgRate(g);
     }
 
     return {
@@ -101,10 +132,11 @@ function itemWiseSummaryReport({ side, view, categories, noun }) {
       grid: {
         layout: view,
         variant: category,
-        groupColumns: [],
-        groupDisplays: [],
+        // GROUP1 is JSM's group header; GROUP2/GROUP3 are the row's own columns.
+        groupColumns: levels[0] ? ['GROUP1'] : [],
+        groupDisplays: levels[0] ? [levels[0] === 'ITEM_NAME' ? 'ITEM' : levels[0]] : [],
         captions: { GROUP2: cat.caption },
-        title: `${cat.caption} Wise ${noun} Item Summary Report`,
+        title: `${cat.title}${noun} Report [ItemWise Summary]`,
         period: `DATE : FROM ${p.fromText || p.from || ''}  TO  ${p.toText || p.to || ''}`,
         pageWise: p.printout === '2-PageWise',
       },
