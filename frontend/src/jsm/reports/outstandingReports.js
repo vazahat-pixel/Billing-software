@@ -68,6 +68,11 @@ function ageConfig(form, categories) {
       CheckBox_Total: true,
       CheckBox_Address: true,
       CheckBox_Ledger: true,
+      // JSM's Day 1-4 boxes decide where each ageing bucket ends; it opens on these.
+      txt_day1: '30',
+      txt_day2: '60',
+      txt_day3: '90',
+      txt_day4: '120',
     }),
     toParams: (s) => ({
       from: toIsoDate(s.txt_bill_dt_from),
@@ -79,6 +84,11 @@ function ageConfig(form, categories) {
       printout: s.cbo_printout,
       parties: s.ListView0 || [],
       brokers: s.ListView1 || [],
+      // Day 4 opens a fifth bucket in JSM's own code, but this company's captured layout shows
+      // four (0-30 / 31-60 / 61-90 / 91&Above), so only the first three boundaries are sent.
+      ageDay1: s.txt_day1,
+      ageDay2: s.txt_day2,
+      ageDay3: s.txt_day3,
     }),
   };
 }

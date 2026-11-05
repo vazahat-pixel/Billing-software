@@ -99,3 +99,35 @@ describe('grid primaryDetailColumn points at the bill, not the party', () => {
     assert.equal(r.grid.primaryDetailColumn, '_billId');
   });
 });
+
+describe('Age Analysis follows the screen\'s own Day 1-4 boxes', () => {
+  const AGE_ROWS = [
+    { PARTY: 'ALPHA', BROKER: 'B1', TOT_BALANCE: 300, BAL_AMT1: 100, BAL_AMT2: 100, BAL_AMT3: 100, BAL_AMT4: 0, BAL_UNADJ: 0 },
+  ];
+
+  it('captions the buckets from the days given, the way JSM labels them', async () => {
+    const r = await jsmReports.get('Rpt_Jsm_Os_Sales_AgeAnalysis')
+      .run('c1', { ...P, ageDay1: 15, ageDay2: 45, ageDay3: 75 }, { rows: AGE_ROWS });
+    assert.equal(r.grid.captions.BAL_AMT1, '0-15');
+    assert.equal(r.grid.captions.BAL_AMT2, '16-45');
+    assert.equal(r.grid.captions.BAL_AMT3, '46-75');
+    assert.equal(r.grid.captions.BAL_AMT4, '76&Above');
+  });
+
+  it('keeps JSM\'s own 0-30 / 31-60 / 61-90 / 91&Above when the boxes are untouched', async () => {
+    const r = await jsmReports.get('Rpt_Jsm_Os_Sales_AgeAnalysis').run('c1', P, { rows: AGE_ROWS });
+    assert.deepEqual(
+      [r.grid.captions.BAL_AMT1, r.grid.captions.BAL_AMT2, r.grid.captions.BAL_AMT3, r.grid.captions.BAL_AMT4],
+      ['0-30', '31-60', '61-90', '91&Above']
+    );
+  });
+
+  it('1-Normal and 2-Party both list a row per party; 3-Broker gathers them', async () => {
+    const party = await jsmReports.get('Rpt_Jsm_Os_Sales_AgeAnalysis').run('c1', { ...P, category: '2-Party' }, { rows: AGE_ROWS });
+    assert.equal(party.grid.captions.GROUP2, 'PARTY');
+    assert.deepEqual(party.rows.map((x) => x.GROUP2), ['ALPHA']);
+    const broker = await jsmReports.get('Rpt_Jsm_Os_Sales_AgeAnalysis').run('c1', { ...P, category: '3-Broker' }, { rows: AGE_ROWS });
+    assert.equal(broker.grid.captions.GROUP2, 'BROKER');
+    assert.deepEqual(broker.rows.map((x) => x.GROUP2), ['B1']);
+  });
+});

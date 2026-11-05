@@ -77,13 +77,37 @@ async function loadOutstandingRows(companyId, kind, filters = {}) {
   return rows;
 }
 
+/** JSM's Day 1 / Day 2 / Day 3 / Day 4 boxes, which its screen opens on. */
+
+
 /**
- * Age Analysis rows: one per party, from the SAME aging buckets getOutstanding already computed
- * while walking each bill (bucket30/60/90/90Plus) — not re-derived from a different cut of the data.
+ * Age Analysis rows: one per party.
+ *
+ * JSM buckets each bill by its own OS_DAYS against the Day 1–4 boxes on the screen
+ * (`UPDATE … SET BAL_AMT2=TOT_BALANCE WHERE OS_DAYS > <day1> AND OS_DAYS <= <day2>` and so on),
+ * so the boundaries are the operator's, not fixed. While they are left at JSM's own defaults the
+ * totals are taken straight from the aging getOutstanding already worked out bill by bill; only
+ * when the operator moves a boundary are the same bills re-bucketed here, against the same
+ * per-bill balances — no figure is recomputed either way.
  */
-async function loadOutstandingAgeRows(companyId, kind, filters = {}) {
+async function loadOutstandingAgeRows(companyId, kind, filters = {}, ageDays) {
   const reportService = require('../../reportService');
   const parties = await reportService.getOutstanding(companyId, TYPE_OF[kind], filters);
+  const days = Array.isArray(ageDays) && ageDays.length === 3 && ageDays.every((d) => Number.isFinite(d))
+    ? ageDays
+    : null;
+
+  /** Re-bucket one party's bills when the operator has moved a boundary off JSM's defaults. */
+  const custom = (p) => {
+    const b = [0, 0, 0, 0];
+    for (const inv of p.invoices) {
+      const age = Number(inv.ageDays || 0);
+      const amount = Number(inv.outstanding || 0);
+      const i = age <= days[0] ? 0 : (age <= days[1] ? 1 : (age <= days[2] ? 2 : 3));
+      b[i] += amount;
+    }
+    return b.map(round);
+  };
 
   const allInvoices = parties.flatMap((p) => p.invoices);
   const brokerNames = await resolveBrokerNames(companyId, allInvoices);
@@ -92,19 +116,24 @@ async function loadOutstandingAgeRows(companyId, kind, filters = {}) {
     return first ? (brokerNames.get(String(first.broker)) || '') : '';
   };
 
-  return parties.map((p) => ({
-    PARTY: p.partyName,
-    BROKER: brokerOf(p),
-    STATION: p.city || '',
-    MAINGROUP: p.mainGroupId || '',
-    TOT_BALANCE: round(p.totalOutstanding),
-    BAL_AMT1: round(p.aging.bucket30),
-    BAL_AMT2: round(p.aging.bucket60),
-    BAL_AMT3: round(p.aging.bucket90),
-    BAL_AMT4: round(p.aging.bucket90Plus),
-    BAL_UNADJ: 0,
-    _partyId: String(p.partyId),
-  }));
+  return parties.map((p) => {
+    const [b1, b2, b3, b4] = days
+      ? custom(p)
+      : [p.aging.bucket30, p.aging.bucket60, p.aging.bucket90, p.aging.bucket90Plus].map(round);
+    return {
+      PARTY: p.partyName,
+      BROKER: brokerOf(p),
+      STATION: p.city || '',
+      MAINGROUP: p.mainGroupId || '',
+      TOT_BALANCE: round(p.totalOutstanding),
+      BAL_AMT1: b1,
+      BAL_AMT2: b2,
+      BAL_AMT3: b3,
+      BAL_AMT4: b4,
+      BAL_UNADJ: 0,
+      _partyId: String(p.partyId),
+    };
+  });
 }
 
 module.exports = { loadOutstandingRows, loadOutstandingAgeRows, TYPE_OF };

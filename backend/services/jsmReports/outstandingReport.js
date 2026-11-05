@@ -41,6 +41,23 @@ const LISTS = { parties: 'PARTY', brokers: 'BROKER', stations: 'STATION', books:
 const SUM = ['NET_TOT', 'ADJUST', 'GOODS_RTN', 'TOT_DISC', 'TOT_BALANCE'];
 const AGE_SUM = ['TOT_BALANCE', 'BAL_AMT1', 'BAL_AMT2', 'BAL_AMT3', 'BAL_AMT4', 'BAL_UNADJ'];
 
+/** JSM's Day 1 / Day 2 / Day 3 boxes on the Age Analysis screen; it opens on 30 / 60 / 90. */
+const DEFAULT_AGE_DAYS = [30, 60, 90];
+function ageDaysOf(p) {
+  const days = [p.ageDay1, p.ageDay2, p.ageDay3].map((d) => Number(d));
+  return days.every((d) => Number.isFinite(d) && d > 0) ? days : DEFAULT_AGE_DAYS;
+}
+
+/** The bucket headings follow those boxes, the way JSM labels them: 0-30, 31-60, 61-90, 91&Above. */
+function ageCaptions([d1, d2, d3]) {
+  return {
+    BAL_AMT1: `0-${d1}`,
+    BAL_AMT2: `${d1 + 1}-${d2}`,
+    BAL_AMT3: `${d2 + 1}-${d3}`,
+    BAL_AMT4: `${d3 + 1}&Above`,
+  };
+}
+
 function categoryOf(raw, offered) {
   const n = Number(String(raw ?? '').trim().split('-')[0]);
   return offered.includes(n) ? n : offered[0];
@@ -126,15 +143,19 @@ function outstandingReport(spec) {
 
   async function runAge(companyId, p = {}, deps = {}) {
     const category = categoryOf(p.category, spec.categories.filter((c) => c <= 3));
-    const cat = category === 3 ? CATEGORIES[3] : CATEGORIES[1];
+    // JSM's Age Analysis has only the two listings: a row per party, or those rows gathered
+    // under their broker (`A.PARTY AS JS_GROUP … ORDER BY A.PARTY` / `A.BROKER AS JS_GROUP,
+    // A.PARTY AS JS_DETAIL … ORDER BY A.BROKER,A.PARTY`).
+    const byBroker = category === 3;
+    const ageDays = ageDaysOf(p);
 
-    let rows = deps.rows || await loadOutstandingAgeRows(companyId, spec.kind, toFilters(p));
+    let rows = deps.rows || await loadOutstandingAgeRows(companyId, spec.kind, toFilters(p), ageDays);
     for (const [param, field] of Object.entries(LISTS)) {
       if (field === 'PARTY' || field === 'BROKER') rows = inList(rows, field, p[param]);
     }
 
-    if (cat.key !== 'PARTY') {
-      const grouped = groupBy(rows.map((r) => ({ ...r, GROUP2: r[cat.key] || '' })), ['GROUP2'], { sum: AGE_SUM });
+    if (byBroker) {
+      const grouped = groupBy(rows.map((r) => ({ ...r, GROUP2: r.BROKER || '' })), ['GROUP2'], { sum: AGE_SUM });
       for (const g of grouped) for (const f of AGE_SUM) g[f] = round(g[f]);
       rows = grouped;
     } else {
@@ -148,7 +169,7 @@ function outstandingReport(spec) {
         variant: 1,
         groupColumns: [],
         groupDisplays: [],
-        captions: { GROUP2: cat.caption },
+        captions: { GROUP2: byBroker ? 'BROKER' : 'PARTY', ...ageCaptions(ageDays) },
         title: `${spec.noun} Age Analysis`,
         period: `BILLDATE : FROM ${p.fromText || p.from || ''}  TO  ${p.toText || p.to || ''}`,
         pageWise: p.printout === '2-PageWise',
