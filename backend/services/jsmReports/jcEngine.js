@@ -31,14 +31,31 @@ function sqlCompare(a, b) {
   return 0;
 }
 
-/** ORDER BY a, b DESC … — keys: ['A', { field: 'B', dir: 'desc' }]. Stable like SQL for equal keys. */
+/**
+ * ORDER BY a, b DESC … — keys: ['A', { field: 'B', dir: 'desc' }, { field: 'C', numeric: true }].
+ * Stable like SQL for equal keys.
+ *
+ * `numeric` is for the columns JSM holds as integers (a bill number, a serial) but this software
+ * holds as text: sorted as text, bill 1009 would come before bill 919.
+ */
 function orderRows(rows, keys) {
   const spec = keys.filter(Boolean).map((k) => (typeof k === 'string' ? { field: k, dir: 'asc' } : k));
   return rows
     .map((row, i) => ({ row, i }))
     .sort((x, y) => {
-      for (const { field, dir } of spec) {
-        const c = sqlCompare(x.row[field], y.row[field]);
+      for (const { field, dir, numeric } of spec) {
+        const a = x.row[field];
+        const b = y.row[field];
+        let c;
+        if (numeric) {
+          const na = Number(a);
+          const nb = Number(b);
+          c = (Number.isFinite(na) && Number.isFinite(nb) && !isBlank(a) && !isBlank(b))
+            ? na - nb
+            : sqlCompare(a, b);
+        } else {
+          c = sqlCompare(a, b);
+        }
         if (c !== 0) return dir === 'desc' ? -c : c;
       }
       return x.i - y.i;

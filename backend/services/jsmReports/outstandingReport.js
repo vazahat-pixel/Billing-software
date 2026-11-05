@@ -12,13 +12,30 @@
 const { loadOutstandingRows, loadOutstandingAgeRows } = require('./sources/outstanding');
 const { orderRows, inList, groupBy, round } = require('./jcEngine');
 
+/**
+ * JSM's own Category Wise options, from the decompiled screens (Rpt_Jsm_Os_Sales /
+ * _Purchase / _Process / _Jobwork → Genrate_Reports).
+ *
+ * 1-Normal is NOT a party grouping: JSM selects `'' AS JS_GROUP` for it, i.e. one flat list of
+ * bills with no group headers at all, ordered by bill date. Every other category groups on its
+ * own column and breaks ties on the party first.
+ */
 const CATEGORIES = {
-  1: { key: 'PARTY', caption: 'PARTY' },      // Normal — JSM's own screens group by party too
-  2: { key: 'PARTY', caption: 'PARTY' },
-  3: { key: 'BROKER', caption: 'BROKER' },
-  4: { key: 'STATION', caption: 'CITY' },
-  5: { key: 'MAINGROUP', caption: 'MAINGROUP' },
+  1: { key: null, caption: '', title: 'Outstanding {noun} Report' },
+  2: { key: 'PARTY', caption: 'PARTY', title: 'Party Wise ' },
+  3: { key: 'BROKER', caption: 'BROKER', order2: 'PARTY', title: 'Broker Wise ' },
+  4: { key: 'STATION', caption: 'CITY', order2: 'PARTY', title: 'City Wise ' },
+  5: { key: 'MAINGROUP', caption: 'MAINGROUP', order2: 'PARTY', title: 'MainGroup Wise ', noQType: true },
 };
+
+/**
+ * The bill's own number, which JSM holds as an integer — never sorted as text.
+ * Q_TYPE (JSM's row kind: the bill itself vs an adjustment booked against it) sorts just before
+ * it on every category but Main Group; rows this software builds carry no Q_TYPE, so there it
+ * simply leaves the order alone.
+ */
+const BILL_TAIL = ['BILL_DATE', { field: 'NCBILL_NO', dir: 'asc', numeric: true }, '_billId'];
+const tailFor = (cat, spec) => ((cat.noQType && !spec.qtypeInMainGroup) ? BILL_TAIL : ['Q_TYPE', ...BILL_TAIL]);
 
 const LISTS = { parties: 'PARTY', brokers: 'BROKER', stations: 'STATION', books: 'BOOK', hastes: 'HASTE', states: 'STATE', msmeTypes: 'MSME_TYPE', mainGroups: 'MAINGROUP' };
 const SUM = ['NET_TOT', 'ADJUST', 'GOODS_RTN', 'TOT_DISC', 'TOT_BALANCE'];
@@ -64,6 +81,19 @@ function outstandingReport(spec) {
     };
   }
 
+  /**
+   * JSM's own window titles. Sales words them "<X> Wise Sales Outstanding Report"; Purchase,
+   * Process and Jobwork word the same thing "<X> Wise Outstanding <noun> Report". Category
+   * 1-Normal is just "Outstanding <noun> Report" on all four.
+   */
+  function titleFor(cat) {
+    const noun = spec.titleNoun || spec.noun;
+    if (!cat.key) return `Outstanding ${noun} Report`;
+    return spec.titleNounFirst
+      ? `${cat.title}${noun} Outstanding Report`
+      : `${cat.title}Outstanding ${noun} Report`;
+  }
+
   async function run(companyId, p = {}, deps = {}) {
     const category = categoryOf(p.category, spec.categories);
     const cat = CATEGORIES[category];
@@ -72,19 +102,22 @@ function outstandingReport(spec) {
     let rows = deps.rows || await loadOutstandingRows(companyId, spec.kind, toFilters(p));
     for (const [param, field] of Object.entries(LISTS)) rows = inList(rows, field, p[param]);
 
-    const withX = rows.map((r) => ({ ...r, XGROUP: r[cat.key] || '' }));
-    const ordered = orderRows(withX, ['XGROUP', 'BILL_DATE', 'NCBILL_NO', '_billId']);
+    const withX = rows.map((r) => ({ ...r, XGROUP: cat.key ? (r[cat.key] || '') : '' }));
+    const ordered = orderRows(withX, cat.key
+      ? ['XGROUP', cat.order2, ...tailFor(cat, spec)].filter(Boolean)
+      : tailFor(cat, spec));
 
     return {
       rows: ordered,
       grid: {
         layout: spec.view,
         variant: 1,
-        groupColumns: ['XGROUP'],
-        groupDisplays: [cat.caption],
+        // 1-Normal is a flat list — no group header, no group totals.
+        groupColumns: cat.key ? ['XGROUP'] : [],
+        groupDisplays: cat.key ? [cat.caption] : [],
         primaryDetailColumn: '_billId',
-        captions: { GROUP2: cat.caption },
-        title: `${spec.noun} Outstanding`,
+        captions: cat.key ? { GROUP2: cat.caption } : {},
+        title: titleFor(cat),
         period,
         pageWise: p.printout === '2-PageWise',
       },

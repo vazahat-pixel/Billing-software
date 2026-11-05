@@ -1,0 +1,4269 @@
+{
+ "co": "SC27",
+ "db": "JsmSql2_DEMO2026",
+ "kinds": {
+  "sales": {
+   "rows": [
+    {
+     "Q_TYPE": "2",
+     "PARTY": "RAJA TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-06-05",
+     "NCBILL_NO": "1",
+     "NET_TOT": 295,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 295,
+     "_billId": "1SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-06-05",
+     "NCBILL_NO": "2",
+     "NET_TOT": 29500,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 29500,
+     "_billId": "2SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY SALES",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-16",
+     "NCBILL_NO": "909",
+     "NET_TOT": 82,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 82,
+     "_billId": "3SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-22",
+     "NCBILL_NO": "3",
+     "NET_TOT": 4410,
+     "ADJUST": 4400,
+     "GOODS_RTN": 0,
+     "TOT_DISC": -10,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "4SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY SALES",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-25",
+     "NCBILL_NO": "919",
+     "NET_TOT": 147,
+     "ADJUST": 0,
+     "GOODS_RTN": 3150,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": -3003,
+     "_billId": "5SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY SALES",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-25",
+     "NCBILL_NO": "999",
+     "NET_TOT": 337,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 337,
+     "_billId": "6SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "ADDU CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-10-03",
+     "NCBILL_NO": "1106",
+     "NET_TOT": 37333,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 37333,
+     "_billId": "25SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "REALME CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-10-29",
+     "NCBILL_NO": "1107",
+     "NET_TOT": 1512,
+     "ADJUST": 1512,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "26SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-21",
+     "NCBILL_NO": "1100",
+     "NET_TOT": 34020,
+     "ADJUST": 34000,
+     "GOODS_RTN": 0,
+     "TOT_DISC": -20,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "19SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "VISHAL TEXTILES",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-24",
+     "NCBILL_NO": "1101",
+     "NET_TOT": 1050,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 1050,
+     "_billId": "20SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "ADDU CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-09-15",
+     "NCBILL_NO": "1102",
+     "NET_TOT": 19379,
+     "ADJUST": 19379,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "21SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "ADDU CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-09-17",
+     "NCBILL_NO": "1103",
+     "NET_TOT": 58085,
+     "ADJUST": 58000,
+     "GOODS_RTN": 0,
+     "TOT_DISC": -85,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "22SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "ADDU CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-09-25",
+     "NCBILL_NO": "1104",
+     "NET_TOT": 7692,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 7692,
+     "_billId": "23SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "ADDU CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-09-29",
+     "NCBILL_NO": "1105",
+     "NET_TOT": 545,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 545,
+     "_billId": "24SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-07",
+     "NCBILL_NO": "5",
+     "NET_TOT": 1040,
+     "ADJUST": 1000,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "13SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-07",
+     "NCBILL_NO": "5",
+     "NET_TOT": 1040,
+     "ADJUST": 40,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "13SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-07",
+     "NCBILL_NO": "6",
+     "NET_TOT": 114273,
+     "ADJUST": 114000,
+     "GOODS_RTN": 0,
+     "TOT_DISC": -273,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "14SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-07",
+     "NCBILL_NO": "7",
+     "NET_TOT": 17351,
+     "ADJUST": 1000,
+     "GOODS_RTN": 0,
+     "TOT_DISC": -20,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 16331,
+     "_billId": "15SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-11",
+     "NCBILL_NO": "8",
+     "NET_TOT": 35910,
+     "ADJUST": 3000,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 33386,
+     "_billId": "16SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-11",
+     "NCBILL_NO": "8",
+     "NET_TOT": 35910,
+     "ADJUST": -476,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 33386,
+     "_billId": "16SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-14",
+     "NCBILL_NO": "9",
+     "NET_TOT": 54455,
+     "ADJUST": 54400,
+     "GOODS_RTN": 0,
+     "TOT_DISC": -55,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "17SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-17",
+     "NCBILL_NO": "10",
+     "NET_TOT": 94500,
+     "ADJUST": 94000,
+     "GOODS_RTN": 0,
+     "TOT_DISC": -500,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "18SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY SALES",
+     "HASTE": "E",
+     "BILL_DATE": "2026-07-25",
+     "NCBILL_NO": "1009",
+     "NET_TOT": 227,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 227,
+     "_billId": "7SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY SALES",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-30",
+     "NCBILL_NO": "1019",
+     "NET_TOT": 359,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 359,
+     "_billId": "8SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-30",
+     "NCBILL_NO": "4",
+     "NET_TOT": 93563,
+     "ADJUST": 2000,
+     "GOODS_RTN": 0,
+     "TOT_DISC": -8477,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 83086,
+     "_billId": "9SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY SALES",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-30",
+     "NCBILL_NO": "1029",
+     "NET_TOT": 18315,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 18315,
+     "_billId": "10SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY SALES",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-30",
+     "NCBILL_NO": "1039",
+     "NET_TOT": 1121,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 1121,
+     "_billId": "11SC27  2"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY SALES",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-30",
+     "NCBILL_NO": "1049",
+     "NET_TOT": 85,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 85,
+     "_billId": "12SC27  2"
+    },
+    {
+     "Q_TYPE": "1",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "SALES BOOK",
+     "HASTE": "",
+     "BILL_DATE": "2024-11-09",
+     "NCBILL_NO": "88",
+     "NET_TOT": 3,
+     "ADJUST": 4,
+     "GOODS_RTN": 4,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": -5,
+     "_billId": "1SC27  1"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "HDFC BANK",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-22",
+     "NCBILL_NO": "1",
+     "NET_TOT": 10,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": 10,
+     "_billId": "1SC27  1"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "CASH BOOK",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-22",
+     "NCBILL_NO": "1",
+     "NET_TOT": 0,
+     "ADJUST": 10,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": -10,
+     "_billId": "1SC27  0"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "CASH BOOK",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-10",
+     "NCBILL_NO": "1",
+     "NET_TOT": 2000,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": 2000,
+     "_billId": "4SC27  1"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "CASH BOOK",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-20",
+     "NCBILL_NO": "2",
+     "NET_TOT": 20000,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": 20000,
+     "_billId": "17SC27  1"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "BANK COMMISION",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-10",
+     "NCBILL_NO": "1",
+     "NET_TOT": 0,
+     "ADJUST": 2000,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": -2000,
+     "_billId": "4SC27  0"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "BANK CHARGES",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-11",
+     "NCBILL_NO": "88",
+     "NET_TOT": 0,
+     "ADJUST": 90000.01,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": -90000.01,
+     "_billId": "1SC27  1"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "DISCOUNT ACCOUNT",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-13",
+     "NCBILL_NO": "5",
+     "NET_TOT": 5,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": 5,
+     "_billId": "5SC27  1"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "DISCOUNT ACCOUNT",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-09-17",
+     "NCBILL_NO": "1103",
+     "NET_TOT": 0,
+     "ADJUST": 85,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": -85,
+     "_billId": "6SC27  1"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-20",
+     "NCBILL_NO": "2",
+     "NET_TOT": 0,
+     "ADJUST": 20000,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": -20000,
+     "_billId": "17SC27  0"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-11",
+     "NCBILL_NO": "88",
+     "NET_TOT": 90000,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": 90000,
+     "_billId": "1SC27  0"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-13",
+     "NCBILL_NO": "5",
+     "NET_TOT": 0,
+     "ADJUST": 5,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": -5,
+     "_billId": "5SC27  0"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "ADDU CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-09-17",
+     "NCBILL_NO": "1103",
+     "NET_TOT": 84.75,
+     "ADJUST": 0,
+     "GOODS_RTN": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": 84.75,
+     "_billId": "6SC27  0"
+    }
+   ],
+   "scenarios": [
+    {
+     "category": 1,
+     "expected": [
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2024-11-09",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-06-05",
+       "PARTY": "RAJA TEX",
+       "TOT_BALANCE": "295.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-06-05",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "29500.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "909",
+       "BILL_DATE": "2026-07-16",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "82.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "919",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "-3003.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "999",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "337.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1009",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "227.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "4",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "83086.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1019",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "359.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1029",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "18315.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1039",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "1121.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1049",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "85.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "6",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "7",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "16331.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "8",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "33386.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "8",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "33386.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "10",
+       "BILL_DATE": "2026-08-17",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1100",
+       "BILL_DATE": "2026-08-21",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1101",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "VISHAL TEXTILES",
+       "TOT_BALANCE": "1050.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1102",
+       "BILL_DATE": "2026-09-15",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1104",
+       "BILL_DATE": "2026-09-25",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "7692.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1105",
+       "BILL_DATE": "2026-09-29",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "545.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1106",
+       "BILL_DATE": "2026-10-03",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "37333.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1107",
+       "BILL_DATE": "2026-10-29",
+       "PARTY": "REALME CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "HDFC BANK",
+       "TOT_BALANCE": "10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "BANK COMMISION",
+       "TOT_BALANCE": "-2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "BANK CHARGES",
+       "TOT_BALANCE": "-90000.01"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "90000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "84.75"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "-85.00"
+      }
+     ]
+    },
+    {
+     "category": 2,
+     "expected": [
+      {
+       "JS_GROUP": "ADDU CUSTOMER",
+       "NCBILL_NO": "1102",
+       "BILL_DATE": "2026-09-15",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "ADDU CUSTOMER",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "ADDU CUSTOMER",
+       "NCBILL_NO": "1104",
+       "BILL_DATE": "2026-09-25",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "7692.00"
+      },
+      {
+       "JS_GROUP": "ADDU CUSTOMER",
+       "NCBILL_NO": "1105",
+       "BILL_DATE": "2026-09-29",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "545.00"
+      },
+      {
+       "JS_GROUP": "ADDU CUSTOMER",
+       "NCBILL_NO": "1106",
+       "BILL_DATE": "2026-10-03",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "37333.00"
+      },
+      {
+       "JS_GROUP": "ADDU CUSTOMER",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "84.75"
+      },
+      {
+       "JS_GROUP": "BANK CHARGES",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "BANK CHARGES",
+       "TOT_BALANCE": "-90000.01"
+      },
+      {
+       "JS_GROUP": "BANK COMMISION",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "BANK COMMISION",
+       "TOT_BALANCE": "-2000.00"
+      },
+      {
+       "JS_GROUP": "CASH BOOK",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-10.00"
+      },
+      {
+       "JS_GROUP": "CASH BOOK",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "2000.00"
+      },
+      {
+       "JS_GROUP": "CASH BOOK",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "20000.00"
+      },
+      {
+       "JS_GROUP": "DISCOUNT ACCOUNT",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "5.00"
+      },
+      {
+       "JS_GROUP": "DISCOUNT ACCOUNT",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "-85.00"
+      },
+      {
+       "JS_GROUP": "HDFC BANK",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "HDFC BANK",
+       "TOT_BALANCE": "10.00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2024-11-09",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "4",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "83086.00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "6",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "7",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "16331.00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "8",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "33386.00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "8",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "33386.00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "10",
+       "BILL_DATE": "2026-08-17",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "1100",
+       "BILL_DATE": "2026-08-21",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "90000.00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-20000.00"
+      },
+      {
+       "JS_GROUP": "NAVKAR TEX",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-06-05",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "29500.00"
+      },
+      {
+       "JS_GROUP": "NAVKAR TEX",
+       "NCBILL_NO": "909",
+       "BILL_DATE": "2026-07-16",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "82.00"
+      },
+      {
+       "JS_GROUP": "NAVKAR TEX",
+       "NCBILL_NO": "919",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "-3003.00"
+      },
+      {
+       "JS_GROUP": "NAVKAR TEX",
+       "NCBILL_NO": "999",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "337.00"
+      },
+      {
+       "JS_GROUP": "NAVKAR TEX",
+       "NCBILL_NO": "1009",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "227.00"
+      },
+      {
+       "JS_GROUP": "NAVKAR TEX",
+       "NCBILL_NO": "1019",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "359.00"
+      },
+      {
+       "JS_GROUP": "NAVKAR TEX",
+       "NCBILL_NO": "1029",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "18315.00"
+      },
+      {
+       "JS_GROUP": "NAVKAR TEX",
+       "NCBILL_NO": "1039",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "1121.00"
+      },
+      {
+       "JS_GROUP": "NAVKAR TEX",
+       "NCBILL_NO": "1049",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "85.00"
+      },
+      {
+       "JS_GROUP": "RAJA TEX",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-06-05",
+       "PARTY": "RAJA TEX",
+       "TOT_BALANCE": "295.00"
+      },
+      {
+       "JS_GROUP": "REALME CUSTOMER",
+       "NCBILL_NO": "1107",
+       "BILL_DATE": "2026-10-29",
+       "PARTY": "REALME CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "VISHAL TEXTILES",
+       "NCBILL_NO": "1101",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "VISHAL TEXTILES",
+       "TOT_BALANCE": "1050.00"
+      }
+     ]
+    },
+    {
+     "category": 3,
+     "expected": [
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1102",
+       "BILL_DATE": "2026-09-15",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1104",
+       "BILL_DATE": "2026-09-25",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "7692.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1105",
+       "BILL_DATE": "2026-09-29",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "545.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1106",
+       "BILL_DATE": "2026-10-03",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "37333.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "84.75"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "BANK CHARGES",
+       "TOT_BALANCE": "-90000.01"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "BANK COMMISION",
+       "TOT_BALANCE": "-2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "-85.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "HDFC BANK",
+       "TOT_BALANCE": "10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2024-11-09",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "4",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "83086.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "6",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "7",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "16331.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "8",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "33386.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "8",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "33386.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "10",
+       "BILL_DATE": "2026-08-17",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1100",
+       "BILL_DATE": "2026-08-21",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "90000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-06-05",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "29500.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "909",
+       "BILL_DATE": "2026-07-16",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "82.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "919",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "-3003.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "999",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "337.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1009",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "227.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1019",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "359.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1029",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "18315.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1039",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "1121.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1049",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "85.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-06-05",
+       "PARTY": "RAJA TEX",
+       "TOT_BALANCE": "295.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1107",
+       "BILL_DATE": "2026-10-29",
+       "PARTY": "REALME CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1101",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "VISHAL TEXTILES",
+       "TOT_BALANCE": "1050.00"
+      }
+     ]
+    },
+    {
+     "category": 4,
+     "expected": [
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "BANK CHARGES",
+       "TOT_BALANCE": "-90000.01"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "BANK COMMISION",
+       "TOT_BALANCE": "-2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "-85.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "HDFC BANK",
+       "TOT_BALANCE": "10.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2024-11-09",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "4",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "83086.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "6",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "7",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "16331.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "8",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "33386.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "8",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "33386.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "10",
+       "BILL_DATE": "2026-08-17",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "1100",
+       "BILL_DATE": "2026-08-21",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "90000.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-20000.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-06-05",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "29500.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "909",
+       "BILL_DATE": "2026-07-16",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "82.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "919",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "-3003.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "999",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "337.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "1009",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "227.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "1019",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "359.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "1029",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "18315.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "1039",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "1121.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "1049",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "85.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-06-05",
+       "PARTY": "RAJA TEX",
+       "TOT_BALANCE": "295.00"
+      },
+      {
+       "JS_GROUP": "UJJAIN",
+       "NCBILL_NO": "1102",
+       "BILL_DATE": "2026-09-15",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "UJJAIN",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "UJJAIN",
+       "NCBILL_NO": "1104",
+       "BILL_DATE": "2026-09-25",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "7692.00"
+      },
+      {
+       "JS_GROUP": "UJJAIN",
+       "NCBILL_NO": "1105",
+       "BILL_DATE": "2026-09-29",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "545.00"
+      },
+      {
+       "JS_GROUP": "UJJAIN",
+       "NCBILL_NO": "1106",
+       "BILL_DATE": "2026-10-03",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "37333.00"
+      },
+      {
+       "JS_GROUP": "UJJAIN",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "84.75"
+      },
+      {
+       "JS_GROUP": "UJJAIN",
+       "NCBILL_NO": "1107",
+       "BILL_DATE": "2026-10-29",
+       "PARTY": "REALME CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "UJJAIN",
+       "NCBILL_NO": "1101",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "VISHAL TEXTILES",
+       "TOT_BALANCE": "1050.00"
+      }
+     ]
+    },
+    {
+     "category": 5,
+     "expected": [
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1102",
+       "BILL_DATE": "2026-09-15",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1104",
+       "BILL_DATE": "2026-09-25",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "7692.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1105",
+       "BILL_DATE": "2026-09-29",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "545.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1106",
+       "BILL_DATE": "2026-10-03",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "37333.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "84.75"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "BANK CHARGES",
+       "TOT_BALANCE": "-90000.01"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "BANK COMMISION",
+       "TOT_BALANCE": "-2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "-85.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "HDFC BANK",
+       "TOT_BALANCE": "10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2024-11-09",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "4",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "83086.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "6",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "7",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "16331.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "8",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "33386.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "8",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "33386.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "10",
+       "BILL_DATE": "2026-08-17",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1100",
+       "BILL_DATE": "2026-08-21",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "90000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-06-05",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "29500.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "909",
+       "BILL_DATE": "2026-07-16",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "82.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "919",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "-3003.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "999",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "337.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1009",
+       "BILL_DATE": "2026-07-25",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "227.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1019",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "359.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1029",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "18315.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1039",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "1121.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1049",
+       "BILL_DATE": "2026-07-30",
+       "PARTY": "NAVKAR TEX",
+       "TOT_BALANCE": "85.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-06-05",
+       "PARTY": "RAJA TEX",
+       "TOT_BALANCE": "295.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1107",
+       "BILL_DATE": "2026-10-29",
+       "PARTY": "REALME CUSTOMER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1101",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "VISHAL TEXTILES",
+       "TOT_BALANCE": "1050.00"
+      }
+     ]
+    }
+   ]
+  },
+  "purchase": {
+   "rows": [
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-22",
+     "NCBILL_NO": "12",
+     "NET_TOT": 5000,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 5000,
+     "_billId": "1SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-22",
+     "NCBILL_NO": "2",
+     "NET_TOT": 10000,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 10000,
+     "_billId": "2SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-05",
+     "NCBILL_NO": "",
+     "NET_TOT": 4500,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 4500,
+     "_billId": "3SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-05",
+     "NCBILL_NO": "10",
+     "NET_TOT": 8100,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 8100,
+     "_billId": "4SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-05",
+     "NCBILL_NO": "45",
+     "NET_TOT": 9030,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 9030,
+     "_billId": "5SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-05",
+     "NCBILL_NO": "121",
+     "NET_TOT": 900,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 900,
+     "_billId": "7SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "RAJESH ENTERPRISE",
+     "BROKER": "",
+     "STATION": "MALGEGAON",
+     "MAINGROUP": "",
+     "BOOK": "PURCHASE ACCOUNT",
+     "HASTE": "",
+     "BILL_DATE": "2026-09-04",
+     "NCBILL_NO": "909",
+     "NET_TOT": 720,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 720,
+     "_billId": "20SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "PURCHASE ACCOUNT",
+     "HASTE": "",
+     "BILL_DATE": "2026-09-04",
+     "NCBILL_NO": "90",
+     "NET_TOT": 243,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 243,
+     "_billId": "21SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "LALA SUPPLIER",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "PURCHASE ACCOUNT",
+     "HASTE": "",
+     "BILL_DATE": "2026-09-15",
+     "NCBILL_NO": "232",
+     "NET_TOT": 355,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 355,
+     "_billId": "22SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "LALA SUPPLIER",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "PURCHASE ACCOUNT",
+     "HASTE": "",
+     "BILL_DATE": "2026-09-17",
+     "NCBILL_NO": "434",
+     "NET_TOT": 717750,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 717750,
+     "_billId": "23SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "VAZAHAT SUPPLIER",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "PURCHASE ACCOUNT",
+     "HASTE": "",
+     "BILL_DATE": "2026-10-29",
+     "NCBILL_NO": "1",
+     "NET_TOT": 1440,
+     "ADJUST": 1440,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "24SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "PURCHASE ACCOUNT",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-14",
+     "NCBILL_NO": "43",
+     "NET_TOT": 1140,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 1140,
+     "_billId": "14SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "PURCHASE ACCOUNT",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-14",
+     "NCBILL_NO": "44",
+     "NET_TOT": 72900,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 72900,
+     "_billId": "15SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-14",
+     "NCBILL_NO": "090",
+     "NET_TOT": 72900,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 72900,
+     "_billId": "16SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "PURCHASE ACCOUNT",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-21",
+     "NCBILL_NO": "900",
+     "NET_TOT": 78300,
+     "ADJUST": 78000,
+     "TOT_DISC": -300,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "17SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "RAJESH ENTERPRISE",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-24",
+     "NCBILL_NO": "1",
+     "NET_TOT": 15000,
+     "ADJUST": 12500,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 2500,
+     "_billId": "18SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "RAJESH ENTERPRISE",
+     "BROKER": "",
+     "STATION": "MALGEGAON",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-24",
+     "NCBILL_NO": "12",
+     "NET_TOT": 54000,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 54000,
+     "_billId": "19SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-05",
+     "NCBILL_NO": "99",
+     "NET_TOT": 900,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 900,
+     "_billId": "8SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-07",
+     "NCBILL_NO": "23",
+     "NET_TOT": 149340,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 149340,
+     "_billId": "9SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-10",
+     "NCBILL_NO": "22",
+     "NET_TOT": 933,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 933,
+     "_billId": "10SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-11",
+     "NCBILL_NO": "7",
+     "NET_TOT": 1425,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 1425,
+     "_billId": "11SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "PURCHASE ACCOUNT",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-11",
+     "NCBILL_NO": "9",
+     "NET_TOT": 2650000,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 2650000,
+     "_billId": "12SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-12",
+     "NCBILL_NO": "3",
+     "NET_TOT": 4469,
+     "ADJUST": 4000,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "13SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "GREY PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-12",
+     "NCBILL_NO": "3",
+     "NET_TOT": 4469,
+     "ADJUST": 469,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "13SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "OTHER PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-05",
+     "NCBILL_NO": "9",
+     "NET_TOT": 7450,
+     "ADJUST": 5000,
+     "TOT_DISC": -20,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "6SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "OTHER PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-05",
+     "NCBILL_NO": "9",
+     "NET_TOT": 7450,
+     "ADJUST": 300,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "6SC27"
+    },
+    {
+     "Q_TYPE": "2",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "BOOK": "OTHER PURCHASE",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-05",
+     "NCBILL_NO": "9",
+     "NET_TOT": 7450,
+     "ADJUST": 2130,
+     "TOT_DISC": 0,
+     "Q_UNADJ": 0,
+     "TOT_BALANCE": 0,
+     "_billId": "6SC27"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "HDFC BANK",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-22",
+     "NCBILL_NO": "1",
+     "NET_TOT": 0,
+     "ADJUST": 10,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": -10,
+     "_billId": "1SC27"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "CASH BOOK",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-07-22",
+     "NCBILL_NO": "1",
+     "NET_TOT": 10,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": 10,
+     "_billId": "1SC27"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "CASH BOOK",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-10",
+     "NCBILL_NO": "1",
+     "NET_TOT": 0,
+     "ADJUST": 2000,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": -2000,
+     "_billId": "4SC27"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "CASH BOOK",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-20",
+     "NCBILL_NO": "2",
+     "NET_TOT": 0,
+     "ADJUST": 20000,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": -20000,
+     "_billId": "17SC27"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "BANK COMMISION",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-10",
+     "NCBILL_NO": "1",
+     "NET_TOT": 2000,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": 2000,
+     "_billId": "4SC27"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "BANK CHARGES",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-11",
+     "NCBILL_NO": "88",
+     "NET_TOT": 90000.01,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": 90000.01,
+     "_billId": "1SC27"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "DISCOUNT ACCOUNT",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-13",
+     "NCBILL_NO": "5",
+     "NET_TOT": 0,
+     "ADJUST": 5,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": -5,
+     "_billId": "5SC27"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "DISCOUNT ACCOUNT",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-09-17",
+     "NCBILL_NO": "1103",
+     "NET_TOT": 85,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": 85,
+     "_billId": "6SC27"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-20",
+     "NCBILL_NO": "2",
+     "NET_TOT": 20000,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": 20000,
+     "_billId": "17SC27"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-11",
+     "NCBILL_NO": "88",
+     "NET_TOT": 0,
+     "ADJUST": 90000,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": -90000,
+     "_billId": "1SC27"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-08-13",
+     "NCBILL_NO": "5",
+     "NET_TOT": 5,
+     "ADJUST": 0,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": 5,
+     "_billId": "5SC27"
+    },
+    {
+     "Q_TYPE": "3",
+     "PARTY": "ADDU CUSTOMER",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "BOOK": "",
+     "HASTE": "",
+     "BILL_DATE": "2026-09-17",
+     "NCBILL_NO": "1103",
+     "NET_TOT": 0,
+     "ADJUST": 84.75,
+     "TOT_DISC": 0,
+     "Q_UNADJ": null,
+     "TOT_BALANCE": -84.75,
+     "_billId": "6SC27"
+    }
+   ],
+   "scenarios": [
+    {
+     "category": 1,
+     "expected": [
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "12",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "5000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "10000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "4500.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "10",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "8100.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "121",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "900.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "45",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "9030.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "99",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "900.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "23",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "149340.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "22",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "933.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "7",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "1425.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "2650000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-08-12",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-08-12",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "090",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "72900.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "43",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "1140.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "44",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "72900.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "900",
+       "BILL_DATE": "2026-08-21",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "2500.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "12",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "54000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "90",
+       "BILL_DATE": "2026-09-04",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "243.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "909",
+       "BILL_DATE": "2026-09-04",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "720.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "232",
+       "BILL_DATE": "2026-09-15",
+       "PARTY": "LALA SUPPLIER",
+       "TOT_BALANCE": "355.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "434",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "LALA SUPPLIER",
+       "TOT_BALANCE": "717750.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-10-29",
+       "PARTY": "VAZAHAT SUPPLIER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "HDFC BANK",
+       "TOT_BALANCE": "-10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "BANK COMMISION",
+       "TOT_BALANCE": "2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "BANK CHARGES",
+       "TOT_BALANCE": "90000.01"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-90000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "-84.75"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "85.00"
+      }
+     ]
+    },
+    {
+     "category": 2,
+     "expected": [
+      {
+       "JS_GROUP": "ADDU CUSTOMER",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "-84.75"
+      },
+      {
+       "JS_GROUP": "BANK CHARGES",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "BANK CHARGES",
+       "TOT_BALANCE": "90000.01"
+      },
+      {
+       "JS_GROUP": "BANK COMMISION",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "BANK COMMISION",
+       "TOT_BALANCE": "2000.00"
+      },
+      {
+       "JS_GROUP": "CASH BOOK",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "10.00"
+      },
+      {
+       "JS_GROUP": "CASH BOOK",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-2000.00"
+      },
+      {
+       "JS_GROUP": "CASH BOOK",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-20000.00"
+      },
+      {
+       "JS_GROUP": "DISCOUNT ACCOUNT",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "DISCOUNT ACCOUNT",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "85.00"
+      },
+      {
+       "JS_GROUP": "HDFC BANK",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "HDFC BANK",
+       "TOT_BALANCE": "-10.00"
+      },
+      {
+       "JS_GROUP": "LALA SUPPLIER",
+       "NCBILL_NO": "232",
+       "BILL_DATE": "2026-09-15",
+       "PARTY": "LALA SUPPLIER",
+       "TOT_BALANCE": "355.00"
+      },
+      {
+       "JS_GROUP": "LALA SUPPLIER",
+       "NCBILL_NO": "434",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "LALA SUPPLIER",
+       "TOT_BALANCE": "717750.00"
+      },
+      {
+       "JS_GROUP": "MAHESH SIR",
+       "NCBILL_NO": "12",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "5000.00"
+      },
+      {
+       "JS_GROUP": "MAHESH SIR",
+       "NCBILL_NO": "7",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "1425.00"
+      },
+      {
+       "JS_GROUP": "MAHESH SIR",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "2650000.00"
+      },
+      {
+       "JS_GROUP": "MAHESH SIR",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-08-12",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH SIR",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-08-12",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH SIR",
+       "NCBILL_NO": "090",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "72900.00"
+      },
+      {
+       "JS_GROUP": "MAHESH SIR",
+       "NCBILL_NO": "43",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "1140.00"
+      },
+      {
+       "JS_GROUP": "MAHESH SIR",
+       "NCBILL_NO": "44",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "72900.00"
+      },
+      {
+       "JS_GROUP": "MAHESH SIR",
+       "NCBILL_NO": "900",
+       "BILL_DATE": "2026-08-21",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH SIR",
+       "NCBILL_NO": "90",
+       "BILL_DATE": "2026-09-04",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "243.00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-90000.00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "5.00"
+      },
+      {
+       "JS_GROUP": "MAHESH TEX",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "20000.00"
+      },
+      {
+       "JS_GROUP": "PADMAVATI PRINT",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "10000.00"
+      },
+      {
+       "JS_GROUP": "PADMAVATI PRINT",
+       "NCBILL_NO": "",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "4500.00"
+      },
+      {
+       "JS_GROUP": "PADMAVATI PRINT",
+       "NCBILL_NO": "10",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "8100.00"
+      },
+      {
+       "JS_GROUP": "PADMAVATI PRINT",
+       "NCBILL_NO": "121",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "900.00"
+      },
+      {
+       "JS_GROUP": "PADMAVATI PRINT",
+       "NCBILL_NO": "45",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "9030.00"
+      },
+      {
+       "JS_GROUP": "PADMAVATI PRINT",
+       "NCBILL_NO": "99",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "900.00"
+      },
+      {
+       "JS_GROUP": "PADMAVATI PRINT",
+       "NCBILL_NO": "23",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "149340.00"
+      },
+      {
+       "JS_GROUP": "PADMAVATI PRINT",
+       "NCBILL_NO": "22",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "933.00"
+      },
+      {
+       "JS_GROUP": "RAJESH ENTERPRISE",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "2500.00"
+      },
+      {
+       "JS_GROUP": "RAJESH ENTERPRISE",
+       "NCBILL_NO": "12",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "54000.00"
+      },
+      {
+       "JS_GROUP": "RAJESH ENTERPRISE",
+       "NCBILL_NO": "909",
+       "BILL_DATE": "2026-09-04",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "720.00"
+      },
+      {
+       "JS_GROUP": "VAZAHAT SUPPLIER",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-10-29",
+       "PARTY": "VAZAHAT SUPPLIER",
+       "TOT_BALANCE": ".00"
+      }
+     ]
+    },
+    {
+     "category": 3,
+     "expected": [
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "-84.75"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "BANK CHARGES",
+       "TOT_BALANCE": "90000.01"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "BANK COMMISION",
+       "TOT_BALANCE": "2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "85.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "HDFC BANK",
+       "TOT_BALANCE": "-10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "232",
+       "BILL_DATE": "2026-09-15",
+       "PARTY": "LALA SUPPLIER",
+       "TOT_BALANCE": "355.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "434",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "LALA SUPPLIER",
+       "TOT_BALANCE": "717750.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "12",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "5000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "7",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "1425.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "2650000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-08-12",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-08-12",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "090",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "72900.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "43",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "1140.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "44",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "72900.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "900",
+       "BILL_DATE": "2026-08-21",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "90",
+       "BILL_DATE": "2026-09-04",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "243.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-90000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "10000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "4500.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "10",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "8100.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "121",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "900.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "45",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "9030.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "99",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "900.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "23",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "149340.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "22",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "933.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "2500.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "12",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "54000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "909",
+       "BILL_DATE": "2026-09-04",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "720.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-10-29",
+       "PARTY": "VAZAHAT SUPPLIER",
+       "TOT_BALANCE": ".00"
+      }
+     ]
+    },
+    {
+     "category": 4,
+     "expected": [
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "-84.75"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "BANK CHARGES",
+       "TOT_BALANCE": "90000.01"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "BANK COMMISION",
+       "TOT_BALANCE": "2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "85.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "HDFC BANK",
+       "TOT_BALANCE": "-10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-90000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "4500.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "2500.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-10-29",
+       "PARTY": "VAZAHAT SUPPLIER",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "MALGEGAON",
+       "NCBILL_NO": "12",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "54000.00"
+      },
+      {
+       "JS_GROUP": "MALGEGAON",
+       "NCBILL_NO": "909",
+       "BILL_DATE": "2026-09-04",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "720.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "232",
+       "BILL_DATE": "2026-09-15",
+       "PARTY": "LALA SUPPLIER",
+       "TOT_BALANCE": "355.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "434",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "LALA SUPPLIER",
+       "TOT_BALANCE": "717750.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "12",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "5000.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "7",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "1425.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "2650000.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-08-12",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-08-12",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "090",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "72900.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "43",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "1140.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "44",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "72900.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "900",
+       "BILL_DATE": "2026-08-21",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "90",
+       "BILL_DATE": "2026-09-04",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "243.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "10000.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "10",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "8100.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "121",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "900.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "45",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "9030.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "99",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "900.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "23",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "149340.00"
+      },
+      {
+       "JS_GROUP": "SURAT",
+       "NCBILL_NO": "22",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "933.00"
+      }
+     ]
+    },
+    {
+     "category": 5,
+     "expected": [
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "ADDU CUSTOMER",
+       "TOT_BALANCE": "-84.75"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "BANK CHARGES",
+       "TOT_BALANCE": "90000.01"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "BANK COMMISION",
+       "TOT_BALANCE": "2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-2000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "CASH BOOK",
+       "TOT_BALANCE": "-20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "-5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1103",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "DISCOUNT ACCOUNT",
+       "TOT_BALANCE": "85.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "HDFC BANK",
+       "TOT_BALANCE": "-10.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "232",
+       "BILL_DATE": "2026-09-15",
+       "PARTY": "LALA SUPPLIER",
+       "TOT_BALANCE": "355.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "434",
+       "BILL_DATE": "2026-09-17",
+       "PARTY": "LALA SUPPLIER",
+       "TOT_BALANCE": "717750.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "12",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "5000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "7",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "1425.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "2650000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-08-12",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "3",
+       "BILL_DATE": "2026-08-12",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "090",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "72900.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "43",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "1140.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "44",
+       "BILL_DATE": "2026-08-14",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "72900.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "900",
+       "BILL_DATE": "2026-08-21",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "90",
+       "BILL_DATE": "2026-09-04",
+       "PARTY": "MAHESH SIR",
+       "TOT_BALANCE": "243.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "9",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": ".00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "88",
+       "BILL_DATE": "2026-08-11",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "-90000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "5",
+       "BILL_DATE": "2026-08-13",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "5.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-08-20",
+       "PARTY": "MAHESH TEX",
+       "TOT_BALANCE": "20000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "2",
+       "BILL_DATE": "2026-07-22",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "10000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "4500.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "10",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "8100.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "121",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "900.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "45",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "9030.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "99",
+       "BILL_DATE": "2026-08-05",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "900.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "23",
+       "BILL_DATE": "2026-08-07",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "149340.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "22",
+       "BILL_DATE": "2026-08-10",
+       "PARTY": "PADMAVATI PRINT",
+       "TOT_BALANCE": "933.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "2500.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "12",
+       "BILL_DATE": "2026-08-24",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "54000.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "909",
+       "BILL_DATE": "2026-09-04",
+       "PARTY": "RAJESH ENTERPRISE",
+       "TOT_BALANCE": "720.00"
+      },
+      {
+       "JS_GROUP": "",
+       "NCBILL_NO": "1",
+       "BILL_DATE": "2026-10-29",
+       "PARTY": "VAZAHAT SUPPLIER",
+       "TOT_BALANCE": ".00"
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

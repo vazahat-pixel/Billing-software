@@ -48,8 +48,10 @@ for (const [form, report, view] of REGISTERS) {
       assert.equal(jsmReports.get(form), report);
       assert.ok(forms[form], 'blueprint screen must exist');
       for (const suffix of ['_SMRY_SHORT', '_SMRY_FULL', '_DTL']) assert.ok(layouts[view + suffix], `${view}${suffix} captured`);
+      // JSM's three modes: "Summary Reports" ticked -> the grouped _SMRY_SHORT totals; unticked ->
+      // the plain register, one row per bill, on _SMRY_FULL; the Detail menu entry -> _DTL.
       assert.equal((await run({})).grid.layout, `${view}_SMRY_SHORT`);
-      assert.equal((await run({ reportType: '2-My Format' })).grid.layout, `${view}_SMRY_FULL`);
+      assert.equal((await run({ summaryReports: false })).grid.layout, `${view}_SMRY_FULL`);
       assert.equal((await run({ detail: true })).grid.layout, `${view}_DTL`);
     });
 

@@ -16,15 +16,25 @@
  */
 const { orderRows, inList, inDateRange, groupBy, round } = require('./jcEngine');
 
-/** Every grouping JSM offers on these screens. A register only gets the ones it can honour. */
+/**
+ * Every grouping JSM offers on these screens. A register only gets the ones it can honour.
+ *
+ * `key` is the column JSM puts in GROUP2 (the row label); `group1` is the extra outer level JSM
+ * adds for MainGroup only — its own SQL is `GROUP1=A.PARTY_MN_GROUP, GROUP2=A.PARTY ... GROUP BY
+ * A.PARTY_MN_GROUP, PARTY`, i.e. a row per PARTY under a main-group header, not one row per main
+ * group (Rpt_Jsm_Sales.Genrate_Reports, decompiled).
+ */
 const ALL_CATEGORIES = {
-  1: { key: 'REGISTER', caption: 'REGISTER' },
-  2: { key: 'PARTY', caption: 'PARTY' },
-  3: { key: 'BROKER', caption: 'BROKER' },
-  4: { key: 'STATION', caption: 'CITY' },
-  5: { key: 'MAINGROUP', caption: 'MAINGROUP' },
-  6: { key: 'ITEM_NAME', caption: 'ITEM', perLine: true },
-  7: { key: 'ITEM_PARTY', caption: 'ITEM+PARTY', perLine: true },
+  1: { key: 'REGISTER', caption: 'REGISTER', title: '' },
+  2: { key: 'PARTY', caption: 'PARTY', title: 'Party Wise ' },
+  3: { key: 'BROKER', caption: 'BROKER', title: 'Broker Wise ' },
+  4: { key: 'STATION', caption: 'CITY', title: 'City Wise ' },
+  5: { key: 'PARTY', group1: 'MAINGROUP', caption: 'MAINGROUP', title: 'MainGroup Wise ', registerTitle: 'Main Group Wise ' },
+  6: { key: 'ITEM_NAME', caption: 'ITEM', perLine: true, title: 'Item Wise ' },
+  // Item+Party lists under the ITEM alone and breaks ties on the party —
+  // `JS_GROUP=A.ITEM_NAME, JS_DETAIL=A.PARTY ... order by A.ITEM_NAME,a.PARTY,...`. Only the
+  // (JSM-less) summary of this category folds both into one label.
+  7: { key: 'ITEM_PARTY', detailGroup: 'ITEM_NAME', order2: 'PARTY', caption: 'ITEM+PARTY', perLine: true, title: 'Item+Party Wise ' },
 };
 
 const SUM = ['TO_PCS', 'TO_QTY', 'SUB_TOT', 'T_ADD', 'T_LESS', 'TAXABLE_AMT', 'GST_AMT', 'NET_TOT'];
@@ -58,11 +68,25 @@ function registerReport(spec) {
     return offered[0];
   }
 
-  function billOrder(p) {
-    if (p.orderBy === 'billno') return ['NCBILL_NO', 'BILL_DATE'];
-    if (p.orderBy === 'srno') return ['SRAL_NO', 'BILL_DATE'];
-    return ['BILL_DATE', 'SRAL_NO'];
-  }
+  /**
+   * JSM always sorts a register the same way — `ORDER BY <group>, BILL_DATE, BILL_NO, CBILL_NO,
+   * NCBILL_NO [, SR_NO]`. The A-Date / B-Bill.No / C-Serial.No radio only swaps which range
+   * FILTERS the rows (Fill_String_For_Condition), it never re-sorts them, so this does not depend
+   * on the radio. SRAL_NO stands in for JSM's internal BILL_NO/CBILL_NO pair.
+   */
+  const BILL_ORDER = ['BILL_DATE',
+    { field: 'SRAL_NO', dir: 'asc', numeric: true },
+    { field: 'NCBILL_NO', dir: 'asc', numeric: true }];
+
+  /** Broker Wise and Item+Party break their ties on the party first, as JSM's own ORDER BY does. */
+  const orderFor = (cat) => ((cat.key === 'BROKER' || cat.order2) ? [cat.order2 || 'PARTY', ...BILL_ORDER] : BILL_ORDER);
+
+  /**
+   * The screen's own "Summary Reports" tick. It opens ticked on JSM (the captured runtime state,
+   * and what the owner's recording showed), so an unset param keeps the grouped summary.
+   */
+  const isSummary = (p) => p.summaryReports === undefined || p.summaryReports === null
+    || p.summaryReports === true || String(p.summaryReports) === 'true';
 
   /** Compare bill numbers the way people read them: 9 before 10, then text for the rest. */
   function numCompare(a, b) {
@@ -119,15 +143,22 @@ function registerReport(spec) {
     const groupValue = (r, l = {}) => (cat.key === 'ITEM_PARTY'
       ? [l.ITEM_NAME || '', r.PARTY || ''].filter(Boolean).join(' / ')
       : (r[cat.key] ?? l[cat.key] ?? ''));
+    // JSM's JS_GROUP: the outer level for MainGroup, the item alone for Item+Party, and the row
+    // label itself for every other category.
+    const outerValue = (r, l = {}) => {
+      if (cat.group1) return r[cat.group1] ?? '';
+      if (cat.detailGroup) return r[cat.detailGroup] ?? l[cat.detailGroup] ?? '';
+      return groupValue(r, l);
+    };
 
     if (detail) {
       const out = [];
       for (const r of rows) {
         const lines = (r._lines || []).length ? r._lines : [{}];
-        for (const l of lines) out.push({ ...r, ...l, _lines: undefined, XGROUP: groupValue(r, l) });
+        for (const l of lines) out.push({ ...r, ...l, _lines: undefined, XGROUP: outerValue(r, l) });
       }
       return {
-        rows: orderRows(out, ['XGROUP', ...billOrder(p), 'CO_ENT_NO']),
+        rows: orderRows(out, ['XGROUP', ...orderFor(cat), 'CO_ENT_NO']),
         grid: {
           layout: spec.views.detail,
           variant: category,
@@ -135,7 +166,27 @@ function registerReport(spec) {
           groupDisplays: [cat.caption],
           primaryDetailColumn: 'CO_ENT_NO',
           captions: { GROUP2: cat.caption },
-          title: `${cat.caption} Wise ${spec.noun} Detail Report`,
+          title: `${cat.title}${spec.noun} Report [Detail]`,
+          period,
+          pageWise,
+        },
+      };
+    }
+
+    // "Summary Reports" unticked is JSM's plain Register: one row per bill under the category's
+    // own header, on the _SMRY_FULL layout (which carries the per-bill columns). Ticked, JSM
+    // builds its _RUNTIME grouped view instead and shows the _SMRY_SHORT totals layout.
+    if (!isSummary(p)) {
+      const out = rows.map((r) => ({ ...r, _lines: undefined, XGROUP: outerValue(r) }));
+      return {
+        rows: orderRows(out, ['XGROUP', ...orderFor(cat)]),
+        grid: {
+          layout: spec.views.full,
+          variant: category,
+          groupColumns: ['XGROUP'],
+          groupDisplays: [cat.caption],
+          captions: { GROUP2: cat.caption },
+          title: `${cat.registerTitle ?? cat.title}${spec.noun} Report`,
           period,
           pageWise,
         },
@@ -146,7 +197,7 @@ function registerReport(spec) {
     const flat = [];
     for (const r of rows) {
       if (!cat.perLine) {
-        flat.push({ ...r, GROUP1: '', GROUP2: groupValue(r), GROUP3: '' });
+        flat.push({ ...r, GROUP1: cat.group1 ? (r[cat.group1] ?? '') : '', GROUP2: groupValue(r), GROUP3: '' });
         continue;
       }
       for (const l of r._lines || []) {
@@ -168,20 +219,22 @@ function registerReport(spec) {
         });
       }
     }
-    const grouped = groupBy(flat, ['GROUP2'], { sum: SUM }, (first) => ({
+    // MainGroup is JSM's only two-level summary: GROUP BY PARTY_MN_GROUP, PARTY, ORDER BY both.
+    const keys = cat.group1 ? ['GROUP1', 'GROUP2'] : ['GROUP2'];
+    const grouped = groupBy(flat, keys, { sum: SUM }, (first) => ({
       GROUP1: first.GROUP1 || '', GROUP3: first.GROUP3 || '',
     }));
     for (const g of grouped) for (const f of SUM) g[f] = round(g[f]);
 
     return {
-      rows: orderRows(grouped, ['GROUP2']),
+      rows: orderRows(grouped, keys),
       grid: {
-        layout: String(p.reportType || '').startsWith('2') ? spec.views.full : spec.views.short,
+        layout: spec.views.short,
         variant: category,
-        groupColumns: [],
-        groupDisplays: [],
+        groupColumns: cat.group1 ? ['GROUP1'] : [],
+        groupDisplays: cat.group1 ? [cat.caption] : [],
         captions: { GROUP2: cat.caption },
-        title: `${cat.caption} Wise ${spec.noun} Summary Report`,
+        title: `${cat.title}${spec.noun} Report [Summary]`,
         period,
         pageWise,
       },

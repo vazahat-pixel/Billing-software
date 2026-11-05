@@ -10,11 +10,16 @@
  */
 const { outstandingReport } = require('../outstandingReport');
 
+/**
+ * `titleNoun` / `titleNounFirst` reproduce JSM's own window captions, which are worded one way on
+ * the Sales screen ("Party Wise Sales Outstanding Report") and the other way on the three others
+ * ("Party Wise Outstanding Purchase Report").
+ */
 const SPECS = {
-  sales: { kind: 'sales', view: 'JSM_VW_OS_SALES', ageView: 'JSM_VW_OS_SALES_AGEANALYSIS', categories: [1, 2, 3, 4, 5], noun: 'Debitor' },
-  purchase: { kind: 'purchase', view: 'JSM_VW_OS_PURCHASE', ageView: 'JSM_VW_OS_PURCHASE_AGEANALYSIS', categories: [1, 2, 3, 4, 5], noun: 'Creditor' },
-  process: { kind: 'process', view: 'JSM_VW_OS_PROCESS', ageView: 'JSM_VW_OS_PROCESS_AGEANALYSIS', categories: [1, 2, 3], noun: 'Process' },
-  jobwork: { kind: 'jobwork', view: 'JSM_VW_OS_JOBWORK', ageView: 'JSM_VW_OS_JOBWORK_AGEANALYSIS', categories: [1, 2, 3], noun: 'Jobwork' },
+  sales: { kind: 'sales', view: 'JSM_VW_OS_SALES', ageView: 'JSM_VW_OS_SALES_AGEANALYSIS', categories: [1, 2, 3, 4, 5], noun: 'Debitor', titleNoun: 'Sales', titleNounFirst: true, qtypeInMainGroup: true },
+  purchase: { kind: 'purchase', view: 'JSM_VW_OS_PURCHASE', ageView: 'JSM_VW_OS_PURCHASE_AGEANALYSIS', categories: [1, 2, 3, 4, 5], noun: 'Creditor', titleNoun: 'Purchase' },
+  process: { kind: 'process', view: 'JSM_VW_OS_PROCESS', ageView: 'JSM_VW_OS_PROCESS_AGEANALYSIS', categories: [1, 2, 3], noun: 'Process', titleNoun: 'Process' },
+  jobwork: { kind: 'jobwork', view: 'JSM_VW_OS_JOBWORK', ageView: 'JSM_VW_OS_JOBWORK_AGEANALYSIS', categories: [1, 2, 3], noun: 'Jobwork', titleNoun: 'Jobwork' },
 };
 
 const builders = Object.fromEntries(Object.entries(SPECS).map(([k, spec]) => [k, outstandingReport(spec)]));

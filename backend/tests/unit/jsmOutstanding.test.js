@@ -79,9 +79,17 @@ for (const [form, view, ageView] of FORMS) {
 }
 
 describe('process and jobwork only offer Normal/Party/Broker', () => {
-  it('a City or MainGroup request falls back to Party (the next offered category)', async () => {
+  it('a City or MainGroup request falls back to 1-Normal, JSM\'s own flat ungrouped list', async () => {
     const r = await jsmReports.get('Rpt_Jsm_Os_Process').run('c1', { ...P, category: '4-CityWise' }, { rows: ROWS });
+    assert.deepEqual(r.grid.groupColumns, []);
+    assert.equal(r.grid.title, 'Outstanding Process Report');
+  });
+
+  it('Party Wise still groups, and is captioned as JSM captions it', async () => {
+    const r = await jsmReports.get('Rpt_Jsm_Os_Process').run('c1', { ...P, category: '2-Party' }, { rows: ROWS });
+    assert.deepEqual(r.grid.groupColumns, ['XGROUP']);
     assert.equal(r.grid.captions.GROUP2, 'PARTY');
+    assert.equal(r.grid.title, 'Party Wise Outstanding Process Report');
   });
 });
 
