@@ -12,16 +12,17 @@ database, and compared row-for-row with what this software produces from the sam
 ## 1. What this certificate does and does not say
 
 It certifies **22 of JSM's 218 menu entries** as matching JSM's own output on real data, and a
-further **17 as built and tested but not yet replayed against JSM**.
+further **16 as built and tested but not yet replayed against JSM**.
 
-It does **not** certify the remaining **179 entries**: those screens do not exist in this software
+It does **not** certify the remaining **178 entries**: those screens do not exist in this software
 yet. A complete, per-entry list is in `docs/jsm-parity-checklist.txt`.
 
 | Status | Entries | Meaning |
 |---|---:|---|
 | **VERIFIED** | 22 | Replayed against JSM's own SQL output on SANCHAL CREATION's real books |
-| **BUILT** | 17 | Implemented and tested, not yet replayed against JSM |
-| **NOT BUILT** | 179 | No JSM-identical screen yet |
+| **BUILT** | 16 | Implemented and tested, not yet replayed against JSM |
+| **NOT WIRED** | 2 | The JSM form is implemented, but this entry's own behaviour is not (Ledger Interest; Cash/Bank Register) |
+| **NOT BUILT** | 178 | No JSM-identical screen yet |
 | **Total** | 218 | |
 
 ---

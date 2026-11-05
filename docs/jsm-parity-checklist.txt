@@ -1,7 +1,8 @@
 JSM PARITY CHECKLIST  (generated 2026-11-05)
-====================================================================================================
+==============================================================================================================
 VERIFIED  = replayed against JSM own SQL/printed output on real data (golden test)
 BUILT     = implemented and unit/DB tested, not yet replayed against JSM output
+NOT WIRED = the JSM form is implemented, but this menu entry own behaviour is not
 NOT BUILT = no JSM-identical screen in this software yet
 
 BUILT      | Rpt_cashbank1                      | Reports > Fas Reports > Bank / Cash Book > Bank Book
@@ -9,12 +10,12 @@ BUILT      | Rpt_cashbank1                      | Reports > Fas Reports > Bank /
 NOT BUILT  | Rpt_CB1_Reconsilation              | Reports > Fas Reports > Bank / Cash Book > Reconciliation
 NOT BUILT  | Rpt_CB1_Reconsilation              | Reports > Fas Reports > Bank / Cash Book > Recon.Test
 NOT BUILT  | A_CashBankLedgerSingleSide         | Reports > Fas Reports > Bank / Cash Book > Bank OD Intrest
-NOT BUILT  | A_All_CashBank_Report              | Reports > Fas Reports > Bank / Cash Book > Cash/Bank Register
+NOT WIRED  | A_All_CashBank_Report              | Reports > Fas Reports > Bank / Cash Book > Cash/Bank Register   -- JSM uses a different form (A_All_CashBank_Report)
 NOT BUILT  | Rpt_BankStockInHandCheq            | Reports > Fas Reports > Bank / Cash Book > Cheq In Hand
 NOT BUILT  | A_Bank_Receipt_Bill_Os_Details     | Reports > Fas Reports > Bank / Cash Book > Bank Voucher Print
 BUILT      | A_AccountLedgerSingleSide          | Reports > Fas Reports > Ledger
 BUILT      | A_AccountLedgerDoubleSide          | Reports > Fas Reports > Ledger T-Format
-BUILT      | A_AccountLedgerDoubleSide          | Reports > Fas Reports > Ledger Interest
+NOT WIRED  | A_AccountLedgerDoubleSide          | Reports > Fas Reports > Ledger Interest   -- shares the Ledger screen; the interest calculation is not built
 BUILT      | A_AccountLedgerDoubleSide          | Reports > Fas Reports > Confirmation
 NOT BUILT  | Rpt_Above_Below                    | Reports > Fas Reports > Above Below Rs.
 NOT BUILT  | Rpt_JvBook1                        | Reports > Fas Reports > Voucher Book
