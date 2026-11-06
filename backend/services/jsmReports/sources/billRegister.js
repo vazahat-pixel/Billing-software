@@ -121,8 +121,16 @@ function mapBill(doc, o) {
     SUB_TOT: round(items.reduce((s, it) => s + lineTaxable(it), 0)),
     T_ADD: add,
     T_LESS: less,
+    // JSM's own second quantity column. This software records the one quantity, so the register
+    // summary screens that print TO_QTY1 print that.
+    TO_QTY1: round(items.reduce((s, it) => s + Number(it.mts || 0), 0)),
     TAXABLE_AMT: round(Number(doc.taxableAmount || 0)),
     GST_AMT: round(Number(doc.gstAmount || 0)),
+    // The three heads JSM's register summary prints separately, and its TCS column.
+    SGST_AMT: round(Number(doc.sgst || 0)),
+    CGST_AMT: round(Number(doc.cgst || 0)),
+    IGST_AMT: round(Number(doc.igst || 0)),
+    TCS_AMT: round(Number(doc.tcsAmount ?? doc.tcsAmt ?? 0)),
     NET_TOT: round(Number(doc.netAmount || 0)),
 
     _lines: items.map((it) => ({

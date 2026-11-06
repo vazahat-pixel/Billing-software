@@ -15,10 +15,11 @@ import trialBalance from './trialBalance';
 import cashBank from './cashBank';
 import balanceSheet from './balanceSheet';
 import profitAndLoss from './profitAndLoss';
+import { REGISTER_SUMMARIES } from './registerSummaries';
 
 /** JSM report screens rebuilt so far, keyed by JSM form name. */
 export const JSM_REPORTS = Object.fromEntries([
   processSend, jobSend, processReceiptDetail, jobReceiptDetail, processReceiptSummary, jobReceiptSummary,
   processStock, jobStock, ...BILL_REGISTERS, ...OUTSTANDING_REPORTS, ...ITEM_WISE_REPORTS, salesHaste,
-  ...LEDGER_REPORTS, trialBalance, cashBank, balanceSheet, profitAndLoss,
+  ...LEDGER_REPORTS, trialBalance, cashBank, balanceSheet, profitAndLoss, ...REGISTER_SUMMARIES,
 ].map((r) => [r.form, r]));

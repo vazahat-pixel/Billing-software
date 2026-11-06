@@ -93,9 +93,12 @@ export const FORM_HANDLERS = {
   Rpt_Jsm_Ledger_os_Diff_Check: { id: 'final-diff-year', external: 'fasCheck', reportKind: 'diffYear' },
   Rpt_Group_Balance: { id: 'final-group', external: 'finalReport', reportKind: 'groupList' },
 
+  // Sales / Purchase Summary — the screens on the main menu path, which group on two Order By
+  // combos rather than a Category Wise.
+  Rpt_SalesRegisterSummary_Report: { id: 'sales-summary', external: 'jsmReport', jsmForm: 'Rpt_SalesRegisterSummary_Report' },
+  Rpt_PurchaseRegisterSummary_Report: { id: 'purchase-summary-main', external: 'jsmReport', jsmForm: 'Rpt_PurchaseRegisterSummary_Report' },
+
   // Monthly
-  Rpt_SalesRegisterSummary_Report: { id: 'monthly-sales', external: 'finalReport', reportKind: 'monthlySales' },
-  Rpt_PurchaseRegisterSummary_Report: { id: 'monthly-purchase', external: 'finalReport', reportKind: 'monthlyPurchase' },
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
 };
 

@@ -29,11 +29,11 @@ if (!/^[A-Za-z0-9_]+$/.test(CO)) throw new Error('--co must be alphanumeric');
 const SQLCMD = [
   'C:\\Program Files (x86)\\Microsoft SQL Server\\100\\Tools\\Binn\\sqlcmd.exe',
   'sqlcmd',
-].find((p) => { try { execFileSync(p, ['-?'], { stdio: 'ignore' }); return true; } catch { return false; } });
+].find((p) => p === 'sqlcmd' || fs.existsSync(p));
 if (!SQLCMD) throw new Error('sqlcmd not found');
 
 function query(sql, cols) {
-  const out = execFileSync(SQLCMD, ['-S', SERVER, '-E', '-d', DB, '-h', '-1', '-W', '-s', SEP, '-Q', `SET NOCOUNT ON; ${sql}`],
+  const out = execFileSync(SQLCMD, ['-S', SERVER, '-E', '-l', '60', '-d', DB, '-h', '-1', '-W', '-s', SEP, '-Q', `SET NOCOUNT ON; ${sql}`],
     { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
   // sqlcmd reports some failures as "Sqlcmd: Error:" rather than "Msg nnn" — without this an
   // errored scenario is silently recorded as an empty expected result.

@@ -1,0 +1,40 @@
+'use strict';
+
+/**
+ * JSM's Sales Summary and Purchase Summary screens — the ones on the main menu path:
+ *   Reports › Sales › Sales Bill › Sales Summary          Rpt_SalesRegisterSummary_Report
+ *   Reports › Purchase › Purchase Bill › Purchase Summary Rpt_PurchaseRegisterSummary_Report
+ *
+ * They read the same bills the Category Wise registers do; nothing is loaded or recomputed here.
+ */
+const { registerSummaryReport } = require('../registerSummaryReport');
+const src = require('../sources/billRegister');
+
+const options = (load) => async (companyId, p = {}, deps = {}) => {
+  const rows = deps.rows || await load(companyId);
+  const u = (f) => [...new Set(rows.map((r) => r[f]).filter((v) => String(v ?? '').trim()))]
+    .sort((a, b) => String(a).localeCompare(String(b)));
+  return { parties: u('PARTY'), brokers: u('BROKER'), books: u('REGISTER'), stations: u('STATION') };
+};
+
+const sales = registerSummaryReport({
+  load: src.loadSalesRegisterRows,
+  views: {
+    summary: 'JSM_VW_REGISTER_SALES_SUMMARY_SUMMARYREPORT',
+    bills: 'JSM_VW_REGISTER_SALES_SUMMARY_REPORT',
+  },
+  noun: 'Sales',
+  options: options(src.loadSalesRegisterRows),
+});
+
+const purchase = registerSummaryReport({
+  load: src.loadPurchaseRegisterRows,
+  views: {
+    summary: 'JSM_VW_REGISTER_SALES_SUMMARY_SUMMARYREPORT',
+    bills: 'JSM_VW_REGISTER_PURCHASE_SUMMARY_REPORT',
+  },
+  noun: 'Purchase',
+  options: options(src.loadPurchaseRegisterRows),
+});
+
+module.exports = { sales, purchase };

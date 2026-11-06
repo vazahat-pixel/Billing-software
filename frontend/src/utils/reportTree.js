@@ -41,8 +41,8 @@ export function findReportLeaf(id, nodes = REPORT_TREE) {
 
 /** Map legacy hub tab ids → first matching leaf id */
 export const LEGACY_TAB_TO_LEAF = {
-  summary: 'monthly-sales',
-  sales: 'monthly-sales',
+  summary: 'final-tb',
+  sales: 'purchase-detail',
   purchase: 'purchase-detail',
   stock: 'stock-grey-shop',
   stockItem: 'stock-mts',
@@ -50,7 +50,7 @@ export const LEGACY_TAB_TO_LEAF = {
   jobwork: 'jw-send',
   pl: 'final-pl',
   daily: 'monthly-bank',
-  masters: 'monthly-sales',
+  masters: 'final-tb',
 };
 
 /** Ids of folders that contain this leaf, so the hub can expand to it. */

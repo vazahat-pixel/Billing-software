@@ -31,6 +31,8 @@ const REPORTS = {
   Rpt_cashbank1: require('./reports/cashBank'),
   A_Final_BalanceSheet: require('./reports/balanceSheet'),
   A_Final_ProfitAndLoss: require('./reports/profitAndLoss'),
+  Rpt_SalesRegisterSummary_Report: require('./reports/registerSummaries').sales,
+  Rpt_PurchaseRegisterSummary_Report: require('./reports/registerSummaries').purchase,
 };
 
 function get(reportId) {
