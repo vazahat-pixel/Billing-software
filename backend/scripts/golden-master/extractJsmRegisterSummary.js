@@ -116,3 +116,93 @@ for (const s of SCREENS) {
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
 console.log('wrote', OUT);
+
+// --- the matching "ItemDetail" screens -------------------------------------------------------
+// JSM groups the item LINES on two combos here, optionally splitting by month, and sorts by
+// Pcs / Qty / Amt when the Asc/Desc radio is on (Rpt_SalesRegisterDetailDigital_Report).
+const DETAIL_BY = {
+  Register: 'A.REGISTER', Party: 'A.PARTY', Broker: 'A.BROKER', City: 'A.STATION',
+  MainGroup: 'A.MAINGROUP', Haste: 'A.HASTE', Transport: 'A.TRANSPORT', Item: 'A.ITEM',
+  Category: 'A.CATEGORY', DateWise: 'A.BILL_DATE', Rate: 'A.IT_RATE', ItemDesc: 'A.IT_DISC1',
+  None: null,
+};
+const DETAIL_SUMS = `SUM(A.IT_PCS) AS TOT_PCS, SUM(A.IT_QTY) AS TOT_QTY,
+  SUM(A.IT_QTY1) AS TOT_QTY1, SUM(A.IT_AMOUNT) AS TOT_AMOUNT`;
+
+function detailOrder(by1, monthWise, sortBy, dir) {
+  const on = { Pcs: 'TOT_PCS', Qty: 'TOT_QTY', Amt: 'TOT_AMOUNT' }[sortBy];
+  if (on && dir) return `${on} ${dir.toUpperCase()}, YEAR_NO, MONTH_NO`;
+  if (by1 === 'Month') return 'YEAR_NO, MONTH_NO ASC, ZGROUP, ZGROUP2';
+  if (monthWise) return 'ZGROUP, ZGROUP2, YEAR_NO, MONTH_NO ASC, ZGROUP3';
+  return 'ZGROUP, ZGROUP2, YEAR_NO, MONTH_NO ASC';
+}
+
+function itemDetail(view, by1, by2, monthWise, sortBy, dir) {
+  const g1 = DETAIL_BY[by1];
+  const g2 = DETAIL_BY[by2];
+  const group = [g1, g2, monthWise ? 'A.MONTH' : null].filter(Boolean).join(', ');
+  const cols = ['ZGROUP', 'ZGROUP2', 'ZGROUP3', 'TOT_PCS', 'TOT_QTY', 'TOT_QTY1', 'TOT_AMOUNT'];
+  return query(`SELECT ZGROUP, ZGROUP2, ZGROUP3, TOT_PCS, TOT_QTY, TOT_QTY1, TOT_AMOUNT FROM (
+      SELECT ${g1 || "''"} AS ZGROUP, ${g2 || "''"} AS ZGROUP2, ${monthWise ? 'A.MONTH' : "''"} AS ZGROUP3,
+             MAX(A.YEAR_NO) AS YEAR_NO, MAX(A.MONTH_NO) AS MONTH_NO, ${DETAIL_SUMS}
+      FROM ${view} A WHERE ${where}${group ? ` GROUP BY ${group}` : ''}) X
+    ORDER BY ${detailOrder(by1, monthWise, sortBy, dir)}`, cols);
+}
+
+const DETAIL_SCREENS = [
+  { key: 'salesDetail', view: 'JSM_VW_REGISTER_SALES_DETAIL' },
+  { key: 'purchaseDetail', view: 'JSM_VW_REGISTER_PURCHASE_DETAIL' },
+];
+const DETAIL_CASES = [
+  ['Register', 'None', false, null, null], ['Item', 'None', false, null, null],
+  ['Party', 'Item', false, null, null], ['Item', 'Party', false, null, null],
+  ['Broker', 'Item', false, null, null], ['City', 'Item', false, null, null],
+  ['Item', 'None', true, null, null], ['Register', 'Item', true, null, null],
+  ['Item', 'None', false, 'Amt', 'desc'], ['Item', 'None', false, 'Qty', 'asc'],
+  ['Item', 'None', false, 'Pcs', 'desc'], ['Category', 'None', false, null, null],
+];
+
+/** Bill fields the ItemDetail groupings use, plus the line itself. */
+const DETAIL_HEAD = {
+  ENT_NO: 'ENT_NO', REGISTER: 'REGISTER', PARTY: 'PARTY', BROKER: 'BROKER', STATION: 'STATION',
+  MAINGROUP: 'MAINGROUP', HASTE: 'HASTE', TRANSPORT: 'TRANSPORT', MONTH: 'MONTH',
+  MONTH_NO: 'MONTH_NO', YEAR_NO: 'YEAR_NO', BILL_DATE: 'BILL_DATE', SRAL_NO: 'SRAL_NO',
+};
+const DETAIL_LINE = {
+  ITEM: 'ITEM_NAME', CATEGORY: 'ITEM_GROUP', IT_PCS: 'IT_PCS', IT_QTY: 'IT_QTY',
+  IT_RATE: 'IT_RATE', IT_AMOUNT: 'IT_AMOUNT', IT_DISC1: 'IT_DISC1',
+};
+const DETAIL_NUMERIC = new Set(['MONTH_NO', 'YEAR_NO', 'IT_PCS', 'IT_QTY', 'IT_RATE', 'IT_AMOUNT']);
+
+/** The same bills, carrying their item lines, as this software's register loaders produce them. */
+function detailRows(view) {
+  const cols = [...Object.keys(DETAIL_HEAD), ...Object.keys(DETAIL_LINE)];
+  const raw = query(`SELECT ${cols.map(sel).join(', ')} FROM ${view} A WHERE ${where}`, cols);
+  const bills = new Map();
+  for (const r of raw) {
+    const key = String(r.ENT_NO);
+    if (!bills.has(key)) {
+      const b = {};
+      for (const c of Object.keys(DETAIL_HEAD)) b[DETAIL_HEAD[c]] = DETAIL_NUMERIC.has(c) ? Number(r[c] || 0) : r[c];
+      b._lines = [];
+      bills.set(key, b);
+    }
+    const line = {};
+    for (const c of Object.keys(DETAIL_LINE)) line[DETAIL_LINE[c]] = DETAIL_NUMERIC.has(c) ? Number(r[c] || 0) : r[c];
+    bills.get(key)._lines.push(line);
+  }
+  return [...bills.values()];
+}
+
+for (const s of DETAIL_SCREENS) {
+  out.screens[s.key] = {
+    rows: detailRows(s.view),
+    scenarios: DETAIL_CASES.map(([by1, by2, month, sortBy, dir]) => ({
+      groupBy1: by1, groupBy2: by2, monthWise: month, sortBy, sort: dir,
+      expected: itemDetail(s.view, by1, by2, month, sortBy, dir),
+    })),
+  };
+  console.log(s.key.padEnd(14), out.screens[s.key].rows.length, 'bills,', out.screens[s.key].scenarios.length, 'scenarios');
+}
+fs.writeFileSync(OUT, JSON.stringify(out, null, 1));
+console.log('rewrote', OUT);

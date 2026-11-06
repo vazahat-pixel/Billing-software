@@ -33,6 +33,8 @@ const REPORTS = {
   A_Final_ProfitAndLoss: require('./reports/profitAndLoss'),
   Rpt_SalesRegisterSummary_Report: require('./reports/registerSummaries').sales,
   Rpt_PurchaseRegisterSummary_Report: require('./reports/registerSummaries').purchase,
+  Rpt_SalesRegisterDetailDigital_Report: require('./reports/registerSummaries').salesDetail,
+  Rpt_PurchaseRegisterDetail_Report: require('./reports/registerSummaries').purchaseDetail,
 };
 
 function get(reportId) {

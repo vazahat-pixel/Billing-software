@@ -52,3 +52,60 @@ export const salesRegisterSummary = { ...COMMON, form: 'Rpt_SalesRegisterSummary
 export const purchaseRegisterSummary = { ...COMMON, form: 'Rpt_PurchaseRegisterSummary_Report' };
 
 export const REGISTER_SUMMARIES = [salesRegisterSummary, purchaseRegisterSummary];
+
+/**
+ * JSM: Reports › Sales › Sales Bill › Sales ItemDetail (Rpt_SalesRegisterDetailDigital_Report,
+ * titled "Sales Detail(Digital) Report") and the Purchase one
+ * (Rpt_PurchaseRegisterDetail_Report). Item lines grouped on two combos, an optional Month
+ * split, and a Pcs/Qty/Amt sort.
+ *
+ * JSM's grouped layout for these (JSM_VW_SALES_DETAIL_SUM_REPORT) has no captured column set, so
+ * the columns below are the ones its own SELECT builds: the two group columns, the month, and
+ * the four totals.
+ */
+const DETAIL_COMMON = {
+  lists: { lst_vw1: 'parties' },
+  defaults: ({ fyFrom, fyTo }) => ({
+    txt_dt_from: fyFrom,
+    txt_dt_to: fyTo,
+    Cbo_GroupBy1: 'Register',
+    Cbo_GroupBy2: 'None',
+    Cbo_OrderBy1: 'Register',
+    Cbo_OrderBy2: 'None',
+    cbo_select: 'None',
+    rdo_None: true,
+    Chk_Month: false,
+    CheckBox_Summary: true,
+    CheckBox_Total: true,
+  }),
+  toParams: (s) => ({
+    from: toIsoDate(s.txt_dt_from),
+    to: toIsoDate(s.txt_dt_to),
+    fromText: s.txt_dt_from,
+    toText: s.txt_dt_to,
+    // The Sales screen calls them Group By, the Purchase one Order By; same two combos.
+    groupBy1: s.Cbo_GroupBy1 || s.Cbo_OrderBy1,
+    groupBy2: s.Cbo_GroupBy2 || s.Cbo_OrderBy2,
+    monthWise: Boolean(s.Chk_Month),
+    sortBy: s.cbo_select,
+    sort: s.rdo_asc ? 'asc' : (s.rdo_dsc ? 'desc' : null),
+    summaryReports: s.CheckBox_Summary !== false,
+    printout: s.cbo_printout,
+    parties: s.lst_vw1 || [],
+  }),
+  fallbackColumns: {
+    JSM_VW_SALES_DETAIL_SUM_REPORT: [
+      { field: 'ZGROUP', caption: 'GROUP', kind: 'C', len: 24 },
+      { field: 'ZGROUP2', caption: 'GROUP2', kind: 'C', len: 24 },
+      { field: 'ZGROUP3', caption: 'MONTH', kind: 'C', len: 10 },
+      { field: 'TOT_PCS', caption: 'TOT.PCS', kind: 'N', dec: 2, total: true, len: 10 },
+      { field: 'TOT_QTY', caption: 'TOT.QTY', kind: 'N', dec: 2, total: true, len: 12 },
+      { field: 'TOT_AMOUNT', caption: 'TOT.AMOUNT', kind: 'N', dec: 2, total: true, len: 14 },
+    ],
+  },
+};
+
+export const salesRegisterDetail = { ...DETAIL_COMMON, form: 'Rpt_SalesRegisterDetailDigital_Report' };
+export const purchaseRegisterDetail = { ...DETAIL_COMMON, form: 'Rpt_PurchaseRegisterDetail_Report' };
+
+REGISTER_SUMMARIES.push(salesRegisterDetail, purchaseRegisterDetail);

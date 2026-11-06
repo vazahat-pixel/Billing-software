@@ -97,6 +97,8 @@ export const FORM_HANDLERS = {
   // combos rather than a Category Wise.
   Rpt_SalesRegisterSummary_Report: { id: 'sales-summary', external: 'jsmReport', jsmForm: 'Rpt_SalesRegisterSummary_Report' },
   Rpt_PurchaseRegisterSummary_Report: { id: 'purchase-summary-main', external: 'jsmReport', jsmForm: 'Rpt_PurchaseRegisterSummary_Report' },
+  Rpt_SalesRegisterDetailDigital_Report: { id: 'sales-itemdetail', external: 'jsmReport', jsmForm: 'Rpt_SalesRegisterDetailDigital_Report' },
+  Rpt_PurchaseRegisterDetail_Report: { id: 'purchase-itemdetail', external: 'jsmReport', jsmForm: 'Rpt_PurchaseRegisterDetail_Report' },
 
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },

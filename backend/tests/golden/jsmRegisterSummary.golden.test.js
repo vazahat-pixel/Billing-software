@@ -88,3 +88,55 @@ for (const [key, form] of SCREENS) {
     });
   });
 }
+
+// --- the matching "ItemDetail" screens -------------------------------------------------------
+const DETAIL_SCREENS = [
+  ['salesDetail', 'Rpt_SalesRegisterDetailDigital_Report', 'sales'],
+  ['purchaseDetail', 'Rpt_PurchaseRegisterDetail_Report', 'purchase'],
+];
+
+for (const [key, form, billsFrom] of DETAIL_SCREENS) {
+  const data = fixture.screens[key];
+  const rows = data.rows;
+
+  describe(`JSM golden: ${key} matches JSM's own grouped SQL`, () => {
+    for (const s of data.scenarios) {
+      const name = `${s.groupBy1} / ${s.groupBy2}${s.monthWise ? ' + Month' : ''}${s.sortBy ? ` by ${s.sortBy} ${s.sort}` : ''}`;
+      it(name, async () => {
+        const { rows: got } = await jsmReports.get(form).run('jsm', {
+          ...P,
+          groupBy1: s.groupBy1,
+          groupBy2: s.groupBy2,
+          monthWise: s.monthWise,
+          sortBy: s.sortBy,
+          sort: s.sort,
+          summaryReports: true,
+        }, { rows });
+
+        const ours = got.map((r) => [
+          String(r.ZGROUP ?? ''), String(r.ZGROUP2 ?? ''), String(r.ZGROUP3 ?? ''),
+          r2(r.TOT_PCS), r2(r.TOT_QTY), r2(r.TOT_AMOUNT),
+        ]);
+        const jsm = s.expected.map((e) => [
+          String(e.ZGROUP ?? ''), String(e.ZGROUP2 ?? ''), String(e.ZGROUP3 ?? ''),
+          r2(e.TOT_PCS), r2(e.TOT_QTY), r2(e.TOT_AMOUNT),
+        ]);
+        // Sorting by a total leaves rows that share that total in an order SQL does not promise,
+        // and so does Month as the first group; those runs are compared as sets.
+        if (s.sortBy || s.groupBy1 === 'Month') {
+          assert.deepEqual(byGroup1(ours.map((r) => [r[3 + ['Pcs', 'Qty', 'Amt'].indexOf(s.sortBy || 'Amt')], ...r])),
+            byGroup1(jsm.map((r) => [r[3 + ['Pcs', 'Qty', 'Amt'].indexOf(s.sortBy || 'Amt')], ...r])));
+          return;
+        }
+        assert.deepEqual(ours, jsm);
+      });
+    }
+
+    it('a Group By this software does not record is refused, not guessed', async () => {
+      await assert.rejects(
+        () => jsmReports.get(form).run('jsm', { ...P, groupBy1: 'Area' }, { rows }),
+        /does not record Area/
+      );
+    });
+  });
+}

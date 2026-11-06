@@ -38,3 +38,23 @@ const purchase = registerSummaryReport({
 });
 
 module.exports = { sales, purchase };
+
+// --- the matching "ItemDetail" screens -------------------------------------------------------
+const { registerDetailReport } = require('../registerDetailReport');
+
+const salesDetail = registerDetailReport({
+  load: src.loadSalesRegisterRows,
+  views: { summary: 'JSM_VW_SALES_DETAIL_SUM_REPORT', bills: 'JSM_VW_REGISTER_SALES_DETAIL_REPORT' },
+  noun: 'Sales',
+  options: options(src.loadSalesRegisterRows),
+});
+
+const purchaseDetail = registerDetailReport({
+  load: src.loadPurchaseRegisterRows,
+  views: { summary: 'JSM_VW_SALES_DETAIL_SUM_REPORT', bills: 'JSM_VW_REGISTER_SALES_DETAIL_REPORT' },
+  noun: 'Purchase',
+  options: options(src.loadPurchaseRegisterRows),
+});
+
+module.exports.salesDetail = salesDetail;
+module.exports.purchaseDetail = purchaseDetail;

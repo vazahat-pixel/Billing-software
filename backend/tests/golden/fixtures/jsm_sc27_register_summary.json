@@ -3169,6 +3169,3451 @@
      ]
     }
    ]
+  },
+  "salesDetail": {
+   "rows": [
+    {
+     "ENT_NO": "1",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "RAJA TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "June",
+     "MONTH_NO": 6,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-06-05",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 5,
+       "IT_QTY": 0,
+       "IT_RATE": 50,
+       "IT_AMOUNT": 250,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "2",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "June",
+     "MONTH_NO": 6,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-06-05",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 500,
+       "IT_QTY": 0,
+       "IT_RATE": 50,
+       "IT_AMOUNT": 25000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "3",
+     "REGISTER": "GREY SALES",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "July",
+     "MONTH_NO": 7,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-07-16",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 9,
+       "IT_QTY": 81,
+       "IT_RATE": 9,
+       "IT_AMOUNT": 81,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 8,
+       "IT_QTY": 64,
+       "IT_RATE": 8,
+       "IT_AMOUNT": 64,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "4",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "July",
+     "MONTH_NO": 7,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-07-22",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "GRAY MICRO",
+       "ITEM_GROUP": "GRAY STOCK",
+       "IT_PCS": 42,
+       "IT_QTY": 420,
+       "IT_RATE": 10,
+       "IT_AMOUNT": 4200,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "5",
+     "REGISTER": "GREY SALES",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "July",
+     "MONTH_NO": 7,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-07-25",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 5,
+       "IT_QTY": 10,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 1000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "6",
+     "REGISTER": "GREY SALES",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "July",
+     "MONTH_NO": 7,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-07-25",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 3,
+       "IT_QTY": 60,
+       "IT_RATE": 50,
+       "IT_AMOUNT": 150,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "7",
+     "REGISTER": "GREY SALES",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "E",
+     "TRANSPORT": "",
+     "MONTH": "July",
+     "MONTH_NO": 7,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-07-25",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "GRAY MICRO",
+       "ITEM_GROUP": "GRAY STOCK",
+       "IT_PCS": 2,
+       "IT_QTY": 6,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 1200,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "8",
+     "REGISTER": "GREY SALES",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "July",
+     "MONTH_NO": 7,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-07-30",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 2,
+       "IT_QTY": 40,
+       "IT_RATE": 100,
+       "IT_AMOUNT": 200,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "9",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "July",
+     "MONTH_NO": 7,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-07-30",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 10,
+       "IT_QTY": 200,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 40000,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "GRAY MICRO",
+       "ITEM_GROUP": "GRAY STOCK",
+       "IT_PCS": 14,
+       "IT_QTY": 350,
+       "IT_RATE": 500,
+       "IT_AMOUNT": 7000,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 13,
+       "IT_QTY": 780,
+       "IT_RATE": 50,
+       "IT_AMOUNT": 39000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "10",
+     "REGISTER": "GREY SALES",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "July",
+     "MONTH_NO": 7,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-07-30",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 2,
+       "IT_QTY": 300,
+       "IT_RATE": 50,
+       "IT_AMOUNT": 15000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "11",
+     "REGISTER": "GREY SALES",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "July",
+     "MONTH_NO": 7,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-07-30",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 1,
+       "IT_QTY": 100,
+       "IT_RATE": 10,
+       "IT_AMOUNT": 950,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "12",
+     "REGISTER": "GREY SALES",
+     "PARTY": "NAVKAR TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "July",
+     "MONTH_NO": 7,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-07-30",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 3,
+       "IT_QTY": 7,
+       "IT_RATE": 20,
+       "IT_AMOUNT": 140,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "13",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-07",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "GRAY MICRO",
+       "ITEM_GROUP": "GRAY STOCK",
+       "IT_PCS": 10,
+       "IT_QTY": 110,
+       "IT_RATE": 10,
+       "IT_AMOUNT": 1100,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "14",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-07",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "TEST FABRIC",
+       "ITEM_GROUP": "",
+       "IT_PCS": 210,
+       "IT_QTY": 0,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 42000,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 6,
+       "IT_QTY": 320,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 64000,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "GRAY MICRO",
+       "ITEM_GROUP": "GRAY STOCK",
+       "IT_PCS": 9,
+       "IT_QTY": 0,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 1800,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "15",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-07",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 3,
+       "IT_QTY": 110,
+       "IT_RATE": 50,
+       "IT_AMOUNT": 5500,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 130,
+       "IT_QTY": 0,
+       "IT_RATE": 50,
+       "IT_AMOUNT": 6500,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "GRAY MICRO",
+       "ITEM_GROUP": "GRAY STOCK",
+       "IT_PCS": 3,
+       "IT_QTY": 0,
+       "IT_RATE": 50,
+       "IT_AMOUNT": 5000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "16",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-11",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 180,
+       "IT_QTY": 0,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 36000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "17",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-14",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 20,
+       "IT_QTY": 200,
+       "IT_RATE": 300,
+       "IT_AMOUNT": 60000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "18",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-17",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 20,
+       "IT_QTY": 200,
+       "IT_RATE": 500,
+       "IT_AMOUNT": 100000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "19",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-21",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 5,
+       "IT_QTY": 180,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 36000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "20",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "VISHAL TEXTILES",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-24",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "SHIRT COTTON",
+       "ITEM_GROUP": "",
+       "IT_PCS": 10,
+       "IT_QTY": 0,
+       "IT_RATE": 100,
+       "IT_AMOUNT": 1000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "21",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "ADDU CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "September",
+     "MONTH_NO": 9,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-09-15",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 380,
+       "IT_QTY": 0,
+       "IT_RATE": 50,
+       "IT_AMOUNT": 19000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "22",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "ADDU CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "September",
+     "MONTH_NO": 9,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-09-17",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 7,
+       "IT_QTY": 320,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 64000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "23",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "ADDU CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "September",
+     "MONTH_NO": 9,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-09-25",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 22,
+       "IT_QTY": 333,
+       "IT_RATE": 333,
+       "IT_AMOUNT": 7326,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "24",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "ADDU CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "September",
+     "MONTH_NO": 9,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-09-29",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 3,
+       "IT_QTY": 70,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 600,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "25",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "ADDU CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "October",
+     "MONTH_NO": 10,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-10-03",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 4,
+       "IT_QTY": 0,
+       "IT_RATE": 264,
+       "IT_AMOUNT": 1056,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "SHIRT COTTON",
+       "ITEM_GROUP": "",
+       "IT_PCS": 20,
+       "IT_QTY": 200,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 40000,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "GRY SHIRT",
+       "ITEM_GROUP": "",
+       "IT_PCS": 30,
+       "IT_QTY": 0,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 6000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "26",
+     "REGISTER": "SALES BOOK",
+     "PARTY": "REALME CUSTOMER",
+     "BROKER": "",
+     "STATION": "UJJAIN",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "October",
+     "MONTH_NO": 10,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-10-29",
+     "SRAL_NO": "0",
+     "_lines": [
+      {
+       "ITEM_NAME": "SHIRT COTTON",
+       "ITEM_GROUP": "",
+       "IT_PCS": 40,
+       "IT_QTY": 40,
+       "IT_RATE": 40,
+       "IT_AMOUNT": 1600,
+       "IT_DISC1": ""
+      }
+     ]
+    }
+   ],
+   "scenarios": [
+    {
+     "groupBy1": "Register",
+     "groupBy2": "None",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "GREY SALES",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "35",
+       "TOT_QTY": "668.0000",
+       "TOT_QTY1": "587.0100",
+       "TOT_AMOUNT": "18785.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "1696",
+       "TOT_QTY": "3833.0000",
+       "TOT_QTY1": "3593.0000",
+       "TOT_AMOUNT": "613932.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Item",
+     "groupBy2": "None",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "1050",
+       "TOT_QTY": "1664.0000",
+       "TOT_QTY1": "1638.7200",
+       "TOT_AMOUNT": "170114.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "291",
+       "TOT_QTY": "1711.0000",
+       "TOT_QTY1": "1510.0900",
+       "TOT_AMOUNT": "351703.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "80",
+       "TOT_QTY": "886.0000",
+       "TOT_QTY1": "835.2000",
+       "TOT_AMOUNT": "20300.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "30",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "6000.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "70",
+       "TOT_QTY": "240.0000",
+       "TOT_QTY1": "196.0000",
+       "TOT_AMOUNT": "42600.00"
+      },
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "210",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "42000.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Party",
+     "groupBy2": "Item",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "ADDU CUSTOMER",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "380",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "19000.00"
+      },
+      {
+       "ZGROUP": "ADDU CUSTOMER",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "",
+       "TOT_PCS": "36",
+       "TOT_QTY": "723.0000",
+       "TOT_QTY1": "684.0000",
+       "TOT_AMOUNT": "72982.00"
+      },
+      {
+       "ZGROUP": "ADDU CUSTOMER",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "",
+       "TOT_PCS": "30",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "6000.00"
+      },
+      {
+       "ZGROUP": "ADDU CUSTOMER",
+       "ZGROUP2": "SHIRT COTTON",
+       "ZGROUP3": "",
+       "TOT_PCS": "20",
+       "TOT_QTY": "200.0000",
+       "TOT_QTY1": "160.0000",
+       "TOT_AMOUNT": "40000.00"
+      },
+      {
+       "ZGROUP": "MAHESH TEX",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "149",
+       "TOT_QTY": "1100.0000",
+       "TOT_QTY1": "1068.0000",
+       "TOT_AMOUNT": "109500.00"
+      },
+      {
+       "ZGROUP": "MAHESH TEX",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "",
+       "TOT_PCS": "238",
+       "TOT_QTY": "890.0000",
+       "TOT_QTY1": "811.0000",
+       "TOT_AMOUNT": "277500.00"
+      },
+      {
+       "ZGROUP": "MAHESH TEX",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "",
+       "TOT_PCS": "78",
+       "TOT_QTY": "880.0000",
+       "TOT_QTY1": "834.0000",
+       "TOT_AMOUNT": "19100.00"
+      },
+      {
+       "ZGROUP": "MAHESH TEX",
+       "ZGROUP2": "TEST FABRIC",
+       "ZGROUP3": "",
+       "TOT_PCS": "210",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "42000.00"
+      },
+      {
+       "ZGROUP": "NAVKAR TEX",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "516",
+       "TOT_QTY": "564.0000",
+       "TOT_QTY1": "570.7200",
+       "TOT_AMOUNT": "41364.00"
+      },
+      {
+       "ZGROUP": "NAVKAR TEX",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "",
+       "TOT_PCS": "17",
+       "TOT_QTY": "98.0000",
+       "TOT_QTY1": "15.0900",
+       "TOT_AMOUNT": "1221.00"
+      },
+      {
+       "ZGROUP": "NAVKAR TEX",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "",
+       "TOT_PCS": "2",
+       "TOT_QTY": "6.0000",
+       "TOT_QTY1": "1.2000",
+       "TOT_AMOUNT": "1200.00"
+      },
+      {
+       "ZGROUP": "RAJA TEX",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "5",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "250.00"
+      },
+      {
+       "ZGROUP": "REALME CUSTOMER",
+       "ZGROUP2": "SHIRT COTTON",
+       "ZGROUP3": "",
+       "TOT_PCS": "40",
+       "TOT_QTY": "40.0000",
+       "TOT_QTY1": "36.0000",
+       "TOT_AMOUNT": "1600.00"
+      },
+      {
+       "ZGROUP": "VISHAL TEXTILES",
+       "ZGROUP2": "SHIRT COTTON",
+       "ZGROUP3": "",
+       "TOT_PCS": "10",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "1000.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Item",
+     "groupBy2": "Party",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "ADDU CUSTOMER",
+       "ZGROUP3": "",
+       "TOT_PCS": "380",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "19000.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "MAHESH TEX",
+       "ZGROUP3": "",
+       "TOT_PCS": "149",
+       "TOT_QTY": "1100.0000",
+       "TOT_QTY1": "1068.0000",
+       "TOT_AMOUNT": "109500.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "NAVKAR TEX",
+       "ZGROUP3": "",
+       "TOT_PCS": "516",
+       "TOT_QTY": "564.0000",
+       "TOT_QTY1": "570.7200",
+       "TOT_AMOUNT": "41364.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "RAJA TEX",
+       "ZGROUP3": "",
+       "TOT_PCS": "5",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "250.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "ADDU CUSTOMER",
+       "ZGROUP3": "",
+       "TOT_PCS": "36",
+       "TOT_QTY": "723.0000",
+       "TOT_QTY1": "684.0000",
+       "TOT_AMOUNT": "72982.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "MAHESH TEX",
+       "ZGROUP3": "",
+       "TOT_PCS": "238",
+       "TOT_QTY": "890.0000",
+       "TOT_QTY1": "811.0000",
+       "TOT_AMOUNT": "277500.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "NAVKAR TEX",
+       "ZGROUP3": "",
+       "TOT_PCS": "17",
+       "TOT_QTY": "98.0000",
+       "TOT_QTY1": "15.0900",
+       "TOT_AMOUNT": "1221.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "MAHESH TEX",
+       "ZGROUP3": "",
+       "TOT_PCS": "78",
+       "TOT_QTY": "880.0000",
+       "TOT_QTY1": "834.0000",
+       "TOT_AMOUNT": "19100.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "NAVKAR TEX",
+       "ZGROUP3": "",
+       "TOT_PCS": "2",
+       "TOT_QTY": "6.0000",
+       "TOT_QTY1": "1.2000",
+       "TOT_AMOUNT": "1200.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "ADDU CUSTOMER",
+       "ZGROUP3": "",
+       "TOT_PCS": "30",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "6000.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "ADDU CUSTOMER",
+       "ZGROUP3": "",
+       "TOT_PCS": "20",
+       "TOT_QTY": "200.0000",
+       "TOT_QTY1": "160.0000",
+       "TOT_AMOUNT": "40000.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "REALME CUSTOMER",
+       "ZGROUP3": "",
+       "TOT_PCS": "40",
+       "TOT_QTY": "40.0000",
+       "TOT_QTY1": "36.0000",
+       "TOT_AMOUNT": "1600.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "VISHAL TEXTILES",
+       "ZGROUP3": "",
+       "TOT_PCS": "10",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "1000.00"
+      },
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "MAHESH TEX",
+       "ZGROUP3": "",
+       "TOT_PCS": "210",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "42000.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Broker",
+     "groupBy2": "Item",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "1050",
+       "TOT_QTY": "1664.0000",
+       "TOT_QTY1": "1638.7200",
+       "TOT_AMOUNT": "170114.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "",
+       "TOT_PCS": "291",
+       "TOT_QTY": "1711.0000",
+       "TOT_QTY1": "1510.0900",
+       "TOT_AMOUNT": "351703.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "",
+       "TOT_PCS": "80",
+       "TOT_QTY": "886.0000",
+       "TOT_QTY1": "835.2000",
+       "TOT_AMOUNT": "20300.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "",
+       "TOT_PCS": "30",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "6000.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "SHIRT COTTON",
+       "ZGROUP3": "",
+       "TOT_PCS": "70",
+       "TOT_QTY": "240.0000",
+       "TOT_QTY1": "196.0000",
+       "TOT_AMOUNT": "42600.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "TEST FABRIC",
+       "ZGROUP3": "",
+       "TOT_PCS": "210",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "42000.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "City",
+     "groupBy2": "Item",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "16",
+       "TOT_QTY": "840.0000",
+       "TOT_QTY1": "900.0000",
+       "TOT_AMOUNT": "39150.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "",
+       "TOT_PCS": "10",
+       "TOT_QTY": "200.0000",
+       "TOT_QTY1": "190.0000",
+       "TOT_AMOUNT": "40000.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "",
+       "TOT_PCS": "14",
+       "TOT_QTY": "350.0000",
+       "TOT_QTY1": "315.0000",
+       "TOT_AMOUNT": "7000.00"
+      },
+      {
+       "ZGROUP": "SURAT",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "654",
+       "TOT_QTY": "824.0000",
+       "TOT_QTY1": "738.7200",
+       "TOT_AMOUNT": "111964.00"
+      },
+      {
+       "ZGROUP": "SURAT",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "",
+       "TOT_PCS": "245",
+       "TOT_QTY": "788.0000",
+       "TOT_QTY1": "636.0900",
+       "TOT_AMOUNT": "238721.00"
+      },
+      {
+       "ZGROUP": "SURAT",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "",
+       "TOT_PCS": "66",
+       "TOT_QTY": "536.0000",
+       "TOT_QTY1": "520.2000",
+       "TOT_AMOUNT": "13300.00"
+      },
+      {
+       "ZGROUP": "SURAT",
+       "ZGROUP2": "TEST FABRIC",
+       "ZGROUP3": "",
+       "TOT_PCS": "210",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "42000.00"
+      },
+      {
+       "ZGROUP": "UJJAIN",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "380",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "19000.00"
+      },
+      {
+       "ZGROUP": "UJJAIN",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "",
+       "TOT_PCS": "36",
+       "TOT_QTY": "723.0000",
+       "TOT_QTY1": "684.0000",
+       "TOT_AMOUNT": "72982.00"
+      },
+      {
+       "ZGROUP": "UJJAIN",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "",
+       "TOT_PCS": "30",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "6000.00"
+      },
+      {
+       "ZGROUP": "UJJAIN",
+       "ZGROUP2": "SHIRT COTTON",
+       "ZGROUP3": "",
+       "TOT_PCS": "70",
+       "TOT_QTY": "240.0000",
+       "TOT_QTY1": "196.0000",
+       "TOT_AMOUNT": "42600.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Item",
+     "groupBy2": "None",
+     "monthWise": true,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "June",
+       "TOT_PCS": "505",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "25250.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "July",
+       "TOT_PCS": "29",
+       "TOT_QTY": "1344.0000",
+       "TOT_QTY1": "1350.7200",
+       "TOT_AMOUNT": "55364.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "August",
+       "TOT_PCS": "136",
+       "TOT_QTY": "320.0000",
+       "TOT_QTY1": "288.0000",
+       "TOT_AMOUNT": "70500.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "September",
+       "TOT_PCS": "380",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "19000.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "July",
+       "TOT_PCS": "27",
+       "TOT_QTY": "298.0000",
+       "TOT_QTY1": "205.0900",
+       "TOT_AMOUNT": "41221.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "August",
+       "TOT_PCS": "228",
+       "TOT_QTY": "690.0000",
+       "TOT_QTY1": "621.0000",
+       "TOT_AMOUNT": "237500.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "September",
+       "TOT_PCS": "32",
+       "TOT_QTY": "723.0000",
+       "TOT_QTY1": "684.0000",
+       "TOT_AMOUNT": "71926.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "October",
+       "TOT_PCS": "4",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "1056.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "",
+       "ZGROUP3": "July",
+       "TOT_PCS": "58",
+       "TOT_QTY": "776.0000",
+       "TOT_QTY1": "736.2000",
+       "TOT_AMOUNT": "12400.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "",
+       "ZGROUP3": "August",
+       "TOT_PCS": "22",
+       "TOT_QTY": "110.0000",
+       "TOT_QTY1": "99.0000",
+       "TOT_AMOUNT": "7900.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "",
+       "ZGROUP3": "October",
+       "TOT_PCS": "30",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "6000.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "",
+       "ZGROUP3": "August",
+       "TOT_PCS": "10",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "1000.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "",
+       "ZGROUP3": "October",
+       "TOT_PCS": "60",
+       "TOT_QTY": "240.0000",
+       "TOT_QTY1": "196.0000",
+       "TOT_AMOUNT": "41600.00"
+      },
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "",
+       "ZGROUP3": "August",
+       "TOT_PCS": "210",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "42000.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Register",
+     "groupBy2": "Item",
+     "monthWise": true,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "GREY SALES",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "July",
+       "TOT_PCS": "16",
+       "TOT_QTY": "564.0000",
+       "TOT_QTY1": "570.7200",
+       "TOT_AMOUNT": "16364.00"
+      },
+      {
+       "ZGROUP": "GREY SALES",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "July",
+       "TOT_PCS": "17",
+       "TOT_QTY": "98.0000",
+       "TOT_QTY1": "15.0900",
+       "TOT_AMOUNT": "1221.00"
+      },
+      {
+       "ZGROUP": "GREY SALES",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "July",
+       "TOT_PCS": "2",
+       "TOT_QTY": "6.0000",
+       "TOT_QTY1": "1.2000",
+       "TOT_AMOUNT": "1200.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "June",
+       "TOT_PCS": "505",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "25250.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "July",
+       "TOT_PCS": "13",
+       "TOT_QTY": "780.0000",
+       "TOT_QTY1": "780.0000",
+       "TOT_AMOUNT": "39000.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "August",
+       "TOT_PCS": "136",
+       "TOT_QTY": "320.0000",
+       "TOT_QTY1": "288.0000",
+       "TOT_AMOUNT": "70500.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "September",
+       "TOT_PCS": "380",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "19000.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "July",
+       "TOT_PCS": "10",
+       "TOT_QTY": "200.0000",
+       "TOT_QTY1": "190.0000",
+       "TOT_AMOUNT": "40000.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "August",
+       "TOT_PCS": "228",
+       "TOT_QTY": "690.0000",
+       "TOT_QTY1": "621.0000",
+       "TOT_AMOUNT": "237500.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "September",
+       "TOT_PCS": "32",
+       "TOT_QTY": "723.0000",
+       "TOT_QTY1": "684.0000",
+       "TOT_AMOUNT": "71926.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "October",
+       "TOT_PCS": "4",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "1056.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "July",
+       "TOT_PCS": "56",
+       "TOT_QTY": "770.0000",
+       "TOT_QTY1": "735.0000",
+       "TOT_AMOUNT": "11200.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "August",
+       "TOT_PCS": "22",
+       "TOT_QTY": "110.0000",
+       "TOT_QTY1": "99.0000",
+       "TOT_AMOUNT": "7900.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "October",
+       "TOT_PCS": "30",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "6000.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "SHIRT COTTON",
+       "ZGROUP3": "August",
+       "TOT_PCS": "10",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "1000.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "SHIRT COTTON",
+       "ZGROUP3": "October",
+       "TOT_PCS": "60",
+       "TOT_QTY": "240.0000",
+       "TOT_QTY1": "196.0000",
+       "TOT_AMOUNT": "41600.00"
+      },
+      {
+       "ZGROUP": "SALES BOOK",
+       "ZGROUP2": "TEST FABRIC",
+       "ZGROUP3": "August",
+       "TOT_PCS": "210",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "42000.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Item",
+     "groupBy2": "None",
+     "monthWise": false,
+     "sortBy": "Amt",
+     "sort": "desc",
+     "expected": [
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "291",
+       "TOT_QTY": "1711.0000",
+       "TOT_QTY1": "1510.0900",
+       "TOT_AMOUNT": "351703.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "1050",
+       "TOT_QTY": "1664.0000",
+       "TOT_QTY1": "1638.7200",
+       "TOT_AMOUNT": "170114.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "70",
+       "TOT_QTY": "240.0000",
+       "TOT_QTY1": "196.0000",
+       "TOT_AMOUNT": "42600.00"
+      },
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "210",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "42000.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "80",
+       "TOT_QTY": "886.0000",
+       "TOT_QTY1": "835.2000",
+       "TOT_AMOUNT": "20300.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "30",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "6000.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Item",
+     "groupBy2": "None",
+     "monthWise": false,
+     "sortBy": "Qty",
+     "sort": "asc",
+     "expected": [
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "210",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "42000.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "30",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "6000.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "70",
+       "TOT_QTY": "240.0000",
+       "TOT_QTY1": "196.0000",
+       "TOT_AMOUNT": "42600.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "80",
+       "TOT_QTY": "886.0000",
+       "TOT_QTY1": "835.2000",
+       "TOT_AMOUNT": "20300.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "1050",
+       "TOT_QTY": "1664.0000",
+       "TOT_QTY1": "1638.7200",
+       "TOT_AMOUNT": "170114.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "291",
+       "TOT_QTY": "1711.0000",
+       "TOT_QTY1": "1510.0900",
+       "TOT_AMOUNT": "351703.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Item",
+     "groupBy2": "None",
+     "monthWise": false,
+     "sortBy": "Pcs",
+     "sort": "desc",
+     "expected": [
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "1050",
+       "TOT_QTY": "1664.0000",
+       "TOT_QTY1": "1638.7200",
+       "TOT_AMOUNT": "170114.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "291",
+       "TOT_QTY": "1711.0000",
+       "TOT_QTY1": "1510.0900",
+       "TOT_AMOUNT": "351703.00"
+      },
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "210",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "42000.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "80",
+       "TOT_QTY": "886.0000",
+       "TOT_QTY1": "835.2000",
+       "TOT_AMOUNT": "20300.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "70",
+       "TOT_QTY": "240.0000",
+       "TOT_QTY1": "196.0000",
+       "TOT_AMOUNT": "42600.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "30",
+       "TOT_QTY": ".0000",
+       "TOT_QTY1": ".0000",
+       "TOT_AMOUNT": "6000.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Category",
+     "groupBy2": "None",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "601",
+       "TOT_QTY": "1951.0000",
+       "TOT_QTY1": "1706.0900",
+       "TOT_AMOUNT": "442303.00"
+      },
+      {
+       "ZGROUP": "FINISH STOCK",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "1050",
+       "TOT_QTY": "1664.0000",
+       "TOT_QTY1": "1638.7200",
+       "TOT_AMOUNT": "170114.00"
+      },
+      {
+       "ZGROUP": "GRAY STOCK",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "80",
+       "TOT_QTY": "886.0000",
+       "TOT_QTY1": "835.2000",
+       "TOT_AMOUNT": "20300.00"
+      }
+     ]
+    }
+   ]
+  },
+  "purchaseDetail": {
+   "rows": [
+    {
+     "ENT_NO": "1",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "July",
+     "MONTH_NO": 7,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-07-22",
+     "SRAL_NO": "1",
+     "_lines": [
+      {
+       "ITEM_NAME": "GRAY MICRO",
+       "ITEM_GROUP": "GRAY STOCK",
+       "IT_PCS": 48,
+       "IT_QTY": 500,
+       "IT_RATE": 10,
+       "IT_AMOUNT": 5000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "2",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "July",
+     "MONTH_NO": 7,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-07-22",
+     "SRAL_NO": "2",
+     "_lines": [
+      {
+       "ITEM_NAME": "GRAY MICRO",
+       "ITEM_GROUP": "GRAY STOCK",
+       "IT_PCS": 10,
+       "IT_QTY": 1000,
+       "IT_RATE": 10,
+       "IT_AMOUNT": 10000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "3",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-05",
+     "SRAL_NO": "3",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 1000,
+       "IT_QTY": 1000,
+       "IT_RATE": 5,
+       "IT_AMOUNT": 4500,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "4",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-05",
+     "SRAL_NO": "4",
+     "_lines": [
+      {
+       "ITEM_NAME": "GRAY MICRO",
+       "ITEM_GROUP": "GRAY STOCK",
+       "IT_PCS": 99,
+       "IT_QTY": 1000,
+       "IT_RATE": 9,
+       "IT_AMOUNT": 8100,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "5",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-05",
+     "SRAL_NO": "5",
+     "_lines": [
+      {
+       "ITEM_NAME": "TEST FABRIC",
+       "ITEM_GROUP": "",
+       "IT_PCS": 5,
+       "IT_QTY": 50,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 10000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "6",
+     "REGISTER": "OTHER PURCHASE",
+     "PARTY": "MAHESH TEX",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-05",
+     "SRAL_NO": "1",
+     "_lines": [
+      {
+       "ITEM_NAME": "TEST FABRIC",
+       "ITEM_GROUP": "",
+       "IT_PCS": 20,
+       "IT_QTY": 40,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 8000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "7",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-05",
+     "SRAL_NO": "6",
+     "_lines": [
+      {
+       "ITEM_NAME": "TEST FABRIC",
+       "ITEM_GROUP": "",
+       "IT_PCS": 100,
+       "IT_QTY": 100,
+       "IT_RATE": 10,
+       "IT_AMOUNT": 900,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "8",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-05",
+     "SRAL_NO": "7",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 100,
+       "IT_QTY": 100,
+       "IT_RATE": 10,
+       "IT_AMOUNT": 1000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "9",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-07",
+     "SRAL_NO": "8",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 2,
+       "IT_QTY": 6,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 120000,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 2,
+       "IT_QTY": 6,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 1200,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "GRAY MICRO",
+       "ITEM_GROUP": "GRAY STOCK",
+       "IT_PCS": 3,
+       "IT_QTY": 10,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 36000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "10",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "PADMAVATI PRINT",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-10",
+     "SRAL_NO": "9",
+     "_lines": [
+      {
+       "ITEM_NAME": "GRAY MICRO",
+       "ITEM_GROUP": "GRAY STOCK",
+       "IT_PCS": 2,
+       "IT_QTY": 50,
+       "IT_RATE": 20,
+       "IT_AMOUNT": 1000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "11",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-11",
+     "SRAL_NO": "10",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 2,
+       "IT_QTY": 5,
+       "IT_RATE": 300,
+       "IT_AMOUNT": 1500,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "12",
+     "REGISTER": "PURCHASE ACCOUNT",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-11",
+     "SRAL_NO": "1",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 500,
+       "IT_QTY": 0,
+       "IT_RATE": 90,
+       "IT_AMOUNT": 45000,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "GRAY MICRO",
+       "ITEM_GROUP": "GRAY STOCK",
+       "IT_PCS": 60,
+       "IT_QTY": 14000,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 2800000,
+       "IT_DISC1": ""
+      },
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 3,
+       "IT_QTY": 0,
+       "IT_RATE": 20,
+       "IT_AMOUNT": 1400,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "13",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-12",
+     "SRAL_NO": "11",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 4,
+       "IT_QTY": 80,
+       "IT_RATE": 60,
+       "IT_AMOUNT": 4800,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "14",
+     "REGISTER": "PURCHASE ACCOUNT",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-14",
+     "SRAL_NO": "2",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 6,
+       "IT_QTY": 200,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 1200,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "15",
+     "REGISTER": "PURCHASE ACCOUNT",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-14",
+     "SRAL_NO": "3",
+     "_lines": [
+      {
+       "ITEM_NAME": "DOBBY",
+       "ITEM_GROUP": "",
+       "IT_PCS": 9,
+       "IT_QTY": 90,
+       "IT_RATE": 900,
+       "IT_AMOUNT": 81000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "16",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-14",
+     "SRAL_NO": "12",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 9,
+       "IT_QTY": 90,
+       "IT_RATE": 900,
+       "IT_AMOUNT": 81000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "17",
+     "REGISTER": "PURCHASE ACCOUNT",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-21",
+     "SRAL_NO": "4",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 9,
+       "IT_QTY": 0,
+       "IT_RATE": 300,
+       "IT_AMOUNT": 87000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "18",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "RAJESH ENTERPRISE",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-24",
+     "SRAL_NO": "13",
+     "_lines": [
+      {
+       "ITEM_NAME": "SHIRT COTTON",
+       "ITEM_GROUP": "",
+       "IT_PCS": 10,
+       "IT_QTY": 1000,
+       "IT_RATE": 15,
+       "IT_AMOUNT": 15000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "19",
+     "REGISTER": "GREY PURCHASE",
+     "PARTY": "RAJESH ENTERPRISE",
+     "BROKER": "",
+     "STATION": "MALGEGAON",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "August",
+     "MONTH_NO": 8,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-08-24",
+     "SRAL_NO": "14",
+     "_lines": [
+      {
+       "ITEM_NAME": "GRY SHIRT",
+       "ITEM_GROUP": "",
+       "IT_PCS": 10,
+       "IT_QTY": 5400,
+       "IT_RATE": 10,
+       "IT_AMOUNT": 54000,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "20",
+     "REGISTER": "PURCHASE ACCOUNT",
+     "PARTY": "RAJESH ENTERPRISE",
+     "BROKER": "",
+     "STATION": "MALGEGAON",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "September",
+     "MONTH_NO": 9,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-09-04",
+     "SRAL_NO": "5",
+     "_lines": [
+      {
+       "ITEM_NAME": "GRY SHIRT",
+       "ITEM_GROUP": "",
+       "IT_PCS": 4,
+       "IT_QTY": 210,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 800,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "21",
+     "REGISTER": "PURCHASE ACCOUNT",
+     "PARTY": "MAHESH SIR",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "September",
+     "MONTH_NO": 9,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-09-04",
+     "SRAL_NO": "6",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 3,
+       "IT_QTY": 80,
+       "IT_RATE": 90,
+       "IT_AMOUNT": 270,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "22",
+     "REGISTER": "PURCHASE ACCOUNT",
+     "PARTY": "LALA SUPPLIER",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "September",
+     "MONTH_NO": 9,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-09-15",
+     "SRAL_NO": "7",
+     "_lines": [
+      {
+       "ITEM_NAME": "GRY SHIRT",
+       "ITEM_GROUP": "",
+       "IT_PCS": 2,
+       "IT_QTY": 20,
+       "IT_RATE": 200,
+       "IT_AMOUNT": 400,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "23",
+     "REGISTER": "PURCHASE ACCOUNT",
+     "PARTY": "LALA SUPPLIER",
+     "BROKER": "",
+     "STATION": "SURAT",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "September",
+     "MONTH_NO": 9,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-09-17",
+     "SRAL_NO": "8",
+     "_lines": [
+      {
+       "ITEM_NAME": "BLOUSE",
+       "ITEM_GROUP": "FINISH STOCK",
+       "IT_PCS": 17,
+       "IT_QTY": 1450,
+       "IT_RATE": 550,
+       "IT_AMOUNT": 797500,
+       "IT_DISC1": ""
+      }
+     ]
+    },
+    {
+     "ENT_NO": "24",
+     "REGISTER": "PURCHASE ACCOUNT",
+     "PARTY": "VAZAHAT SUPPLIER",
+     "BROKER": "",
+     "STATION": "",
+     "MAINGROUP": "",
+     "HASTE": "",
+     "TRANSPORT": "",
+     "MONTH": "October",
+     "MONTH_NO": 10,
+     "YEAR_NO": 2026,
+     "BILL_DATE": "2026-10-29",
+     "SRAL_NO": "9",
+     "_lines": [
+      {
+       "ITEM_NAME": "GRY SHIRT",
+       "ITEM_GROUP": "",
+       "IT_PCS": 40,
+       "IT_QTY": 40,
+       "IT_RATE": 40,
+       "IT_AMOUNT": 1600,
+       "IT_DISC1": ""
+      }
+     ]
+    }
+   ],
+   "scenarios": [
+    {
+     "groupBy1": "Register",
+     "groupBy2": "None",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "GREY PURCHASE",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "1406",
+       "TOT_QTY": "10397.0000",
+       "TOT_QTY1": "10157.6500",
+       "TOT_AMOUNT": "354000.00"
+      },
+      {
+       "ZGROUP": "OTHER PURCHASE",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "20",
+       "TOT_QTY": "40.0000",
+       "TOT_QTY1": "38.0000",
+       "TOT_AMOUNT": "8000.00"
+      },
+      {
+       "ZGROUP": "PURCHASE ACCOUNT",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "653",
+       "TOT_QTY": "16090.0000",
+       "TOT_QTY1": "15191.0000",
+       "TOT_AMOUNT": "3816170.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Item",
+     "groupBy2": "None",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "1646",
+       "TOT_QTY": "2926.0000",
+       "TOT_QTY1": "2643.7000",
+       "TOT_AMOUNT": "1137470.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "20",
+       "TOT_QTY": "181.0000",
+       "TOT_QTY1": "167.4500",
+       "TOT_AMOUNT": "89900.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "222",
+       "TOT_QTY": "16560.0000",
+       "TOT_QTY1": "15757.0000",
+       "TOT_AMOUNT": "2860100.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "56",
+       "TOT_QTY": "5670.0000",
+       "TOT_QTY1": "5643.0000",
+       "TOT_AMOUNT": "56800.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "10",
+       "TOT_QTY": "1000.0000",
+       "TOT_QTY1": "1000.0000",
+       "TOT_AMOUNT": "15000.00"
+      },
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "125",
+       "TOT_QTY": "190.0000",
+       "TOT_QTY1": "175.5000",
+       "TOT_AMOUNT": "18900.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Party",
+     "groupBy2": "Item",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "LALA SUPPLIER",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "17",
+       "TOT_QTY": "1450.0000",
+       "TOT_QTY1": "1305.0000",
+       "TOT_AMOUNT": "797500.00"
+      },
+      {
+       "ZGROUP": "LALA SUPPLIER",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "",
+       "TOT_PCS": "2",
+       "TOT_QTY": "20.0000",
+       "TOT_QTY1": "18.0000",
+       "TOT_AMOUNT": "400.00"
+      },
+      {
+       "ZGROUP": "MAHESH SIR",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "527",
+       "TOT_QTY": "370.0000",
+       "TOT_QTY1": "343.0000",
+       "TOT_AMOUNT": "214470.00"
+      },
+      {
+       "ZGROUP": "MAHESH SIR",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "",
+       "TOT_PCS": "18",
+       "TOT_QTY": "175.0000",
+       "TOT_QTY1": "161.7500",
+       "TOT_AMOUNT": "88700.00"
+      },
+      {
+       "ZGROUP": "MAHESH SIR",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "",
+       "TOT_PCS": "108",
+       "TOT_QTY": "14500.0000",
+       "TOT_QTY1": "13800.0000",
+       "TOT_AMOUNT": "2805000.00"
+      },
+      {
+       "ZGROUP": "MAHESH TEX",
+       "ZGROUP2": "TEST FABRIC",
+       "ZGROUP3": "",
+       "TOT_PCS": "20",
+       "TOT_QTY": "40.0000",
+       "TOT_QTY1": "38.0000",
+       "TOT_AMOUNT": "8000.00"
+      },
+      {
+       "ZGROUP": "PADMAVATI PRINT",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "1102",
+       "TOT_QTY": "1106.0000",
+       "TOT_QTY1": "995.7000",
+       "TOT_AMOUNT": "125500.00"
+      },
+      {
+       "ZGROUP": "PADMAVATI PRINT",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "",
+       "TOT_PCS": "2",
+       "TOT_QTY": "6.0000",
+       "TOT_QTY1": "5.7000",
+       "TOT_AMOUNT": "1200.00"
+      },
+      {
+       "ZGROUP": "PADMAVATI PRINT",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "",
+       "TOT_PCS": "114",
+       "TOT_QTY": "2060.0000",
+       "TOT_QTY1": "1957.0000",
+       "TOT_AMOUNT": "55100.00"
+      },
+      {
+       "ZGROUP": "PADMAVATI PRINT",
+       "ZGROUP2": "TEST FABRIC",
+       "ZGROUP3": "",
+       "TOT_PCS": "105",
+       "TOT_QTY": "150.0000",
+       "TOT_QTY1": "137.5000",
+       "TOT_AMOUNT": "10900.00"
+      },
+      {
+       "ZGROUP": "RAJESH ENTERPRISE",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "",
+       "TOT_PCS": "14",
+       "TOT_QTY": "5610.0000",
+       "TOT_QTY1": "5589.0000",
+       "TOT_AMOUNT": "54800.00"
+      },
+      {
+       "ZGROUP": "RAJESH ENTERPRISE",
+       "ZGROUP2": "SHIRT COTTON",
+       "ZGROUP3": "",
+       "TOT_PCS": "10",
+       "TOT_QTY": "1000.0000",
+       "TOT_QTY1": "1000.0000",
+       "TOT_AMOUNT": "15000.00"
+      },
+      {
+       "ZGROUP": "VAZAHAT SUPPLIER",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "",
+       "TOT_PCS": "40",
+       "TOT_QTY": "40.0000",
+       "TOT_QTY1": "36.0000",
+       "TOT_AMOUNT": "1600.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Item",
+     "groupBy2": "Party",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "LALA SUPPLIER",
+       "ZGROUP3": "",
+       "TOT_PCS": "17",
+       "TOT_QTY": "1450.0000",
+       "TOT_QTY1": "1305.0000",
+       "TOT_AMOUNT": "797500.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "MAHESH SIR",
+       "ZGROUP3": "",
+       "TOT_PCS": "527",
+       "TOT_QTY": "370.0000",
+       "TOT_QTY1": "343.0000",
+       "TOT_AMOUNT": "214470.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "PADMAVATI PRINT",
+       "ZGROUP3": "",
+       "TOT_PCS": "1102",
+       "TOT_QTY": "1106.0000",
+       "TOT_QTY1": "995.7000",
+       "TOT_AMOUNT": "125500.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "MAHESH SIR",
+       "ZGROUP3": "",
+       "TOT_PCS": "18",
+       "TOT_QTY": "175.0000",
+       "TOT_QTY1": "161.7500",
+       "TOT_AMOUNT": "88700.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "PADMAVATI PRINT",
+       "ZGROUP3": "",
+       "TOT_PCS": "2",
+       "TOT_QTY": "6.0000",
+       "TOT_QTY1": "5.7000",
+       "TOT_AMOUNT": "1200.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "MAHESH SIR",
+       "ZGROUP3": "",
+       "TOT_PCS": "108",
+       "TOT_QTY": "14500.0000",
+       "TOT_QTY1": "13800.0000",
+       "TOT_AMOUNT": "2805000.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "PADMAVATI PRINT",
+       "ZGROUP3": "",
+       "TOT_PCS": "114",
+       "TOT_QTY": "2060.0000",
+       "TOT_QTY1": "1957.0000",
+       "TOT_AMOUNT": "55100.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "LALA SUPPLIER",
+       "ZGROUP3": "",
+       "TOT_PCS": "2",
+       "TOT_QTY": "20.0000",
+       "TOT_QTY1": "18.0000",
+       "TOT_AMOUNT": "400.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "RAJESH ENTERPRISE",
+       "ZGROUP3": "",
+       "TOT_PCS": "14",
+       "TOT_QTY": "5610.0000",
+       "TOT_QTY1": "5589.0000",
+       "TOT_AMOUNT": "54800.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "VAZAHAT SUPPLIER",
+       "ZGROUP3": "",
+       "TOT_PCS": "40",
+       "TOT_QTY": "40.0000",
+       "TOT_QTY1": "36.0000",
+       "TOT_AMOUNT": "1600.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "RAJESH ENTERPRISE",
+       "ZGROUP3": "",
+       "TOT_PCS": "10",
+       "TOT_QTY": "1000.0000",
+       "TOT_QTY1": "1000.0000",
+       "TOT_AMOUNT": "15000.00"
+      },
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "MAHESH TEX",
+       "ZGROUP3": "",
+       "TOT_PCS": "20",
+       "TOT_QTY": "40.0000",
+       "TOT_QTY1": "38.0000",
+       "TOT_AMOUNT": "8000.00"
+      },
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "PADMAVATI PRINT",
+       "ZGROUP3": "",
+       "TOT_PCS": "105",
+       "TOT_QTY": "150.0000",
+       "TOT_QTY1": "137.5000",
+       "TOT_AMOUNT": "10900.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Broker",
+     "groupBy2": "Item",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "1646",
+       "TOT_QTY": "2926.0000",
+       "TOT_QTY1": "2643.7000",
+       "TOT_AMOUNT": "1137470.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "",
+       "TOT_PCS": "20",
+       "TOT_QTY": "181.0000",
+       "TOT_QTY1": "167.4500",
+       "TOT_AMOUNT": "89900.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "",
+       "TOT_PCS": "222",
+       "TOT_QTY": "16560.0000",
+       "TOT_QTY1": "15757.0000",
+       "TOT_AMOUNT": "2860100.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "",
+       "TOT_PCS": "56",
+       "TOT_QTY": "5670.0000",
+       "TOT_QTY1": "5643.0000",
+       "TOT_AMOUNT": "56800.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "SHIRT COTTON",
+       "ZGROUP3": "",
+       "TOT_PCS": "10",
+       "TOT_QTY": "1000.0000",
+       "TOT_QTY1": "1000.0000",
+       "TOT_AMOUNT": "15000.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "TEST FABRIC",
+       "ZGROUP3": "",
+       "TOT_PCS": "125",
+       "TOT_QTY": "190.0000",
+       "TOT_QTY1": "175.5000",
+       "TOT_AMOUNT": "18900.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "City",
+     "groupBy2": "Item",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "1000",
+       "TOT_QTY": "1000.0000",
+       "TOT_QTY1": "900.0000",
+       "TOT_AMOUNT": "4500.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "",
+       "TOT_PCS": "40",
+       "TOT_QTY": "40.0000",
+       "TOT_QTY1": "36.0000",
+       "TOT_AMOUNT": "1600.00"
+      },
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "SHIRT COTTON",
+       "ZGROUP3": "",
+       "TOT_PCS": "10",
+       "TOT_QTY": "1000.0000",
+       "TOT_QTY1": "1000.0000",
+       "TOT_AMOUNT": "15000.00"
+      },
+      {
+       "ZGROUP": "MALGEGAON",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "",
+       "TOT_PCS": "14",
+       "TOT_QTY": "5610.0000",
+       "TOT_QTY1": "5589.0000",
+       "TOT_AMOUNT": "54800.00"
+      },
+      {
+       "ZGROUP": "SURAT",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "",
+       "TOT_PCS": "646",
+       "TOT_QTY": "1926.0000",
+       "TOT_QTY1": "1743.7000",
+       "TOT_AMOUNT": "1132970.00"
+      },
+      {
+       "ZGROUP": "SURAT",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "",
+       "TOT_PCS": "20",
+       "TOT_QTY": "181.0000",
+       "TOT_QTY1": "167.4500",
+       "TOT_AMOUNT": "89900.00"
+      },
+      {
+       "ZGROUP": "SURAT",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "",
+       "TOT_PCS": "222",
+       "TOT_QTY": "16560.0000",
+       "TOT_QTY1": "15757.0000",
+       "TOT_AMOUNT": "2860100.00"
+      },
+      {
+       "ZGROUP": "SURAT",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "",
+       "TOT_PCS": "2",
+       "TOT_QTY": "20.0000",
+       "TOT_QTY1": "18.0000",
+       "TOT_AMOUNT": "400.00"
+      },
+      {
+       "ZGROUP": "SURAT",
+       "ZGROUP2": "TEST FABRIC",
+       "ZGROUP3": "",
+       "TOT_PCS": "125",
+       "TOT_QTY": "190.0000",
+       "TOT_QTY1": "175.5000",
+       "TOT_AMOUNT": "18900.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Item",
+     "groupBy2": "None",
+     "monthWise": true,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "August",
+       "TOT_PCS": "1626",
+       "TOT_QTY": "1396.0000",
+       "TOT_QTY1": "1266.7000",
+       "TOT_AMOUNT": "339700.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "September",
+       "TOT_PCS": "20",
+       "TOT_QTY": "1530.0000",
+       "TOT_QTY1": "1377.0000",
+       "TOT_AMOUNT": "797770.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "August",
+       "TOT_PCS": "20",
+       "TOT_QTY": "181.0000",
+       "TOT_QTY1": "167.4500",
+       "TOT_AMOUNT": "89900.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "",
+       "ZGROUP3": "July",
+       "TOT_PCS": "58",
+       "TOT_QTY": "1500.0000",
+       "TOT_QTY1": "1500.0000",
+       "TOT_AMOUNT": "15000.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "",
+       "ZGROUP3": "August",
+       "TOT_PCS": "164",
+       "TOT_QTY": "15060.0000",
+       "TOT_QTY1": "14257.0000",
+       "TOT_AMOUNT": "2845100.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "",
+       "ZGROUP3": "August",
+       "TOT_PCS": "10",
+       "TOT_QTY": "5400.0000",
+       "TOT_QTY1": "5400.0000",
+       "TOT_AMOUNT": "54000.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "",
+       "ZGROUP3": "September",
+       "TOT_PCS": "6",
+       "TOT_QTY": "230.0000",
+       "TOT_QTY1": "207.0000",
+       "TOT_AMOUNT": "1200.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "",
+       "ZGROUP3": "October",
+       "TOT_PCS": "40",
+       "TOT_QTY": "40.0000",
+       "TOT_QTY1": "36.0000",
+       "TOT_AMOUNT": "1600.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "",
+       "ZGROUP3": "August",
+       "TOT_PCS": "10",
+       "TOT_QTY": "1000.0000",
+       "TOT_QTY1": "1000.0000",
+       "TOT_AMOUNT": "15000.00"
+      },
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "",
+       "ZGROUP3": "August",
+       "TOT_PCS": "125",
+       "TOT_QTY": "190.0000",
+       "TOT_QTY1": "175.5000",
+       "TOT_AMOUNT": "18900.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Register",
+     "groupBy2": "Item",
+     "monthWise": true,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "GREY PURCHASE",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "August",
+       "TOT_PCS": "1111",
+       "TOT_QTY": "1196.0000",
+       "TOT_QTY1": "1076.7000",
+       "TOT_AMOUNT": "206500.00"
+      },
+      {
+       "ZGROUP": "GREY PURCHASE",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "August",
+       "TOT_PCS": "8",
+       "TOT_QTY": "91.0000",
+       "TOT_QTY1": "86.4500",
+       "TOT_AMOUNT": "7500.00"
+      },
+      {
+       "ZGROUP": "GREY PURCHASE",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "July",
+       "TOT_PCS": "58",
+       "TOT_QTY": "1500.0000",
+       "TOT_QTY1": "1500.0000",
+       "TOT_AMOUNT": "15000.00"
+      },
+      {
+       "ZGROUP": "GREY PURCHASE",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "August",
+       "TOT_PCS": "104",
+       "TOT_QTY": "1060.0000",
+       "TOT_QTY1": "957.0000",
+       "TOT_AMOUNT": "45100.00"
+      },
+      {
+       "ZGROUP": "GREY PURCHASE",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "August",
+       "TOT_PCS": "10",
+       "TOT_QTY": "5400.0000",
+       "TOT_QTY1": "5400.0000",
+       "TOT_AMOUNT": "54000.00"
+      },
+      {
+       "ZGROUP": "GREY PURCHASE",
+       "ZGROUP2": "SHIRT COTTON",
+       "ZGROUP3": "August",
+       "TOT_PCS": "10",
+       "TOT_QTY": "1000.0000",
+       "TOT_QTY1": "1000.0000",
+       "TOT_AMOUNT": "15000.00"
+      },
+      {
+       "ZGROUP": "GREY PURCHASE",
+       "ZGROUP2": "TEST FABRIC",
+       "ZGROUP3": "August",
+       "TOT_PCS": "105",
+       "TOT_QTY": "150.0000",
+       "TOT_QTY1": "137.5000",
+       "TOT_AMOUNT": "10900.00"
+      },
+      {
+       "ZGROUP": "OTHER PURCHASE",
+       "ZGROUP2": "TEST FABRIC",
+       "ZGROUP3": "August",
+       "TOT_PCS": "20",
+       "TOT_QTY": "40.0000",
+       "TOT_QTY1": "38.0000",
+       "TOT_AMOUNT": "8000.00"
+      },
+      {
+       "ZGROUP": "PURCHASE ACCOUNT",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "August",
+       "TOT_PCS": "515",
+       "TOT_QTY": "200.0000",
+       "TOT_QTY1": "190.0000",
+       "TOT_AMOUNT": "133200.00"
+      },
+      {
+       "ZGROUP": "PURCHASE ACCOUNT",
+       "ZGROUP2": "BLOUSE",
+       "ZGROUP3": "September",
+       "TOT_PCS": "20",
+       "TOT_QTY": "1530.0000",
+       "TOT_QTY1": "1377.0000",
+       "TOT_AMOUNT": "797770.00"
+      },
+      {
+       "ZGROUP": "PURCHASE ACCOUNT",
+       "ZGROUP2": "DOBBY",
+       "ZGROUP3": "August",
+       "TOT_PCS": "12",
+       "TOT_QTY": "90.0000",
+       "TOT_QTY1": "81.0000",
+       "TOT_AMOUNT": "82400.00"
+      },
+      {
+       "ZGROUP": "PURCHASE ACCOUNT",
+       "ZGROUP2": "GRAY MICRO",
+       "ZGROUP3": "August",
+       "TOT_PCS": "60",
+       "TOT_QTY": "14000.0000",
+       "TOT_QTY1": "13300.0000",
+       "TOT_AMOUNT": "2800000.00"
+      },
+      {
+       "ZGROUP": "PURCHASE ACCOUNT",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "September",
+       "TOT_PCS": "6",
+       "TOT_QTY": "230.0000",
+       "TOT_QTY1": "207.0000",
+       "TOT_AMOUNT": "1200.00"
+      },
+      {
+       "ZGROUP": "PURCHASE ACCOUNT",
+       "ZGROUP2": "GRY SHIRT",
+       "ZGROUP3": "October",
+       "TOT_PCS": "40",
+       "TOT_QTY": "40.0000",
+       "TOT_QTY1": "36.0000",
+       "TOT_AMOUNT": "1600.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Item",
+     "groupBy2": "None",
+     "monthWise": false,
+     "sortBy": "Amt",
+     "sort": "desc",
+     "expected": [
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "222",
+       "TOT_QTY": "16560.0000",
+       "TOT_QTY1": "15757.0000",
+       "TOT_AMOUNT": "2860100.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "1646",
+       "TOT_QTY": "2926.0000",
+       "TOT_QTY1": "2643.7000",
+       "TOT_AMOUNT": "1137470.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "20",
+       "TOT_QTY": "181.0000",
+       "TOT_QTY1": "167.4500",
+       "TOT_AMOUNT": "89900.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "56",
+       "TOT_QTY": "5670.0000",
+       "TOT_QTY1": "5643.0000",
+       "TOT_AMOUNT": "56800.00"
+      },
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "125",
+       "TOT_QTY": "190.0000",
+       "TOT_QTY1": "175.5000",
+       "TOT_AMOUNT": "18900.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "10",
+       "TOT_QTY": "1000.0000",
+       "TOT_QTY1": "1000.0000",
+       "TOT_AMOUNT": "15000.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Item",
+     "groupBy2": "None",
+     "monthWise": false,
+     "sortBy": "Qty",
+     "sort": "asc",
+     "expected": [
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "20",
+       "TOT_QTY": "181.0000",
+       "TOT_QTY1": "167.4500",
+       "TOT_AMOUNT": "89900.00"
+      },
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "125",
+       "TOT_QTY": "190.0000",
+       "TOT_QTY1": "175.5000",
+       "TOT_AMOUNT": "18900.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "10",
+       "TOT_QTY": "1000.0000",
+       "TOT_QTY1": "1000.0000",
+       "TOT_AMOUNT": "15000.00"
+      },
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "1646",
+       "TOT_QTY": "2926.0000",
+       "TOT_QTY1": "2643.7000",
+       "TOT_AMOUNT": "1137470.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "56",
+       "TOT_QTY": "5670.0000",
+       "TOT_QTY1": "5643.0000",
+       "TOT_AMOUNT": "56800.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "222",
+       "TOT_QTY": "16560.0000",
+       "TOT_QTY1": "15757.0000",
+       "TOT_AMOUNT": "2860100.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Item",
+     "groupBy2": "None",
+     "monthWise": false,
+     "sortBy": "Pcs",
+     "sort": "desc",
+     "expected": [
+      {
+       "ZGROUP": "BLOUSE",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "1646",
+       "TOT_QTY": "2926.0000",
+       "TOT_QTY1": "2643.7000",
+       "TOT_AMOUNT": "1137470.00"
+      },
+      {
+       "ZGROUP": "GRAY MICRO",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "222",
+       "TOT_QTY": "16560.0000",
+       "TOT_QTY1": "15757.0000",
+       "TOT_AMOUNT": "2860100.00"
+      },
+      {
+       "ZGROUP": "TEST FABRIC",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "125",
+       "TOT_QTY": "190.0000",
+       "TOT_QTY1": "175.5000",
+       "TOT_AMOUNT": "18900.00"
+      },
+      {
+       "ZGROUP": "GRY SHIRT",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "56",
+       "TOT_QTY": "5670.0000",
+       "TOT_QTY1": "5643.0000",
+       "TOT_AMOUNT": "56800.00"
+      },
+      {
+       "ZGROUP": "DOBBY",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "20",
+       "TOT_QTY": "181.0000",
+       "TOT_QTY1": "167.4500",
+       "TOT_AMOUNT": "89900.00"
+      },
+      {
+       "ZGROUP": "SHIRT COTTON",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "10",
+       "TOT_QTY": "1000.0000",
+       "TOT_QTY1": "1000.0000",
+       "TOT_AMOUNT": "15000.00"
+      }
+     ]
+    },
+    {
+     "groupBy1": "Category",
+     "groupBy2": "None",
+     "monthWise": false,
+     "sortBy": null,
+     "sort": null,
+     "expected": [
+      {
+       "ZGROUP": "",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "211",
+       "TOT_QTY": "7041.0000",
+       "TOT_QTY1": "6985.9500",
+       "TOT_AMOUNT": "180600.00"
+      },
+      {
+       "ZGROUP": "FINISH STOCK",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "1646",
+       "TOT_QTY": "2926.0000",
+       "TOT_QTY1": "2643.7000",
+       "TOT_AMOUNT": "1137470.00"
+      },
+      {
+       "ZGROUP": "GRAY STOCK",
+       "ZGROUP2": "",
+       "ZGROUP3": "",
+       "TOT_PCS": "222",
+       "TOT_QTY": "16560.0000",
+       "TOT_QTY1": "15757.0000",
+       "TOT_AMOUNT": "2860100.00"
+      }
+     ]
+    }
+   ]
   }
  }
 }
