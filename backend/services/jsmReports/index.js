@@ -35,6 +35,9 @@ const REPORTS = {
   Rpt_PurchaseRegisterSummary_Report: require('./reports/registerSummaries').purchase,
   Rpt_SalesRegisterDetailDigital_Report: require('./reports/registerSummaries').salesDetail,
   Rpt_PurchaseRegisterDetail_Report: require('./reports/registerSummaries').purchaseDetail,
+  Rpt_Group_Balance: require('./reports/groupBalance'),
+  Rpt_Above_Below: require('./reports/aboveBelow'),
+  Rpt_JvBook1: require('./reports/voucherBook'),
 };
 
 function get(reportId) {

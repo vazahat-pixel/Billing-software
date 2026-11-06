@@ -1,225 +1,225 @@
-JSM PARITY CHECKLIST  (generated 2026-11-05)
+JSM PARITY CHECKLIST  (generated 2026-11-06)
 ==============================================================================================================
 VERIFIED  = replayed against JSM own SQL/printed output on real data (golden test)
 BUILT     = implemented and unit/DB tested, not yet replayed against JSM output
 NOT WIRED = the JSM form is implemented, but this menu entry own behaviour is not
 NOT BUILT = no JSM-identical screen in this software yet
 
-BUILT      | Rpt_cashbank1                      | Reports > Fas Reports > Bank / Cash Book > Bank Book
-BUILT      | Rpt_cashbank1                      | Reports > Fas Reports > Bank / Cash Book > Cash Book
-NOT BUILT  | Rpt_CB1_Reconsilation              | Reports > Fas Reports > Bank / Cash Book > Reconciliation
-NOT BUILT  | Rpt_CB1_Reconsilation              | Reports > Fas Reports > Bank / Cash Book > Recon.Test
-NOT BUILT  | A_CashBankLedgerSingleSide         | Reports > Fas Reports > Bank / Cash Book > Bank OD Intrest
-NOT WIRED  | A_All_CashBank_Report              | Reports > Fas Reports > Bank / Cash Book > Cash/Bank Register   -- JSM uses a different form (A_All_CashBank_Report)
-NOT BUILT  | Rpt_BankStockInHandCheq            | Reports > Fas Reports > Bank / Cash Book > Cheq In Hand
-NOT BUILT  | A_Bank_Receipt_Bill_Os_Details     | Reports > Fas Reports > Bank / Cash Book > Bank Voucher Print
-BUILT      | A_AccountLedgerSingleSide          | Reports > Fas Reports > Ledger
-BUILT      | A_AccountLedgerDoubleSide          | Reports > Fas Reports > Ledger T-Format
-NOT WIRED  | A_AccountLedgerDoubleSide          | Reports > Fas Reports > Ledger Interest   -- shares the Ledger screen; the interest calculation is not built
-BUILT      | A_AccountLedgerDoubleSide          | Reports > Fas Reports > Confirmation
-NOT BUILT  | Rpt_Above_Below                    | Reports > Fas Reports > Above Below Rs.
-NOT BUILT  | Rpt_JvBook1                        | Reports > Fas Reports > Voucher Book
-NOT BUILT  | Tran_ImportCashBank                | Reports > Fas Reports > Import Bank
-NOT BUILT  | Rpt_Group_Balance                  | Reports > Final Reports > Group List
-BUILT      | Rpt_Trail_Bal_101                  | Reports > Final Reports > Trail Balance
-BUILT      | A_Final_ProfitAndLoss              | Reports > Final Reports > Profit & Loss Account
-BUILT      | A_Final_BalanceSheet               | Reports > Final Reports > BalanceSheet
-NOT BUILT  | Mst1_Check_Diff                    | Reports > Final Reports > Chek Diff Os.Bill/Op.Balance
-NOT BUILT  | Rpt_Cash_Bank_Finance_Report       | Reports > Final Reports > CashBank Finance
-NOT BUILT  | Rpt_Jsm_Ledger_os_Diff_Check       | Reports > Final Reports > Check Diff Os/Ledger Cur.Year
-NOT BUILT  | Rpt_SalesRegisterSummary_Report    | Reports > Sales > Sales Bill > Sales Summary
-NOT BUILT  | Rpt_SalesRegisterDetailDigital_Report | Reports > Sales > Sales Bill > Sales ItemDetail
-VERIFIED   | Rpt_Jsm_Sales_ItemSummary          | Reports > Sales > Sales Bill > Item Wise Summary
-BUILT      | Rpt_Sales_Haste                    | Reports > Sales > Sales Bill > Haste/Transport
-NOT BUILT  | Rpt_Sales_Order_Detail_Report      | Reports > Sales > Sales Bill > Sales Order Register
-NOT BUILT  | Rpt_Sales_Rg_Pend                  | Reports > Sales > Sales Bill > Rg Pending
-NOT BUILT  | Rpt_Sales_Pump_Profit              | Reports > Sales > Sales Bill > Profit Register
-NOT BUILT  | Rpt_Sales_Slip_Register            | Reports > Sales > Sales Bill > Slip Register
-NOT BUILT  | Rpt_SalesSlipDetail_Report         | Reports > Sales > Sales Bill > Slip (New) Register
-NOT BUILT  | Rpt_Sales_Challan_Detail_Report    | Reports > Sales > Sales Bill > Sales Challan
-NOT BUILT  | Rpt_Sales_Interest                 | Reports > Sales > Sales Bill > Interest Bill Wise (Old)
-NOT BUILT  | New_Rpt_Sales_Intrest_ZoomIn_New   | Reports > Sales > Sales Bill > Interest Bill Wise New
-NOT BUILT  | Rpt_SalesRtnRegisterSummary_Report | Reports > Sales > Sales Return > SalesReturn Summary
-NOT BUILT  | Rpt_SalesRtnRegisterDetail_Report  | Reports > Sales > Sales Return > SalesReturn Detail
-VERIFIED   | Rpt_Jsm_Sales_Return               | Reports > Sales > Sales Return > Summary
-VERIFIED   | Rpt_Jsm_Sales_Return               | Reports > Sales > Sales Return > Detail
-NOT BUILT  | OldRpt_SalesRTNRegisterSummary_Report | Reports > Sales > Sales Return > SalesReturn Summary New
-NOT BUILT  | OldRpt_SalesRTNRegisterDetail_Report | Reports > Sales > Sales Return > SalesReturn ItemDetail New
-NOT BUILT  | Rpt_PurchaseRegisterSummary_Report | Reports > Purchase > Purchase Bill > Purchase Summary
-NOT BUILT  | Rpt_PurchaseRegisterDetail_Report  | Reports > Purchase > Purchase Bill > Purchase ItemDetail
-VERIFIED   | Rpt_Jsm_Purchase_ItemSummary       | Reports > Purchase > Purchase Bill > Item Wise Summary
-VERIFIED   | Rpt_Jsm_Purchase                   | Reports > Purchase > Purchase Bill > Summary
-VERIFIED   | Rpt_Jsm_Purchase                   | Reports > Purchase > Purchase Bill > Detail
-NOT BUILT  | Rpt_Purchase_Order_Detail_Rpt      | Reports > Purchase > Purchase Bill > Purchase Order
-NOT BUILT  | New_Rpt_Sales_Intrest_ZoomIn_New   | Reports > Purchase > Purchase Bill > Purchase Bill Wise Interest
-NOT BUILT  | Rpt_PurchaseRtnRegisterSummary_Report | Reports > Purchase > Purchase Return > PurchReturn Summary
-NOT BUILT  | Rpt_PurchaseRtnRegisterDetail_Report | Reports > Purchase > Purchase Return > PurchReturn ItemDetail
-VERIFIED   | Rpt_Jsm_Purchase_Return            | Reports > Purchase > Purchase Return > Summary
-VERIFIED   | Rpt_Jsm_Purchase_Return            | Reports > Purchase > Purchase Return > Detail
-NOT BUILT  | Rpt_Purchase_Stock_LRWiseReport    | Reports > Purchase > Purchase Stock
-NOT BUILT  | Rpt_Purchase_Stock_Godown_Report   | Reports > Purchase > Purchase Stock(Godown)
-NOT BUILT  | Rpt_Purchase_Stock                 | Reports > Purchase > Purchase Stock(Old)
-NOT BUILT  | Rpt_1StockSubItemAcc_DetailReport  | Reports > Purchase > Mill Return To Send
-VERIFIED   | Rpt_Process_Issue_Report           | Reports > Process Reports > Send
-VERIFIED   | Rpt_Process_Receipt_Summary        | Reports > Process Reports > Receipt Summary
-VERIFIED   | Rpt_Process_Receipt_Detail         | Reports > Process Reports > Receipt Detail
-VERIFIED   | Rpt_Process_Stock_New_Gst          | Reports > Process Reports > Process Stock
-VERIFIED   | Rpt_Process_Stock_New_Gst          | Reports > Process Reports > Process Stock Zoom
-NOT BUILT  | Rpt_Jsm_Process_ItemSummary        | Reports > Process Reports > Item Wise Summary
-NOT BUILT  | Rpt_Process_Stock_TakaDetail       | Reports > Process Reports > TakaWise Stock Detail
-NOT BUILT  | Rpt_Lot_Costing                    | Reports > Process Reports > Lot Wise Costing
-NOT BUILT  | Rpt_Cutting_Report                 | Reports > Process Reports > Cutting Reports
-NOT BUILT  | Rpt_Stk_Cutting_At_Shop            | Reports > Process Reports > Cutting Stock Reports
-NOT BUILT  | Rpt_Update_Lot_Status              | Reports > Process Reports > Update Lot Status
-NOT BUILT  | New_Rpt_Sales_Intrest_ZoomIn       | Reports > Process Reports > Process Bill Wise Interest
-VERIFIED   | Rpt_Job_IssueReport                | Reports > JobWork Reports > Send
-VERIFIED   | Rpt_JobWork_Receipt_Summary        | Reports > JobWork Reports > Receipt Summary
-VERIFIED   | Rpt_JobWork_Receipt_Detail         | Reports > JobWork Reports > Receipt Detail
-BUILT      | Rpt_JobWork_Stock_Report           | Reports > JobWork Reports > Jobwork Stock/Pending Report
-NOT BUILT  | Rpt_Additional_Job_Bill            | Reports > JobWork Reports > Challan Status
-NOT BUILT  | Tran_WorkChallan_PL_Repo           | Reports > JobWork Reports > Job P & L
-NOT BUILT  | Rpt_SalesRegisterSummary_Report    | Reports > Monthly Reports > Sales
-NOT BUILT  | Rpt_PurchaseRegisterSummary_Report | Reports > Monthly Reports > Purchase
-VERIFIED   | Rpt_Process_Receipt_Summary        | Reports > Monthly Reports > Process
-VERIFIED   | Rpt_JobWork_Receipt_Summary        | Reports > Monthly Reports > JobWork
-NOT BUILT  | Rpt_Stk_Grey_Finish_Summary        | Reports > Monthly Reports > Sales G/F
-NOT BUILT  | A_Gstr1_SalesReturnSummary         | Reports > Monthly Reports > Sales Return
-NOT BUILT  | A_Gstr1_PurchaseRtn_Report         | Reports > Monthly Reports > Purchase Return
-NOT BUILT  | Rpt_BankBookRec_GstMonthWise       | Reports > Monthly Reports > Bank Rec. Payment
-NOT BUILT  | Rpt_TdsReports                     | Reports > Tds Reports > Head Wise Report
-NOT BUILT  | Rpt_Tds2_Prty_Mnth_Wise            | Reports > Tds Reports > Party Wise Report
-NOT BUILT  | Rpt_Tds2_Prty_Mnth_Wise            | Reports > Tds Reports > Party Wise Monthly Report
-NOT BUILT  | Rpt_Tds3_Add_Ackn                  | Reports > Tds Reports > Address/Acknowledge
-NOT BUILT  | Rpt_Tds4_Challan                   | Reports > Tds Reports > Tax Challan
-NOT BUILT  | Rpt_Tds5_Certi                     | Reports > Tds Reports > Certificate
-NOT BUILT  | Rpt_TdsReports                     | Reports > Tds Reports > Tds Register
-NOT BUILT  | Rpt_Tcs                            | Reports > Tcs Reports > Tcs Rec/Pay Report
-NOT BUILT  | Rpt_TcsReports                     | Reports > Tcs Reports > Tcs Sales Register
-NOT BUILT  | Rpt_TcsReports                     | Reports > Tcs Reports > Tcs Purchase Register
-NOT BUILT  | Gstr_3B_TextNew_Monthly            | Reports > Gst Reports > 3B Monthly Return > 3B - Monthly Return
+BUILT      | Rpt_cashbank1                          | Reports > Fas Reports > Bank / Cash Book > Bank Book
+BUILT      | Rpt_cashbank1                          | Reports > Fas Reports > Bank / Cash Book > Cash Book
+NOT BUILT  | Rpt_CB1_Reconsilation                  | Reports > Fas Reports > Bank / Cash Book > Reconciliation
+NOT BUILT  | Rpt_CB1_Reconsilation                  | Reports > Fas Reports > Bank / Cash Book > Recon.Test
+NOT BUILT  | A_CashBankLedgerSingleSide             | Reports > Fas Reports > Bank / Cash Book > Bank OD Intrest
+NOT WIRED  | A_All_CashBank_Report                  | Reports > Fas Reports > Bank / Cash Book > Cash/Bank Register
+NOT BUILT  | Rpt_BankStockInHandCheq                | Reports > Fas Reports > Bank / Cash Book > Cheq In Hand
+NOT BUILT  | A_Bank_Receipt_Bill_Os_Details         | Reports > Fas Reports > Bank / Cash Book > Bank Voucher Print
+BUILT      | A_AccountLedgerSingleSide              | Reports > Fas Reports > Ledger
+BUILT      | A_AccountLedgerDoubleSide              | Reports > Fas Reports > Ledger T-Format
+NOT WIRED  | A_AccountLedgerDoubleSide              | Reports > Fas Reports > Ledger Interest
+BUILT      | A_AccountLedgerDoubleSide              | Reports > Fas Reports > Confirmation
+BUILT      | Rpt_Above_Below                        | Reports > Fas Reports > Above Below Rs.
+BUILT      | Rpt_JvBook1                            | Reports > Fas Reports > Voucher Book
+NOT BUILT  | Tran_ImportCashBank                    | Reports > Fas Reports > Import Bank
+BUILT      | Rpt_Group_Balance                      | Reports > Final Reports > Group List
+BUILT      | Rpt_Trail_Bal_101                      | Reports > Final Reports > Trail Balance
+BUILT      | A_Final_ProfitAndLoss                  | Reports > Final Reports > Profit & Loss Account
+BUILT      | A_Final_BalanceSheet                   | Reports > Final Reports > BalanceSheet
+NOT BUILT  | Mst1_Check_Diff                        | Reports > Final Reports > Chek Diff Os.Bill/Op.Balance
+NOT BUILT  | Rpt_Cash_Bank_Finance_Report           | Reports > Final Reports > CashBank Finance
+NOT BUILT  | Rpt_Jsm_Ledger_os_Diff_Check           | Reports > Final Reports > Check Diff Os/Ledger Cur.Year
+VERIFIED   | Rpt_SalesRegisterSummary_Report        | Reports > Sales > Sales Bill > Sales Summary
+VERIFIED   | Rpt_SalesRegisterDetailDigital_Report  | Reports > Sales > Sales Bill > Sales ItemDetail
+VERIFIED   | Rpt_Jsm_Sales_ItemSummary              | Reports > Sales > Sales Bill > Item Wise Summary
+BUILT      | Rpt_Sales_Haste                        | Reports > Sales > Sales Bill > Haste/Transport
+NOT BUILT  | Rpt_Sales_Order_Detail_Report          | Reports > Sales > Sales Bill > Sales Order Register
+NOT BUILT  | Rpt_Sales_Rg_Pend                      | Reports > Sales > Sales Bill > Rg Pending
+NOT BUILT  | Rpt_Sales_Pump_Profit                  | Reports > Sales > Sales Bill > Profit Register
+NOT BUILT  | Rpt_Sales_Slip_Register                | Reports > Sales > Sales Bill > Slip Register
+NOT BUILT  | Rpt_SalesSlipDetail_Report             | Reports > Sales > Sales Bill > Slip (New) Register
+NOT BUILT  | Rpt_Sales_Challan_Detail_Report        | Reports > Sales > Sales Bill > Sales Challan
+NOT BUILT  | Rpt_Sales_Interest                     | Reports > Sales > Sales Bill > Interest Bill Wise (Old)
+NOT BUILT  | New_Rpt_Sales_Intrest_ZoomIn_New       | Reports > Sales > Sales Bill > Interest Bill Wise New
+NOT BUILT  | Rpt_SalesRtnRegisterSummary_Report     | Reports > Sales > Sales Return > SalesReturn Summary
+NOT BUILT  | Rpt_SalesRtnRegisterDetail_Report      | Reports > Sales > Sales Return > SalesReturn Detail
+VERIFIED   | Rpt_Jsm_Sales_Return                   | Reports > Sales > Sales Return > Summary
+VERIFIED   | Rpt_Jsm_Sales_Return                   | Reports > Sales > Sales Return > Detail
+NOT BUILT  | OldRpt_SalesRTNRegisterSummary_Report  | Reports > Sales > Sales Return > SalesReturn Summary New
+NOT BUILT  | OldRpt_SalesRTNRegisterDetail_Report   | Reports > Sales > Sales Return > SalesReturn ItemDetail New
+VERIFIED   | Rpt_PurchaseRegisterSummary_Report     | Reports > Purchase > Purchase Bill > Purchase Summary
+VERIFIED   | Rpt_PurchaseRegisterDetail_Report      | Reports > Purchase > Purchase Bill > Purchase ItemDetail
+VERIFIED   | Rpt_Jsm_Purchase_ItemSummary           | Reports > Purchase > Purchase Bill > Item Wise Summary
+VERIFIED   | Rpt_Jsm_Purchase                       | Reports > Purchase > Purchase Bill > Summary
+VERIFIED   | Rpt_Jsm_Purchase                       | Reports > Purchase > Purchase Bill > Detail
+NOT BUILT  | Rpt_Purchase_Order_Detail_Rpt          | Reports > Purchase > Purchase Bill > Purchase Order
+NOT BUILT  | New_Rpt_Sales_Intrest_ZoomIn_New       | Reports > Purchase > Purchase Bill > Purchase Bill Wise Interest
+NOT BUILT  | Rpt_PurchaseRtnRegisterSummary_Report  | Reports > Purchase > Purchase Return > PurchReturn Summary
+NOT BUILT  | Rpt_PurchaseRtnRegisterDetail_Report   | Reports > Purchase > Purchase Return > PurchReturn ItemDetail
+VERIFIED   | Rpt_Jsm_Purchase_Return                | Reports > Purchase > Purchase Return > Summary
+VERIFIED   | Rpt_Jsm_Purchase_Return                | Reports > Purchase > Purchase Return > Detail
+NOT BUILT  | Rpt_Purchase_Stock_LRWiseReport        | Reports > Purchase > Purchase Stock
+NOT BUILT  | Rpt_Purchase_Stock_Godown_Report       | Reports > Purchase > Purchase Stock(Godown)
+NOT BUILT  | Rpt_Purchase_Stock                     | Reports > Purchase > Purchase Stock(Old)
+NOT BUILT  | Rpt_1StockSubItemAcc_DetailReport      | Reports > Purchase > Mill Return To Send
+VERIFIED   | Rpt_Process_Issue_Report               | Reports > Process Reports > Send
+VERIFIED   | Rpt_Process_Receipt_Summary            | Reports > Process Reports > Receipt Summary
+VERIFIED   | Rpt_Process_Receipt_Detail             | Reports > Process Reports > Receipt Detail
+VERIFIED   | Rpt_Process_Stock_New_Gst              | Reports > Process Reports > Process Stock
+VERIFIED   | Rpt_Process_Stock_New_Gst              | Reports > Process Reports > Process Stock Zoom
+NOT BUILT  | Rpt_Jsm_Process_ItemSummary            | Reports > Process Reports > Item Wise Summary
+NOT BUILT  | Rpt_Process_Stock_TakaDetail           | Reports > Process Reports > TakaWise Stock Detail
+NOT BUILT  | Rpt_Lot_Costing                        | Reports > Process Reports > Lot Wise Costing
+NOT BUILT  | Rpt_Cutting_Report                     | Reports > Process Reports > Cutting Reports
+NOT BUILT  | Rpt_Stk_Cutting_At_Shop                | Reports > Process Reports > Cutting Stock Reports
+NOT BUILT  | Rpt_Update_Lot_Status                  | Reports > Process Reports > Update Lot Status
+NOT BUILT  | New_Rpt_Sales_Intrest_ZoomIn           | Reports > Process Reports > Process Bill Wise Interest
+VERIFIED   | Rpt_Job_IssueReport                    | Reports > JobWork Reports > Send
+VERIFIED   | Rpt_JobWork_Receipt_Summary            | Reports > JobWork Reports > Receipt Summary
+VERIFIED   | Rpt_JobWork_Receipt_Detail             | Reports > JobWork Reports > Receipt Detail
+BUILT      | Rpt_JobWork_Stock_Report               | Reports > JobWork Reports > Jobwork Stock/Pending Report
+NOT BUILT  | Rpt_Additional_Job_Bill                | Reports > JobWork Reports > Challan Status
+NOT BUILT  | Tran_WorkChallan_PL_Repo               | Reports > JobWork Reports > Job P & L
+VERIFIED   | Rpt_SalesRegisterSummary_Report        | Reports > Monthly Reports > Sales
+VERIFIED   | Rpt_PurchaseRegisterSummary_Report     | Reports > Monthly Reports > Purchase
+VERIFIED   | Rpt_Process_Receipt_Summary            | Reports > Monthly Reports > Process
+VERIFIED   | Rpt_JobWork_Receipt_Summary            | Reports > Monthly Reports > JobWork
+NOT BUILT  | Rpt_Stk_Grey_Finish_Summary            | Reports > Monthly Reports > Sales G/F
+NOT BUILT  | A_Gstr1_SalesReturnSummary             | Reports > Monthly Reports > Sales Return
+NOT BUILT  | A_Gstr1_PurchaseRtn_Report             | Reports > Monthly Reports > Purchase Return
+NOT BUILT  | Rpt_BankBookRec_GstMonthWise           | Reports > Monthly Reports > Bank Rec. Payment
+NOT BUILT  | Rpt_TdsReports                         | Reports > Tds Reports > Head Wise Report
+NOT BUILT  | Rpt_Tds2_Prty_Mnth_Wise                | Reports > Tds Reports > Party Wise Report
+NOT BUILT  | Rpt_Tds2_Prty_Mnth_Wise                | Reports > Tds Reports > Party Wise Monthly Report
+NOT BUILT  | Rpt_Tds3_Add_Ackn                      | Reports > Tds Reports > Address/Acknowledge
+NOT BUILT  | Rpt_Tds4_Challan                       | Reports > Tds Reports > Tax Challan
+NOT BUILT  | Rpt_Tds5_Certi                         | Reports > Tds Reports > Certificate
+NOT BUILT  | Rpt_TdsReports                         | Reports > Tds Reports > Tds Register
+NOT BUILT  | Rpt_Tcs                                | Reports > Tcs Reports > Tcs Rec/Pay Report
+NOT BUILT  | Rpt_TcsReports                         | Reports > Tcs Reports > Tcs Sales Register
+NOT BUILT  | Rpt_TcsReports                         | Reports > Tcs Reports > Tcs Purchase Register
+NOT BUILT  | Gstr_3B_TextNew_Monthly                | Reports > Gst Reports > 3B Monthly Return > 3B - Monthly Return
 NOT BUILT  | Gstr_3B_Detail_Inward_Outwardard_supply | Reports > Gst Reports > 3B Monthly Return > 3B - Inward & Outward Supply
-NOT BUILT  | A_All_Inward_Supply_Purchase       | Reports > Gst Reports > 3B Monthly Return > 3B - Inward Supply
-NOT BUILT  | A_All_Outward_Supply_Sales         | Reports > Gst Reports > 3B Monthly Return > 3B - Outward Supply
-NOT BUILT  | GstFilingFreezeData                | Reports > Gst Reports > 3B Monthly Return > 3B - Freeze DataEntry
-NOT BUILT  | Stp_Gst_OutWrad_ErrorCheck         | Reports > Gst Reports > Gstr-1 Error Checking
-NOT BUILT  | Rpt_Jsm_GSTR1_3_2_2                | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v3.2.2
-NOT BUILT  | Rpt_Jsm_GSTR1_Old2_0_GovAllExcel   | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v2.0
-NOT BUILT  | Rpt_Jsm_GSTR1_1_8_GovAllExcel      | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v1.9
-NOT BUILT  | Rpt_Jsm_GSTR1_7_GovAllExcel        | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v1.7
-NOT BUILT  | Rpt_Match2B_Report_Tejas           | Reports > Gst Reports > Gstr Matching > Gstr-2B Matching Reconcial
-NOT BUILT  | Rpt_Match2A                        | Reports > Gst Reports > Gstr Matching > Gstr-2A Matching Reconcial
-NOT BUILT  | Rpt_Jsm_Gstr1_Match                | Reports > Gst Reports > Gstr Matching > Gstr-1 Matching Reconcial
-NOT BUILT  | Rpt_Match8A_Report                 | Reports > Gst Reports > Gstr Matching > Gstr-8 Match
-NOT BUILT  | Rpt_Match4A_Report_New             | Reports > Gst Reports > Gstr Matching > Gstr-4A Matching
-NOT BUILT  | Rpt_Match2B_Report                 | Reports > Gst Reports > Gstr Matching > Gstr-2B Matching Reconcial (Old)
-NOT BUILT  | Rpt_Jsm_GSTR1_Json_Match           | Reports > Gst Reports > Gstr Matching > match 1 test
-NOT BUILT  | Rpt_Jsm_GSTR9_New                  | Reports > Gst Reports > Gstr-9 > Gstr-9 & 9C
-NOT BUILT  | xOld_Rpt_Jsm_GSTR9_All_Excel_Report | Reports > Gst Reports > Gstr-9 > Gstr-9C Old
-NOT BUILT  | Rpt_Jsm_GSTR9_Excel                | Reports > Gst Reports > Gstr-9 > Gstr-9 Old
-NOT BUILT  | A_Brokreg_Main_Rpt_Zoom_Column     | Reports > Gst Reports > ITC 04 > ITC 04 (V 2.10)
-NOT BUILT  | Eway_Billing_Bulk                  | Reports > Gst Reports > E-Way Bill Bulk Generation
-NOT BUILT  | A_All_Ewb_Einv_Rpt                 | Reports > Gst Reports > E-Way Bill / Invoice Status
-NOT BUILT  | Gstr_3BB_TextNew_Excel_Monthly     | Reports > Gst Reports > 3B Form - Monthly Excel
-NOT BUILT  | Hsn_Wise_Report_All                | Reports > Gst Reports > Hsn Wise Reports
-NOT BUILT  | Rpt_Jsm_GSTR1_1x_8_GovAllExcel_Old | Reports > Gst Reports > Gst 4.5 > Gstr1
-NOT BUILT  | Rpt_Match2B_x1_ReportNew           | Reports > Gst Reports > Gst 4.5 > 2B
-NOT BUILT  | A_Gstr1_SalesInvoiceSummary        | Reports > Gst Reports > Gstin - Sales > Sales Summary
-NOT BUILT  | A_Gstr1_SalesInvoiceDetail         | Reports > Gst Reports > Gstin - Sales > Sales Detail (Item)
-NOT BUILT  | A_Gstr1_SalesReturnSummary         | Reports > Gst Reports > Gstin - Sales > Sales Rtn (Summary)
-NOT BUILT  | A_Gstr1_SalesReturnDetails         | Reports > Gst Reports > Gstin - Sales > Sales Rtn Detail (Item)
-NOT BUILT  | A_Gstr2_PurchaseSummary            | Reports > Gst Reports > Gstin - Purchase > Purchase Summary
-NOT BUILT  | A_Gstr2_PurchaseDetail             | Reports > Gst Reports > Gstin - Purchase > Purchase Detail ( Item )
-NOT BUILT  | A_Gstr1_PurchaseRtn_Report         | Reports > Gst Reports > Gstin - Purchase > Purchase Rtn (Summary)
-NOT BUILT  | A_Gstr2_PurchaseReturnDetails      | Reports > Gst Reports > Gstin - Purchase > Purchase Rtn Detail  (Item)
-NOT BUILT  | A_Gstr2_ProcessSummary             | Reports > Gst Reports > Gstin - Process
-NOT BUILT  | A_Gstr2_JobWorkReceiptSummary      | Reports > Gst Reports > Gstin - JobWork
-NOT BUILT  | Rpt_Journal_Details_Report         | Reports > Gst Reports > Gstin - Journal Report
-NOT BUILT  | A_Gstr2_Expense                    | Reports > Gst Reports > Gstin - Expense
-NOT BUILT  | JS_GSTR1_RPT                       | Reports > Gst Reports > Extra > 1Sales
-NOT BUILT  | JS_GSTR2_RPT                       | Reports > Gst Reports > Extra > 2Purchase
-NOT BUILT  | JS_GSTR3_SMRY                      | Reports > Gst Reports > Extra > 3Summary
-NOT BUILT  | Rpt_Stk_Acc_Finish_Summary         | Reports > Acc Stock Reports > Stock Ledger
-NOT BUILT  | Rpt_Stk_Acc_Finish_Summary_Value   | Reports > Acc Stock Reports > Stock With Value Report
-NOT BUILT  | Rpt_StockSubItemAccReport          | Reports > Acc Stock Reports > Stock SubItem Wise
-NOT BUILT  | Rpt_StockSubItemAcc_DetailReport   | Reports > Acc Stock Reports > Stock SubItem(Detail) Wise
+NOT BUILT  | A_All_Inward_Supply_Purchase           | Reports > Gst Reports > 3B Monthly Return > 3B - Inward Supply
+NOT BUILT  | A_All_Outward_Supply_Sales             | Reports > Gst Reports > 3B Monthly Return > 3B - Outward Supply
+NOT BUILT  | GstFilingFreezeData                    | Reports > Gst Reports > 3B Monthly Return > 3B - Freeze DataEntry
+NOT BUILT  | Stp_Gst_OutWrad_ErrorCheck             | Reports > Gst Reports > Gstr-1 Error Checking
+NOT BUILT  | Rpt_Jsm_GSTR1_3_2_2                    | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v3.2.2
+NOT BUILT  | Rpt_Jsm_GSTR1_Old2_0_GovAllExcel       | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v2.0
+NOT BUILT  | Rpt_Jsm_GSTR1_1_8_GovAllExcel          | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v1.9
+NOT BUILT  | Rpt_Jsm_GSTR1_7_GovAllExcel            | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v1.7
+NOT BUILT  | Rpt_Match2B_Report_Tejas               | Reports > Gst Reports > Gstr Matching > Gstr-2B Matching Reconcial
+NOT BUILT  | Rpt_Match2A                            | Reports > Gst Reports > Gstr Matching > Gstr-2A Matching Reconcial
+NOT BUILT  | Rpt_Jsm_Gstr1_Match                    | Reports > Gst Reports > Gstr Matching > Gstr-1 Matching Reconcial
+NOT BUILT  | Rpt_Match8A_Report                     | Reports > Gst Reports > Gstr Matching > Gstr-8 Match
+NOT BUILT  | Rpt_Match4A_Report_New                 | Reports > Gst Reports > Gstr Matching > Gstr-4A Matching
+NOT BUILT  | Rpt_Match2B_Report                     | Reports > Gst Reports > Gstr Matching > Gstr-2B Matching Reconcial (Old)
+NOT BUILT  | Rpt_Jsm_GSTR1_Json_Match               | Reports > Gst Reports > Gstr Matching > match 1 test
+NOT BUILT  | Rpt_Jsm_GSTR9_New                      | Reports > Gst Reports > Gstr-9 > Gstr-9 & 9C
+NOT BUILT  | xOld_Rpt_Jsm_GSTR9_All_Excel_Report    | Reports > Gst Reports > Gstr-9 > Gstr-9C Old
+NOT BUILT  | Rpt_Jsm_GSTR9_Excel                    | Reports > Gst Reports > Gstr-9 > Gstr-9 Old
+NOT BUILT  | A_Brokreg_Main_Rpt_Zoom_Column         | Reports > Gst Reports > ITC 04 > ITC 04 (V 2.10)
+NOT BUILT  | Eway_Billing_Bulk                      | Reports > Gst Reports > E-Way Bill Bulk Generation
+NOT BUILT  | A_All_Ewb_Einv_Rpt                     | Reports > Gst Reports > E-Way Bill / Invoice Status
+NOT BUILT  | Gstr_3BB_TextNew_Excel_Monthly         | Reports > Gst Reports > 3B Form - Monthly Excel
+NOT BUILT  | Hsn_Wise_Report_All                    | Reports > Gst Reports > Hsn Wise Reports
+NOT BUILT  | Rpt_Jsm_GSTR1_1x_8_GovAllExcel_Old     | Reports > Gst Reports > Gst 4.5 > Gstr1
+NOT BUILT  | Rpt_Match2B_x1_ReportNew               | Reports > Gst Reports > Gst 4.5 > 2B
+NOT BUILT  | A_Gstr1_SalesInvoiceSummary            | Reports > Gst Reports > Gstin - Sales > Sales Summary
+NOT BUILT  | A_Gstr1_SalesInvoiceDetail             | Reports > Gst Reports > Gstin - Sales > Sales Detail (Item)
+NOT BUILT  | A_Gstr1_SalesReturnSummary             | Reports > Gst Reports > Gstin - Sales > Sales Rtn (Summary)
+NOT BUILT  | A_Gstr1_SalesReturnDetails             | Reports > Gst Reports > Gstin - Sales > Sales Rtn Detail (Item)
+NOT BUILT  | A_Gstr2_PurchaseSummary                | Reports > Gst Reports > Gstin - Purchase > Purchase Summary
+NOT BUILT  | A_Gstr2_PurchaseDetail                 | Reports > Gst Reports > Gstin - Purchase > Purchase Detail ( Item )
+NOT BUILT  | A_Gstr1_PurchaseRtn_Report             | Reports > Gst Reports > Gstin - Purchase > Purchase Rtn (Summary)
+NOT BUILT  | A_Gstr2_PurchaseReturnDetails          | Reports > Gst Reports > Gstin - Purchase > Purchase Rtn Detail  (Item)
+NOT BUILT  | A_Gstr2_ProcessSummary                 | Reports > Gst Reports > Gstin - Process
+NOT BUILT  | A_Gstr2_JobWorkReceiptSummary          | Reports > Gst Reports > Gstin - JobWork
+NOT BUILT  | Rpt_Journal_Details_Report             | Reports > Gst Reports > Gstin - Journal Report
+NOT BUILT  | A_Gstr2_Expense                        | Reports > Gst Reports > Gstin - Expense
+NOT BUILT  | JS_GSTR1_RPT                           | Reports > Gst Reports > Extra > 1Sales
+NOT BUILT  | JS_GSTR2_RPT                           | Reports > Gst Reports > Extra > 2Purchase
+NOT BUILT  | JS_GSTR3_SMRY                          | Reports > Gst Reports > Extra > 3Summary
+NOT BUILT  | Rpt_Stk_Acc_Finish_Summary             | Reports > Acc Stock Reports > Stock Ledger
+NOT BUILT  | Rpt_Stk_Acc_Finish_Summary_Value       | Reports > Acc Stock Reports > Stock With Value Report
+NOT BUILT  | Rpt_StockSubItemAccReport              | Reports > Acc Stock Reports > Stock SubItem Wise
+NOT BUILT  | Rpt_StockSubItemAcc_DetailReport       | Reports > Acc Stock Reports > Stock SubItem(Detail) Wise
 NOT BUILT  | Rpt_StockSubItemAcc_DetailReport_Online | Reports > Acc Stock Reports > Stock Register
-NOT BUILT  | Rpt_Stock_Acc_Finish_Summary       | Reports > Acc Stock Reports > Stock Ledger New
-NOT BUILT  | Rpt_Stk_Meter_TanusKgs             | Reports > Inv Stock Ledger > Stock Mts Reports
-NOT BUILT  | Rpt_Stk_Meter_TanusKgs             | Reports > Inv Stock Ledger > Stock Mts Reports(Kgs)
-NOT BUILT  | Rpt_Monthly_Stk_Qty_Value_Report   | Reports > Inv Stock Ledger > Stock Mts New Reports
-NOT BUILT  | Rpt_Jsm_Stock_Finish_New1          | Reports > Inv Stock Ledger > Finish At Shop Stock
-NOT BUILT  | Rpt_Stk_Grey_At_Shop               | Reports > Inv Stock Ledger > Grey   At Shop Stock
-NOT BUILT  | Rpt_Jsm_Stock_Grey_At_Mill         | Reports > Inv Stock Ledger > Grey   At Mill Stock - Format 1
-NOT BUILT  | Rpt1_Stk_Grey_At_Mill              | Reports > Inv Stock Ledger > Grey   At Mill Stock - Format 2
-NOT BUILT  | Rpt_FinishStockReport              | Reports > Inv Stock Ledger > Finish Stock Excel
-NOT BUILT  | Rpt_Stock_Acc_Finish_Summary       | Reports > Inv Stock Ledger > Finish At Shop Stock(Book-Acc)
-NOT BUILT  | A_StockValueReport                 | Reports > Inv Stock Ledger > Stock Value Reports
-NOT BUILT  | Rpt_Outstating_Report              | Others Reports > Outstanding Zoom > Debitors
-NOT BUILT  | Rpt_Outstating_Report              | Others Reports > Outstanding Zoom > Creditors
-NOT BUILT  | Rpt_Outstating_Report              | Others Reports > Outstanding Zoom > Process
-NOT BUILT  | Rpt_Outstating_Report              | Others Reports > Outstanding Zoom > JobWork
-NOT BUILT  | Rpt_Outstating_Age_Report          | Others Reports > Outstanding Zoom > Age Analysis > Debitors Age
-NOT BUILT  | A_Jsm_Os_Sales_Age_Analysys_Updated | Others Reports > Outstanding Zoom > Age Analysis > Debitors Excel Age Analysis
-NOT BUILT  | Rpt_Outstating_ReportSales         | Others Reports > Outstanding Zoom > Os New Format Testing
-VERIFIED   | Rpt_Jsm_Os_Sales                   | Others Reports > Outstanding > Debitors > Normal
-BUILT      | Rpt_Jsm_Os_Sales_AgeAnalysis       | Others Reports > Outstanding > Debitors > AgeAnalysis
-NOT BUILT  | Rpt_Jsm_Os_Sales_Detail            | Others Reports > Outstanding > Debitors > Detail
-NOT BUILT  | Rpt_Os_90Days_Eklvya               | Others Reports > Outstanding > Debitors > 90 Days
-VERIFIED   | Rpt_Jsm_Os_Purchase                | Others Reports > Outstanding > Creditors > Normal
-BUILT      | Rpt_Jsm_Os_Purchase_AgeAnalysis    | Others Reports > Outstanding > Creditors > AgeAnalysis
-NOT BUILT  | Rpt_Jsm_Os_Purchase_Detail         | Others Reports > Outstanding > Creditors > Detail
-BUILT      | Rpt_Jsm_Os_Process                 | Others Reports > Outstanding > Process > Normal
-BUILT      | Rpt_Jsm_Os_Process_AgeAnalysis     | Others Reports > Outstanding > Process > AgeAnalysis
-BUILT      | Rpt_Jsm_Os_Jobwork                 | Others Reports > Outstanding > JobWork > Normal
-BUILT      | Rpt_Jsm_Os_Jobwork_AgeAnalysis     | Others Reports > Outstanding > JobWork > AgeAnalysis
-NOT BUILT  | Rpt_Jsm_Os_Update                  | Others Reports > Outstanding > Update O/s. Bill
-NOT BUILT  | Zoom_SelectDate_List               | Others Reports > Outstanding > UnAdjust Setup
-NOT BUILT  | Rpt_Sms_OsReports                  | Others Reports > Outstanding > Sms Days Wise
-NOT BUILT  | A_Textiles_Outstanding_MonthWise   | Others Reports > Outstanding > Month O/s. > Sales
-NOT BUILT  | A_Textiles_Outstanding_MonthWise   | Others Reports > Outstanding > Month O/s. > Purchase
-NOT BUILT  | A_BrokregStatment                  | Others Reports > Brokreg Statment > Sales > Rec.Date Wise
-NOT BUILT  | A_BrokregStatment                  | Others Reports > Brokreg Statment > Sales > Bill Date Wise
-NOT BUILT  | A_BrokregStatment                  | Others Reports > Brokreg Statment > Purchase > Bill Date Wise
-NOT BUILT  | A_BrokregStatment                  | Others Reports > Brokreg Statment > Purchase > Paid Date Wise
-NOT BUILT  | Rpt_Job_Brokerage                  | Others Reports > Brokreg Statment > JobWork
-NOT BUILT  | Tran_TradingBrokregEntry           | Others Reports > Brokreg Statment > SalesBrokreg Entry
-NOT BUILT  | Rpt_BrokregReport                  | Others Reports > Brokreg Statment > Brokreg Os (Rec/Pay)
-NOT BUILT  | Rpt_Daily_TransactionNew           | Others Reports > Daily Transaction
-NOT BUILT  | Rpt_Account_List_Print             | Others Reports > Master List > Envelope
-NOT BUILT  | Rpt_Account_List_Print             | Others Reports > Master List > Label Printing
-NOT BUILT  | Rpt_Account_ReportRpt              | Others Reports > Master List > Account
-NOT BUILT  | Rpt_Item_Mst_Report                | Others Reports > Master List > Item
-NOT BUILT  | Zoom_SelectDate_List_Item          | Others Reports > Zoom Item Ledger
-NOT BUILT  | A_ReportYarnStock                  | Others Reports > Others Reports > YarnKgsStock
-NOT BUILT  | Rpt_StkKgsFinishAtShop             | Others Reports > Others Reports > Finish At Shp Kgs
-NOT BUILT  | Rpt_StkKgsGreyAtMill               | Others Reports > Others Reports > Grey At Mill Kgs
-NOT BUILT  | Rpt_StkKgsGreyAtshop               | Others Reports > Others Reports > Grey At Shop Kgs
-NOT BUILT  | Rpt_Box_Stock_ItemDesc             | Others Reports > Others Reports > Box Stock
-NOT BUILT  | A_Jsm_Brokreg_Statement_Report     | Others Reports > Others Reports > Brokreg
-NOT BUILT  | Rpt_OutstatingAllPurchase_Report   | Others Reports > Others Reports > OutStanding PurchaseAll
-NOT BUILT  | Frm_BillAgistPaidDetail            | Others Reports > MissingReport(Query) > BillAgainst PaidDetail
-NOT BUILT  | Stp_DataBaseFromTo                 | Others Reports > Jsm Testingfor > DataBase Repair
-NOT BUILT  | Gstr_3B_TextNew_Monthly_Cess       | Others Reports > Old Reports > Extra Reports > 3B Cess
-NOT BUILT  | Gstr_3BB_TextNew_Excel_Monthly     | Others Reports > Old Reports > Extra Reports > 3B Excel
-NOT BUILT  | Gstr_3BB_Zoomin_Rpt                | Others Reports > Old Reports > Extra Reports > 3B Zoom
-NOT BUILT  | Eway_No_Upload_Offline             | Others Reports > Old Reports > Extra Reports > Brif Cash
-NOT BUILT  | Broker_commision_check             | Others Reports > Old Reports > Extra Reports > Brokreg Entry
-NOT BUILT  | FrmReminder_All_Details            | Others Reports > Old Reports > Extra Reports > Reminder
-NOT BUILT  | Frm_TabReport                      | Others Reports > Old Reports > Extra Reports > CB Bal
-NOT BUILT  | Frm_Import_SalesJsm                | Others Reports > Old Reports > Extra Reports > Import Sales
-NOT BUILT  | Tran_BankDetail                    | Others Reports > Old Reports > Extra Reports > Cash Bank Flow
-NOT BUILT  | Rpt_Stock_Share                    | Others Reports > Old Reports > Extra Reports > Share Stock
-NOT BUILT  | Rpt_StockSizeWise                  | Others Reports > Old Reports > Extra Reports > Stock(Old) Detail SizeWise
-NOT BUILT  | Rpt_Jsm_SalesPurchaseVat           | Others Reports > Old Reports > Old FinalReports > Book Printing
-NOT BUILT  | Rpt_Stk_Grey_At_Shop_DateWise      | Others Reports > Old Reports > Old Stock Reports > GreyAtShop-DateWise
-NOT BUILT  | Rpt_Stk_Grey_At_Shop               | Others Reports > Old Reports > Old Stock Reports > GreyAtShop
-NOT BUILT  | Rpt_1Sales_Receipt_Reg             | Others Reports > Old Reports > Rec/Pay Register > Sales
-NOT BUILT  | Rpt_1Purchase_Payment_Reg          | Others Reports > Old Reports > Rec/Pay Register > Purchase
-NOT BUILT  | Rpt_1Process_Payment_Reg           | Others Reports > Old Reports > Rec/Pay Register > Process
-NOT BUILT  | Rpt_1Job_Payment_Reg               | Others Reports > Old Reports > Rec/Pay Register > JobWork
-NOT BUILT  | ZOld_Rpt_Os_Sales                  | Others Reports > Old Reports > Rec/Pay Register > Debitors.,
-VERIFIED   | Rpt_Jsm_Sales                      | Others Reports > Old Reports > Sales > SalesSummary
-VERIFIED   | Rpt_Jsm_Sales                      | Others Reports > Old Reports > Sales > SalesDetail
-NOT BUILT  | Rpt_Account_List_Print_Old         | Others Reports > Old Reports > List Printing OLD
-NOT BUILT  | Frm_Investment_Raju                | Others Reports > Extra RajuBhai > Inv Report
-NOT BUILT  | Frm_TabReport                      | Others Reports > Extra Report > Balance
+NOT BUILT  | Rpt_Stock_Acc_Finish_Summary           | Reports > Acc Stock Reports > Stock Ledger New
+NOT BUILT  | Rpt_Stk_Meter_TanusKgs                 | Reports > Inv Stock Ledger > Stock Mts Reports
+NOT BUILT  | Rpt_Stk_Meter_TanusKgs                 | Reports > Inv Stock Ledger > Stock Mts Reports(Kgs)
+NOT BUILT  | Rpt_Monthly_Stk_Qty_Value_Report       | Reports > Inv Stock Ledger > Stock Mts New Reports
+NOT BUILT  | Rpt_Jsm_Stock_Finish_New1              | Reports > Inv Stock Ledger > Finish At Shop Stock
+NOT BUILT  | Rpt_Stk_Grey_At_Shop                   | Reports > Inv Stock Ledger > Grey   At Shop Stock
+NOT BUILT  | Rpt_Jsm_Stock_Grey_At_Mill             | Reports > Inv Stock Ledger > Grey   At Mill Stock - Format 1
+NOT BUILT  | Rpt1_Stk_Grey_At_Mill                  | Reports > Inv Stock Ledger > Grey   At Mill Stock - Format 2
+NOT BUILT  | Rpt_FinishStockReport                  | Reports > Inv Stock Ledger > Finish Stock Excel
+NOT BUILT  | Rpt_Stock_Acc_Finish_Summary           | Reports > Inv Stock Ledger > Finish At Shop Stock(Book-Acc)
+NOT BUILT  | A_StockValueReport                     | Reports > Inv Stock Ledger > Stock Value Reports
+NOT BUILT  | Rpt_Outstating_Report                  | Others Reports > Outstanding Zoom > Debitors
+NOT BUILT  | Rpt_Outstating_Report                  | Others Reports > Outstanding Zoom > Creditors
+NOT BUILT  | Rpt_Outstating_Report                  | Others Reports > Outstanding Zoom > Process
+NOT BUILT  | Rpt_Outstating_Report                  | Others Reports > Outstanding Zoom > JobWork
+NOT BUILT  | Rpt_Outstating_Age_Report              | Others Reports > Outstanding Zoom > Age Analysis > Debitors Age
+NOT BUILT  | A_Jsm_Os_Sales_Age_Analysys_Updated    | Others Reports > Outstanding Zoom > Age Analysis > Debitors Excel Age Analysis
+NOT BUILT  | Rpt_Outstating_ReportSales             | Others Reports > Outstanding Zoom > Os New Format Testing
+VERIFIED   | Rpt_Jsm_Os_Sales                       | Others Reports > Outstanding > Debitors > Normal
+BUILT      | Rpt_Jsm_Os_Sales_AgeAnalysis           | Others Reports > Outstanding > Debitors > AgeAnalysis
+NOT BUILT  | Rpt_Jsm_Os_Sales_Detail                | Others Reports > Outstanding > Debitors > Detail
+NOT BUILT  | Rpt_Os_90Days_Eklvya                   | Others Reports > Outstanding > Debitors > 90 Days
+VERIFIED   | Rpt_Jsm_Os_Purchase                    | Others Reports > Outstanding > Creditors > Normal
+BUILT      | Rpt_Jsm_Os_Purchase_AgeAnalysis        | Others Reports > Outstanding > Creditors > AgeAnalysis
+NOT BUILT  | Rpt_Jsm_Os_Purchase_Detail             | Others Reports > Outstanding > Creditors > Detail
+BUILT      | Rpt_Jsm_Os_Process                     | Others Reports > Outstanding > Process > Normal
+BUILT      | Rpt_Jsm_Os_Process_AgeAnalysis         | Others Reports > Outstanding > Process > AgeAnalysis
+BUILT      | Rpt_Jsm_Os_Jobwork                     | Others Reports > Outstanding > JobWork > Normal
+BUILT      | Rpt_Jsm_Os_Jobwork_AgeAnalysis         | Others Reports > Outstanding > JobWork > AgeAnalysis
+NOT BUILT  | Rpt_Jsm_Os_Update                      | Others Reports > Outstanding > Update O/s. Bill
+NOT BUILT  | Zoom_SelectDate_List                   | Others Reports > Outstanding > UnAdjust Setup
+NOT BUILT  | Rpt_Sms_OsReports                      | Others Reports > Outstanding > Sms Days Wise
+NOT BUILT  | A_Textiles_Outstanding_MonthWise       | Others Reports > Outstanding > Month O/s. > Sales
+NOT BUILT  | A_Textiles_Outstanding_MonthWise       | Others Reports > Outstanding > Month O/s. > Purchase
+NOT BUILT  | A_BrokregStatment                      | Others Reports > Brokreg Statment > Sales > Rec.Date Wise
+NOT BUILT  | A_BrokregStatment                      | Others Reports > Brokreg Statment > Sales > Bill Date Wise
+NOT BUILT  | A_BrokregStatment                      | Others Reports > Brokreg Statment > Purchase > Bill Date Wise
+NOT BUILT  | A_BrokregStatment                      | Others Reports > Brokreg Statment > Purchase > Paid Date Wise
+NOT BUILT  | Rpt_Job_Brokerage                      | Others Reports > Brokreg Statment > JobWork
+NOT BUILT  | Tran_TradingBrokregEntry               | Others Reports > Brokreg Statment > SalesBrokreg Entry
+NOT BUILT  | Rpt_BrokregReport                      | Others Reports > Brokreg Statment > Brokreg Os (Rec/Pay)
+NOT BUILT  | Rpt_Daily_TransactionNew               | Others Reports > Daily Transaction
+NOT BUILT  | Rpt_Account_List_Print                 | Others Reports > Master List > Envelope
+NOT BUILT  | Rpt_Account_List_Print                 | Others Reports > Master List > Label Printing
+NOT BUILT  | Rpt_Account_ReportRpt                  | Others Reports > Master List > Account
+NOT BUILT  | Rpt_Item_Mst_Report                    | Others Reports > Master List > Item
+NOT BUILT  | Zoom_SelectDate_List_Item              | Others Reports > Zoom Item Ledger
+NOT BUILT  | A_ReportYarnStock                      | Others Reports > Others Reports > YarnKgsStock
+NOT BUILT  | Rpt_StkKgsFinishAtShop                 | Others Reports > Others Reports > Finish At Shp Kgs
+NOT BUILT  | Rpt_StkKgsGreyAtMill                   | Others Reports > Others Reports > Grey At Mill Kgs
+NOT BUILT  | Rpt_StkKgsGreyAtshop                   | Others Reports > Others Reports > Grey At Shop Kgs
+NOT BUILT  | Rpt_Box_Stock_ItemDesc                 | Others Reports > Others Reports > Box Stock
+NOT BUILT  | A_Jsm_Brokreg_Statement_Report         | Others Reports > Others Reports > Brokreg
+NOT BUILT  | Rpt_OutstatingAllPurchase_Report       | Others Reports > Others Reports > OutStanding PurchaseAll
+NOT BUILT  | Frm_BillAgistPaidDetail                | Others Reports > MissingReport(Query) > BillAgainst PaidDetail
+NOT BUILT  | Stp_DataBaseFromTo                     | Others Reports > Jsm Testingfor > DataBase Repair
+NOT BUILT  | Gstr_3B_TextNew_Monthly_Cess           | Others Reports > Old Reports > Extra Reports > 3B Cess
+NOT BUILT  | Gstr_3BB_TextNew_Excel_Monthly         | Others Reports > Old Reports > Extra Reports > 3B Excel
+NOT BUILT  | Gstr_3BB_Zoomin_Rpt                    | Others Reports > Old Reports > Extra Reports > 3B Zoom
+NOT BUILT  | Eway_No_Upload_Offline                 | Others Reports > Old Reports > Extra Reports > Brif Cash
+NOT BUILT  | Broker_commision_check                 | Others Reports > Old Reports > Extra Reports > Brokreg Entry
+NOT BUILT  | FrmReminder_All_Details                | Others Reports > Old Reports > Extra Reports > Reminder
+NOT BUILT  | Frm_TabReport                          | Others Reports > Old Reports > Extra Reports > CB Bal
+NOT BUILT  | Frm_Import_SalesJsm                    | Others Reports > Old Reports > Extra Reports > Import Sales
+NOT BUILT  | Tran_BankDetail                        | Others Reports > Old Reports > Extra Reports > Cash Bank Flow
+NOT BUILT  | Rpt_Stock_Share                        | Others Reports > Old Reports > Extra Reports > Share Stock
+NOT BUILT  | Rpt_StockSizeWise                      | Others Reports > Old Reports > Extra Reports > Stock(Old) Detail SizeWise
+NOT BUILT  | Rpt_Jsm_SalesPurchaseVat               | Others Reports > Old Reports > Old FinalReports > Book Printing
+NOT BUILT  | Rpt_Stk_Grey_At_Shop_DateWise          | Others Reports > Old Reports > Old Stock Reports > GreyAtShop-DateWise
+NOT BUILT  | Rpt_Stk_Grey_At_Shop                   | Others Reports > Old Reports > Old Stock Reports > GreyAtShop
+NOT BUILT  | Rpt_1Sales_Receipt_Reg                 | Others Reports > Old Reports > Rec/Pay Register > Sales
+NOT BUILT  | Rpt_1Purchase_Payment_Reg              | Others Reports > Old Reports > Rec/Pay Register > Purchase
+NOT BUILT  | Rpt_1Process_Payment_Reg               | Others Reports > Old Reports > Rec/Pay Register > Process
+NOT BUILT  | Rpt_1Job_Payment_Reg                   | Others Reports > Old Reports > Rec/Pay Register > JobWork
+NOT BUILT  | ZOld_Rpt_Os_Sales                      | Others Reports > Old Reports > Rec/Pay Register > Debitors.,
+VERIFIED   | Rpt_Jsm_Sales                          | Others Reports > Old Reports > Sales > SalesSummary
+VERIFIED   | Rpt_Jsm_Sales                          | Others Reports > Old Reports > Sales > SalesDetail
+NOT BUILT  | Rpt_Account_List_Print_Old             | Others Reports > Old Reports > List Printing OLD
+NOT BUILT  | Frm_Investment_Raju                    | Others Reports > Extra RajuBhai > Inv Report
+NOT BUILT  | Frm_TabReport                          | Others Reports > Extra Report > Balance

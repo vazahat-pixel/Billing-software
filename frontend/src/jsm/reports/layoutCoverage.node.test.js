@@ -16,13 +16,18 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const layouts = JSON.parse(fs.readFileSync(path.join(here, '..', 'blueprint', 'layouts.json'), 'utf8'));
 
-/** Layout names each backend report declares, read from the source so the test cannot drift. */
+/**
+ * Layout names each backend report declares, read from the source so the test cannot drift.
+ *
+ * Any JSM_VW_… string in a report file counts, not only `layout: '…'` — some reports pick their
+ * layout from a `views: { summary, bills }` block, and those were slipping past this check.
+ */
 function declaredLayouts() {
   const dir = path.resolve(here, '..', '..', '..', '..', 'backend', 'services', 'jsmReports', 'reports');
   const out = [];
   for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.js'))) {
     const src = fs.readFileSync(path.join(dir, file), 'utf8');
-    for (const m of src.matchAll(/layout:\s*'([A-Z0-9_]+)'/g)) {
+    for (const m of src.matchAll(/'(JSM_VW_[A-Z0-9_]+)'/g)) {
       out.push({ report: file.replace(/\.js$/, ''), layout: m[1] });
     }
   }
@@ -57,8 +62,10 @@ test('only the known no-layout screens are uncaptured, and each has fallback col
   assert.deepEqual(
     [...new Set(uncaptured)].sort(),
     [
-      'JSM_VW_CASHBANK_DETAIL', 'JSM_VW_CASHBANK_DTLVNO',
-      'JSM_VW_PROCESS_ISSUE_SUM_REPORT', 'JSM_VW_SALES_HASTE_REPORT', 'JSM_VW_TR_BAL',
+      'JSM_VW_CASHBANK_DETAIL', 'JSM_VW_CASHBANK_DTLVNO', 'JSM_VW_GRATER_OR_LESS',
+      'JSM_VW_GROUP_BALANCE', 'JSM_VW_JV_BOOK', 'JSM_VW_JV_BOOK_SUMMARY',
+      'JSM_VW_PROCESS_ISSUE_SUM_REPORT', 'JSM_VW_SALES_DETAIL_SUM_REPORT',
+      'JSM_VW_SALES_HASTE_REPORT', 'JSM_VW_TR_BAL',
     ],
     'a newly uncaptured layout appeared — give it fallbackColumns or capture it from STP_REPORT'
   );

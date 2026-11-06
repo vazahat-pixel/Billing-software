@@ -85,13 +85,13 @@ export const FORM_HANDLERS = {
 
   // Fas / Final
   A_AccountLedgerDoubleSide: { id: 'fas-ledger-t', external: 'jsmReport', jsmForm: 'A_AccountLedgerDoubleSide_TFormat' },
-  Rpt_Above_Below: { id: 'fas-above', external: 'fasCheck', reportKind: 'aboveBelow' },
-  Rpt_JvBook1: { id: 'fas-voucher', external: 'journal' },
+  Rpt_Above_Below: { id: 'fas-above', external: 'jsmReport', jsmForm: 'Rpt_Above_Below' },
+  Rpt_JvBook1: { id: 'fas-voucher', external: 'jsmReport', jsmForm: 'Rpt_JvBook1' },
   Tran_ImportCashBank: { id: 'fas-import-bank', external: 'fasCheck', reportKind: 'importBank' },
   Mst1_Check_Diff: { id: 'final-diff-os', external: 'fasCheck', reportKind: 'diffOpening' },
   Rpt_Cash_Bank_Finance_Report: { id: 'final-cash-fin', external: 'cashBook' },
   Rpt_Jsm_Ledger_os_Diff_Check: { id: 'final-diff-year', external: 'fasCheck', reportKind: 'diffYear' },
-  Rpt_Group_Balance: { id: 'final-group', external: 'finalReport', reportKind: 'groupList' },
+  Rpt_Group_Balance: { id: 'final-group', external: 'jsmReport', jsmForm: 'Rpt_Group_Balance' },
 
   // Sales / Purchase Summary — the screens on the main menu path, which group on two Order By
   // combos rather than a Category Wise.
