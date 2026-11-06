@@ -53,7 +53,7 @@ import { useConfig } from '../context/ConfigContext';
 import { isFlagEnabled } from '../utils/configHelpers';
 import { toast } from '../store/useToastStore';
 import { CardGridLoader, InlineLoader, TopProgressBar } from '../components/ui/loaders';
-import { buildReportsMenuItems } from '../utils/reportTree';
+import { buildReportsMenuItems, JSM_OTHERS_TREE } from '../utils/reportTree';
 
 // Daily-path modals — eager so click → form is instant (no blank Suspense wait)
 import SalesModal from './sales/SalesModal';
@@ -826,6 +826,31 @@ const Dashboard = () => {
       openReportsHub('summary', leafId);
    };
 
+   /** Opens whichever screen a Reports / Others Reports entry points at. Shared by both menus. */
+   const openReportExternal = (node) => {
+      const ext = typeof node === 'string' ? node : node?.external;
+      if (ext === 'jsmReport') setJsmReportForm(node.jsmForm);
+      else if (ext === 'gstReports' && node?.reportKind === 'gst3b') toggleModal('gst3bMonthly', true);
+      else if (ext === 'gstReports' && /^gstin(Sales|Purchase|Process|Jobwork|Journal|Expense)$/.test(node?.reportKind || '')) {
+         setGstinJsmKind(node.reportKind);
+         toggleModal('gstinJsm', true);
+      } else if (ext === 'gstReports') openGstReport(node?.reportKind || 'gstr1');
+      else if (ext === 'gstr1') openGstReport('gstr1');
+      else if (ext === 'finalReport') {
+         setFinalReportKind(node.reportKind || 'groupList');
+         setModals((prev) => ({ ...prev, finalReport: true }));
+      } else if (ext === 'fasCheck') {
+         setFasCheckKind(node?.reportKind || 'interest');
+         setModals((prev) => ({ ...prev, fasCheck: true }));
+      } else if (ext === 'stockLedger') {
+         setStockLedgerKind(node.reportKind || 'stockMts');
+         setModals((prev) => ({ ...prev, stockLedger: true }));
+      } else if (ext === 'outstanding' || ext === 'outstandingSalesFull') {
+         yieldOtherWindows('outstanding');
+         setModals((prev) => ({ ...prev, outstanding: true, outstandingSalesFull: true }));
+      } else if (ext) toggleModal(ext, true);
+   };
+
    const [companyPanel, setCompanyPanel] = useState('list');
    const openCompanyPanel = (panel) => {
       setCompanyPanel(panel);
@@ -1168,80 +1193,19 @@ const Dashboard = () => {
          ...buildReportsMenuItems({
             openLeaf: openReportLeaf,
             openHub: openReportsHub,
-            openExternal: (node) => {
-               const ext = typeof node === 'string' ? node : node?.external;
-               if (ext === 'jsmReport') setJsmReportForm(node.jsmForm);
-               else if (ext === 'gstReports' && node?.reportKind === 'gst3b') toggleModal('gst3bMonthly', true);
-               else if (ext === 'gstReports' && /^gstin(Sales|Purchase|Process|Jobwork|Journal|Expense)$/.test(node?.reportKind || '')) { setGstinJsmKind(node.reportKind); toggleModal('gstinJsm', true); }
-               else if (ext === 'gstReports') openGstReport(node?.reportKind || 'gstr1');
-               else if (ext === 'gstr1') openGstReport('gstr1');
-               else if (ext === 'finalReport') {
-                  setFinalReportKind(node.reportKind || 'groupList');
-                  setModals((prev) => ({ ...prev, finalReport: true }));
-               } else if (ext === 'fasCheck') {
-                  setFasCheckKind(node?.reportKind || 'interest');
-                  setModals((prev) => ({ ...prev, fasCheck: true }));
-               } else if (ext === 'stockLedger') {
-                  setStockLedgerKind(node.reportKind || 'stockMts');
-                  setModals((prev) => ({ ...prev, stockLedger: true }));
-               } else if (ext === 'outstanding' || ext === 'outstandingSalesFull') {
-                  yieldOtherWindows('outstanding');
-                  setModals((prev) => ({ ...prev, outstanding: true, outstandingSalesFull: true }));
-               } else if (ext) toggleModal(ext, true);
-            },
+            openExternal: openReportExternal,
          }).filter((i) => i.label !== 'All Reports Hub'),
       ],
-      // Same order and sub-menus as JSM's Others Reports; the MERN-only hubs sit at the end.
+      // JSM's own Others Reports menu, entry for entry (utils/jsmMenuTree.js), with this
+      // software's own two extras after it.
       'Others Reports': [
-         {
-            // JSM's own Debitor/Creditor/Process/Jobwork O/s screens (Rpt_Jsm_Os_*), not the
-            // generic modal — "Zoom" is JSM's name for this detail-grid view.
-            label: 'Outstanding Zoom',
-            children: [
-               { label: 'Debitors', action: () => setJsmReportForm('Rpt_Jsm_Os_Sales') },
-               { label: 'Creditors', action: () => setJsmReportForm('Rpt_Jsm_Os_Purchase') },
-               { label: 'Process', action: () => setJsmReportForm('Rpt_Jsm_Os_Process') },
-               { label: 'JobWork', action: () => setJsmReportForm('Rpt_Jsm_Os_Jobwork') },
-               { label: 'Age Analysis', action: () => setJsmReportForm('Rpt_Jsm_Os_Sales_AgeAnalysis') },
-               { label: 'Os New Format Testing', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
-            ],
-         },
-         {
-            label: 'Outstanding',
-            children: [
-               { label: 'Debitors', action: () => setJsmReportForm('Rpt_Jsm_Os_Sales') },
-               { label: 'Creditors', action: () => setJsmReportForm('Rpt_Jsm_Os_Purchase') },
-               { label: 'Process', action: () => setJsmReportForm('Rpt_Jsm_Os_Process') },
-               { label: 'JobWork', action: () => setJsmReportForm('Rpt_Jsm_Os_Jobwork') },
-               { label: 'Update O/s. Bill', action: () => setModals(prev => ({ ...prev, outstanding: true })) },
-               { label: 'UnAdjust Setup', action: () => setModals(prev => ({ ...prev, outstanding: true })) },
-            ],
-         },
-         {
-            label: 'Brokreg Statment',
-            children: [
-               { label: 'Sales', action: () => setModals(prev => ({ ...prev, outstandingSalesFull: true })) },
-               { label: 'Purchase', action: () => setModals(prev => ({ ...prev, outstandingPurchaseFull: true })) },
-               { label: 'JobWork', action: () => setModals(prev => ({ ...prev, outstandingJobworkFull: true })) },
-            ],
-         },
-         { label: 'Daily Transaction', action: () => openReportsHub('daily') },
-         { label: 'Master List', action: () => openReportsHub('masters') },
-         { label: 'Letter Pad', action: () => openReportsHub('general') },
-         { label: 'Zoom Item Ledger', action: () => openReportsHub('stockItem') },
-         {
-            // JSM's own sales register lives here, not under Reports › Sales.
-            label: 'Old Reports',
-            children: [
-               {
-                  label: 'Sales',
-                  children: [
-                     { label: 'SalesSummary', action: () => setJsmReportForm('Rpt_Jsm_Sales') },
-                     { label: 'SalesDetail', action: () => setJsmReportForm('Rpt_Jsm_Sales_Detail') },
-                  ],
-               },
-            ],
-         },
+         ...buildReportsMenuItems({
+            nodes: JSM_OTHERS_TREE,
+            hub: false,
+            openLeaf: openReportLeaf,
+            openHub: openReportsHub,
+            openExternal: openReportExternal,
+         }),
          { label: 'All Reports Hub', action: () => openReportsHub('summary'), separatorBefore: true },
          { label: 'CA Desk', key: 'caDashboard' },
       ],

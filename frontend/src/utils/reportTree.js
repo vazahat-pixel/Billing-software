@@ -1,225 +1,18 @@
-/**
- * JSM-style Reports hierarchy.
- * Leaf nodes with `reportKey` open the report runner.
- */
+import { JSM_REPORTS_TREE } from './jsmMenuTree.js';
 
-export const REPORT_TREE = [
-  {
-    id: 'fas',
-    label: 'Fas Reports',
-    children: [
-      {
-        id: 'fas-cashbook',
-        label: 'Bank / Cash Book',
-        children: [
-          { id: 'fas-cb-bankbook', label: 'Bank Book', external: 'jsmReport', jsmForm: 'Rpt_cashbank1' },
-          { id: 'fas-cb-cashbook', label: 'Cash Book', external: 'jsmReport', jsmForm: 'Rpt_cashbank1' },
-          { id: 'fas-cb-recon', label: 'Reconciliation', external: 'cashBook' },
-          { id: 'fas-cb-recontest', label: 'Recon.Test', external: 'cashBook' },
-          { id: 'fas-cb-odint', label: 'Bank OD Intrest', external: 'cashBook' },
-          { id: 'fas-cb-register', label: 'Cash/Bank Register', external: 'jsmReport', jsmForm: 'Rpt_cashbank1' },
-          { id: 'fas-cb-cheqhand', label: 'Cheq In Hand', external: 'cashBook' },
-          { id: 'fas-cb-voucherprint', label: 'Bank Voucher Print', external: 'cashBook' },
-        ],
-      },
-      { id: 'fas-ledger', label: 'Ledger', external: 'jsmReport', jsmForm: 'A_AccountLedgerSingleSide' },
-      { id: 'fas-ledger-t', label: 'Ledger T-Format', external: 'jsmReport', jsmForm: 'A_AccountLedgerDoubleSide_TFormat' },
-      { id: 'fas-interest', label: 'Ledger Interest', external: 'fasCheck', reportKind: 'interest' },
-      { id: 'fas-confirm', label: 'Confirmation', external: 'jsmReport', jsmForm: 'A_AccountLedgerDoubleSide_Confirmation' },
-      { id: 'fas-above', label: 'Above Below Rs.', external: 'fasCheck', reportKind: 'aboveBelow' },
-      { id: 'fas-voucher', label: 'Voucher Book', external: 'journal' },
-      { id: 'fas-ledger-old', label: 'Ledger(Old)', external: 'ledger' },
-      { id: 'fas-old-ledger', label: 'Old Ledger', external: 'ledger' },
-      { id: 'fas-import-bank', label: 'Import Bank', external: 'fasCheck', reportKind: 'importBank' },
-    ],
-  },
-  {
-    id: 'final',
-    label: 'Final Reports',
-    children: [
-      { id: 'final-group', label: 'Group List', external: 'finalReport', reportKind: 'groupList' },
-      { id: 'final-tb', label: 'Trail Balance', external: 'jsmReport', jsmForm: 'Rpt_Trail_Bal_101' },
-      { id: 'final-pl', label: 'Profit & Loss Account', external: 'jsmReport', jsmForm: 'A_Final_ProfitAndLoss' },
-      { id: 'final-bs', label: 'BalanceSheet', external: 'jsmReport', jsmForm: 'A_Final_BalanceSheet' },
-      { id: 'final-diff-os', label: 'Chek Diff Os.Bill/Op.Balance', external: 'fasCheck', reportKind: 'diffOpening' },
-      { id: 'final-cash-fin', label: 'CashBank Finance', external: 'cashBook' },
-      { id: 'final-diff-year', label: 'Check Diff Os/Ledger Cur.Year', external: 'fasCheck', reportKind: 'diffYear' },
-    ],
-  },
-  {
-    id: 'sales',
-    label: 'Sales',
-    children: [
-      {
-        id: 'sales-bill',
-        label: 'Sales Bill',
-        children: [
-          { id: 'sales-summary', label: 'Sales Summary', reportKey: 'salesSummary' },
-          { id: 'sales-detail', label: 'Sales ItemDetail', reportKey: 'salesDetail' },
-          { id: 'sales-item-wise', label: 'Item Wise Summary', reportKey: 'salesItemWise', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Sales_ItemSummary' },
-          { id: 'sales-haste', label: 'Haste/Transport', reportKey: 'salesHaste', external: 'jsmReport', jsmForm: 'Rpt_Sales_Haste' },
-          { id: 'sales-order-reg', label: 'Sales Order Register', reportKey: 'salesOrder' },
-          { id: 'sales-challan', label: 'Sales Challan', reportKey: 'salesChallan' },
-          { id: 'sales-outstanding', label: 'Sales Outstanding', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Os_Sales' },
-        ],
-      },
-      {
-        id: 'sales-return',
-        label: 'Sales Return',
-        children: [
-          { id: 'sales-return-reg', label: 'Sales Return Register', reportKey: 'salesReturn' },
-          // JSM's own sales-return register (form Rpt_Jsm_Sales_Return).
-          { id: 'sales-return-jsm-summary', label: 'Summary', reportKey: 'salesReturn', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Sales_Return' },
-          { id: 'sales-return-jsm-detail', label: 'Detail', reportKey: 'salesReturn', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Sales_Return_Detail' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'purchase',
-    label: 'Purchase',
-    children: [
-      {
-        id: 'purchase-bill',
-        label: 'Purchase Bill',
-        children: [
-          { id: 'purchase-summary', label: 'Purchase Summary', reportKey: 'purchaseSummary' },
-          { id: 'purchase-detail', label: 'Purchase ItemDetail', reportKey: 'purchaseDetail' },
-          { id: 'purchase-item-wise', label: 'Item Wise Summary', reportKey: 'purchaseItemWise', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Purchase_ItemSummary' },
-          // JSM's own purchase register (form Rpt_Jsm_Purchase), in its menu position.
-          { id: 'purchase-jsm-summary', label: 'Summary', reportKey: 'purchaseSummary', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Purchase' },
-          { id: 'purchase-jsm-detail', label: 'Detail', reportKey: 'purchaseDetail', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Purchase_Detail' },
-          { id: 'purchase-order', label: 'Purchase Order', reportKey: 'purchaseOrder' },
-          { id: 'purchase-outstanding', label: 'Purchase Outstanding', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Os_Purchase' },
-        ],
-      },
-      {
-        id: 'purchase-return',
-        label: 'Purchase Return',
-        children: [
-          { id: 'purchase-return-reg', label: 'Purchase Return Register', reportKey: 'purchaseReturn' },
-          // JSM's own purchase-return register (form Rpt_Jsm_Purchase_Return).
-          { id: 'purchase-return-jsm-summary', label: 'Summary', reportKey: 'purchaseReturn', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Purchase_Return' },
-          { id: 'purchase-return-jsm-detail', label: 'Detail', reportKey: 'purchaseReturn', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Purchase_Return_Detail' },
-        ],
-      },
-      {
-        id: 'purchase-stock',
-        label: 'Purchase Stock',
-        children: [
-          { id: 'purchase-stock-lot', label: 'Lot Stock', reportKey: 'stock' },
-          { id: 'purchase-stock-item', label: 'Item Wise Stock', reportKey: 'stockItem' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'process',
-    label: 'Process Reports',
-    children: [
-      { id: 'process-send', label: 'Send', reportKey: 'processSend', view: 'send', external: 'jsmReport', jsmForm: 'Rpt_Process_Issue_Report' },
-      { id: 'process-receipt-sum', label: 'Receipt Summary', reportKey: 'processReceiptSummary', view: 'receiptSummary', external: 'jsmReport', jsmForm: 'Rpt_Process_Receipt_Summary' },
-      { id: 'process-receipt-det', label: 'Receipt Detail', reportKey: 'processReceiptDetail', view: 'receiptDetail', external: 'jsmReport', jsmForm: 'Rpt_Process_Receipt_Detail' },
-      { id: 'process-stock', label: 'Process Stock', reportKey: 'processSend', view: 'stock', external: 'jsmReport', jsmForm: 'Rpt_Process_Stock_New_Gst' },
-      { id: 'process-stock-zoom', label: 'Process Stock Zoom', reportKey: 'processSend', view: 'stockZoom', external: 'jsmReport', jsmForm: 'Rpt_Process_Stock_New_Gst' },
-      { id: 'process-item-wise', label: 'Item Wise Summary', reportKey: 'processSend', view: 'itemWise' },
-      { id: 'process-taka', label: 'TakaWise Stock Detail', reportKey: 'processSend', view: 'taka' },
-      { id: 'process-lot-cost', label: 'Lot Wise Costing', reportKey: 'processSend', view: 'lotCost' },
-      { id: 'process-cutting', label: 'Cutting Reports', reportKey: 'processSend', view: 'cutting' },
-      { id: 'process-lot-status', label: 'Update Lot Status', reportKey: 'processSend', view: 'lotStatus' },
-      { id: 'process-interest', label: 'Process Bill Wise Interest', reportKey: 'processSend', view: 'billDue' },
-    ],
-  },
-  {
-    id: 'jobwork',
-    label: 'JobWork Reports',
-    children: [
-      { id: 'jw-send', label: 'Send', reportKey: 'jobwork', view: 'send', external: 'jsmReport', jsmForm: 'Rpt_Job_IssueReport' },
-      { id: 'jw-receipt-sum', label: 'Receipt Summary', reportKey: 'jobwork', view: 'receiptSummary', external: 'jsmReport', jsmForm: 'Rpt_JobWork_Receipt_Summary' },
-      { id: 'jw-receipt-det', label: 'Receipt Detail', reportKey: 'jobwork', view: 'receiptDetail', external: 'jsmReport', jsmForm: 'Rpt_JobWork_Receipt_Detail' },
-      { id: 'jw-pending', label: 'Jobwork Stock/Pending Report', reportKey: 'jobworkPending', view: 'stock', external: 'jsmReport', jsmForm: 'Rpt_JobWork_Stock_Report' },
-      { id: 'jw-challan', label: 'Challan Status', reportKey: 'jobworkChallan', view: 'challan' },
-      { id: 'jw-pl', label: 'Job P & L', reportKey: 'jobwork', view: 'jobPl' },
-    ],
-  },
-  {
-    id: 'monthly',
-    label: 'Monthly Reports',
-    children: [
-      { id: 'monthly-sales', label: 'Sales', reportKey: 'salesDetail' },
-      { id: 'monthly-purchase', label: 'Purchase', reportKey: 'purchaseDetail' },
-      { id: 'monthly-process', label: 'Process', reportKey: 'processSend' },
-      { id: 'monthly-jobwork', label: 'JobWork', reportKey: 'jobwork' },
-      { id: 'monthly-sales-return', label: 'Sales Return', reportKey: 'salesReturn' },
-      { id: 'monthly-purchase-return', label: 'Purchase Return', reportKey: 'purchaseReturn' },
-      { id: 'monthly-bank', label: 'Bank Rec. Payment', reportKey: 'daily' },
-      { id: 'monthly-summary', label: 'Period Summary', reportKey: 'summary' },
-      { id: 'monthly-pl', label: 'Profit & Loss', reportKey: 'pl' },
-    ],
-  },
-  {
-    id: 'gst',
-    label: 'Gst Reports',
-    children: [
-      { id: 'gst-hub', label: 'GST Reports Hub', external: 'gstReports', reportKind: 'gstr1' },
-      { id: 'gst-3b', label: '3B Monthly Return', external: 'gstReports', reportKind: 'gst3b' },
-      { id: 'gst-gstr1-err', label: 'Gstr-1 Error Checking', external: 'gstReports', reportKind: 'gstr1Errors' },
-      { id: 'gst-gstr1', label: 'Gstr-1 Report', external: 'gstReports', reportKind: 'gstr1' },
-      { id: 'gst-matching', label: 'Gstr Matching', external: 'gstReports', reportKind: 'gstrMatching' },
-      { id: 'gst-gstr2', label: 'Gstr-2 Report', external: 'gstReports', reportKind: 'gstr2' },
-      { id: 'gst-gstr9', label: 'Gstr-9', external: 'gstReports', reportKind: 'gstr9' },
-      { id: 'gst-itc04', label: 'ITC 04', external: 'gstReports', reportKind: 'itc04' },
-      { id: 'gst-ewb-bulk', label: 'E-Way Bill Bulk Generation', external: 'gstReports', reportKind: 'ewayBulk' },
-      { id: 'gst-ewb-status', label: 'E-Way Bill / Invoice Status', external: 'gstReports', reportKind: 'ewayStatus' },
-      { id: 'gst-ewb-excel', label: 'E-Way Excel Upload', external: 'gstReports', reportKind: 'ewayExcel' },
-      { id: 'gst-45', label: 'Gst 4.5', external: 'gstReports', reportKind: 'gst45' },
-      { id: 'gst-sales', label: 'Gstin - Sales', external: 'gstReports', reportKind: 'gstinSales' },
-      { id: 'gst-purchase', label: 'Gstin - Purchase', external: 'gstReports', reportKind: 'gstinPurchase' },
-      { id: 'gst-process', label: 'Gstin - Process', external: 'gstReports', reportKind: 'gstinProcess' },
-      { id: 'gst-jobwork', label: 'Gstin - JobWork', external: 'gstReports', reportKind: 'gstinJobwork' },
-      { id: 'gst-journal', label: 'Gstin - Journal Report', external: 'gstReports', reportKind: 'gstinJournal' },
-      { id: 'gst-expense', label: 'Gstin - Expense', external: 'gstReports', reportKind: 'gstinExpense' },
-      { id: 'gst-outstanding', label: 'Outstanding', external: 'outstanding', reportKind: 'receivable' },
-    ],
-  },
-  {
-    id: 'stock-ledger',
-    label: 'Inv Stock Ledger',
-    children: [
-      { id: 'stock-mts', label: 'Stock Mts Reports', external: 'stockLedger', reportKind: 'stockMts' },
-      { id: 'stock-kgs', label: 'Stock Mts Reports(Kgs)', external: 'stockLedger', reportKind: 'stockKgs' },
-      { id: 'stock-finish-shop', label: 'Finish At Shop Stock', external: 'stockLedger', reportKind: 'finishShop' },
-      { id: 'stock-grey-shop', label: 'Grey At Shop Stock', external: 'stockLedger', reportKind: 'greyShop' },
-      { id: 'stock-grey-pcs', label: 'Grey At Shop Stock (Pcs)', external: 'stockLedger', reportKind: 'greyShopPcs' },
-      { id: 'stock-grey-mill', label: 'Grey At Mill Stock - Format 2', external: 'stockLedger', reportKind: 'greyMill' },
-      { id: 'stock-finish-excel', label: 'Finish Stock Excel', external: 'stockLedger', reportKind: 'finishExcel' },
-      { id: 'stock-finish-book', label: 'Finish At Shop Stock(Book-Acc)', external: 'stockLedger', reportKind: 'finishBook' },
-      { id: 'stock-value', label: 'Stock Value Reports', external: 'stockLedger', reportKind: 'stockValue' },
-    ],
-  },
-  {
-    id: 'tds',
-    label: 'Tds Reports',
-    children: [
-      { id: 'tds-head', label: 'Head Wise Report', reportKey: 'tds', view: 'tdsHead' },
-      { id: 'tds-party', label: 'Party Wise Report', reportKey: 'tds', view: 'tdsParty' },
-      { id: 'tds-monthly', label: 'Party Wise Monthly Report', reportKey: 'tds', view: 'tdsMonthly' },
-      { id: 'tds-address', label: 'Address/Acknowledge', reportKey: 'tds', view: 'tdsAddress' },
-      { id: 'tds-challan', label: 'Tax Challan', reportKey: 'tds', view: 'tdsChallan' },
-      { id: 'tds-certificate', label: 'Certificate', reportKey: 'tds', view: 'tdsCertificate' },
-      { id: 'tds-reg', label: 'Tds Register', reportKey: 'tds', view: 'tdsRegister' },
-    ],
-  },
-  {
-    id: 'tcs',
-    label: 'Tcs Reports',
-    children: [
-      { id: 'tcs-recpay', label: 'Tcs Rec/Pay Report', reportKey: 'tcs', view: 'tcsRecPay' },
-      { id: 'tcs-sales', label: 'Tcs Sales Register', reportKey: 'tcs', view: 'tcsSales' },
-      { id: 'tcs-purchase', label: 'Tcs Purchase Register', reportKey: 'tcs', view: 'tcsPurchase' },
-    ],
-  },
-];
+/**
+ * The Reports menu IS JSM's own menu: folders, order and wording all come from the capture of
+ * the real JSM installation (jsm/blueprint/menu.json), built in utils/jsmMenuTree.js. An entry
+ * opens a screen when utils/jsmMenuHandlers.js names one; the rest are listed in their own place
+ * and marked `soon`, so an operator can see JSM's whole menu and what is not ready yet.
+ *
+ * This replaced a hand-made tree whose folders and wording had drifted from JSM's. Every screen
+ * that tree reached is still reached from this one — utils/jsmMenuTree.node.test.js holds the
+ * list and fails if any of them stops being reachable.
+ */
+export { JSM_OTHERS_TREE } from './jsmMenuTree.js';
+export const REPORT_TREE = JSM_REPORTS_TREE;
+
 
 /** Flat list of leaf nodes for lookup */
 export function flattenReportLeaves(nodes = REPORT_TREE, trail = []) {
@@ -248,16 +41,16 @@ export function findReportLeaf(id, nodes = REPORT_TREE) {
 
 /** Map legacy hub tab ids → first matching leaf id */
 export const LEGACY_TAB_TO_LEAF = {
-  summary: 'monthly-summary',
-  sales: 'sales-detail',
+  summary: 'monthly-sales',
+  sales: 'monthly-sales',
   purchase: 'purchase-detail',
   stock: 'stock-grey-shop',
   stockItem: 'stock-mts',
-  outstanding: 'gst-outstanding',
+  outstanding: 'os-debitors',
   jobwork: 'jw-send',
-  pl: 'monthly-pl',
+  pl: 'final-pl',
   daily: 'monthly-bank',
-  masters: 'monthly-summary',
+  masters: 'monthly-sales',
 };
 
 /** Ids of folders that contain this leaf, so the hub can expand to it. */
@@ -273,7 +66,7 @@ export function reportAncestorIds(id, nodes = REPORT_TREE, trail = []) {
 }
 
 /** Build Dashboard menu items with nested `children` from REPORT_TREE */
-export function buildReportsMenuItems({ openLeaf, openHub, openExternal }) {
+export function buildReportsMenuItems({ openLeaf, openHub, openExternal, nodes = REPORT_TREE, hub = true }) {
   const openNode = (node) => {
     if (node.external && openExternal) {
       openExternal(node);
@@ -298,7 +91,7 @@ export function buildReportsMenuItems({ openLeaf, openHub, openExternal }) {
   };
 
   return [
-    { label: 'All Reports Hub', action: () => openHub && openHub('summary') },
-    ...REPORT_TREE.map(mapNode),
+    ...(hub ? [{ label: 'All Reports Hub', action: () => openHub && openHub('summary') }] : []),
+    ...nodes.map(mapNode),
   ];
 }
