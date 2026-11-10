@@ -24,10 +24,11 @@ import { MASTER_LISTS } from './masterList';
 import { OUTSTANDING_DETAILS } from './outstandingDetail';
 import { REC_PAY_REGISTERS } from './recPayRegister';
 import greyFinishSummary from './greyFinishSummary';
+import { ACC_STOCK_REPORTS } from './accStock';
 
 /** JSM report screens rebuilt so far, keyed by JSM form name. */
 export const JSM_REPORTS = Object.fromEntries([
   processSend, jobSend, processReceiptDetail, jobReceiptDetail, processReceiptSummary, jobReceiptSummary,
   processStock, jobStock, ...BILL_REGISTERS, ...OUTSTANDING_REPORTS, ...ITEM_WISE_REPORTS, salesHaste,
-  ...LEDGER_REPORTS, trialBalance, cashBank, balanceSheet, profitAndLoss, ...REGISTER_SUMMARIES, groupBalance, aboveBelow, voucherBook, processItemSummary, ...MASTER_LISTS, ...OUTSTANDING_DETAILS, ...REC_PAY_REGISTERS, greyFinishSummary,
+  ...LEDGER_REPORTS, trialBalance, cashBank, balanceSheet, profitAndLoss, ...REGISTER_SUMMARIES, groupBalance, aboveBelow, voucherBook, processItemSummary, ...MASTER_LISTS, ...OUTSTANDING_DETAILS, ...REC_PAY_REGISTERS, greyFinishSummary, ...ACC_STOCK_REPORTS,
 ].map((r) => [r.form, r]));

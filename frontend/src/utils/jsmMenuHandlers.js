@@ -125,6 +125,10 @@ export const FORM_HANDLERS = {
 
   Rpt_Stk_Grey_Finish_Summary: { id: 'monthly-sales-gf', external: 'jsmReport', jsmForm: 'Rpt_Stk_Grey_Finish_Summary' },
 
+  Rpt_StockSubItemAccReport: { id: 'accstock-subitem', external: 'jsmReport', jsmForm: 'Rpt_StockSubItemAccReport' },
+  Rpt_StockSubItemAcc_DetailReport: { id: 'accstock-subitem-detail', external: 'jsmReport', jsmForm: 'Rpt_StockSubItemAcc_DetailReport' },
+  Rpt_StockSubItemAcc_DetailReport_Online: { id: 'accstock-register', external: 'jsmReport', jsmForm: 'Rpt_StockSubItemAcc_DetailReport_Online' },
+
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
 };

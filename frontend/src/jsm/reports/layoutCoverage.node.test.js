@@ -63,6 +63,7 @@ test('only the known no-layout screens are uncaptured, and each has fallback col
   assert.deepEqual(
     [...new Set(uncaptured)].sort(),
     [
+      'JSM_VW_ACC_STOCK', 'JSM_VW_ACC_STOCK_DETAIL',
       'JSM_VW_CASHBANK_DETAIL', 'JSM_VW_CASHBANK_DTLVNO', 'JSM_VW_GRATER_OR_LESS',
       'JSM_VW_GROUP_BALANCE', 'JSM_VW_JB_RCPT', 'JSM_VW_JV_BOOK', 'JSM_VW_JV_BOOK_SUMMARY',
       'JSM_VW_MASTER_ITEM_REPORT', 'JSM_VW_PROCESS_ISSUE_SUM_REPORT',
