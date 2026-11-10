@@ -112,6 +112,14 @@ export const FORM_HANDLERS = {
   Rpt_Account_ReportRpt: { id: 'master-account', external: 'jsmReport', jsmForm: 'Rpt_Account_ReportRpt' },
   Rpt_Item_Mst_Report: { id: 'master-item', external: 'jsmReport', jsmForm: 'Rpt_Item_Mst_Report' },
 
+  Rpt_Jsm_Os_Sales_Detail: { id: 'os-debitors-detail', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Os_Sales_Detail' },
+  Rpt_Jsm_Os_Purchase_Detail: { id: 'os-creditors-detail', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Os_Purchase_Detail' },
+
+  Rpt_1Sales_Receipt_Reg: { id: 'recpay-sales', external: 'jsmReport', jsmForm: 'Rpt_1Sales_Receipt_Reg' },
+  Rpt_1Purchase_Payment_Reg: { id: 'recpay-purchase', external: 'jsmReport', jsmForm: 'Rpt_1Purchase_Payment_Reg' },
+  Rpt_1Process_Payment_Reg: { id: 'recpay-process', external: 'jsmReport', jsmForm: 'Rpt_1Process_Payment_Reg' },
+  Rpt_1Job_Payment_Reg: { id: 'recpay-jobwork', external: 'jsmReport', jsmForm: 'Rpt_1Job_Payment_Reg' },
+
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
 };
