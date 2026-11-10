@@ -100,6 +100,15 @@ export const FORM_HANDLERS = {
   Rpt_SalesRegisterDetailDigital_Report: { id: 'sales-itemdetail', external: 'jsmReport', jsmForm: 'Rpt_SalesRegisterDetailDigital_Report' },
   Rpt_PurchaseRegisterDetail_Report: { id: 'purchase-itemdetail', external: 'jsmReport', jsmForm: 'Rpt_PurchaseRegisterDetail_Report' },
 
+  Rpt_SalesRtnRegisterSummary_Report: { id: 'sales-rtn-summary', external: 'jsmReport', jsmForm: 'Rpt_SalesRtnRegisterSummary_Report' },
+  OldRpt_SalesRTNRegisterSummary_Report: { id: 'sales-rtn-summary-new', external: 'jsmReport', jsmForm: 'OldRpt_SalesRTNRegisterSummary_Report' },
+  Rpt_PurchaseRtnRegisterSummary_Report: { id: 'purchase-rtn-summary', external: 'jsmReport', jsmForm: 'Rpt_PurchaseRtnRegisterSummary_Report' },
+  Rpt_SalesRtnRegisterDetail_Report: { id: 'sales-rtn-detail', external: 'jsmReport', jsmForm: 'Rpt_SalesRtnRegisterDetail_Report' },
+  OldRpt_SalesRTNRegisterDetail_Report: { id: 'sales-rtn-itemdetail-new', external: 'jsmReport', jsmForm: 'OldRpt_SalesRTNRegisterDetail_Report' },
+  Rpt_PurchaseRtnRegisterDetail_Report: { id: 'purchase-rtn-itemdetail', external: 'jsmReport', jsmForm: 'Rpt_PurchaseRtnRegisterDetail_Report' },
+
+  Rpt_Jsm_Process_ItemSummary: { id: 'process-item-wise', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Process_ItemSummary' },
+
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
 };

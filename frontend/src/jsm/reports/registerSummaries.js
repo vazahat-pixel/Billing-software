@@ -109,3 +109,14 @@ export const salesRegisterDetail = { ...DETAIL_COMMON, form: 'Rpt_SalesRegisterD
 export const purchaseRegisterDetail = { ...DETAIL_COMMON, form: 'Rpt_PurchaseRegisterDetail_Report' };
 
 REGISTER_SUMMARIES.push(salesRegisterDetail, purchaseRegisterDetail);
+
+/** The Return registers use the very same two screens, over the return bills. */
+const RETURN_FORMS = [
+  ['Rpt_SalesRtnRegisterSummary_Report', COMMON],
+  ['OldRpt_SalesRTNRegisterSummary_Report', COMMON],
+  ['Rpt_PurchaseRtnRegisterSummary_Report', COMMON],
+  ['Rpt_SalesRtnRegisterDetail_Report', DETAIL_COMMON],
+  ['OldRpt_SalesRTNRegisterDetail_Report', DETAIL_COMMON],
+  ['Rpt_PurchaseRtnRegisterDetail_Report', DETAIL_COMMON],
+];
+for (const [form, shape] of RETURN_FORMS) REGISTER_SUMMARIES.push({ ...shape, form });

@@ -58,3 +58,43 @@ const purchaseDetail = registerDetailReport({
 
 module.exports.salesDetail = salesDetail;
 module.exports.purchaseDetail = purchaseDetail;
+
+// --- the Return registers, same two shapes over the return bills -----------------------------
+const salesReturnSummary = registerSummaryReport({
+  load: (companyId) => src.loadReturnRegisterRows(companyId, 'Sales'),
+  views: {
+    summary: 'JSM_VW_REGISTER_SALES_SUMMARY_SUMMARYREPORT',
+    bills: 'JSM_VW_REGISTER_SALES_RTN_SUMMARY_REPORT',
+  },
+  noun: 'Sales Return',
+  options: options((companyId) => src.loadReturnRegisterRows(companyId, 'Sales')),
+});
+
+const purchaseReturnSummary = registerSummaryReport({
+  load: (companyId) => src.loadReturnRegisterRows(companyId, 'Purchase'),
+  views: {
+    summary: 'JSM_VW_REGISTER_SALES_SUMMARY_SUMMARYREPORT',
+    bills: 'JSM_VW_REGISTER_PURCHASE_RTN_SUMMARY_REPORT',
+  },
+  noun: 'Purchase Return',
+  options: options((companyId) => src.loadReturnRegisterRows(companyId, 'Purchase')),
+});
+
+const salesReturnDetail = registerDetailReport({
+  load: (companyId) => src.loadReturnRegisterRows(companyId, 'Sales'),
+  views: { summary: 'JSM_VW_SALES_DETAIL_SUM_REPORT', bills: 'JSM_VW_REGISTER_SALES_DETAIL_REPORT' },
+  noun: 'Sales Return',
+  options: options((companyId) => src.loadReturnRegisterRows(companyId, 'Sales')),
+});
+
+const purchaseReturnDetail = registerDetailReport({
+  load: (companyId) => src.loadReturnRegisterRows(companyId, 'Purchase'),
+  views: { summary: 'JSM_VW_SALES_DETAIL_SUM_REPORT', bills: 'JSM_VW_REGISTER_SALES_DETAIL_REPORT' },
+  noun: 'Purchase Return',
+  options: options((companyId) => src.loadReturnRegisterRows(companyId, 'Purchase')),
+});
+
+module.exports.salesReturnSummary = salesReturnSummary;
+module.exports.purchaseReturnSummary = purchaseReturnSummary;
+module.exports.salesReturnDetail = salesReturnDetail;
+module.exports.purchaseReturnDetail = purchaseReturnDetail;

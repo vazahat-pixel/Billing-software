@@ -140,3 +140,55 @@ test.describe('JSM Voucher Book on a real database', () => {
     );
   });
 });
+
+test.describe('JSM Process Item Wise Summary on a real database', () => {
+  let jsmReports; let companyId;
+
+  test.before(async () => {
+    await startMemoryDb();
+    const mongoose = require('mongoose');
+    const Company = require('../../models/Company');
+    const Party = require('../../models/Party');
+    const Item = require('../../models/Item');
+    const Book = require('../../models/Book');
+    const Job = require('../../models/Job');
+    const InventoryLot = require('../../models/InventoryLot');
+    jsmReports = require('../../services/jsmReports');
+
+    companyId = new mongoose.Types.ObjectId();
+    await Company.collection.insertOne({ _id: companyId, name: 'PI CO', coCode: 'PI', createdAt: new Date() });
+    const mill = await Party.create({ companyId, name: 'SHREE LAV', type: 'Job Worker', group: 'MILLS', city: 'SURAT' });
+    const grey = await Item.create({ companyId, name: 'GREY 60x60', group: 'GREY', category: 'Grey' });
+    await Book.create({ companyId, name: 'MILL RECEIPT', code: 'MR', module: 'millRec' });
+    const lot = await InventoryLot.create({ companyId, lotId: 'L1', itemId: grey._id, totalMtrs: 500, remainingMtrs: 500, pcs: 10 });
+
+    await Job.create({
+      companyId, jobCardNo: 'JC-1', workerId: mill._id, workKind: 'Mill', processType: 'Mill Work', lotId: lot._id,
+      outputItemId: grey._id, status: 'Received',
+      issueDate: new Date('2026-05-01T00:00:00Z'), receiveDate: new Date('2026-05-20T00:00:00Z'),
+      issuePcs: 10, issueQty: 500, receivedPcs: 9, receivedQty: 480,
+      jobRate: 10, processCharges: 4800,
+    });
+  });
+
+  test.after(async () => { await stopMemoryDb(); });
+
+  test('totals what went out and what came back, and the rate on the summed row', async () => {
+    const r = await jsmReports.get('Rpt_Jsm_Process_ItemSummary')
+      .run(String(companyId), { category: '2-Item', from: '2026-04-01', to: '2027-03-31' });
+    assert.equal(r.rows.length, 1);
+    const [row] = r.rows;
+    assert.equal(row.GROUP2, 'GREY 60x60');
+    assert.equal(row.SND_QTY, 500);
+    assert.equal(row.REC_QTY, 480);
+    assert.equal(row.IT_AMOUNT, 4800);
+    assert.equal(row.AVG_RATE, 10, 'IT_AMOUNT / REC_QTY on the summed row, as JSM does it');
+  });
+
+  test('a level this software does not record is refused, not guessed', async () => {
+    await assert.rejects(
+      () => jsmReports.get('Rpt_Jsm_Process_ItemSummary').run(String(companyId), { category: '4-PuParty+Item' }),
+      /does not record/
+    );
+  });
+});

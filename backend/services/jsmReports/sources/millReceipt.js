@@ -52,6 +52,9 @@ async function loadMillReceiptRows(companyId, bookModule = 'millRec') {
       BILL_DATE: date,
       MONTH: date ? MONTHS[date.getUTCMonth()] : '',
       REC_PCS: Number(j.receivedPcs || 0),
+      // What was sent to the mill, which the Item Wise Summary totals beside what came back.
+      SND_QTY: round(Number(j.issueQty || 0)),
+      SND_PCS: Number(j.issuePcs || 0),
       REC_QTY: qty,
       IT_RATE: rate,
       IT_AMOUNT: amount,

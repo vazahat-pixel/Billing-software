@@ -38,6 +38,13 @@ const REPORTS = {
   Rpt_Group_Balance: require('./reports/groupBalance'),
   Rpt_Above_Below: require('./reports/aboveBelow'),
   Rpt_JvBook1: require('./reports/voucherBook'),
+  Rpt_Jsm_Process_ItemSummary: require('./reports/processItemSummary'),
+  Rpt_SalesRtnRegisterSummary_Report: require('./reports/registerSummaries').salesReturnSummary,
+  OldRpt_SalesRTNRegisterSummary_Report: require('./reports/registerSummaries').salesReturnSummary,
+  Rpt_PurchaseRtnRegisterSummary_Report: require('./reports/registerSummaries').purchaseReturnSummary,
+  Rpt_SalesRtnRegisterDetail_Report: require('./reports/registerSummaries').salesReturnDetail,
+  OldRpt_SalesRTNRegisterDetail_Report: require('./reports/registerSummaries').salesReturnDetail,
+  Rpt_PurchaseRtnRegisterDetail_Report: require('./reports/registerSummaries').purchaseReturnDetail,
 };
 
 function get(reportId) {
