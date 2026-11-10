@@ -42,7 +42,7 @@ function fallbacksFor(report) {
   const block = src.indexOf('fallbackColumns');
   if (block < 0) return new Set();
   // A column set is written inline (`NAME: [ … ]`) or shared under a name (`NAME: COLUMNS`).
-  return new Set([...src.matchAll(/([A-Z][A-Z0-9_]{6,}):\s*(?:\[|[A-Z][A-Za-z0-9_]*,?\s*$)/gm)].map((m) => m[1]));
+  return new Set([...src.matchAll(/([A-Z][A-Z0-9_]{6,}):\s*(?:\[|[A-Z][A-Za-z0-9_]*\s*[,}\r\n])/g)].map((m) => m[1]));
 }
 
 test('every layout a report declares is either captured or has fallback columns', () => {
@@ -63,9 +63,9 @@ test('only the known no-layout screens are uncaptured, and each has fallback col
   assert.deepEqual(
     [...new Set(uncaptured)].sort(),
     [
-      'JSM_VW_ACC_STOCK', 'JSM_VW_ACC_STOCK_DETAIL',
-      'JSM_VW_CASHBANK_DETAIL', 'JSM_VW_CASHBANK_DTLVNO', 'JSM_VW_GRATER_OR_LESS',
-      'JSM_VW_GROUP_BALANCE', 'JSM_VW_JB_RCPT', 'JSM_VW_JV_BOOK', 'JSM_VW_JV_BOOK_SUMMARY',
+      'JSM_VW_ACC_STOCK', 'JSM_VW_ACC_STOCK_DETAIL', 'JSM_VW_CASHBANK_DETAIL',
+      'JSM_VW_CASHBANK_DTLVNO', 'JSM_VW_GRATER_OR_LESS', 'JSM_VW_GROUP_BALANCE',
+      'JSM_VW_JB_RCPT', 'JSM_VW_JV_BOOK', 'JSM_VW_JV_BOOK_SUMMARY', 'JSM_VW_KGS_STOCK',
       'JSM_VW_MASTER_ITEM_REPORT', 'JSM_VW_PROCESS_ISSUE_SUM_REPORT',
       'JSM_VW_PR_RCPT', 'JSM_VW_PU_RCPT', 'JSM_VW_ROW_FINISH_STOCK',
       'JSM_VW_SALES_DETAIL_SUM_REPORT', 'JSM_VW_SALES_HASTE_REPORT',

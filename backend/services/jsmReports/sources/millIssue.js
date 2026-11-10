@@ -65,7 +65,7 @@ async function loadMillIssueRows(companyId, bookModule = 'millIssue') {
       CHLN_DATE: date,
       ISS_PCS: Number(j.issuePcs || 0),
       ISS_QTY: issQty,
-      ISS_KGS: 0,
+      ISS_KGS: round(Number(j.issueKgs || 0)),
       PU_RATE: puRate,
       PU_AMOUNT: round(issQty * puRate),
       LOT_NO: j.lotId?.lotId || '',

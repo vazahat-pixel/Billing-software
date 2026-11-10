@@ -129,6 +129,10 @@ export const FORM_HANDLERS = {
   Rpt_StockSubItemAcc_DetailReport: { id: 'accstock-subitem-detail', external: 'jsmReport', jsmForm: 'Rpt_StockSubItemAcc_DetailReport' },
   Rpt_StockSubItemAcc_DetailReport_Online: { id: 'accstock-register', external: 'jsmReport', jsmForm: 'Rpt_StockSubItemAcc_DetailReport_Online' },
 
+  Rpt_StkKgsFinishAtShop: { id: 'kgs-finish-shop', external: 'jsmReport', jsmForm: 'Rpt_StkKgsFinishAtShop' },
+  Rpt_StkKgsGreyAtshop: { id: 'kgs-grey-shop', external: 'jsmReport', jsmForm: 'Rpt_StkKgsGreyAtshop' },
+  Rpt_StkKgsGreyAtMill: { id: 'kgs-grey-mill', external: 'jsmReport', jsmForm: 'Rpt_StkKgsGreyAtMill' },
+
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
 };
