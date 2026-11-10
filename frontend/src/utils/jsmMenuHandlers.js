@@ -109,6 +109,9 @@ export const FORM_HANDLERS = {
 
   Rpt_Jsm_Process_ItemSummary: { id: 'process-item-wise', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Process_ItemSummary' },
 
+  Rpt_Account_ReportRpt: { id: 'master-account', external: 'jsmReport', jsmForm: 'Rpt_Account_ReportRpt' },
+  Rpt_Item_Mst_Report: { id: 'master-item', external: 'jsmReport', jsmForm: 'Rpt_Item_Mst_Report' },
+
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
 };

@@ -39,6 +39,8 @@ const REPORTS = {
   Rpt_Above_Below: require('./reports/aboveBelow'),
   Rpt_JvBook1: require('./reports/voucherBook'),
   Rpt_Jsm_Process_ItemSummary: require('./reports/processItemSummary'),
+  Rpt_Account_ReportRpt: require('./reports/masterList').account,
+  Rpt_Item_Mst_Report: require('./reports/masterList').item,
   Rpt_SalesRtnRegisterSummary_Report: require('./reports/registerSummaries').salesReturnSummary,
   OldRpt_SalesRTNRegisterSummary_Report: require('./reports/registerSummaries').salesReturnSummary,
   Rpt_PurchaseRtnRegisterSummary_Report: require('./reports/registerSummaries').purchaseReturnSummary,

@@ -192,3 +192,48 @@ test.describe('JSM Process Item Wise Summary on a real database', () => {
     );
   });
 });
+
+test.describe('JSM Master List on a real database', () => {
+  let jsmReports; let companyId;
+
+  test.before(async () => {
+    await startMemoryDb();
+    const mongoose = require('mongoose');
+    const Company = require('../../models/Company');
+    const Party = require('../../models/Party');
+    const Item = require('../../models/Item');
+    const LedgerMaster = require('../../models/LedgerMaster');
+    jsmReports = require('../../services/jsmReports');
+
+    companyId = new mongoose.Types.ObjectId();
+    await Company.collection.insertOne({ _id: companyId, name: 'ML CO', coCode: 'ML', createdAt: new Date() });
+    await Party.create({ companyId, name: 'ZEBRA TEX', type: 'Customer', group: 'DEBTORS', city: 'SURAT', mobile: '99999' });
+    await Party.create({ companyId, name: 'ALPHA TEX', type: 'Customer', group: 'DEBTORS', city: 'MUMBAI' });
+    await LedgerMaster.create({ companyId, name: 'BANK CHARGES', group: 'Expenses', accountType: 'General' });
+    await Item.create({ companyId, name: 'POPLIN', group: 'GREY', category: 'Grey', unit: 'MTRS' });
+    await Item.create({ companyId, name: 'BLOUSE', group: 'FINISH', category: 'Finished', unit: 'PCS' });
+  });
+
+  test.after(async () => { await stopMemoryDb(); });
+
+  test('the account list carries parties and the ledgers that are not a party, in name order', async () => {
+    const r = await jsmReports.get('Rpt_Account_ReportRpt').run(String(companyId), {});
+    const names = r.rows.map((x) => x.ACCOUNT);
+    assert.deepEqual(names, ['ALPHA TEX', 'BANK CHARGES', 'ZEBRA TEX']);
+    assert.equal(r.grid.title, 'Account Wise Account Report');
+    assert.equal(r.rows.find((x) => x.ACCOUNT === 'ZEBRA TEX').PHONENO, '99999');
+  });
+
+  test('the account list can be ordered by another column, which also heads the window', async () => {
+    const r = await jsmReports.get('Rpt_Account_ReportRpt').run(String(companyId), { orderBy: 'Station' });
+    assert.deepEqual(r.rows.map((x) => x.STATION), ['', 'MUMBAI', 'SURAT']);
+    assert.equal(r.grid.title, 'Station Wise Account Report');
+  });
+
+  test('the item list carries every item, in name order', async () => {
+    const r = await jsmReports.get('Rpt_Item_Mst_Report').run(String(companyId), {});
+    assert.deepEqual(r.rows.map((x) => x.ITEM), ['BLOUSE', 'POPLIN']);
+    assert.equal(r.rows.find((x) => x.ITEM === 'BLOUSE').UNIT, 'PCS');
+    assert.equal(r.grid.title, 'Item Wise Item Report');
+  });
+});

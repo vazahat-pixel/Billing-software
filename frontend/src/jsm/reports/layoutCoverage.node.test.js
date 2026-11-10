@@ -64,6 +64,7 @@ test('only the known no-layout screens are uncaptured, and each has fallback col
     [
       'JSM_VW_CASHBANK_DETAIL', 'JSM_VW_CASHBANK_DTLVNO', 'JSM_VW_GRATER_OR_LESS',
       'JSM_VW_GROUP_BALANCE', 'JSM_VW_JV_BOOK', 'JSM_VW_JV_BOOK_SUMMARY',
+      'JSM_VW_MASTER_ITEM_REPORT',
       'JSM_VW_PROCESS_ISSUE_SUM_REPORT', 'JSM_VW_SALES_DETAIL_SUM_REPORT',
       'JSM_VW_SALES_HASTE_REPORT', 'JSM_VW_TR_BAL',
     ],
