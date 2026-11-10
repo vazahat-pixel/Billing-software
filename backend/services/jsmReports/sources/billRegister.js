@@ -106,6 +106,10 @@ function mapBill(doc, o) {
     BROKER: doc.brokerId?.name || '',
     STATION: party?.city || '',
     MAINGROUP: party?.group || '',
+    // The three the GSTIN return screens group by, beside the usual ones.
+    STATE: party?.state || '',
+    TYPE: party?.type || '',
+    GST_RATE: round(Number(doc.totalGstPer ?? doc.gstPer ?? 0)),
     TRANSPORT: doc.transport || '',
     // JSM's delivery place; sales keep it as `station`, purchases record none.
     DELIVERY: doc.station || '',
@@ -136,6 +140,7 @@ function mapBill(doc, o) {
     _lines: items.map((it) => ({
       ITEM_NAME: it.itemId?.name || it.desc || '',
       ITEM_GROUP: it.itemId?.group || '',
+      ITEM_CATEGORY: it.itemId?.category || '',
       IT_PCS: Number(it.pcs || 0),
       IT_QTY: round(Number(it.mts || 0)),
       IT_RATE: round(Number(it.rate || 0)),
@@ -162,8 +167,8 @@ const Company = require('../../../models/Company');
 require('../../../models/Party');
 require('../../../models/Item');
 
-const PARTY_FIELDS = 'name group city state';
-const ITEM_POPULATE = { path: 'items.itemId', select: 'name group' };
+const PARTY_FIELDS = 'name group city state type';
+const ITEM_POPULATE = { path: 'items.itemId', select: 'name group category' };
 
 async function bookContext(companyId, module, fallback) {
   const [books, company] = await Promise.all([

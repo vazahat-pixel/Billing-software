@@ -112,6 +112,9 @@ REGISTER_SUMMARIES.push(salesRegisterDetail, purchaseRegisterDetail);
 
 /** The Return registers use the very same two screens, over the return bills. */
 const RETURN_FORMS = [
+  // JSM's GSTIN Return screens are the same summary over the same return bills.
+  ['A_Gstr1_SalesReturnSummary', COMMON],
+  ['A_Gstr1_PurchaseRtn_Report', COMMON],
   ['Rpt_SalesRtnRegisterSummary_Report', COMMON],
   ['OldRpt_SalesRTNRegisterSummary_Report', COMMON],
   ['Rpt_PurchaseRtnRegisterSummary_Report', COMMON],

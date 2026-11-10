@@ -120,6 +120,11 @@ export const FORM_HANDLERS = {
   Rpt_1Process_Payment_Reg: { id: 'recpay-process', external: 'jsmReport', jsmForm: 'Rpt_1Process_Payment_Reg' },
   Rpt_1Job_Payment_Reg: { id: 'recpay-jobwork', external: 'jsmReport', jsmForm: 'Rpt_1Job_Payment_Reg' },
 
+  A_Gstr1_SalesReturnSummary: { id: 'monthly-sales-return', external: 'jsmReport', jsmForm: 'A_Gstr1_SalesReturnSummary' },
+  A_Gstr1_PurchaseRtn_Report: { id: 'monthly-purchase-return', external: 'jsmReport', jsmForm: 'A_Gstr1_PurchaseRtn_Report' },
+
+  Rpt_Stk_Grey_Finish_Summary: { id: 'monthly-sales-gf', external: 'jsmReport', jsmForm: 'Rpt_Stk_Grey_Finish_Summary' },
+
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
 };

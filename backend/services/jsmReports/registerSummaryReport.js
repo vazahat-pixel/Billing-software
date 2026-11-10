@@ -25,7 +25,12 @@ const ORDER_FIELDS = {
   Haste: 'HASTE',
   Transport: 'TRANSPORT',
   Month: 'MONTH',
+  MONTH: 'MONTH',
   DateWise: 'BILL_DATE',
+  // The GSTIN Return screens offer these three instead of Broker/Haste/Transport.
+  State_Code_Nm: 'STATE',
+  Type: 'TYPE',
+  GstRate: 'GST_RATE',
   None: null,
 };
 
