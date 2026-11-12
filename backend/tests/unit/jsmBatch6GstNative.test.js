@@ -194,3 +194,23 @@ test('Grey At Mill (Format 1): issue less receipt and shortage; earlier movement
   assert.equal(dated.grid.variant, 3);
   assert.ok(dated.rows.some((r) => r.BILLDATE === '2026-05-10' && r.ML_REC_QTY === 400));
 });
+
+test('Stock Ledger New (book-acc): earlier movement and master join OP.STOCK; detail keeps date and book', async () => {
+  const rows = [
+    { ITEM_NAME: 'A', GRIT_NAME: 'FINISH', BILL_DATE: null, BOOK_NAME: '', OP_STOCK: 100, __master: true },
+    { ITEM_NAME: 'A', GRIT_NAME: 'FINISH', BILL_DATE: new Date('2026-03-01'), BOOK_NAME: 'PURCHASE', PURCHASE: 50 },
+    { ITEM_NAME: 'A', GRIT_NAME: 'FINISH', BILL_DATE: new Date('2026-05-01'), BOOK_NAME: 'SALES', SALES: 30 },
+    { ITEM_NAME: 'A', GRIT_NAME: 'FINISH', BILL_DATE: new Date('2026-05-02'), BOOK_NAME: 'SALES', SL_RTN: 5 },
+  ];
+  const rpt = require('../../services/jsmReports').get('Rpt_Stock_Acc_Finish_Summary');
+  const base = { from: '2026-04-01', to: '2027-03-31', itemBy: '1-Qty', summary: true };
+  const sum = await rpt.run('507f1f77bcf86cd799439011', base, { rows });
+  assert.equal(sum.rows.length, 1);
+  assert.equal(sum.rows[0].OP_STOCK, 150);
+  assert.equal(sum.rows[0].SALES, 30);
+  assert.equal(sum.rows[0].SL_RTN, 5);
+  assert.equal(sum.rows[0].CL_STK, 125);
+  const det = await rpt.run('507f1f77bcf86cd799439011', { ...base, summary: false }, { rows });
+  assert.ok(det.rows.length >= 3);
+  await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { ...base, orderBy1: 'Nope' }, { rows }), /Unknown GroupBy/);
+});

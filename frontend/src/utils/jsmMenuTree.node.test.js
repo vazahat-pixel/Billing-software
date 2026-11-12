@@ -57,7 +57,7 @@ const MUST_STAY_REACHABLE = [
   // the real JSM screens (Gstr_3B_TextNew_Monthly, Stp_Gst_OutWrad_ErrorCheck, A_Gstr1_*, A_Gstr2_*, etc.).
   ['stockLedger', 'stockMts'], ['stockLedger', 'stockKgs'],
   ['stockLedger', 'greyShop'], ['stockLedger', 'greyMill'],
-  ['stockLedger', 'finishExcel'], ['stockLedger', 'finishBook'], ['stockLedger', 'stockValue'],
+  ['stockLedger', 'finishBook'], ['stockLedger', 'stockValue'],
   ['fasCheck', 'importBank'], ['fasCheck', 'diffOpening'],
   ['fasCheck', 'diffYear'],
   ['cashBook', undefined],

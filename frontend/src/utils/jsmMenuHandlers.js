@@ -92,7 +92,7 @@ export const FORM_HANDLERS = {
   Rpt1_Stk_Grey_At_Mill: { id: 'stock-grey-mill', external: 'stockLedger', reportKind: 'greyMill' },
   Rpt_Stk_Acc_Finish_Summary: { id: 'stock-finish-book', external: 'stockLedger', reportKind: 'finishBook' },
   Rpt_Stk_Acc_Finish_Summary_Value: { id: 'stock-value', external: 'stockLedger', reportKind: 'stockValue' },
-  Rpt_Stock_Acc_Finish_Summary: { id: 'stock-finish-excel', external: 'stockLedger', reportKind: 'finishExcel' },
+  Rpt_Stock_Acc_Finish_Summary: { id: 'stock-finish-excel', external: 'jsmReport', jsmForm: 'Rpt_Stock_Acc_Finish_Summary' },
 
   // Tds / Tcs
   Rpt_TdsReports: { id: 'tds-head', external: 'jsmReport', jsmForm: 'Rpt_TdsReports' },

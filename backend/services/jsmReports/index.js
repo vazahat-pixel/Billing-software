@@ -155,6 +155,7 @@ const REPORTS = {
   Rpt_Tcs: require('./reports/tcsRecPay'),
   Rpt_Jsm_Stock_Finish_New1: require('./reports/stockFinishNew'),
   Rpt_Jsm_Stock_Grey_At_Mill: require('./reports/stockGreyAtMill'),
+  Rpt_Stock_Acc_Finish_Summary: require('./reports/stockAccFinish'),
   Rpt_Tds2_Prty_Mnth_Wise: require('./reports/tdsTcsBooks').tdsPartyMonth,
   Rpt_TcsSalesRegister: require('./reports/tdsTcsBooks').tcsSales,
   Rpt_TcsPurchaseRegister: require('./reports/tdsTcsBooks').tcsPurchase,
