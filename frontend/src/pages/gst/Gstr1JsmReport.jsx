@@ -148,6 +148,7 @@ const Grid = ({ cols, rows, tab, onOpenInvoice }) => {
 };
 
 /** JSM-style GSTR-1 window: header bar + B2B/B2CL/… tabs + JSM column names + Generate Excel / Exit */
+export { COLS_MAP as GSTR1_COLS_MAP, flat as flatGstr1 };
 const Gstr1JsmReport = ({ isOpen, onClose, onOpenInvoice }) => {
   const { fetchGstr1 } = useStore();
   const today = useMemo(() => new Date(), []);

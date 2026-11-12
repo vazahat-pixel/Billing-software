@@ -48,3 +48,4 @@ for (const [kind, file] of [['gstr9', 'GSTR_9'], ['gstr9c', 'GSTR_9C']]) {
     }
   });
 }
+

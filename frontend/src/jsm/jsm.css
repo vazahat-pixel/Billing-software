@@ -79,3 +79,12 @@
   .jsmg-two-col { overflow: visible; background: #fff; }
   .jsmg-side-table { background: #fff; }
 }
+
+.jsmf-dgv { background: #fff; }
+.jsmf-dgv table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 11px; }
+.jsmf-dgv th { position: sticky; top: 0; background: #e0e0e0; border: 1px solid #888; padding: 1px 6px; text-align: left; white-space: nowrap; }
+.jsmf-dgv td { border: 1px solid #ccc; padding: 1px 6px; white-space: nowrap; }
+.jsmf-dgv td.num { text-align: right; }
+.jsmf-dgv tr:nth-child(even) td { background: #f7f7f7; }
+.jsmf-dgv tr.is-click { cursor: pointer; }
+.jsmf-dgv tr.is-click:hover td { background: #dbeafe; }

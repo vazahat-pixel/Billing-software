@@ -153,3 +153,4 @@ export function downloadGstr9TemplateWorkbook(rows, kind = 'gstr9', companyName 
   const safe = String(companyName || 'Company').replace(/[^\w ]+/g, '').trim() || 'Company';
   XLSX.writeFile(wb, `${safe}_${kind === 'gstr9c' ? 'GSTR_9C' : 'GSTR_9'}.xlsx`);
 }
+

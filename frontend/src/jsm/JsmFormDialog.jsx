@@ -45,7 +45,7 @@ function boxStyle(c, extra = {}) {
 }
 
 export default function JsmFormDialog({
-  form, state, onChange, lists = {}, onButton, overrides = {}, busy = false,
+  form, state, onChange, lists = {}, onButton, overrides = {}, busy = false, grids = {},
 }) {
   const [search, setSearch] = useState('');
   const [focusList, setFocusList] = useState(null);
@@ -283,7 +283,31 @@ export default function JsmFormDialog({
       );
     }
     if (c.type === 'ListView') return renderListView(c);
-    if (c.type === 'DataGridView') return <div key={c.name} className="jsmf-grid" style={boxStyle(c)} />;
+    if (/DataGridView$/.test(c.type)) {
+      // Data grids carry no columns in the blueprint (JSM adds them in code), so the screen supplies
+      // { columns: [{ key, label, width, num, fmt }], rows, onRowClick } per grid name.
+      const g = grids[c.name];
+      if (!g) return <div key={c.name} className="jsmf-grid" style={boxStyle(c)} />;
+      return (
+        <div key={c.name} className="jsmf-grid jsmf-dgv" style={boxStyle(c, { overflow: 'auto' })}>
+          <table>
+            <thead>
+              <tr>{g.columns.map((col) => <th key={col.key} style={{ minWidth: col.width }}>{col.label}</th>)}</tr>
+            </thead>
+            <tbody>
+              {g.rows.map((r, i) => (
+                <tr key={i} className={g.onRowClick ? 'is-click' : ''} onClick={g.onRowClick ? () => g.onRowClick(r) : undefined}>
+                  {g.columns.map((col) => {
+                    const v = r[col.key];
+                    return <td key={col.key} className={col.num ? 'num' : ''}>{String(col.fmt ? col.fmt(v) : (v ?? ''))}</td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
     if (c.type === 'ProgressBar') return <div key={c.name} className="jsmf-progress" style={boxStyle(c)} />;
     return null;
   };

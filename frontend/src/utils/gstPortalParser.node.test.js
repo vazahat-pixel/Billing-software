@@ -45,3 +45,4 @@ test('parseGstr1Excel and parseGstr2bExcel parse standard portal workbook sheets
   assert.equal(r2[0].XINV_NO, 'PU-M-5');
   assert.equal(r2[0].CGST, 50);
 });
+

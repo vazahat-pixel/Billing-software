@@ -170,3 +170,4 @@ export function parseGstr2bExcel(data) {
   parseSheet(['B2B-CDNR', 'CDNR'], 'CDNR', 'DN');
   return rows;
 }
+

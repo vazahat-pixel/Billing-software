@@ -104,6 +104,7 @@ const CuttingBeamEntryModal = lazy(() => import('./inventory/CuttingBeamEntryMod
 const JobWorkerMaster = lazy(() => import('./masters/JobWorkerMaster'));
 const InventoryPage = lazy(() => import('./inventory/InventoryPage'));
 const Gst3bMonthlyModal = lazy(() => import('./gst/Gstr3bJsmReport'));
+const JsmGstr1Screen = lazy(() => import('../jsm/JsmGstr1Screen'));
 const GstinJsmReport = lazy(() => import('./gst/GstinJsmReport'));
 const Gstr1Modal = lazy(() => import('./gst/Gstr1JsmReport'));
 const Gst2bMatchingModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst2bMatchingModal })));
@@ -820,6 +821,7 @@ const Dashboard = () => {
    };
 
    const [jsmReportForm, setJsmReportForm] = useState(null);
+   const [jsmGstr1Form, setJsmGstr1Form] = useState(null);
    const [gstinJsmKind, setGstinJsmKind] = useState('gstinPurchase');
 
    const openReportLeaf = (leafId) => {
@@ -830,6 +832,7 @@ const Dashboard = () => {
    const openReportExternal = (node) => {
       const ext = typeof node === 'string' ? node : node?.external;
       if (ext === 'jsmReport') setJsmReportForm(node.jsmForm);
+      else if (ext === 'jsmGstr1') setJsmGstr1Form(node.jsmForm);
       else if (ext === 'gstReports' && node?.reportKind === 'gst3b') toggleModal('gst3bMonthly', true);
       else if (ext === 'gstReports' && GSTIN_JSM_FORMS[node?.reportKind]) setJsmReportForm(GSTIN_JSM_FORMS[node.reportKind]);
       else if (ext === 'gstReports') {
@@ -2835,6 +2838,11 @@ const Dashboard = () => {
             onClose={() => setModals(prev => ({ ...prev, recordsHub: false }))}
             initialTab={modals.recordsTab}
          />
+         {jsmGstr1Form && (
+            <Suspense fallback={null}>
+               <JsmGstr1Screen formName={jsmGstr1Form} isOpen onClose={() => setJsmGstr1Form(null)} onOpenInvoice={onOpenGstr1Invoice} />
+            </Suspense>
+         )}
          {jsmReportForm && (
             <Suspense fallback={null}>
                <JsmReport
@@ -2875,6 +2883,7 @@ const Dashboard = () => {
                const ext = typeof node === 'string' ? node : node?.external;
                setModals(prev => ({ ...prev, reportsHub: false, reportsLeafId: null }));
                if (ext === 'jsmReport') setJsmReportForm(node.jsmForm);
+               else if (ext === 'jsmGstr1') setJsmGstr1Form(node.jsmForm);
                else if (ext === 'gstReports') toggleModal('gstReports', true);
                else if (ext === 'gstr1') toggleModal('gstr1', true);
                else if (ext === 'finalReport') {

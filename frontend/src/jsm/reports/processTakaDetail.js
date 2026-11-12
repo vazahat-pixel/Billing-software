@@ -39,3 +39,4 @@ export default {
     purParties: s.ListView3 || [],
   }),
 };
+

@@ -105,3 +105,4 @@ export const OLD_STOCK_REPORTS = [
     },
   },
 ];
+

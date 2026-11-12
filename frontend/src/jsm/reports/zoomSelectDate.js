@@ -33,3 +33,4 @@ export default {
     action: btnName || 'Btn_Ok',
   }),
 };
+
