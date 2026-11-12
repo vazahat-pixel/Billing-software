@@ -131,7 +131,7 @@ export default function JsmGstr1Screen({ formName, isOpen, onClose, onOpenInvoic
             <WindowControls />
           </div>
           {form ? (
-            <JsmFormDialog form={form} state={state} onChange={setState} onButton={run} busy={busy} grids={grids} />
+            <JsmFormDialog form={form} state={state} onChange={setState} onButton={run} busy={busy} grids={grids} overrides={{ lbl_Progress: { text: '', visible: false } }} />
           ) : (
             <div style={{ padding: 16 }}>Loading…</div>
           )}
