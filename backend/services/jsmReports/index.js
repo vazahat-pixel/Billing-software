@@ -97,6 +97,13 @@ const REPORTS = {
   Rpt_SalesRtnRegisterDetail_Report: require('./reports/registerSummaries').salesReturnDetail,
   OldRpt_SalesRTNRegisterDetail_Report: require('./reports/registerSummaries').salesReturnDetail,
   Rpt_PurchaseRtnRegisterDetail_Report: require('./reports/registerSummaries').purchaseReturnDetail,
+  Rpt_Sales_Order_Detail_Report: require('./reports/orderStatus').sales,
+  Rpt_Purchase_Order_Detail_Rpt: require('./reports/orderStatus').purchase,
+  Rpt_Sales_Slip_Register: require('./reports/slipRegister').slip,
+  Rpt_SalesSlipDetail_Report: require('./reports/slipRegister').slipNew,
+  Rpt_Lot_Costing: require('./reports/lotCosting'),
+  Rpt_Cutting_Report: require('./reports/cuttingReport').cuttingReport,
+  Rpt_Stk_Cutting_At_Shop: require('./reports/cuttingReport').cuttingStockReport,
 };
 
 function get(reportId) {

@@ -47,10 +47,14 @@ import finishStock from './finishStock';
 import cashBankRegister from './cashBankRegister';
 import cheqInHand from './cheqInHand';
 import { BROKERAGE_STATEMENTS } from './brokerageStatement';
+import { ORDER_STATUSES } from './orderStatus';
+import { SLIP_REGISTERS } from './slipRegister';
+import lotCosting from './lotCosting';
+import { CUTTING_REPORTS } from './cuttingReport';
 
 /** JSM report screens rebuilt so far, keyed by JSM form name. */
 export const JSM_REPORTS = Object.fromEntries([
   processSend, jobSend, processReceiptDetail, jobReceiptDetail, processReceiptSummary, jobReceiptSummary,
   processStock, jobStock, ...BILL_REGISTERS, ...OUTSTANDING_REPORTS, ...ITEM_WISE_REPORTS, salesHaste,
-  ...LEDGER_REPORTS, trialBalance, cashBank, balanceSheet, profitAndLoss, ...REGISTER_SUMMARIES, groupBalance, aboveBelow, voucherBook, processItemSummary, ...MASTER_LISTS, ...OUTSTANDING_DETAILS, ...REC_PAY_REGISTERS, greyFinishSummary, ...ACC_STOCK_REPORTS, ...KGS_STOCK_REPORTS, itemStockRegister, ...OUTSTANDING_ZOOMS, ...MONTH_OUTSTANDINGS, smsOutstanding, os90Days, dailyTransaction, challanStatus, jobProfitLoss, rgPending, salesChallan, ...PURCHASE_STOCKS, millReturnToSend, boxStock, finishStock, cashBankRegister, cheqInHand, ...BROKERAGE_STATEMENTS, ...LIST_PRINTS, outstandingPurchaseAll, ...GSTIN_ITEM_DETAILS, ...SUPPLY_REGISTERS, gstr9Old,
+  ...LEDGER_REPORTS, trialBalance, cashBank, balanceSheet, profitAndLoss, ...REGISTER_SUMMARIES, groupBalance, aboveBelow, voucherBook, processItemSummary, ...MASTER_LISTS, ...OUTSTANDING_DETAILS, ...REC_PAY_REGISTERS, greyFinishSummary, ...ACC_STOCK_REPORTS, ...KGS_STOCK_REPORTS, itemStockRegister, ...OUTSTANDING_ZOOMS, ...MONTH_OUTSTANDINGS, smsOutstanding, os90Days, dailyTransaction, challanStatus, jobProfitLoss, rgPending, salesChallan, ...PURCHASE_STOCKS, millReturnToSend, boxStock, finishStock, cashBankRegister, cheqInHand, ...BROKERAGE_STATEMENTS, ...LIST_PRINTS, outstandingPurchaseAll, ...GSTIN_ITEM_DETAILS, ...SUPPLY_REGISTERS, gstr9Old, ...ORDER_STATUSES, ...SLIP_REGISTERS, lotCosting, ...CUTTING_REPORTS,
 ].map((r) => [r.form, r]));

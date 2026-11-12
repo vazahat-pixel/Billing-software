@@ -172,6 +172,13 @@ export const FORM_HANDLERS = {
   Rpt_FinishStockReport: { id: 'finish-stock-excel', external: 'jsmReport', jsmForm: 'Rpt_FinishStockReport' },
   A_All_CashBank_Report: { id: 'fas-cashbank-register', external: 'jsmReport', jsmForm: 'A_All_CashBank_Report' },
   Rpt_BankStockInHandCheq: { id: 'fas-cheq-in-hand', external: 'jsmReport', jsmForm: 'Rpt_BankStockInHandCheq' },
+  Rpt_Sales_Order_Detail_Report: { id: 'sales-order-register', external: 'jsmReport', jsmForm: 'Rpt_Sales_Order_Detail_Report' },
+  Rpt_Purchase_Order_Detail_Rpt: { id: 'purchase-order-register', external: 'jsmReport', jsmForm: 'Rpt_Purchase_Order_Detail_Rpt' },
+  Rpt_Sales_Slip_Register: { id: 'sales-slip-register', external: 'jsmReport', jsmForm: 'Rpt_Sales_Slip_Register' },
+  Rpt_SalesSlipDetail_Report: { id: 'sales-slip-new-register', external: 'jsmReport', jsmForm: 'Rpt_SalesSlipDetail_Report' },
+  Rpt_Lot_Costing: { id: 'process-lot-costing', external: 'jsmReport', jsmForm: 'Rpt_Lot_Costing' },
+  Rpt_Cutting_Report: { id: 'process-cutting', external: 'jsmReport', jsmForm: 'Rpt_Cutting_Report' },
+  Rpt_Stk_Cutting_At_Shop: { id: 'process-cutting-stock', external: 'jsmReport', jsmForm: 'Rpt_Stk_Cutting_At_Shop' },
 
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
