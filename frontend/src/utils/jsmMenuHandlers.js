@@ -142,6 +142,9 @@ export const FORM_HANDLERS = {
   Tran_WorkChallan_PL_Repo: { id: 'job-profit-loss', external: 'jsmReport', jsmForm: 'Tran_WorkChallan_PL_Repo' },
   Rpt_Sales_Rg_Pend: { id: 'sales-rg-pending', external: 'jsmReport', jsmForm: 'Rpt_Sales_Rg_Pend' },
   Rpt_Sales_Challan_Detail_Report: { id: 'sales-challan-detail', external: 'jsmReport', jsmForm: 'Rpt_Sales_Challan_Detail_Report' },
+  Rpt_Purchase_Stock: { id: 'purchase-stock-old', external: 'jsmReport', jsmForm: 'Rpt_Purchase_Stock' },
+  Rpt_Purchase_Stock_LRWiseReport: { id: 'purchase-stock-lr', external: 'jsmReport', jsmForm: 'Rpt_Purchase_Stock_LRWiseReport' },
+  Rpt_Purchase_Stock_Godown_Report: { id: 'purchase-stock-godown', external: 'jsmReport', jsmForm: 'Rpt_Purchase_Stock_Godown_Report' },
 
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
