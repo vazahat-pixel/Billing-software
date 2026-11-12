@@ -146,6 +146,15 @@ const REPORTS = {
   Frm_BillAgistPaidDetail: require('./reports/billAgainstPaidDetail'),
   Rpt_Match8A_Report: require('./reports/match8aReport'),
   Stp_DataBaseFromTo: require('./reports/dbRepairDiagnostics'),
+  GstFilingFreezeData: require('./reports/gstFreezeData'),
+  Rpt_Update_Lot_Status: require('./reports/updateStatusTools').updateLot,
+  Rpt_Jsm_Os_Update: require('./reports/updateStatusTools').osUpdate,
+  Eway_No_Upload_Offline: require('./reports/ewayUploadOffline'),
+  Frm_Import_SalesJsm: require('./reports/importSalesJsm'),
+  FrmReminder_All_Details: require('./reports/reminderTool'),
+  Tran_TradingBrokregEntry: require('./reports/brokerageEntryTools').tradingEntry,
+  Broker_commision_check: require('./reports/brokerageEntryTools').brokerTaxInvoice,
+  Frm_Investment_Raju: require('./reports/investmentReport'),
 };
 
 function get(reportId) {

@@ -71,6 +71,13 @@ import brokregOsReport from './brokregOsReport';
 import billAgainstPaidDetail from './billAgainstPaidDetail';
 import match8aReport from './match8aReport';
 import dbRepairDiagnostics from './dbRepairDiagnostics';
+import gstFreezeData from './gstFreezeData';
+import { UPDATE_STATUS_TOOLS } from './updateStatusTools';
+import ewayUploadOffline from './ewayUploadOffline';
+import importSalesJsm from './importSalesJsm';
+import reminderTool from './reminderTool';
+import { BROKERAGE_ENTRY_TOOLS } from './brokerageEntryTools';
+import investmentReport from './investmentReport';
 
 /** JSM report screens rebuilt so far, keyed by JSM form name. */
 export const JSM_REPORTS = Object.fromEntries([
@@ -80,4 +87,5 @@ export const JSM_REPORTS = Object.fromEntries([
   ...OUTSTANDING_AGE_EXTRAS, ...BILL_WISE_INTEREST_REPORTS, ...BANK_EXTRA_REPORTS, ...BROKERAGE_JOB_AND_ALL, ...PROFIT_AND_YARN_REPORTS,
   ...OLD_GST_REPORTS, ...OLD_STOCK_REPORTS, ...OLD_MISC_REPORTS, ...OLD_BANK_REPORTS,
   processTakaDetail, zoomSelectDate, brokregOsReport, billAgainstPaidDetail, match8aReport, dbRepairDiagnostics,
+  gstFreezeData, ...UPDATE_STATUS_TOOLS, ewayUploadOffline, importSalesJsm, reminderTool, ...BROKERAGE_ENTRY_TOOLS, investmentReport,
 ].map((r) => [r.form, r]));

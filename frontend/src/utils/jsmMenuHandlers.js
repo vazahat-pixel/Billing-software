@@ -206,6 +206,15 @@ export const FORM_HANDLERS = {
   Frm_BillAgistPaidDetail: { id: 'missing-bill-against-paid', external: 'jsmReport', jsmForm: 'Frm_BillAgistPaidDetail' },
   Rpt_Match8A_Report: { id: 'gst-match-8a', external: 'jsmReport', jsmForm: 'Rpt_Match8A_Report' },
   Stp_DataBaseFromTo: { id: 'jsm-db-repair', external: 'jsmReport', jsmForm: 'Stp_DataBaseFromTo' },
+  GstFilingFreezeData: { id: 'gst-3b-freeze', external: 'jsmReport', jsmForm: 'GstFilingFreezeData' },
+  Rpt_Update_Lot_Status: { id: 'proc-update-lot-status', external: 'jsmReport', jsmForm: 'Rpt_Update_Lot_Status' },
+  Rpt_Jsm_Os_Update: { id: 'os-update-bill', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Os_Update' },
+  Eway_No_Upload_Offline: { id: 'old-eway-upload', external: 'jsmReport', jsmForm: 'Eway_No_Upload_Offline' },
+  Frm_Import_SalesJsm: { id: 'old-import-sales', external: 'jsmReport', jsmForm: 'Frm_Import_SalesJsm' },
+  FrmReminder_All_Details: { id: 'old-reminder-details', external: 'jsmReport', jsmForm: 'FrmReminder_All_Details' },
+  Tran_TradingBrokregEntry: { id: 'brokreg-sales-entry', external: 'jsmReport', jsmForm: 'Tran_TradingBrokregEntry' },
+  Broker_commision_check: { id: 'old-brokreg-tax-invoice', external: 'jsmReport', jsmForm: 'Broker_commision_check' },
+  Frm_Investment_Raju: { id: 'raju-investment-rpt', external: 'jsmReport', jsmForm: 'Frm_Investment_Raju' },
 
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
