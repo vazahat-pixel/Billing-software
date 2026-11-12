@@ -148,6 +148,8 @@ export const FORM_HANDLERS = {
   Rpt_1StockSubItemAcc_DetailReport: { id: 'mill-return-to-send', external: 'jsmReport', jsmForm: 'Rpt_1StockSubItemAcc_DetailReport' },
   Rpt_Box_Stock_ItemDesc: { id: 'box-stock', external: 'jsmReport', jsmForm: 'Rpt_Box_Stock_ItemDesc' },
   Rpt_FinishStockReport: { id: 'finish-stock-excel', external: 'jsmReport', jsmForm: 'Rpt_FinishStockReport' },
+  A_All_CashBank_Report: { id: 'fas-cashbank-register', external: 'jsmReport', jsmForm: 'A_All_CashBank_Report' },
+  Rpt_BankStockInHandCheq: { id: 'fas-cheq-in-hand', external: 'jsmReport', jsmForm: 'Rpt_BankStockInHandCheq' },
 
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },

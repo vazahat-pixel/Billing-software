@@ -60,6 +60,8 @@ const REPORTS = {
   Rpt_1StockSubItemAcc_DetailReport: require('./reports/millReturnToSend'),
   Rpt_Box_Stock_ItemDesc: require('./reports/boxStock'),
   Rpt_FinishStockReport: require('./reports/finishStock'),
+  A_All_CashBank_Report: require('./reports/cashBankRegister'),
+  Rpt_BankStockInHandCheq: require('./reports/cheqInHand'),
   Zoom_SelectDate_List_Item: require('./reports/itemStockRegister'),
   Rpt_StkKgsFinishAtShop: require('./reports/kgsStock').finishAtShop,
   Rpt_StkKgsGreyAtshop: require('./reports/kgsStock').greyAtShop,

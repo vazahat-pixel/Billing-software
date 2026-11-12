@@ -27,7 +27,9 @@ function declaredLayouts() {
   const out = [];
   for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.js'))) {
     const src = fs.readFileSync(path.join(dir, file), 'utf8');
-    for (const m of src.matchAll(/'(JSM_VW_[A-Z0-9_]+)'/g)) {
+    // JSM_VW_… is its usual naming, but a few of its runtime tables are named RPT_… instead
+    // (the Cash/Bank Register's two), and those must be covered by this check just the same.
+    for (const m of src.matchAll(/'((?:JSM_VW|RPT)_[A-Z0-9_]+)'/g)) {
       out.push({ report: file.replace(/\.js$/, ''), layout: m[1] });
     }
   }
@@ -65,7 +67,7 @@ test('only the known no-layout screens are uncaptured, and each has fallback col
     [
       'JSM_VW_ACC_STOCK', 'JSM_VW_ACC_STOCK_DETAIL', 'JSM_VW_BOX_STOCK',
       'JSM_VW_BOX_STOCK_VALUE', 'JSM_VW_CASHBANK_DETAIL',
-      'JSM_VW_CASHBANK_DTLVNO', 'JSM_VW_DAILY_TRANS', 'JSM_VW_DAILY_TRANS_SUMMARY',
+      'JSM_VW_CASHBANK_DTLVNO', 'JSM_VW_CHEQ_IN_HAND', 'JSM_VW_DAILY_TRANS', 'JSM_VW_DAILY_TRANS_SUMMARY',
       'JSM_VW_GRATER_OR_LESS', 'JSM_VW_GROUP_BALANCE',
       'JSM_VW_JB_RCPT', 'JSM_VW_JOB_CHALLAN_STATUS', 'JSM_VW_JOB_PROFIT_REG',
       'JSM_VW_JOB_PROFIT_REG_PCS', 'JSM_VW_JV_BOOK', 'JSM_VW_JV_BOOK_SUMMARY',
@@ -78,6 +80,7 @@ test('only the known no-layout screens are uncaptured, and each has fallback col
       'JSM_VW_SALES_CHALLAN_DTL_REPORT', 'JSM_VW_SALES_DETAIL_SUM_REPORT',
       'JSM_VW_SALES_HASTE_REPORT', 'JSM_VW_SL_RCPT', 'JSM_VW_SMS_OS',
       'JSM_VW_STOCK_WITH_VALUE_REGISTER', 'JSM_VW_TR_BAL',
+      'RPT_CASHBANK_DETAIL', 'RPT_CASHBANK_SUMMARY',
     ],
     'a newly uncaptured layout appeared — give it fallbackColumns or capture it from STP_REPORT'
   );
