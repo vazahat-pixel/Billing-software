@@ -178,6 +178,18 @@ export const FORM_HANDLERS = {
   Rpt_Lot_Costing: { id: 'process-lot-costing', external: 'jsmReport', jsmForm: 'Rpt_Lot_Costing' },
   Rpt_Cutting_Report: { id: 'process-cutting', external: 'jsmReport', jsmForm: 'Rpt_Cutting_Report' },
   Rpt_Stk_Cutting_At_Shop: { id: 'process-cutting-stock', external: 'jsmReport', jsmForm: 'Rpt_Stk_Cutting_At_Shop' },
+  Rpt_Outstating_Age_Report: { id: 'os-zoom-debitors-age', external: 'jsmReport', jsmForm: 'Rpt_Outstating_Age_Report' },
+  A_Jsm_Os_Sales_Age_Analysys_Updated: { id: 'os-zoom-debitors-excel-age', external: 'jsmReport', jsmForm: 'A_Jsm_Os_Sales_Age_Analysys_Updated' },
+  Rpt_Outstating_ReportSales: { id: 'os-zoom-new-format', external: 'jsmReport', jsmForm: 'Rpt_Outstating_ReportSales' },
+  Rpt_Sales_Interest: { id: 'sales-interest-old', external: 'jsmReport', jsmForm: 'Rpt_Sales_Interest' },
+  New_Rpt_Sales_Intrest_ZoomIn: { id: 'process-interest', external: 'jsmReport', jsmForm: 'New_Rpt_Sales_Intrest_ZoomIn' },
+  A_CashBankLedgerSingleSide: { id: 'fas-bank-od-interest', external: 'jsmReport', jsmForm: 'A_CashBankLedgerSingleSide' },
+  A_Bank_Receipt_Bill_Os_Details: { id: 'fas-bank-voucher-print', external: 'jsmReport', jsmForm: 'A_Bank_Receipt_Bill_Os_Details' },
+  Rpt_Job_Brokerage: { id: 'brokreg-jobwork', external: 'jsmReport', jsmForm: 'Rpt_Job_Brokerage' },
+  A_Jsm_Brokreg_Statement_Report: { id: 'others-brokreg-all', external: 'jsmReport', jsmForm: 'A_Jsm_Brokreg_Statement_Report' },
+  Rpt_Sales_Pump_Profit: { id: 'sales-profit-register', external: 'jsmReport', jsmForm: 'Rpt_Sales_Pump_Profit' },
+  A_StockValueReport: { id: 'inv-stock-value', external: 'jsmReport', jsmForm: 'A_StockValueReport' },
+  A_ReportYarnStock: { id: 'others-yarn-kgs-stock', external: 'jsmReport', jsmForm: 'A_ReportYarnStock' },
 
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
@@ -230,4 +242,12 @@ export const PATH_HANDLERS = {
     { id: 'tds-reg', reportKey: 'tds', view: 'tdsRegister' },
   'Reports > Tcs Reports > Tcs Purchase Register':
     { id: 'tcs-purchase', reportKey: 'tcs', view: 'tcsPurchase' },
+  'Reports > Fas Reports > Bank / Cash Book > Reconciliation':
+    { id: 'fas-bank-recon', external: 'jsmReport', jsmForm: 'Rpt_CB1_Reconsilation' },
+  'Reports > Fas Reports > Bank / Cash Book > Recon.Test':
+    { id: 'fas-bank-recon-test', external: 'jsmReport', jsmForm: 'Rpt_CB1_Reconsilation' },
+  'Reports > Sales > Sales Bill > Interest Bill Wise New':
+    { id: 'sales-interest-new', external: 'jsmReport', jsmForm: 'New_Rpt_Sales_Intrest_ZoomIn_New_Sales' },
+  'Reports > Purchase > Purchase Bill > Purchase Bill Wise Interest':
+    { id: 'purchase-interest', external: 'jsmReport', jsmForm: 'New_Rpt_Sales_Intrest_ZoomIn_New_Purchase' },
 };

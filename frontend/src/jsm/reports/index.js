@@ -56,10 +56,16 @@ import gstr9New from './gstr9New';
 import gstr3bInwardOutward from './gstr3bInwardOutward';
 import { GST_MATCHING_REPORTS } from './gstMatching';
 import { JS_GSTR_REPORTS } from './gstExtraReports';
+import { OUTSTANDING_AGE_EXTRAS } from './outstandingAgeExtra';
+import { BILL_WISE_INTEREST_REPORTS } from './billWiseInterest';
+import { BANK_EXTRA_REPORTS } from './bankExtraReports';
+import { BROKERAGE_JOB_AND_ALL } from './brokerageJobAndAll';
+import { PROFIT_AND_YARN_REPORTS } from './profitAndYarnReports';
 
 /** JSM report screens rebuilt so far, keyed by JSM form name. */
 export const JSM_REPORTS = Object.fromEntries([
   processSend, jobSend, processReceiptDetail, jobReceiptDetail, processReceiptSummary, jobReceiptSummary,
   processStock, jobStock, ...BILL_REGISTERS, ...OUTSTANDING_REPORTS, ...ITEM_WISE_REPORTS, salesHaste,
   ...LEDGER_REPORTS, trialBalance, cashBank, balanceSheet, profitAndLoss, ...REGISTER_SUMMARIES, groupBalance, aboveBelow, voucherBook, processItemSummary, ...MASTER_LISTS, ...OUTSTANDING_DETAILS, ...REC_PAY_REGISTERS, greyFinishSummary, ...ACC_STOCK_REPORTS, ...KGS_STOCK_REPORTS, itemStockRegister, ...OUTSTANDING_ZOOMS, ...MONTH_OUTSTANDINGS, smsOutstanding, os90Days, dailyTransaction, challanStatus, jobProfitLoss, rgPending, salesChallan, ...PURCHASE_STOCKS, millReturnToSend, boxStock, finishStock, cashBankRegister, cheqInHand, ...BROKERAGE_STATEMENTS, ...LIST_PRINTS, outstandingPurchaseAll, ...GSTIN_ITEM_DETAILS, ...SUPPLY_REGISTERS, gstr9Old, ...ORDER_STATUSES, ...SLIP_REGISTERS, lotCosting, ...CUTTING_REPORTS, gstr9cOld, gstr9New, gstr3bInwardOutward, ...GST_MATCHING_REPORTS, ...JS_GSTR_REPORTS,
+  ...OUTSTANDING_AGE_EXTRAS, ...BILL_WISE_INTEREST_REPORTS, ...BANK_EXTRA_REPORTS, ...BROKERAGE_JOB_AND_ALL, ...PROFIT_AND_YARN_REPORTS,
 ].map((r) => [r.form, r]));

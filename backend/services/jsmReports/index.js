@@ -115,6 +115,21 @@ const REPORTS = {
   JS_GSTR1_RPT: require('./reports/gstExtraReports').jsGstr1,
   JS_GSTR2_RPT: require('./reports/gstExtraReports').jsGstr2,
   JS_GSTR3_SMRY: require('./reports/gstExtraReports').jsGstr3,
+  Rpt_Outstating_Age_Report: require('./reports/outstandingAgeExtra').debitorsAge,
+  A_Jsm_Os_Sales_Age_Analysys_Updated: require('./reports/outstandingAgeExtra').debitorsExcelAge,
+  Rpt_Outstating_ReportSales: require('./reports/outstandingAgeExtra').osNewFormatTesting,
+  Rpt_Sales_Interest: require('./reports/billWiseInterest').salesOld,
+  New_Rpt_Sales_Intrest_ZoomIn_New_Sales: require('./reports/billWiseInterest').salesNew,
+  New_Rpt_Sales_Intrest_ZoomIn_New_Purchase: require('./reports/billWiseInterest').purchaseNew,
+  New_Rpt_Sales_Intrest_ZoomIn: require('./reports/billWiseInterest').processNew,
+  Rpt_CB1_Reconsilation: require('./reports/bankExtraReports').bankReconciliation,
+  A_CashBankLedgerSingleSide: require('./reports/bankExtraReports').bankOdInterest,
+  A_Bank_Receipt_Bill_Os_Details: require('./reports/bankExtraReports').bankVoucherPrint,
+  Rpt_Job_Brokerage: require('./reports/brokerageJobAndAll').jobBrokerage,
+  A_Jsm_Brokreg_Statement_Report: require('./reports/brokerageJobAndAll').brokregAll,
+  Rpt_Sales_Pump_Profit: require('./reports/profitAndYarnReports').profitRegister,
+  A_StockValueReport: require('./reports/profitAndYarnReports').stockValueReport,
+  A_ReportYarnStock: require('./reports/profitAndYarnReports').yarnKgsStock,
 };
 
 function get(reportId) {
