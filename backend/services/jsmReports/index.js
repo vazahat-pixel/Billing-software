@@ -155,6 +155,18 @@ const REPORTS = {
   Tran_TradingBrokregEntry: require('./reports/brokerageEntryTools').tradingEntry,
   Broker_commision_check: require('./reports/brokerageEntryTools').brokerTaxInvoice,
   Frm_Investment_Raju: require('./reports/investmentReport'),
+  A_Gstr1_SalesInvoiceSummary: require('./reports/gstinSummary').salesSummary,
+  A_Gstr2_PurchaseSummary: require('./reports/gstinSummary').purchaseSummary,
+  A_Gstr2_ProcessSummary: require('./reports/gstinSummary').processSummary,
+  A_Gstr2_JobWorkReceiptSummary: require('./reports/gstinSummary').jobworkSummary,
+  Rpt_Journal_Details_Report: require('./reports/gstinSummary').journalDetails,
+  A_Gstr2_Expense: require('./reports/gstinSummary').expenseGstr2,
+  Hsn_Wise_Report_All: require('./reports/gstNativeTools').hsnWiseAll,
+  Stp_Gst_OutWrad_ErrorCheck: require('./reports/gstNativeTools').outwardErrorCheck,
+  Gstr_3B_TextNew_Monthly: require('./reports/gstNativeTools').gstr3bMonthly,
+  Gstr_3BB_TextNew_Excel_Monthly: require('./reports/gstNativeTools').gstr3bExcel,
+  A_Brokreg_Main_Rpt_Zoom_Column: require('./reports/gstNativeTools').brokregZoomColumn,
+  A_All_Ewb_Einv_Rpt: require('./reports/gstNativeTools').ewbEinvRpt,
 };
 
 function get(reportId) {

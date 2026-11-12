@@ -51,13 +51,10 @@ test('the menu adds nothing JSM does not have', () => {
  * reachable, a report an operator uses today has gone missing from the menu.
  */
 const MUST_STAY_REACHABLE = [
-  ['gstReports', 'gst3b'], ['gstReports', 'gstr1'], ['gstReports', 'gstr1Errors'],
-  ['gstReports', 'itc04'], ['gstReports', 'ewayBulk'], ['gstReports', 'ewayStatus'],
-  ['gstReports', 'ewayExcel'], ['gstReports', 'gst45'], ['gstReports', 'gstinSales'],
-  ['gstReports', 'gstinPurchase'], ['gstReports', 'gstinProcess'], ['gstReports', 'gstinJobwork'],
-  ['gstReports', 'gstinJournal'], ['gstReports', 'gstinExpense'],
-  // gstReports|gstrMatching, gstr2, gstr9 now open the real JSM screens (Rpt_Jsm_Gstr1_Match,
-  // Rpt_Match2B_Report*, Rpt_Match2A, Rpt_Match4A_Report_New, Rpt_Jsm_GSTR9_New, xOld_*).
+  ['gstReports', 'gstr1'], ['gstReports', 'ewayBulk'], ['gstReports', 'gst45'],
+  // gstReports|gstrMatching, gstr2, gstr9, gst3b, gstr1Errors, itc04, ewayStatus, ewayExcel,
+  // gstinSales, gstinPurchase, gstinProcess, gstinJobwork, gstinJournal, gstinExpense now open
+  // the real JSM screens (Gstr_3B_TextNew_Monthly, Stp_Gst_OutWrad_ErrorCheck, A_Gstr1_*, A_Gstr2_*, etc.).
   ['stockLedger', 'stockMts'], ['stockLedger', 'stockKgs'], ['stockLedger', 'finishShop'],
   ['stockLedger', 'greyShop'], ['stockLedger', 'greyShopPcs'], ['stockLedger', 'greyMill'],
   ['stockLedger', 'finishExcel'], ['stockLedger', 'finishBook'], ['stockLedger', 'stockValue'],
