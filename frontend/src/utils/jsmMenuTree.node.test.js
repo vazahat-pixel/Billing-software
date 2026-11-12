@@ -56,7 +56,7 @@ const MUST_STAY_REACHABLE = [
   // gstinSales, gstinPurchase, gstinProcess, gstinJobwork, gstinJournal, gstinExpense now open
   // the real JSM screens (Gstr_3B_TextNew_Monthly, Stp_Gst_OutWrad_ErrorCheck, A_Gstr1_*, A_Gstr2_*, etc.).
   ['stockLedger', 'stockMts'], ['stockLedger', 'stockKgs'],
-  ['stockLedger', 'greyShop'], ['stockLedger', 'greyMill'],
+  ['stockLedger', 'greyMill'],
   ['stockLedger', 'finishBook'], ['stockLedger', 'stockValue'],
   ['fasCheck', 'importBank'],
   // fasCheck|diffYear now opens JSM's Rpt_Jsm_Ledger_os_Diff_Check.

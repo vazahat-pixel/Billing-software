@@ -160,6 +160,7 @@ const REPORTS = {
   Rpt_Cash_Bank_Finance_Report: require('./reports/cashBankFinance'),
   Rpt_BankBookRec_GstMonthWise: require('./reports/bankMonthWise'),
   Mst1_Check_Diff: require('./reports/checkDiffOpening'),
+  Rpt_Stk_Grey_At_Shop: require('./reports/stockGreyAtShop'),
   Rpt_Tds2_Prty_Mnth_Wise: require('./reports/tdsTcsBooks').tdsPartyMonth,
   Rpt_TcsSalesRegister: require('./reports/tdsTcsBooks').tcsSales,
   Rpt_TcsPurchaseRegister: require('./reports/tdsTcsBooks').tcsPurchase,

@@ -270,3 +270,20 @@ test('Chek Diff Os.Bill/Op.Balance: opening vs pending old bills, Summary only, 
   await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { book: 'Agency' }, { fas }), /not kept/);
   await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { book: 'Sale', detail: true }, { fas }), /Detail/);
 });
+
+test('Grey At Shop: opening rolls forward, closing = OP + purchase - mill send - sales - returns; month wise groups by month', async () => {
+  const rows = [
+    { ITEM_NAME: 'G1', GRIT_NAME: 'GREY', BILL_DATE: null, OP_STOCK: 100, __master: true },
+    { ITEM_NAME: 'G1', GRIT_NAME: 'GREY', BILL_DATE: new Date('2026-03-01'), PURCHASE: 50 },
+    { ITEM_NAME: 'G1', GRIT_NAME: 'GREY', BILL_DATE: new Date('2026-05-03'), PURCHASE: 200 },
+    { ITEM_NAME: 'G1', GRIT_NAME: 'GREY', BILL_DATE: new Date('2026-05-09'), MILL_SEND: 120 },
+    { ITEM_NAME: 'G1', GRIT_NAME: 'GREY', BILL_DATE: new Date('2026-06-09'), GREY_SL: 30 },
+  ];
+  const rpt = require('../../services/jsmReports').get('Rpt_Stk_Grey_At_Shop');
+  const base = { from: '2026-04-01', to: '2027-03-31' };
+  const item = await rpt.run('507f1f77bcf86cd799439011', { ...base, mode: 'item' }, { rows });
+  assert.equal(item.rows[0].OP_STOCK, 150);
+  assert.equal(item.rows[0].CL_STOCK, 200);
+  const month = await rpt.run('507f1f77bcf86cd799439011', { ...base, mode: 'month' }, { rows });
+  assert.deepEqual(month.rows.map((r) => r.MONTH), ['April', 'May', 'June']);
+});
