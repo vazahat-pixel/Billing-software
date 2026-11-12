@@ -2,6 +2,8 @@
 import useWindowDockStore, { yieldOtherWindows } from '../store/useWindowDockStore';
 
 const TOP_CHROME = 76;
+const MIN_W = 320;
+const MIN_H = 240;
 let windowZ = 1200;
 
 /** Next stacking level. Stays under the app header (z-4000) and the keyboard bar. */
@@ -55,6 +57,12 @@ export default function useErpWindow(isOpen, options = {}) {
   const [z, setZ] = useState(1200);
   const [box, setBox] = useState(() => floatingSize(initialSize));
   const [pos, setPos] = useState(() => floatingPos(floatingSize(initialSize)));
+  // The real initialSize often arrives a tick after the window mounts (the form blueprint loads
+  // async), so keep the latest in a ref and re-fit to it below. userSizedRef stops that re-fit
+  // once the operator has dragged the window to their own size.
+  const initialSizeRef = useRef(initialSize);
+  initialSizeRef.current = initialSize;
+  const userSizedRef = useRef(false);
   const resizing = useRef(null);
   const dragging = useRef(null);
   const onCloseRef = useRef(onClose);
@@ -96,14 +104,26 @@ export default function useErpWindow(isOpen, options = {}) {
   useEffect(() => {
     if (!isOpen) {
       setMode(defaultMode);
+      // A fresh open should size itself to the form again, not keep a past drag.
+      userSizedRef.current = false;
       useWindowDockStore.getState().unregister(id);
     }
   }, [isOpen, id, defaultMode]);
 
+  // The form's own width/height arrive after mount; snap the floating window to them once they do
+  // (and whenever they change), unless the operator has already resized it by hand.
+  const sizeKey = initialSize?.w && initialSize?.h ? `${initialSize.w}x${initialSize.h}` : '';
+  useEffect(() => {
+    if (!isOpen || mode !== 'normal' || userSizedRef.current || !sizeKey) return;
+    const next = floatingSize(initialSizeRef.current);
+    setBox(next);
+    setPos(floatingPos(next));
+  }, [isOpen, mode, sizeKey]);
+
   useEffect(() => {
     if (!isOpen || mode !== 'normal') return undefined;
     const fit = () => {
-      const next = floatingSize();
+      const next = floatingSize(userSizedRef.current ? undefined : initialSizeRef.current);
       setBox(next);
       setPos(floatingPos(next));
     };
@@ -150,7 +170,7 @@ export default function useErpWindow(isOpen, options = {}) {
   }, [isOpen, mode, id]);
 
   const goFloating = useCallback(() => {
-    const next = floatingSize();
+    const next = floatingSize(userSizedRef.current ? undefined : initialSizeRef.current);
     setBox(next);
     setPos(floatingPos(next, id));
     setMode('normal');
@@ -166,7 +186,7 @@ export default function useErpWindow(isOpen, options = {}) {
   const toggleMax = useCallback(() => {
     setMode((m) => {
       if (m === 'maximized') {
-        const next = floatingSize();
+        const next = floatingSize(userSizedRef.current ? undefined : initialSizeRef.current);
         setBox(next);
         setPos(floatingPos(next, id));
         return 'normal';
@@ -185,6 +205,8 @@ export default function useErpWindow(isOpen, options = {}) {
       const startY = e.clientY;
       const startW = box.w;
       const startH = box.h;
+      // From here the window keeps the operator's size, not the form's.
+      userSizedRef.current = true;
       resizing.current = { startX, startY, startW, startH };
 
       const onMove = (ev) => {
