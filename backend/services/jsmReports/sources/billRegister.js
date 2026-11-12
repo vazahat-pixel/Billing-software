@@ -91,6 +91,8 @@ function mapBill(doc, o) {
   const party = doc[o.partyPath] || null;
   const items = Array.isArray(doc.items) ? doc.items : [];
   const book = o.bookName.get(String(doc.bookId)) || o.fallbackBook;
+  // The bill's own tax split says whether it was taxed inter-state; nothing is re-decided here.
+  const interState = Number(doc.igst || 0) > 0;
 
   return {
     CO_PATH: o.coShort,
@@ -108,6 +110,8 @@ function mapBill(doc, o) {
     MAINGROUP: party?.group || '',
     // The three the GSTIN return screens group by, beside the usual ones.
     STATE: party?.state || '',
+    // The party's GSTIN, which the GSTIN registers group under.
+    GSTIN_NO: party?.gstin || '',
     TYPE: party?.type || '',
     GST_RATE: round(Number(doc.totalGstPer ?? doc.gstPer ?? 0)),
     TRANSPORT: doc.transport || '',
@@ -147,6 +151,19 @@ function mapBill(doc, o) {
       IT_AMOUNT: round(Number(it.amount || 0)),
       // JSM's IT_KGS, which the Kgs stock reports add up.
       IT_KGS: round(Number(it.netKgs || 0)),
+      // The line's own GST, which the GSTIN item-detail screens print per line. A bill taxed
+      // inter-state carries its tax as IGST and one taxed inside the state splits it half and
+      // half — the same rule JSM's own GSTR-1 view applies, read off the bill's stored split.
+      HSN_CODE: it.itemId?.hsnCode || '',
+      IT_TAXABLE: round(Number(it.amount || 0)),
+      IT_GST_PER: round(Number(it.gstPer || 0)),
+      IT_GST_AMT: round(Number(it.gstAmt || 0)),
+      IT_IGST_P: interState ? round(Number(it.gstPer || 0)) : 0,
+      IT_IGST_A: interState ? round(Number(it.gstAmt || 0)) : 0,
+      IT_SGST_P: interState ? 0 : round(Number(it.gstPer || 0) / 2),
+      IT_SGST_A: interState ? 0 : round(Number(it.gstAmt || 0) / 2),
+      IT_CGST_P: interState ? 0 : round(Number(it.gstPer || 0) / 2),
+      IT_CGST_A: interState ? 0 : round(Number(it.gstAmt || 0) / 2),
       // JSM's UNIT_NAME: its Item Wise Summary divides by pieces or by quantity depending on it.
       UNIT_NAME: it.unit || it.itemId?.unit || '',
       LOT_NO: it.lotNo || '',
@@ -169,8 +186,8 @@ const Company = require('../../../models/Company');
 require('../../../models/Party');
 require('../../../models/Item');
 
-const PARTY_FIELDS = 'name group city state type';
-const ITEM_POPULATE = { path: 'items.itemId', select: 'name group category' };
+const PARTY_FIELDS = 'name group city state type gstin';
+const ITEM_POPULATE = { path: 'items.itemId', select: 'name group category hsnCode unit' };
 
 async function bookContext(companyId, module, fallback) {
   const [books, company] = await Promise.all([

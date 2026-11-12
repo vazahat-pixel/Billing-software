@@ -29,6 +29,7 @@ import { KGS_STOCK_REPORTS } from './kgsStock';
 import itemStockRegister from './itemStockRegister';
 import { OUTSTANDING_ZOOMS, outstandingPurchaseAll } from './outstandingZoom';
 import { LIST_PRINTS } from './listPrint';
+import { GSTIN_ITEM_DETAILS } from './gstinItemDetail';
 import { MONTH_OUTSTANDINGS } from './monthOutstanding';
 import smsOutstanding from './smsOutstanding';
 import os90Days from './os90Days';
@@ -49,5 +50,5 @@ import { BROKERAGE_STATEMENTS } from './brokerageStatement';
 export const JSM_REPORTS = Object.fromEntries([
   processSend, jobSend, processReceiptDetail, jobReceiptDetail, processReceiptSummary, jobReceiptSummary,
   processStock, jobStock, ...BILL_REGISTERS, ...OUTSTANDING_REPORTS, ...ITEM_WISE_REPORTS, salesHaste,
-  ...LEDGER_REPORTS, trialBalance, cashBank, balanceSheet, profitAndLoss, ...REGISTER_SUMMARIES, groupBalance, aboveBelow, voucherBook, processItemSummary, ...MASTER_LISTS, ...OUTSTANDING_DETAILS, ...REC_PAY_REGISTERS, greyFinishSummary, ...ACC_STOCK_REPORTS, ...KGS_STOCK_REPORTS, itemStockRegister, ...OUTSTANDING_ZOOMS, ...MONTH_OUTSTANDINGS, smsOutstanding, os90Days, dailyTransaction, challanStatus, jobProfitLoss, rgPending, salesChallan, ...PURCHASE_STOCKS, millReturnToSend, boxStock, finishStock, cashBankRegister, cheqInHand, ...BROKERAGE_STATEMENTS, ...LIST_PRINTS, outstandingPurchaseAll,
+  ...LEDGER_REPORTS, trialBalance, cashBank, balanceSheet, profitAndLoss, ...REGISTER_SUMMARIES, groupBalance, aboveBelow, voucherBook, processItemSummary, ...MASTER_LISTS, ...OUTSTANDING_DETAILS, ...REC_PAY_REGISTERS, greyFinishSummary, ...ACC_STOCK_REPORTS, ...KGS_STOCK_REPORTS, itemStockRegister, ...OUTSTANDING_ZOOMS, ...MONTH_OUTSTANDINGS, smsOutstanding, os90Days, dailyTransaction, challanStatus, jobProfitLoss, rgPending, salesChallan, ...PURCHASE_STOCKS, millReturnToSend, boxStock, finishStock, cashBankRegister, cheqInHand, ...BROKERAGE_STATEMENTS, ...LIST_PRINTS, outstandingPurchaseAll, ...GSTIN_ITEM_DETAILS,
 ].map((r) => [r.form, r]));
