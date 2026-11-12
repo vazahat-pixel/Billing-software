@@ -108,7 +108,10 @@ function normalizeGstr3b(raw) {
   };
 }
 
-export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1', excelVersion = null }) {
+// The GSTIN books open JSM's own parameter screen, not an in-hub grid.
+const GSTIN_JSM_IDS = new Set(['gstinSales', 'gstinPurchase', 'gstinProcess', 'gstinJobwork', 'gstinExpense']);
+
+export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1', excelVersion = null, onOpenJsmReport }) {
   const { company } = useStore();
   const [activeReport, setActiveReport] = useState(initialReport || 'gstr1');
   const [fromDate, setFromDate] = useState(firstOfMonth);
@@ -504,7 +507,7 @@ export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1'
                           key={item.id}
                           id={`gst-report-btn-${item.id}`}
                           type="button"
-                          onClick={() => setActiveReport(item.id)}
+                          onClick={() => (onOpenJsmReport && GSTIN_JSM_IDS.has(item.id) ? onOpenJsmReport(item.id === 'gstinPurchase' ? 'A_Gstr2_PurchaseSummary#All' : item.jsmForm) : setActiveReport(item.id))}
                           className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-left text-xs transition-all cursor-pointer ${
                             isActive
                               ? 'bg-blue-600 text-white font-semibold shadow-md'

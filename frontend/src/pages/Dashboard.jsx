@@ -831,10 +831,8 @@ const Dashboard = () => {
       const ext = typeof node === 'string' ? node : node?.external;
       if (ext === 'jsmReport') setJsmReportForm(node.jsmForm);
       else if (ext === 'gstReports' && node?.reportKind === 'gst3b') toggleModal('gst3bMonthly', true);
-      else if (ext === 'gstReports' && /^gstin(Sales|Purchase|Process|Jobwork|Journal|Expense)$/.test(node?.reportKind || '')) {
-         setGstinJsmKind(node.reportKind);
-         toggleModal('gstinJsm', true);
-      } else if (ext === 'gstReports') {
+      else if (ext === 'gstReports' && GSTIN_JSM_FORMS[node?.reportKind]) setJsmReportForm(GSTIN_JSM_FORMS[node.reportKind]);
+      else if (ext === 'gstReports') {
          setGstExcelVersion(node?.templateVersion || null);
          openGstReport(node?.reportKind || 'gstr1');
       }
@@ -1004,7 +1002,22 @@ const Dashboard = () => {
    const [gstHubInitialReport, setGstHubInitialReport] = useState('gstr1');
    // The older GSTR-1 Excel entries open the same report but download that template's layout.
    const [gstExcelVersion, setGstExcelVersion] = useState(null);
+   // JSM opens its own parameter screen (From/To, Party/Book lists, GroupBy) before any GSTIN book;
+   // these keys go straight to that screen instead of the older in-hub grid.
+   const GSTIN_JSM_FORMS = {
+      gstinSales: 'A_Gstr1_SalesInvoiceSummary',
+      gstinPurchase: 'A_Gstr2_PurchaseSummary#All',
+      gstinProcess: 'A_Gstr2_ProcessSummary',
+      gstinJobwork: 'A_Gstr2_JobWorkReceiptSummary',
+      gstinJournal: 'Rpt_Journal_Details_Report',
+      gstinExpense: 'A_Gstr2_Expense',
+   };
    const openGstReport = (reportKey = 'gstr1') => {
+      if (GSTIN_JSM_FORMS[reportKey]) {
+         setModals(prev => ({ ...prev, gstReports: false }));
+         setJsmReportForm(GSTIN_JSM_FORMS[reportKey]);
+         return;
+      }
       setGstHubInitialReport(reportKey);
       setModals(prev => ({ ...prev, gstReports: true }));
    };
@@ -2573,6 +2586,7 @@ const Dashboard = () => {
                   onClose={() => toggleModal('gstReports', false)}
                   initialReport={gstHubInitialReport || 'gstr1'}
                   excelVersion={gstExcelVersion}
+                  onOpenJsmReport={(form) => { toggleModal('gstReports', false); setJsmReportForm(form); }}
                />
             )}
             {modals.gst2bMatching && <Gst2bMatchingModal isOpen onClose={() => toggleModal('gst2bMatching', false)} />}

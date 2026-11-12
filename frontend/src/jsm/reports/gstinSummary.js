@@ -75,7 +75,31 @@ const mk = (form, extra = {}) => ({
   ...(extra.fallbackColumns ? { fallbackColumns: extra.fallbackColumns } : {}),
 });
 
+const GSTIN_ALL_PURCHASE_FORM = 'A_Gstr2_PurchaseSummary#All';
+
+/**
+ * JSM opens the same purchase screen from the GSTIN shortcut as "GSTIN All Purchase Reports" with only
+ * the Party and Book lists. Same backend report; only the title and the tabs shown differ.
+ */
+const gstinAllPurchase = () => {
+  const base = mk('A_Gstr2_PurchaseSummary', { fallbackColumns: { JSM_VW_GST_PU_SMRY_GROUP: SUM_COLS } });
+  return {
+    ...base,
+    form: GSTIN_ALL_PURCHASE_FORM,
+    blueprintForm: 'A_Gstr2_PurchaseSummary',
+    apiForm: 'A_Gstr2_PurchaseSummary',
+    title: 'GSTIN All Purchase Reports',
+    overrides: (s) => ({
+      ...base.overrides(s),
+      TabPage1: { visible: false },
+      TabPage2: { visible: false },
+      TabPage4: { visible: false },
+    }),
+  };
+};
+
 export const GSTIN_SUMMARY_REPORTS = [
+  gstinAllPurchase(),
   mk('A_Gstr1_SalesInvoiceSummary', {
     fallbackColumns: {
       JSM_VW_GST_SALES_SUMMARY: DETAIL_COLS,
@@ -147,3 +171,4 @@ export const GSTIN_SUMMARY_REPORTS = [
     },
   }),
 ];
+
