@@ -301,3 +301,20 @@ test('Grey At Mill Format 2: sent, came back, net grey; earlier movement becomes
   const upto = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', mode: 'item', recTo: '2026-05-31' }, { rows, items: [] });
   assert.equal(upto.rows[0].NET_MTS, 400);
 });
+
+test('Monthly stock (Kgs): each month carries the previous closing; sections use their own flows', async () => {
+  const rows = [
+    { date: new Date('2026-03-10'), PURCHASE: 100 },
+    { date: new Date('2026-04-10'), PURCHASE: 50 },
+    { date: new Date('2026-05-05'), GR_SL: 30 },
+    { date: new Date('2026-05-06'), MILL_SEND: 20 },
+    { date: new Date('2026-05-07'), FNS_PURCHASE: 7 },
+  ];
+  const rpt = require('../../services/jsmReports').get('Rpt_Stk_Meter_TanusKgs');
+  const grey = await rpt.run('507f1f77bcf86cd799439011', { to: '2026-05-31', section: '2' }, { rows });
+  assert.deepEqual(grey.rows.map((r) => [r.MONTH, r.OP_KGS, r.CL_KGS]), [['April', 100, 150], ['May', 150, 100]]);
+  const all = await rpt.run('507f1f77bcf86cd799439011', { to: '2026-05-31', section: '1' }, { rows });
+  assert.equal(all.rows[1].GREY_CL, 100);
+  assert.equal(all.rows[1].FINISH_CL, 7);
+  await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { to: '2026-05-31', section: '9' }, { rows }), /Unknown report/);
+});

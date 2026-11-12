@@ -84,7 +84,7 @@ export const FORM_HANDLERS = {
   Hsn_Wise_Report_All: { id: 'gst-hub', external: 'jsmReport', jsmForm: 'Hsn_Wise_Report_All' },
 
   // Stock
-  Rpt_Stk_Meter_TanusKgs: { id: 'stock-mts', external: 'stockLedger', reportKind: 'stockMts' },
+  Rpt_Stk_Meter_TanusKgs: { id: 'stock-mts', external: 'jsmReport', jsmForm: 'Rpt_Stk_Meter_TanusKgs' },
   Rpt_Monthly_Stk_Qty_Value_Report: { id: 'stock-kgs', external: 'stockLedger', reportKind: 'stockKgs' },
   Rpt_Jsm_Stock_Finish_New1: { id: 'inv-finish-shop', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Stock_Finish_New1' },
   Rpt_Stk_Grey_At_Shop: { id: 'stock-grey-shop', external: 'jsmReport', jsmForm: 'Rpt_Stk_Grey_At_Shop' },
