@@ -86,9 +86,9 @@ export const FORM_HANDLERS = {
   // Stock
   Rpt_Stk_Meter_TanusKgs: { id: 'stock-mts', external: 'stockLedger', reportKind: 'stockMts' },
   Rpt_Monthly_Stk_Qty_Value_Report: { id: 'stock-kgs', external: 'stockLedger', reportKind: 'stockKgs' },
-  Rpt_Jsm_Stock_Finish_New1: { id: 'stock-finish-shop', external: 'stockLedger', reportKind: 'finishShop' },
+  Rpt_Jsm_Stock_Finish_New1: { id: 'inv-finish-shop', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Stock_Finish_New1' },
   Rpt_Stk_Grey_At_Shop: { id: 'stock-grey-shop', external: 'stockLedger', reportKind: 'greyShop' },
-  Rpt_Jsm_Stock_Grey_At_Mill: { id: 'stock-grey-pcs', external: 'stockLedger', reportKind: 'greyShopPcs' },
+  Rpt_Jsm_Stock_Grey_At_Mill: { id: 'inv-grey-mill-1', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Stock_Grey_At_Mill' },
   Rpt1_Stk_Grey_At_Mill: { id: 'stock-grey-mill', external: 'stockLedger', reportKind: 'greyMill' },
   Rpt_Stk_Acc_Finish_Summary: { id: 'stock-finish-book', external: 'stockLedger', reportKind: 'finishBook' },
   Rpt_Stk_Acc_Finish_Summary_Value: { id: 'stock-value', external: 'stockLedger', reportKind: 'stockValue' },

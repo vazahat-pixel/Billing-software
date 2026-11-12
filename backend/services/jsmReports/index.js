@@ -153,6 +153,8 @@ const REPORTS = {
   Eway_Billing_Bulk: require('./reports/ewayBillingBulk'),
   Rpt_TdsReports: require('./reports/tdsTcsBooks').tds,
   Rpt_Tcs: require('./reports/tcsRecPay'),
+  Rpt_Jsm_Stock_Finish_New1: require('./reports/stockFinishNew'),
+  Rpt_Jsm_Stock_Grey_At_Mill: require('./reports/stockGreyAtMill'),
   Rpt_Tds2_Prty_Mnth_Wise: require('./reports/tdsTcsBooks').tdsPartyMonth,
   Rpt_TcsSalesRegister: require('./reports/tdsTcsBooks').tcsSales,
   Rpt_TcsPurchaseRegister: require('./reports/tdsTcsBooks').tcsPurchase,

@@ -152,3 +152,45 @@ test('TDS party / monthly report: party groups, month order by number, summary t
   const heads = await rpt.run('507f1f77bcf86cd799439011', { ...base, mode: 'P', byHead: true, accounts: ['194C'] }, { rows });
   assert.equal(heads.rows.length, 3);
 });
+
+test('Finish At Shop Stock (new): opening = master + earlier movement, Summary keeps CL, Datewise drops nothing but dates', async () => {
+  const rows = [
+    { ITEM_NAME: 'SILK', GRIT_NAME: 'FINISH', BILLDATE: null, __opening: true, OP: 100 },
+    { ITEM_NAME: 'SILK', GRIT_NAME: 'FINISH', BILLDATE: new Date('2026-03-20'), FNS_PU: 50 },
+    { ITEM_NAME: 'SILK', GRIT_NAME: 'FINISH', BILLDATE: new Date('2026-05-02'), FNS_SL: 30 },
+    { ITEM_NAME: 'SILK', GRIT_NAME: 'FINISH', BILLDATE: new Date('2026-06-02'), FNS_PU: 10 },
+    { ITEM_NAME: 'GONE', GRIT_NAME: 'FINISH', BILLDATE: new Date('2026-02-02'), FNS_PU: 5 },
+  ];
+  const rpt = require('../../services/jsmReports').get('Rpt_Jsm_Stock_Finish_New1');
+  const base = { from: '2026-04-01', to: '2027-03-31', unit: '1-Qty', category: '1-Item' };
+  const sum = await rpt.run('507f1f77bcf86cd799439011', { ...base, mode: 'summary' }, { rows });
+  const silk = sum.rows.find((r) => r.ITEM_NAME === 'SILK');
+  assert.equal(silk.OP_QTY, 150);
+  assert.equal(silk.FNS_SL_QTY, 30);
+  assert.equal(silk.CL_QTY, 130);
+  assert.equal(sum.grid.layout, 'JSM_VW_STOCK_FINISH');
+  assert.equal(sum.grid.variant, 1);
+  const monthly = await rpt.run('507f1f77bcf86cd799439011', { ...base, mode: 'month' }, { rows });
+  assert.ok(monthly.rows.some((r) => r.BILLDATE === 'May-2026' && r.FNS_SL_QTY === 30));
+  assert.equal(monthly.grid.variant, 4);
+  const pcs = await rpt.run('507f1f77bcf86cd799439011', { ...base, unit: '2-Pcs', mode: 'summary' }, { rows });
+  assert.equal(pcs.grid.layout, 'JSM_VW_STOCK_FINISH_PCS');
+  await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { ...base, unit: '9-Bad' }, { rows }), /Unknown Unit/);
+});
+
+test('Grey At Mill (Format 1): issue less receipt and shortage; earlier movement rolls into opening', async () => {
+  const mk = (ent, chDate, iss, recs) => recs.map((r) => ({ ENT_NO: ent, ITEM_NAME: 'GREY-A', CHLN_DATE: new Date(chDate), ISS_QTY: iss, REC_BILLDATE: new Date(r.d), R_GRY_REC_QTY: r.g, R_SHORT_QTY: r.s }));
+  const rows = [...mk('c1', '2026-03-01', 1000, [{ d: '2026-05-10', g: 400, s: 10 }, { d: '2026-06-10', g: 300, s: 0 }]), ...mk('c2', '2026-06-01', 500, [{ d: '2026-06-20', g: 0, s: 0 }])];
+  const rpt = require('../../services/jsmReports').get('Rpt_Jsm_Stock_Grey_At_Mill');
+  const out = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', summary: true }, { rows, items: [] });
+  const a = out.rows[0];
+  assert.equal(a.OP_QTY, 1000); // issued 1-Mar, before the period
+  assert.equal(a.ML_ISS_QTY, 500);
+  assert.equal(a.ML_REC_QTY, 700);
+  assert.equal(a.ML_SHRT_QTY, 10);
+  assert.equal(a.CL_QTY, 790);
+  assert.equal(out.grid.layout, 'JSM_VW_STOCK_MILL');
+  const dated = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31' }, { rows, items: [] });
+  assert.equal(dated.grid.variant, 3);
+  assert.ok(dated.rows.some((r) => r.BILLDATE === '2026-05-10' && r.ML_REC_QTY === 400));
+});

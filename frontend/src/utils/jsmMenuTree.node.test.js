@@ -55,8 +55,8 @@ const MUST_STAY_REACHABLE = [
   // gstReports|gstrMatching, gstr2, gstr9, gst3b, gstr1Errors, itc04, ewayStatus, ewayExcel,
   // gstinSales, gstinPurchase, gstinProcess, gstinJobwork, gstinJournal, gstinExpense now open
   // the real JSM screens (Gstr_3B_TextNew_Monthly, Stp_Gst_OutWrad_ErrorCheck, A_Gstr1_*, A_Gstr2_*, etc.).
-  ['stockLedger', 'stockMts'], ['stockLedger', 'stockKgs'], ['stockLedger', 'finishShop'],
-  ['stockLedger', 'greyShop'], ['stockLedger', 'greyShopPcs'], ['stockLedger', 'greyMill'],
+  ['stockLedger', 'stockMts'], ['stockLedger', 'stockKgs'],
+  ['stockLedger', 'greyShop'], ['stockLedger', 'greyMill'],
   ['stockLedger', 'finishExcel'], ['stockLedger', 'finishBook'], ['stockLedger', 'stockValue'],
   ['fasCheck', 'importBank'], ['fasCheck', 'diffOpening'],
   ['fasCheck', 'diffYear'],

@@ -81,6 +81,8 @@ import investmentReport from './investmentReport';
 import { GSTIN_SUMMARY_REPORTS } from './gstinSummary';
 import { TDS_TCS_REPORTS } from './tdsTcsBooks';
 import tcsRecPay from './tcsRecPay';
+import stockFinishNew from './stockFinishNew';
+import stockGreyAtMill from './stockGreyAtMill';
 import { GST_NATIVE_TOOLS } from './gstNativeTools';
 
 /** JSM report screens rebuilt so far, keyed by JSM form name. */
@@ -92,5 +94,5 @@ export const JSM_REPORTS = Object.fromEntries([
   ...OLD_GST_REPORTS, ...OLD_STOCK_REPORTS, ...OLD_MISC_REPORTS, ...OLD_BANK_REPORTS,
   processTakaDetail, zoomSelectDate, brokregOsReport, billAgainstPaidDetail, match8aReport, dbRepairDiagnostics,
   gstFreezeData, ...UPDATE_STATUS_TOOLS, ewayUploadOffline, importSalesJsm, reminderTool, ...BROKERAGE_ENTRY_TOOLS, investmentReport,
-  ...GSTIN_SUMMARY_REPORTS, ...GST_NATIVE_TOOLS, ...TDS_TCS_REPORTS, tcsRecPay,
+  ...GSTIN_SUMMARY_REPORTS, ...GST_NATIVE_TOOLS, ...TDS_TCS_REPORTS, tcsRecPay, stockFinishNew, stockGreyAtMill,
 ].map((r) => [r.form, r]));
