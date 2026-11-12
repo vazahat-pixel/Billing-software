@@ -147,6 +147,7 @@ export const FORM_HANDLERS = {
   Rpt_Purchase_Stock_Godown_Report: { id: 'purchase-stock-godown', external: 'jsmReport', jsmForm: 'Rpt_Purchase_Stock_Godown_Report' },
   Rpt_1StockSubItemAcc_DetailReport: { id: 'mill-return-to-send', external: 'jsmReport', jsmForm: 'Rpt_1StockSubItemAcc_DetailReport' },
   Rpt_Box_Stock_ItemDesc: { id: 'box-stock', external: 'jsmReport', jsmForm: 'Rpt_Box_Stock_ItemDesc' },
+  Rpt_FinishStockReport: { id: 'finish-stock-excel', external: 'jsmReport', jsmForm: 'Rpt_FinishStockReport' },
 
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },

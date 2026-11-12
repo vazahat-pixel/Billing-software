@@ -59,6 +59,7 @@ const REPORTS = {
   Rpt_Purchase_Stock_Godown_Report: require('./reports/purchaseStock').godown,
   Rpt_1StockSubItemAcc_DetailReport: require('./reports/millReturnToSend'),
   Rpt_Box_Stock_ItemDesc: require('./reports/boxStock'),
+  Rpt_FinishStockReport: require('./reports/finishStock'),
   Zoom_SelectDate_List_Item: require('./reports/itemStockRegister'),
   Rpt_StkKgsFinishAtShop: require('./reports/kgsStock').finishAtShop,
   Rpt_StkKgsGreyAtshop: require('./reports/kgsStock').greyAtShop,
