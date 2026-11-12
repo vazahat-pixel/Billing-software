@@ -133,6 +133,8 @@ export const FORM_HANDLERS = {
   Rpt_StkKgsGreyAtshop: { id: 'kgs-grey-shop', external: 'jsmReport', jsmForm: 'Rpt_StkKgsGreyAtshop' },
   Rpt_StkKgsGreyAtMill: { id: 'kgs-grey-mill', external: 'jsmReport', jsmForm: 'Rpt_StkKgsGreyAtMill' },
 
+  Zoom_SelectDate_List_Item: { id: 'zoom-item-ledger', external: 'jsmReport', jsmForm: 'Zoom_SelectDate_List_Item' },
+
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
 };

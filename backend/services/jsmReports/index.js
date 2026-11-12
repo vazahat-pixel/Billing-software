@@ -40,6 +40,7 @@ const REPORTS = {
   Rpt_JvBook1: require('./reports/voucherBook'),
   Rpt_Jsm_Process_ItemSummary: require('./reports/processItemSummary'),
   Rpt_Stk_Grey_Finish_Summary: require('./reports/greyFinishSummary'),
+  Zoom_SelectDate_List_Item: require('./reports/itemStockRegister'),
   Rpt_StkKgsFinishAtShop: require('./reports/kgsStock').finishAtShop,
   Rpt_StkKgsGreyAtshop: require('./reports/kgsStock').greyAtShop,
   Rpt_StkKgsGreyAtMill: require('./reports/kgsStock').greyAtMill,

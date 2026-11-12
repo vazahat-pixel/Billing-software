@@ -69,7 +69,7 @@ test('only the known no-layout screens are uncaptured, and each has fallback col
       'JSM_VW_MASTER_ITEM_REPORT', 'JSM_VW_PROCESS_ISSUE_SUM_REPORT',
       'JSM_VW_PR_RCPT', 'JSM_VW_PU_RCPT', 'JSM_VW_ROW_FINISH_STOCK',
       'JSM_VW_SALES_DETAIL_SUM_REPORT', 'JSM_VW_SALES_HASTE_REPORT',
-      'JSM_VW_SL_RCPT', 'JSM_VW_TR_BAL',
+      'JSM_VW_SL_RCPT', 'JSM_VW_STOCK_WITH_VALUE_REGISTER', 'JSM_VW_TR_BAL',
     ],
     'a newly uncaptured layout appeared — give it fallbackColumns or capture it from STP_REPORT'
   );
