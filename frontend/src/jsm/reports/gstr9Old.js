@@ -1,4 +1,5 @@
 import { toIsoDate } from '../winforms.js';
+import { downloadGstr9TemplateWorkbook } from '../../utils/gstr9TemplateExport.js';
 
 /**
  * JSM: Reports › Gst Reports › Gstr-9 › Gstr-9 Old (Rpt_Jsm_GSTR9_Excel, "GSTR - 9").
@@ -33,7 +34,11 @@ const COLUMNS = [
 
 export default {
   form: 'Rpt_Jsm_GSTR9_Excel',
-  runButtons: ['Btn_LoadData', 'Js1_Button1'],
+  runButtons: ['Btn_LoadData'],
+  excelButtons: ['Js1_Button1'],
+  onExcel: (result, state, companyName) => {
+    downloadGstr9TemplateWorkbook(result?.rows || [], 'gstr9', companyName || state?.companyName);
+  },
   lists: {},
   defaults: ({ fyFrom, fyTo }) => ({ txt_dt_from: fyFrom, txt_dt_to: fyTo, RdBtn_UnitWise: true }),
   toParams: (s) => ({

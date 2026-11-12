@@ -1,0 +1,1783 @@
+{
+  "gstr9": {
+    "file": "GSTR_9.xlsx",
+    "sheets": [
+      {
+        "name": "SALES - BOOK WISE",
+        "headerRows": [
+          [
+            "SALES TYPE / BOOK WISE :-",
+            "",
+            "",
+            "ALL SALES , SALES RETURN , DEBIT NOTE &  CREDIT NOTE",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "BOOK NAME",
+            "NET TOTAL",
+            "TAXABLE AMOUNT",
+            "IGST AMT",
+            "CGST AMT",
+            "SGST AMT",
+            "CESS AMT",
+            "BILL AMOUNT",
+            "MONTH NAME",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "PURCHASE - BOOK WISE",
+        "headerRows": [
+          [
+            "PU TYPE / BOOK WISE :-",
+            "",
+            "",
+            "ALL PURCHASE ,PURCHASE RETURN, DEBIT NOTE & CREDIT NOTE",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "BOOK NAME",
+            "NET TOTAL",
+            "TAXABLE AMOUNT",
+            "IGST AMT",
+            "CGST AMT",
+            "SGST AMT",
+            "CESS AMT",
+            "BILL AMOUNT",
+            "MONTH NAME",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "B2C(UNREG)",
+        "headerRows": [
+          [
+            "B2C UNREGISTERED:-",
+            "",
+            "",
+            "",
+            "NONGST SALES (BUSINESS TO CUSTOMER) DETAILS WISE",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "PARTY NAME",
+            "NC BILL.NO",
+            "BILL.DATE",
+            "NET.TOTAL",
+            "HSN CODE",
+            "A TAX RATE",
+            "SGST AMT",
+            "CGST AMT",
+            "IGST AMT",
+            "TAX RATE",
+            "TAXABLE AMOUNT",
+            "CESS AMOUNT",
+            "ECOMM",
+            "MONTH NAME"
+          ]
+        ]
+      },
+      {
+        "name": "B2C - HSN WISE(UNREG)",
+        "headerRows": [
+          [
+            "B2C HSN WISE UNREGISTERED:-",
+            "",
+            "",
+            "NONGST SALES (BUSINESS TO CUSTOMER) HSN WISE",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "HSN CODE",
+            "NET QTY",
+            "TAXABLE AMOUNT",
+            "NET VALUE",
+            "IGST AMT",
+            "CGST AMT",
+            "SGST AMT",
+            "TYPE",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "RCM MONTH WISE",
+        "headerRows": [
+          [
+            "RCM MONTH WISE:-",
+            "",
+            "ALL RCM MONTH WISE ",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "MONTH NAME",
+            "MONTH NO",
+            "BILL AMT",
+            "SGST AMT",
+            "CGST AMT",
+            "IGST AMT",
+            "TOT GST AMT",
+            "TAXABLE AMT"
+          ]
+        ]
+      },
+      {
+        "name": "CDNR - REG",
+        "headerRows": [
+          [
+            "CREDIT NOTE REG:-",
+            "",
+            "",
+            "REG. SALES & PURCHASE CREDIT NOTE MONTH WISE",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "MONTH NAME",
+            "MONTH NO",
+            "BILL AMT",
+            "TAXABLE AMT",
+            "IGST AMT",
+            "CGST AMT",
+            "SGST AMT",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "CDNR - UNREG",
+        "headerRows": [
+          [
+            "CREDIT NOTE UNREG:-",
+            "",
+            "",
+            "UNREG. SALES & PURCHASE CREDIT NOTE MONTH WISE",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "MONTH NAME",
+            "MONTH NO",
+            "BILL AMT",
+            "TAXABLE AMT",
+            "IGST AMT",
+            "CGST AMT",
+            "SGST AMT",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "DBNR - REG",
+        "headerRows": [
+          [
+            "DEBIT NOTE REG:-",
+            "",
+            "REG. SALES & PURCHASE DEBIT NOTE MONTH WISE",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "MONTH NAME",
+            "MONTH NO",
+            "BILL AMT",
+            "TAXABLE AMT",
+            "IGST AMT",
+            "CGST AMT",
+            "SGST AMT",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "DBNR - UNREG",
+        "headerRows": [
+          [
+            "DEBIT NOTE UNREG:-",
+            "",
+            "UNREG. SALES & PURCHASE DEBIT NOTE MONTH WISE",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "MONTH NAME",
+            "MONTH NO",
+            "BILL AMT",
+            "TAXABLE AMT",
+            "IGST AMT",
+            "CGST AMT",
+            "SGST AMT",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "ITC ALL",
+        "headerRows": [
+          [
+            "ITC ALL:-",
+            "",
+            "ITC ALL TYPE WISE",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "SGST AMT",
+            "CGST AMT",
+            "IGST AMT",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "SALES - HSN WISE",
+        "headerRows": [
+          [
+            "SALES HSN WISE SUMMARY:-",
+            "",
+            "",
+            "",
+            "",
+            "SALES HSN WISE ",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "HSN CODE",
+            "QUC",
+            "NET QTY",
+            "TAXABLE AMT",
+            "NET AMOUNT",
+            "IGST AMOUNT",
+            "CGST AMOUNT",
+            "SGST AMOUNT",
+            " A TAX RATE",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "SALES TAX RATE WISE",
+        "headerRows": [
+          [
+            "SALES TAX RATE WISE SUMMARY:-",
+            "",
+            "",
+            "",
+            "SALES TAX RATE WISE",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TAX RATE",
+            "TAXABLE AMT",
+            "IGST AMOUNT",
+            "CGST AMOUNT",
+            "SGST AMOUNT",
+            "CESS",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "PURCHASE - TAXRATE WISE",
+        "headerRows": [
+          [
+            "PURCHASE TAX RATE WISE SUMMARY:-",
+            "",
+            "",
+            "",
+            "PURCHASE TAX RATE WISE",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TAX RATE",
+            "TAXABLE AMT",
+            "IGST AMOUNT",
+            "CGST AMOUNT",
+            "SGST AMOUNT",
+            "CESS",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "PURCHASE - HSN WISE",
+        "headerRows": [
+          [
+            "PURCHASE HSN WISE SUMMARY:-",
+            "",
+            "",
+            "",
+            "",
+            "PURCHASE HSN WISE",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "HSN CODE",
+            "QUC",
+            "NET QTY",
+            "TAXABLE AMT",
+            "NET AMOUNT",
+            "IGST AMOUNT",
+            "CGST AMOUNT",
+            "SGST AMOUNT",
+            " A TAX RATE",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "SL.NONGST",
+        "headerRows": [
+          [
+            "SALES TYPE / BOOK WISE NONGST :-",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "BOOK NAME",
+            "NET TOTAL",
+            "TAXABLE AMOUNT",
+            "IGST AMT",
+            "CGST AMT",
+            "SGST AMT",
+            "CESS AMT",
+            "BILL AMOUNT",
+            "MONTH NAME",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "PU.NONGST",
+        "headerRows": [
+          [
+            "PU TYPE / BOOK WISE NONGST :-",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "BOOK NAME",
+            "NET TOTAL",
+            "TAXABLE AMOUNT",
+            "IGST AMT",
+            "CGST AMT",
+            "SGST AMT",
+            "CESS AMT",
+            "BILL AMOUNT",
+            "MONTH NAME",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "B2CREG.NONGST",
+        "headerRows": [
+          [
+            "B2C NONGST UNREGISTERED:-",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "PARTY NAME",
+            "NC BILL.NO",
+            "BILL.DATE",
+            "NET.TOTAL",
+            "STATE NAME",
+            "A TAX RATE",
+            "TAX RATE",
+            "TAXABLE AMOUNT",
+            "CESS AMOUNT",
+            "ECOMM",
+            "MONTH NAME"
+          ]
+        ]
+      },
+      {
+        "name": "B2CHSN.NONGST",
+        "headerRows": [
+          [
+            "B2C NONGST HSN WISE UNREGISTERED:-",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "HSN CODE",
+            "NET QTY",
+            "TAXABLE AMOUNT",
+            "NET VALUE",
+            "IGST AMT",
+            "CGST AMT",
+            "SGST AMT",
+            "TYPE"
+          ]
+        ]
+      },
+      {
+        "name": "RCM.NONGST",
+        "headerRows": [
+          [
+            "RCM NONGST MONTH WISE:-",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "MONTH NAME",
+            "MONTH NO",
+            "BILL AMT",
+            "SGST AMT",
+            "CGST AMT",
+            "IGST AMT",
+            "TOT GST AMT",
+            "TAXABLE AMT"
+          ]
+        ]
+      },
+      {
+        "name": "DBCDNR.NONGST",
+        "headerRows": [
+          [
+            "DBCDNR NOTE NONGST REG:-",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "MONTH NAME",
+            "MONTH NO",
+            "BILL AMT",
+            "TAXABLE AMT",
+            "IGST AMT",
+            "CGST AMT",
+            "SGST AMT",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "ITC.NONGST",
+        "headerRows": [
+          [
+            "ITC NONGST ALL:-",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "SGST AMT",
+            "CGST AMT",
+            "IGST AMT",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "SL.HSN.NONGST",
+        "headerRows": [
+          [
+            "SALES NONGST HSN WISE SUMMARY:-",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "HSN CODE",
+            "QUC",
+            "NET QTY",
+            "TAXABLE AMT",
+            "NET AMOUNT",
+            "IGST AMOUNT",
+            "CGST AMOUNT",
+            "SGST AMOUNT",
+            " A TAX RATE",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "PU.HSN.NONGST",
+        "headerRows": [
+          [
+            "PU NONGST HSN WISE SUMMARY:-",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "HSN CODE",
+            "QUC",
+            "NET QTY",
+            "TAXABLE AMT",
+            "NET AMOUNT",
+            "IGST AMOUNT",
+            "CGST AMOUNT",
+            "SGST AMOUNT",
+            " A TAX RATE",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "SL.TAX.NONGST",
+        "headerRows": [
+          [
+            "SALES NONGST TAX RATE WISE SUMMARY:-",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TAX RATE",
+            "TAXABLE AMT",
+            "IGST AMOUNT",
+            "CGST AMOUNT",
+            "SGST AMOUNT",
+            "CESS",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "PU.TAX.NONGST",
+        "headerRows": [
+          [
+            "PURCHASE NONGST TAX RATE WISE SUMMARY:-",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TAX RATE",
+            "TAXABLE AMT",
+            "IGST AMOUNT",
+            "CGST AMOUNT",
+            "SGST AMOUNT",
+            "CESS"
+          ]
+        ]
+      }
+    ]
+  },
+  "gstr9c": {
+    "file": "GSTR_9C.xlsx",
+    "sheets": [
+      {
+        "name": "OUTWARD SUPPLY - B2B",
+        "headerRows": [
+          [
+            "OUTWARD SUPPLY AS PER BOOKS - B2B",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "Months",
+            "Taxable Amount",
+            "",
+            "TAX AMOUNT",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "Net Amount",
+            "Book",
+            ""
+          ],
+          [
+            "",
+            "B2B",
+            "",
+            "IGST",
+            "",
+            "CGST",
+            "",
+            "SGST",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "B2B",
+            "",
+            "B2B",
+            "",
+            "B2B",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "OUTWARD SUPPLY - B2C",
+        "headerRows": [
+          [
+            "OUTWARD SUPPLY AS PER BOOKS - B2C",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "Months",
+            "Gross Amount",
+            "",
+            "TAX AMOUNT",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "Net Amount",
+            "TYPE",
+            ""
+          ],
+          [
+            "",
+            "B2C",
+            "",
+            "IGST",
+            "",
+            "CGST",
+            "",
+            "SGST",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "B2C",
+            "",
+            "B2C",
+            "",
+            "B2C",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "DEBIT NOTE",
+        "headerRows": [
+          [
+            " DEBIT NOTE AS PER BOOKS",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "Months",
+            "Gross Amount",
+            "",
+            "TAX AMOUNT",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "Net Amount"
+          ],
+          [
+            "",
+            "(+)DN",
+            "",
+            "IGST",
+            "",
+            "CGST",
+            "",
+            "SGST",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "DN",
+            "",
+            "DN",
+            "",
+            "DN",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "CREDIT NOTE",
+        "headerRows": [
+          [
+            " CREDIT NOTE AS PER BOOKS",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "Months",
+            "Gross Amount",
+            "",
+            "TAX AMOUNT",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "Net Amount"
+          ],
+          [
+            "",
+            "CN",
+            "",
+            "IGST",
+            "",
+            "CGST",
+            "",
+            "SGST",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "CN",
+            "",
+            "CN",
+            "",
+            "CN",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "REVERCE CHARGE",
+        "headerRows": [
+          [
+            "Detail of Reverce charge (U/s 9(3) And 9(4) - ALL)",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "(a). U/S 9(3) TRANSPORT,ADVOCATE FEES",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "Month",
+            "TAXABLE Value",
+            "Tax",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "IGST",
+            "CGST",
+            "SGST",
+            "BILL AMT",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "ITC - INPUT",
+        "headerRows": [
+          [
+            "ITC  As per Book ",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "Months",
+            "ON INPUT",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "SGST",
+            "CGST",
+            "IGST",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "ITC - SERVICE",
+        "headerRows": [
+          [
+            "ITC  As per Book ",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "Months",
+            "ON SERVICE",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "SGST",
+            "CGST",
+            "IGST",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "ITC - CAP.GOODS",
+        "headerRows": [
+          [
+            "ITC  As per Book ",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "Months",
+            "ON CAPITAL GOODS",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "SGST",
+            "CGST",
+            "IGST",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "OUTWARD SUPPLY - HSN",
+        "headerRows": [
+          [
+            "OUTWARD SUPPLY HSN WISE SUMMARY:-",
+            "",
+            "",
+            "",
+            "",
+            "SALES HSN WISE ",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "HSN CODE",
+            "QUC",
+            "NET QTY",
+            "TAXABLE AMT",
+            "NET AMOUNT",
+            "IGST AMOUNT",
+            "CGST AMOUNT",
+            "SGST AMOUNT",
+            " A TAX RATE"
+          ]
+        ]
+      },
+      {
+        "name": "INWARD SUPPLY - HSN",
+        "headerRows": [
+          [
+            "INWARD SUPPLY HSN WISE SUMMARY:-",
+            "",
+            "",
+            "",
+            "",
+            "PURCHASE HSN WISE",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "HSN CODE",
+            "QUC",
+            "NET QTY",
+            "TAXABLE AMT",
+            "NET AMOUNT",
+            "IGST AMOUNT",
+            "CGST AMOUNT",
+            "SGST AMOUNT",
+            " A TAX RATE"
+          ]
+        ]
+      },
+      {
+        "name": "EXEMP.ALL",
+        "headerRows": [
+          [
+            "EXEMPTED OUTWARD & INWARD SUPPLY:-",
+            "",
+            "",
+            "",
+            "",
+            "EXEMPTED ALL",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TYPE",
+            "MONTH",
+            "TAXABLE AMOUNT",
+            "SGST AMT",
+            "CGST AMT",
+            "IGST AMT",
+            "NET VALUE",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "TAX PAID",
+        "headerRows": [
+          [
+            "DETAILS OF (GST) TAX PAID ",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "Months",
+            "Tax Amount",
+            "",
+            "Date"
+          ]
+        ]
+      },
+      {
+        "name": "INWARD SUPPLY",
+        "headerRows": [
+          [
+            "Details of Inward Supply (Headwise of trading & P&L A/C & Capital items etc.)",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "PARTICULAR",
+            "",
+            "",
+            "TAXABLE AMOUNT",
+            "SGST AMT",
+            "CGST AMT",
+            "IGST AMT"
+          ]
+        ]
+      },
+      {
+        "name": "SL.TAXRATE",
+        "headerRows": [
+          [
+            "SALES TAX RATE WISE SUMMARY:-",
+            "",
+            "",
+            "",
+            "SALES TAX RATE WISE",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TAX RATE",
+            "TAXABLE AMT",
+            "IGST AMOUNT",
+            "CGST AMOUNT",
+            "SGST AMOUNT",
+            "CESS",
+            "",
+            "",
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "PU.TAXRATE",
+        "headerRows": [
+          [
+            "PURCHSE TAX RATE WISE SUMMARY:-",
+            "",
+            "",
+            "",
+            "PURCHASE TAX RATE WISE",
+            "",
+            "",
+            "",
+            ""
+          ],
+          [
+            "TAX RATE",
+            "TAXABLE AMT",
+            "IGST AMOUNT",
+            "CGST AMOUNT",
+            "SGST AMOUNT",
+            "CESS",
+            "",
+            "",
+            ""
+          ]
+        ]
+      }
+    ]
+  }
+}

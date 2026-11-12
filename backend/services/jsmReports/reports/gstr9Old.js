@@ -27,7 +27,8 @@ const SHEETS = [
   'SALES - BOOK WISE', 'PURCHASE - BOOK WISE', 'B2C(UNREG)', 'B2C - HSN WISE(UNREG)',
   'CDNR - REG', 'CDNR - UNREG', 'DBNR - REG', 'DBNR - UNREG',
   'SALES - HSN WISE', 'SALES TAX RATE WISE', 'PURCHASE - TAXRATE WISE', 'PURCHASE - HSN WISE',
-  'SL.NONGST', 'PU.NONGST', 'SL.HSN.NONGST', 'PU.HSN.NONGST', 'SL.TAX.NONGST', 'PU.TAX.NONGST',
+  'SL.NONGST', 'PU.NONGST', 'B2CREG.NONGST', 'B2CHSN.NONGST', 'DBCDNR.NONGST',
+  'SL.HSN.NONGST', 'PU.HSN.NONGST', 'SL.TAX.NONGST', 'PU.TAX.NONGST',
 ];
 const UNAVAILABLE = ['RCM MONTH WISE', 'ITC ALL', 'RCM.NONGST', 'ITC.NONGST'];
 
@@ -160,10 +161,27 @@ async function run(companyId, p = {}, deps = {}) {
       IGST_AMT: round(r.IGST_AMT), TAX_RATE: r.TAX_RATE, TAXABLE_AMT: round(r.TAXABLE_AMT), CESS_AMOUNT: 0,
       ECOMM: '', MONTH_NAME: r.MONTH_NAME,
     })),
+    'B2CREG.NONGST': () => lineRows(slUnreg).filter((r) => !r.HAS_TAX).map((r) => ({
+      TYPE: r.TYPE, PARTY: r.PARTY, NCBILL_NO: r.NCBILL_NO, BILL_DATE: r.BILL_DATE, NET_TOT: round(r.NET_TOT),
+      STATE_NAME: r.STATE_NAME, A_TAX_RATE: '', TAX_RATE: r.TAX_RATE, TAXABLE_AMT: round(r.TAXABLE_AMT),
+      CESS_AMOUNT: 0, ECOMM: '', MONTH_NAME: r.MONTH_NAME,
+    })),
     'B2C - HSN WISE(UNREG)': () => hsnWise(lineRows(slUnreg).filter((r) => r.HAS_TAX)).map((r) => ({
       HSN_CODE: r.HSN_CODE, NET_QTY: r.NET_QTY, TAXABLE_AMT: r.TAXABLE_AMT, NET_VALUE: r.NET_AMOUNT,
       IGST_AMT: r.IGST_AMT, CGST_AMT: r.CGST_AMT, SGST_AMT: r.SGST_AMT, TYPE: r.TYPE,
     })),
+    'B2CHSN.NONGST': () => hsnWise(lineRows(slUnreg).filter((r) => !r.HAS_TAX)).map((r) => ({
+      HSN_CODE: r.HSN_CODE, NET_QTY: r.NET_QTY, TAXABLE_AMT: r.TAXABLE_AMT, NET_VALUE: r.NET_AMOUNT,
+      IGST_AMT: r.IGST_AMT, CGST_AMT: r.CGST_AMT, SGST_AMT: r.SGST_AMT, TYPE: r.TYPE,
+    })),
+    'DBCDNR.NONGST': async () => {
+      const zero = (xs) => xs.filter((n) => Math.abs(n.SGST_AMT) + Math.abs(n.CGST_AMT) + Math.abs(n.IGST_AMT) <= 0.004);
+      const [c, d] = await Promise.all([
+        deps.notes?.['DBCDNR.NONGST_C'] || noteRows(companyId, 'Credit', true),
+        deps.notes?.['DBCDNR.NONGST_D'] || noteRows(companyId, 'Debit', true),
+      ]);
+      return [...noteSheet(zero(c), 'CREDIT NOTE'), ...noteSheet(zero(d), 'DEBIT NOTE')];
+    },
     'SALES - HSN WISE': () => hsnWise(slLines.filter((r) => r.HAS_TAX)),
     'SL.HSN.NONGST': () => hsnWise(slLines.filter((r) => !r.HAS_TAX)),
     'PURCHASE - HSN WISE': () => hsnWise(puLines.filter((r) => r.HAS_TAX)),
@@ -186,7 +204,7 @@ async function run(companyId, p = {}, deps = {}) {
       const [type, reg, label] = noteSheets[name];
       sheet = noteSheet(deps.notes?.[name] || await noteRows(companyId, type, reg), label);
     } else {
-      sheet = sheetRows[name]();
+      sheet = await sheetRows[name]();
     }
     for (const r of sheet) rows.push({ SHEET: name, ...r });
   }
@@ -202,6 +220,7 @@ async function run(companyId, p = {}, deps = {}) {
       title: 'Gstr-9 Working Sheets',
       period: `DATE : FROM ${p.fromText || p.from || ''}  TO  ${p.toText || p.to || ''}`,
       pageWise: false,
+      notice: `Skipped (not in MERN): ${UNAVAILABLE.join(', ')}`,
     },
   };
 }

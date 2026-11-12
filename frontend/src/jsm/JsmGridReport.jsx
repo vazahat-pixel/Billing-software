@@ -21,7 +21,7 @@ function Btn({ b, onClick }) {
   );
 }
 
-export default function JsmGridReport({ result, layouts, fallbackColumns, companyName, onClose, onOpenRow }) {
+export default function JsmGridReport({ result, layouts, fallbackColumns, companyName, onClose, onOpenRow, onExcel }) {
   const { rows = [], grid = {} } = result || {};
   const allColumns = useMemo(
     () => layoutColumns(layouts, grid.layout, grid.variant, {
@@ -36,6 +36,7 @@ export default function JsmGridReport({ result, layouts, fallbackColumns, compan
   const lines = useMemo(() => buildGridLines(rows, columns, grid), [rows, columns, grid]);
 
   const exportExcel = () => {
+    if (typeof onExcel === 'function' && onExcel(result) !== false) return;
     const aoa = [columns.map((c) => c.caption), ...lines.map((l) => l.cells)];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const wb = XLSX.utils.book_new();
@@ -63,6 +64,11 @@ export default function JsmGridReport({ result, layouts, fallbackColumns, compan
         <div>{grid.title}</div>
         <div>{grid.period}</div>
       </div>
+      {grid.notice && (
+        <div style={{ padding: '4px 10px', fontSize: 12, background: '#fff8e1', borderBottom: '1px solid #f0d78c', color: '#7a5800' }}>
+          {grid.notice}
+        </div>
+      )}
       <div className="jsmg-grid">
         <table>
           <colgroup>

@@ -104,6 +104,17 @@ const REPORTS = {
   Rpt_Lot_Costing: require('./reports/lotCosting'),
   Rpt_Cutting_Report: require('./reports/cuttingReport').cuttingReport,
   Rpt_Stk_Cutting_At_Shop: require('./reports/cuttingReport').cuttingStockReport,
+  xOld_Rpt_Jsm_GSTR9_All_Excel_Report: require('./reports/gstr9cOld'),
+  Rpt_Jsm_GSTR9_New: require('./reports/gstr9New'),
+  Gstr_3B_Detail_Inward_Outwardard_supply: require('./reports/gstr3bInwardOutward'),
+  Rpt_Jsm_Gstr1_Match: require('./reports/gstMatching').gstr1Match,
+  Rpt_Jsm_GSTR1_Json_Match: require('./reports/gstMatching').gstr1JsonMatch,
+  Rpt_Match2B_Report: require('./reports/gstMatching').match2b,
+  Rpt_Match4A_Report_New: require('./reports/gstMatching').match4a,
+  Rpt_Match2A: require('./reports/gstMatching').match2a,
+  JS_GSTR1_RPT: require('./reports/gstExtraReports').jsGstr1,
+  JS_GSTR2_RPT: require('./reports/gstExtraReports').jsGstr2,
+  JS_GSTR3_SMRY: require('./reports/gstExtraReports').jsGstr3,
 };
 
 function get(reportId) {

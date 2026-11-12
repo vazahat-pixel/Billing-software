@@ -52,11 +52,12 @@ test('the menu adds nothing JSM does not have', () => {
  */
 const MUST_STAY_REACHABLE = [
   ['gstReports', 'gst3b'], ['gstReports', 'gstr1'], ['gstReports', 'gstr1Errors'],
-  ['gstReports', 'gstrMatching'], ['gstReports', 'gstr2'], ['gstReports', 'gstr9'],
   ['gstReports', 'itc04'], ['gstReports', 'ewayBulk'], ['gstReports', 'ewayStatus'],
   ['gstReports', 'ewayExcel'], ['gstReports', 'gst45'], ['gstReports', 'gstinSales'],
   ['gstReports', 'gstinPurchase'], ['gstReports', 'gstinProcess'], ['gstReports', 'gstinJobwork'],
   ['gstReports', 'gstinJournal'], ['gstReports', 'gstinExpense'],
+  // gstReports|gstrMatching, gstr2, gstr9 now open the real JSM screens (Rpt_Jsm_Gstr1_Match,
+  // Rpt_Match2B_Report*, Rpt_Match2A, Rpt_Match4A_Report_New, Rpt_Jsm_GSTR9_New, xOld_*).
   ['stockLedger', 'stockMts'], ['stockLedger', 'stockKgs'], ['stockLedger', 'finishShop'],
   ['stockLedger', 'greyShop'], ['stockLedger', 'greyShopPcs'], ['stockLedger', 'greyMill'],
   ['stockLedger', 'finishExcel'], ['stockLedger', 'finishBook'], ['stockLedger', 'stockValue'],

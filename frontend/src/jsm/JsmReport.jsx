@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ErpWindowedModal from '../components/erp/ErpWindowedModal';
 import JsmFormDialog from './JsmFormDialog';
 import JsmGridReport from './JsmGridReport';
@@ -43,6 +43,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen || !config) return;
@@ -77,12 +78,44 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
   // something else (the Job P&L grid has Btn_Refresh / Btn_Exit), and those configs say so.
   const runButtons = config.runButtons || ['btn_screen'];
   const exitButtons = config.exitButtons || ['btn_exit'];
+  const excelButtons = config.excelButtons || [];
+  const browseButtons = config.browseButtons || [];
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || typeof config.onBrowseFile !== 'function') return;
+    setBusy(true);
+    setError('');
+    try {
+      const patch = await config.onBrowseFile(file, state);
+      setState((s) => ({ ...s, ...(patch || {}) }));
+    } catch (err) {
+      setError(err?.message || 'Could not read selected file');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const onButton = async (name, value) => {
     if (exitButtons.includes(name)) { onClose?.(); return; }
+    if (browseButtons.includes(name)) { fileInputRef.current?.click(); return; }
     if (name === 'Check_Select_UnSelectAll') {
       const lv = activeListView();
       if (lv) setState((s) => ({ ...s, [lv]: value ? [...(lists[lv] || [])] : [] }));
+      return;
+    }
+    if (excelButtons.includes(name) && typeof config.onExcel === 'function') {
+      setBusy(true);
+      setError('');
+      try {
+        const res = result || await jsmReportApi.run(apiForm, config.toParams(state));
+        config.onExcel(res, state, companyName);
+      } catch (e) {
+        setError(e?.response?.data?.message || e?.message || 'Excel export failed');
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     if (runButtons.includes(name)) {
@@ -100,6 +133,15 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
 
   return (
     <>
+      {browseButtons.length > 0 && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={config.browseAccept || '.xlsx,.xlsm,.xls,.json,.txt'}
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
+      )}
       <ErpWindowedModal
         isOpen={!result}
         onClose={onClose}
@@ -158,6 +200,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
                   companyName={companyName}
                   onClose={() => setResult(null)}
                   onOpenRow={onOpenRow}
+                  onExcel={config.onExcel ? (res) => { config.onExcel(res, state, companyName); return true; } : undefined}
                 />
               )}
             </div>
