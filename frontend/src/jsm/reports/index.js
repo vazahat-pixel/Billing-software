@@ -90,6 +90,7 @@ import checkDiffOpening from './checkDiffOpening';
 import stockGreyAtShop from './stockGreyAtShop';
 import stockGreyAtMill2 from './stockGreyAtMill2';
 import stockMonthlyKgs from './stockMonthlyKgs';
+import stockLedgerAcc from './stockLedgerAcc';
 import { GST_NATIVE_TOOLS } from './gstNativeTools';
 
 /** JSM report screens rebuilt so far, keyed by JSM form name. */
@@ -101,5 +102,5 @@ export const JSM_REPORTS = Object.fromEntries([
   ...OLD_GST_REPORTS, ...OLD_STOCK_REPORTS, ...OLD_MISC_REPORTS, ...OLD_BANK_REPORTS,
   processTakaDetail, zoomSelectDate, brokregOsReport, billAgainstPaidDetail, match8aReport, dbRepairDiagnostics,
   gstFreezeData, ...UPDATE_STATUS_TOOLS, ewayUploadOffline, importSalesJsm, reminderTool, ...BROKERAGE_ENTRY_TOOLS, investmentReport,
-  ...GSTIN_SUMMARY_REPORTS, ...GST_NATIVE_TOOLS, ...TDS_TCS_REPORTS, tcsRecPay, stockFinishNew, stockGreyAtMill, stockAccFinish, cashBankFinance, bankMonthWise, checkDiffOpening, stockGreyAtShop, stockGreyAtMill2, stockMonthlyKgs,
+  ...GSTIN_SUMMARY_REPORTS, ...GST_NATIVE_TOOLS, ...TDS_TCS_REPORTS, tcsRecPay, stockFinishNew, stockGreyAtMill, stockAccFinish, cashBankFinance, bankMonthWise, checkDiffOpening, stockGreyAtShop, stockGreyAtMill2, stockMonthlyKgs, stockLedgerAcc,
 ].map((r) => [r.form, r]));
