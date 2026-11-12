@@ -89,7 +89,7 @@ export const FORM_HANDLERS = {
   Rpt_Jsm_Stock_Finish_New1: { id: 'inv-finish-shop', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Stock_Finish_New1' },
   Rpt_Stk_Grey_At_Shop: { id: 'stock-grey-shop', external: 'jsmReport', jsmForm: 'Rpt_Stk_Grey_At_Shop' },
   Rpt_Jsm_Stock_Grey_At_Mill: { id: 'inv-grey-mill-1', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Stock_Grey_At_Mill' },
-  Rpt1_Stk_Grey_At_Mill: { id: 'stock-grey-mill', external: 'stockLedger', reportKind: 'greyMill' },
+  Rpt1_Stk_Grey_At_Mill: { id: 'stock-grey-mill', external: 'jsmReport', jsmForm: 'Rpt1_Stk_Grey_At_Mill' },
   Rpt_Stk_Acc_Finish_Summary: { id: 'stock-finish-book', external: 'stockLedger', reportKind: 'finishBook' },
   Rpt_Stk_Acc_Finish_Summary_Value: { id: 'stock-value', external: 'stockLedger', reportKind: 'stockValue' },
   Rpt_Stock_Acc_Finish_Summary: { id: 'stock-finish-excel', external: 'jsmReport', jsmForm: 'Rpt_Stock_Acc_Finish_Summary' },

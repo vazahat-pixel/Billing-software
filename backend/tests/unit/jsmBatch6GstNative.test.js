@@ -287,3 +287,17 @@ test('Grey At Shop: opening rolls forward, closing = OP + purchase - mill send -
   const month = await rpt.run('507f1f77bcf86cd799439011', { ...base, mode: 'month' }, { rows });
   assert.deepEqual(month.rows.map((r) => r.MONTH), ['April', 'May', 'June']);
 });
+
+test('Grey At Mill Format 2: sent, came back, net grey; earlier movement becomes opening', async () => {
+  const mk = (ent, ch, pcs, qty, recs) => recs.map((r) => ({ ENT_NO: ent, ITEM_NAME: 'G', CHLN_DATE: new Date(ch), ISS_PCS: pcs, ISS_QTY: qty, REC_BILLDATE: new Date(r.d), R_REC_PCS: r.p, R_FNS_REC_QTY: r.f, R_GRY_REC_QTY: r.g, R_SHORT_QTY: r.s }));
+  const rows = [...mk('c1', '2026-03-01', 10, 1000, [{ d: '2026-05-01', p: 4, f: 380, g: 400, s: 5 }]), ...mk('c2', '2026-06-01', 5, 500, [{ d: '2026-06-15', p: 5, f: 480, g: 500, s: 0 }])];
+  const rpt = require('../../services/jsmReports').get('Rpt1_Stk_Grey_At_Mill');
+  const out = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', mode: 'item' }, { rows, items: [] });
+  const g = out.rows[0];
+  assert.equal(g.OP_MTS, 1000);
+  assert.equal(g.ML_SND_MTS, 500);
+  assert.equal(g.NET_MTS, 900);
+  assert.equal(g.CL_MTS, 600);
+  const upto = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', mode: 'item', recTo: '2026-05-31' }, { rows, items: [] });
+  assert.equal(upto.rows[0].NET_MTS, 400);
+});
