@@ -152,6 +152,7 @@ const REPORTS = {
   Eway_No_Upload_Offline: require('./reports/ewayUploadOffline'),
   Eway_Billing_Bulk: require('./reports/ewayBillingBulk'),
   Rpt_TdsReports: require('./reports/tdsTcsBooks').tds,
+  Rpt_Tcs: require('./reports/tcsRecPay'),
   Rpt_TcsSalesRegister: require('./reports/tdsTcsBooks').tcsSales,
   Rpt_TcsPurchaseRegister: require('./reports/tdsTcsBooks').tcsPurchase,
   Frm_Import_SalesJsm: require('./reports/importSalesJsm'),

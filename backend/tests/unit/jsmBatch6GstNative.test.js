@@ -112,3 +112,30 @@ test('TCS registers: summary sums per month/party; sales returns carry negative 
   assert.equal(sum.rows.length, 2); // TCS_PER 0.1 and -0.1 are separate group keys, as in JSM's GROUP BY
   assert.equal(sum.rows.find((r) => r.TCS_PER === 0.1).TCS_AMT, 150);
 });
+
+test('Tcs Rec/Pay: opening from 1 April, TCS only on the part above 50 lakh, Pay looks at creditors', async () => {
+  const v = (type, date, amt, name, debtor) => ({ REC_PAY: type, REC_DATE: new Date(date), REC_AMT: amt, AC_NAME: name, PAN_NO: 'AAAPA1234C', DEBTOR: debtor, CREDITOR: !debtor });
+  const vouchers = [
+    v('R', '2026-05-10', 4000000, 'BIG', true), // opening (before From, same year)
+    v('R', '2026-03-10', 9000000, 'BIG', true), // last year: not counted
+    v('R', '2026-08-05', 2000000, 'BIG', true), // current -> total 60L, 10L applicable
+    v('R', '2026-08-06', 100000, 'SMALL', true),
+    v('P', '2026-08-07', 7000000, 'SUPP', false),
+  ];
+  const rpt = require('../../services/jsmReports').get('Rpt_Tcs');
+  const out = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-08-01', to: '2026-08-31', head: 'Receipt' }, { vouchers });
+  const big = out.rows.find((r) => r.AC_NAME === 'BIG');
+  assert.equal(big.OP_RECEIPT, 4000000);
+  assert.equal(big.CUR_RECEIPT, 2000000);
+  assert.equal(big.APPLICABLE_VALUE, 1000000);
+  assert.equal(big.TCS_PER, 0.1);
+  assert.equal(big.TCS_AMT, 1000);
+  assert.equal(out.rows.find((r) => r.AC_NAME === 'SMALL').TCS_AMT, 0);
+  assert.ok(!out.rows.some((r) => r.AC_NAME === 'SUPP'));
+  const only = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-08-01', to: '2026-08-31', head: 'Receipt', applicableOnly: true }, { vouchers });
+  assert.deepEqual(only.rows.map((r) => r.AC_NAME), ['BIG']);
+  const pay = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-08-01', to: '2026-08-31', head: 'Pay' }, { vouchers });
+  assert.equal(pay.rows[0].AC_NAME, 'SUPP');
+  assert.equal(pay.rows[0].BOOK, 'Payment For TCS');
+  assert.equal(pay.rows[0].TCS_AMT, 2000);
+});

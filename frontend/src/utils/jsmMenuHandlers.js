@@ -100,7 +100,7 @@ export const FORM_HANDLERS = {
   Rpt_Tds3_Add_Ackn: { id: 'tds-address', reportKey: 'tds', view: 'tdsAddress' },
   Rpt_Tds4_Challan: { id: 'tds-challan', reportKey: 'tds', view: 'tdsChallan' },
   Rpt_Tds5_Certi: { id: 'tds-certificate', reportKey: 'tds', view: 'tdsCertificate' },
-  Rpt_Tcs: { id: 'tcs-recpay', reportKey: 'tcs', view: 'tcsRecPay' },
+  Rpt_Tcs: { id: 'tcs-recpay', external: 'jsmReport', jsmForm: 'Rpt_Tcs' },
   Rpt_TcsReports: { id: 'tcs-sales', external: 'jsmReport', jsmForm: 'Rpt_TcsReports#Sales' },
 
   // Fas / Final
