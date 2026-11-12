@@ -150,6 +150,7 @@ const REPORTS = {
   Rpt_Update_Lot_Status: require('./reports/updateStatusTools').updateLot,
   Rpt_Jsm_Os_Update: require('./reports/updateStatusTools').osUpdate,
   Eway_No_Upload_Offline: require('./reports/ewayUploadOffline'),
+  Eway_Billing_Bulk: require('./reports/ewayBillingBulk'),
   Frm_Import_SalesJsm: require('./reports/importSalesJsm'),
   FrmReminder_All_Details: require('./reports/reminderTool'),
   Tran_TradingBrokregEntry: require('./reports/brokerageEntryTools').tradingEntry,

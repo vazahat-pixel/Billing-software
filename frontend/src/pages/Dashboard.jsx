@@ -105,6 +105,7 @@ const JobWorkerMaster = lazy(() => import('./masters/JobWorkerMaster'));
 const InventoryPage = lazy(() => import('./inventory/InventoryPage'));
 const Gst3bMonthlyModal = lazy(() => import('./gst/Gstr3bJsmReport'));
 const JsmGstr1Screen = lazy(() => import('../jsm/JsmGstr1Screen'));
+const JsmEwayBulkScreen = lazy(() => import('../jsm/JsmEwayBulkScreen'));
 const GstinJsmReport = lazy(() => import('./gst/GstinJsmReport'));
 const Gstr1Modal = lazy(() => import('./gst/Gstr1JsmReport'));
 const Gst2bMatchingModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst2bMatchingModal })));
@@ -2840,7 +2841,9 @@ const Dashboard = () => {
          />
          {jsmGstr1Form && (
             <Suspense fallback={null}>
-               <JsmGstr1Screen formName={jsmGstr1Form} isOpen onClose={() => setJsmGstr1Form(null)} onOpenInvoice={onOpenGstr1Invoice} />
+               {jsmGstr1Form === 'Eway_Billing_Bulk'
+                  ? <JsmEwayBulkScreen isOpen onClose={() => setJsmGstr1Form(null)} />
+                  : <JsmGstr1Screen formName={jsmGstr1Form} isOpen onClose={() => setJsmGstr1Form(null)} onOpenInvoice={onOpenGstr1Invoice} />}
             </Suspense>
          )}
          {jsmReportForm && (

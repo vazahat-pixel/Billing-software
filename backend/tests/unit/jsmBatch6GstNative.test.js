@@ -52,3 +52,30 @@ test('Batch 6 Native GST Tools: HSN All, ErrorCheck, 3B Monthly/Excel, BrokZoom,
   assert.equal(ewb.grid.layout, 'JSM_VW_ALL_EWB_EINV_REPORT_MAIN');
   assert.equal(ewb.rows[0].BILL_NO, '1');
 });
+
+
+test('Eway_Billing_Bulk: one row per item line in JSM column names, Check Error lists missing NIC values', async () => {
+  const bills = [{
+    _id: 'b1', invoiceNo: '12', date: new Date('2026-07-05'), bookId: 'x', __book: 'SALES', gstType: 'CGST+SGST', netAmount: 1050,
+    transport: 'RAMESH TRANSPORT', lrNo: 'LR9', lrDate: new Date('2026-07-06'),
+    __company: { legalName: 'ACME', gstin: '24AAAAA0000A1Z5', address: 'Ring Road', city: 'Surat', pincode: '395002', state: 'GUJARAT' },
+    customerId: { name: 'BUYER', gstin: '27BBBBB0000B1Z5', address: 'Mumbai', city: 'Mumbai', pincode: '400001', state: 'MAHARASHTRA' },
+    items: [{ itemId: { name: 'CLOTH', hsnCode: '5407', unit: 'MTRS' }, mts: 100, amount: 1000, gstPer: 5, gstAmt: 50 }],
+  }];
+  const rpt = require('../../services/jsmReports').get('Eway_Billing_Bulk');
+  const out = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-07-01', to: '2026-07-31', checkError: true }, { bills });
+  assert.equal(out.rows.length, 1);
+  const r = out.rows[0];
+  assert.equal(r.DOC_NO, '12');
+  assert.equal(r.DOC_DATE, '05/07/2026');
+  assert.equal(r.FRM_ACT_STATE_CODE, 24);
+  assert.equal(r.TO_ACT_STATE_CODE, 27);
+  assert.equal(r.CGST_AMT, 25);
+  assert.equal(r.SGST_AMT, 25);
+  assert.equal(r.TOT_INV_VALUE, 1050);
+  assert.equal(r.TRAN_NAME, 'RAMESH TRANSPORT');
+  // no distance is recorded on a bill, so NIC would reject it
+  assert.match(out.errors[0].ERROR, /DISTANCE/);
+  const none = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-08-01', to: '2026-08-31' }, { bills });
+  assert.equal(none.rows.length, 0);
+});

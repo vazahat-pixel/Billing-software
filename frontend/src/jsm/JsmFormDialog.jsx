@@ -283,11 +283,10 @@ export default function JsmFormDialog({
       );
     }
     if (c.type === 'ListView') return renderListView(c);
-    if (/DataGridView$/.test(c.type)) {
+    if (/DataGridView$|ListView$/.test(c.type) && grids[c.name]) {
       // Data grids carry no columns in the blueprint (JSM adds them in code), so the screen supplies
       // { columns: [{ key, label, width, num, fmt }], rows, onRowClick } per grid name.
       const g = grids[c.name];
-      if (!g) return <div key={c.name} className="jsmf-grid" style={boxStyle(c)} />;
       return (
         <div key={c.name} className="jsmf-grid jsmf-dgv" style={boxStyle(c, { overflow: 'auto' })}>
           <table>
@@ -308,6 +307,7 @@ export default function JsmFormDialog({
         </div>
       );
     }
+    if (/DataGridView$/.test(c.type)) return <div key={c.name} className="jsmf-grid" style={boxStyle(c)} />;
     if (c.type === 'ProgressBar') return <div key={c.name} className="jsmf-progress" style={boxStyle(c)} />;
     return null;
   };

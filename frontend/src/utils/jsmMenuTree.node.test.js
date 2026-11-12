@@ -51,8 +51,7 @@ test('the menu adds nothing JSM does not have', () => {
  * reachable, a report an operator uses today has gone missing from the menu.
  */
 const MUST_STAY_REACHABLE = [
-  // gstReports|gstr1 and gstReports|gst45 now open the JSM GSTR-1 screens (Rpt_Jsm_GSTR1_*).
-  ['gstReports', 'ewayBulk'],
+  // gstReports|gstr1, gst45 and ewayBulk now open the JSM screens (Rpt_Jsm_GSTR1_*, Eway_Billing_Bulk).
   // gstReports|gstrMatching, gstr2, gstr9, gst3b, gstr1Errors, itc04, ewayStatus, ewayExcel,
   // gstinSales, gstinPurchase, gstinProcess, gstinJobwork, gstinJournal, gstinExpense now open
   // the real JSM screens (Gstr_3B_TextNew_Monthly, Stp_Gst_OutWrad_ErrorCheck, A_Gstr1_*, A_Gstr2_*, etc.).

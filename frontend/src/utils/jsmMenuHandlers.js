@@ -65,7 +65,7 @@ export const FORM_HANDLERS = {
   JS_GSTR2_RPT: { id: 'gst-extra-purchase', external: 'jsmReport', jsmForm: 'JS_GSTR2_RPT' },
   JS_GSTR3_SMRY: { id: 'gst-extra-summary', external: 'jsmReport', jsmForm: 'JS_GSTR3_SMRY' },
   A_Brokreg_Main_Rpt_Zoom_Column: { id: 'gst-itc04', external: 'jsmReport', jsmForm: 'A_Brokreg_Main_Rpt_Zoom_Column' },
-  Eway_Billing_Bulk: { id: 'gst-ewb-bulk', external: 'gstReports', reportKind: 'ewayBulk' },
+  Eway_Billing_Bulk: { id: 'gst-eway-bulk', external: 'jsmGstr1', jsmForm: 'Eway_Billing_Bulk' },
   A_All_Ewb_Einv_Rpt: { id: 'gst-ewb-status', external: 'jsmReport', jsmForm: 'A_All_Ewb_Einv_Rpt' },
   Gstr_3BB_TextNew_Excel_Monthly: { id: 'gst-ewb-excel', external: 'jsmReport', jsmForm: 'Gstr_3BB_TextNew_Excel_Monthly' },
   Rpt_Jsm_GSTR1_1x_8_GovAllExcel_Old: { id: 'gst-45', external: 'jsmGstr1', jsmForm: 'Rpt_Jsm_GSTR1_1x_8_GovAllExcel_Old' },
