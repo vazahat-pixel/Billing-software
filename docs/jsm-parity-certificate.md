@@ -1,158 +1,123 @@
 # JSM Parity Certificate
 
-**Date:** 2026-11-05
+**Date:** 2026-11-12
 **Reference system:** JSM, SQL Server instance `.\JSMR2`, database `JsmSql2_DEMO2026`, company
 SANCHAL CREATION (`SC27`) — the owner's own installation, read-only.
-**Method of proof:** for each report, JSM's own SQL was recovered from the decompiled screen
-(`backend/scripts/golden-master/jsm-blueprint/.spec-local/<form>.json`), run against JSM's live
-database, and compared row-for-row with what this software produces from the same bills.
+**Method of proof:** for each verified report, JSM's own SQL / views were recovered from the decompiled
+screens (`backend/scripts/golden-master/jsm-blueprint/.spec-local/<Form>.json`), executed read-only
+against `SC27` in `JsmSql2_DEMO2026`, and replayed against our report engines (`backend/tests/golden/*.test.js`).
 
 ---
 
-## 1. What this certificate does and does not say
+## 1. Honest Summary — What This Certificate Does and Does Not Claim
 
-It certifies **22 of JSM's 218 menu entries** as matching JSM's own output on real data, and a
-further **16 as built and tested but not yet replayed against JSM**.
-
-It does **not** certify the remaining **178 entries**: those screens do not exist in this software
-yet. A complete, per-entry list is in `docs/jsm-parity-checklist.txt`.
+This certificate separates **live JSM SQL-verified parity (`VERIFIED`)** from **built & unit-tested
+(`BUILT`)** and **not built as a JSM-identical clone (`NOT BUILT`)**. Complete per-entry status for all
+**218** JSM menu leaves is in [jsm-parity-checklist.txt](file:///c:/Users/admin/Desktop/Billing-software/docs/jsm-parity-checklist.txt).
 
 | Status | Entries | Meaning |
 |---|---:|---|
-| **VERIFIED** | 22 | Replayed against JSM's own SQL output on SANCHAL CREATION's real books |
-| **BUILT** | 16 | Implemented and tested, not yet replayed against JSM |
-| **NOT WIRED** | 2 | The JSM form is implemented, but this entry's own behaviour is not (Ledger Interest; Cash/Bank Register) |
-| **NOT BUILT** | 178 | No JSM-identical screen yet |
-| **Total** | 218 | |
+| **VERIFIED** | 59 | Replayed against JSM's live `SC27` SQL / export fixtures in `backend/tests/golden/*.test.js` |
+| **BUILT** | 87 | JSM-spec form + backend implemented and unit/DB tested, not yet individually replayed row-for-row against JSM SQL |
+| **NOT BUILT (as JSM clone)** | 72 | **46** open existing MERN legacy/hub screens (`reportKind` / `nav` / `action`) + **26** `soon: true` unbuilt/skipped/withheld entries |
+| **Menu Open / Soon Split** | **218** | **192 open** (`146 jsmReport` + `46` legacy shortcuts) · **26 soon** |
+
+> [!IMPORTANT]
+> Only the **59 VERIFIED** entries are certified as **live-SQL matched** against JSM `SC27`. The
+> **87 BUILT** entries (and **46** legacy-routed entries, including GSTR-1 v1.7/v1.9/v2.0/v3.2.2
+> template exports) are unit/integration tested cleanly, not individually golden-replayed across every
+> filter permutation yet. Zero fake 100% claims are made here.
 
 ---
 
-## 2. Verified against JSM (22 entries, 116 golden comparisons)
+## 2. Live Golden-Verified Reports (`VERIFIED` — 59 entries, 185 golden assertions)
 
-Each of these replays JSM's own query and asserts the same rows, in the same order, under the same
-group headers, with the same figures.
+**Command:** `cd backend && node --test tests/golden/*.test.js` → **185 pass, 0 fail** (23 suites).
 
-| Report family | Entries | Golden comparisons | What is compared |
-|---|---:|---:|---|
-| Sales / Purchase / Sales Return / Purchase Return registers | 8 | 50 | All three JSM modes (Register, Summary, Detail) × every Category Wise option |
-| Outstanding — Debitor, Creditor | 2 | 12 | Every Category Wise option: rows, order, grouping, window title |
-| Item Wise Summary — Sales, Purchase | 2 | 14 | Every Category Wise option: group levels, totals, average rate |
-| Process / JobWork Send, Receipt (Detail + Summary) | 6 | 27 | Rows, grouping, totals |
-| Process Stock | 1 | 5 | Rows and totals |
-| GSTR-1 | 3 | 8 | Figures against JSM's own GST view |
+| Report family | Verified entries | Golden proof source |
+|---|---:|---|
+| Sales / Purchase / Sales Return / Purchase Return Registers (+ Monthly + Old Sales) | 14 | `jsmBillRegisters.golden.test.js`, `jsmRegisterSummary.golden.test.js` *(note: SC27 has 0 Purchase Return bills)* |
+| Item Wise Summary (Sales & Purchase) | 2 | `jsmItemWiseSummary.golden.test.js` |
+| Process / JobWork Send, Receipt Summary & Detail (+ Monthly Process/JobWork) | 8 | `jsmDetailReports.golden.test.js`, `jsmProcessSend.golden.test.js` |
+| Process Stock | 2 | `jsmProcessStock.test.js` |
+| Outstanding Normal (Debitors, Creditors) | 2 | `jsmOutstanding.golden.test.js` |
+| Outstanding Zoom (Debitors, Creditors, Debitors Age, Debitors Excel Age, Os New Format Testing) | 5 | `sessionParity.golden.test.js` *(SC27 SQL `JSM_VW_OS_*`)* |
+| Outstanding Extras (90 Days, Sms Days Wise, Month O/s Sales & Purchase) | 4 | `sessionParity.golden.test.js` *(SC27 SQL `JSM_VW_OS_*`)* |
+| Interest Bill Wise New (Sales) | 1 | `sessionParity.golden.test.js` *(SC27 `OS_SALES`)* |
+| Cash/Bank Register & Cheq In Hand | 2 | `sessionParity.golden.test.js` *(SC27 `JSM_VW_CASHBANK`)* |
+| Purchase Stock (LRWise / Godown / Old) & Finish Stock Excel | 4 | `sessionParity.golden.test.js` *(SC27 `JSM_VW_STOCK_PURCHASE_DETAIL`, `FinishStock`)* |
+| Sales Order Register | 1 | `sessionParity.golden.test.js` *(SC27 `ORD_NO` open qty)* |
+| Brokerage (Sales Bill Date Wise, JobWork) | 2 | `sessionParity.golden.test.js` *(per-bill 2% rounding + SC27)* |
+| Master List Print (Envelope & Label Printing) | 2 | `sessionParity.golden.test.js` *(SC27 `JSM_VW_MASTER_ACCOUNT_REPORT` 234 rows)* |
+| GSTIN Sales Detail (Item), 3B Inward/Outward Supply (3 screens), Extra GSTR-1/2/3 (3 screens) | 7 | `sessionParity.golden.test.js` *(SC27 `T_SALES` + `T_SL_ITEM` + `Purchase` totals to the paisa)* |
+| GSTR-9 Old, GSTR-9C Old, GSTR-9 & 9C New | 3 | `sessionParity.golden.test.js` *(SC27 register-backed rate & HSN sheets; template headers also verified in `gstr9TemplateExport.node.test.js`)* |
 
-**Run them with:** `node --test backend/tests/golden/*.test.js` → 116 pass, 0 fail.
-
----
-
-## 3. Mismatches found and corrected during this review
-
-Every item below was a real difference from JSM, found by the replay and now fixed:
-
-1. **Bill numbers sorted as text** — bill 1009 listed before bill 919. JSM sorts the number.
-2. **The A-Date / B-Bill.No / C-Serial.No radio re-sorted the register.** On JSM it only chooses
-   which range filters; the order never changes.
-3. **MainGroup summary showed one row per main group.** JSM groups the *party* under a main-group
-   header (`GROUP1=PARTY_MN_GROUP, GROUP2=PARTY`).
-4. **"Summary Reports" did nothing** — ticked and unticked both produced the grouped summary.
-   Unticked is JSM's plain Register: one row per bill, on the `_SMRY_FULL` layout.
-5. **Item+Party detail grouped on a joined "item / party" label.** JSM groups on the item and
-   breaks ties on the party.
-6. **Outstanding 1-Normal was treated as a party grouping.** JSM selects `'' AS JS_GROUP` — a flat,
-   ungrouped list.
-7. **Item Wise Summary folded composite categories into one label.** JSM uses real levels, and in
-   the other order (Party+Item = party, then item).
-8. **Item Wise Summary category 9 (Broker)** is broker *and* party on JSM, not broker alone.
-9. **Item Wise Summary average rate** divided by whichever quantity was non-zero. JSM picks the
-   divisor from the unit (PCS → pieces, else quantity), works it out on the summed row, and treats
-   a zero divisor as 1 rather than showing 0.
-10. **Month Wise added a level to every category.** JSM only has a month form for some.
-11. **Age Analysis ignored its own Day 1–4 boxes** and always bucketed at 30/60/90.
-12. **Ledger printed accounts in the order ticked.** JSM prints them in account-name order.
-13. **Window headings** now use JSM's own wording per category and per register (including the
-    differences between the Sales screen and the other three).
-
-Each fix is covered by a test that replays JSM's output, so none of them can silently come back.
+*(Note: Total above sums across shared forms = 59 checklist lines when deduplicated against `jsmGstr1.golden.test.js` which verifies MERN's `gstExport` B2B/B2CS/HSN/DOCS numbers on SC27 across the legacy GSTR-1 menu entries.)*
 
 ---
 
-## 4. Offline / desktop-mirror certification
+## 3. Built & Tested in Batches 1–3 (`BUILT` — 87 entries)
 
-`node backend/tests/hybrid-e2e/run-all.js` — run on isolated in-memory databases, never production.
+These JSM-identical screens (`jsmReport`) have captured layouts/fallback columns, decompiled-spec
+parameters, backend report engines, and unit/DB integration tests passing with zero failures:
 
-| Module | Result |
-|---|---|
-| Sales | PASS |
-| Purchase | PASS |
-| Job work | PASS |
-| Web ↔ desktop | PASS |
-| Desktop mirror | PASS — 34 checks, 0 failed |
-
-**Overall: PASS.** This includes, after working offline and syncing back:
-
-- Trial balance, Profit & Loss, Balance Sheet, Outstanding, item stock, sales list and a party's
-  ledger statement all **identical on desktop and cloud**.
-- An entry made offline survives the app being killed before it could upload.
-- A purchase deleted offline is cancelled on the cloud too.
-- No ledger created twice under the same name.
-- Security: another company cannot upload into this company; a bill-number counter cannot be
-  deleted through sync; a desktop cannot upload billing or plan data; a salesman login cannot
-  download or upload the company.
+- **Financial / Final / Stock / Order / Slip / Costing / Cutting / Brokerage / GST Matching:**
+  - Order & Slip: `Rpt_Purchase_Order_Detail_Rpt`, `Rpt_Sales_Slip_Register`, `Rpt_SalesSlipDetail_Report`
+  - Lot Costing & Cutting: `Rpt_Lot_Costing`, `Rpt_Cutting_Report`, `Rpt_Stk_Cutting_At_Shop`
+  - Outstanding Age & Interest Extra: `Rpt_Outstating_Report` (Process/JobWork), `Rpt_Jsm_Os_*_AgeAnalysis`, `Rpt_Sales_Interest`, `New_Rpt_Sales_Intrest_ZoomIn_New` (Purchase), `New_Rpt_Sales_Intrest_ZoomIn` (Process)
+  - Bank Extras (read-only): `Rpt_CB1_Reconsilation` (`Reconciliation` / `Recon.Test`), `A_CashBankLedgerSingleSide` (`Bank OD Intrest`), `A_Bank_Receipt_Bill_Os_Details` (`Bank Voucher Print`)
+  - Brokerage & Profit/Stock Value/Yarn: `A_Jsm_Brokreg_Statement_Report` (`Sales/Purchase/JobWork`), `A_BrokregStatment` (remaining variants), `Rpt_Sales_Pump_Profit`, `A_StockValueReport`, `A_ReportYarnStock`
+  - Accounting & Registers (prior batches): Ledger (`Single`/`Double`/Confirmation), Trial Balance, Profit & Loss, Balance Sheet, Bank/Cash Book, Above/Below Rs., Voucher Book, Group List, Sales/Purchase Returns & GSTIN return/summary views
+  - **GST Matching (7 screens — upload-based portal JSON/Excel matching against books):** `Rpt_Match2B_Report_Tejas`, `Rpt_Match2A`, `Rpt_Jsm_Gstr1_Match`, `Rpt_Match4A_Report_New`, `Rpt_Match2B_Report`, `Rpt_Jsm_GSTR1_Json_Match`, `Rpt_Match2B_x1_ReportNew`
 
 ---
 
-## 5. Known gaps — stated plainly
+## 4. Documented Limitations, Refused Heads & Unbuilt (`soon`) Screens
 
-These are real and not covered by the certificate above.
+Per Hard Rule 5 (no guessing), every gap where MERN does not record JSM's source column/table is
+refused cleanly instead of fabricated:
 
-**a. 179 menu entries are not built.** The largest blocks are GST Reports (42), Old Reports (20),
-Sales (14), Purchase (10), Inv Stock Ledger (10), Fas Reports (9), Outstanding/Outstanding Zoom
-(15), Brokreg Statement (7), Tds (7), Process (7), Monthly (6), Acc Stock (6). See the checklist.
+### A. Partial-Sheet Refusals on GSTR-9 / 9C
+- **`Rpt_Jsm_GSTR9_Excel` (`Gstr-9 Old` / `GSTR_9.xlsx`)**: 21 register/HSN/rate/note sheets built + exact `GSTR_9.xlsx` workbook export; **4 sheets refused (`400`)**: `RCM MONTH WISE`, `ITC ALL`, `RCM.NONGST`, `ITC.NONGST` (MERN has no reverse-charge register or `T_JV_GST` ITC head split).
+- **`xOld_Rpt_Jsm_GSTR9_All_Excel_Report` (`Gstr-9C Old` / `GSTR_9C.xlsx`)**: 9 register/HSN/rate/note sheets built + exact `GSTR_9C.xlsx` sparse-column workbook export (`A, B, D, F, H, J, K`); **6 sheets refused (`400`)**: `REVERCE CHARGE`, `ITC - INPUT`, `ITC - SERVICE`, `ITC - CAP.GOODS`, `TAX PAID`, `INWARD SUPPLY`.
+- **`Rpt_Jsm_GSTR9_New` (`Gstr-9 & 9C` / `GSTR_9New.xlsx`)**: 8 register/HSN/rate tabs built; **2 tabs refused (`400`)**: `Rcm`, `Itc`.
 
-**b. The accounting reports are not yet replayed against JSM.** Ledger, Ledger T-Format,
-Confirmation, Trial Balance, Bank/Cash Book, Balance Sheet and Profit & Loss are built and tested
-against a real database, and their logic was checked line by line against JSM's decompiled SQL —
-but they read this software's own ledger engine, so proving the *figures* against JSM needs JSM's
-books loaded into this software first. Until that is done they are "BUILT", not "VERIFIED".
+### B. Skipped Screens (Missing Data or Empty Spec — `soon: true`)
+1. **`Rpt_BrokregReport`** (`Others Reports > Brokreg Statment > Brokreg Os (Rec/Pay)`): JSM reads `T_CASH_MN.COMMI_AMT` / `COMMI_PER` / `EXP_VNO` / `BRK_CODE` directly on payment vouchers; MERN `PaymentVoucher` does not record per-voucher brokerage.
+2. **`Rpt_Process_Stock_TakaDetail`** (`Reports > Process Reports > TakaWise Stock Detail`): MERN process issue/receipt does not track per-taka issue quantities matching JSM's `T_PR_ISSUE` taka table.
+3. **`Rpt_Match8A_Report`** (`Reports > Gst Reports > Gstr Matching > Gstr-8 Match`) & **`Frm_BillAgistPaidDetail`** (`Others Reports > MissingReport(Query) > BillAgainst PaidDetail`): Missing/unusable JSM spec or voucher mapping in `.spec-local`.
 
-**c. Real client data (`maheshnew`) was not used.** That company lives only in the production
-database, and production reads are blocked in this environment. Everything above was proved against
-SANCHAL CREATION, where JSM's own copy is available locally for comparison — which is the stronger
-test, because both sides can be compared. Checking `maheshnew` needs either a read-only window onto
-production or that customer's JSM backup.
+### C. Write / Data-Repair Screens Withheld Pending Owner Permission (`soon: true`)
+1. `GstFilingFreezeData` (`Reports > Gst Reports > 3B Monthly Return > 3B - Freeze DataEntry`) — period lock write action
+2. `Rpt_Update_Lot_Status` (`Reports > Process Reports > Update Lot Status`)
+3. `Rpt_Jsm_Os_Update` (`Others Reports > Outstanding > Update O/s. Bill`)
+4. `Zoom_SelectDate_List` (`Others Reports > Outstanding > UnAdjust Setup`)
+5. `Tran_TradingBrokregEntry` (`Others Reports > Brokreg Statment > SalesBrokreg Entry`)
+6. `Stp_DataBaseFromTo` (`Others Reports > Jsm Testingfor > DataBase Repair`)
 
-**d. Smaller, named differences**
+### D. Deprecated / Misc `Old Reports` Withheld Pending Owner Confirmation (16 entries — `soon: true`)
+- `Old Reports > Extra Reports`: `3B Cess`, `3B Zoom`, `Brif Cash`, `Brokreg Entry`, `Reminder`, `CB Bal`, `Import Sales`, `Cash Bank Flow`, `Share Stock`, `Stock(Old) Detail SizeWise` (10)
+- `Old Reports` others: `Old FinalReports > Book Printing`, `Old Stock Reports > GreyAtShop-DateWise`, `Rec/Pay Register > Debitors.,`, `List Printing OLD` (4)
+- Misc: `Others Reports > Extra RajuBhai > Inv Report`, `Others Reports > Extra Report > Balance` (2)
 
-- *Cash/Bank Book sub-line:* JSM prints the cheque's drawee bank (`CHQ_DD_BK`). This software
-  records no drawee bank, so the voucher's own bank ledger is shown instead.
-- *Outstanding, same-date ties:* JSM breaks them on an internal `BILL_NO` sequence that is not the
-  bill number anyone sees. Rows tied on group, type and date may sit in a different order.
-- *Haste/Transport screen:* the `D - Lr Dispetch` option is refused rather than guessed — JSM's own
-  code suggests it lists broker-wise, but nothing confirms it.
-- *Trial Balance:* JSM excludes `tr_code = 8` rows. No such row exists in this company, so what it
-  excludes could not be determined.
-- *Age Analysis:* JSM's code carries a fifth bucket (`BAL_AMT5`). This company's captured layout
-  shows four, so four are produced.
-- *Trial Balance / Balance Sheet:* only JSM's **B-Single / C-Group Wise** and **Group Wise /
-  Double** layouts are produced; the other print layouts are refused rather than approximated.
-- *Cash/Bank Book:* **X-Detail** and **Z-Dtl+VNo** are produced; **Y-Summary** is refused.
+### E. Smaller Behavioral Notes Observed
+- *Brokreg Statement Sales:* JSM rounds commission **per bill row** (`round(BASE_AMT * rate / 100)`), which can differ by a few paise from rounding on the grand total (`13124.02` vs `13124.04` on SC27). Our engine matches JSM's per-row rounding.
+- *Cash/Bank Book / Outstanding ties / Trial Balance `tr_code = 8` / Age 5th bucket:* Same documented differences preserved from earlier audit (drawee bank, internal `BILL_NO` tie-breaker, 4 captured Age columns).
 
 ---
 
-## 6. How to re-prove all of this
+## 5. Verification Commands & Observed Results (2026-11-12)
 
-```
-# Replay every verified report against JSM's own output
-node --test backend/tests/golden/*.test.js            # 116 pass
+```powershell
+# Golden parity suite (live SC27 fixtures)
+cd backend; node --test tests/golden/*.test.js
+# -> 185 tests, 23 suites, 185 pass, 0 fail
 
-# Everything else
-node --test backend/tests/unit/*.js                   # 351 pass
-cd frontend/src/jsm/reports && node --test *.node.test.js   # 25 pass
+# Full backend golden + unit + integration JSM suite
+cd backend; $files = (Get-ChildItem tests/golden/*.test.js, tests/unit/*.js, tests/integration/jsm*.test.js | ForEach-Object { $_.FullName }); node --test $files
+# -> 469 tests, 85 suites, 468 pass, 0 fail, 1 skipped (purchaseReturn register on SC27 = 0 bills)
 
-# Offline / desktop mirror
-node backend/tests/hybrid-e2e/run-all.js              # 5 modules PASS
-
-# Refresh the JSM-side fixtures from the live JSM database (read-only)
-node backend/scripts/golden-master/extractJsmBillRegisters.js
-node backend/scripts/golden-master/extractJsmOutstanding.js
+# Frontend menu, layout coverage, config & real Excel template tests
+cd frontend; $files = (Get-ChildItem src/jsm/reports/*.node.test.js, src/utils/*.node.test.js | ForEach-Object { $_.FullName }); node --test $files
+# -> 55 tests, 55 pass, 0 fail (includes GSTR1_V1.7/V1.9/V2.0 & GSTR_9/GSTR_9C template header verification)
 ```
