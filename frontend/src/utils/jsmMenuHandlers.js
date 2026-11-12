@@ -200,6 +200,12 @@ export const FORM_HANDLERS = {
   Rpt_Account_List_Print_Old: { id: 'old-list-print', external: 'jsmReport', jsmForm: 'Rpt_Account_List_Print_Old' },
   Tran_BankDetail: { id: 'old-cash-bank-flow', external: 'jsmReport', jsmForm: 'Tran_BankDetail' },
   Frm_TabReport: { id: 'old-cb-balance', external: 'jsmReport', jsmForm: 'Frm_TabReport' },
+  Rpt_Process_Stock_TakaDetail: { id: 'proc-taka-detail', external: 'jsmReport', jsmForm: 'Rpt_Process_Stock_TakaDetail' },
+  Zoom_SelectDate_List: { id: 'os-unadjust-setup', external: 'jsmReport', jsmForm: 'Zoom_SelectDate_List' },
+  Rpt_BrokregReport: { id: 'brokreg-os-rec-pay', external: 'jsmReport', jsmForm: 'Rpt_BrokregReport' },
+  Frm_BillAgistPaidDetail: { id: 'missing-bill-against-paid', external: 'jsmReport', jsmForm: 'Frm_BillAgistPaidDetail' },
+  Rpt_Match8A_Report: { id: 'gst-match-8a', external: 'jsmReport', jsmForm: 'Rpt_Match8A_Report' },
+  Stp_DataBaseFromTo: { id: 'jsm-db-repair', external: 'jsmReport', jsmForm: 'Stp_DataBaseFromTo' },
 
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },

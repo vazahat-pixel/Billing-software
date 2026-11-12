@@ -140,6 +140,12 @@ const REPORTS = {
   Rpt_Account_List_Print_Old: require('./reports/oldMiscReports').listPrintOld,
   Tran_BankDetail: require('./reports/oldBankReports').bankDetail,
   Frm_TabReport: require('./reports/oldBankReports').tabReport,
+  Rpt_Process_Stock_TakaDetail: require('./reports/processTakaDetail'),
+  Zoom_SelectDate_List: require('./reports/zoomSelectDate'),
+  Rpt_BrokregReport: require('./reports/brokregOsReport'),
+  Frm_BillAgistPaidDetail: require('./reports/billAgainstPaidDetail'),
+  Rpt_Match8A_Report: require('./reports/match8aReport'),
+  Stp_DataBaseFromTo: require('./reports/dbRepairDiagnostics'),
 };
 
 function get(reportId) {
