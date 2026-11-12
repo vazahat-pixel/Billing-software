@@ -110,7 +110,7 @@ export const FORM_HANDLERS = {
   Tran_ImportCashBank: { id: 'fas-import-bank', external: 'fasCheck', reportKind: 'importBank' },
   Mst1_Check_Diff: { id: 'final-diff-os', external: 'fasCheck', reportKind: 'diffOpening' },
   Rpt_Cash_Bank_Finance_Report: { id: 'final-cash-fin', external: 'cashBook' },
-  Rpt_Jsm_Ledger_os_Diff_Check: { id: 'final-diff-year', external: 'fasCheck', reportKind: 'diffYear' },
+  Rpt_Jsm_Ledger_os_Diff_Check: { id: 'final-diff-year', external: 'jsmGstr1', jsmForm: 'Rpt_Jsm_Ledger_os_Diff_Check' },
   Rpt_Group_Balance: { id: 'final-group', external: 'jsmReport', jsmForm: 'Rpt_Group_Balance' },
 
   // Sales / Purchase Summary — the screens on the main menu path, which group on two Order By

@@ -214,3 +214,17 @@ test('Stock Ledger New (book-acc): earlier movement and master join OP.STOCK; de
   assert.ok(det.rows.length >= 3);
   await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { ...base, orderBy1: 'Nope' }, { rows }), /Unknown GroupBy/);
 });
+
+test('Ledger vs O/s difference: Sales compares debtor ledger with receivables, refuses Process/JobWork', async () => {
+  const fas = { diffYear: async () => ({ rows: [
+    { partyName: 'B', ledgerDebit: 1000, ledgerCredit: 0, receivable: 900, payable: 0 },
+    { partyName: 'A', ledgerDebit: 500, ledgerCredit: 0, receivable: 500, payable: 0 },
+    { partyName: 'S', ledgerDebit: 0, ledgerCredit: 700, receivable: 0, payable: 600 },
+  ] }) };
+  const rpt = require('../../services/jsmReports').get('Rpt_Jsm_Ledger_os_Diff_Check');
+  const sales = await rpt.run('507f1f77bcf86cd799439011', { book: 'Sales' }, { fas });
+  assert.deepEqual(sales.rows, [{ AC_NAME: 'B', LED_BAL: 1000, OS_BAL: 900, BAL_OS_AMT: 100 }, { AC_NAME: 'S', LED_BAL: -700, OS_BAL: 0, BAL_OS_AMT: -700 }]);
+  const purchase = await rpt.run('507f1f77bcf86cd799439011', { book: 'Purchase' }, { fas });
+  assert.deepEqual(purchase.rows.map((r) => [r.AC_NAME, r.BAL_OS_AMT]), [['A', -500], ['B', -1000], ['S', 100]]);
+  await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { book: 'Process' }, { fas }), /not kept/);
+});
