@@ -95,13 +95,13 @@ export const FORM_HANDLERS = {
   Rpt_Stock_Acc_Finish_Summary: { id: 'stock-finish-excel', external: 'stockLedger', reportKind: 'finishExcel' },
 
   // Tds / Tcs
-  Rpt_TdsReports: { id: 'tds-head', reportKey: 'tds', view: 'tdsHead' },
+  Rpt_TdsReports: { id: 'tds-head', external: 'jsmReport', jsmForm: 'Rpt_TdsReports' },
   Rpt_Tds2_Prty_Mnth_Wise: { id: 'tds-party', reportKey: 'tds', view: 'tdsParty' },
   Rpt_Tds3_Add_Ackn: { id: 'tds-address', reportKey: 'tds', view: 'tdsAddress' },
   Rpt_Tds4_Challan: { id: 'tds-challan', reportKey: 'tds', view: 'tdsChallan' },
   Rpt_Tds5_Certi: { id: 'tds-certificate', reportKey: 'tds', view: 'tdsCertificate' },
   Rpt_Tcs: { id: 'tcs-recpay', reportKey: 'tcs', view: 'tcsRecPay' },
-  Rpt_TcsReports: { id: 'tcs-sales', reportKey: 'tcs', view: 'tcsSales' },
+  Rpt_TcsReports: { id: 'tcs-sales', external: 'jsmReport', jsmForm: 'Rpt_TcsReports#Sales' },
 
   // Fas / Final
   A_AccountLedgerDoubleSide: { id: 'fas-ledger-t', external: 'jsmReport', jsmForm: 'A_AccountLedgerDoubleSide_TFormat' },
@@ -264,9 +264,9 @@ export const PATH_HANDLERS = {
   'Reports > Tds Reports > Party Wise Monthly Report':
     { id: 'tds-monthly', reportKey: 'tds', view: 'tdsMonthly' },
   'Reports > Tds Reports > Tds Register':
-    { id: 'tds-reg', reportKey: 'tds', view: 'tdsRegister' },
+    { id: 'tds-reg', external: 'jsmReport', jsmForm: 'Rpt_TdsReports' },
   'Reports > Tcs Reports > Tcs Purchase Register':
-    { id: 'tcs-purchase', reportKey: 'tcs', view: 'tcsPurchase' },
+    { id: 'tcs-purchase', external: 'jsmReport', jsmForm: 'Rpt_TcsReports#Purchase' },
   'Reports > Fas Reports > Bank / Cash Book > Reconciliation':
     { id: 'fas-bank-recon', external: 'jsmReport', jsmForm: 'Rpt_CB1_Reconsilation' },
   'Reports > Fas Reports > Bank / Cash Book > Recon.Test':

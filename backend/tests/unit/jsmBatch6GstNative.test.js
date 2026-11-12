@@ -79,3 +79,36 @@ test('Eway_Billing_Bulk: one row per item line in JSM column names, Check Error 
   const none = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-08-01', to: '2026-08-31' }, { bills });
   assert.equal(none.rows.length, 0);
 });
+
+test('TDS book: summary groups by the Report Type, detail orders Month by year+month number', async () => {
+  const rows = [
+    { ENT_NO: 1, SRAL_NO: 1, ENT_DATE: new Date('2026-08-24'), YEAR_NO: 2026, MONTH_NO: 8, MONTH: 'August', TDSHEAD: '194C', PARTY: 'B', PANNO: 'AAACB1234C', AMOUNT: 28025, TDS_PER: 5, TDS_AMT: 1401, COMP_NON: 'COMP', COMPANY: 'X' },
+    { ENT_NO: 2, SRAL_NO: 2, ENT_DATE: new Date('2026-07-22'), YEAR_NO: 2026, MONTH_NO: 7, MONTH: 'July', TDSHEAD: '194C', PARTY: 'A', PANNO: 'AAAPA1234C', AMOUNT: 1164, TDS_PER: 2, TDS_AMT: 23, COMP_NON: 'NON-COMP', COMPANY: 'X' },
+    { ENT_NO: 3, SRAL_NO: 3, ENT_DATE: new Date('2026-07-30'), YEAR_NO: 2026, MONTH_NO: 7, MONTH: 'July', TDSHEAD: '194C', PARTY: 'A', PANNO: 'AAAPA1234C', AMOUNT: 1000, TDS_PER: 2, TDS_AMT: 20, COMP_NON: 'NON-COMP', COMPANY: 'X' },
+  ];
+  const rpt = require('../../services/jsmReports').get('Rpt_TdsReports');
+  const det = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', group: 'Month+TdsHead+Party' }, { rows });
+  assert.deepEqual(det.rows.map((r) => r.MONTH), ['July', 'July', 'August']); // July before August, not A..Z
+  assert.equal(det.grid.layout, 'JSM_VW_TDS_BOOK_DETAILREPORT');
+  const sum = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', group: 'Month+TdsHead+Party', summary: true }, { rows });
+  assert.equal(sum.rows.length, 2);
+  assert.equal(sum.rows[0].TDS_AMT, 43);
+  assert.equal(sum.rows[0].AMOUNT, 2164);
+  assert.equal(sum.grid.layout, 'JSM_VW_TDS_BOOK_SUMMARYREPORT');
+  await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { group: 'Nope' }, { rows }), /Unknown Report Type/);
+});
+
+test('TCS registers: summary sums per month/party; sales returns carry negative TCS', async () => {
+  const rows = [
+    { COMPANY: 'X', TCSHEAD: 'TCS', PARTY: 'P', PANNO: 'AAAPA1234C', YEAR_NO: 2026, MONTH_NO: 7, MONTH: 'July', TCS_PER: 0.1, TCS_AMT: 100, TAXABLE_AMT: 100000, NET_TOT: 105100, BILL_DATE: new Date('2026-07-05'), NCBILL_NO: '1', ENT_NO: 1, T_TDS_PER: 0, T_TDS_AMT: 0 },
+    { COMPANY: 'X', TCSHEAD: 'TCS', PARTY: 'P', PANNO: 'AAAPA1234C', YEAR_NO: 2026, MONTH_NO: 7, MONTH: 'July', TCS_PER: 0.1, TCS_AMT: 50, TAXABLE_AMT: 50000, NET_TOT: 52550, BILL_DATE: new Date('2026-07-09'), NCBILL_NO: '2', ENT_NO: 2, T_TDS_PER: 0, T_TDS_AMT: 0 },
+    { COMPANY: 'X', TCSHEAD: 'TCS', PARTY: 'P', PANNO: 'AAAPA1234C', YEAR_NO: 2026, MONTH_NO: 7, MONTH: 'July', TCS_PER: -0.1, TCS_AMT: -10, TAXABLE_AMT: -10000, NET_TOT: -10510, BILL_DATE: new Date('2026-07-12'), NCBILL_NO: 'R1', ENT_NO: 3, T_TDS_PER: 0, T_TDS_AMT: 0 },
+  ];
+  const rpt = require('../../services/jsmReports').get('Rpt_TcsSalesRegister');
+  const det = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31' }, { rows });
+  assert.equal(det.rows.length, 3);
+  assert.equal(det.grid.layout, 'TCS_DETAILREPORT');
+  const sum = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', summary: true }, { rows });
+  assert.equal(sum.rows.length, 2); // TCS_PER 0.1 and -0.1 are separate group keys, as in JSM's GROUP BY
+  assert.equal(sum.rows.find((r) => r.TCS_PER === 0.1).TCS_AMT, 150);
+});

@@ -77,8 +77,9 @@ test('every screen that opened from the old menu still opens from this one', () 
 test('the TDS and TCS views all still have an entry', () => {
   const leaves = [...leavesOf(JSM_REPORTS_TREE), ...leavesOf(JSM_OTHERS_TREE)];
   const views = new Set(leaves.filter((l) => l.reportKey).map((l) => `${l.reportKey}|${l.view}`));
-  for (const v of ['tds|tdsHead', 'tds|tdsParty', 'tds|tdsMonthly', 'tds|tdsAddress', 'tds|tdsChallan',
-    'tds|tdsCertificate', 'tds|tdsRegister', 'tcs|tcsRecPay', 'tcs|tcsSales', 'tcs|tcsPurchase']) {
+  // tdsHead, tdsRegister, tcsSales and tcsPurchase now open the JSM screens (Rpt_TdsReports, Rpt_TcsReports).
+  for (const v of ['tds|tdsParty', 'tds|tdsMonthly', 'tds|tdsAddress', 'tds|tdsChallan',
+    'tds|tdsCertificate', 'tcs|tcsRecPay']) {
     assert.ok(views.has(v), `${v} has no menu entry`);
   }
 });
