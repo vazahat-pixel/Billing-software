@@ -256,3 +256,17 @@ test('Bank month wise: debits and credits of the ticked banks totalled per month
   const one = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', banks: ['SBI'] }, { banks, statement });
   assert.deepEqual(one.rows.map((r) => [r.MONTH, r.DEBIT]), [['May', 10]]);
 });
+
+test('Chek Diff Os.Bill/Op.Balance: opening vs pending old bills, Summary only, Sale/Purchase only', async () => {
+  const fas = { diffOpening: async () => ({ rows: [
+    { partyName: 'D1', partyType: 'Customer', opening: 1000, openingType: 'Dr', receivable: 900, payable: 0 },
+    { partyName: 'C1', partyType: 'Supplier', opening: 500, openingType: 'Cr', receivable: 0, payable: 500 },
+  ] }) };
+  const rpt = require('../../services/jsmReports').get('Mst1_Check_Diff');
+  const sale = await rpt.run('507f1f77bcf86cd799439011', { book: 'Sale' }, { fas });
+  assert.deepEqual(sale.rows, [{ AC_NAME: 'D1', OP_BAL: 1000, OS_AMOUNT: 900, DIFF: 100 }]);
+  const pur = await rpt.run('507f1f77bcf86cd799439011', { book: 'Purchase' }, { fas });
+  assert.deepEqual(pur.rows, [{ AC_NAME: 'C1', OP_BAL: 500, OS_AMOUNT: 500, DIFF: 0 }]);
+  await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { book: 'Agency' }, { fas }), /not kept/);
+  await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { book: 'Sale', detail: true }, { fas }), /Detail/);
+});

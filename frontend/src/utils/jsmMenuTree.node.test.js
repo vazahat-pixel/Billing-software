@@ -58,7 +58,7 @@ const MUST_STAY_REACHABLE = [
   ['stockLedger', 'stockMts'], ['stockLedger', 'stockKgs'],
   ['stockLedger', 'greyShop'], ['stockLedger', 'greyMill'],
   ['stockLedger', 'finishBook'], ['stockLedger', 'stockValue'],
-  ['fasCheck', 'importBank'], ['fasCheck', 'diffOpening'],
+  ['fasCheck', 'importBank'],
   // fasCheck|diffYear now opens JSM's Rpt_Jsm_Ledger_os_Diff_Check.
   // cashBook (CashBank Finance, Bank Rec. Payment) now opens the JSM screens.
   // finalReport|groupList was this software's own Group List; the entry now opens the
