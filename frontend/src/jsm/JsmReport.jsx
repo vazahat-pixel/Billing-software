@@ -39,6 +39,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
   const apiForm = config?.apiForm || formName;
   const [blueprint, setBlueprint] = useState(null);
   const [lists, setLists] = useState({});
+  const [rawOptions, setRawOptions] = useState({});
   const [state, setState] = useState({});
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -55,6 +56,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
     jsmReportApi.options(apiForm)
       .then((opts) => {
         if (!live) return;
+        setRawOptions(opts || {});
         const next = {};
         for (const [lv, key] of Object.entries(config.lists || {})) next[lv] = opts?.[key] || [];
         setLists(next);
@@ -65,6 +67,8 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
 
   if (!isOpen || !config) return null;
   const form = blueprint?.forms?.[screenForm];
+  // A few screens swap a list on a radio button (Account / Acc Head): the config picks it from the state.
+  const shownLists = config.dynamicLists ? { ...lists, ...config.dynamicLists(state, rawOptions) } : lists;
 
   const activeListView = () => {
     const tabControl = form?.controls.find((c) => c.type === 'TabControl');
@@ -102,7 +106,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
     if (browseButtons.includes(name)) { fileInputRef.current?.click(); return; }
     if (name === 'Check_Select_UnSelectAll') {
       const lv = activeListView();
-      if (lv) setState((s) => ({ ...s, [lv]: value ? [...(lists[lv] || [])] : [] }));
+      if (lv) setState((s) => ({ ...s, [lv]: value ? [...(shownLists[lv] || [])] : [] }));
       return;
     }
     if (excelButtons.includes(name) && typeof config.onExcel === 'function') {
@@ -163,7 +167,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
                 form={form}
                 state={state}
                 onChange={setState}
-                lists={lists}
+                lists={shownLists}
                 onButton={onButton}
                 busy={busy}
                 overrides={config.overrides ? config.overrides(state) : undefined}

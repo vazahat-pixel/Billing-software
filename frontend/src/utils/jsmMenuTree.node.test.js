@@ -78,7 +78,7 @@ test('the TDS and TCS views all still have an entry', () => {
   const leaves = [...leavesOf(JSM_REPORTS_TREE), ...leavesOf(JSM_OTHERS_TREE)];
   const views = new Set(leaves.filter((l) => l.reportKey).map((l) => `${l.reportKey}|${l.view}`));
   // tdsHead, tdsRegister, tcsSales, tcsPurchase and tcsRecPay now open the JSM screens (Rpt_TdsReports, Rpt_TcsReports).
-  for (const v of ['tds|tdsParty', 'tds|tdsMonthly', 'tds|tdsAddress', 'tds|tdsChallan',
+  for (const v of ['tds|tdsAddress', 'tds|tdsChallan',
     'tds|tdsCertificate']) {
     assert.ok(views.has(v), `${v} has no menu entry`);
   }

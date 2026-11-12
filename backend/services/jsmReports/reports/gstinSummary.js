@@ -279,3 +279,4 @@ module.exports = {
   journalDetails: { run: (c, p, d) => runJournalOrExpense(c, p, d, 'Journal'), options },
   expenseGstr2: { run: (c, p, d) => runJournalOrExpense(c, p, d, 'Expense'), options },
 };
+

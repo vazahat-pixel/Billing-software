@@ -139,3 +139,16 @@ test('Tcs Rec/Pay: opening from 1 April, TCS only on the part above 50 lakh, Pay
   assert.equal(pay.rows[0].BOOK, 'Payment For TCS');
   assert.equal(pay.rows[0].TCS_AMT, 2000);
 });
+
+test('TDS party / monthly report: party groups, month order by number, summary totals', async () => {
+  const mk = (n, d, party, m, amt, tds) => ({ ENT_NO: n, SRAL_NO: n, ENT_DATE: new Date(d), YEAR_NO: 2026, MONTH_NO: m, MONTH: m === 7 ? 'July' : 'August', TDSHEAD: '194C', PARTY: party, PANNO: 'AAAPA1234C', AMOUNT: amt, TDS_PER: 2, TDS_AMT: tds });
+  const rows = [mk(1, '2026-08-02', 'B', 8, 100, 2), mk(2, '2026-07-02', 'A', 7, 200, 4), mk(3, '2026-07-09', 'A', 7, 300, 6)];
+  const rpt = require('../../services/jsmReports').get('Rpt_Tds2_Prty_Mnth_Wise');
+  const base = { from: '2026-04-01', to: '2027-03-31' };
+  const party = await rpt.run('507f1f77bcf86cd799439011', { ...base, mode: 'P' }, { rows });
+  assert.deepEqual(party.rows.map((r) => r.PARTY), ['A', 'A', 'B']);
+  const month = await rpt.run('507f1f77bcf86cd799439011', { ...base, mode: 'M', summary: true }, { rows });
+  assert.deepEqual(month.rows.map((r) => [r.MONTH, r.TDS_AMT]), [['July', 10], ['August', 2]]);
+  const heads = await rpt.run('507f1f77bcf86cd799439011', { ...base, mode: 'P', byHead: true, accounts: ['194C'] }, { rows });
+  assert.equal(heads.rows.length, 3);
+});

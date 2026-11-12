@@ -96,7 +96,7 @@ export const FORM_HANDLERS = {
 
   // Tds / Tcs
   Rpt_TdsReports: { id: 'tds-head', external: 'jsmReport', jsmForm: 'Rpt_TdsReports' },
-  Rpt_Tds2_Prty_Mnth_Wise: { id: 'tds-party', reportKey: 'tds', view: 'tdsParty' },
+  Rpt_Tds2_Prty_Mnth_Wise: { id: 'tds-party', external: 'jsmReport', jsmForm: 'Rpt_Tds2_Prty_Mnth_Wise' },
   Rpt_Tds3_Add_Ackn: { id: 'tds-address', reportKey: 'tds', view: 'tdsAddress' },
   Rpt_Tds4_Challan: { id: 'tds-challan', reportKey: 'tds', view: 'tdsChallan' },
   Rpt_Tds5_Certi: { id: 'tds-certificate', reportKey: 'tds', view: 'tdsCertificate' },
@@ -262,7 +262,7 @@ export const PATH_HANDLERS = {
   'Reports > Fas Reports > Bank / Cash Book > Cash Book':
     { id: 'fas-cashbook-cash', external: 'jsmReport', jsmForm: 'Rpt_cashbank1' },
   'Reports > Tds Reports > Party Wise Monthly Report':
-    { id: 'tds-monthly', reportKey: 'tds', view: 'tdsMonthly' },
+    { id: 'tds-monthly', external: 'jsmReport', jsmForm: 'Rpt_Tds2_Prty_Mnth_Wise#Month' },
   'Reports > Tds Reports > Tds Register':
     { id: 'tds-reg', external: 'jsmReport', jsmForm: 'Rpt_TdsReports' },
   'Reports > Tcs Reports > Tcs Purchase Register':

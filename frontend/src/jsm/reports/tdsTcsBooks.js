@@ -84,11 +84,56 @@ const tcs = (key, apiForm) => ({
   fallbackColumns: { TCS_SUMMARYREPORT: TCS_SUMMARY_COLUMNS, TCS_DETAILREPORT: TCS_DETAIL_COLUMNS },
 });
 
+const tdsPartyMonth = (key, mode) => ({
+  form: key,
+  blueprintForm: 'Rpt_Tds2_Prty_Mnth_Wise',
+  apiForm: 'Rpt_Tds2_Prty_Mnth_Wise',
+  title: mode === 'M' ? 'Month Wise Report' : 'Party Wise Report',
+  lists: {},
+  dynamicLists: (s, o) => ({ lst_vw1: s.Rdbtn_A2 ? (o.heads || []) : (o.parties || []) }),
+  runButtons: ['btn_screen', 'btn_print', 'btn_word'],
+  defaults: ({ fyFrom, fyTo, today }) => ({
+    txt_dt_from: fyFrom, txt_dt_to: fyTo, txt_prn_dt: today, Grp_With: true, Grp_Dtl: true, Rdbtn_A1: true,
+  }),
+  toParams: (s) => ({
+    mode,
+    from: toIsoDate(s.txt_dt_from),
+    to: toIsoDate(s.txt_dt_to),
+    fromText: s.txt_dt_from,
+    toText: s.txt_dt_to,
+    byHead: Boolean(s.Rdbtn_A2),
+    accounts: s.lst_vw1 || [],
+    withChq: Boolean(s.Grp_With),
+    summary: Boolean(s.Grp_Smry),
+  }),
+  fallbackColumns: {
+    RPT_TDS_PARTY_MONTH: [
+      { field: 'PARTY', caption: 'PARTY', kind: 'C', len: 24 },
+      { field: 'PANNO', caption: 'PAN NO', kind: 'C', len: 11 },
+      { field: 'MONTH', caption: 'MONTH', kind: 'C', len: 10 },
+      { field: 'ENT_DATE', caption: 'DATE', kind: 'D', len: 10 },
+      { field: 'NCBILL_NO', caption: 'BILL.NO', kind: 'C', len: 8 },
+      N('AMOUNT', 'AMOUNT'),
+      { field: 'TDS_PER', caption: 'TDS%', kind: 'N', dec: 2, len: 6 },
+      N('TDS_AMT', 'TDS.AMT'),
+      { field: 'CHQ_DDNO', caption: 'CHQ.NO', kind: 'C', len: 10 },
+      { field: 'PAY_DATE', caption: 'PAY.DT', kind: 'D', len: 10 },
+      { field: 'BSR_CODE', caption: 'BSR', kind: 'C', len: 8 },
+      { field: 'TRNS_VOU', caption: 'CHALLAN', kind: 'C', len: 8 },
+    ],
+  },
+});
+
+export const TDS_PARTY_FORM = 'Rpt_Tds2_Prty_Mnth_Wise';
+export const TDS_MONTH_FORM = 'Rpt_Tds2_Prty_Mnth_Wise#Month';
+
 export const TCS_SALES_FORM = 'Rpt_TcsReports#Sales';
 export const TCS_PURCHASE_FORM = 'Rpt_TcsReports#Purchase';
 
 export const TDS_TCS_REPORTS = [
   tdsReports,
+  tdsPartyMonth(TDS_PARTY_FORM, 'P'),
+  tdsPartyMonth(TDS_MONTH_FORM, 'M'),
   tcs(TCS_SALES_FORM, 'Rpt_TcsSalesRegister'),
   tcs(TCS_PURCHASE_FORM, 'Rpt_TcsPurchaseRegister'),
 ];

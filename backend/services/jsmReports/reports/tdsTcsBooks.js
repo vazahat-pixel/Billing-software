@@ -226,8 +226,48 @@ function tcsReport(kind) {
   return { run, options };
 }
 
+/**
+ * Reports › Tds Reports › Party Wise Report / Party Wise Monthly Report (Rpt_Tds2_Prty_Mnth_Wise):
+ * JSM prints these from Crystal templates; the data is its TMP_VW_TDS view (entries in the date range,
+ * for the ticked accounts or TDS heads). Party Wise groups by party, Monthly by month; Detail lists the
+ * entries, Summary one line per group; "With Chq Detail" adds the payment columns.
+ */
+function tdsPartyMonthReport() {
+  async function run(companyId, p = {}, deps = {}) {
+    const monthly = String(p.mode || 'P').toUpperCase() === 'M';
+    let rows = deps.rows || await loadTdsBook(companyId);
+    rows = inDateRange(rows, 'ENT_DATE', p.from, p.to);
+    rows = inList(rows, p.byHead ? 'TDSHEAD' : 'PARTY', p.accounts);
+    const key = monthly ? 'MONTH' : 'PARTY';
+    const order = monthly ? [{ field: 'YEAR_NO', numeric: true }, { field: 'MONTH_NO', numeric: true }, 'PARTY'] : ['PARTY'];
+    const grid = {
+      layout: 'RPT_TDS_PARTY_MONTH',
+      variant: p.withChq ? 2 : 1,
+      groupColumns: p.summary ? [] : [key],
+      groupDisplays: p.summary ? [] : [monthly ? 'MONTH' : 'PARTY'],
+      captions: {},
+      title: `${monthly ? 'Month' : 'Party'} Wise TDS Report`,
+      period: period(p),
+      pageWise: false,
+    };
+    if (p.summary) {
+      const g = groupBy(rows, monthly ? ['MONTH'] : ['PARTY'], { sum: ['AMOUNT', 'TDS_AMT'], max: ['PANNO', 'YEAR_NO', 'MONTH_NO', 'TDSHEAD'] })
+        .map((r) => ({ ...r, AMOUNT: round(r.AMOUNT), TDS_AMT: round(r.TDS_AMT) }));
+      return { rows: orderRows(g, order), grid };
+    }
+    return { rows: orderRows(rows, [...order, 'ENT_DATE', { field: 'SRAL_NO', numeric: true }]), grid };
+  }
+  async function options(companyId, deps = {}) {
+    const rows = deps.rows || await loadTdsBook(companyId);
+    const u = (f) => [...new Set(rows.map((r) => r[f]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
+    return { parties: u('PARTY'), heads: u('TDSHEAD') };
+  }
+  return { run, options };
+}
+
 module.exports = {
   tds: tdsReport(),
+  tdsPartyMonth: tdsPartyMonthReport(),
   tcsSales: tcsReport('sales'),
   tcsPurchase: tcsReport('purchase'),
   TDS_MODES,

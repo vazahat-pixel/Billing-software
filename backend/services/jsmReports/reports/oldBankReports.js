@@ -132,3 +132,4 @@ module.exports = {
   bankDetail: { run: runBankDetail, options: opts },
   tabReport: { run: runTabReport, options: opts },
 };
+

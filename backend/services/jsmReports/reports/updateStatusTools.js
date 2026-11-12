@@ -142,3 +142,4 @@ module.exports = {
   updateLot: { run: runUpdateLotStatus, options: async () => ({}) },
   osUpdate: { run: runOsUpdate, options: async () => ({}) },
 };
+
