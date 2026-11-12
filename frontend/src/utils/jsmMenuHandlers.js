@@ -60,6 +60,8 @@ export const FORM_HANDLERS = {
   A_Gstr1_SalesReturnDetails: { id: 'gst-sales-rtn-item', external: 'jsmReport', jsmForm: 'A_Gstr1_SalesReturnDetails' },
   A_Gstr2_PurchaseDetail: { id: 'gst-purchase-item', external: 'jsmReport', jsmForm: 'A_Gstr2_PurchaseDetail' },
   A_Gstr2_PurchaseReturnDetails: { id: 'gst-purchase-rtn-item', external: 'jsmReport', jsmForm: 'A_Gstr2_PurchaseReturnDetails' },
+  A_All_Inward_Supply_Purchase: { id: 'gst-3b-inward', external: 'jsmReport', jsmForm: 'A_All_Inward_Supply_Purchase' },
+  A_All_Outward_Supply_Sales: { id: 'gst-3b-outward', external: 'jsmReport', jsmForm: 'A_All_Outward_Supply_Sales' },
   A_Gstr2_PurchaseSummary: { id: 'gst-purchase', external: 'gstReports', reportKind: 'gstinPurchase' },
   A_Gstr2_ProcessSummary: { id: 'gst-process', external: 'gstReports', reportKind: 'gstinProcess' },
   A_Gstr2_JobWorkReceiptSummary: { id: 'gst-jobwork', external: 'gstReports', reportKind: 'gstinJobwork' },

@@ -71,6 +71,8 @@ const REPORTS = {
   A_Gstr1_SalesReturnDetails: require('./reports/gstinItemDetail').salesReturn,
   A_Gstr2_PurchaseDetail: require('./reports/gstinItemDetail').purchase,
   A_Gstr2_PurchaseReturnDetails: require('./reports/gstinItemDetail').purchaseReturn,
+  A_All_Inward_Supply_Purchase: require('./reports/supplyRegister').inward,
+  A_All_Outward_Supply_Sales: require('./reports/supplyRegister').outward,
   Zoom_SelectDate_List_Item: require('./reports/itemStockRegister'),
   Rpt_StkKgsFinishAtShop: require('./reports/kgsStock').finishAtShop,
   Rpt_StkKgsGreyAtshop: require('./reports/kgsStock').greyAtShop,
