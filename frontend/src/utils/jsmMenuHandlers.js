@@ -135,6 +135,7 @@ export const FORM_HANDLERS = {
 
   Zoom_SelectDate_List_Item: { id: 'zoom-item-ledger', external: 'jsmReport', jsmForm: 'Zoom_SelectDate_List_Item' },
 
+  Rpt_OutstatingAllPurchase_Report: { id: 'os-purchase-all', external: 'jsmReport', jsmForm: 'Rpt_OutstatingAllPurchase_Report' },
   Rpt_Sms_OsReports: { id: 'os-sms-days', external: 'jsmReport', jsmForm: 'Rpt_Sms_OsReports' },
   Rpt_Os_90Days_Eklvya: { id: 'os-90-days', external: 'jsmReport', jsmForm: 'Rpt_Os_90Days_Eklvya' },
   Rpt_Daily_TransactionNew: { id: 'daily-transaction', external: 'jsmReport', jsmForm: 'Rpt_Daily_TransactionNew' },
@@ -180,6 +181,10 @@ export const PATH_HANDLERS = {
     { id: 'brokreg-purchase-bill', external: 'jsmReport', jsmForm: 'A_BrokregStatment_PurchaseBillDate' },
   'Others Reports > Brokreg Statment > Purchase > Paid Date Wise':
     { id: 'brokreg-purchase-paid', external: 'jsmReport', jsmForm: 'A_BrokregStatment_PurchasePaidDate' },
+  'Others Reports > Master List > Envelope':
+    { id: 'master-envelope', external: 'jsmReport', jsmForm: 'Rpt_Account_List_Print_Envelope' },
+  'Others Reports > Master List > Label Printing':
+    { id: 'master-label', external: 'jsmReport', jsmForm: 'Rpt_Account_List_Print_Label' },
   'Reports > Fas Reports > Confirmation':
     { id: 'fas-confirm', external: 'jsmReport', jsmForm: 'A_AccountLedgerDoubleSide_Confirmation' },
   'Reports > Purchase > Purchase Bill > Detail':

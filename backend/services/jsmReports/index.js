@@ -66,6 +66,7 @@ const REPORTS = {
   A_BrokregStatment_SalesRecDate: require('./reports/brokerageStatement').salesRecDate,
   A_BrokregStatment_PurchaseBillDate: require('./reports/brokerageStatement').purchaseBillDate,
   A_BrokregStatment_PurchasePaidDate: require('./reports/brokerageStatement').purchasePaidDate,
+  Rpt_Account_List_Print: require('./reports/listPrint'),
   Zoom_SelectDate_List_Item: require('./reports/itemStockRegister'),
   Rpt_StkKgsFinishAtShop: require('./reports/kgsStock').finishAtShop,
   Rpt_StkKgsGreyAtshop: require('./reports/kgsStock').greyAtShop,

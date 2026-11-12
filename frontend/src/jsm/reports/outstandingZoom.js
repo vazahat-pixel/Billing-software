@@ -73,3 +73,47 @@ const zoom = (side) => ({
 });
 
 export const OUTSTANDING_ZOOMS = [zoom('Sales'), zoom('Purchase'), zoom('Process'), zoom('Jobwork')];
+
+/**
+ * JSM: Others Reports › Others Reports › OutStanding PurchaseAll
+ * (Rpt_OutstatingAllPurchase_Report, titled "Outstanding").
+ *
+ * The same older outstanding window as the Zoom ones — three Order By levels out of the same list
+ * (Register, Party, Broker, Station, MainGroup, Haste, MonthWise and the ones this software does
+ * not record) and a Summary tick — on the purchase side, so it reads that side's report. Its
+ * screen carries ten ticked lists; the four this software can fill are wired, and the rest
+ * (SalesMan, Area, Discount, Company, account head) are the ones the report already refuses to
+ * group by, for want of anything to group on.
+ */
+export const outstandingPurchaseAll = {
+  form: 'Rpt_OutstatingAllPurchase_Report',
+  apiForm: 'Rpt_Outstating_Report_Purchase',
+  lists: { ListView0: 'parties', ListView1: 'brokers', ListView2: 'stations', ListView3: 'books' },
+  defaults: () => ({
+    Cbo_OrderBy1: 'Party',
+    Cbo_OrderBy2: 'None',
+    Cbo_OrderBy3: 'None',
+    cbo_status: '1-Pending',
+    CheckBox_NewYear: true,
+    CheckBox_LastYear: true,
+    CheckBox_Total: true,
+    CheckBox_Address: true,
+    CheckBox_Unadjust: true,
+    CheckBox_Ledger: true,
+  }),
+  toParams: (s) => ({
+    groupBy1: s.Cbo_OrderBy1,
+    groupBy2: s.Cbo_OrderBy2,
+    groupBy3: s.Cbo_OrderBy3,
+    summary: Boolean(s.CheckBox_Summary),
+    status: s.cbo_status,
+    includeLastYear: s.CheckBox_LastYear !== false,
+    onlyPartReceived: Boolean(s.CheckBox_OnlyPart),
+    printout: s.cbo_printout,
+    parties: s.ListView0 || [],
+    brokers: s.ListView1 || [],
+    stations: s.ListView2 || [],
+    books: s.ListView3 || [],
+  }),
+  fallbackColumns: FALLBACKS,
+};
