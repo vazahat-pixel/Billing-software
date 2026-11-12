@@ -22,14 +22,14 @@ const { BSON } = require('mongodb');
 
 const BOTH = [
   'accountgroups', 'accountingentries', 'automationrules', 'bankinstruments', 'bankreconciliations',
-  'beamentries', 'billconfigs', 'billsettlements', 'books', 'businessrules', 'columnconfigs',
+  'beamentries', 'billconfigs', 'billsettlements', 'books', 'brokeragevouchers', 'businessrules', 'columnconfigs',
   'companysettings', 'costcenters', 'cuttingentries', 'debitcreditnotes', 'deliverychallans',
   'documenttemplates', 'einvoices', 'ewaybills', 'financialclosingruns', 'financialyears',
   'formconfigs', 'grns', 'gstconfigs', 'gstperiods', 'gstr2bimports', 'gstreturnsnapshots',
-  'hsnmasters', 'inventories', 'inventorylots', 'items', 'itemprocessmappings', 'jobs',
+  'hsnmasters', 'inventories', 'inventorylots', 'investmententries', 'items', 'itemprocessmappings', 'jobs',
   'ledgerentries', 'ledgermasters', 'notificationconfigs', 'orders', 'parties', 'paymentvouchers',
   'permissionmatrixes', 'pricingruleconfigs', 'processchaintemplates', 'profitsnapshots',
-  'purchases', 'purchaseindents', 'reconciliationruns', 'reportconfigs', 'returninvoices', 'sales',
+  'purchases', 'purchaseindents', 'reconciliationruns', 'reminders', 'reportconfigs', 'returninvoices', 'sales',
   'salesquotations', 'stockadjustments', 'stockmovements', 'stockreservations', 'stocktransfers',
   'submasters', 'supplierquotations', 'taxdeductions', 'visits', 'voucherseries', 'warehouses',
   'workflowdefinitions', 'workflowinstances',
