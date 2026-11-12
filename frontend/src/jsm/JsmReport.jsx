@@ -17,7 +17,13 @@ const loadBlueprint = () => {
 
 function financialYear(now = new Date()) {
   const y = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-  return { fyFrom: toDisplayDate(`${y}-04-01`), fyTo: toDisplayDate(`${y + 1}-03-31`) };
+  // `today` is for the screens JSM opens on the current date rather than on the year's range
+  // (its "AsOn Date" and "Current Date" boxes).
+  return {
+    fyFrom: toDisplayDate(`${y}-04-01`),
+    fyTo: toDisplayDate(`${y + 1}-03-31`),
+    today: toDisplayDate(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`),
+  };
 }
 
 export function hasJsmReport(formName) {

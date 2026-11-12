@@ -135,6 +135,9 @@ export const FORM_HANDLERS = {
 
   Zoom_SelectDate_List_Item: { id: 'zoom-item-ledger', external: 'jsmReport', jsmForm: 'Zoom_SelectDate_List_Item' },
 
+  Rpt_Sms_OsReports: { id: 'os-sms-days', external: 'jsmReport', jsmForm: 'Rpt_Sms_OsReports' },
+  Rpt_Os_90Days_Eklvya: { id: 'os-90-days', external: 'jsmReport', jsmForm: 'Rpt_Os_90Days_Eklvya' },
+
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
 };
@@ -152,6 +155,10 @@ export const PATH_HANDLERS = {
     { id: 'os-zoom-process', external: 'jsmReport', jsmForm: 'Rpt_Outstating_Report_Process' },
   'Others Reports > Outstanding Zoom > JobWork':
     { id: 'os-zoom-jobwork', external: 'jsmReport', jsmForm: 'Rpt_Outstating_Report_Jobwork' },
+  'Others Reports > Outstanding > Month O/s. > Sales':
+    { id: 'os-month-sales', external: 'jsmReport', jsmForm: 'A_Textiles_Outstanding_MonthWise_Sales' },
+  'Others Reports > Outstanding > Month O/s. > Purchase':
+    { id: 'os-month-purchase', external: 'jsmReport', jsmForm: 'A_Textiles_Outstanding_MonthWise_Purchase' },
   'Reports > Fas Reports > Confirmation':
     { id: 'fas-confirm', external: 'jsmReport', jsmForm: 'A_AccountLedgerDoubleSide_Confirmation' },
   'Reports > Purchase > Purchase Bill > Detail':

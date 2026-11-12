@@ -48,6 +48,7 @@ async function loadOutstandingRows(companyId, kind, filters = {}) {
         BROKER: inv.broker ? (brokerNames.get(String(inv.broker)) || '') : '',
         STATION: p.city || '',
         MAINGROUP: p.mainGroupId || '',
+        PARTY_MOBILE: p.phone || '',
         STATE: p.state || '',
         MSME_TYPE: p.msmeType || '',
         BOOK: String(inv.bookId || '').toUpperCase() || (kind === 'process' ? 'MILL' : kind === 'jobwork' ? 'JOB' : ''),

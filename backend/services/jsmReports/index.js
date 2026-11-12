@@ -44,6 +44,11 @@ const REPORTS = {
   Rpt_Outstating_Report_Purchase: require('./reports/outstandingZoom').purchase,
   Rpt_Outstating_Report_Process: require('./reports/outstandingZoom').process,
   Rpt_Outstating_Report_Jobwork: require('./reports/outstandingZoom').jobwork,
+
+  A_Textiles_Outstanding_MonthWise_Sales: require('./reports/monthOutstanding').sales,
+  A_Textiles_Outstanding_MonthWise_Purchase: require('./reports/monthOutstanding').purchase,
+  Rpt_Sms_OsReports: require('./reports/smsOutstanding'),
+  Rpt_Os_90Days_Eklvya: require('./reports/os90Days'),
   Zoom_SelectDate_List_Item: require('./reports/itemStockRegister'),
   Rpt_StkKgsFinishAtShop: require('./reports/kgsStock').finishAtShop,
   Rpt_StkKgsGreyAtshop: require('./reports/kgsStock').greyAtShop,
