@@ -144,6 +144,14 @@ export const FORM_HANDLERS = {
  * keyed by the entry's full menu path, which always wins over the form.
  */
 export const PATH_HANDLERS = {
+  'Others Reports > Outstanding Zoom > Debitors':
+    { id: 'os-zoom-sales', external: 'jsmReport', jsmForm: 'Rpt_Outstating_Report_Sales' },
+  'Others Reports > Outstanding Zoom > Creditors':
+    { id: 'os-zoom-purchase', external: 'jsmReport', jsmForm: 'Rpt_Outstating_Report_Purchase' },
+  'Others Reports > Outstanding Zoom > Process':
+    { id: 'os-zoom-process', external: 'jsmReport', jsmForm: 'Rpt_Outstating_Report_Process' },
+  'Others Reports > Outstanding Zoom > JobWork':
+    { id: 'os-zoom-jobwork', external: 'jsmReport', jsmForm: 'Rpt_Outstating_Report_Jobwork' },
   'Reports > Fas Reports > Confirmation':
     { id: 'fas-confirm', external: 'jsmReport', jsmForm: 'A_AccountLedgerDoubleSide_Confirmation' },
   'Reports > Purchase > Purchase Bill > Detail':
