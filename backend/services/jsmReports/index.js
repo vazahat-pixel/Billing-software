@@ -49,6 +49,7 @@ const REPORTS = {
   A_Textiles_Outstanding_MonthWise_Purchase: require('./reports/monthOutstanding').purchase,
   Rpt_Sms_OsReports: require('./reports/smsOutstanding'),
   Rpt_Os_90Days_Eklvya: require('./reports/os90Days'),
+  Rpt_Daily_TransactionNew: require('./reports/dailyTransaction'),
   Zoom_SelectDate_List_Item: require('./reports/itemStockRegister'),
   Rpt_StkKgsFinishAtShop: require('./reports/kgsStock').finishAtShop,
   Rpt_StkKgsGreyAtshop: require('./reports/kgsStock').greyAtShop,

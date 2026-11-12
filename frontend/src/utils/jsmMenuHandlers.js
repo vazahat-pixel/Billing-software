@@ -137,6 +137,7 @@ export const FORM_HANDLERS = {
 
   Rpt_Sms_OsReports: { id: 'os-sms-days', external: 'jsmReport', jsmForm: 'Rpt_Sms_OsReports' },
   Rpt_Os_90Days_Eklvya: { id: 'os-90-days', external: 'jsmReport', jsmForm: 'Rpt_Os_90Days_Eklvya' },
+  Rpt_Daily_TransactionNew: { id: 'daily-transaction', external: 'jsmReport', jsmForm: 'Rpt_Daily_TransactionNew' },
 
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },

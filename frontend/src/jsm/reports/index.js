@@ -31,10 +31,11 @@ import { OUTSTANDING_ZOOMS } from './outstandingZoom';
 import { MONTH_OUTSTANDINGS } from './monthOutstanding';
 import smsOutstanding from './smsOutstanding';
 import os90Days from './os90Days';
+import dailyTransaction from './dailyTransaction';
 
 /** JSM report screens rebuilt so far, keyed by JSM form name. */
 export const JSM_REPORTS = Object.fromEntries([
   processSend, jobSend, processReceiptDetail, jobReceiptDetail, processReceiptSummary, jobReceiptSummary,
   processStock, jobStock, ...BILL_REGISTERS, ...OUTSTANDING_REPORTS, ...ITEM_WISE_REPORTS, salesHaste,
-  ...LEDGER_REPORTS, trialBalance, cashBank, balanceSheet, profitAndLoss, ...REGISTER_SUMMARIES, groupBalance, aboveBelow, voucherBook, processItemSummary, ...MASTER_LISTS, ...OUTSTANDING_DETAILS, ...REC_PAY_REGISTERS, greyFinishSummary, ...ACC_STOCK_REPORTS, ...KGS_STOCK_REPORTS, itemStockRegister, ...OUTSTANDING_ZOOMS, ...MONTH_OUTSTANDINGS, smsOutstanding, os90Days,
+  ...LEDGER_REPORTS, trialBalance, cashBank, balanceSheet, profitAndLoss, ...REGISTER_SUMMARIES, groupBalance, aboveBelow, voucherBook, processItemSummary, ...MASTER_LISTS, ...OUTSTANDING_DETAILS, ...REC_PAY_REGISTERS, greyFinishSummary, ...ACC_STOCK_REPORTS, ...KGS_STOCK_REPORTS, itemStockRegister, ...OUTSTANDING_ZOOMS, ...MONTH_OUTSTANDINGS, smsOutstanding, os90Days, dailyTransaction,
 ].map((r) => [r.form, r]));
