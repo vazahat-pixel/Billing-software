@@ -172,6 +172,14 @@ export const PATH_HANDLERS = {
     { id: 'os-month-sales', external: 'jsmReport', jsmForm: 'A_Textiles_Outstanding_MonthWise_Sales' },
   'Others Reports > Outstanding > Month O/s. > Purchase':
     { id: 'os-month-purchase', external: 'jsmReport', jsmForm: 'A_Textiles_Outstanding_MonthWise_Purchase' },
+  'Others Reports > Brokreg Statment > Sales > Bill Date Wise':
+    { id: 'brokreg-sales-bill', external: 'jsmReport', jsmForm: 'A_BrokregStatment_SalesBillDate' },
+  'Others Reports > Brokreg Statment > Sales > Rec.Date Wise':
+    { id: 'brokreg-sales-rec', external: 'jsmReport', jsmForm: 'A_BrokregStatment_SalesRecDate' },
+  'Others Reports > Brokreg Statment > Purchase > Bill Date Wise':
+    { id: 'brokreg-purchase-bill', external: 'jsmReport', jsmForm: 'A_BrokregStatment_PurchaseBillDate' },
+  'Others Reports > Brokreg Statment > Purchase > Paid Date Wise':
+    { id: 'brokreg-purchase-paid', external: 'jsmReport', jsmForm: 'A_BrokregStatment_PurchasePaidDate' },
   'Reports > Fas Reports > Confirmation':
     { id: 'fas-confirm', external: 'jsmReport', jsmForm: 'A_AccountLedgerDoubleSide_Confirmation' },
   'Reports > Purchase > Purchase Bill > Detail':
