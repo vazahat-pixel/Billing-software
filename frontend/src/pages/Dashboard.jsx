@@ -106,6 +106,7 @@ const InventoryPage = lazy(() => import('./inventory/InventoryPage'));
 const Gst3bMonthlyModal = lazy(() => import('./gst/Gstr3bJsmReport'));
 const JsmGstr1Screen = lazy(() => import('../jsm/JsmGstr1Screen'));
 const JsmLedgerOsDiffScreen = lazy(() => import('../jsm/JsmLedgerOsDiffScreen'));
+const JsmTdsAddressScreen = lazy(() => import('../jsm/JsmTdsAddressScreen'));
 const JsmEwayBulkScreen = lazy(() => import('../jsm/JsmEwayBulkScreen'));
 const GstinJsmReport = lazy(() => import('./gst/GstinJsmReport'));
 const Gstr1Modal = lazy(() => import('./gst/Gstr1JsmReport'));
@@ -2842,7 +2843,9 @@ const Dashboard = () => {
          />
          {jsmGstr1Form && (
             <Suspense fallback={null}>
-               {jsmGstr1Form === 'Rpt_Jsm_Ledger_os_Diff_Check'
+               {jsmGstr1Form === 'Rpt_Tds3_Add_Ackn'
+                  ? <JsmTdsAddressScreen isOpen onClose={() => setJsmGstr1Form(null)} />
+                  : jsmGstr1Form === 'Rpt_Jsm_Ledger_os_Diff_Check'
                   ? <JsmLedgerOsDiffScreen isOpen onClose={() => setJsmGstr1Form(null)} />
                   : jsmGstr1Form === 'Eway_Billing_Bulk'
                   ? <JsmEwayBulkScreen isOpen onClose={() => setJsmGstr1Form(null)} />

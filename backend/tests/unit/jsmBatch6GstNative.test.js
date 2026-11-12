@@ -318,3 +318,19 @@ test('Monthly stock (Kgs): each month carries the previous closing; sections use
   assert.equal(all.rows[1].FINISH_CL, 7);
   await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { to: '2026-05-31', section: '9' }, { rows }), /Unknown report/);
 });
+
+test('Tds Address/Acknowledge: saves the CIT address and four acknowledgement numbers, then reads them back', async () => {
+  const store = {};
+  const CompanySettings = {
+    findOne: () => ({ select: () => ({ lean: async () => (store.set ? { _id: 1 } : null) }), lean: async () => store.doc || null }),
+    updateOne: async (_f, { $set }) => { store.set = true; store.doc = { ...$set }; },
+  };
+  const rpt = require('../../services/jsmReports').get('Rpt_Tds3_Add_Ackn');
+  const first = await rpt.run('507f1f77bcf86cd799439011', { action: 'save', TDS_ADDR: 'CIT Surat', TDS_Q1: '111', TDS_Q2: '222', TDS_Q3: '', TDS_Q4: '444' }, { CompanySettings });
+  assert.equal(first.message, 'Record saved...');
+  const second = await rpt.run('507f1f77bcf86cd799439011', { action: 'save', TDS_ADDR: 'CIT Surat 2', TDS_Q1: '111' }, { CompanySettings });
+  assert.equal(second.message, 'Record Updated');
+  const read = await rpt.run('507f1f77bcf86cd799439011', {}, { CompanySettings });
+  assert.equal(read.rows[0].TDS_ADDR, 'CIT Surat 2');
+  assert.equal(read.rows[0].TDS_Q1, '111');
+});

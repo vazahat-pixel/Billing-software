@@ -10,6 +10,12 @@ const CompanySettingsSchema = new mongoose.Schema({
     gstin: { type: String, default: '' },
     pan: { type: String, default: '' },
     tan: { type: String, default: '' },
+    // Tds Address/Acknowledge screen: CIT address and the four quarterly acknowledgement numbers
+    tdsCitAddress: { type: String, default: '' },
+    tdsAckQ1: { type: String, default: '' },
+    tdsAckQ2: { type: String, default: '' },
+    tdsAckQ3: { type: String, default: '' },
+    tdsAckQ4: { type: String, default: '' },
     msmeNumber: { type: String, default: '' },
     tinCstNo: { type: String, default: '' },
     serviceTaxNo: { type: String, default: '' },

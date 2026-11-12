@@ -163,6 +163,7 @@ const REPORTS = {
   Rpt_Stk_Grey_At_Shop: require('./reports/stockGreyAtShop'),
   Rpt1_Stk_Grey_At_Mill: require('./reports/stockGreyAtMill2'),
   Rpt_Stk_Meter_TanusKgs: require('./reports/stockMonthlyKgs'),
+  Rpt_Tds3_Add_Ackn: require('./reports/tdsAddress'),
   Rpt_Tds2_Prty_Mnth_Wise: require('./reports/tdsTcsBooks').tdsPartyMonth,
   Rpt_TcsSalesRegister: require('./reports/tdsTcsBooks').tcsSales,
   Rpt_TcsPurchaseRegister: require('./reports/tdsTcsBooks').tcsPurchase,

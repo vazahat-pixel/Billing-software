@@ -7,6 +7,7 @@ import { accel, cssColor, cssFont, lastFill } from './winforms';
  * arrays of ticked names for ListViews, and `<TabControl>.__tab` for the selected tab.
  */
 const INPUT_TYPES = /^(Js1_textBox|TextBox|Js1_MaskDate|MaskedTextBox)$/;
+const TEXTAREA_TYPES = /^RichTextBox$/;
 const COMBO_TYPES = /^(Js1_ComboBox|ComboBox)$/;
 const CHECK_TYPES = /^(Js1_CheckBox|CheckBox)$/;
 const RADIO_TYPES = /^(Js1_RadioButton|RadioButton)$/;
@@ -202,6 +203,9 @@ export default function JsmFormDialog({
     if (c.type === 'Label') {
       const text = c.name === 'Lbl_Find' ? search : captionOf(c);
       return <span key={c.name} className="jsmf-label" style={boxStyle(c, { width: undefined, minWidth: c.w })}>{text}</span>;
+    }
+    if (TEXTAREA_TYPES.test(c.type)) {
+      return <textarea key={c.name} className="jsmf-input" style={boxStyle(c)} value={state[c.name] ?? ''} disabled={disabled} onChange={(e) => set(c.name, e.target.value)} />;
     }
     if (INPUT_TYPES.test(c.type)) {
       const isDate = /MaskDate|Masked/.test(c.type);
