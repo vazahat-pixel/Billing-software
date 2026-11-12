@@ -50,6 +50,8 @@ const REPORTS = {
   Rpt_Sms_OsReports: require('./reports/smsOutstanding'),
   Rpt_Os_90Days_Eklvya: require('./reports/os90Days'),
   Rpt_Daily_TransactionNew: require('./reports/dailyTransaction'),
+  Rpt_Additional_Job_Bill: require('./reports/challanStatus'),
+  Tran_WorkChallan_PL_Repo: require('./reports/jobProfitLoss'),
   Zoom_SelectDate_List_Item: require('./reports/itemStockRegister'),
   Rpt_StkKgsFinishAtShop: require('./reports/kgsStock').finishAtShop,
   Rpt_StkKgsGreyAtshop: require('./reports/kgsStock').greyAtShop,

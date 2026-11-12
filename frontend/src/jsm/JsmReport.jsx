@@ -73,14 +73,19 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
     return form?.controls.find((c) => c.type === 'ListView' && c.parent === page)?.name;
   };
 
+  // Most JSM report screens name their two buttons btn_screen and btn_exit; a few name them
+  // something else (the Job P&L grid has Btn_Refresh / Btn_Exit), and those configs say so.
+  const runButtons = config.runButtons || ['btn_screen'];
+  const exitButtons = config.exitButtons || ['btn_exit'];
+
   const onButton = async (name, value) => {
-    if (name === 'btn_exit') { onClose?.(); return; }
+    if (exitButtons.includes(name)) { onClose?.(); return; }
     if (name === 'Check_Select_UnSelectAll') {
       const lv = activeListView();
       if (lv) setState((s) => ({ ...s, [lv]: value ? [...(lists[lv] || [])] : [] }));
       return;
     }
-    if (name === 'btn_screen') {
+    if (runButtons.includes(name)) {
       setBusy(true);
       setError('');
       try {

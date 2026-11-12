@@ -50,6 +50,12 @@ async function loadMillReceiptRows(companyId, bookModule = 'millRec') {
       SRAL_NO: '',
       NCBILL_NO: String(j.billGpNo || j.challanNo || ''),
       BILL_DATE: date,
+      // The work bill raised against this challan, if one has been — JSM's JOB_BILL_ENTNO, which
+      // its Challan Status screen tests against 0 to tell a billed challan from a pending one.
+      NCCHLN_NO: String(j.challanNo || ''),
+      CHLN_DATE: j.issueDate ? new Date(j.issueDate) : null,
+      JOB_BILL_NO: String(j.processBillNo || ''),
+      JOB_BILL_DATE: j.processBillDate ? new Date(j.processBillDate) : null,
       MONTH: date ? MONTHS[date.getUTCMonth()] : '',
       REC_PCS: Number(j.receivedPcs || 0),
       // What was sent to the mill, which the Item Wise Summary totals beside what came back.
