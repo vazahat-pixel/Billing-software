@@ -97,3 +97,4 @@ export const CUTTING_REPORTS = [
     fallbackColumns: { JSM_VW_CUTTING_STK: STK_COLUMNS },
   },
 ];
+

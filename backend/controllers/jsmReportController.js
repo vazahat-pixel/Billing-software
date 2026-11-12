@@ -7,7 +7,9 @@ function send(res, err) {
 exports.run = async (req, res) => {
   try {
     let params = {};
-    if (req.query.q) {
+    if (req.method === 'POST' && req.body && typeof req.body === 'object') {
+      params = req.body;
+    } else if (req.query.q) {
       try { params = JSON.parse(req.query.q); } catch (_) {
         return res.status(400).json({ success: false, message: 'Invalid report parameters' });
       }

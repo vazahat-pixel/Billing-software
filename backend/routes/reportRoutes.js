@@ -26,5 +26,6 @@ router.post('/import-bank', reportController.postImportBank);
 const jsmReportController = require('../controllers/jsmReportController');
 router.get('/jsm/:reportId/options', jsmReportController.options);
 router.get('/jsm/:reportId', jsmReportController.run);
+router.post('/jsm/:reportId', jsmReportController.run);
 
 module.exports = router;

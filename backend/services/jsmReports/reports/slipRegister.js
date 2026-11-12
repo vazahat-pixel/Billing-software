@@ -212,3 +212,4 @@ const slipNew = {
 };
 
 module.exports = { slip, slipNew };
+

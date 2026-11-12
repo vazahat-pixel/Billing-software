@@ -367,3 +367,4 @@ module.exports = {
   match4a: { run: (c, p, d) => runGstr2Match(c, p, d, '4A'), options },
   match2a: { run: (c, p, d) => runGstr2Match(c, p, d, '2A'), options },
 };
+

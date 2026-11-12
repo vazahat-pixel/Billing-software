@@ -107,3 +107,4 @@ export const BANK_EXTRA_REPORTS = [
     fallbackColumns: { RUNTIME_BANK_VOUCHER_PRINT: VOUCHER_COLS },
   },
 ];
+

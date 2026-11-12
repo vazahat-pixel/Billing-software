@@ -122,7 +122,9 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
       setBusy(true);
       setError('');
       try {
-        setResult(await jsmReportApi.run(apiForm, config.toParams(state)));
+        const params = config.toParams(state, name);
+        const invoke = config.method === 'POST' ? jsmReportApi.runPost : jsmReportApi.run;
+        setResult(await invoke(apiForm, params));
       } catch (e) {
         setError(e?.response?.data?.message || e?.message || 'Report failed');
       } finally {

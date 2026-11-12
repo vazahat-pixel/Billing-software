@@ -36,3 +36,4 @@ export default {
   }),
   fallbackColumns: { JSM_VW_GSTR9C_OLD: COLUMNS },
 };
+

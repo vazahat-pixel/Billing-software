@@ -130,6 +130,16 @@ const REPORTS = {
   Rpt_Sales_Pump_Profit: require('./reports/profitAndYarnReports').profitRegister,
   A_StockValueReport: require('./reports/profitAndYarnReports').stockValueReport,
   A_ReportYarnStock: require('./reports/profitAndYarnReports').yarnKgsStock,
+  Gstr_3B_TextNew_Monthly_Cess: require('./reports/oldGstReports').cess,
+  Gstr_3BB_Zoomin_Rpt: require('./reports/oldGstReports').zoom,
+  Rpt_Stock_Share: require('./reports/oldStockReports').shareStock,
+  Rpt_StockSizeWise: require('./reports/oldStockReports').sizeWise,
+  Rpt_Stk_Grey_At_Shop_DateWise: require('./reports/oldStockReports').greyDateWise,
+  Rpt_Jsm_SalesPurchaseVat: require('./reports/oldMiscReports').bookPrint,
+  ZOld_Rpt_Os_Sales: require('./reports/oldMiscReports').oldOsSales,
+  Rpt_Account_List_Print_Old: require('./reports/oldMiscReports').listPrintOld,
+  Tran_BankDetail: require('./reports/oldBankReports').bankDetail,
+  Frm_TabReport: require('./reports/oldBankReports').tabReport,
 };
 
 function get(reportId) {

@@ -171,3 +171,4 @@ const cuttingStockReport = {
 };
 
 module.exports = { cuttingReport, cuttingStockReport };
+

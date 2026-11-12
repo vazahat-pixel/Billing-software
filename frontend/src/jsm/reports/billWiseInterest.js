@@ -95,3 +95,4 @@ export const BILL_WISE_INTEREST_REPORTS = [
   zoomConfig('New_Rpt_Sales_Intrest_ZoomIn_New_Purchase', 'New_Rpt_Sales_Intrest_ZoomIn_New', 365),
   zoomConfig('New_Rpt_Sales_Intrest_ZoomIn', 'New_Rpt_Sales_Intrest_ZoomIn', 360),
 ];
+

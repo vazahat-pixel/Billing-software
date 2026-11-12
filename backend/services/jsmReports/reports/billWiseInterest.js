@@ -186,3 +186,4 @@ module.exports = {
     loadRegister: (c) => loadMillReceiptRows(c),
   }),
 };
+

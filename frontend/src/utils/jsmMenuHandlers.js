@@ -190,6 +190,16 @@ export const FORM_HANDLERS = {
   Rpt_Sales_Pump_Profit: { id: 'sales-profit-register', external: 'jsmReport', jsmForm: 'Rpt_Sales_Pump_Profit' },
   A_StockValueReport: { id: 'inv-stock-value', external: 'jsmReport', jsmForm: 'A_StockValueReport' },
   A_ReportYarnStock: { id: 'others-yarn-kgs-stock', external: 'jsmReport', jsmForm: 'A_ReportYarnStock' },
+  Gstr_3B_TextNew_Monthly_Cess: { id: 'old-3b-cess', external: 'jsmReport', jsmForm: 'Gstr_3B_TextNew_Monthly_Cess' },
+  Gstr_3BB_Zoomin_Rpt: { id: 'old-3b-zoom', external: 'jsmReport', jsmForm: 'Gstr_3BB_Zoomin_Rpt' },
+  Rpt_Stock_Share: { id: 'old-share-stock', external: 'jsmReport', jsmForm: 'Rpt_Stock_Share' },
+  Rpt_StockSizeWise: { id: 'old-stock-sizewise', external: 'jsmReport', jsmForm: 'Rpt_StockSizeWise' },
+  Rpt_Stk_Grey_At_Shop_DateWise: { id: 'old-grey-shop-datewise', external: 'jsmReport', jsmForm: 'Rpt_Stk_Grey_At_Shop_DateWise' },
+  Rpt_Jsm_SalesPurchaseVat: { id: 'old-book-printing', external: 'jsmReport', jsmForm: 'Rpt_Jsm_SalesPurchaseVat' },
+  ZOld_Rpt_Os_Sales: { id: 'old-os-debitors', external: 'jsmReport', jsmForm: 'ZOld_Rpt_Os_Sales' },
+  Rpt_Account_List_Print_Old: { id: 'old-list-print', external: 'jsmReport', jsmForm: 'Rpt_Account_List_Print_Old' },
+  Tran_BankDetail: { id: 'old-cash-bank-flow', external: 'jsmReport', jsmForm: 'Tran_BankDetail' },
+  Frm_TabReport: { id: 'old-cb-balance', external: 'jsmReport', jsmForm: 'Frm_TabReport' },
 
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
@@ -250,4 +260,6 @@ export const PATH_HANDLERS = {
     { id: 'sales-interest-new', external: 'jsmReport', jsmForm: 'New_Rpt_Sales_Intrest_ZoomIn_New_Sales' },
   'Reports > Purchase > Purchase Bill > Purchase Bill Wise Interest':
     { id: 'purchase-interest', external: 'jsmReport', jsmForm: 'New_Rpt_Sales_Intrest_ZoomIn_New_Purchase' },
+  'Others Reports > Extra Report > Balance':
+    { id: 'extra-balance', external: 'jsmReport', jsmForm: 'Frm_TabReport' },
 };

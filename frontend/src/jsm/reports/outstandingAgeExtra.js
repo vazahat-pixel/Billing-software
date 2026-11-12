@@ -146,3 +146,4 @@ export const OUTSTANDING_AGE_EXTRAS = [
     fallbackColumns: { RPT_OSSALES_DETAIL: OS_NEW_COLS },
   },
 ];
+

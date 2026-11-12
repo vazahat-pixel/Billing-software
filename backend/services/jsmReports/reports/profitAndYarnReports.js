@@ -250,3 +250,4 @@ const yarnKgsStock = {
 };
 
 module.exports = { profitRegister, stockValueReport, yarnKgsStock };
+

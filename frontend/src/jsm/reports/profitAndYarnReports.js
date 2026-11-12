@@ -85,3 +85,4 @@ export const PROFIT_AND_YARN_REPORTS = [
     fallbackColumns: { RUNTIME_YARN_KGS_STOCK: YARN_COLS },
   },
 ];
+

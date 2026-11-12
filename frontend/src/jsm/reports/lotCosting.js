@@ -72,3 +72,4 @@ export default {
     JSM_VW_LOT_COSTING_KGS: KGS_COLUMNS,
   },
 };
+

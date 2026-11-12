@@ -93,3 +93,4 @@ export const BROKERAGE_JOB_AND_ALL = [
     fallbackColumns: FALLBACKS,
   },
 ];
+
