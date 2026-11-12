@@ -210,7 +210,7 @@ const gstPurchaseRateExpected = numRows(query(`
 `, ['TAXABLE_AMT', 'SGST_AMT', 'CGST_AMT', 'IGST_AMT', 'NET_TOT'], 'gstPurchaseTotals'),
 ['TAXABLE_AMT', 'SGST_AMT', 'CGST_AMT', 'IGST_AMT', 'NET_TOT']);
 
-// 6. RG Pending (JSM_VW_JOBWORK_STOCK), Job Brokerage (I_JOB_RECEIPT + T_CASH), Item Profit/Stock (MST_IT_MAST + T_PURCHASE + T_SALES)
+// 6. RG Pending (JSM_VW_JOBWORK_STOCK), Taka Detail (JSM_VW_PROCESS_STOCK_TAKADETAIL_WISE), HSN Sales, EWB/EINV, Table Counts
 const jwStockRaw = numRows(query(`
   SELECT ${s('NCCHLN_NO')}, ${d('CHLN_DATE')}, ${s('PARTY')}, ${s('BROKER')}, ${s('ITEM')}, ${s('BOOK')},
          ISS_PCS, ISS_QTY, REC_PCS, REC_QTY, BAL_PCS, BAL_QTY, BAL_AMT, OS_DAYS
@@ -218,6 +218,52 @@ const jwStockRaw = numRows(query(`
   WHERE CO_PATH='${CO}'
 `, ['NCCHLN_NO', 'CHLN_DATE', 'PARTY', 'BROKER', 'ITEM', 'BOOK', 'ISS_PCS', 'ISS_QTY', 'REC_PCS', 'REC_QTY', 'BAL_PCS', 'BAL_QTY', 'BAL_AMT', 'OS_DAYS'], 'jwStock'),
 ['ISS_PCS', 'ISS_QTY', 'REC_PCS', 'REC_QTY', 'BAL_PCS', 'BAL_QTY', 'BAL_AMT', 'OS_DAYS']);
+
+const takaRaw = numRows(query(`
+  SELECT CO_PATH, ${s('ENT_NO')}, ${s('NCCHLN_NO')}, ${d('CHLN_DATE')}, ${s('MILL_NAME')}, ${s('ITEM_NAME')},
+         ISS_PCS, ISS_QTY, REC_PCS, REC_QTY, DSR_NO, DISS_QTY, DREC_QTY, DSHORT_QTY,
+         ${s('STATUS')}, ${s('LOT_NO')}, ${s('BOOK')}, ${s('PURCHASE_PARTY')}, PU_KGS, ${s('NCBILL_NO')}, ${s('REMARK_1')}, ${s('REMARK_2')}
+  FROM JSM_VW_PROCESS_STOCK_TAKADETAIL_WISE
+  WHERE CO_PATH='${CO}'
+`, ['CO_PATH', 'ENT_NO', 'NCCHLN_NO', 'CHLN_DATE', 'MILL_NAME', 'ITEM_NAME', 'ISS_PCS', 'ISS_QTY', 'REC_PCS', 'REC_QTY', 'DSR_NO', 'DISS_QTY', 'DREC_QTY', 'DSHORT_QTY', 'STATUS', 'LOT_NO', 'BOOK', 'PURCHASE_PARTY', 'PU_KGS', 'NCBILL_NO', 'REMARK_1', 'REMARK_2'], 'takaDetail'),
+['ISS_PCS', 'ISS_QTY', 'REC_PCS', 'REC_QTY', 'DSR_NO', 'DISS_QTY', 'DREC_QTY', 'DSHORT_QTY', 'PU_KGS']);
+
+const takaExpected = numRows(query(`
+  SELECT COUNT(*) AS CNT, SUM(DISS_QTY) AS DISS_QTY, SUM(DREC_QTY) AS DREC_QTY, SUM(DSHORT_QTY) AS DSHORT_QTY
+  FROM JSM_VW_PROCESS_STOCK_TAKADETAIL_WISE
+  WHERE CO_PATH='${CO}'
+`, ['CNT', 'DISS_QTY', 'DREC_QTY', 'DSHORT_QTY'], 'takaExpected'), ['CNT', 'DISS_QTY', 'DREC_QTY', 'DSHORT_QTY']);
+
+const hsnSalesExpected = numRows(query(`
+  SELECT ISNULL(NULLIF(LTRIM(RTRIM(B.HSN_CODE)), ''), 'UNSPECIFIED') AS HSN_CODE,
+         SUM(B.IT_PCS) AS IT_PCS, SUM(B.IT_QTY) AS IT_QTY, SUM(B.IT_TAXABLE) AS TAXABLE_AMT,
+         SUM(B.SGST_A) AS SGST_AMT, SUM(B.CGST_A) AS CGST_AMT, SUM(B.IGST_A) AS IGST_AMT, SUM(B.IT_FINAL) AS NET_TOT
+  FROM T_SALES A
+  INNER JOIN T_SL_ITEM B ON A.CO_PATH=B.CO_PATH AND A.ENT_NO=B.ENT_NO
+  WHERE A.CO_PATH='${CO}'
+  GROUP BY ISNULL(NULLIF(LTRIM(RTRIM(B.HSN_CODE)), ''), 'UNSPECIFIED')
+  ORDER BY HSN_CODE
+`, ['HSN_CODE', 'IT_PCS', 'IT_QTY', 'TAXABLE_AMT', 'SGST_AMT', 'CGST_AMT', 'IGST_AMT', 'NET_TOT'], 'hsnSalesExpected'),
+['IT_PCS', 'IT_QTY', 'TAXABLE_AMT', 'SGST_AMT', 'CGST_AMT', 'IGST_AMT', 'NET_TOT']);
+
+const ewbExpected = numRows(query(`
+  SELECT ${s('ENT_TYPE')} AS ENT_TYPE, COUNT(*) AS CNT, SUM(TAXABLE_AMT) AS TAXABLE_AMT, SUM(BILL_AMT) AS BILL_AMT
+  FROM ALL_EWB_EINV_REPORT_MAIN
+  WHERE CO_PATH='${CO}'
+  GROUP BY ENT_TYPE
+  ORDER BY ENT_TYPE
+`, ['ENT_TYPE', 'CNT', 'TAXABLE_AMT', 'BILL_AMT'], 'ewbExpected'), ['CNT', 'TAXABLE_AMT', 'BILL_AMT']);
+
+const sc27Counts = Object.fromEntries(numRows(query(`
+  SELECT 'T_SALES' AS TBL, COUNT(*) AS CNT FROM T_SALES WHERE CO_PATH='${CO}'
+  UNION ALL SELECT 'T_PURCHASE', COUNT(*) FROM T_PURCHASE WHERE CO_PATH='${CO}'
+  UNION ALL SELECT 'T_SL_RETU', COUNT(*) FROM T_SL_RETU WHERE CO_PATH='${CO}'
+  UNION ALL SELECT 'T_PU_RETU', COUNT(*) FROM T_PU_RETU WHERE CO_PATH='${CO}'
+  UNION ALL SELECT 'T_JV_GST', COUNT(*) FROM T_JV_GST WHERE CO_PATH='${CO}'
+  UNION ALL SELECT 'T_CASH_COMMI', COUNT(*) FROM T_CASH_MN WHERE CO_PATH='${CO}' AND ISNULL(COMMI_AMT,0)<>0
+  UNION ALL SELECT 'T_COMMI_MN', COUNT(*) FROM T_COMMI_MN WHERE CO_PATH='${CO}'
+  UNION ALL SELECT 'I_INVESTMENT', COUNT(*) FROM I_INVESTMENT WHERE CO_PATH='${CO}'
+`, ['TBL', 'CNT'], 'sc27Counts'), ['CNT']).map((r) => [r.TBL, r.CNT]));
 
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, JSON.stringify({
@@ -241,6 +287,11 @@ fs.writeFileSync(OUT, JSON.stringify({
   gstPurchaseAll,
   gstPurchaseRateExpected,
   jwStockRaw,
+  takaRaw,
+  takaExpected: takaExpected[0] || { CNT: 0, DISS_QTY: 0, DREC_QTY: 0, DSHORT_QTY: 0 },
+  hsnSalesExpected,
+  ewbExpected,
+  sc27Counts,
 }, null, 2));
 
 console.log('Wrote', OUT);
@@ -256,4 +307,7 @@ console.log({
   finishStk: finishStkRaw.length,
   gstSalesLines: gstSalesLines.length,
   gstPurchaseAll: gstPurchaseAll.length,
+  taka: takaRaw.length,
+  hsnSales: hsnSalesExpected.length,
+  sc27Counts,
 });

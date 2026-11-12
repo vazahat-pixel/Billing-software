@@ -283,3 +283,83 @@ describe('JSM live SC27 parity: GST reports (Item Detail, Supply, 3B, GSTR-9/9C/
     assert.equal(sum(g9n.rows, 'TAXABLE'), sum(fx.gstSalesRateExpected, 'TAXABLE_AMT'));
   });
 });
+
+describe('JSM live SC27 parity: Batch 4, 5A, 6 (Taka, Old Reports, Native GSTIN Summaries)', () => {
+  it('TakaWise Stock Detail matches JSM_VW_PROCESS_STOCK_TAKADETAIL_WISE count and quantities', async () => {
+    const res = await jsmReports.get('Rpt_Process_Stock_TakaDetail').run('sc27', { status: 'Pending' }, { rows: fx.takaRaw });
+    assert.equal(res.rows.length, fx.takaExpected.CNT);
+    assert.equal(sum(res.rows, 'DISS_QTY'), r2(fx.takaExpected.DISS_QTY));
+    assert.equal(sum(res.rows, 'DREC_QTY'), r2(fx.takaExpected.DREC_QTY));
+    assert.equal(sum(res.rows, 'DSHORT_QTY'), r2(fx.takaExpected.DSHORT_QTY));
+  });
+
+  it('Batch 4 Old Reports (O/s Sales Old, BookPrint Sales, Master List Old, 3B Cess & Zoom) match SC27 totals', async () => {
+    const osOld = await jsmReports.get('ZOld_Rpt_Os_Sales').run('sc27', {}, { rows: fx.osSalesRaw });
+    assert.equal(osOld.rows.length, fx.osSalesRaw.length);
+    assert.equal(sum(osOld.rows, 'TOT_BALANCE'), sum(fx.osSalesExpectedByParty, 'TOT_BALANCE'));
+
+    const salesHeaders = buildSalesHeaderRows(fx.gstSalesLines);
+    const vatBook = await jsmReports.get('Rpt_Jsm_SalesPurchaseVat').run('sc27', { mode: 'Sales' }, { sales: salesHeaders });
+    assert.equal(vatBook.rows.length, salesHeaders.length);
+    assert.equal(sum(vatBook.rows, 'TAXABLE_AMT'), sum(fx.gstSalesRateExpected, 'TAXABLE_AMT'));
+    assert.equal(sum(vatBook.rows, 'NET_TOT'), sum(fx.gstSalesRateExpected, 'NET_TOT'));
+
+    const mstParties = fx.mstRaw.map((m) => ({
+      name: m.AC_NAME,
+      city: m.CITY,
+      address: m.ADDRESS,
+      mobile: m.MOBILE,
+      gstin: m.GSTIN_NO,
+      accountGroupId: { name: m.GROUP },
+    }));
+    const mstOld = await jsmReports.get('Rpt_Account_List_Print_Old').run('sc27', {}, { parties: mstParties });
+    assert.equal(mstOld.rows.length, fx.mstRaw.length);
+
+    const isOut3b = (h) => h && (h.startsWith('SALES') || h.startsWith('STATEWISE')) && h !== 'SALES RETURN';
+    const deps = { sales: salesHeaders, purchases: fx.gstPurchaseAll, salesRtn: [], purchaseRtn: [], notes: [] };
+    const cess = await jsmReports.get('Gstr_3B_TextNew_Monthly_Cess').run('sc27', {}, deps);
+    const outCess = cess.rows.filter((r) => isOut3b(r.HEAD));
+    assert.equal(sum(outCess, 'TAXABLE_AMT'), sum(fx.gstSalesRateExpected, 'TAXABLE_AMT'));
+
+    const zoom = await jsmReports.get('Gstr_3BB_Zoomin_Rpt').run('sc27', {}, deps);
+    const outZoom = zoom.rows.filter((r) => ['SALES REGISTRED', 'NILL RATED & EXEMPTED', 'STATEWISE - UNREGISTERED AND COMPOSITION SCHEME'].includes(r.GRACE_HEAD));
+    assert.equal(sum(outZoom, 'TAXABLE_AMT'), sum(fx.gstSalesRateExpected, 'TAXABLE_AMT'));
+  });
+
+  it('Batch 6 Native GSTIN Summary, HSN Wise All, 3B Monthly/Excel, and Ewb/Einv match SC27 SQL totals', async () => {
+    const salesHeaders = buildSalesHeaderRows(fx.gstSalesLines);
+    const isOut3b = (h) => h && (h.startsWith('SALES') || h.startsWith('STATEWISE')) && h !== 'SALES RETURN';
+
+    const sSum = await jsmReports.get('A_Gstr1_SalesInvoiceSummary').run('sc27', { summary: true }, { sales: salesHeaders });
+    assert.equal(sum(sSum.rows, 'TAXABLE_AMT'), sum(fx.gstSalesRateExpected, 'TAXABLE_AMT'));
+    assert.equal(sum(sSum.rows, 'NET_TOT'), sum(fx.gstSalesRateExpected, 'NET_TOT'));
+
+    const pSum = await jsmReports.get('A_Gstr2_PurchaseSummary').run('sc27', { summary: true }, { purchases: fx.gstPurchaseAll });
+    assert.equal(sum(pSum.rows, 'TAXABLE_AMT'), sum(fx.gstPurchaseRateExpected, 'TAXABLE_AMT'));
+    assert.equal(sum(pSum.rows, 'NET_TOT'), sum(fx.gstPurchaseRateExpected, 'NET_TOT'));
+
+    const hsn = await jsmReports.get('Hsn_Wise_Report_All').run('sc27', {}, { sales: salesHeaders, salesRtn: [], purchases: [] });
+    assert.equal(sum(hsn.rows, 'TAXABLE_AMT'), sum(fx.hsnSalesExpected, 'TAXABLE_AMT'));
+    assert.equal(sum(hsn.rows, 'IT_QTY'), sum(fx.hsnSalesExpected, 'IT_QTY'));
+
+    const g3bM = await jsmReports.get('Gstr_3B_TextNew_Monthly').run('sc27', {}, {
+      sales: salesHeaders, purchases: fx.gstPurchaseAll, salesRtn: [], purchaseRtn: [], notes: [],
+    });
+    assert.equal(sum(g3bM.rows.filter((r) => isOut3b(r.HEAD)), 'TAXABLE_AMT'), sum(fx.gstSalesRateExpected, 'TAXABLE_AMT'));
+
+    const g3bEx = await jsmReports.get('Gstr_3BB_TextNew_Excel_Monthly').run('sc27', {}, {
+      sales: salesHeaders, purchases: fx.gstPurchaseAll, salesRtn: [], purchaseRtn: [], notes: [],
+    });
+    assert.equal(sum(g3bEx.rows.filter((r) => isOut3b(r.HEAD)), 'TAXABLE_AMT'), sum(fx.gstSalesRateExpected, 'TAXABLE_AMT'));
+
+    const ewb = await jsmReports.get('A_All_Ewb_Einv_Rpt').run('sc27', {}, { sales: salesHeaders });
+    const sqlSalesEwb = fx.ewbExpected.find((e) => e.ENT_TYPE === 'SL' || e.ENT_TYPE === 'SALES');
+    assert.equal(ewb.rows.length, salesHeaders.length);
+    if (sqlSalesEwb) {
+      assert.equal(ewb.rows.length, sqlSalesEwb.CNT);
+      assert.equal(sum(ewb.rows, 'TAXABLE_AMT'), r2(sqlSalesEwb.TAXABLE_AMT));
+    } else {
+      assert.equal(sum(ewb.rows, 'TAXABLE_AMT'), sum(fx.gstSalesRateExpected, 'TAXABLE_AMT'));
+    }
+  });
+});
