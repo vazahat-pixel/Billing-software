@@ -834,7 +834,10 @@ const Dashboard = () => {
       else if (ext === 'gstReports' && /^gstin(Sales|Purchase|Process|Jobwork|Journal|Expense)$/.test(node?.reportKind || '')) {
          setGstinJsmKind(node.reportKind);
          toggleModal('gstinJsm', true);
-      } else if (ext === 'gstReports') openGstReport(node?.reportKind || 'gstr1');
+      } else if (ext === 'gstReports') {
+         setGstExcelVersion(node?.templateVersion || null);
+         openGstReport(node?.reportKind || 'gstr1');
+      }
       else if (ext === 'gstr1') openGstReport('gstr1');
       else if (ext === 'finalReport') {
          setFinalReportKind(node.reportKind || 'groupList');
@@ -999,6 +1002,8 @@ const Dashboard = () => {
    }, []);
 
    const [gstHubInitialReport, setGstHubInitialReport] = useState('gstr1');
+   // The older GSTR-1 Excel entries open the same report but download that template's layout.
+   const [gstExcelVersion, setGstExcelVersion] = useState(null);
    const openGstReport = (reportKey = 'gstr1') => {
       setGstHubInitialReport(reportKey);
       setModals(prev => ({ ...prev, gstReports: true }));
@@ -2567,6 +2572,7 @@ const Dashboard = () => {
                   isOpen
                   onClose={() => toggleModal('gstReports', false)}
                   initialReport={gstHubInitialReport || 'gstr1'}
+                  excelVersion={gstExcelVersion}
                />
             )}
             {modals.gst2bMatching && <Gst2bMatchingModal isOpen onClose={() => toggleModal('gst2bMatching', false)} />}

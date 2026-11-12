@@ -8,6 +8,7 @@ import { gstinReportApi } from '../../api/gstinReport.api';
 import { salesApi } from '../../api/sales.api';
 import { exportTableToExcel } from '../../utils/reportExport';
 import { exportGstr1Excel, downloadJson } from '../../utils/gstExport';
+import { exportGstr1TemplateExcel } from '../../utils/gstr1TemplateExport';
 import ListPrint from '../../components/print/ListPrint';
 import GSTReportsTab from './GSTReportsTab';
 import {
@@ -107,7 +108,7 @@ function normalizeGstr3b(raw) {
   };
 }
 
-export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1' }) {
+export default function GstReportsHub({ isOpen, onClose, initialReport = 'gstr1', excelVersion = null }) {
   const { company } = useStore();
   const [activeReport, setActiveReport] = useState(initialReport || 'gstr1');
   const [fromDate, setFromDate] = useState(firstOfMonth);
