@@ -228,3 +228,17 @@ test('Ledger vs O/s difference: Sales compares debtor ledger with receivables, r
   assert.deepEqual(purchase.rows.map((r) => [r.AC_NAME, r.BAL_OS_AMT]), [['A', -500], ['B', -1000], ['S', 100]]);
   await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { book: 'Process' }, { fas }), /not kept/);
 });
+
+test('CashBank Finance: only vouchers not wholly adjusted; FINANCE.AMT = REC.AMT - TOT.ADJ', async () => {
+  const rows = [
+    { ENT_NO: 'a', BOOK: 'BANK', AC_NAME: 'P1', REC_DATE: new Date('2026-05-01'), REC_AMT: 1000, TOT_ADJUST: 1000, FNCE_AMT: 0 },
+    { ENT_NO: 'b', BOOK: 'BANK', AC_NAME: 'P2', REC_DATE: new Date('2026-05-02'), REC_AMT: 800, TOT_ADJUST: 300, FNCE_AMT: 500 },
+    { ENT_NO: 'c', BOOK: 'CASH', AC_NAME: 'P2', REC_DATE: new Date('2026-05-03'), REC_AMT: 50, TOT_ADJUST: 0, FNCE_AMT: 50 },
+  ];
+  const rpt = require('../../services/jsmReports').get('Rpt_Cash_Bank_Finance_Report');
+  const out = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', orderBy1: 'Party' }, { rows });
+  assert.deepEqual(out.rows.map((r) => r.ENT_NO), ['b', 'c']);
+  assert.equal(out.grid.layout, 'JSM_VW_GST_BC_FINANCE_RPT');
+  const cash = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', books: ['CASH'] }, { rows });
+  assert.deepEqual(cash.rows.map((r) => r.ENT_NO), ['c']);
+});

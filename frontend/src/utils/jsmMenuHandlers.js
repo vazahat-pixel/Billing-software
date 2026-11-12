@@ -109,7 +109,7 @@ export const FORM_HANDLERS = {
   Rpt_JvBook1: { id: 'fas-voucher', external: 'jsmReport', jsmForm: 'Rpt_JvBook1' },
   Tran_ImportCashBank: { id: 'fas-import-bank', external: 'fasCheck', reportKind: 'importBank' },
   Mst1_Check_Diff: { id: 'final-diff-os', external: 'fasCheck', reportKind: 'diffOpening' },
-  Rpt_Cash_Bank_Finance_Report: { id: 'final-cash-fin', external: 'cashBook' },
+  Rpt_Cash_Bank_Finance_Report: { id: 'final-cb-finance', external: 'jsmReport', jsmForm: 'Rpt_Cash_Bank_Finance_Report' },
   Rpt_Jsm_Ledger_os_Diff_Check: { id: 'final-diff-year', external: 'jsmGstr1', jsmForm: 'Rpt_Jsm_Ledger_os_Diff_Check' },
   Rpt_Group_Balance: { id: 'final-group', external: 'jsmReport', jsmForm: 'Rpt_Group_Balance' },
 
