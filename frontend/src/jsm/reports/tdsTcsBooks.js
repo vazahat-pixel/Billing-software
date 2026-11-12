@@ -9,34 +9,38 @@ import { toIsoDate } from '../winforms.js';
  */
 const N = (field, caption, dec = 2, len = 12) => ({ field, caption, kind: 'N', dec, total: true, len });
 
+// Columns as JSM's own format scripts (JS_Table_Reset_Column_DefaultFormat) set them for these views.
 const TDS_COLUMNS = [
-  { field: 'ENT_DATE', caption: 'BILL.DT', kind: 'D', len: 10 },
-  { field: 'NCBILL_NO', caption: 'BILL.NO', kind: 'C', len: 10 },
-  { field: 'PARTY', caption: 'PARTY', kind: 'C', len: 24 },
-  { field: 'PANNO', caption: 'PANNO', kind: 'C', len: 12 },
-  N('AMOUNT', 'AMOUNT'),
-  { field: 'TDS_PER', caption: 'TDS_PER', kind: 'N', dec: 2, len: 8 },
-  N('TDS_AMT', 'TDS_AMT'),
-  { field: 'COMP_NON', caption: 'COMP-NON', kind: 'C', len: 9 },
-  { field: 'DOB_DATE', caption: 'DOB.DATE', kind: 'D', len: 10 },
+  { field: 'MONTH', caption: 'MONTH', kind: 'C', len: 10 },
+  { field: 'TDSHEAD', caption: 'TDSHEAD', kind: 'C', len: 18 },
+  { field: 'PARTY', caption: 'PARTY', kind: 'C', len: 20 },
+  { field: 'PANNO', caption: 'PANNO', kind: 'C', len: 10 },
+  { field: 'AMOUNT', caption: 'AMOUNT', kind: 'N', dec: 2, len: 12 },
+  { field: 'TDS_PER', caption: 'TDS_PER', kind: 'N', dec: 2, len: 6 },
+  { field: 'TDS_AMT', caption: 'TDS_AMT', kind: 'N', dec: 2, len: 12 },
 ];
 
 const TCS_SUMMARY_COLUMNS = [
-  { field: 'MONTH', caption: 'MONTH', kind: 'C', len: 10 },
-  { field: 'PARTY', caption: 'PARTY', kind: 'C', len: 24 },
-  { field: 'PANNO', caption: 'PANNO', kind: 'C', len: 12 },
+  { field: 'PARTY', caption: 'PARTY', kind: 'C', len: 20 },
+  { field: 'PANNO', caption: 'PANNO', kind: 'C', len: 10 },
   N('TAXABLE_AMT', 'TAXABLEAMT'),
   N('NET_TOT', 'NETAMT'),
-  { field: 'TCS_PER', caption: 'TCS_PER', kind: 'N', dec: 3, len: 8 },
+  { field: 'TCS_PER', caption: 'TCS_PER', kind: 'N', dec: 3, len: 6 },
   N('TCS_AMT', 'TCS_AMT'),
-  { field: 'T_TDS_PER', caption: 'TDS_PER', kind: 'N', dec: 2, len: 8 },
-  N('T_TDS_AMT', 'TDS_AMT'),
+  { field: 'TCSHEAD', caption: 'TCSHEAD', kind: 'C', len: 18 },
 ];
 
 const TCS_DETAIL_COLUMNS = [
+  { field: 'MONTH', caption: 'MONTH', kind: 'C', len: 10 },
+  { field: 'PARTY', caption: 'PARTY', kind: 'C', len: 20 },
+  { field: 'PANNO', caption: 'PANNO', kind: 'C', len: 10 },
+  N('TAXABLE_AMT', 'TAXABLEAMT'),
+  N('NET_TOT', 'NETAMT'),
+  { field: 'TCS_PER', caption: 'TCS_PER', kind: 'N', dec: 3, len: 6 },
+  N('TCS_AMT', 'TCS_AMT'),
+  { field: 'NCBILL_NO', caption: 'BILL.NO', kind: 'C', len: 6 },
   { field: 'BILL_DATE', caption: 'BILL.DT', kind: 'D', len: 10 },
-  { field: 'NCBILL_NO', caption: 'BILL.NO', kind: 'C', len: 10 },
-  ...TCS_SUMMARY_COLUMNS.slice(1),
+  { field: 'TCSHEAD', caption: 'TCSHEAD', kind: 'C', len: 18 },
 ];
 
 const baseParams = (s) => ({

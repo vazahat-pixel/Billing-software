@@ -121,7 +121,8 @@ function tdsReport() {
 
     const orderKeys = spec.order.map((f) => (f === 'YEAR_NO' || f === 'MONTH_NO' ? { field: f, numeric: true } : f));
     const grid = {
-      variant: 1,
+      // JSM keeps one column format per Report Type: the combo's position, counted from 1.
+      variant: Object.keys(TDS_MODES).indexOf(mode) + 1,
       groupColumns: spec.show,
       groupDisplays: spec.show,
       captions: {},
