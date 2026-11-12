@@ -217,7 +217,7 @@ export const FORM_HANDLERS = {
   Frm_Investment_Raju: { id: 'raju-investment-rpt', external: 'jsmReport', jsmForm: 'Frm_Investment_Raju' },
 
   // Monthly
-  Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },
+  Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'jsmReport', jsmForm: 'Rpt_BankBookRec_GstMonthWise' },
 };
 
 /**

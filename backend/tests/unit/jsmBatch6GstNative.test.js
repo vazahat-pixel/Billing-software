@@ -242,3 +242,17 @@ test('CashBank Finance: only vouchers not wholly adjusted; FINANCE.AMT = REC.AMT
   const cash = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', books: ['CASH'] }, { rows });
   assert.deepEqual(cash.rows.map((r) => r.ENT_NO), ['c']);
 });
+
+test('Bank month wise: debits and credits of the ticked banks totalled per month, in month order', async () => {
+  const banks = [{ _id: 'b1', name: 'HDFC' }, { _id: 'b2', name: 'SBI' }];
+  const data = {
+    b1: [{ date: new Date('2026-06-05'), debit: 100, credit: 0 }, { date: new Date('2026-05-05'), debit: 0, credit: 40 }],
+    b2: [{ date: new Date('2026-05-20'), debit: 10, credit: 5 }],
+  };
+  const statement = async (l) => ({ statement: data[l._id] });
+  const rpt = require('../../services/jsmReports').get('Rpt_BankBookRec_GstMonthWise');
+  const all = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31' }, { banks, statement });
+  assert.deepEqual(all.rows.map((r) => [r.MONTH, r.DEBIT, r.CREDIT]), [['May', 10, 45], ['June', 100, 0]]);
+  const one = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', banks: ['SBI'] }, { banks, statement });
+  assert.deepEqual(one.rows.map((r) => [r.MONTH, r.DEBIT]), [['May', 10]]);
+});

@@ -158,6 +158,7 @@ const REPORTS = {
   Rpt_Stock_Acc_Finish_Summary: require('./reports/stockAccFinish'),
   Rpt_Jsm_Ledger_os_Diff_Check: require('./reports/ledgerOsDiff'),
   Rpt_Cash_Bank_Finance_Report: require('./reports/cashBankFinance'),
+  Rpt_BankBookRec_GstMonthWise: require('./reports/bankMonthWise'),
   Rpt_Tds2_Prty_Mnth_Wise: require('./reports/tdsTcsBooks').tdsPartyMonth,
   Rpt_TcsSalesRegister: require('./reports/tdsTcsBooks').tcsSales,
   Rpt_TcsPurchaseRegister: require('./reports/tdsTcsBooks').tcsPurchase,
