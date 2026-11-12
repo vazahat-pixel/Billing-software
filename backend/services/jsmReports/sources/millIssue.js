@@ -22,7 +22,7 @@ async function loadMillIssueRows(companyId, bookModule = 'millIssue') {
   const [jobs, book, company] = await Promise.all([
     Job.find({ companyId, status: { $ne: 'Cancelled' } })
       .populate('workerId', 'name')
-      .populate({ path: 'lotId', select: 'lotId itemId rate', populate: { path: 'itemId', select: 'name' } })
+      .populate({ path: 'lotId', select: 'lotId itemId rate purchaseId', populate: { path: 'itemId', select: 'name' } })
       .lean(),
     Book.findOne({ companyId, module: bookModule }).sort({ createdAt: 1 }).lean(),
     Company.findById(companyId).select('name coCode').lean(),
@@ -59,6 +59,9 @@ async function loadMillIssueRows(companyId, bookModule = 'millIssue') {
       MONTH_NO: date ? date.getUTCMonth() + 1 : null,
       YEAR_NO: date ? date.getUTCFullYear() : null,
       RE_FINISH: 'F',
+      // JSM's PU_BILLNO: the purchase bill the issued goods came in on, blank when none. The lot
+      // names the purchase here, so the challan's bill is its lot's.
+      PU_BILLNO: j.lotId?.purchaseId ? String(j.lotId.purchaseId) : '',
       CHLN_NO: numericCh,
       CCHLN_NO: '',
       NCCHLN_NO: chNo,
