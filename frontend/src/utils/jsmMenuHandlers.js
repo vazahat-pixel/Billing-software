@@ -61,7 +61,7 @@ export const FORM_HANDLERS = {
   Rpt_Jsm_GSTR1_Json_Match: { id: 'gst-match-json', external: 'gstReports', reportKind: 'gstrMatching' },
   Rpt_Match2B_x1_ReportNew: { id: 'gst-45-2b', external: 'gstReports', reportKind: 'gstrMatching' },
   xOld_Rpt_Jsm_GSTR9_All_Excel_Report: { id: 'gst-gstr9c-old', external: 'gstReports', reportKind: 'gstr9' },
-  Rpt_Jsm_GSTR9_Excel: { id: 'gst-gstr9-old', external: 'gstReports', reportKind: 'gstr9' },
+  Rpt_Jsm_GSTR9_Excel: { id: 'gst-gstr9-old', external: 'jsmReport', jsmForm: 'Rpt_Jsm_GSTR9_Excel' },
   JS_GSTR1_RPT: { id: 'gst-extra-sales', external: 'gstReports', reportKind: 'gstr1' },
   JS_GSTR2_RPT: { id: 'gst-extra-purchase', external: 'gstReports', reportKind: 'gstr2' },
   JS_GSTR3_SMRY: { id: 'gst-extra-summary', external: 'gstReports', reportKind: 'gst3b' },
