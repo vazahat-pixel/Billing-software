@@ -52,6 +52,8 @@ const REPORTS = {
   Rpt_Daily_TransactionNew: require('./reports/dailyTransaction'),
   Rpt_Additional_Job_Bill: require('./reports/challanStatus'),
   Tran_WorkChallan_PL_Repo: require('./reports/jobProfitLoss'),
+  Rpt_Sales_Rg_Pend: require('./reports/rgPending'),
+  Rpt_Sales_Challan_Detail_Report: require('./reports/salesChallan'),
   Zoom_SelectDate_List_Item: require('./reports/itemStockRegister'),
   Rpt_StkKgsFinishAtShop: require('./reports/kgsStock').finishAtShop,
   Rpt_StkKgsGreyAtshop: require('./reports/kgsStock').greyAtShop,

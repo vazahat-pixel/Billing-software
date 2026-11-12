@@ -140,6 +140,8 @@ export const FORM_HANDLERS = {
   Rpt_Daily_TransactionNew: { id: 'daily-transaction', external: 'jsmReport', jsmForm: 'Rpt_Daily_TransactionNew' },
   Rpt_Additional_Job_Bill: { id: 'job-challan-status', external: 'jsmReport', jsmForm: 'Rpt_Additional_Job_Bill' },
   Tran_WorkChallan_PL_Repo: { id: 'job-profit-loss', external: 'jsmReport', jsmForm: 'Tran_WorkChallan_PL_Repo' },
+  Rpt_Sales_Rg_Pend: { id: 'sales-rg-pending', external: 'jsmReport', jsmForm: 'Rpt_Sales_Rg_Pend' },
+  Rpt_Sales_Challan_Detail_Report: { id: 'sales-challan-detail', external: 'jsmReport', jsmForm: 'Rpt_Sales_Challan_Detail_Report' },
 
   // Monthly
   Rpt_BankBookRec_GstMonthWise: { id: 'monthly-bank', external: 'cashBook' },

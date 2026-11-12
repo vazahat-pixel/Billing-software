@@ -63,6 +63,9 @@ async function loadOutstandingRows(companyId, kind, filters = {}) {
         TOT_DISC: round(inv.addLess || 0),
         IT_DISC1: round(inv.addLess || 0),
         Q_UNADJ: inv.rg ? 'Y' : '',
+        // The return goods promised on the bill's receipt, which the Rg Pending screen compares
+        // against the returns that have actually come back.
+        RG_AMT: round(inv.rg || 0),
         TOT_BALANCE: round(inv.outstanding),
         OS_DAYS: inv.ageDays,
 
