@@ -184,6 +184,8 @@ const REPORTS = {
   A_Gstr2_Expense: require('./reports/gstinSummary').expenseGstr2,
   Hsn_Wise_Report_All: require('./reports/gstNativeTools').hsnWiseAll,
   Stp_Gst_OutWrad_ErrorCheck: require('./reports/gstNativeTools').outwardErrorCheck,
+  Rpt_Jsm_GSTR2_AllExcel: require('./reports/gstr2AllExcel'),
+  Stp_Gst_Inward_ErrorCheck: require('./reports/gstNativeTools').inwardErrorCheck,
   Gstr_3B_TextNew_Monthly: require('./reports/gstNativeTools').gstr3bMonthly,
   Gstr_3BB_TextNew_Excel_Monthly: require('./reports/gstNativeTools').gstr3bExcel,
   A_Brokreg_Main_Rpt_Zoom_Column: require('./reports/gstNativeTools').brokregZoomColumn,

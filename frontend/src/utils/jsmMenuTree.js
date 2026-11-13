@@ -19,7 +19,8 @@ const slug = (path) => `jsm-${path.join('-')}`
   .slice(0, 80);
 
 function build(items, trail, seen) {
-  return items.map((item) => {
+  // JSM hides some entries at design time (Visible=false); they are in the capture but not on screen.
+  return items.filter((item) => !item.hidden).map((item) => {
     const caption = item.caption || '';
     const path = [...trail, caption];
 

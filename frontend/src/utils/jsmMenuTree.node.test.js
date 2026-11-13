@@ -18,7 +18,7 @@ const menu = JSON.parse(fs.readFileSync(path.join(here, '..', 'jsm', 'blueprint'
 const jsmEntries = (caption) => {
   const out = [];
   const walk = (items, trail) => {
-    for (const i of items) {
+    for (const i of items.filter((x) => !x.hidden)) {
       const p = [...trail, i.caption || ''];
       if (i.items?.length) walk(i.items, p);
       else out.push(p.join(' > '));
@@ -92,7 +92,9 @@ test('every JSM report screen this software has built is reachable', () => {
   }
   const leaves = [...leavesOf(JSM_REPORTS_TREE), ...leavesOf(JSM_OTHERS_TREE)];
   const wired = new Set(leaves.filter((l) => l.external === 'jsmReport').map((l) => l.jsmForm));
-  const unreachable = [...forms].filter((f) => f !== '__dynamic__' && !wired.has(f));
+  // Hsn_Wise_Report_All is Visible=false in JSM's own menu: built, but not on the menu.
+  const hiddenInJsm = new Set(['Hsn_Wise_Report_All']);
+  const unreachable = [...forms].filter((f) => f !== '__dynamic__' && !wired.has(f) && !hiddenInJsm.has(f));
   assert.deepEqual(unreachable, [], 'these built screens have no menu entry');
 });
 

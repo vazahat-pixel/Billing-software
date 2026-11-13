@@ -62,6 +62,30 @@ export const GST_NATIVE_TOOLS = [
     },
   },
   {
+    form: 'Stp_Gst_Inward_ErrorCheck',
+    runButtons: ['btn_hsncd', 'Btn_StateCd', 'Btn_CheckGst_Reg', 'Btn_CheckGst_UnReg'],
+    lists: {},
+    defaults: ({ fyFrom, fyTo }) => ({ txt_dt_from: fyFrom, txt_dt_to: fyTo }),
+    toParams: (s, btnName) => ({
+      from: toIsoDate(s.txt_dt_from), to: toIsoDate(s.txt_dt_to),
+      fromText: s.txt_dt_from, toText: s.txt_dt_to,
+      action: btnName || 'All',
+    }),
+    fallbackColumns: {
+      JSM_VW_GST_ERROR_GSTR2: [
+        { field: 'ERROR_TYPE', caption: 'ERROR TYPE', kind: 'C', len: 18 },
+        { field: 'TRANS_TYPE', caption: 'TYPE', kind: 'C', len: 10 },
+        { field: 'BILL_DATE', caption: 'BILL DT', kind: 'D', len: 10 },
+        { field: 'NCBILL_NO', caption: 'BILL NO', kind: 'C', len: 11 },
+        { field: 'PARTY', caption: 'PARTY', kind: 'C', len: 24 },
+        { field: 'GST_NO', caption: 'GSTIN', kind: 'C', len: 16 },
+        N('TAXABLE_AMT', 'TAXABLE'),
+        N('GST_AMT', 'GST AMT', 2, 10),
+        N('NET_TOT', 'NET AMT'),
+      ],
+    },
+  },
+  {
     form: 'Gstr_3B_TextNew_Monthly',
     runButtons: ['btn_screen'],
     excelButtons: ['Btn_Excel'],

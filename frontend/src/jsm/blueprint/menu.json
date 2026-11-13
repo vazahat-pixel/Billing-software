@@ -663,6 +663,27 @@
       ]
      },
      {
+      "caption": "Gstr-2 Report",
+      "id": "SHUBH_GSTR2_FORM",
+      "items": [
+       {
+        "caption": "Gstr2 All Inward",
+        "id": "SHUBH_GSTR2_ALL_INWARD",
+        "form": "A_Gstr2_Purchase_All"
+       },
+       {
+        "caption": "Gstr2 Error Checking",
+        "id": "SHUBH_GSTR2_ERROR_CHECK",
+        "form": "Stp_Gst_Inward_ErrorCheck"
+       },
+       {
+        "caption": "Gstr2 Excel Format",
+        "id": "SHUBH_GSTR2_EXCEL",
+        "form": "Rpt_Jsm_GSTR2_AllExcel"
+       }
+      ]
+     },
+     {
       "caption": "Gstr-9",
       "id": "SHUBH_GSTR9",
       "items": [
@@ -708,14 +729,21 @@
       "form": "A_All_Ewb_Einv_Rpt"
      },
      {
+      "caption": "E-Way Excel Upload",
+      "id": "SHUBH_EWAY_EXCEL_UPLOAD",
+      "form": "Eway_No_Upload_Offline"
+     },
+     {
       "caption": "3B Form - Monthly Excel",
       "id": "SHUBH_3B_FORM_EXCEL",
-      "form": "Gstr_3BB_TextNew_Excel_Monthly"
+      "form": "Gstr_3BB_TextNew_Excel_Monthly",
+      "hidden": true
      },
      {
       "caption": "Hsn Wise Reports",
       "id": "SHUBH_HSN",
-      "form": "Hsn_Wise_Report_All"
+      "form": "Hsn_Wise_Report_All",
+      "hidden": true
      },
      {
       "caption": "Gst 4.5",

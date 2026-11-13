@@ -72,8 +72,11 @@ async function runHsnWiseAll(companyId, p = {}, deps = {}) {
   };
 }
 
-async function runOutwardErrorCheck(companyId, p = {}, deps = {}) {
-  const [sl, sr] = await Promise.all([
+async function runOutwardErrorCheck(companyId, p = {}, deps = {}, inward = false) {
+  const [sl, sr] = await Promise.all(inward ? [
+    inDateRange(deps.purchases || await billSrc.loadPurchaseRegisterRows(companyId), 'BILL_DATE', p.from, p.to),
+    inDateRange(deps.purchaseRtn || await billSrc.loadReturnRegisterRows(companyId, 'Purchase'), 'BILL_DATE', p.from, p.to),
+  ] : [
     inDateRange(deps.sales || await billSrc.loadSalesRegisterRows(companyId), 'BILL_DATE', p.from, p.to),
     inDateRange(deps.salesRtn || await billSrc.loadReturnRegisterRows(companyId, 'Sales'), 'BILL_DATE', p.from, p.to),
   ]);
@@ -101,21 +104,21 @@ async function runOutwardErrorCheck(companyId, p = {}, deps = {}) {
       }
     }
   };
-  check(sl, 'SALES');
-  check(sr, 'RTN_SALES');
+  check(sl, inward ? 'PURCHASE' : 'SALES');
+  check(sr, inward ? 'RTN_PURCHASE' : 'RTN_SALES');
 
   return {
     rows: orderRows(issues, ['ERROR_TYPE', 'TRANS_TYPE', 'BILL_DATE', 'NCBILL_NO']),
     grid: {
-      layout: 'JSM_VW_OUTWARD_ERROR_CHECK',
+      layout: inward ? 'JSM_VW_GST_ERROR_GSTR2' : 'JSM_VW_OUTWARD_ERROR_CHECK',
       variant: 1,
       groupColumns: ['ERROR_TYPE'],
       groupDisplays: ['ERROR TYPE'],
       captions: {},
-      title: 'GST Outward Supply Error Check',
+      title: inward ? 'GSTR-2 Error Checking' : 'GST Outward Supply Error Check',
       period: `DATE : FROM ${p.fromText || p.from || ''} TO ${p.toText || p.to || ''}`,
       pageWise: false,
-      notice: issues.length ? '' : 'No outward GST errors detected in selected period.',
+      notice: issues.length ? '' : inward ? 'No inward GST errors detected in selected period.' : 'No outward GST errors detected in selected period.',
     },
   };
 }
@@ -192,6 +195,7 @@ async function runEwbEinvRpt(companyId, p = {}, deps = {}) {
 module.exports = {
   hsnWiseAll: { run: runHsnWiseAll, options: async () => ({}) },
   outwardErrorCheck: { run: runOutwardErrorCheck, options: async () => ({}) },
+  inwardErrorCheck: { run: (c, p, d) => runOutwardErrorCheck(c, p, d, true), options: async () => ({}) },
   gstr3bMonthly: { run: (c, p, d) => runGstr3bMonthly(c, p, d, false), options: async () => ({}) },
   gstr3bExcel: { run: (c, p, d) => runGstr3bMonthly(c, p, d, true), options: async () => ({}) },
   brokregZoomColumn: { run: runBrokregZoomColumn, options: brokStmt.options },

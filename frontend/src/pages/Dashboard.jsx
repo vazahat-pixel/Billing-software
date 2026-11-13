@@ -109,6 +109,7 @@ const JsmLedgerOsDiffScreen = lazy(() => import('../jsm/JsmLedgerOsDiffScreen'))
 const JsmTdsAddressScreen = lazy(() => import('../jsm/JsmTdsAddressScreen'));
 const JsmImportBankScreen = lazy(() => import('../jsm/JsmImportBankScreen'));
 const JsmEwayBulkScreen = lazy(() => import('../jsm/JsmEwayBulkScreen'));
+const JsmGstr2Screen = lazy(() => import('../jsm/JsmGstr2Screen'));
 const GstinJsmReport = lazy(() => import('./gst/GstinJsmReport'));
 const Gstr1Modal = lazy(() => import('./gst/Gstr1JsmReport'));
 const Gst2bMatchingModal = lazy(() => import('./gst/GstModals').then((m) => ({ default: m.Gst2bMatchingModal })));
@@ -2852,6 +2853,8 @@ const Dashboard = () => {
                   ? <JsmLedgerOsDiffScreen isOpen onClose={() => setJsmGstr1Form(null)} />
                   : jsmGstr1Form === 'Eway_Billing_Bulk'
                   ? <JsmEwayBulkScreen isOpen onClose={() => setJsmGstr1Form(null)} />
+                  : jsmGstr1Form === 'Rpt_Jsm_GSTR2_AllExcel'
+                  ? <JsmGstr2Screen isOpen onClose={() => setJsmGstr1Form(null)} />
                   : <JsmGstr1Screen formName={jsmGstr1Form} isOpen onClose={() => setJsmGstr1Form(null)} onOpenInvoice={onOpenGstr1Invoice} />}
             </Suspense>
          )}
