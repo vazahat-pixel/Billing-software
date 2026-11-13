@@ -129,3 +129,14 @@ cd frontend; npx vite build   # -> clean
 
 # Menu: 218 of 218 entries open a JSM screen (checklist generated from the live menu + report registry)
 ```
+
+---
+
+## 6. Compared against JSM's own printed / exported output (2026-11-13)
+
+Real JSM output found on this machine (`D:\0JsmGstinCSV`, `D:\JsmReports`) and the live SC27 database were used:
+
+- **GSTR-1 v3.2.2:** the template is now the workbook JSM itself produced (all 32 sheets, both `hsn(b2b)` / `hsn(b2c)` sheets); a test checks sheet names and header rows against that file.
+- **E-Way Bill JSON:** keys, order and constants (`genMode`, `TotNonAdvolVal`, `OthValue`, `cessNonAdvol`, version `1.0.0421`, `totInvValue` as text) follow JSM's own `SANCHAL_CREATION_E-WAY_JSON.json`; the grid is one row per bill as in JSM's SQL.
+- **Stock Mts:** rebuilt as JSM's single statement (Grey / Mill Grey / Mill Rf / Finish) and checked against the figures printed in `Monthwise_Stock_Mts.pdf` (2482 − 1202 − 2969 = −1689; 1202 − 602 = 600; 602 + 360 − 1880 = −918). The printout's source quantities do not exist in the current SC27 data (it was printed from different data), so only the arithmetic is verified, not the totals from the database.
+- **SC27 data limits:** SC27 holds 3 TDS entries, 0 TCS amounts, 11 process / 7 jobwork GST rows; larger comparisons need a database with more data.
