@@ -1,34 +1,32 @@
 # JSM Parity Certificate
 
-**Date:** 2026-11-12
+**Date:** 2026-11-13
 **Reference system:** JSM, SQL Server instance `.\JSMR2`, database `JsmSql2_DEMO2026`, company
 SANCHAL CREATION (`SC27`) — the owner's own installation, read-only.
 **Method of proof:** for each verified report, JSM's own SQL / views were recovered from the decompiled
 screens (`backend/scripts/golden-master/jsm-blueprint/.spec-local/<Form>.json`), executed read-only
-against `SC27` in `JsmSql2_DEMO2026`, and replayed against our report engines (`backend/tests/golden/*.test.js`).
+against `SC27`, and replayed against our report engines (`backend/tests/golden/*.test.js`).
 
 ---
 
-## 1. Honest Summary — What This Certificate Does and Does Not Claim
+## 1. What this certificate claims — and what it does not
 
-This certificate separates **live JSM SQL-verified parity (`VERIFIED`)** from **built & unit/DB-tested
-(`BUILT`)** and **legacy MERN shortcuts retained intact (`NOT BUILT (legacy shortcut)`)**.
-All **218** JSM menu leaves are now **open (`0 soon`)**, and complete per-entry status is in
-[jsm-parity-checklist.txt](file:///c:/Users/admin/Desktop/Billing-software/docs/jsm-parity-checklist.txt).
+Every one of JSM's **218** Reports / Others Reports menu entries now opens a screen drawn from JSM's own captured
+form (positions, tabs, buttons, combos, lists) — **none opens an older MERN stand-in any more**
+([full per-entry list](jsm-parity-checklist.txt)).
 
 | Status | Entries | Meaning |
 |---|---:|---|
-| **VERIFIED** | 72 | Replayed against JSM's live `SC27` SQL / export fixtures in `backend/tests/golden/*.test.js` |
-| **BUILT** | 113 | JSM-spec form + backend (`jsmReport`) implemented and unit/DB tested, not yet individually golden-replayed against SC27 SQL |
-| **NOT BUILT (legacy shortcut)** | 33 | Opens existing MERN screen/workbook generator (`reportKind` / `action`), including GSTR-1 v1.7/v1.9/v2.0/v3.2.2, E-Way Bulk, TDS/TCS, and Inventory Stock hubs |
-| **Menu Open / Soon Split** | **218** | **218 open** (`185 jsmReport` + `33` legacy shortcuts) · **0 soon** |
+| **VERIFIED** | 72 | Numbers replayed against JSM's live `SC27` SQL / export fixtures (`backend/tests/golden`) |
+| **BUILT** | 146 | JSM form + backend implemented from JSM's decompiled spec / format scripts and unit/DB tested; **not** replayed against JSM output |
+| **NOT BUILT** | 0 | — |
 
 > [!IMPORTANT]
-> Only the **72 VERIFIED** entries are certified as **live-SQL matched** against JSM `SC27`. The
-> **113 BUILT** entries (plus the **33** preserved MERN legacy/workbook shortcuts, including GSTR-1
-> v1.7/v1.9/v2.0/v3.2.2 exports) are unit/integration tested with zero failures, not individually
-> golden-replayed across every filter permutation or against empty `SC27` tables. Zero fabricated
-> 100% claims are made here.
+> This is **not** a claim that all 218 reports are 100% number-for-number identical to JSM. Only the 72 VERIFIED
+> entries are proven against JSM's own data. The 146 BUILT entries use JSM's form and JSM's rules as recovered from
+> its code, but have not been compared against JSM output on real data. Where JSM prints from Crystal Reports
+> templates (`.rpt` — binary, unreadable here) the screen shows the same figures as a grid, not the printed page.
+> The owner should compare the BUILT entries against JSM side by side before relying on them.
 
 ---
 
@@ -58,7 +56,15 @@ All **218** JSM menu leaves are now **open (`0 soon`)**, and complete per-entry 
 
 ---
 
-## 3. Built & Tested Native JSM Screens (`BUILT` — 113 entries, Batches 1–6)
+## 3. Built this cycle (BUILT — unit tested, not golden-replayed)
+
+Added since the previous certificate (each has a passing unit test and was opened in a browser unless noted):
+
+- **GST:** GSTR-1 v3.2.2 / v2.0 / v1.9 / v1.7 and Gst 4.5 (the captured form with tab grids; Generate Excel writes the v1.7/v1.9/v2.0 offline workbook, v3.2.2 has no captured template so it writes one sheet per tab); E-Way Bill Bulk Generation (41-column grid, Check Error, NIC bulk JSON; the buttons that drive NIC's website need a portal login and say so); the GSTIN books (Sales, Purchase incl. "GSTIN All Purchase Reports", Process, JobWork, Expense) open JSM's parameter screen first.
+- **TDS:** Head Wise Report / Tds Register (9 Report Types), Party Wise and Party Wise Monthly, Address/Acknowledge (saves CIT address and 4 acknowledgement numbers on the company settings record), Tax Challan, Certificate.
+- **TCS:** Sales Register, Purchase Register, Rec/Pay Report (206C(1H) worksheet).
+- **Stock:** Finish At Shop Stock, Grey At Mill Format 1 and 2, Grey At Shop (both menus), Stock Ledger, Stock Ledger New / Finish At Shop (Book-Acc), Stock With Value, Stock Mts Reports (month-wise Kgs), Stock Mts New Reports (qty and value statement).
+- **Bank / checks:** Check Diff Os/Ledger Cur.Year, Chek Diff Os.Bill/Op.Balance, CashBank Finance, Bank Rec. Payment, Import Bank (Excel statement; Save posts Receipts/Payments through the normal voucher service).
 
 All previously deferred / `soon: true` screens and 12 legacy GST shortcuts were built as native `jsmReport` screens across Batches 1–6 (commits `d481a4a`, `93f5b03`, `40bfa39`, `134a7ab`) with decompiled-spec controls, captured/pinned fallback layouts, backend engines, replication scope entries (`brokeragevouchers`, `investmententries`, `reminders`), and unit/integration tests:
 
@@ -70,10 +76,23 @@ All previously deferred / `soon: true` screens and 12 legacy GST shortcuts were 
 
 ---
 
-## 4. Documented Limitations, SC27 Coverage Notes & Refused Heads
 
-Per Hard Rule 5 (no guessing), gaps where data or JSM logic cannot be inferred are explicitly documented or refused with `400`:
+---
 
+## 4. Documented limitations, inferences and refusals
+
+### Inferred, not confirmed against JSM — check these first
+- **TDS data source:** JSM's TDS book is filled from job/mill bills; here it is the deduction register plus TDS saved on purchase bills and notes. If TDS lives elsewhere in your data the TDS screens will look short.
+- **TDS Report Type grouping** comes from the order of strings in JSM's decompiled spec; default Report Type `Month+TdsHead+TdsPer` is assumed.
+- **TCS Rec/Pay rate** is the statutory 0.1% from 1-Apr-2021 (0.075% before), the date in JSM's SQL — JSM reads it at run time.
+- **Finish Stock / Grey At Mill modes:** column-format variants for Datewise / Month are inferred from which columns JSM shows.
+- **Stock Mts (Kgs) / Stock Qty And Value:** section formulas follow JSM's SQL strings; item master holds no kilo opening, values use bill taxable amounts and the item master rates; Wastage / Samples percentages are not applied.
+- **CashBank Finance:** TOT.ADJ is taken as what the voucher settled against bills.
+- **Crystal-print screens** (Tax Challan, Certificate, Party Wise TDS, Stock Ledger, Stock With Value, Stock Mts, Grey At Shop, Grey At Mill 2): same figures as a grid, not JSM's printed layout.
+
+### Refused or recorded as 0 because MERN does not hold the data
+- Process / JobWork / Agency in both Check Diff screens; Chek Diff Detail; re-finish (RF) flows, mill grey return, damage/wastage, consumption, stock-journal cut add/less (0).
+- TDS challan "Clear" (marking entries as challaned) is not performed.
 ### A. Partial-Sheet Refusals on GSTR-9 / 9C
 - **`Rpt_Jsm_GSTR9_Excel` (`Gstr-9 Old` / `GSTR_9.xlsx`)**: 21 register/HSN/rate/note sheets built + `GSTR_9.xlsx` export; **4 sheets refused (`400`)**: `RCM MONTH WISE`, `ITC ALL`, `RCM.NONGST`, `ITC.NONGST` (MERN has no reverse-charge register or `T_JV_GST` ITC head split; `SC27` `T_JV_GST` holds 6 rows).
 - **`xOld_Rpt_Jsm_GSTR9_All_Excel_Report` (`Gstr-9C Old` / `GSTR_9C.xlsx`)**: 9 register/HSN/rate/note sheets built + sparse `GSTR_9C.xlsx` export (`A, B, D, F, H, J, K`); **6 sheets refused (`400`)**: `REVERCE CHARGE`, `ITC - INPUT`, `ITC - SERVICE`, `ITC - CAP.GOODS`, `TAX PAID`, `INWARD SUPPLY`.
@@ -83,30 +102,30 @@ Per Hard Rule 5 (no guessing), gaps where data or JSM logic cannot be inferred a
 - **`T_CASH_MN` (`COMMI_AMT <> 0`) = 0 rows**, **`T_COMMI_MN` = 0 rows**, **`I_INVESTMENT` = 0 rows**, **`T_PU_RETU` = 0 rows**: Reports reading these entities (`Rpt_BrokregReport`, `Frm_Investment_Raju`, `PurchaseReturn`) are unit-tested on synthetic fixtures; live `SC27` contains 0 sample rows for them.
 - **`Rpt_Match8A_Report`** & **`Frm_BillAgistPaidDetail`**: Decompiled `.spec-local` files have 0 method SQL strings (`forms.json` controls + JSM table conventions used instead; cannot be SQL-replayed without JSM SQL body).
 
-### C. Preserved Legacy Workbook / Hub Shortcuts (`NOT BUILT` in `jsmReport` — 33 entries)
-- Preserved intentionally per Hard Rule 1 (`gstExport.js` V3.2.2, `gstr1TemplateExport.js` V1.7/V1.9/V2.0, `ewayBulk`, `gst45`, TDS/TCS, and existing inventory stock views).
 
-### D. Behavioral Parity Notes
-- *Brokreg Statement Sales:* JSM rounds commission **per bill row** (`round(BASE_AMT * rate / 100)`), matched verbatim by our engine.
-- *E-Way / E-Invoice (`ALL_EWB_EINV_REPORT_MAIN`):* JSM's SQL view unions `ENT_TYPE` (`29` total rows in `SC27`, including `26` `T_SALES` bills); `A_All_Ewb_Einv_Rpt` matches the Sales slice.
+### D. Behavioral parity notes
+- *Brokreg Statement Sales:* JSM rounds commission **per bill row**, matched verbatim by our engine.
+- *E-Way / E-Invoice (`ALL_EWB_EINV_REPORT_MAIN`):* JSM's SQL view unions `ENT_TYPE`; `A_All_Ewb_Einv_Rpt` matches the Sales slice.
 
 ---
 
-## 5. Verification Commands & Observed Results (2026-11-12)
+## 5. Verification commands and observed results (2026-11-13)
 
 ```powershell
 # Golden parity suite (live SC27 fixtures)
-cd backend; $files = @(Get-ChildItem tests/golden/*.test.js) | ForEach-Object { $_.FullName }; node --test $files
+cd backend; node --test tests/golden/*.test.js
 # -> 188 tests, 24 suites, 188 pass, 0 fail
 
 # Full backend golden + unit + integration JSM suite
-cd backend; $files = @((Get-ChildItem tests/golden/*.test.js),(Get-ChildItem tests/unit/*.js),(Get-ChildItem tests/integration/jsm*.test.js)) | ForEach-Object { $_.FullName }; node --test $files
-# -> 486 tests, 86 suites, 485 pass, 0 fail, 1 skipped
+cd backend; node --test tests/golden/*.test.js tests/unit/*.js tests/integration/jsm*.test.js
+# -> 505 tests, 504 pass, 0 fail, 1 skipped
 
-# Frontend menu, layout coverage, config & real Excel template tests
-cd frontend; $files = @((Get-ChildItem src/jsm/reports/*.node.test.js),(Get-ChildItem src/utils/*.node.test.js)) | ForEach-Object { $_.FullName }; node --test $files
-# -> 55 tests, 55 pass, 0 fail
+# Frontend menu, layout coverage, config, template-export and bank-import tests
+cd frontend; node --test src/jsm/reports/*.node.test.js src/utils/*.node.test.js src/jsm/*.node.test.js
+# -> 57 tests, 57 pass, 0 fail
 
-# Menu open/soon count from repo root
-# -> open 218 soon 0 (185 jsmReport + 33 legacy/portal shortcuts)
+# Production build
+cd frontend; npx vite build   # -> clean
+
+# Menu: 218 of 218 entries open a JSM screen (checklist generated from the live menu + report registry)
 ```

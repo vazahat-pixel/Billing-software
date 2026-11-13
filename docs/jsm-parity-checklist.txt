@@ -1,8 +1,10 @@
-JSM PARITY CHECKLIST  (generated 2026-11-12)
+JSM PARITY CHECKLIST  (generated 2026-11-13)
 ==============================================================================================================
 VERIFIED  = replayed against JSM own SQL/printed output on real SC27 data (golden test)
-BUILT     = JSM-identical screen (jsmReport) implemented and unit/DB tested, not yet golden-replayed against SC27 SQL
-NOT BUILT = opens existing MERN shortcut (33 legacy reportKind views kept intact per Hard Rule 1)
+BUILT     = JSM form (captured layout) + backend report implemented and unit/DB tested; NOT replayed against SC27 SQL
+NOT BUILT = still opens an older MERN screen
+Totals: 218 entries | 72 VERIFIED | 146 BUILT | 0 NOT BUILT
+==============================================================================================================
 
 BUILT      | Rpt_cashbank1                            | Reports > Fas Reports > Bank / Cash Book > Bank Book
 BUILT      | Rpt_cashbank1                            | Reports > Fas Reports > Bank / Cash Book > Cash Book
@@ -18,14 +20,14 @@ BUILT      | A_AccountLedgerDoubleSide_TFormat        | Reports > Fas Reports > 
 BUILT      | A_AccountLedgerDoubleSide_Confirmation   | Reports > Fas Reports > Confirmation
 BUILT      | Rpt_Above_Below                          | Reports > Fas Reports > Above Below Rs.
 BUILT      | Rpt_JvBook1                              | Reports > Fas Reports > Voucher Book
-NOT BUILT  | Tran_ImportCashBank                      | Reports > Fas Reports > Import Bank
+BUILT      | Tran_ImportCashBank                      | Reports > Fas Reports > Import Bank
 BUILT      | Rpt_Group_Balance                        | Reports > Final Reports > Group List
 BUILT      | Rpt_Trail_Bal_101                        | Reports > Final Reports > Trail Balance
 BUILT      | A_Final_ProfitAndLoss                    | Reports > Final Reports > Profit & Loss Account
 BUILT      | A_Final_BalanceSheet                     | Reports > Final Reports > BalanceSheet
-NOT BUILT  | Mst1_Check_Diff                          | Reports > Final Reports > Chek Diff Os.Bill/Op.Balance
-NOT BUILT  | Rpt_Cash_Bank_Finance_Report             | Reports > Final Reports > CashBank Finance
-NOT BUILT  | Rpt_Jsm_Ledger_os_Diff_Check             | Reports > Final Reports > Check Diff Os/Ledger Cur.Year
+BUILT      | Mst1_Check_Diff                          | Reports > Final Reports > Chek Diff Os.Bill/Op.Balance
+BUILT      | Rpt_Cash_Bank_Finance_Report             | Reports > Final Reports > CashBank Finance
+BUILT      | Rpt_Jsm_Ledger_os_Diff_Check             | Reports > Final Reports > Check Diff Os/Ledger Cur.Year
 VERIFIED   | Rpt_SalesRegisterSummary_Report          | Reports > Sales > Sales Bill > Sales Summary
 VERIFIED   | Rpt_SalesRegisterDetailDigital_Report    | Reports > Sales > Sales Bill > Sales ItemDetail
 VERIFIED   | Rpt_Jsm_Sales_ItemSummary                | Reports > Sales > Sales Bill > Item Wise Summary
@@ -84,27 +86,27 @@ VERIFIED   | Rpt_JobWork_Receipt_Summary              | Reports > Monthly Report
 BUILT      | Rpt_Stk_Grey_Finish_Summary              | Reports > Monthly Reports > Sales G/F
 BUILT      | A_Gstr1_SalesReturnSummary               | Reports > Monthly Reports > Sales Return
 BUILT      | A_Gstr1_PurchaseRtn_Report               | Reports > Monthly Reports > Purchase Return
-NOT BUILT  | Rpt_BankBookRec_GstMonthWise             | Reports > Monthly Reports > Bank Rec. Payment
-NOT BUILT  | Rpt_TdsReports                           | Reports > Tds Reports > Head Wise Report
-NOT BUILT  | Rpt_Tds2_Prty_Mnth_Wise                  | Reports > Tds Reports > Party Wise Report
-NOT BUILT  | Rpt_Tds2_Prty_Mnth_Wise                  | Reports > Tds Reports > Party Wise Monthly Report
-NOT BUILT  | Rpt_Tds3_Add_Ackn                        | Reports > Tds Reports > Address/Acknowledge
-NOT BUILT  | Rpt_Tds4_Challan                         | Reports > Tds Reports > Tax Challan
-NOT BUILT  | Rpt_Tds5_Certi                           | Reports > Tds Reports > Certificate
-NOT BUILT  | Rpt_TdsReports                           | Reports > Tds Reports > Tds Register
-NOT BUILT  | Rpt_Tcs                                  | Reports > Tcs Reports > Tcs Rec/Pay Report
-NOT BUILT  | Rpt_TcsReports                           | Reports > Tcs Reports > Tcs Sales Register
-NOT BUILT  | Rpt_TcsReports                           | Reports > Tcs Reports > Tcs Purchase Register
+BUILT      | Rpt_BankBookRec_GstMonthWise             | Reports > Monthly Reports > Bank Rec. Payment
+BUILT      | Rpt_TdsReports                           | Reports > Tds Reports > Head Wise Report
+BUILT      | Rpt_Tds2_Prty_Mnth_Wise                  | Reports > Tds Reports > Party Wise Report
+BUILT      | Rpt_Tds2_Prty_Mnth_Wise#Month            | Reports > Tds Reports > Party Wise Monthly Report
+BUILT      | Rpt_Tds3_Add_Ackn                        | Reports > Tds Reports > Address/Acknowledge
+BUILT      | Rpt_Tds4_Challan                         | Reports > Tds Reports > Tax Challan
+BUILT      | Rpt_Tds5_Certi                           | Reports > Tds Reports > Certificate
+BUILT      | Rpt_TdsReports                           | Reports > Tds Reports > Tds Register
+BUILT      | Rpt_Tcs                                  | Reports > Tcs Reports > Tcs Rec/Pay Report
+BUILT      | Rpt_TcsReports#Sales                     | Reports > Tcs Reports > Tcs Sales Register
+BUILT      | Rpt_TcsReports#Purchase                  | Reports > Tcs Reports > Tcs Purchase Register
 VERIFIED   | Gstr_3B_TextNew_Monthly                  | Reports > Gst Reports > 3B Monthly Return > 3B - Monthly Return
 VERIFIED   | Gstr_3B_Detail_Inward_Outwardard_supply  | Reports > Gst Reports > 3B Monthly Return > 3B - Inward & Outward Supply
 VERIFIED   | A_All_Inward_Supply_Purchase             | Reports > Gst Reports > 3B Monthly Return > 3B - Inward Supply
 VERIFIED   | A_All_Outward_Supply_Sales               | Reports > Gst Reports > 3B Monthly Return > 3B - Outward Supply
 BUILT      | GstFilingFreezeData                      | Reports > Gst Reports > 3B Monthly Return > 3B - Freeze DataEntry
 BUILT      | Stp_Gst_OutWrad_ErrorCheck               | Reports > Gst Reports > Gstr-1 Error Checking
-NOT BUILT  | Rpt_Jsm_GSTR1_3_2_2                      | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v3.2.2
-NOT BUILT  | Rpt_Jsm_GSTR1_Old2_0_GovAllExcel         | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v2.0
-NOT BUILT  | Rpt_Jsm_GSTR1_1_8_GovAllExcel            | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v1.9
-NOT BUILT  | Rpt_Jsm_GSTR1_7_GovAllExcel              | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v1.7
+BUILT      | Rpt_Jsm_GSTR1_3_2_2                      | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v3.2.2
+BUILT      | Rpt_Jsm_GSTR1_Old2_0_GovAllExcel         | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v2.0
+BUILT      | Rpt_Jsm_GSTR1_1_8_GovAllExcel            | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v1.9
+BUILT      | Rpt_Jsm_GSTR1_7_GovAllExcel              | Reports > Gst Reports > Gstr-1 Report > Gstr 1 Excel v1.7
 BUILT      | Rpt_Match2B_Report_Tejas                 | Reports > Gst Reports > Gstr Matching > Gstr-2B Matching Reconcial
 BUILT      | Rpt_Match2A                              | Reports > Gst Reports > Gstr Matching > Gstr-2A Matching Reconcial
 BUILT      | Rpt_Jsm_Gstr1_Match                      | Reports > Gst Reports > Gstr Matching > Gstr-1 Matching Reconcial
@@ -116,11 +118,11 @@ VERIFIED   | Rpt_Jsm_GSTR9_New                        | Reports > Gst Reports > 
 VERIFIED   | xOld_Rpt_Jsm_GSTR9_All_Excel_Report      | Reports > Gst Reports > Gstr-9 > Gstr-9C Old
 VERIFIED   | Rpt_Jsm_GSTR9_Excel                      | Reports > Gst Reports > Gstr-9 > Gstr-9 Old
 BUILT      | A_Brokreg_Main_Rpt_Zoom_Column           | Reports > Gst Reports > ITC 04 > ITC 04 (V 2.10)
-NOT BUILT  | Eway_Billing_Bulk                        | Reports > Gst Reports > E-Way Bill Bulk Generation
+BUILT      | Eway_Billing_Bulk                        | Reports > Gst Reports > E-Way Bill Bulk Generation
 VERIFIED   | A_All_Ewb_Einv_Rpt                       | Reports > Gst Reports > E-Way Bill / Invoice Status
 VERIFIED   | Gstr_3BB_TextNew_Excel_Monthly           | Reports > Gst Reports > 3B Form - Monthly Excel
 VERIFIED   | Hsn_Wise_Report_All                      | Reports > Gst Reports > Hsn Wise Reports
-NOT BUILT  | Rpt_Jsm_GSTR1_1x_8_GovAllExcel_Old       | Reports > Gst Reports > Gst 4.5 > Gstr1
+BUILT      | Rpt_Jsm_GSTR1_1x_8_GovAllExcel_Old       | Reports > Gst Reports > Gst 4.5 > Gstr1
 BUILT      | Rpt_Match2B_x1_ReportNew                 | Reports > Gst Reports > Gst 4.5 > 2B
 VERIFIED   | A_Gstr1_SalesInvoiceSummary              | Reports > Gst Reports > Gstin - Sales > Sales Summary
 VERIFIED   | A_Gstr1_SalesInvoiceDetail               | Reports > Gst Reports > Gstin - Sales > Sales Detail (Item)
@@ -137,21 +139,21 @@ BUILT      | A_Gstr2_Expense                          | Reports > Gst Reports > 
 VERIFIED   | JS_GSTR1_RPT                             | Reports > Gst Reports > Extra > 1Sales
 VERIFIED   | JS_GSTR2_RPT                             | Reports > Gst Reports > Extra > 2Purchase
 VERIFIED   | JS_GSTR3_SMRY                            | Reports > Gst Reports > Extra > 3Summary
-NOT BUILT  | Rpt_Stk_Acc_Finish_Summary               | Reports > Acc Stock Reports > Stock Ledger
-NOT BUILT  | Rpt_Stk_Acc_Finish_Summary_Value         | Reports > Acc Stock Reports > Stock With Value Report
+BUILT      | Rpt_Stk_Acc_Finish_Summary               | Reports > Acc Stock Reports > Stock Ledger
+BUILT      | Rpt_Stk_Acc_Finish_Summary_Value         | Reports > Acc Stock Reports > Stock With Value Report
 BUILT      | Rpt_StockSubItemAccReport                | Reports > Acc Stock Reports > Stock SubItem Wise
 BUILT      | Rpt_StockSubItemAcc_DetailReport         | Reports > Acc Stock Reports > Stock SubItem(Detail) Wise
 BUILT      | Rpt_StockSubItemAcc_DetailReport_Online  | Reports > Acc Stock Reports > Stock Register
-NOT BUILT  | Rpt_Stock_Acc_Finish_Summary             | Reports > Acc Stock Reports > Stock Ledger New
-NOT BUILT  | Rpt_Stk_Meter_TanusKgs                   | Reports > Inv Stock Ledger > Stock Mts Reports
-NOT BUILT  | Rpt_Stk_Meter_TanusKgs                   | Reports > Inv Stock Ledger > Stock Mts Reports(Kgs)
-NOT BUILT  | Rpt_Monthly_Stk_Qty_Value_Report         | Reports > Inv Stock Ledger > Stock Mts New Reports
-NOT BUILT  | Rpt_Jsm_Stock_Finish_New1                | Reports > Inv Stock Ledger > Finish At Shop Stock
-NOT BUILT  | Rpt_Stk_Grey_At_Shop                     | Reports > Inv Stock Ledger > Grey   At Shop Stock
-NOT BUILT  | Rpt_Jsm_Stock_Grey_At_Mill               | Reports > Inv Stock Ledger > Grey   At Mill Stock - Format 1
-NOT BUILT  | Rpt1_Stk_Grey_At_Mill                    | Reports > Inv Stock Ledger > Grey   At Mill Stock - Format 2
+BUILT      | Rpt_Stock_Acc_Finish_Summary             | Reports > Acc Stock Reports > Stock Ledger New
+BUILT      | Rpt_Stk_Meter_TanusKgs                   | Reports > Inv Stock Ledger > Stock Mts Reports
+BUILT      | Rpt_Stk_Meter_TanusKgs                   | Reports > Inv Stock Ledger > Stock Mts Reports(Kgs)
+BUILT      | Rpt_Monthly_Stk_Qty_Value_Report         | Reports > Inv Stock Ledger > Stock Mts New Reports
+BUILT      | Rpt_Jsm_Stock_Finish_New1                | Reports > Inv Stock Ledger > Finish At Shop Stock
+BUILT      | Rpt_Stk_Grey_At_Shop                     | Reports > Inv Stock Ledger > Grey   At Shop Stock
+BUILT      | Rpt_Jsm_Stock_Grey_At_Mill               | Reports > Inv Stock Ledger > Grey   At Mill Stock - Format 1
+BUILT      | Rpt1_Stk_Grey_At_Mill                    | Reports > Inv Stock Ledger > Grey   At Mill Stock - Format 2
 VERIFIED   | Rpt_FinishStockReport                    | Reports > Inv Stock Ledger > Finish Stock Excel
-NOT BUILT  | Rpt_Stock_Acc_Finish_Summary             | Reports > Inv Stock Ledger > Finish At Shop Stock(Book-Acc)
+BUILT      | Rpt_Stock_Acc_Finish_Summary             | Reports > Inv Stock Ledger > Finish At Shop Stock(Book-Acc)
 BUILT      | A_StockValueReport                       | Reports > Inv Stock Ledger > Stock Value Reports
 VERIFIED   | Rpt_Outstating_Report_Sales              | Others Reports > Outstanding Zoom > Debitors
 VERIFIED   | Rpt_Outstating_Report_Purchase           | Others Reports > Outstanding Zoom > Creditors
@@ -211,7 +213,7 @@ BUILT      | Rpt_Stock_Share                          | Others Reports > Old Rep
 BUILT      | Rpt_StockSizeWise                        | Others Reports > Old Reports > Extra Reports > Stock(Old) Detail SizeWise
 VERIFIED   | Rpt_Jsm_SalesPurchaseVat                 | Others Reports > Old Reports > Old FinalReports > Book Printing
 BUILT      | Rpt_Stk_Grey_At_Shop_DateWise            | Others Reports > Old Reports > Old Stock Reports > GreyAtShop-DateWise
-NOT BUILT  | Rpt_Stk_Grey_At_Shop                     | Others Reports > Old Reports > Old Stock Reports > GreyAtShop
+BUILT      | Rpt_Stk_Grey_At_Shop                     | Others Reports > Old Reports > Old Stock Reports > GreyAtShop
 BUILT      | Rpt_1Sales_Receipt_Reg                   | Others Reports > Old Reports > Rec/Pay Register > Sales
 BUILT      | Rpt_1Purchase_Payment_Reg                | Others Reports > Old Reports > Rec/Pay Register > Purchase
 BUILT      | Rpt_1Process_Payment_Reg                 | Others Reports > Old Reports > Rec/Pay Register > Process
