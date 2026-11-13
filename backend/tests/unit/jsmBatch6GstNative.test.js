@@ -351,3 +351,22 @@ test('TDS certificate and challan: per party/month with quarter; challan splits 
   const non = await ch.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', company: false }, { rows });
   assert.equal(non.rows.length, 1);
 });
+
+test('Stock With Value: closing times the item PU_RATE, /100 divides, category sums items', async () => {
+  const rows = [
+    { ITEM_NAME: 'A', GRIT_NAME: 'FINISH', BILLDATE: new Date('2026-05-01'), FNS_PU: 100 },
+    { ITEM_NAME: 'A', GRIT_NAME: 'FINISH', BILLDATE: new Date('2026-05-02'), FNS_SL: 40 },
+    { ITEM_NAME: 'B', GRIT_NAME: 'FINISH', BILLDATE: new Date('2026-05-03'), FNS_PU: 10 },
+  ];
+  const rates = new Map([['A', 50], ['B', 10]]);
+  const rpt = require('../../services/jsmReports').get('Rpt_Stk_Acc_Finish_Summary_Value');
+  const base = { from: '2026-04-01', to: '2027-03-31' };
+  const out = await rpt.run('507f1f77bcf86cd799439011', base, { rows, rates });
+  const a = out.rows.find((r) => r.ITEM_NAME === 'A');
+  assert.deepEqual([a.CL_STOCK, a.PU_RATE, a.STOCK_VALUE], [60, 50, 3000]);
+  const div = await rpt.run('507f1f77bcf86cd799439011', { ...base, div100: true }, { rows, rates });
+  assert.equal(div.rows.find((r) => r.ITEM_NAME === 'A').STOCK_VALUE, 30);
+  const cat = await rpt.run('507f1f77bcf86cd799439011', { ...base, byCategory: true }, { rows, rates });
+  assert.equal(cat.rows.length, 1);
+  assert.equal(cat.rows[0].STOCK_VALUE, 3100);
+});
