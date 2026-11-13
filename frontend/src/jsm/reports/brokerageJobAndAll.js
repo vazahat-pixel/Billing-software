@@ -59,7 +59,7 @@ export const BROKERAGE_JOB_AND_ALL = [
   },
   {
     form: 'A_Jsm_Brokreg_Statement_Report',
-    lists: { ListView5: 'books', ListView6: 'parties', ListView7: 'brokers' },
+    lists: { ListView5: 'brokers', ListView6: 'books', ListView7: 'parties' },
     defaults: ({ fyFrom, fyTo }) => ({
       txt_dt_from: fyFrom,
       txt_dt_to: fyTo,
@@ -86,9 +86,9 @@ export const BROKERAGE_JOB_AND_ALL = [
       summary: Boolean(s.CheckBox_Summary),
       includeLastYear: s.CheckBox_LastYear !== false,
       printout: s.cbo_printout,
-      books: s.ListView5 || [],
-      parties: s.ListView6 || [],
-      brokers: s.ListView7 || [],
+      brokers: s.ListView5 || [],
+      books: s.ListView6 || [],
+      parties: s.ListView7 || [],
     }),
     fallbackColumns: FALLBACKS,
   },

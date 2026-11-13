@@ -27,7 +27,7 @@ const COLUMNS = [
 
 export default {
   form: 'Rpt_Sales_Challan_Detail_Report',
-  lists: { ListView0: 'registers', ListView1: 'parties', ListView2: 'brokers', ListView3: 'items' },
+  lists: { ListView0: 'parties', ListView1: 'brokers', ListView2: 'items' },
   defaults: ({ fyFrom, fyTo }) => ({
     txt_dt_from: fyFrom,
     txt_dt_to: fyTo,
@@ -42,10 +42,10 @@ export default {
     orderBy1: s.Cbo_OrderBy1,
     orderBy2: s.Cbo_OrderBy2,
     printout: s.cbo_printout,
-    registers: s.ListView0 || [],
-    parties: s.ListView1 || [],
-    brokers: s.ListView2 || [],
-    items: s.ListView3 || [],
+    registers: [],
+    parties: s.ListView0 || [],
+    brokers: s.ListView1 || [],
+    items: s.ListView2 || [],
   }),
   fallbackColumns: { JSM_VW_SALES_CHALLAN_DTL_REPORT: COLUMNS },
 };

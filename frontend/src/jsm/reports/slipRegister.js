@@ -73,7 +73,7 @@ export const SLIP_REGISTERS = [
   },
   {
     form: 'Rpt_SalesSlipDetail_Report',
-    lists: { ListView0: 'registers', ListView1: 'parties', ListView2: 'items' },
+    lists: { ListView0: 'parties', ListView1: 'registers', ListView2: 'items' },
     defaults: ({ fyFrom, fyTo }) => ({
       txt_dt_from: fyFrom,
       txt_dt_to: fyTo,
@@ -92,8 +92,8 @@ export const SLIP_REGISTERS = [
       orderBy2: s.Cbo_OrderBy2,
       printout: s.cbo_printout,
       summary: Boolean(s.CheckBox_Summary),
-      registers: s.ListView0 || [],
-      parties: s.ListView1 || [],
+      parties: s.ListView0 || [],
+      registers: s.ListView1 || [],
       items: s.ListView2 || [],
     }),
     fallbackColumns: {

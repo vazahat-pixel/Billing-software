@@ -14,7 +14,13 @@ const options = (load) => async (companyId, p = {}, deps = {}) => {
   const rows = deps.rows || await load(companyId);
   const u = (f) => [...new Set(rows.map((r) => r[f]).filter((v) => String(v ?? '').trim()))]
     .sort((a, b) => String(a).localeCompare(String(b)));
-  return { parties: u('PARTY'), brokers: u('BROKER'), books: u('REGISTER'), stations: u('STATION') };
+  return {
+    parties: u('PARTY'),
+    brokers: u('BROKER'),
+    books: u('REGISTER'),
+    stations: u('STATION'),
+    items: [...new Set(rows.flatMap((r) => (r._lines || []).map((l) => l.ITEM_NAME)).filter(Boolean))].sort(),
+  };
 };
 
 const sales = registerSummaryReport({

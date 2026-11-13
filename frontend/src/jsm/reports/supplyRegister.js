@@ -27,7 +27,7 @@ const SUMMARY = DETAIL.filter((c) => !['BILL_DATE', 'BILL_NO'].includes(c.field)
 
 const supply = (form, fallbackColumns) => ({
   form,
-  lists: { ListView0: 'books', ListView1: 'parties', ListView2: 'states', ListView3: 'types', ListView4: 'gstRates' },
+  lists: { ListView0: 'parties', ListView1: 'states', ListView2: 'types', ListView3: 'books', ListView4: 'gstRates' },
   defaults: ({ fyFrom, fyTo }) => ({
     txt_dt_from: fyFrom, txt_dt_to: fyTo, Cbo_OrderBy1: 'Register', Cbo_OrderBy2: 'None',
   }),
@@ -40,10 +40,10 @@ const supply = (form, fallbackColumns) => ({
     orderBy2: s.Cbo_OrderBy2,
     summary: Boolean(s.CheckBox_Summary),
     printout: s.cbo_printout,
-    books: s.ListView0 || [],
-    parties: s.ListView1 || [],
-    states: s.ListView2 || [],
-    types: s.ListView3 || [],
+    parties: s.ListView0 || [],
+    states: s.ListView1 || [],
+    types: s.ListView2 || [],
+    books: s.ListView3 || [],
     gstRates: s.ListView4 || [],
   }),
   fallbackColumns,

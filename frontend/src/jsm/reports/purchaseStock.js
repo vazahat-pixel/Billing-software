@@ -61,7 +61,7 @@ const GODOWN_COLUMNS = [
 /** The two newer screens share their shape: four lists, two Order By boxes, a status combo. */
 const tabbed = (form, fallbackColumns) => ({
   form,
-  lists: { ListView0: 'registers', ListView1: 'parties', ListView2: 'items', ListView3: 'godowns' },
+  lists: { ListView0: 'parties', ListView1: 'items', ListView2: 'registers', ListView3: 'godowns' },
   defaults: ({ fyFrom, fyTo }) => ({
     txt_dt_from: fyFrom,
     txt_dt_to: fyTo,
@@ -78,9 +78,9 @@ const tabbed = (form, fallbackColumns) => ({
     orderBy1: s.Cbo_OrderBy1,
     orderBy2: s.Cbo_OrderBy2,
     printout: s.cbo_printout,
-    registers: s.ListView0 || [],
-    parties: s.ListView1 || [],
-    items: s.ListView2 || [],
+    parties: s.ListView0 || [],
+    items: s.ListView1 || [],
+    registers: s.ListView2 || [],
     godowns: s.ListView3 || [],
   }),
   fallbackColumns,

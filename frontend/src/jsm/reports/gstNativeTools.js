@@ -127,11 +127,11 @@ export const GST_NATIVE_TOOLS = [
   // JSM_VW_ALL_EWB_EINV_REPORT_MAIN is CAPTURED in layouts.json — no fallbackColumns!
   {
     form: 'A_All_Ewb_Einv_Rpt',
-    lists: { ListView0: 'books', ListView1: 'parties' },
+    lists: { ListView0: 'parties', ListView1: 'states' },
     defaults: ({ fyFrom, fyTo }) => ({ txt_dt_from: fyFrom, txt_dt_to: fyTo }),
     toParams: (s) => ({
       from: toIsoDate(s.txt_dt_from), to: toIsoDate(s.txt_dt_to), fromText: s.txt_dt_from, toText: s.txt_dt_to,
-      books: s.ListView0 || [], parties: s.ListView1 || [],
+      parties: s.ListView0 || [], states: s.ListView1 || [],
     }),
   },
 ];

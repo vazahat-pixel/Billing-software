@@ -107,7 +107,7 @@ export const OUTSTANDING_AGE_EXTRAS = [
   },
   {
     form: 'Rpt_Outstating_ReportSales',
-    lists: { ListView0: 'parties', ListView1: 'brokers', ListView2: 'stations', ListView3: 'books', ListView4: 'mainGroups' },
+    lists: { ListView0: 'parties', ListView1: 'brokers', ListView2: 'stations', ListView3: 'mainGroups', ListView4: 'books' },
     defaults: ({ fyFrom, fyTo, today }) => ({
       txt_bill_dt_from: fyFrom,
       txt_bill_dt_to: fyTo,
@@ -140,8 +140,8 @@ export const OUTSTANDING_AGE_EXTRAS = [
       parties: s.ListView0 || [],
       brokers: s.ListView1 || [],
       stations: s.ListView2 || [],
-      books: s.ListView3 || [],
-      mainGroups: s.ListView4 || [],
+      mainGroups: s.ListView3 || [],
+      books: s.ListView4 || [],
     }),
     fallbackColumns: { RPT_OSSALES_DETAIL: OS_NEW_COLS },
   },

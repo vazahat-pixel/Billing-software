@@ -29,7 +29,7 @@ const FALLBACKS = {
 
 const recPay = (form) => ({
   form,
-  lists: { ListView0: 'parties', ListView1: 'brokers' },
+  lists: { lst_vw1: 'parties', lst_vw2: 'brokers' },
   defaults: ({ fyFrom, fyTo }) => ({
     txt_dt_from: fyFrom,
     txt_dt_to: fyTo,
@@ -43,8 +43,8 @@ const recPay = (form) => ({
     fromText: s.txt_dt_from || s.txt_bill_dt_from,
     toText: s.txt_dt_to || s.txt_bill_dt_to,
     category: s.Rdbtn_B3 ? 3 : s.Rdbtn_B2 ? 2 : 1,
-    parties: s.ListView0 || [],
-    brokers: s.ListView1 || [],
+    parties: s.lst_vw1 || [],
+    brokers: s.lst_vw2 || [],
   }),
   fallbackColumns: FALLBACKS,
 });

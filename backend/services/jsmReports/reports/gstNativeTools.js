@@ -152,6 +152,7 @@ async function runEwbEinvRpt(companyId, p = {}, deps = {}) {
   sales = inDateRange(sales, 'BILL_DATE', p.from, p.to);
   sales = inList(sales, 'BOOK', p.books);
   sales = inList(sales, 'PARTY', p.parties);
+  sales = inList(sales, 'STATE', p.states);
 
   const rows = sales.map((s) => ({
     REGISTER: s.BOOK || 'SALES',
@@ -199,6 +200,13 @@ module.exports = {
   gstr3bMonthly: { run: (c, p, d) => runGstr3bMonthly(c, p, d, false), options: async () => ({}) },
   gstr3bExcel: { run: (c, p, d) => runGstr3bMonthly(c, p, d, true), options: async () => ({}) },
   brokregZoomColumn: { run: runBrokregZoomColumn, options: brokStmt.options },
-  ewbEinvRpt: { run: runEwbEinvRpt, options: async () => ({}) },
+  ewbEinvRpt: {
+    run: runEwbEinvRpt,
+    options: async (companyId) => {
+      const sales = await billSrc.loadSalesRegisterRows(companyId);
+      const u = (f) => [...new Set(sales.map((r) => r[f]).filter(Boolean))].sort();
+      return { parties: u('PARTY'), states: u('STATE') };
+    },
+  },
 };
 

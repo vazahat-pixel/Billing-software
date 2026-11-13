@@ -7,9 +7,9 @@ import { toIsoDate } from '../winforms.js';
 export default {
   form: 'Rpt_Process_Stock_TakaDetail',
   lists: {
-    ListView1: 'mills',
-    ListView2: 'items',
-    ListView3: 'purParties',
+    ListView0: 'mills',
+    ListView1: 'items',
+    ListView2: 'purParties',
   },
   defaults: ({ fyFrom, fyTo }) => ({
     txt_bill_dt_from: fyFrom,
@@ -34,9 +34,9 @@ export default {
     orderBy1: s.Cbo_OrderBy1 || 'Register',
     orderBy2: s.Cbo_OrderBy2 || 'None',
     printout: s.cbo_printout || '1-Continue',
-    mills: s.ListView1 || [],
-    items: s.ListView2 || [],
-    purParties: s.ListView3 || [],
+    mills: s.ListView0 || [],
+    items: s.ListView1 || [],
+    purParties: s.ListView2 || [],
   }),
 };
 

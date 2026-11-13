@@ -35,7 +35,8 @@ const zoom = (side) => ({
   form: `Rpt_Outstating_Report_${side}`,
   blueprintForm: 'Rpt_Outstating_Report',
   apiForm: `Rpt_Outstating_Report_${side}`,
-  lists: { ListView1: 'parties', ListView2: 'brokers', ListView3: 'stations', ListView4: 'books' },
+  // Tabs: Party (DataGridView1), Broker, Station, MainGroup, Book, Group, Haste ...
+  lists: { DataGridView1: 'parties', ListView1: 'brokers', ListView2: 'stations', ListView4: 'books', ListView6: 'hastes' },
   defaults: ({ fyFrom, fyTo }) => ({
     txt_bill_dt_from: fyFrom,
     txt_bill_dt_to: fyTo,
@@ -64,10 +65,11 @@ const zoom = (side) => ({
     onlyFullBill: Boolean(s.CheckBox_ESC_OnlyPart),
     onlyPartReceived: Boolean(s.CheckBox_OnlyPart),
     printout: s.cbo_printout,
-    parties: s.ListView1 || [],
-    brokers: s.ListView2 || [],
-    stations: s.ListView3 || [],
+    parties: s.DataGridView1 || [],
+    brokers: s.ListView1 || [],
+    stations: s.ListView2 || [],
     books: s.ListView4 || [],
+    hastes: s.ListView6 || [],
   }),
   fallbackColumns: FALLBACKS,
 });
@@ -88,7 +90,7 @@ export const OUTSTANDING_ZOOMS = [zoom('Sales'), zoom('Purchase'), zoom('Process
 export const outstandingPurchaseAll = {
   form: 'Rpt_OutstatingAllPurchase_Report',
   apiForm: 'Rpt_Outstating_Report_Purchase',
-  lists: { ListView0: 'parties', ListView1: 'brokers', ListView2: 'stations', ListView3: 'books' },
+  lists: { ListView0: 'parties', ListView1: 'brokers', ListView2: 'stations', ListView4: 'books', ListView6: 'hastes' },
   defaults: () => ({
     Cbo_OrderBy1: 'Party',
     Cbo_OrderBy2: 'None',
@@ -113,7 +115,8 @@ export const outstandingPurchaseAll = {
     parties: s.ListView0 || [],
     brokers: s.ListView1 || [],
     stations: s.ListView2 || [],
-    books: s.ListView3 || [],
+    books: s.ListView4 || [],
+    hastes: s.ListView6 || [],
   }),
   fallbackColumns: FALLBACKS,
 };
