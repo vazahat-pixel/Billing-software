@@ -16,7 +16,7 @@ import './jsm.css';
  * Generate Excel writes the offline-utility workbook of that version (v1.7 / v1.9 / v2.0).
  */
 const FORMS = {
-  Rpt_Jsm_GSTR1_3_2_2: { version: null },
+  Rpt_Jsm_GSTR1_3_2_2: { version: 'v3_2_2' },
   Rpt_Jsm_GSTR1_Old2_0_GovAllExcel: { version: 'v2_0' },
   Rpt_Jsm_GSTR1_1_8_GovAllExcel: { version: 'v1_9' },
   Rpt_Jsm_GSTR1_7_GovAllExcel: { version: 'v1_7' },

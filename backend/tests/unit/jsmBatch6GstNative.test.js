@@ -302,21 +302,24 @@ test('Grey At Mill Format 2: sent, came back, net grey; earlier movement becomes
   assert.equal(upto.rows[0].NET_MTS, 400);
 });
 
-test('Monthly stock (Kgs): each month carries the previous closing; sections use their own flows', async () => {
-  const rows = [
-    { date: new Date('2026-03-10'), PURCHASE: 100 },
-    { date: new Date('2026-04-10'), PURCHASE: 50 },
-    { date: new Date('2026-05-05'), GR_SL: 30 },
-    { date: new Date('2026-05-06'), MILL_SEND: 20 },
-    { date: new Date('2026-05-07'), FNS_PURCHASE: 7 },
+test('Stock Mts statement reproduces the figures of JSM own printout (Monthwise_Stock_Mts.pdf)', async () => {
+  // JSM printed: Grey purchase 2482, issue 1202, G.Sales 2969 -> -1689; mill 1202 - 602 -> 600; finish 602 + 360 - 1880 -> -918
+  const d = new Date('2026-07-01');
+  const flows = [
+    { date: d, G_PURCHASE: 2482 }, { date: d, M_ISSUE: 1202 }, { date: d, G_SALES: 2969 }, { date: d, M_RECEIPT: 602, PROCESS: 602 },
+    { date: d, F_PURCHASE: 360 }, { date: d, F_SALES: 1880 },
   ];
   const rpt = require('../../services/jsmReports').get('Rpt_Stk_Meter_TanusKgs');
-  const grey = await rpt.run('507f1f77bcf86cd799439011', { to: '2026-05-31', section: '2' }, { rows });
-  assert.deepEqual(grey.rows.map((r) => [r.MONTH, r.OP_KGS, r.CL_KGS]), [['April', 100, 150], ['May', 150, 100]]);
-  const all = await rpt.run('507f1f77bcf86cd799439011', { to: '2026-05-31', section: '1' }, { rows });
-  assert.equal(all.rows[1].GREY_CL, 100);
-  assert.equal(all.rows[1].FINISH_CL, 7);
-  await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { to: '2026-05-31', section: '9' }, { rows }), /Unknown report/);
+  const out = await rpt.run('507f1f77bcf86cd799439011', { to: '2026-09-28', section: '1' }, { flows });
+  const v = (head, nth = 0) => out.rows.filter((r) => r.HEADNAME === head)[nth].VALUE;
+  assert.equal(v('Closing Stock', 0), -1689);
+  assert.equal(v('Grey Closing Stock'), 600);
+  assert.equal(v('Net Closing Stock'), 600);
+  assert.equal(v('Closing Stock', 1), -918);
+  assert.equal(out.rows.find((r) => r.HEADNAME === 'Process').VALUE, 602);
+  const grey = await rpt.run('507f1f77bcf86cd799439011', { to: '2026-09-28', section: '2' }, { flows });
+  assert.equal(grey.rows.length, 8);
+  await assert.rejects(() => rpt.run('507f1f77bcf86cd799439011', { to: '2026-09-28', section: '9' }, { flows }), /Unknown report/);
 });
 
 test('Tds Address/Acknowledge: saves the CIT address and four acknowledgement numbers, then reads them back', async () => {

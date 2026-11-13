@@ -25,3 +25,17 @@ test('item lines of one document become one bill with summed values', () => {
   assert.equal(b13.itemList[0].igstRate, 12);
   assert.equal(b13.itemList[0].cgstRate, 0);
 });
+
+test('bill keys and constants follow the JSON JSM itself writes', () => {
+  const out = buildEwayBulkJson([{ ...base, PRO_NAME: 'A', PRO_HSN: '5407', PRO_QTY: 3, ACC_VALUE: 518.62, TAX_RATE: 5, CGST_AMT: 0, SGST_AMT: 0, IGST_AMT: 25.93, TOT_INV_VALUE: 545 }]);
+  assert.equal(out.version, '1.0.0421');
+  const b = out.billLists[0];
+  assert.deepEqual(Object.keys(b).slice(0, 8), ['genMode', 'userGstin', 'supplyType', 'subSupplyType', 'docType', 'docNo', 'docDate', 'transType']);
+  assert.equal(b.genMode, 'Excel');
+  assert.equal(b.totInvValue, '545.00');
+  assert.equal(b.TotNonAdvolVal, 1);
+  assert.equal(b.transDistance, 0);
+  assert.equal(b.transDocDate, '05/07/2026');
+  assert.equal(b.itemList[0].cessNonAdvol, 0);
+  assert.equal(b.itemList[0].igstRate, 5);
+});

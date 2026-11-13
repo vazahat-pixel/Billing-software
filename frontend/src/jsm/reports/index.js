@@ -89,7 +89,7 @@ import bankMonthWise from './bankMonthWise';
 import checkDiffOpening from './checkDiffOpening';
 import stockGreyAtShop from './stockGreyAtShop';
 import stockGreyAtMill2 from './stockGreyAtMill2';
-import stockMonthlyKgs from './stockMonthlyKgs';
+import { STOCK_METER_REPORTS } from './stockMonthlyKgs';
 import stockLedgerAcc from './stockLedgerAcc';
 import stockValueFinish from './stockValueFinish';
 import stockQtyValue from './stockQtyValue';
@@ -105,5 +105,5 @@ export const JSM_REPORTS = Object.fromEntries([
   ...OLD_GST_REPORTS, ...OLD_STOCK_REPORTS, ...OLD_MISC_REPORTS, ...OLD_BANK_REPORTS,
   processTakaDetail, zoomSelectDate, brokregOsReport, billAgainstPaidDetail, match8aReport, dbRepairDiagnostics,
   gstFreezeData, ...UPDATE_STATUS_TOOLS, ewayUploadOffline, importSalesJsm, reminderTool, ...BROKERAGE_ENTRY_TOOLS, investmentReport,
-  ...GSTIN_SUMMARY_REPORTS, ...GST_NATIVE_TOOLS, ...TDS_TCS_REPORTS, tcsRecPay, stockFinishNew, stockGreyAtMill, stockAccFinish, cashBankFinance, bankMonthWise, checkDiffOpening, stockGreyAtShop, stockGreyAtMill2, stockMonthlyKgs, stockLedgerAcc, stockValueFinish, stockQtyValue, ...TDS_CERT_CHALLAN,
+  ...GSTIN_SUMMARY_REPORTS, ...GST_NATIVE_TOOLS, ...TDS_TCS_REPORTS, tcsRecPay, stockFinishNew, stockGreyAtMill, stockAccFinish, cashBankFinance, bankMonthWise, checkDiffOpening, stockGreyAtShop, stockGreyAtMill2, ...STOCK_METER_REPORTS, stockLedgerAcc, stockValueFinish, stockQtyValue, ...TDS_CERT_CHALLAN,
 ].map((r) => [r.form, r]));

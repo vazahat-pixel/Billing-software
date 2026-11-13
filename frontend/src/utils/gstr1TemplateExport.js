@@ -68,13 +68,16 @@ const FIELDS = {
   }),
 };
 
+FIELDS.hsnb2c = FIELDS.hsn;
+
 /** which data array feeds which sheet (the sheet name's first word decides) */
 const SOURCE = {
   b2b: 'b2bRows', b2cl: 'b2clRows', b2cs: 'b2cs', cdnr: 'cdnrRows', cdnur: 'cdnuRows',
-  exp: 'expRows', hsn: 'hsnRows', exemp: 'exempRows', docs: 'docsRows',
+  exp: 'expRows', hsn: 'hsnRows', hsnb2c: 'hsnB2cRows', exemp: 'exempRows', docs: 'docsRows',
 };
 const kindOf = (name) => {
-  const k = String(name).split(',')[0].trim();
+  // v3.2.2 splits HSN in two sheets: hsn(b2b) and hsn(b2c)
+  const k = String(name).split(',')[0].trim().replace(/^hsn\(b2b\)$/, 'hsn').replace(/^hsn\(b2c\)$/, 'hsnb2c');
   return SOURCE[k] ? k : null;
 };
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9%]/g, '');

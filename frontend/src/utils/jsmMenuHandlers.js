@@ -265,6 +265,8 @@ export const PATH_HANDLERS = {
     { id: 'tds-monthly', external: 'jsmReport', jsmForm: 'Rpt_Tds2_Prty_Mnth_Wise#Month' },
   'Reports > Tds Reports > Tds Register':
     { id: 'tds-reg', external: 'jsmReport', jsmForm: 'Rpt_TdsReports' },
+  'Reports > Inv Stock Ledger > Stock Mts Reports(Kgs)':
+    { id: 'stock-mts-kgs', external: 'jsmReport', jsmForm: 'Rpt_Stk_Meter_TanusKgs#Kgs' },
   'Reports > Tcs Reports > Tcs Purchase Register':
     { id: 'tcs-purchase', external: 'jsmReport', jsmForm: 'Rpt_TcsReports#Purchase' },
   'Reports > Fas Reports > Bank / Cash Book > Reconciliation':

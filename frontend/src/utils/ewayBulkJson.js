@@ -17,6 +17,7 @@ export function buildEwayBulkJson(rows) {
     const key = `${r.DOC_NO}|${r.DOC_DATE}`;
     if (!bills.has(key)) {
       bills.set(key, {
+        genMode: 'Excel',
         userGstin: r.FRM_GSTN,
         supplyType: 'O',
         subSupplyType: 1,
@@ -45,16 +46,19 @@ export function buildEwayBulkJson(rows) {
         sgstValue: 0,
         igstValue: 0,
         cessValue: 0,
-        totInvValue: num(r.TOT_INV_VALUE),
+        // constants JSM writes on every bill
+        TotNonAdvolVal: 1,
+        OthValue: 1,
+        totInvValue: num(r.TOT_INV_VALUE).toFixed(2),
         transMode: 1,
-        transDistance: String(r.DISTANCE || ''),
+        transDistance: num(r.DISTANCE),
         transporterName: r.TRAN_NAME || '',
         transporterId: r.TRAN_GSTN || '',
         transDocNo: r.TRNS_DOCNO || '',
-        transDocDate: r.TRNS_DATE || '',
+        transDocDate: r.TRNS_DATE || r.DOC_DATE || '',
         vehicleNo: r.VEHICAL_NO || '',
         vehicleType: r.VEHICAL_TYPE || 'R',
-        mainHsnCode: num(r.MAIN_HSN_CODE),
+        mainHsnCode: r.MAIN_HSN_CODE ? num(r.MAIN_HSN_CODE) : '',
         itemList: [],
       });
     }
@@ -78,7 +82,8 @@ export function buildEwayBulkJson(rows) {
       cgstRate: intra ? rate / 2 : 0,
       igstRate: intra ? 0 : rate,
       cessRate: 0,
+      cessNonAdvol: 0,
     });
   }
-  return { version: '1.0.0621', billLists: [...bills.values()] };
+  return { version: '1.0.0421', billLists: [...bills.values()] };
 }
