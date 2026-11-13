@@ -199,7 +199,7 @@ module.exports = {
   inwardErrorCheck: { run: (c, p, d) => runOutwardErrorCheck(c, p, d, true), options: async () => ({}) },
   gstr3bMonthly: { run: (c, p, d) => runGstr3bMonthly(c, p, d, false), options: async () => ({}) },
   gstr3bExcel: { run: (c, p, d) => runGstr3bMonthly(c, p, d, true), options: async () => ({}) },
-  brokregZoomColumn: { run: runBrokregZoomColumn, options: brokStmt.options },
+  brokregZoomColumn: { run: runBrokregZoomColumn, options: brokStmt.salesBillDate.options },
   ewbEinvRpt: {
     run: runEwbEinvRpt,
     options: async (companyId) => {

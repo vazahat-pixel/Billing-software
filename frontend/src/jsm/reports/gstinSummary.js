@@ -146,7 +146,7 @@ export const GSTIN_SUMMARY_REPORTS = [
     },
   }),
   mk('Rpt_Journal_Details_Report', {
-    lists: {},
+    lists: { ListView2: 'parties' },
     fallbackColumns: {
       JSM_VW_JOURNAL_DETAILS_RPT: [
         { field: 'BOOK', caption: 'BOOK', kind: 'C', len: 14 },
@@ -161,7 +161,7 @@ export const GSTIN_SUMMARY_REPORTS = [
     },
   }),
   mk('A_Gstr2_Expense', {
-    lists: {},
+    lists: { ListView1: 'parties' },
     fallbackColumns: {
       JSM_VW_JOURNAL_DETAILS_RPT: [
         { field: 'BOOK', caption: 'BOOK', kind: 'C', len: 14 },

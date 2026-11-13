@@ -211,9 +211,9 @@ async function runReceiptGstSummary(companyId, p = {}, deps = {}, kind = 'Mill')
   };
 }
 
-async function runJournalOrExpense(companyId, p = {}, deps = {}, mode = 'Journal') {
-  let rows = deps.rows;
-  if (!rows) {
+async function loadJournalRows(companyId, mode) {
+  let rows;
+  {
     const DebitCreditNote = require('../../../models/DebitCreditNote');
     const AccountingEntry = require('../../../models/AccountingEntry');
     require('../../../models/LedgerMaster');
@@ -241,7 +241,12 @@ async function runJournalOrExpense(companyId, p = {}, deps = {}, mode = 'Journal
       }),
     ];
   }
-  const filtered = inDateRange(rows, 'BILL_DATE', p.from, p.to);
+  return rows;
+}
+
+async function runJournalOrExpense(companyId, p = {}, deps = {}, mode = 'Journal') {
+  const rows = deps.rows || await loadJournalRows(companyId, mode);
+  const filtered = inList(inDateRange(rows, 'BILL_DATE', p.from, p.to), 'PARTY', p.parties);
   return {
     rows: orderRows(filtered, ['BOOK', 'BILL_DATE', 'NCBILL_NO']),
     grid: {
@@ -288,7 +293,12 @@ const receiptOptions = (kind) => async (companyId) => {
   };
 };
 
-// Journal and Expense screens keep the combined lists they always had.
+// Journal and Expense screens list the parties of their own vouchers.
+const journalOptions = (mode) => async (companyId) => {
+  const rows = await loadJournalRows(companyId, mode);
+  return { parties: uniq(rows, 'PARTY'), books: uniq(rows, 'BOOK') };
+};
+
 const options = async (companyId) => {
   const [sl, pu] = await Promise.all([sideOptions(billSrc.loadSalesRegisterRows, true)(companyId), sideOptions(billSrc.loadPurchaseRegisterRows)(companyId)]);
   const m = (k) => [...new Set([...sl[k], ...pu[k]])].sort();
@@ -300,7 +310,7 @@ module.exports = {
   purchaseSummary: { run: runPurchaseSummary, options: sideOptions(billSrc.loadPurchaseRegisterRows) },
   processSummary: { run: (c, p, d) => runReceiptGstSummary(c, p, d, 'Mill'), options: receiptOptions('Mill') },
   jobworkSummary: { run: (c, p, d) => runReceiptGstSummary(c, p, d, 'Job'), options: receiptOptions('Job') },
-  journalDetails: { run: (c, p, d) => runJournalOrExpense(c, p, d, 'Journal'), options },
-  expenseGstr2: { run: (c, p, d) => runJournalOrExpense(c, p, d, 'Expense'), options },
+  journalDetails: { run: (c, p, d) => runJournalOrExpense(c, p, d, 'Journal'), options: journalOptions('Journal') },
+  expenseGstr2: { run: (c, p, d) => runJournalOrExpense(c, p, d, 'Expense'), options: journalOptions('Expense') },
 };
 

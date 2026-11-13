@@ -129,4 +129,23 @@ const RETURN_FORMS = [
   ['OldRpt_SalesRTNRegisterDetail_Report', DETAIL_COMMON],
   ['Rpt_PurchaseRtnRegisterDetail_Report', DETAIL_COMMON],
 ];
-for (const [form, shape] of RETURN_FORMS) REGISTER_SUMMARIES.push({ ...shape, form });
+// Their tick-lists: the register-style screens list Party, Broker, Station, MainGroup, Book...; the GSTIN-style
+// ones (A_Gstr1_*) list Party, State, Type, Book, GstRate.
+const RTN_SUMMARY_LISTS = { ListView0: 'parties', ListView1: 'brokers', ListView2: 'stations', ListView4: 'books' };
+const GSTIN_RTN_LISTS = { ListView0: 'parties', ListView3: 'books' };
+for (const [form, shape] of RETURN_FORMS) {
+  if (shape !== COMMON) { REGISTER_SUMMARIES.push({ ...shape, form }); continue; }
+  const gstin = form.startsWith('A_Gstr1_');
+  REGISTER_SUMMARIES.push({
+    ...shape,
+    form,
+    lists: gstin ? GSTIN_RTN_LISTS : RTN_SUMMARY_LISTS,
+    toParams: (st) => ({
+      ...shape.toParams(st),
+      parties: st.ListView0 || [],
+      brokers: gstin ? [] : (st.ListView1 || []),
+      stations: gstin ? [] : (st.ListView2 || []),
+      books: (gstin ? st.ListView3 : st.ListView4) || [],
+    }),
+  });
+}
