@@ -13,7 +13,6 @@ import { toIsoDate } from '../winforms.js';
  */
 const COMMON = {
   renderer: undefined,
-  lists: { lst_vw1: 'parties' },
   defaults: ({ fyFrom, fyTo }) => ({
     txt_dt_from: fyFrom,
     txt_dt_to: fyTo,
@@ -33,7 +32,10 @@ const COMMON = {
     summaryReports: s.CheckBox_Summary !== false,
     sort: s.rdo_asc_sales_prt ? 'asc' : (s.rdo_desc_sales_prt ? 'desc' : null),
     printout: s.cbo_printout,
-    parties: s.lst_vw1 || [],
+    parties: s.DataGridView1 || s.ListView0 || [],
+    brokers: s.ListView1 || [],
+    stations: s.ListView2 || [],
+    books: s.ListView4 || [],
   }),
   fallbackColumns: {
     JSM_VW_REGISTER_SALES_SUMMARY_SUMMARYREPORT: [
@@ -48,8 +50,10 @@ const COMMON = {
   },
 };
 
-export const salesRegisterSummary = { ...COMMON, form: 'Rpt_SalesRegisterSummary_Report' };
-export const purchaseRegisterSummary = { ...COMMON, form: 'Rpt_PurchaseRegisterSummary_Report' };
+// Tab pages are Party, Broker, Station, MainGroup, Book, ... in that order; the Sales screen's Party tab
+// is a DataGridView (DataGridView1) where the Purchase one has a ListView (ListView0).
+export const salesRegisterSummary = { ...COMMON, form: 'Rpt_SalesRegisterSummary_Report', lists: { DataGridView1: 'parties', ListView1: 'brokers', ListView2: 'stations', ListView4: 'books' } };
+export const purchaseRegisterSummary = { ...COMMON, form: 'Rpt_PurchaseRegisterSummary_Report', lists: { ListView0: 'parties', ListView1: 'brokers', ListView2: 'stations', ListView4: 'books' } };
 
 export const REGISTER_SUMMARIES = [salesRegisterSummary, purchaseRegisterSummary];
 
@@ -64,7 +68,7 @@ export const REGISTER_SUMMARIES = [salesRegisterSummary, purchaseRegisterSummary
  * the four totals.
  */
 const DETAIL_COMMON = {
-  lists: { lst_vw1: 'parties' },
+  lists: { ListView0: 'parties', ListView1: 'brokers', ListView4: 'books', ListView8: 'items' },
   defaults: ({ fyFrom, fyTo }) => ({
     txt_dt_from: fyFrom,
     txt_dt_to: fyTo,
@@ -91,7 +95,10 @@ const DETAIL_COMMON = {
     sort: s.rdo_asc ? 'asc' : (s.rdo_dsc ? 'desc' : null),
     summaryReports: s.CheckBox_Summary !== false,
     printout: s.cbo_printout,
-    parties: s.lst_vw1 || [],
+    parties: s.ListView0 || [],
+    brokers: s.ListView1 || [],
+    books: s.ListView4 || [],
+    items: s.ListView8 || [],
   }),
   fallbackColumns: {
     JSM_VW_SALES_DETAIL_SUM_REPORT: [

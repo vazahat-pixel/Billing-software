@@ -14,7 +14,7 @@ export default {
   // The tab's own list always shows Haste names — the report's "account" tab follows whichever
   // radio is active in real JSM, which needs the radio wired into the list source; ticking still
   // filters correctly for the default (and most used) Haste grouping.
-  lists: { ListView0: 'hastes', ListView1: 'parties' },
+  lists: { lst_vw1: 'hastes', lst_vw2: 'parties' },
   defaults: ({ fyFrom, fyTo }) => ({
     txt_dt_from: fyFrom,
     txt_dt_to: fyTo,
@@ -28,8 +28,8 @@ export default {
       fromText: s.txt_dt_from,
       toText: s.txt_dt_to,
       mode,
-      accounts: mode === 'A' ? (s.ListView0 || []) : [],
-      parties: s.ListView1 || [],
+      accounts: mode === 'A' ? (s.lst_vw1 || []) : [],
+      parties: s.lst_vw2 || [],
     };
   },
   fallbackColumns: {

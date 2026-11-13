@@ -287,6 +287,8 @@ export default function JsmFormDialog({
       );
     }
     if (c.type === 'ListView') return renderListView(c);
+    // A tick-list that JSM draws as a DataGridView (Sales Summary's Party tab) is filled from `lists`.
+    if (/DataGridView$/.test(c.type) && !grids[c.name] && lists[c.name]) return renderListView(c);
     if (/DataGridView$|ListView$/.test(c.type) && grids[c.name]) {
       // Data grids carry no columns in the blueprint (JSM adds them in code), so the screen supplies
       // { columns: [{ key, label, width, num, fmt }], rows, onRowClick } per grid name.
