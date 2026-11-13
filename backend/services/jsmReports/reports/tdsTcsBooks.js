@@ -271,4 +271,5 @@ module.exports = {
   tcsSales: tcsReport('sales'),
   tcsPurchase: tcsReport('purchase'),
   TDS_MODES,
+  loadTdsBook,
 };

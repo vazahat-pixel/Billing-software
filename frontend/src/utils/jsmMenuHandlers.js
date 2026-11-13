@@ -98,8 +98,8 @@ export const FORM_HANDLERS = {
   Rpt_TdsReports: { id: 'tds-head', external: 'jsmReport', jsmForm: 'Rpt_TdsReports' },
   Rpt_Tds2_Prty_Mnth_Wise: { id: 'tds-party', external: 'jsmReport', jsmForm: 'Rpt_Tds2_Prty_Mnth_Wise' },
   Rpt_Tds3_Add_Ackn: { id: 'tds-address', external: 'jsmGstr1', jsmForm: 'Rpt_Tds3_Add_Ackn' },
-  Rpt_Tds4_Challan: { id: 'tds-challan', reportKey: 'tds', view: 'tdsChallan' },
-  Rpt_Tds5_Certi: { id: 'tds-certificate', reportKey: 'tds', view: 'tdsCertificate' },
+  Rpt_Tds4_Challan: { id: 'tds-challan', external: 'jsmReport', jsmForm: 'Rpt_Tds4_Challan' },
+  Rpt_Tds5_Certi: { id: 'tds-certificate', external: 'jsmReport', jsmForm: 'Rpt_Tds5_Certi' },
   Rpt_Tcs: { id: 'tcs-recpay', external: 'jsmReport', jsmForm: 'Rpt_Tcs' },
   Rpt_TcsReports: { id: 'tcs-sales', external: 'jsmReport', jsmForm: 'Rpt_TcsReports#Sales' },
 

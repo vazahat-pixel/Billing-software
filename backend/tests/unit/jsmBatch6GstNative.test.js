@@ -334,3 +334,20 @@ test('Tds Address/Acknowledge: saves the CIT address and four acknowledgement nu
   assert.equal(read.rows[0].TDS_ADDR, 'CIT Surat 2');
   assert.equal(read.rows[0].TDS_Q1, '111');
 });
+
+test('TDS certificate and challan: per party/month with quarter; challan splits Company / Non Company by PAN', async () => {
+  const mk = (n, party, pan, m, amt, tds, comp) => ({ ENT_NO: n, ENT_DATE: new Date(`2026-${String(m).padStart(2, '0')}-10`), YEAR_NO: 2026, MONTH_NO: m, MONTH: 'M', TDSHEAD: '194C', PARTY: party, PANNO: pan, AMOUNT: amt, TDS_PER: 2, TDS_AMT: tds, COMP_NON: comp, NCBILL_NO: String(n) });
+  const rows = [mk(1, 'A', 'AAACA1234C', 5, 1000, 20, 'COMP'), mk(2, 'A', 'AAACA1234C', 5, 500, 10, 'COMP'), mk(3, 'B', 'AAAPB1234C', 8, 100, 2, 'NON-COMP')];
+  const cert = require('../../services/jsmReports').get('Rpt_Tds5_Certi');
+  const c = await cert.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31' }, { rows, CompanySettings: { findOne: () => ({ lean: async () => ({ tan: 'TAN1', tdsAckQ1: '999' }) }) } });
+  assert.equal(c.rows.length, 2);
+  assert.deepEqual([c.rows[0].AMOUNT, c.rows[0].TDS_AMT, c.rows[0].QUARTER], [1500, 30, 'Q1']);
+  assert.equal(c.rows[1].QUARTER, 'Q2');
+  assert.match(c.grid.notice, /TAN1/);
+  const ch = require('../../services/jsmReports').get('Rpt_Tds4_Challan');
+  const comp = await ch.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', company: true, penalty: 5, interest: 1 }, { rows });
+  assert.equal(comp.rows.length, 2);
+  assert.match(comp.grid.notice, /TDS: 30\.00.*Total: 36\.00/);
+  const non = await ch.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31', company: false }, { rows });
+  assert.equal(non.rows.length, 1);
+});
