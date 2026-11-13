@@ -164,6 +164,7 @@ const REPORTS = {
   Rpt1_Stk_Grey_At_Mill: require('./reports/stockGreyAtMill2'),
   Rpt_Stk_Meter_TanusKgs: require('./reports/stockMonthlyKgs'),
   Rpt_Tds3_Add_Ackn: require('./reports/tdsAddress'),
+  Rpt_Monthly_Stk_Qty_Value_Report: require('./reports/stockQtyValue'),
   Rpt_Stk_Acc_Finish_Summary_Value: require('./reports/stockValueFinish'),
   Rpt_Tds5_Certi: require('./reports/tdsCertChallan').certificate,
   Rpt_Tds4_Challan: require('./reports/tdsCertChallan').challan,

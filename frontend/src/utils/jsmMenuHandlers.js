@@ -85,7 +85,7 @@ export const FORM_HANDLERS = {
 
   // Stock
   Rpt_Stk_Meter_TanusKgs: { id: 'stock-mts', external: 'jsmReport', jsmForm: 'Rpt_Stk_Meter_TanusKgs' },
-  Rpt_Monthly_Stk_Qty_Value_Report: { id: 'stock-kgs', external: 'stockLedger', reportKind: 'stockKgs' },
+  Rpt_Monthly_Stk_Qty_Value_Report: { id: 'stock-kgs', external: 'jsmReport', jsmForm: 'Rpt_Monthly_Stk_Qty_Value_Report' },
   Rpt_Jsm_Stock_Finish_New1: { id: 'inv-finish-shop', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Stock_Finish_New1' },
   Rpt_Stk_Grey_At_Shop: { id: 'stock-grey-shop', external: 'jsmReport', jsmForm: 'Rpt_Stk_Grey_At_Shop' },
   Rpt_Jsm_Stock_Grey_At_Mill: { id: 'inv-grey-mill-1', external: 'jsmReport', jsmForm: 'Rpt_Jsm_Stock_Grey_At_Mill' },

@@ -370,3 +370,20 @@ test('Stock With Value: closing times the item PU_RATE, /100 divides, category s
   assert.equal(cat.rows.length, 1);
   assert.equal(cat.rows[0].STOCK_VALUE, 3100);
 });
+
+test('Stock Qty And Value statement: opening rolls earlier movement, closing = adds - takes', async () => {
+  const bill = (cat, d, qty, taxable) => ({ BILL_DATE: new Date(d), TO_QTY1: qty, TAXABLE_AMT: taxable, _lines: [{ ITEM_CATEGORY: cat }] });
+  const data = {
+    pu: [bill('GREY', '2026-03-01', 100, 1000), bill('GREY', '2026-05-01', 50, 600)],
+    sl: [bill('GREY', '2026-05-05', 30, 450)], slr: [], pur: [],
+    millIss: [{ CHLN_DATE: new Date('2026-05-06'), ISS_QTY: 20, PU_AMOUNT: 240 }],
+    millRec: [], jobIss: [], jobRec: [], items: [{ name: 'G', category: 'GREY', openingQty: 10, openingRate: 8 }],
+  };
+  const rpt = require('../../services/jsmReports').get('Rpt_Monthly_Stk_Qty_Value_Report');
+  const out = await rpt.run('507f1f77bcf86cd799439011', { from: '2026-04-01', to: '2027-03-31' }, { data });
+  const grey = out.rows.find((r) => r.HEADNAME === 'GREY STOCK CLOSING');
+  // opening 10 + 100 earlier = 110; +50 purchase -20 mill issue -30 sales = 110
+  assert.equal(grey.QTY, 110);
+  assert.equal(out.rows.find((r) => r.HEADNAME === '+ Grey Opening Stock').QTY, 110);
+  assert.equal(out.rows.filter((r) => r.LINE === 'total').length, 4);
+});
