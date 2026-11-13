@@ -1,14 +1,16 @@
-version: 1.0.12
+version: 1.0.13
 files:
-  - url: TextileERP-Setup-1.0.12.exe
-    sha512: JiNTkGbXXVkQ7C2TTMczTOUpjNAj5hiQYOoVvrUQYYkyt850i15dQtvRsalVJm9girHLzqxD9rWDPdwaU/1PZQ==
-    size: 90130467
-path: TextileERP-Setup-1.0.12.exe
-sha512: JiNTkGbXXVkQ7C2TTMczTOUpjNAj5hiQYOoVvrUQYYkyt850i15dQtvRsalVJm9girHLzqxD9rWDPdwaU/1PZQ==
+  - url: TextileERP-Setup-1.0.13.exe
+    sha512: hnOPTI+/1ANLjXR6aVlw/VlyLNTnUJkkyp0K+WpvIUVdK/xSB6bZ7ALmj9EmwRuEv4ia7nVRs+l48778gbQ2oQ==
+    size: 90171351
+path: TextileERP-Setup-1.0.13.exe
+sha512: hnOPTI+/1ANLjXR6aVlw/VlyLNTnUJkkyp0K+WpvIUVdK/xSB6bZ7ALmj9EmwRuEv4ia7nVRs+l48778gbQ2oQ==
 releaseNotes: |
-  - GSTR-1 fixed: the report was showing "No records found" on every tab due to a data-shape bug; also fixed B2CS showing blank tax rate/taxable/CGST/SGST/IGST.
-  - Reports menu (Fas Reports, Final Reports, Sales, Purchase, …) now opens a right-side flyout like JSM, at every nesting level, instead of a stacked dropdown.
-  - GSTR-1 and GSTR-3B detail report windows can now be scrolled when there are many rows.
-  - JSM report windows (Process Stock, Trial Balance, etc.) no longer leave a large empty area — they size to the real JSM form.
-  - Click-through added: Outstanding, Trial Balance, Profit & Loss, Balance Sheet, Group List, Process/JobWork Stock reports, GSTR-1, GSTIN registers, TDS and TCS registers — clicking a row now opens the Sales/Purchase/Ledger/Mill-Job record it came from.
-releaseDate: '2026-11-03T16:17:10.778Z'
+  - Gst Reports: new "Gstr-2 Report" folder exactly as in JSM — Gstr2 All Inward, Gstr2 Error Checking and Gstr2 Excel Format (B2B, B2BUR, CDNR, CDNUR, EXEMP, HSN, RETURN grids and GSTR-2 Excel download). "E-Way Excel Upload" added; entries JSM hides (3B Form - Monthly Excel, Hsn Wise Reports) no longer show.
+  - Party / Broker / Station / Book tick-lists now fill on every report screen: Sales and Purchase Summary, ItemDetail, all Return registers, Outstanding (Sales, Purchase, Process, Jobwork, All Purchase), GSTIN registers, Supply registers, 3B Inward/Outward, E-Way register, Sales Challan, Purchase Stock, Slip Detail, Brokerage, Receipt/Payment registers, GSTIN Journal and Expense.
+  - GSTIN All Purchase / Gstr2 All Inward lists only purchase parties (sales parties and book names no longer appear in the Party tab).
+  - GSTR-1 v3.2.2 Excel uses JSM's own workbook layout (32 sheets, separate HSN B2B / B2C).
+  - E-Way Bill bulk JSON matches the file JSM writes; the grid shows one row per bill.
+  - Stock Mts Reports and Stock Mts Reports (Kgs) print JSM's single statement (Grey, Mill Grey, Mill Rf, Finish).
+  - TDS / TCS reports, Tds Address/Acknowledge, Import Bank, Check Diff Os/Ledger and Cash/Bank screens on JSM's own forms.
+releaseDate: '2026-11-13T10:23:58.231Z'
