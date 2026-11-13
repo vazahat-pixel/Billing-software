@@ -56,7 +56,6 @@ const MUST_STAY_REACHABLE = [
   // gstinSales, gstinPurchase, gstinProcess, gstinJobwork, gstinJournal, gstinExpense now open
   // the real JSM screens (Gstr_3B_TextNew_Monthly, Stp_Gst_OutWrad_ErrorCheck, A_Gstr1_*, A_Gstr2_*, etc.).
   // stockLedger|stockKgs now opens JSM's Rpt_Monthly_Stk_Qty_Value_Report.
-  ['fasCheck', 'importBank'],
   // fasCheck|diffYear now opens JSM's Rpt_Jsm_Ledger_os_Diff_Check.
   // cashBook (CashBank Finance, Bank Rec. Payment) now opens the JSM screens.
   // finalReport|groupList was this software's own Group List; the entry now opens the
