@@ -17,20 +17,20 @@ form (positions, tabs, buttons, combos, lists) — **none opens an older MERN st
 
 | Status | Entries | Meaning |
 |---|---:|---|
-| **VERIFIED** | 72 | Numbers replayed against JSM's live `SC27` SQL / export fixtures (`backend/tests/golden`) |
-| **BUILT** | 146 | JSM form + backend implemented from JSM's decompiled spec / format scripts and unit/DB tested; **not** replayed against JSM output |
+| **VERIFIED** | 78 | Numbers replayed against JSM's live `SC27` SQL / export fixtures (`backend/tests/golden`); the 6 added this cycle (TDS Head Wise / Register, TCS Sales / Purchase, GSTIN Process / JobWork) are engine-level: JSM's own view rows are fed through our grouping and must equal JSM's own SUM / GROUP BY |
+| **BUILT** | 140 | JSM form + backend implemented from JSM's decompiled spec / format scripts and unit/DB tested; **not** replayed against JSM output |
 | **NOT BUILT** | 0 | — |
 
 > [!IMPORTANT]
-> This is **not** a claim that all 218 reports are 100% number-for-number identical to JSM. Only the 72 VERIFIED
-> entries are proven against JSM's own data. The 146 BUILT entries use JSM's form and JSM's rules as recovered from
+> This is **not** a claim that all 218 reports are 100% number-for-number identical to JSM. Only the 78 VERIFIED
+> entries are proven against JSM's own data. The 140 BUILT entries use JSM's form and JSM's rules as recovered from
 > its code, but have not been compared against JSM output on real data. Where JSM prints from Crystal Reports
 > templates (`.rpt` — binary, unreadable here) the screen shows the same figures as a grid, not the printed page.
 > The owner should compare the BUILT entries against JSM side by side before relying on them.
 
 ---
 
-## 2. Live Golden-Verified Reports (`VERIFIED` — 72 entries, 188 golden assertions)
+## 2. Live Golden-Verified Reports (`VERIFIED` — 78 entries)
 
 **Command:** `cd backend; $files = @(Get-ChildItem tests/golden/*.test.js) | ForEach-Object { $_.FullName }; node --test $files` → **188 pass, 0 fail** (24 suites).
 
@@ -114,7 +114,7 @@ All previously deferred / `soon: true` screens and 12 legacy GST shortcuts were 
 ```powershell
 # Golden parity suite (live SC27 fixtures)
 cd backend; node --test tests/golden/*.test.js
-# -> 188 tests, 24 suites, 188 pass, 0 fail
+# -> 196 tests, 24 suites, 196 pass, 0 fail
 
 # Full backend golden + unit + integration JSM suite
 cd backend; node --test tests/golden/*.test.js tests/unit/*.js tests/integration/jsm*.test.js

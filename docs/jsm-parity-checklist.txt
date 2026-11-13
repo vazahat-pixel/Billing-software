@@ -3,7 +3,7 @@ JSM PARITY CHECKLIST  (generated 2026-11-13)
 VERIFIED  = replayed against JSM own SQL/printed output on real SC27 data (golden test)
 BUILT     = JSM form (captured layout) + backend report implemented and unit/DB tested; NOT replayed against SC27 SQL
 NOT BUILT = still opens an older MERN screen
-Totals: 218 entries | 72 VERIFIED | 146 BUILT | 0 NOT BUILT
+Totals: 218 entries | 78 VERIFIED | 140 BUILT | 0 NOT BUILT
 ==============================================================================================================
 
 BUILT      | Rpt_cashbank1                            | Reports > Fas Reports > Bank / Cash Book > Bank Book
@@ -87,16 +87,16 @@ BUILT      | Rpt_Stk_Grey_Finish_Summary              | Reports > Monthly Report
 BUILT      | A_Gstr1_SalesReturnSummary               | Reports > Monthly Reports > Sales Return
 BUILT      | A_Gstr1_PurchaseRtn_Report               | Reports > Monthly Reports > Purchase Return
 BUILT      | Rpt_BankBookRec_GstMonthWise             | Reports > Monthly Reports > Bank Rec. Payment
-BUILT      | Rpt_TdsReports                           | Reports > Tds Reports > Head Wise Report
+VERIFIED   | Rpt_TdsReports                           | Reports > Tds Reports > Head Wise Report
 BUILT      | Rpt_Tds2_Prty_Mnth_Wise                  | Reports > Tds Reports > Party Wise Report
 BUILT      | Rpt_Tds2_Prty_Mnth_Wise#Month            | Reports > Tds Reports > Party Wise Monthly Report
 BUILT      | Rpt_Tds3_Add_Ackn                        | Reports > Tds Reports > Address/Acknowledge
 BUILT      | Rpt_Tds4_Challan                         | Reports > Tds Reports > Tax Challan
 BUILT      | Rpt_Tds5_Certi                           | Reports > Tds Reports > Certificate
-BUILT      | Rpt_TdsReports                           | Reports > Tds Reports > Tds Register
+VERIFIED   | Rpt_TdsReports                           | Reports > Tds Reports > Tds Register
 BUILT      | Rpt_Tcs                                  | Reports > Tcs Reports > Tcs Rec/Pay Report
-BUILT      | Rpt_TcsReports#Sales                     | Reports > Tcs Reports > Tcs Sales Register
-BUILT      | Rpt_TcsReports#Purchase                  | Reports > Tcs Reports > Tcs Purchase Register
+VERIFIED   | Rpt_TcsReports#Sales                     | Reports > Tcs Reports > Tcs Sales Register
+VERIFIED   | Rpt_TcsReports#Purchase                  | Reports > Tcs Reports > Tcs Purchase Register
 VERIFIED   | Gstr_3B_TextNew_Monthly                  | Reports > Gst Reports > 3B Monthly Return > 3B - Monthly Return
 VERIFIED   | Gstr_3B_Detail_Inward_Outwardard_supply  | Reports > Gst Reports > 3B Monthly Return > 3B - Inward & Outward Supply
 VERIFIED   | A_All_Inward_Supply_Purchase             | Reports > Gst Reports > 3B Monthly Return > 3B - Inward Supply
@@ -132,8 +132,8 @@ VERIFIED   | A_Gstr2_PurchaseSummary                  | Reports > Gst Reports > 
 BUILT      | A_Gstr2_PurchaseDetail                   | Reports > Gst Reports > Gstin - Purchase > Purchase Detail ( Item )
 BUILT      | A_Gstr1_PurchaseRtn_Report               | Reports > Gst Reports > Gstin - Purchase > Purchase Rtn (Summary)
 BUILT      | A_Gstr2_PurchaseReturnDetails            | Reports > Gst Reports > Gstin - Purchase > Purchase Rtn Detail  (Item)
-BUILT      | A_Gstr2_ProcessSummary                   | Reports > Gst Reports > Gstin - Process
-BUILT      | A_Gstr2_JobWorkReceiptSummary            | Reports > Gst Reports > Gstin - JobWork
+VERIFIED   | A_Gstr2_ProcessSummary                   | Reports > Gst Reports > Gstin - Process
+VERIFIED   | A_Gstr2_JobWorkReceiptSummary            | Reports > Gst Reports > Gstin - JobWork
 BUILT      | Rpt_Journal_Details_Report               | Reports > Gst Reports > Gstin - Journal Report
 BUILT      | A_Gstr2_Expense                          | Reports > Gst Reports > Gstin - Expense
 VERIFIED   | JS_GSTR1_RPT                             | Reports > Gst Reports > Extra > 1Sales

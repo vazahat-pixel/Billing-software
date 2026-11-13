@@ -88,7 +88,7 @@ export default function JsmEwayBulkScreen({ isOpen, onClose }) {
         if (!(res.rows || []).length) toast.info('No bills found for this period');
       } else {
         if (!(res.rows || []).length) { toast.info('Load Data first - no bills to write'); return; }
-        const blob = new Blob([JSON.stringify(buildEwayBulkJson(res.rows), null, 2)], { type: 'application/json' });
+        const blob = new Blob([JSON.stringify(buildEwayBulkJson(res.itemRows || res.rows), null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = `EWAY_BULK_${params().from}_${params().to}.json`;

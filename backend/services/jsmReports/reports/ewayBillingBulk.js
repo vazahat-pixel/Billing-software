@@ -113,12 +113,27 @@ const REQUIRED = [
 
 async function run(companyId, p = {}, deps = {}) {
   const bills = await loadBills(companyId, p, deps);
+  // JSM's grid (Btn_ok_Click) lists one row per bill: its first item line (B.SR_NO=1) with the bill's own
+  // quantity, taxable value and tax. The JSON still needs every item line, so those come back as itemRows.
   let rows = [];
+  let itemRows = [];
   for (const b of inDateRange(bills, 'date', p.from, p.to)) {
     if (p.book && p.book !== 'All' && String(b.__book || '') !== String(p.book)) continue;
-    rows.push(...rowsOf(b));
+    const lines = rowsOf(b);
+    if (!lines.length) continue;
+    itemRows.push(...lines);
+    rows.push({
+      ...lines[0],
+      PRO_QTY: round(lines.reduce((t, l) => t + Number(l.PRO_QTY || 0), 0), 3),
+      ACC_VALUE: round(Number(b.taxableAmount ?? lines.reduce((t, l) => t + l.ACC_VALUE, 0))),
+      CGST_AMT: round(b.cgst ?? lines.reduce((t, l) => t + l.CGST_AMT, 0)),
+      SGST_AMT: round(b.sgst ?? lines.reduce((t, l) => t + l.SGST_AMT, 0)),
+      IGST_AMT: round(b.igst ?? lines.reduce((t, l) => t + l.IGST_AMT, 0)),
+    });
   }
-  rows = orderRows(rows, [{ field: 'DOC_DATE_RAW' }, { field: 'DOC_NO', numeric: true }, { field: 'SR_NO', numeric: true }]);
+  const order = [{ field: 'DOC_DATE_RAW' }, { field: 'DOC_NO', numeric: true }, { field: 'SR_NO', numeric: true }];
+  rows = orderRows(rows, order);
+  itemRows = orderRows(itemRows, order);
 
   const errors = [];
   if (p.checkError) {
@@ -127,7 +142,7 @@ async function run(companyId, p = {}, deps = {}) {
       if (missing.length) errors.push({ DOC_NO: r.DOC_NO, ERROR: `Missing ${missing.join(', ')}` });
     }
   }
-  return { rows, errors };
+  return { rows, itemRows, errors };
 }
 
 async function options(companyId, deps = {}) {

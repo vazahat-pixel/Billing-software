@@ -76,7 +76,7 @@ async function loadTdsBook(companyId) {
   for (const d of deductions) {
     if (d.refId) covered.add(String(d.refId));
     out.push(tdsRow(base, {
-      ENT_NO: 0, ENT_DATE: d.transactionDate, TDSHEAD: d.section || 'TDS', PARTY: d.partyName || '',
+      ENT_NO: 0, ENT_DATE: d.transactionDate, TDSHEAD: d.section || 'TDS ACCOUNT', PARTY: d.partyName || '',
       PANNO: d.pan || '', AMOUNT: round(d.taxableAmount), TDS_PER: num(d.rate), TDS_AMT: round(d.deductedAmount),
       NCBILL_NO: d.refNo || '', SP_TYPE: d.refType || '',
     }));
@@ -85,7 +85,7 @@ async function loadTdsBook(companyId) {
     if (covered.has(String(b._id))) continue;
     const taxable = num(b.taxableAmount);
     out.push(tdsRow(base, {
-      ENT_NO: 0, ENT_DATE: b.date, TDSHEAD: b.supplierId?.tdsSection || 'TDS', PARTY: b.supplierId?.name || '',
+      ENT_NO: 0, ENT_DATE: b.date, TDSHEAD: b.supplierId?.tdsSection || 'TDS ACCOUNT', PARTY: b.supplierId?.name || '',
       PANNO: b.supplierId?.pan || '', AMOUNT: round(taxable),
       TDS_PER: num(b.supplierId?.tdsPer) || (taxable ? round((num(b.tdsAmount) / taxable) * 100, 4) : 0),
       TDS_AMT: round(b.tdsAmount), NCBILL_NO: b.supplierInvoiceNo || b.invoiceNo || '', SP_TYPE: 'Purchase',
@@ -94,7 +94,7 @@ async function loadTdsBook(companyId) {
   for (const n of notes) {
     if (covered.has(String(n._id))) continue;
     out.push(tdsRow(base, {
-      ENT_NO: 0, ENT_DATE: n.date, TDSHEAD: n.partyId?.tdsSection || 'TDS', PARTY: n.partyId?.name || '',
+      ENT_NO: 0, ENT_DATE: n.date, TDSHEAD: n.partyId?.tdsSection || 'TDS ACCOUNT', PARTY: n.partyId?.name || '',
       PANNO: n.partyId?.pan || '', AMOUNT: round(n.taxableAmount), TDS_PER: num(n.tdsPercent), TDS_AMT: round(n.tdsAmount),
       NCBILL_NO: n.noteNo || '', SP_TYPE: `${n.noteType || ''} Note`,
     }));
