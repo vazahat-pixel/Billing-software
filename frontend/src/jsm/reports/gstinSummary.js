@@ -29,18 +29,18 @@ const SUM_COLS = [
   N('NET_TOT', 'NET.TOT'),
 ];
 
-const listMap = {
-  ListView0: 'books',
-  ListView1: 'parties',
-  ListView2: 'states',
-  ListView3: 'types',
-  ListView4: 'gstRates',
-  ListView5: 'deliveries',
+// The tick-list tabs, in each JSM form's own order (the lists are ListView0, ListView1, ...).
+const FORM_LISTS = {
+  A_Gstr1_SalesInvoiceSummary: ['parties', 'states', 'types', 'books', 'deliveries'],
+  A_Gstr2_PurchaseSummary: ['parties', 'states', 'types', 'books', 'gstRates'],
+  A_Gstr2_ProcessSummary: ['mills', null, null, 'types'],
+  A_Gstr2_JobWorkReceiptSummary: ['parties', 'brokers', 'books', null, null, 'types'],
 };
+const listMapOf = (form) => Object.fromEntries((FORM_LISTS[form] || []).map((k, i) => [`ListView${i}`, k]).filter(([, k]) => k));
 
 const mk = (form, extra = {}) => ({
   form,
-  lists: extra.lists || listMap,
+  lists: extra.lists || listMapOf(form),
   defaults: ({ fyFrom, fyTo }) => ({
     txt_dt_from: fyFrom,
     txt_dt_to: fyTo,
@@ -55,23 +55,28 @@ const mk = (form, extra = {}) => ({
     Cbo_OrderBy2: { items: extra.order2 || ['None', 'Register', 'Party', 'State_Code_Nm', 'Type', 'Month', 'GstRate'] },
     cbo_printout: { items: ['1-Continue', '2-PageWise'] },
   }),
-  toParams: (s) => ({
-    from: toIsoDate(s.txt_dt_from),
-    to: toIsoDate(s.txt_dt_to),
-    fromText: s.txt_dt_from,
-    toText: s.txt_dt_to,
-    orderBy1: s.Cbo_OrderBy1 || 'Register',
-    orderBy2: s.Cbo_OrderBy2 || 'None',
-    printout: s.cbo_printout || '1-Continue',
-    summary: Boolean(s.CheckBox_Summary || s.chk_summary || s.chk_summary_Report),
-    books: s.ListView0 || [],
-    parties: s.ListView1 || [],
-    states: s.ListView2 || [],
-    types: s.ListView3 || [],
-    gstRates: s.ListView4 || [],
-    deliveries: s.ListView5 || [],
-    mills: s.ListView1 || [],
-  }),
+  toParams: (s) => {
+    const picked = {};
+    for (const [lv, key] of Object.entries(extra.lists || listMapOf(form))) picked[key] = s[lv] || [];
+    return {
+      from: toIsoDate(s.txt_dt_from),
+      to: toIsoDate(s.txt_dt_to),
+      fromText: s.txt_dt_from,
+      toText: s.txt_dt_to,
+      orderBy1: s.Cbo_OrderBy1 || 'Register',
+      orderBy2: s.Cbo_OrderBy2 || 'None',
+      printout: s.cbo_printout || '1-Continue',
+      summary: Boolean(s.CheckBox_Summary || s.chk_summary || s.chk_summary_Report),
+      books: [],
+      parties: [],
+      states: [],
+      types: [],
+      gstRates: [],
+      deliveries: [],
+      mills: picked.mills || picked.parties || [],
+      ...picked,
+    };
+  },
   ...(extra.fallbackColumns ? { fallbackColumns: extra.fallbackColumns } : {}),
 });
 

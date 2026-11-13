@@ -257,25 +257,49 @@ async function runJournalOrExpense(companyId, p = {}, deps = {}, mode = 'Journal
   };
 }
 
-async function options(companyId) {
-  const [sl, pu] = await Promise.all([billSrc.loadSalesRegisterRows(companyId), billSrc.loadPurchaseRegisterRows(companyId)]);
-  const u = (xs, f) => [...new Set(xs.map((r) => r[f]).filter(Boolean))].sort();
+const uniq = (xs, f) => [...new Set(xs.map((r) => r[f]).filter(Boolean))].sort();
+
+/** The tick-lists list what the screen reports on: sales bills for the sales screen, purchases for the purchase one. */
+const sideOptions = (load, withDelivery) => async (companyId) => {
+  const rows = await load(companyId);
   return {
-    books: u([...sl, ...pu], 'BOOK'),
-    parties: u([...sl, ...pu], 'PARTY'),
-    states: u([...sl, ...pu], 'STATE'),
+    books: uniq(rows, 'BOOK'),
+    parties: uniq(rows, 'PARTY'),
+    states: uniq(rows, 'STATE'),
     types: ['B2B-LOCAL', 'B2B-IGST', 'UNREG-TAX', 'EXEMPT/NIL'],
-    gstRates: [...new Set([...sl, ...pu].map((r) => round(r.GST_RATE || 0)))].sort((a, b) => a - b).map(String),
-    deliveries: u(sl, 'HASTE'),
+    gstRates: [...new Set(rows.map((r) => round(r.GST_RATE || 0)))].sort((x, y) => x - y).map(String),
+    deliveries: withDelivery ? uniq(rows, 'HASTE') : [],
     mills: [],
   };
-}
+};
+
+const receiptOptions = (kind) => async (companyId) => {
+  const rows = await mrSrc.loadMillReceiptRows(companyId, kind);
+  const parties = [...new Set(rows.map((r) => r.PARTY || r.MILL_NAME).filter(Boolean))].sort();
+  return {
+    books: [...new Set(rows.map((r) => r.BOOK || (kind === 'Job' ? 'JOB WORK' : 'PROCESS RECEIPT')))].sort(),
+    parties,
+    mills: parties,
+    brokers: uniq(rows, 'BROKER'),
+    types: ['REGISTERED', 'UNREG'],
+    states: [],
+    gstRates: [],
+    deliveries: [],
+  };
+};
+
+// Journal and Expense screens keep the combined lists they always had.
+const options = async (companyId) => {
+  const [sl, pu] = await Promise.all([sideOptions(billSrc.loadSalesRegisterRows, true)(companyId), sideOptions(billSrc.loadPurchaseRegisterRows)(companyId)]);
+  const m = (k) => [...new Set([...sl[k], ...pu[k]])].sort();
+  return { ...sl, books: m('books'), parties: m('parties'), states: m('states'), gstRates: pu.gstRates };
+};
 
 module.exports = {
-  salesSummary: { run: runSalesSummary, options },
-  purchaseSummary: { run: runPurchaseSummary, options },
-  processSummary: { run: (c, p, d) => runReceiptGstSummary(c, p, d, 'Mill'), options },
-  jobworkSummary: { run: (c, p, d) => runReceiptGstSummary(c, p, d, 'Job'), options },
+  salesSummary: { run: runSalesSummary, options: sideOptions(billSrc.loadSalesRegisterRows, true) },
+  purchaseSummary: { run: runPurchaseSummary, options: sideOptions(billSrc.loadPurchaseRegisterRows) },
+  processSummary: { run: (c, p, d) => runReceiptGstSummary(c, p, d, 'Mill'), options: receiptOptions('Mill') },
+  jobworkSummary: { run: (c, p, d) => runReceiptGstSummary(c, p, d, 'Job'), options: receiptOptions('Job') },
   journalDetails: { run: (c, p, d) => runJournalOrExpense(c, p, d, 'Journal'), options },
   expenseGstr2: { run: (c, p, d) => runJournalOrExpense(c, p, d, 'Expense'), options },
 };
