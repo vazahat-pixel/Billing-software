@@ -500,15 +500,33 @@ app.whenReady().then(async () => {
       console.warn('[desktop] syncAgent init', err.message);
     }
   } catch (err) {
-    console.error('[desktop] local stack failed', err);
-    splash.destroy();
-    dialog.showErrorBox(
-      'Textile ERP failed to start',
-      `${err.message}\n\nPlease install the latest official setup package or contact support.\nData folder: ${userData}`
-    );
-    app.isQuiting = true;
-    app.quit();
-    return;
+    console.error('[desktop] local stack failed, falling back to remote cloud mode:', err.message);
+    try {
+      const userCfgPath = path.join(userData, 'config.json');
+      const cur = readJsonSafe(userCfgPath) || {};
+      const cloudUrl = cur.centralApiBaseUrl || 'https://app.dealingindia.com/api';
+      writeJsonSafe(userCfgPath, {
+        ...cur,
+        mode: 'remote',
+        apiBaseUrl: cloudUrl,
+        centralApiBaseUrl: cloudUrl,
+      });
+      localStack = {
+        mode: 'remote',
+        apiBaseUrl: cloudUrl,
+        centralApiBaseUrl: cloudUrl,
+      };
+    } catch (healErr) {
+      console.error('[desktop] auto-heal to remote mode failed:', healErr.message);
+      splash.destroy();
+      dialog.showErrorBox(
+        'Textile ERP failed to start',
+        `${err.message}\n\nPlease install the latest official setup package or contact support.\nData folder: ${userData}`
+      );
+      app.isQuiting = true;
+      app.quit();
+      return;
+    }
   }
 
   try {

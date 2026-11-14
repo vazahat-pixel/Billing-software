@@ -62,3 +62,4 @@ test('Batch 5A: Frm_BillAgistPaidDetail, Rpt_Match8A_Report, Stp_DataBaseFromTo'
   assert.equal(dbRes.grid.layout, 'JSM_VW_DB_REPAIR');
   assert.equal(dbRes.rows[0].STATUS, 'OK');
 });
+

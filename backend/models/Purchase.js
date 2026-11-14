@@ -188,6 +188,7 @@ PurchaseSchema.index(
   }
 );
 PurchaseSchema.index({ companyId: 1, date: -1, status: 1 });
+PurchaseSchema.index({ companyId: 1, date: -1, createdAt: -1 });
 
 PurchaseSchema.plugin(enterpriseIntegrityPlugin);
 

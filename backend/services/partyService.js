@@ -187,7 +187,7 @@ class PartyService {
     const filter = { companyId };
     if (type) filter.type = type;
     if (favorites) filter.isFavorite = true;
-    const q = Party.find(filter).sort({ name: 1 });
+    const q = Party.find(filter).sort({ name: 1 }).lean();
     const lim = limit != null ? Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500) : null;
     if (lim != null) {
       const p = Math.max(parseInt(page, 10) || 1, 1);

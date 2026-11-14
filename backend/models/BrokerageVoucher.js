@@ -37,3 +37,4 @@ const BrokerageVoucherSchema = new mongoose.Schema({
 BrokerageVoucherSchema.index({ companyId: 1, kind: 1, voucherNo: 1 }, { unique: true });
 
 module.exports = mongoose.model('BrokerageVoucher', BrokerageVoucherSchema);
+

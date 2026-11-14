@@ -74,3 +74,4 @@ describe('JSM Batch 1 reports (Order Status, Slip Register, Lot Costing, Cutting
     assert.equal(stk.rows[0].LOTNO, '200');
   });
 });
+

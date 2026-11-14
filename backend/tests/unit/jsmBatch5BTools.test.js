@@ -109,3 +109,4 @@ test('Batch 5B: FrmReminder_All_Details, Brokerage Tools, Frm_Investment_Raju', 
   assert.equal(invRes.rows[0].PROFIT_AMT, 200);
   assert.equal(invRes.rows[0].LOSS_AMT, 0);
 });
+

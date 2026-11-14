@@ -500,7 +500,7 @@ exports.listLedgers = async (req, res) => {
       filter.name = { $regex: search, $options: 'i' };
     }
 
-    const ledgers = await LedgerMaster.find(filter).sort({ name: 1 });
+    const ledgers = await LedgerMaster.find(filter).sort({ name: 1 }).lean();
     res.status(200).json({ success: true, data: ledgers });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

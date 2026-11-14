@@ -177,6 +177,7 @@ const SalesSchema = new mongoose.Schema({
 // Per-company unique invoice number — fixes cross-tenant collision bug
 SalesSchema.index({ invoiceNo: 1, companyId: 1 }, { unique: true });
 SalesSchema.index({ companyId: 1, date: -1, status: 1 });
+SalesSchema.index({ companyId: 1, date: -1, createdAt: -1 });
 SalesSchema.index(
   { companyId: 1, operationId: 1 },
   { unique: true, partialFilterExpression: { operationId: { $type: 'string', $gt: '' } } }

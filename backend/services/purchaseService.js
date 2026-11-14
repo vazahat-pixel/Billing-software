@@ -520,7 +520,8 @@ class PurchaseService {
         .populate('items.itemId', 'name hsnCode gstRate')
         .sort({ date: -1, createdAt: -1 })
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(parseInt(limit))
+        .lean(),
       Purchase.countDocuments(query)
     ]);
 

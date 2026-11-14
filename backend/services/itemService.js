@@ -173,7 +173,7 @@ class ItemService {
   async getItems(companyId, { favorites, page, limit } = {}) {
     const filter = { companyId };
     if (favorites) filter.isFavorite = true;
-    const q = Item.find(filter).sort({ name: 1 });
+    const q = Item.find(filter).sort({ name: 1 }).lean();
     const lim = limit != null ? Math.min(Math.max(parseInt(limit, 10) || 50, 1), 500) : null;
     if (lim != null) {
       const p = Math.max(parseInt(page, 10) || 1, 1);

@@ -17,3 +17,4 @@ const ReminderSchema = new mongoose.Schema({
 ReminderSchema.index({ companyId: 1, date: 1 });
 
 module.exports = mongoose.model('Reminder', ReminderSchema);
+

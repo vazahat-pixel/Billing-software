@@ -506,12 +506,19 @@ const useStore = create((set, get) => ({
   // --- MASTER ACTIONS ---
   fetchParties: async () => {
     const seq = ++partiesFetchSeq;
-    set({ partiesLoading: true });
-    if (isOffline()) {
+    const existing = get().parties;
+    if (existing && existing.length > 0) {
+      set({ partiesLoading: false });
+    } else {
       const cached = (await getCachedEntities('parties')).map(normalizeParty);
-      if (seq !== partiesFetchSeq) return cached;
-      set({ parties: cached, partiesLoading: false });
-      return cached;
+      if (cached.length > 0 && seq === partiesFetchSeq) {
+        set({ parties: cached, partiesLoading: false });
+      } else {
+        set({ partiesLoading: true });
+      }
+    }
+    if (isOffline()) {
+      return get().parties;
     }
     try {
       const _parties = await partiesApi.listRaw();
@@ -632,10 +639,18 @@ const useStore = create((set, get) => ({
   },
 
   fetchItems: async () => {
-    set({ loading: true });
-    if (isOffline()) {
+    const existing = get().items;
+    if (existing && existing.length > 0) {
+      // In-memory instant paint
+    } else {
       const cached = (await getCachedEntities('items')).map(normalizeItem);
-      set({ items: cached, loading: false });
+      if (cached.length > 0) {
+        set({ items: cached });
+      } else {
+        set({ loading: true });
+      }
+    }
+    if (isOffline()) {
       return;
     }
     try {
@@ -751,16 +766,24 @@ const useStore = create((set, get) => ({
 
   // --- PURCHASE ACTIONS ---
   fetchPurchases: async (params = {}) => {
-    set({ purchasesLoading: true });
     const linkPurchases = async (list) => {
       const partyList = get().parties.length
         ? get().parties
         : (await getCachedEntities('parties')).map(normalizeParty);
       return linkPurchasesWithParties(list, partyList);
     };
-    if (isOffline()) {
+    const existing = get().purchases;
+    if (existing && existing.length > 0) {
+      // In-memory instant paint
+    } else {
       const cached = await linkPurchases((await getCachedEntities('purchases')).map(normalizePurchase));
-      set({ purchases: cached, purchasesLoading: false });
+      if (cached.length > 0) {
+        set({ purchases: cached, purchasesLoading: false });
+      } else {
+        set({ purchasesLoading: true });
+      }
+    }
+    if (isOffline()) {
       return;
     }
     try {
@@ -923,16 +946,24 @@ const useStore = create((set, get) => ({
 
   // --- SALES ACTIONS ---
   fetchSales: async () => {
-    set({ loading: true });
     const linkSales = async (list) => {
       const partyList = get().parties.length
         ? get().parties
         : (await getCachedEntities('parties')).map(normalizeParty);
       return linkSalesWithParties(list, partyList);
     };
-    if (isOffline()) {
+    const existing = get().sales;
+    if (existing && existing.length > 0) {
+      // In-memory instant paint
+    } else {
       const cached = await linkSales((await getCachedEntities('sales')).map(normalizeSale));
-      set({ sales: cached, loading: false });
+      if (cached.length > 0) {
+        set({ sales: cached, loading: false });
+      } else {
+        set({ loading: true });
+      }
+    }
+    if (isOffline()) {
       return;
     }
     try {
@@ -1126,11 +1157,19 @@ const useStore = create((set, get) => ({
 
   // --- INVENTORY ---
   fetchInventory: async () => {
-    set({ loading: true });
-    if (isOffline()) {
+    const existing = get().inventoryLots;
+    if (existing && existing.length > 0) {
+      // In-memory instant paint
+    } else {
       const cached = (await getCachedEntities('inventory')).map(normalizeInventoryLot);
-      set({ inventoryLots: cached, loading: false });
-      return cached;
+      if (cached.length > 0) {
+        set({ inventoryLots: cached, loading: false });
+      } else {
+        set({ loading: true });
+      }
+    }
+    if (isOffline()) {
+      return get().inventoryLots;
     }
     try {
       const _inv = await inventoryApi.list();
@@ -1381,9 +1420,15 @@ const useStore = create((set, get) => ({
   fetchLedgers: async (group = '', search = '') => {
     const loadCached = async () => {
       const cached = await getCachedEntities('ledgers');
-      set({ ledgers: cached });
+      if (cached && cached.length) set({ ledgers: cached });
       return cached;
     };
+    const existing = get().ledgers;
+    if (existing && existing.length > 0) {
+      // In-memory instant paint
+    } else {
+      await loadCached();
+    }
     if (isOffline()) {
       return loadCached();
     }

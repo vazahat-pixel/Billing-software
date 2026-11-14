@@ -96,3 +96,4 @@ describe('Batch 2 GST Reports', () => {
     assert.equal(r3.rows.length, 3);
   });
 });
+

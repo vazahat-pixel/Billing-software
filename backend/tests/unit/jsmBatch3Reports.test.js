@@ -118,3 +118,4 @@ test('Job brokerage, Brokreg statement all, Profit register, Stock value, Yarn k
   const shopRow = yarn.rows.find((r) => r.STOCK_AT === 'YARN STOCK AT SHOP');
   assert.equal(shopRow.BAL_KGS, 150);
 });
+
