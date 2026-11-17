@@ -70,17 +70,79 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
   // A few screens swap a list on a radio button (Account / Acc Head): the config picks it from the state.
   const shownLists = config.dynamicLists ? { ...lists, ...config.dynamicLists(state, rawOptions) } : lists;
 
+  // Some JSM tabs (Salesman, Area, MSME Type, ...) hold a tick-list this software has no data for. Drawn
+  // as is, they are empty boxes with dead checkboxes, so such a tab is left out — but only when it holds
+  // nothing except lists we do not fill, and never the last tab standing.
+  const deadTabs = (() => {
+    if (!form) return {};
+    const wired = new Set(Object.keys(config.lists || {}));
+    if (config.dynamicLists) Object.keys(config.dynamicLists(state, rawOptions) || {}).forEach((k) => wired.add(k));
+    const byName = new Map(form.controls.map((c) => [c.name, c]));
+    const byParent = new Map();
+    for (const c of form.controls) {
+      if (!byParent.has(c.parent)) byParent.set(c.parent, []);
+      byParent.get(c.parent).push(c);
+    }
+    const under = (name) => (byParent.get(name) || []).flatMap((k) => [k, ...under(k.name)]);
+    const isList = (c) => c.type === 'ListView' || /DataGridView$/.test(c.type);
+    const inert = /^(Label|Panel|GroupBox|TabPage|ColumnHeader|ToolTip)$|ColumnHeader|DataGridView.+Column/;
+    const hidden = {};
+    for (const tab of form.controls.filter((c) => c.type === 'TabControl')) {
+      const pages = (byParent.get(tab.name) || []).filter((c) => c.type === 'TabPage' && c.visible !== false && c.runtime?.visible !== false);
+      const dead = pages.filter((p) => {
+        const kids = under(p.name);
+        const lists = kids.filter(isList);
+        const others = kids.filter((k) => !isList(k) && !inert.test(k.type));
+        return lists.length > 0 && others.length === 0 && lists.every((l) => !wired.has(l.name));
+      });
+      if (dead.length && dead.length < pages.length) dead.forEach((p) => { hidden[p.name] = { visible: false }; });
+    }
+    // The same for a stray tick-list that sits outside any tab beside lists we do fill.
+    const anyWired = form.controls.some((c) => isList(c) && wired.has(c.name));
+    if (anyWired) {
+      const inTab = (c) => { for (let cur = byName.get(c.parent), g = 0; cur && g < 20; cur = byName.get(cur.parent), g += 1) if (cur.type === 'TabPage') return true; return false; };
+      for (const c of form.controls) {
+        if (c.type === 'ListView' && !wired.has(c.name) && !inTab(c)) hidden[c.name] = { visible: false };
+      }
+    }
+    return hidden;
+  })();
+  const formOverrides = { ...deadTabs, ...(config.overrides ? config.overrides(state) : {}) };
+
+  // The tick-list a "Select/UnSelect All" box acts on: the one on screen. Lists sit inside tab pages
+  // (only the selected page is drawn), group boxes or panels, and some are DataGridViews filled from
+  // `lists`, so walk each list's parents and keep the first whose tab pages are all the selected ones.
   const activeListView = () => {
-    const tabControl = form?.controls.find((c) => c.type === 'TabControl');
-    const page = state[`${tabControl?.name}.__tab`]
-      || form?.controls.filter((c) => c.type === 'TabPage' && c.parent === tabControl?.name)
-        .sort((a, b) => Number(a.name.match(/(\d+)$/)?.[1] ?? 999) - Number(b.name.match(/(\d+)$/)?.[1] ?? 999))[0]?.name;
-    return form?.controls.find((c) => c.type === 'ListView' && c.parent === page)?.name;
+    if (!form) return undefined;
+    const byName = new Map(form.controls.map((c) => [c.name, c]));
+    const isShown = (c) => {
+      const o = formOverrides[c.name];
+      if (o && o.visible !== undefined) return o.visible;
+      if (c.runtime?.visible !== undefined) return c.runtime.visible;
+      return c.visible !== false;
+    };
+    const drawn = (c) => {
+      for (let cur = c, guard = 0; cur && guard < 20; cur = byName.get(cur.parent), guard += 1) {
+        if (!isShown(cur)) return false;
+        if (cur.type === 'TabPage') {
+          const tab = byName.get(cur.parent);
+          const pages = form.controls
+            .filter((k) => k.type === 'TabPage' && k.parent === tab?.name && isShown(k))
+            .sort((x, y) => Number(x.name.match(/(\d+)$/)?.[1] ?? 999) - Number(y.name.match(/(\d+)$/)?.[1] ?? 999));
+          const active = state[`${tab?.name}.__tab`] || pages[0]?.name;
+          if (cur.name !== active) return false;
+        }
+      }
+      return true;
+    };
+    return form.controls.find((c) => (c.type === 'ListView' || /DataGridView$/.test(c.type))
+      && Array.isArray(shownLists[c.name]) && drawn(c))?.name;
   };
 
   // Most JSM report screens name their two buttons btn_screen and btn_exit; a few name them
   // something else (the Job P&L grid has Btn_Refresh / Btn_Exit), and those configs say so.
-  const runButtons = config.runButtons || ['btn_screen'];
+  // Print and File (Word/Excel) on a screen open the same report grid, which has its own print and export.
+  const runButtons = config.runButtons || ['btn_screen', 'btn_print', 'btn_word'];
   const exitButtons = config.exitButtons || ['btn_exit'];
   const excelButtons = config.excelButtons || [];
   const browseButtons = config.browseButtons || [];
@@ -101,15 +163,17 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
     }
   };
 
+  // Button names differ in case between screens (btn_exit / Btn_Exit), so compare without case.
+  const isOneOf = (list, name) => list.some((x) => String(x).toLowerCase() === String(name).toLowerCase());
   const onButton = async (name, value) => {
-    if (exitButtons.includes(name)) { onClose?.(); return; }
-    if (browseButtons.includes(name)) { fileInputRef.current?.click(); return; }
+    if (isOneOf(exitButtons, name)) { onClose?.(); return; }
+    if (isOneOf(browseButtons, name)) { fileInputRef.current?.click(); return; }
     if (name === 'Check_Select_UnSelectAll') {
       const lv = activeListView();
       if (lv) setState((s) => ({ ...s, [lv]: value ? [...(shownLists[lv] || [])] : [] }));
       return;
     }
-    if (excelButtons.includes(name) && typeof config.onExcel === 'function') {
+    if (isOneOf(excelButtons, name) && typeof config.onExcel === 'function') {
       setBusy(true);
       setError('');
       try {
@@ -122,7 +186,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
       }
       return;
     }
-    if (runButtons.includes(name)) {
+    if (isOneOf(runButtons, name)) {
       setBusy(true);
       setError('');
       try {
@@ -170,7 +234,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
                 lists={shownLists}
                 onButton={onButton}
                 busy={busy}
-                overrides={config.overrides ? config.overrides(state) : undefined}
+                overrides={formOverrides}
               />
             ) : (
               <div style={{ padding: 16 }}>Loading…</div>

@@ -1306,6 +1306,11 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
                serialNo: serialNo || getNextSerialNo(),
                srNo: ok + 1,
                isFinal: lineIsFinal,
+               // TDS is a bill-level figure (JSM T_TDS_BOOK): kept on the bill's first line, 0 on the rest,
+               // so the TDS reports count it once.
+               tdsBase: ok === 0 ? Number(onTdsAmt) || 0 : 0,
+               tdsPercent: ok === 0 ? Number(tdsPercent) || 0 : 0,
+               tdsAmount: ok === 0 ? Number(tdsAmt) || 0 : 0,
             };
 
             let res;

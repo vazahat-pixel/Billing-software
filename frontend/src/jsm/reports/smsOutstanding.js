@@ -21,6 +21,8 @@ const COLUMNS = [
 export default {
   form: 'Rpt_Sms_OsReports',
   lists: { lst_vw1: 'parties' },
+  // The run button here is "Sms Script" — this screen has no Screen button.
+  runButtons: ['Btn_SmsScriptToListView'],
   defaults: ({ today }) => ({ txt_OsDaysDate: today, txt_osdays: '90' }),
   toParams: (s) => ({
     asOn: toIsoDate(s.txt_OsDaysDate),

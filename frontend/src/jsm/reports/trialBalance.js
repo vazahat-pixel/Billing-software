@@ -12,7 +12,8 @@ import { toIsoDate } from '../winforms.js';
  */
 export default {
   form: 'Rpt_Trail_Bal_101',
-  lists: {},
+  lists: { lst_vw1: 'accounts' },
+  runButtons: ['btn_screen', 'btn_print', 'btn_word'],
   defaults: ({ fyFrom, fyTo }) => ({
     txt_dt_from: fyFrom,
     txt_dt_to: fyTo,
@@ -29,6 +30,7 @@ export default {
     format: s.Rdbtn_B1 ? '1' : s.Rdbtn_B3 ? '3' : s.Rdbtn_B4 ? '4' : s.Rdbtn_B5 ? '5' : '2',
     orderBy: s.Rdbtn_C2 ? '2' : s.Rdbtn_C3 ? '3' : '1',
     withZero: Boolean(s.chk_zero),
+    accounts: s.lst_vw1 || [],
   }),
   fallbackColumns: {
     JSM_VW_TR_BAL: [

@@ -1722,7 +1722,9 @@ const Dashboard = () => {
                                                       className={`erp-menu-item erp-menu-item--parent ${openFlyoutPath === keyPrefix ? 'erp-menu-trigger--open' : ''}`}
                                                       onClick={(e) => {
                                                          e.stopPropagation();
-                                                         setOpenFlyoutPath((prev) => (prev === keyPrefix ? null : keyPrefix));
+                                                         // Hovering already opened this flyout, so a click must keep it open
+                                                         // (toggling shut here made a click look like it did nothing).
+                                                         setOpenFlyoutPath(keyPrefix);
                                                       }}
                                                    >
                                                       {badge && (

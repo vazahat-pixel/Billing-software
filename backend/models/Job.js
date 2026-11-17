@@ -142,6 +142,10 @@ const JobSchema = new mongoose.Schema({
   perKgs: { type: Number, default: 0 },
   receiveDesc1: { type: String, trim: true, default: '' },
   receiveDesc2: { type: String, trim: true, default: '' },
+  /** TDS deducted on this receipt's bill (JSM T_TDS_BOOK): base, %, amount. Held on the bill's first line; the TDS reports read it. */
+  receiveTdsBase: { type: Number, default: 0 },
+  receiveTdsPercent: { type: Number, default: 0 },
+  receiveTdsAmount: { type: Number, default: 0 },
   /** JSM challan lot number (free text) and 'LAST' for a challan carried in from an earlier year. */
   lotNo: { type: String, trim: true, default: '' },
   lastYear: { type: String, trim: true, default: '' },

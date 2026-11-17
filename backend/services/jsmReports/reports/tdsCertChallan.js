@@ -13,7 +13,7 @@
  * challaned; no such flag is kept here, so nothing is marked.
  */
 const { orderRows, inList, inDateRange, groupBy, round } = require('../jcEngine');
-const { loadTdsBook } = require('./tdsTcsBooks');
+const { loadTdsBook, masterTdsLists, uniqSorted } = require('./tdsTcsBooks');
 
 const period = (p) => `DATE : FROM ${p.fromText || p.from || ''}  TO  ${p.toText || p.to || ''}`;
 const quarterOf = (m) => (m >= 4 && m <= 6 ? 'Q1' : m >= 7 && m <= 9 ? 'Q2' : m >= 10 && m <= 12 ? 'Q3' : 'Q4');
@@ -49,8 +49,9 @@ const certificate = {
   },
   async options(companyId, deps = {}) {
     const rows = deps.rows || await loadTdsBook(companyId);
-    const u = (f) => [...new Set(rows.map((r) => r[f]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
-    return { parties: u('PARTY'), heads: u('TDSHEAD') };
+    const master = deps.rows ? { parties: [], heads: [] } : await masterTdsLists(companyId);
+    const u = (f) => uniqSorted(rows.map((r) => r[f]));
+    return { parties: uniqSorted([...u('PARTY'), ...master.parties]), heads: uniqSorted([...u('TDSHEAD'), ...master.heads]) };
   },
 };
 
@@ -58,7 +59,9 @@ const challan = {
   async run(companyId, p = {}, deps = {}) {
     let rows = deps.rows || await loadTdsBook(companyId);
     rows = inDateRange(rows, 'ENT_DATE', p.from, p.to);
-    if (p.head) rows = inList(rows, 'TDSHEAD', [p.head]);
+    // The head typed in, or the heads ticked in the list (none = all heads).
+    const heads = [p.head, ...(Array.isArray(p.heads) ? p.heads : [])].filter(Boolean);
+    if (heads.length) rows = inList(rows, 'TDSHEAD', heads);
     const want = p.company === false ? 'NON-COMP' : 'COMP';
     rows = rows.filter((r) => r.COMP_NON === want);
     const tds = round(rows.reduce((t, r) => t + (Number(r.TDS_AMT) || 0), 0));
@@ -72,7 +75,7 @@ const challan = {
         groupColumns: [],
         groupDisplays: [],
         captions: {},
-        title: `TDS Challan - ${p.head || 'All heads'} (${want === 'COMP' ? 'Company' : 'Non Company'})`,
+        title: `TDS Challan - ${heads.join(', ') || 'All heads'} (${want === 'COMP' ? 'Company' : 'Non Company'})`,
         period: period(p),
         notice: `TDS: ${tds.toFixed(2)}  Penalty: ${penalty.toFixed(2)}  Interest: ${interest.toFixed(2)}  Total: ${round(tds + penalty + interest).toFixed(2)}  Paid by: ${p.byCheque ? 'Cheque' : 'Cash'}  Bank: ${p.bank || ''}  Chq No: ${p.chqNo || ''}  Date: ${p.chqDate || ''}`,
         pageWise: false,
@@ -81,7 +84,8 @@ const challan = {
   },
   async options(companyId, deps = {}) {
     const rows = deps.rows || await loadTdsBook(companyId);
-    return { heads: [...new Set(rows.map((r) => r.TDSHEAD).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b))) };
+    const master = deps.rows ? { heads: [] } : await masterTdsLists(companyId);
+    return { heads: uniqSorted([...rows.map((r) => r.TDSHEAD), ...master.heads]) };
   },
 };
 

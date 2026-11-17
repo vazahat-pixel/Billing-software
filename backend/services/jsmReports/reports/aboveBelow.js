@@ -82,7 +82,10 @@ async function run(companyId, p = {}, deps = {}) {
   }
 
   // JSM's HAVING: strictly above, or strictly below, the amount typed in.
+  // Ticked accounts narrow the list (none ticked = every account).
+  const ticked = Array.isArray(p.accounts) && p.accounts.length ? new Set(p.accounts) : null;
   const rows = totals
+    .filter((r) => !ticked || ticked.has(r.AC_NAME))
     .filter((r) => (above ? r.AC_TOTAL > amount : r.AC_TOTAL < amount))
     .sort((a, b) => a.AC_NAME.localeCompare(b.AC_NAME));
 
@@ -101,6 +104,11 @@ async function run(companyId, p = {}, deps = {}) {
   };
 }
 
-async function options() { return {}; }
+async function options(companyId) {
+  const Party = require('../../../models/Party');
+  const masterId = await require('../../companyGroupService').masterId(companyId);
+  const parties = await Party.find({ companyId: masterId, isDeleted: { $ne: true } }).select('name').lean();
+  return { accounts: [...new Set(parties.map((x) => x.name).filter(Boolean))].sort((a, c) => a.localeCompare(c)) };
+}
 
 module.exports = { run, options, SOURCES };

@@ -1,0 +1,124 @@
+/*
+ * Layout polish for the core bill / book windows (Sales, Purchase, Bank Receipt/Payment,
+ * Mill Issue/Receipt, Job Issue/Receipt). PRESENTATION ONLY — sizes, spacing, overflow.
+ * Loaded last so it wins over the older per-form sheets; every rule is scoped to one window.
+ * Found with a measuring pass (text wider than its box, controls overlapping, grids wider than
+ * their window) at 1920 / 1536 / 1366 wide screens.
+ */
+
+/* ── Sales / Purchase ─────────────────────────────────────────────── */
+/* The line grid keeps its fixed column widths as a minimum but stretches to the window, so the
+   header band and rows reach the right edge instead of stopping short of it. */
+.classic-erp-window.erp-sales-bill-compact .erp-sales-grid .classic-erp-table {
+  width: 100% !important;
+}
+/* CGST / SGST / TCS rows: the % box stretched across the whole row (400px+) and was 24px tall in
+   19px rows, so the three boxes overlapped. Make it a compact 52 x 18 box beside its label. */
+.classic-erp-window .classic-erp-total-row > .classic-erp-control:has(> input[type='number']) {
+  width: auto !important;
+  flex: 0 0 auto !important;
+}
+/* (The older Sales rule is 24px tall and more specific, so name the footer too to win over it.) */
+.classic-erp-window.erp-sales-bill-compact .erp-sales-footer .classic-erp-total-row > .classic-erp-control > input.classic-erp-input[type='number'],
+.classic-erp-window .classic-erp-total-row > .classic-erp-control > input.classic-erp-input[type='number'] {
+  flex: 0 0 52px !important;
+  width: 52px !important;
+  min-width: 52px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  line-height: 16px;
+  padding: 0 2px !important;
+  text-align: center;
+}
+
+/* ── Short screens (laptops: ~550px-tall windows) ─────────────────── */
+/* Sales / Purchase: the body clipped (overflow hidden) once header + grid + totals no longer fit, so
+   the bottom panels were cut off. Let the body scroll; on tall screens nothing changes. */
+.classic-erp-window.erp-sales-bill-compact .classic-erp-body.erp-bill-layout {
+  overflow-y: auto !important;
+}
+/* Mill Issue: the field block was squeezed to a fixed height and its contents ran over the button
+   row. Keep it at its natural height (the body already scrolls) and pin the buttons to the bottom. */
+.classic-erp-window.erp-mill-issue-window .erp-job-issue-split {
+  min-height: min-content !important;
+}
+.classic-erp-window.erp-mill-issue-window .erp-job-issue-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+}
+/* Job Issue: its body is overflow hidden, which cut the lower part on short windows. */
+.classic-erp-window.erp-job-issue-window:not(.erp-mill-issue-window) .erp-job-issue-body {
+  overflow-y: auto !important;
+}
+
+/* ── Mill Issue ───────────────────────────────────────────────────── */
+/* No wide grid on this book: keep it a compact window instead of stretching every field across the
+   whole screen (the Mill/Job windows with grids are widened in erp-form-visibility.css). */
+.job-book-window.erp-bill-window--floating:has(.erp-mill-issue-window) {
+  width: min(1180px, calc(100vw - 24px)) !important;
+}
+.classic-erp-window.erp-job-issue-window .erp-job-issue-split {
+  grid-template-columns: minmax(0, 1fr) 262px;
+}
+/* Side panel selects: leave room for the arrow so "Process Charge" is not drawn under it. */
+.classic-erp-window.erp-job-issue-window .erp-job-issue-side select,
+.classic-erp-window.erp-job-issue-window .erp-job-issue-side .classic-erp-select {
+  padding-right: 22px !important;
+  text-overflow: ellipsis;
+}
+
+/* ── Mill Receipt ─────────────────────────────────────────────────── */
+/* "Press (ALT+L) To LotNo Entry" sat in a 50px column and ran under the Lot box next to it. */
+.mill-rec-head {
+  grid-template-columns: 74px minmax(240px, 1.8fr) 165px minmax(80px, 0.7fr) 140px minmax(75px, 0.6fr) 60px minmax(75px, 0.6fr) !important;
+}
+
+/* The window was 836px tall for ~640px of content, leaving a big empty band above the buttons. */
+.job-book-window.erp-bill-window--floating:has(.mill-rec-sheet) {
+  height: min(calc(100dvh - 114px), 740px) !important;
+  max-height: min(calc(100dvh - 114px), 740px) !important;
+}
+
+/* ── Bank Receipt / Payment ───────────────────────────────────────── */
+/* "In Favour" box was ~78px, cutting its own "Payee name on cheque" hint. */
+.cash-bank-row .cb-f-payee .classic-erp-input {
+  width: 190px !important;
+  min-width: 190px !important;
+}
+
+/* ── Job Receipt ──────────────────────────────────────────────────── */
+/* TaxableAmt sat label-and-box side by side in a 95px column, leaving the box ~10px wide (the figure
+   was not visible). Stack it like the Tax Rate box next to it: label above, box full width. */
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-tax-panel > .classic-erp-field {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  gap: 1px !important;
+}
+.classic-erp-window.erp-job-receipt-window .erp-job-receipt-tax-panel > .classic-erp-field .classic-erp-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+}
+
+/* ── JSM look for Sales / Purchase / Return (same geometry as the Mill Receipt sheet) ────────────
+   Square corners on fields and buttons, one label style, and a uniform 22px field height, so the
+   bill windows read like the JSM WinForms screens instead of rounded web inputs. Colours unchanged. */
+.classic-erp-window.erp-sales-bill-compact input.classic-erp-input,
+.classic-erp-window.erp-sales-bill-compact select.classic-erp-select,
+.classic-erp-window.erp-sales-bill-compact .erp-combobox-input,
+.classic-erp-window.erp-sales-bill-compact textarea.classic-erp-input,
+.classic-erp-window.erp-sales-bill-compact .classic-erp-btn,
+.classic-erp-window.erp-sales-bill-compact .erp-combobox-chevron {
+  border-radius: 0 !important;
+}
+.classic-erp-window.erp-sales-bill-compact .classic-erp-label {
+  color: #111 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+.classic-erp-window.erp-sales-bill-compact .classic-erp-label.text-red-600,
+.classic-erp-window.erp-sales-bill-compact .classic-erp-label[class*='red'] {
+  color: #8b0000 !important;
+}

@@ -38,7 +38,8 @@ if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
 
 const run = (cmd, args, cwd) => {
   console.log(`\n$ ${cmd} ${args.join(' ')}   (in ${path.relative(root, cwd)})`);
-  execFileSync(cmd, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32' });
+  const isCmdOrBat = typeof cmd === 'string' && /\.(cmd|bat)$/i.test(cmd);
+  execFileSync(cmd, args, { cwd, stdio: 'inherit', shell: isCmdOrBat });
 };
 
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';

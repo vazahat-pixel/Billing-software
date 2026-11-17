@@ -62,13 +62,17 @@ async function loadTdsBook(companyId) {
   const Purchase = require('../../../models/Purchase');
   const DebitCreditNote = require('../../../models/DebitCreditNote');
   require('../../../models/Party');
-  const [company, deductions, purchases, notes] = await Promise.all([
+  const Job = require('../../../models/Job');
+  const [company, deductions, purchases, notes, receipts] = await Promise.all([
     companyName(companyId),
     TaxDeduction.find({ companyId, deductionType: 'TDS', status: { $ne: 'Reversed' }, isDeleted: { $ne: true } }).lean(),
     Purchase.find({ companyId, tdsAmount: { $gt: 0 }, status: { $ne: 'cancelled' } })
       .populate('supplierId', 'name pan tdsSection tdsPer').lean(),
     DebitCreditNote.find({ companyId, tdsAmount: { $gt: 0 }, status: { $ne: 'Cancelled' } })
       .populate('partyId', 'name pan tdsSection tdsPer').lean(),
+    // Mill / Job receipts: the TDS deducted on the receipt's bill (kept on its first line).
+    Job.find({ companyId, receiveTdsAmount: { $gt: 0 }, isDeleted: { $ne: true } })
+      .populate('workerId', 'name pan tdsSection tdsPer').lean(),
   ]);
   const base = { COMPANY: company, DOB_DATE: null };
   const out = [];
@@ -99,8 +103,34 @@ async function loadTdsBook(companyId) {
       NCBILL_NO: n.noteNo || '', SP_TYPE: `${n.noteType || ''} Note`,
     }));
   }
+  for (const j of receipts) {
+    if (covered.has(String(j._id))) continue;
+    const w = j.workerId && typeof j.workerId === 'object' ? j.workerId : {};
+    const taxable = num(j.receiveTdsBase);
+    out.push(tdsRow(base, {
+      ENT_NO: 0, ENT_DATE: j.receiveDate || j.updatedAt, TDSHEAD: w.tdsSection || 'TDS ACCOUNT', PARTY: w.name || '',
+      PANNO: w.pan || '', AMOUNT: round(taxable),
+      TDS_PER: num(j.receiveTdsPercent) || (taxable ? round((num(j.receiveTdsAmount) / taxable) * 100, 4) : 0),
+      TDS_AMT: round(j.receiveTdsAmount), NCBILL_NO: j.billGpNo || '', SP_TYPE: j.workKind === 'Job' ? 'Job Receipt' : 'Mill Receipt',
+    }));
+  }
   return out.map((r, i) => ({ ...r, ENT_NO: i + 1, SRAL_NO: i + 1 }));
 }
+
+// JSM's Account / Acc Head tick-lists hold every account, not only the ones that already have TDS
+// entries — an empty book must still show the party list (and the TDS sections set on the masters).
+async function masterTdsLists(companyId) {
+  try {
+    const Party = require('../../../models/Party');
+    const masterId = await require('../../companyGroupService').masterId(companyId);
+    const parties = await Party.find({ companyId: masterId, isDeleted: { $ne: true } }).select('name tdsSection').lean();
+    return { parties: parties.map((x) => x.name), heads: parties.map((x) => x.tdsSection) };
+  } catch (_) {
+    return { parties: [], heads: [] };
+  }
+}
+const uniqSorted = (vals) => [...new Set(vals.filter((v) => String(v ?? '').trim() !== ''))]
+  .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
 
 const period = (p) => `DATE : FROM ${p.fromText || p.from || ''}  TO  ${p.toText || p.to || ''}`;
 
@@ -146,9 +176,13 @@ function tdsReport() {
 
   async function options(companyId, deps = {}) {
     const rows = deps.rows || await loadTdsBook(companyId);
-    const u = (f) => [...new Set(rows.map((r) => r[f]).filter((v) => String(v ?? '').trim() !== ''))]
-      .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
-    return { parties: u('PARTY'), heads: u('TDSHEAD'), pers: u('TDS_PER').map(String) };
+    const master = deps.rows ? { parties: [], heads: [] } : await masterTdsLists(companyId);
+    const u = (f) => uniqSorted(rows.map((r) => r[f]));
+    return {
+      parties: uniqSorted([...u('PARTY'), ...master.parties]),
+      heads: uniqSorted([...u('TDSHEAD'), ...master.heads]),
+      pers: u('TDS_PER').map(String),
+    };
   }
   return { run, options };
 }
@@ -259,8 +293,9 @@ function tdsPartyMonthReport() {
   }
   async function options(companyId, deps = {}) {
     const rows = deps.rows || await loadTdsBook(companyId);
-    const u = (f) => [...new Set(rows.map((r) => r[f]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
-    return { parties: u('PARTY'), heads: u('TDSHEAD') };
+    const master = deps.rows ? { parties: [], heads: [] } : await masterTdsLists(companyId);
+    const u = (f) => uniqSorted(rows.map((r) => r[f]));
+    return { parties: uniqSorted([...u('PARTY'), ...master.parties]), heads: uniqSorted([...u('TDSHEAD'), ...master.heads]) };
   }
   return { run, options };
 }
@@ -272,4 +307,6 @@ module.exports = {
   tcsPurchase: tcsReport('purchase'),
   TDS_MODES,
   loadTdsBook,
+  masterTdsLists,
+  uniqSorted,
 };

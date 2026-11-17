@@ -39,6 +39,8 @@ export const OUTSTANDING_AGE_EXTRAS = [
   {
     form: 'Rpt_Outstating_Age_Report',
     lists: { ListView0: 'parties', ListView1: 'brokers' },
+    // This screen's run button is Btn_Ok, not Screen.
+    runButtons: ['Btn_Ok'],
     defaults: ({ fyFrom, fyTo }) => ({
       txt_bill_dt_from: fyFrom,
       txt_bill_dt_to: fyTo,

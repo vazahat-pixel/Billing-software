@@ -9,6 +9,7 @@
 @import "./styles/erp-transitions.css";
 @import "./styles/admin-theme.css";
 @import "./styles/erp-form-visibility.css";
+@import "./styles/erp-polish.css";
 
 @theme {
   --radius-card: 12px;

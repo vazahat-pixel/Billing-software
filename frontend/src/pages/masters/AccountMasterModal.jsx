@@ -7,7 +7,8 @@ import { notifySuccess, notifyError, notifyWarning } from '../../utils/notify';
 import { erpConfirm } from '../../utils/confirm';
 import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import DataImportModal from '../../components/import/DataImportModal';
-import { GST_STATE_CODES } from '../../utils/gstStateCodes';
+import useConfigStore from '../../store/useConfigStore';
+import { GST_STATE_CODES, stateNameFromCode, stateCodeFromGstin, resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
 
 const MSME_TYPE_OPTIONS = [
   'None',
@@ -179,28 +180,39 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialPartyId, readOnly, initialTab, prefillBankName]);
 
-  // Derive State Details from GSTIN
+  // The firm's own state decides IN STATE / OUT OF STATE; Gujarat (24) is the long-standing default.
+  const companySettings = useConfigStore((s) => s.companySettings);
+  const companyGstin = companySettings?.gstin || companySettings?.GSTIN;
+  const companyStateCode = companySettings?.stateCode || companySettings?.state || '24';
+
+  // State code -> "24-GUJARAT" and the matching GST type. A code that is not a GST state clears the
+  // name rather than leaving a stale one (the old form showed code 43 beside 24-GUJARAT).
+  const stateFields = (rawCode) => {
+    const code = String(rawCode ?? '').replace(/D/g, '').slice(0, 2);
+    if (code.length < 2) return { stateCode: code };
+    const name = stateNameFromCode(code);
+    if (!name) return { stateCode: code, stateName: '' };
+    const supply = resolveInvoiceSupplyType({ partyStateCode: code, companyGstin, companyStateCode });
+    return {
+      stateCode: code,
+      stateName: `${code}-${name.toUpperCase()}`,
+      ...(supply ? { gstType: supply === 'INVOICE IN STATE' ? 'INVOICE (IN STATE)' : 'INVOICE (OUT OF STATE)' } : {}),
+    };
+  };
+
+  // Derive State Details from GSTIN (its first two digits are the state code)
   useEffect(() => {
-    if (formData.gstin && formData.gstin.length >= 2) {
-      const code = formData.gstin.substring(0, 2);
-      let name = '';
-      if (code === '24') name = '24-Gujarat';
-      else if (code === '27') name = '27-Maharashtra';
-      else if (code === '07') name = '07-Delhi';
-      else name = `${code}-Other State`;
-      
+    const code = stateCodeFromGstin(formData.gstin);
+    if (formData.gstin && formData.gstin.length >= 2 && stateNameFromCode(code)) {
       const pan = formData.gstin.length >= 12 ? formData.gstin.substring(2, 12) : '';
-      const gstType = code === '24' ? 'INVOICE (IN STATE)' : 'INVOICE (OUT OF STATE)';
-      
       setFormData(prev => ({
         ...prev,
-        stateCode: code,
-        stateName: name,
-        gstType,
+        ...stateFields(code),
         pan: prev.pan || pan
       }));
     }
-  }, [formData.gstin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.gstin, companyStateCode, companyGstin]);
 
   const currentIndex = useMemo(() => {
     if (!selectedPartyId || !parties.length) return -1;
@@ -545,7 +557,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                 {L(630, 162, 'Gstin No')}
                 {T(709, 160, 181, 'gstin', { maxLength: 15, className: 'classic-erp-input font-mono uppercase font-bold' })}
                 {L(630, 187, 'StateCode')}
-                {T(709, 184, 56, 'stateCode', { className: 'classic-erp-input font-mono' })}
+                {T(709, 184, 56, 'stateCode', { className: 'classic-erp-input font-mono', maxLength: 2, inputMode: 'numeric', onChange: (e) => setFormData((prev) => ({ ...prev, ...stateFields(e.target.value) })) })}
                 {L(630, 211, 'StateName')}
                 {T(709, 208, 181, 'stateName')}
                 {L(630, 235, 'GstType')}

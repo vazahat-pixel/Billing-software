@@ -31,14 +31,14 @@ const certificate = {
 
 const challan = {
   form: 'Rpt_Tds4_Challan',
-  lists: {},
+  lists: { lst_vw1: 'heads' },
   runButtons: ['btn_screen', 'btn_print', 'btn_word'],
   defaults: ({ fyFrom, fyTo }) => ({
     txt_dt_from: fyFrom, txt_dt_to: fyTo, Rdbtn_B1: true, Rdbtn_A1: true, txt_tds_amt: '0.00', txt_penalty: '0.00', txt_int: '0.00',
   }),
   toParams: (s) => ({
     from: toIsoDate(s.txt_dt_from), to: toIsoDate(s.txt_dt_to), fromText: s.txt_dt_from, toText: s.txt_dt_to,
-    head: (s.txt_hdname || '').trim(), company: !s.Rdbtn_B2,
+    head: (s.txt_hdname || '').trim(), heads: s.lst_vw1 || [], company: !s.Rdbtn_B2,
     penalty: Number(s.txt_penalty) || 0, interest: Number(s.txt_int) || 0,
     byCheque: Boolean(s.Rdbtn_A2), bank: s.txt_bank || '', chqNo: s.txt_chq_no || '', chqDate: s.txt_ddate || '',
   }),

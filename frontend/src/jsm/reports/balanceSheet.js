@@ -14,6 +14,8 @@ import { toIsoDate } from '../winforms.js';
 export default {
   form: 'A_Final_BalanceSheet',
   renderer: 'twoColumn',
+  // This JSM screen's run button is OK (btn_ok), not Screen.
+  runButtons: ['btn_ok'],
   lists: {},
   defaults: ({ fyFrom, fyTo }) => ({
     Txt_FromDate: fyFrom,

@@ -79,7 +79,9 @@ export default function JsmFormDialog({
   const captionOf = (c) => overrides[c.name]?.text ?? c.runtime?.text ?? c.text ?? '';
   const itemsOf = (c) => overrides[c.name]?.items || (c.runtime?.items?.length ? lastFill(c.runtime.items) : c.items) || [];
 
-  const set = (name, value) => onChange({ ...state, [name]: value });
+  // Functional update: "Select/UnSelect All" changes the list in the parent first and then this box, and a
+  // plain `{ ...state }` here would write the stale copy back over the list it just filled.
+  const set = (name, value) => onChange((s) => ({ ...s, [name]: value }));
 
   // Alt+<letter> presses the button whose caption has that accelerator; Esc = Exit, like JSM.
   useEffect(() => {

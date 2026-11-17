@@ -57,6 +57,15 @@ function computeWastageSplit(issueQty, receivedQty, tolerancePct) {
   return { wastage, normalShrinkage, abnormalWastage, toleranceQty };
 }
 
+/** Keep the TDS the Receive screen deducted (only when the screen sent it, so older callers are unchanged). */
+function applyReceiveTds(job, data) {
+  if (data.tdsAmount == null && data.tdsPercent == null && data.tdsBase == null) return;
+  const n = (v) => Math.max(0, Number(v) || 0);
+  job.receiveTdsBase = Number(n(data.tdsBase).toFixed(2));
+  job.receiveTdsPercent = n(data.tdsPercent);
+  job.receiveTdsAmount = Number(n(data.tdsAmount).toFixed(2));
+}
+
 class JobService {
   async issueToJob(issueData, options = {}) {
     return withTransaction(async (session) => {
@@ -232,11 +241,11 @@ class JobService {
         const targetOpId = operationId.startsWith('RECV:') ? operationId : `RECV:${operationId}`;
         const SyncOutbox = require('../models/SyncOutbox');
         const ProcessedOperation = require('../models/ProcessedOperation');
-        const [existingOutbox, existingProc, existingByLast] = await Promise.all([
-          SyncOutbox.findOne({ companyId, operationId: { $in: [operationId, targetOpId] } }).session(session),
-          ProcessedOperation.findOne({ companyId, operationId: { $in: [operationId, targetOpId] } }).session(session),
-          Job.findOne({ companyId, lastReceiveOperationId: targetOpId }).session(session),
-        ]);
+        // One after another: queries sharing a transaction session must not run in parallel
+        // (MongoDB: "Given transaction number N ... does not match any in-progress transactions").
+        const existingOutbox = await SyncOutbox.findOne({ companyId, operationId: { $in: [operationId, targetOpId] } }).session(session);
+        const existingProc = await ProcessedOperation.findOne({ companyId, operationId: { $in: [operationId, targetOpId] } }).session(session);
+        const existingByLast = await Job.findOne({ companyId, lastReceiveOperationId: targetOpId }).session(session);
         if (existingOutbox || existingProc || existingByLast) {
           const target = existingByLast || (jobId ? await Job.findOne({ _id: jobId, companyId }).session(session) : null);
           if (target) {
@@ -392,6 +401,7 @@ class JobService {
       job.status = isFinal ? 'Received' : 'Partial';
       job.receiveDate = new Date();
       job.billGpNo = billGpNo || job.billGpNo || '';
+      applyReceiveTds(job, receiveData);
       if (receiveData.serialNo) job.serialNo = String(receiveData.serialNo).trim();
 
       if (isChainJob) {
@@ -834,6 +844,7 @@ class JobService {
       job.processCharges = newCharges;
       job.processGstAmount = newGst;
       if (billGpNo != null) job.billGpNo = String(billGpNo).trim();
+      applyReceiveTds(job, receiveData);
       if (receiveData.serialNo != null) job.serialNo = String(receiveData.serialNo).trim();
       if (workerId) job.workerId = workerId;
       if (billType) job.billType = billType;

@@ -39,9 +39,15 @@ async function run(companyId, p = {}) {
     withZeroBalance: Boolean(p.withZero),
   });
 
+  // Ticked accounts narrow the list (none ticked = every account, as JSM does).
+  const ticked = Array.isArray(p.accounts) && p.accounts.length ? new Set(p.accounts) : null;
   const rows = [];
+  let diff = result.difference;
+  if (ticked) diff = 0;
   for (const g of result.groups) {
     for (const l of g.lines) {
+      if (ticked && !ticked.has(l.name)) continue;
+      if (ticked) diff += (Number(l.debit) || 0) - (Number(l.credit) || 0);
       rows.push({
         GROUP1: g.name,
         AC_NAME: l.name,
@@ -64,12 +70,15 @@ async function run(companyId, p = {}) {
       groupDisplays: [],
       captions: {},
       title: opening ? 'Opening Trial Balance Report' : 'Trial Balance Report',
-      period: `PERIOD : ${period}   |   Diff.Amt : ${result.difference.toFixed(2)}`,
+      period: `PERIOD : ${period}   |   Diff.Amt : ${Number(diff).toFixed(2)}`,
       pageWise: false,
     },
   };
 }
 
-async function options() { return {}; }
+async function options(companyId) {
+  const tb = await financialReportsService.groupedTrialBalance(companyId, { withZeroBalance: true });
+  return { accounts: tb.groups.flatMap((g) => g.lines.map((l) => l.name)).sort((a, b) => a.localeCompare(b)) };
+}
 
 module.exports = { run, options };

@@ -792,7 +792,7 @@ textarea.classic-erp-input {
   top: 76px !important;
   left: 50% !important;
   right: auto !important;
-  width: min(1080px, calc(100vw - 190px)) !important;
+  width: min(1880px, calc(100vw - 24px)) !important;
   height: calc(100dvh - 114px) !important;
   max-height: calc(100dvh - 114px) !important;
   transform: translateX(-50%) !important;

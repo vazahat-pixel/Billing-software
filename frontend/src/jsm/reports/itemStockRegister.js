@@ -8,13 +8,17 @@ import { toIsoDate } from '../winforms.js';
 export default {
   form: 'Zoom_SelectDate_List_Item',
   lists: { ListView0: 'items', lst_vw1: 'items' },
+  // This screen's buttons are Btn_Ok ("Ledger") and Button1 ("All Item"), and its exit is Btn_Exit.
+  runButtons: ['Btn_Ok', 'Button1'],
+  exitButtons: ['Btn_Exit'],
   defaults: ({ fyFrom, fyTo }) => ({ txt_dt_from: fyFrom, txt_dt_to: fyTo }),
-  toParams: (s) => ({
+  toParams: (s, button) => ({
     from: toIsoDate(s.txt_dt_from),
     to: toIsoDate(s.txt_dt_to),
     fromText: s.txt_dt_from,
     toText: s.txt_dt_to,
-    items: s.ListView0 || s.lst_vw1 || [],
+    // "All Item" ignores any ticked items.
+    items: button === 'Button1' ? [] : s.ListView0 || s.lst_vw1 || [],
   }),
   fallbackColumns: {
     JSM_VW_STOCK_WITH_VALUE_REGISTER: [

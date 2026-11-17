@@ -60,15 +60,22 @@ async function applyLotMovement({
   else if (totalForStatus > 0 && remainingForStatus < totalForStatus) lot.status = 'Partially Used';
   else lot.status = 'Available';
 
-  const version = lot.version || 1;
+  // Optimistic lock on the lot's `version`. The stored value is not always 1: lots brought in by the
+  // JSM data migration were saved with version 0, and very old lots have no version at all (Mongoose
+  // shows those as 1). `lot.version || 1` turned a stored 0 into 1, which never matched, so every
+  // sale from an imported lot failed with "Concurrent stock update". Match the value as it really is.
+  const stored = Number(lot.version);
+  const version = Number.isFinite(stored) ? stored : 1;
+  const versionClause = version === 1 ? { version: { $in: [1, null] } } : { version };
   const updated = await InventoryLot.findOneAndUpdate(
-    { _id: lot._id, companyId, version, isDeleted: { $ne: true } },
+    { _id: lot._id, companyId, ...versionClause, isDeleted: { $ne: true } },
     {
       $set: {
         remainingMtrs: lot.remainingMtrs,
         remainingPcs: lot.remainingPcs,
         status: lot.status,
       },
+      // $inc on a missing field starts from 0, so a version-less lot lands on 1 here and is versioned from then on
       $inc: { version: 1 },
     },
     { session, new: true }

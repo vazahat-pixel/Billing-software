@@ -9,7 +9,7 @@ import { toIsoDate } from '../winforms.js';
  */
 export default {
   form: 'Rpt_Above_Below',
-  lists: {},
+  lists: { lst_vw1: 'accounts' },
   defaults: ({ fyFrom, fyTo }) => ({
     txt_dt_from: fyFrom,
     txt_dt_to: fyTo,
@@ -24,6 +24,7 @@ export default {
     toText: s.txt_dt_to,
     source: s.Rdbtn_A2 ? 2 : s.Rdbtn_A3 ? 3 : s.Rdbtn_JobWork ? 4 : s.Rdbtn_Cash_Rec ? 5 : s.Rdbtn_Cash_Pay ? 6 : 1,
     direction: s.Rdbtn_B2 ? 'B' : 'A',
+    accounts: s.lst_vw1 || [],
     amount: Number(String(s.txt_1 || '0').replace(/,/g, '')) || 0,
   }),
   fallbackColumns: {

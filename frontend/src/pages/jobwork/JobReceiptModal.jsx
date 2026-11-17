@@ -644,6 +644,10 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
           serialNo: header.serialNo || getNextSerialNo(),
           srNo: ok + 1,
           isFinal,
+          // TDS is a bill-level figure: kept on the first line, 0 on the rest (TDS reports count it once).
+          tdsBase: ok === 0 ? (Number(footer.tdsOnAmount) || Number(calc.taxable) || 0) : 0,
+          tdsPercent: ok === 0 ? Number(footer.tdsPercent) || 0 : 0,
+          tdsAmount: ok === 0 ? Number(calc.tdsAmt) || 0 : 0,
         });
         ok += 1;
       }

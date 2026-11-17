@@ -32,9 +32,11 @@ const floatingSize = (initialSize) => {
   if (initialSize?.w && initialSize?.h) {
     return { w: Math.min(maxW, initialSize.w), h: Math.min(maxH, initialSize.h) };
   }
+  // Bill windows grow with the screen (the Sales/Purchase grids need ~1500px) instead of sitting at a
+  // fixed 1180x660 in the middle of a big monitor; small screens keep the old size.
   return {
-    w: Math.min(maxW, 1180),
-    h: Math.min(maxH, 660),
+    w: Math.min(maxW, Math.max(1180, Math.round(window.innerWidth * 0.9))),
+    h: Math.min(maxH, Math.max(660, Math.min(820, maxH))),
   };
 };
 
