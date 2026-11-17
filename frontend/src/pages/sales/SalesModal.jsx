@@ -614,13 +614,17 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     if (invId) setSelectedInvoiceId(invId);
     else if (isFromPurchase) setSelectedInvoiceId('');
 
+    const partyObj = typeof inv.customerId === 'object' ? inv.customerId : (parties || []).find((p) => String(p._id || p.id) === String(inv.customerId));
+    const resolvedCity = inv.station || inv.customerId?.station || inv.customerId?.city || partyObj?.station || partyObj?.city || inv.city || '';
+    const resolvedTransport = inv.transport || inv.customerId?.transport || partyObj?.transport || '';
+
     setHeader({
       party: isFromPurchase ? '' : (inv.customerId?._id || inv.customerId || ''),
       add: isFromPurchase ? '' : (inv.remarks || ''),
       broker: inv.brokerId || '',
       book: inv.bookId || selectedBook || 'SALES BOOK',
-      gstin: isFromPurchase ? '' : (inv.customerId?.gstin || ''),
-      city: isFromPurchase ? '' : (inv.station || ''),
+      gstin: isFromPurchase ? '' : (inv.customerId?.gstin || partyObj?.gstin || ''),
+      city: isFromPurchase ? '' : resolvedCity,
       haste: isFromPurchase ? '' : (inv.haste || ''),
       billNo: isFromPurchase ? '' : (inv.invoiceNo || ''),
       billDate: inv.date && !isFromPurchase ? inv.date.split('T')[0] : today(),
@@ -688,8 +692,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     }
 
     setFooter({
-      transport: inv.transport || '',
-      station: inv.station || '',
+      transport: resolvedTransport,
+      station: resolvedCity,
       lrNo: inv.lrNo || '',
       lrDate: inv.lrDate ? inv.lrDate.split('T')[0] : today(),
       baleNo: inv.baleNo || '',

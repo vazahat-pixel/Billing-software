@@ -27,13 +27,18 @@ class DashboardService {
     if (!companyId) throw new Error('companyId required');
     const cid = toOid(companyId);
     const { start, end } = dayBounds();
-    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const fyYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const fyStart = new Date(fyYear, 3, 1);
 
     const [
       salesTodayAgg,
       purchaseTodayAgg,
       salesMonthAgg,
       purchaseMonthAgg,
+      salesFyAgg,
+      purchaseFyAgg,
       receivableOutstanding,
       payableOutstanding,
       lowStock,
@@ -59,6 +64,14 @@ class DashboardService {
       Purchase.aggregate([
         { $match: { companyId: cid, status: { $ne: 'cancelled' }, date: { $gte: monthStart } } },
         { $group: { _id: null, amount: { $sum: '$netAmount' } } },
+      ]),
+      Sales.aggregate([
+        { $match: { companyId: cid, status: { $ne: 'cancelled' }, date: { $gte: fyStart } } },
+        { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: '$netAmount' } } },
+      ]),
+      Purchase.aggregate([
+        { $match: { companyId: cid, status: { $ne: 'cancelled' }, date: { $gte: fyStart } } },
+        { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: '$netAmount' } } },
       ]),
       Sales.aggregate([
         { $match: { companyId: cid, status: { $in: ['active', 'partial'] } } },
@@ -100,16 +113,21 @@ class DashboardService {
     const purchaseToday = purchaseTodayAgg[0] || { count: 0, amount: 0 };
     const salesMonth = salesMonthAgg[0]?.amount || 0;
     const purchaseMonth = purchaseMonthAgg[0]?.amount || 0;
+    const salesFy = salesFyAgg[0] || { count: 0, amount: 0 };
+    const purchaseFy = purchaseFyAgg[0] || { count: 0, amount: 0 };
     const receivable = receivableOutstanding[0]?.amount || 0;
     const payable = payableOutstanding[0]?.amount || 0;
     const cashToday = cashAgg[0]?.amount || 0;
 
     return {
       asOf: new Date().toISOString(),
+      currentFy: `${fyYear}-${String((fyYear + 1) % 100).padStart(2, '0')}`,
       salesToday: { count: salesToday.count || 0, amount: salesToday.amount || 0 },
       purchaseToday: { count: purchaseToday.count || 0, amount: purchaseToday.amount || 0 },
       salesMonthAmount: salesMonth,
       purchaseMonthAmount: purchaseMonth,
+      salesFy: { count: salesFy.count || 0, amount: salesFy.amount || 0 },
+      purchaseFy: { count: purchaseFy.count || 0, amount: purchaseFy.amount || 0 },
       profitProxy: salesMonth - purchaseMonth,
       cashToday,
       receivable,

@@ -1891,15 +1891,27 @@ const Dashboard = () => {
                   </div>
                )}
                {showDashboardSkeleton ? (
-                  <CardGridLoader count={6} />
+                  <CardGridLoader count={7} />
                ) : (
-               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 erp-motion-stagger">
+               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 erp-motion-stagger">
                    {[
+                      { 
+                         label: `Sales FY ${dashboardSummary?.currentFy || ''}`, 
+                         value: dashboardSummary?.salesFy?.amount, 
+                         sub: dashboardSummary?.salesFy?.count != null ? `${dashboardSummary.salesFy.count} bills` : null,
+                         iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+                         svg: (
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                               <path d="M22 7L13.5 15.5L8.5 10.5L2 17" />
+                               <polyline points="16 7 22 7 22 13" />
+                            </svg>
+                         )
+                      },
                       { 
                          label: 'Sales Today', 
                          value: dashboardSummary?.salesToday?.amount, 
                          sub: dashboardSummary?.salesToday?.count != null ? `${dashboardSummary.salesToday.count} bills` : null,
-                         iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+                         iconBg: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20',
                          svg: (
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                                <path d="M22 7L13.5 15.5L8.5 10.5L2 17" />

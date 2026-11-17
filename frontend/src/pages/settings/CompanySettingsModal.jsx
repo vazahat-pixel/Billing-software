@@ -53,10 +53,18 @@ const SECTIONS = [
   { id: 'footer', label: 'Footer Fields', prop: 'footerFields' },
 ];
 
+const currentDefaultFy = () => {
+  const d = new Date();
+  const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+  const nextY = String((y + 1) % 100).padStart(2, '0');
+  return `${y}-${nextY}`;
+};
+
 const FY_OPTIONS = [
   { value: '2024-25', label: '2024-25' },
   { value: '2025-26', label: '2025-26' },
   { value: '2026-27', label: '2026-27' },
+  { value: '2027-28', label: '2027-28' },
 ];
 
 const GST_SCHEME_OPTIONS = [
@@ -95,7 +103,7 @@ const PRINT_TEMPLATES = [
 
 const emptySettings = () => ({
   legalName: '', shortName: '', gstin: '', pan: '', tan: '', phone: '', email: '', website: '',
-  address: '', city: '', state: '', pincode: '', stateCode: '', financialYear: '2025-26',
+  address: '', city: '', state: '', pincode: '', stateCode: '', financialYear: currentDefaultFy(),
   gstScheme: 'Regular (Monthly)', currency: 'INR (₹)', dateFormat: 'DD/MM/YYYY',
   tdsEnabled: false, tcsEnabled: false, eway: false, eInvoice: false, businessType: 'Textile',
   invoicePrefix: 'INV', purchasePrefix: 'PUR', challanPrefix: 'CHL', receiptPrefix: 'RCP',

@@ -82,7 +82,22 @@ function inDateRange(rows, field, from, to) {
 }
 
 function dayKey(v) {
-  const d = v instanceof Date ? v : new Date(v);
+  if (!v) return null;
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return null;
+    return v.getUTCFullYear() * 10000 + (v.getUTCMonth() + 1) * 100 + v.getUTCDate();
+  }
+  const s = String(v).trim();
+  const mDisplay = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (mDisplay) {
+    return parseInt(mDisplay[3], 10) * 10000 + parseInt(mDisplay[2], 10) * 100 + parseInt(mDisplay[1], 10);
+  }
+  const mIso = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (mIso) {
+    return parseInt(mIso[1], 10) * 10000 + parseInt(mIso[2], 10) * 100 + parseInt(mIso[3], 10);
+  }
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return null;
   return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
 }
 

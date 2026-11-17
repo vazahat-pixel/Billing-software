@@ -10,7 +10,14 @@ import AdminCompanySelect from './AdminCompanySelect';
 import { adminApi } from '../../api';
 import { toast } from '../../store/useToastStore';
 
-const FINANCIAL_YEARS = ['2023-24', '2024-25', '2025-26', '2026-27'];
+const currentDefaultFy = () => {
+    const d = new Date();
+    const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+    const nextY = String((y + 1) % 100).padStart(2, '0');
+    return `${y}-${nextY}`;
+};
+
+const FINANCIAL_YEARS = ['2023-24', '2024-25', '2025-26', '2026-27', '2027-28'];
 const GST_SCHEMES = ['Regular (Monthly)', 'QRMP (Quarterly)', 'Composition', 'Exempt'];
 const CURRENCIES = ['INR (₹)', 'USD ($)', 'EUR (€)', 'GBP (£)'];
 const DATE_FORMATS = ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'];
@@ -51,7 +58,7 @@ const CompanyConfig = () => {
         phone: '', email: '', website: '',
         address: '', city: '', state: '', pincode: '',
         // Financial Settings
-        financialYear: '2024-25', gstScheme: 'Regular (Monthly)',
+        financialYear: currentDefaultFy(), gstScheme: 'Regular (Monthly)',
         currency: 'INR (₹)', dateFormat: 'DD/MM/YYYY',
         tdsEnabled: false, tcsEnabled: false, eway: false, eInvoice: false,
         // Business Settings

@@ -38,7 +38,15 @@ const CompanySettingsSchema = new mongoose.Schema({
     coDataPath: { type: String, default: '' },
     coType: { type: String, default: 'TEXT' },
     // Financial
-    financialYear: { type: String, default: '2024-25' },
+    financialYear: {
+      type: String,
+      default: () => {
+        const d = new Date();
+        const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+        const nextY = String((y + 1) % 100).padStart(2, '0');
+        return `${y}-${nextY}`;
+      },
+    },
     gstScheme: { type: String, default: 'Regular (Monthly)' },
     currency: { type: String, default: 'INR (₹)' },
     dateFormat: { type: String, default: 'DD/MM/YYYY' },

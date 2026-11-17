@@ -27,7 +27,7 @@ const EMPTY_LR = {
  * User fills LR fields row-by-row and saves in bulk or one by one.
  * After save those bills disappear from the list on next refresh.
  */
-const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
+const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill, defaultFy }) => {
   const { sales, parties, fetchSales } = useStore();
   const [pendingBills, setPendingBills] = useState([]);
   const [lrData, setLrData] = useState({});
@@ -37,6 +37,22 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
   const cellRefs = useRef({});
   const savedKeep = useRef(new Map());
 
+  const currentFy = useMemo(() => {
+    const d = new Date();
+    const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+    return `${y}-${y + 1}`;
+  }, []);
+
+  const [selectedFy, setSelectedFy] = useState(defaultFy || currentFy);
+  const [statusFilter, setStatusFilter] = useState('pending'); // 'pending' | 'done' | 'all'
+
+  const fyOf = useCallback((b) => {
+    const d = new Date(b?.date || 0);
+    if (isNaN(d.getTime())) return '';
+    const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+    return `${y}-${y + 1}`;
+  }, []);
+
   const partyInfo = useCallback((bill) => {
     const raw = bill?.customerId;
     const embedded = raw && typeof raw === 'object' ? raw : null;
@@ -44,9 +60,30 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
     const party = (parties || []).find((p) => String(p._id || p.id) === String(id || ''));
     return {
       name: party?.name || embedded?.name || bill?.customerName || bill?.partyName || '',
-      city: party?.city || party?.station || embedded?.city || embedded?.station || bill?.city || '',
+      city: bill?.station || party?.city || party?.station || embedded?.city || embedded?.station || bill?.city || '',
+      transport: bill?.transport || party?.transport || embedded?.transport || '',
     };
   }, [parties]);
+
+  const availableFys = useMemo(() => {
+    const fys = new Set();
+    (sales || []).forEach((s) => {
+      const fy = fyOf(s);
+      if (fy) fys.add(fy);
+    });
+    if (!fys.has(currentFy)) fys.add(currentFy);
+    return Array.from(fys).sort().reverse();
+  }, [sales, currentFy, fyOf]);
+
+  const fyCounts = useMemo(() => {
+    const relevant = (sales || []).filter((s) => {
+      if (s.status === 'cancelled') return false;
+      return selectedFy === 'ALL' || fyOf(s) === selectedFy;
+    });
+    const pending = relevant.filter((s) => !s.lrNo || !String(s.lrNo).trim()).length;
+    const done = relevant.length - pending;
+    return { pending, done, total: relevant.length };
+  }, [sales, selectedFy, fyOf]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -54,18 +91,26 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
       setPrintId(null);
       return;
     }
-    const pending = (sales || []).filter(
-      (s) => !s.lrNo && s.status !== 'cancelled'
-    );
+    const relevant = (sales || []).filter((s) => {
+      if (s.status === 'cancelled') return false;
+      if (selectedFy !== 'ALL' && fyOf(s) !== selectedFy) return false;
+      const hasLr = Boolean(s.lrNo && String(s.lrNo).trim());
+      if (statusFilter === 'pending') return !hasLr;
+      if (statusFilter === 'done') return hasLr;
+      return true; // 'all'
+    });
     const kept = [...savedKeep.current.values()].filter(
-      (b) => !pending.some((p) => String(p._id || p.id) === String(b._id || b.id))
+      (b) => !relevant.some((p) => String(p._id || p.id) === String(b._id || b.id))
     );
-    // in bill-number order, as JSM lists them (financial year, then the bill's number, then date)
     const billNum = (b) => parseInt(String(b.invoiceNo || '').match(/\d+/)?.[0] ?? '', 10);
-    const fyOf = (b) => { const d = new Date(b.date || 0); return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; };
-    const list = [...kept, ...pending].sort((a, b) => (fyOf(a) - fyOf(b))
-      || ((billNum(a) || 0) - (billNum(b) || 0))
-      || (new Date(a.date || 0) - new Date(b.date || 0)));
+    const list = [...kept, ...relevant].sort((a, b) => {
+      if (selectedFy === 'ALL') {
+        const fyDiff = (parseInt(fyOf(b), 10) || 0) - (parseInt(fyOf(a), 10) || 0);
+        if (fyDiff !== 0) return fyDiff; // newest FY first when all years selected
+      }
+      return ((billNum(a) || 0) - (billNum(b) || 0))
+        || (new Date(a.date || 0) - new Date(b.date || 0));
+    });
     setPendingBills(list);
     setLrData((prev) => {
       const next = { ...prev };
@@ -80,7 +125,7 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
             baleNo: b.baleNo || '',
             weight: b.weight || '',
             freight: b.freight || '',
-            transport: b.transport || '',
+            transport: b.transport || info.transport || '',
             station: b.station || info.city || '',
             haste: b.haste || '',
             remarks: b.remarks || '',
@@ -90,7 +135,7 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
       });
       return next;
     });
-  }, [isOpen, sales, partyInfo]);
+  }, [isOpen, sales, partyInfo, selectedFy, statusFilter, fyOf]);
 
   const filtered = pendingBills.filter((b) => {
     if (!filterText) return true;
@@ -304,16 +349,68 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
         }}
       >
         {/* Header */}
-        <div className="bg-[#1a3353] text-white px-4 py-2.5 flex items-center justify-between shrink-0">
+        <div className="bg-[#1a3353] text-white px-4 py-2.5 flex items-center justify-between shrink-0 gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <span className="bg-amber-400 text-slate-900 font-black px-2 py-0.5 rounded text-[11px] tracking-wide uppercase">
               LR ENTRY
             </span>
-            <h2 className="font-bold text-sm uppercase tracking-widest">
-              Update LR No. — Pending Bills
+            <h2 className="font-bold text-sm uppercase tracking-widest hidden sm:inline">
+              LR Registry
             </h2>
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-300 text-xs font-semibold">FY:</span>
+              <select
+                value={selectedFy}
+                onChange={(e) => setSelectedFy(e.target.value)}
+                className="bg-[#243f5c] border border-slate-500 text-amber-300 font-bold text-xs rounded px-2 py-1 focus:outline-none focus:border-amber-400 cursor-pointer"
+                title="Select Financial Year"
+              >
+                {availableFys.map((fy) => (
+                  <option key={fy} value={fy}>
+                    FY {fy} {fy === currentFy ? '(Current)' : ''}
+                  </option>
+                ))}
+                <option value="ALL">All Financial Years</option>
+              </select>
+            </div>
+            {/* Status pills: Pending, Done, All */}
+            <div className="flex items-center bg-[#13263d] rounded p-0.5 border border-slate-600">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('pending')}
+                className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase transition-colors ${
+                  statusFilter === 'pending'
+                    ? 'bg-amber-400 text-slate-900 shadow'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                Pending ({fyCounts.pending})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('done')}
+                className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase transition-colors ${
+                  statusFilter === 'done'
+                    ? 'bg-emerald-500 text-white shadow'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                Done ({fyCounts.done})
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase transition-colors ${
+                  statusFilter === 'all'
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                All ({fyCounts.total})
+              </button>
+            </div>
             <span className="text-slate-400 text-xs">
-              ({filtered.length} bill{filtered.length !== 1 ? 's' : ''} pending)
+              ({filtered.length} showing)
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -329,12 +426,12 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
                   focusCell(0, 0);
                 }
               }}
-              className="px-2 py-1 rounded text-xs bg-[#243f5c] border border-slate-500 text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 w-44"
+              className="px-2.5 py-1 rounded text-xs bg-[#243f5c] border border-slate-500 text-white placeholder-slate-400 focus:outline-none focus:border-amber-400 w-48"
             />
             <button
               onClick={onClose}
               className="text-slate-300 hover:text-white px-2 py-1 rounded text-lg font-bold"
-              title="Close"
+              title="Close (Esc)"
             >
               ✕
             </button>
@@ -345,9 +442,19 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill }) => {
         <div className="flex-1 overflow-auto">
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-              <span className="text-5xl mb-4">✅</span>
-              <p className="text-base font-semibold">Sabhi bills ka LR entry ho chuka hai!</p>
-              <p className="text-xs mt-1">Koi pending bill nahi mila.</p>
+              <span className="text-5xl mb-4">{statusFilter === 'pending' ? '✅' : '📄'}</span>
+              <p className="text-base font-semibold">
+                {statusFilter === 'pending'
+                  ? `FY ${selectedFy === 'ALL' ? 'me sabhi' : selectedFy} bills ka LR entry ho chuka hai!`
+                  : statusFilter === 'done'
+                  ? `FY ${selectedFy === 'ALL' ? '' : selectedFy} me koi LR entered bill nahi mila.`
+                  : `FY ${selectedFy === 'ALL' ? '' : selectedFy} me koi bill nahi mila.`}
+              </p>
+              <p className="text-xs mt-1">
+                {statusFilter === 'pending'
+                  ? 'Koi pending bill nahi mila. Dusre FY ya "All" tab me check karein.'
+                  : 'Filter change karke check karein.'}
+              </p>
             </div>
           ) : (
             <table className="w-full text-left border-collapse" style={{ fontSize: '11.5px' }}>
