@@ -16,7 +16,7 @@ export default {
   renderer: 'twoColumn',
   // This JSM screen's run button is OK (btn_ok), not Screen.
   runButtons: ['btn_ok'],
-  lists: {},
+  lists: { Dgv1: 'accounts' },
   defaults: ({ fyFrom, fyTo }) => ({
     Txt_FromDate: fyFrom,
     Txt_AsOnDate: fyTo,
@@ -30,5 +30,6 @@ export default {
     toText: s.Txt_AsOnDate,
     orderBy: s.Rdbtn_Alphabet ? 'alphabet' : s.Rdbtn_ScheduleWise ? 'schedule' : 'group',
     format: s.Rdbtn_SingleSide ? 'single' : 'double',
+    accounts: s.Dgv1 || [],
   }),
 };

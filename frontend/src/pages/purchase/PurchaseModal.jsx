@@ -100,6 +100,7 @@ const PurchaseModal = ({
   const challanRef = useRef(null);
   const chDateRef = useRef(null);
   const lastEnterRef = useRef({ time: 0, idx: -1 });
+  const btnNewRef = useRef(null);
 
   const [showFindModal, setShowFindModal] = useState(false);
   const [findSearch, setFindSearch] = useState('');
@@ -776,6 +777,27 @@ const PurchaseModal = ({
         return;
       }
 
+      if (mode === 'View' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        if (!['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target?.tagName)) {
+          const bar = modalContainerRef.current?.querySelector('.erp-bill-action-bar');
+          if (bar) {
+            const buttons = Array.from(bar.querySelectorAll('button:not([disabled])'));
+            const currentIndex = buttons.indexOf(document.activeElement);
+            if (buttons.length > 0) {
+              e.preventDefault();
+              e.stopPropagation();
+              const nextIndex = currentIndex === -1
+                ? (e.key === 'ArrowRight' ? 0 : buttons.length - 1)
+                : e.key === 'ArrowRight'
+                  ? (currentIndex + 1) % buttons.length
+                  : (currentIndex - 1 + buttons.length) % buttons.length;
+              buttons[nextIndex]?.focus();
+              return;
+            }
+          }
+        }
+      }
+
       // Enter on a saved bill starts a new one, cursor on Bill No.
       if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !showFindModal) {
         if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette]')) return;
@@ -783,6 +805,7 @@ const PurchaseModal = ({
         const inOwn = own && e.target instanceof Node && own.contains(e.target);
         if (!inOwn && e.target instanceof Element && e.target.closest('[data-erp-dialog], [data-form-enter-nav], .classic-erp-window')) return;
         const el = e.target;
+        if (el instanceof HTMLButtonElement || el?.closest?.('button')) return;
         const inField = el && (
           el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT'
           || el.closest?.('[data-erp-combobox]')
@@ -827,6 +850,15 @@ const PurchaseModal = ({
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [isOpen, selectedPurchaseId, mode, showFindModal, bookPurchases, readOnly, gridItems]);
+
+  useEffect(() => {
+    if (isOpen && mode === 'View' && !showFindModal) {
+      const timer = setTimeout(() => {
+        btnNewRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, mode, showFindModal]);
 
   const handleSelectPurchase = (e) => {
     const id = e.target.value;
@@ -2539,9 +2571,27 @@ const PurchaseModal = ({
           </div>
 
           {/* Action bar — outside scroll/window so New/Save never clip */}
-          <div className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]">
+          <div
+            className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]"
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                const buttons = Array.from(e.currentTarget.querySelectorAll('button:not([disabled])'));
+                const currentIndex = buttons.indexOf(document.activeElement);
+                if (buttons.length > 0) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const nextIndex = currentIndex === -1
+                    ? (e.key === 'ArrowRight' ? 0 : buttons.length - 1)
+                    : e.key === 'ArrowRight'
+                      ? (currentIndex + 1) % buttons.length
+                      : (currentIndex - 1 + buttons.length) % buttons.length;
+                  buttons[nextIndex]?.focus();
+                }
+              }
+            }}
+          >
             <ErpKeyboardHintBar items={mode === 'View' ? PURCHASE_KEYBOARD_HINTS : FORM_KEYBOARD_HINTS} dense className="mr-auto min-w-0 flex-1 max-w-full sm:max-w-[55%]" />
-            <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving} title="New Bill (Alt+N)">New</button>
+            <button ref={btnNewRef} className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving} title="New Bill (Alt+N)">New</button>
             <button className="classic-erp-btn btn-blue" type="button" data-enter-save onClick={handleSave} disabled={locked || saving || bootLoading}>
               <SaveButtonLabel saving={saving} />
             </button>

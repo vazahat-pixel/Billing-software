@@ -65,6 +65,7 @@ const ReturnModal = ({
   const [saving, setSaving] = useState(false);
   const [bootLoading, setBootLoading] = useState(false);
   const modalContainerRef = useRef(null);
+  const btnNewRef = useRef(null);
 
   const [showFindModal, setShowFindModal] = useState(false);
   const [findSearch, setFindSearch] = useState('');
@@ -259,8 +260,30 @@ const ReturnModal = ({
         return;
       }
 
+      if (mode === 'View' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        if (!['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target?.tagName)) {
+          const bar = modalContainerRef.current?.querySelector('.classic-erp-form-footer');
+          if (bar) {
+            const buttons = Array.from(bar.querySelectorAll('button:not([disabled])'));
+            const currentIndex = buttons.indexOf(document.activeElement);
+            if (buttons.length > 0) {
+              e.preventDefault();
+              e.stopPropagation();
+              const nextIndex = currentIndex === -1
+                ? (e.key === 'ArrowRight' ? 0 : buttons.length - 1)
+                : e.key === 'ArrowRight'
+                  ? (currentIndex + 1) % buttons.length
+                  : (currentIndex - 1 + buttons.length) % buttons.length;
+              buttons[nextIndex]?.focus();
+              return;
+            }
+          }
+        }
+      }
+
       if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !showFindModal) {
         if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette], [data-find-modal]')) return;
+        if (e.target instanceof HTMLButtonElement || e.target?.closest?.('button')) return;
         if (mode === 'View' && !readOnly) {
           e.preventDefault();
           e.stopPropagation();
@@ -287,6 +310,15 @@ const ReturnModal = ({
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [isOpen, selectedReturnId, mode, showFindModal, sortedReturns, returnType]);
+
+  useEffect(() => {
+    if (isOpen && mode === 'View' && !showFindModal) {
+      const timer = setTimeout(() => {
+        btnNewRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, mode, showFindModal]);
 
   const isSales = returnType === 'Sales';
   const windowTitle = `${returnType} Return [ ${header.book} ]`;
@@ -1269,8 +1301,26 @@ const ReturnModal = ({
           </div>
 
           {/* Form Action Footer Bar matching Sales/Purchase Bill Layout */}
-          <div className="classic-erp-form-footer flex-wrap shrink-0">
-            <button className="classic-erp-btn" type="button" onClick={() => handleNew(returnType)} disabled={readOnly} title="New Return (Alt+N)">
+          <div 
+            className="classic-erp-form-footer flex-wrap shrink-0"
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                const buttons = Array.from(e.currentTarget.querySelectorAll('button:not([disabled])'));
+                const currentIndex = buttons.indexOf(document.activeElement);
+                if (buttons.length > 0) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const nextIndex = currentIndex === -1
+                    ? (e.key === 'ArrowRight' ? 0 : buttons.length - 1)
+                    : e.key === 'ArrowRight'
+                      ? (currentIndex + 1) % buttons.length
+                      : (currentIndex - 1 + buttons.length) % buttons.length;
+                  buttons[nextIndex]?.focus();
+                }
+              }
+            }}
+          >
+            <button ref={btnNewRef} className="classic-erp-btn" type="button" onClick={() => handleNew(returnType)} disabled={readOnly} title="New Return (Alt+N)">
               New
             </button>
             <button className="classic-erp-btn btn-blue font-bold" type="button" onClick={handleSave} disabled={locked || saving || bootLoading}>

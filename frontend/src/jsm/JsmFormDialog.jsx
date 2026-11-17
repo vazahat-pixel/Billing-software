@@ -12,7 +12,7 @@ const COMBO_TYPES = /^(Js1_ComboBox|ComboBox)$/;
 const CHECK_TYPES = /^(Js1_CheckBox|CheckBox)$/;
 const RADIO_TYPES = /^(Js1_RadioButton|RadioButton)$/;
 const BUTTON_TYPES = /^(Js1_Button|Button)$/;
-const SKIP_TYPES = /ColumnHeader|DataGridView.+Column|ToolTip|ErrorProvider|Timer|ImageList|BindingSource/;
+const SKIP_TYPES = /ColumnHeader|DataGridView.+Column|.+Column$|ToolTip|ErrorProvider|Timer|ImageList|BindingSource/;
 
 function Caption({ text }) {
   const { text: t, index } = accel(text);
@@ -50,6 +50,7 @@ export default function JsmFormDialog({
 }) {
   const [search, setSearch] = useState('');
   const [focusList, setFocusList] = useState(null);
+  const [activeRow, setActiveRow] = useState(0);
   const rootRef = useRef(null);
 
   const controls = useMemo(
@@ -59,7 +60,9 @@ export default function JsmFormDialog({
   const columnsOf = useMemo(() => {
     const map = {};
     for (const c of form?.controls || []) {
-      if (c.type === 'ColumnHeader') (map[c.parent] = map[c.parent] || []).push(c);
+      if ((c.type === 'ColumnHeader' || /Column$/.test(c.type)) && c.visible !== false) {
+        (map[c.parent] = map[c.parent] || []).push(c);
+      }
     }
     for (const k of Object.keys(map)) map[k].sort((a, b) => (a.tab ?? 0) - (b.tab ?? 0));
     return map;
@@ -83,6 +86,29 @@ export default function JsmFormDialog({
   // plain `{ ...state }` here would write the stale copy back over the list it just filled.
   const set = (name, value) => onChange((s) => ({ ...s, [name]: value }));
 
+  const getFocusableControls = () => {
+    if (!rootRef.current) return [];
+    return Array.from(
+      rootRef.current.querySelectorAll(
+        'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), .jsmf-listview[tabindex="0"]'
+      )
+    ).filter((el) => el.offsetParent !== null && !el.disabled);
+  };
+
+  // Initial Auto-Focus: Focus first text/date input or combo or first control
+  useEffect(() => {
+    if (!rootRef.current) return;
+    const timer = setTimeout(() => {
+      const focusables = getFocusableControls();
+      if (!focusables.length) return;
+      const firstInput = focusables.find(
+        (el) => (el.tagName === 'INPUT' && el.type !== 'radio' && el.type !== 'checkbox') || el.tagName === 'SELECT'
+      );
+      (firstInput || focusables[0])?.focus();
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [form?.name, form?.title]);
+
   // Alt+<letter> presses the button whose caption has that accelerator; Esc = Exit, like JSM.
   useEffect(() => {
     const onKey = (e) => {
@@ -95,22 +121,43 @@ export default function JsmFormDialog({
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  // JSM moves to the next field on Enter.
+  // JSM moves to next field on Enter. Up/Down moves vertically.
   const onEnterNext = (e) => {
-    if (e.key !== 'Enter' || e.target.tagName === 'BUTTON') return;
-    e.preventDefault();
-    const fields = [...rootRef.current.querySelectorAll('input, select, button')].filter((el) => !el.disabled && el.offsetParent);
-    const i = fields.indexOf(e.target);
-    if (i > -1 && fields[i + 1]) fields[i + 1].focus();
+    if (e.target.tagName === 'BUTTON') return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const fields = getFocusableControls();
+      const i = fields.indexOf(e.target);
+      if (i > -1) {
+        if (fields[i + 1]) {
+          fields[i + 1].focus();
+        } else {
+          const okBtn = fields.find((el) => el.tagName === 'BUTTON' && /ok|screen|print/i.test(el.textContent || el.dataset?.buttonName || ''));
+          okBtn?.focus();
+        }
+      }
+    } else if (e.key === 'ArrowDown' && e.target.tagName === 'INPUT' && e.target.type !== 'radio' && e.target.type !== 'checkbox') {
+      e.preventDefault();
+      const fields = getFocusableControls();
+      const i = fields.indexOf(e.target);
+      if (i > -1 && fields[i + 1]) fields[i + 1].focus();
+    } else if (e.key === 'ArrowUp' && e.target.tagName === 'INPUT' && e.target.type !== 'radio' && e.target.type !== 'checkbox') {
+      e.preventDefault();
+      const fields = getFocusableControls();
+      const i = fields.indexOf(e.target);
+      if (i > 0 && fields[i - 1]) fields[i - 1].focus();
+    }
   };
 
   const renderListView = (c) => {
     const rows = lists[c.name] || [];
     const ticked = new Set(state[c.name] || []);
-    const cols = columnsOf[c.name] || [{ text: 'Name' }];
-    const widths = cols.map((h, i) => (i === 0 ? 420 : i === 1 ? 90 : 60));
+    const cols = columnsOf[c.name]?.length ? columnsOf[c.name] : [{ text: 'Name' }];
+    const widths = cols.map((h, i) => (i === 0 ? (cols.length === 1 ? 420 : 300) : i === 1 ? 120 : 60));
     const q = focusList === c.name ? search.toUpperCase() : '';
     const hit = q ? rows.findIndex((r) => String(r).toUpperCase().startsWith(q)) : -1;
+    const curIndex = hit > -1 ? hit : Math.min(Math.max(0, activeRow), Math.max(0, rows.length - 1));
+
     return (
       <div
         key={c.name}
@@ -119,13 +166,49 @@ export default function JsmFormDialog({
         style={boxStyle(c, { overflow: 'auto' })}
         onFocus={() => setFocusList(c.name)}
         onKeyDown={(e) => {
-          if (e.key.length === 1 && !e.ctrlKey && !e.altKey) { setSearch((s) => s + e.key); e.preventDefault(); }
-          else if (e.key === 'Backspace') { setSearch((s) => s.slice(0, -1)); e.preventDefault(); }
-          else if (e.key === ' ' && hit > -1) {
-            const name = rows[hit];
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSearch('');
+            setActiveRow((prev) => Math.min(rows.length - 1, (prev < 0 ? 0 : prev) + 1));
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSearch('');
+            setActiveRow((prev) => Math.max(0, (prev < 0 ? 0 : prev) - 1));
+          } else if (e.key === 'PageDown') {
+            e.preventDefault();
+            setSearch('');
+            setActiveRow((prev) => Math.min(rows.length - 1, (prev < 0 ? 0 : prev) + 10));
+          } else if (e.key === 'PageUp') {
+            e.preventDefault();
+            setSearch('');
+            setActiveRow((prev) => Math.max(0, (prev < 0 ? 0 : prev) - 10));
+          } else if (e.key === 'Home') {
+            e.preventDefault();
+            setSearch('');
+            setActiveRow(0);
+          } else if (e.key === 'End') {
+            e.preventDefault();
+            setSearch('');
+            setActiveRow(Math.max(0, rows.length - 1));
+          } else if (e.key === ' ' && rows.length > 0 && curIndex >= 0 && curIndex < rows.length) {
+            e.preventDefault();
+            const name = rows[curIndex];
             const next = new Set(ticked);
             if (next.has(name)) next.delete(name); else next.add(name);
             set(c.name, [...next]);
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const fields = getFocusableControls();
+            const i = fields.indexOf(e.currentTarget);
+            if (i > -1 && fields[i + 1]) fields[i + 1].focus();
+          } else if (e.key === 'Backspace') {
+            setSearch((s) => s.slice(0, -1));
+            e.preventDefault();
+          } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && e.key !== ' ') {
+            const nextSearch = (search + e.key).toUpperCase();
+            setSearch((s) => s + e.key);
+            const found = rows.findIndex((r) => String(r).toUpperCase().startsWith(nextSearch));
+            if (found > -1) setActiveRow(found);
             e.preventDefault();
           }
         }}
@@ -135,25 +218,34 @@ export default function JsmFormDialog({
             <tr>{cols.map((h, i) => <th key={i} style={{ width: widths[i] }}>{h.text}</th>)}</tr>
           </thead>
           <tbody>
-            {rows.map((name, i) => (
-              <tr key={`${name}-${i}`} className={i === hit ? 'is-hit' : ''} ref={i === hit ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}>
-                <td>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={ticked.has(name)}
-                      onChange={(e) => {
-                        const next = new Set(ticked);
-                        if (e.target.checked) next.add(name); else next.delete(name);
-                        set(c.name, [...next]);
-                      }}
-                    />
-                    {name === '' ? ' ' : name}
-                  </label>
-                </td>
-                {cols.slice(1).map((_, k) => <td key={k} />)}
-              </tr>
-            ))}
+            {rows.map((name, i) => {
+              const isSelected = i === curIndex;
+              return (
+                <tr
+                  key={`${name}-${i}`}
+                  className={isSelected ? 'is-hit' : ''}
+                  ref={isSelected ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
+                  onClick={() => setActiveRow(i)}
+                >
+                  <td>
+                    <label>
+                      <input
+                        type="checkbox"
+                        tabIndex={-1}
+                        checked={ticked.has(name)}
+                        onChange={(e) => {
+                          const next = new Set(ticked);
+                          if (e.target.checked) next.add(name); else next.delete(name);
+                          set(c.name, [...next]);
+                        }}
+                      />
+                      {name === '' ? ' ' : name}
+                    </label>
+                  </td>
+                  {cols.slice(1).map((_, k) => <td key={k} />)}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -207,7 +299,16 @@ export default function JsmFormDialog({
       return <span key={c.name} className="jsmf-label" style={boxStyle(c, { width: undefined, minWidth: c.w })}>{text}</span>;
     }
     if (TEXTAREA_TYPES.test(c.type)) {
-      return <textarea key={c.name} className="jsmf-input" style={boxStyle(c)} value={state[c.name] ?? ''} disabled={disabled} onChange={(e) => set(c.name, e.target.value)} />;
+      return (
+        <textarea
+          key={c.name}
+          className="jsmf-input"
+          style={boxStyle(c)}
+          value={state[c.name] ?? ''}
+          disabled={disabled}
+          onChange={(e) => set(c.name, e.target.value)}
+        />
+      );
     }
     if (INPUT_TYPES.test(c.type)) {
       const isDate = /MaskDate|Masked/.test(c.type);
@@ -257,7 +358,61 @@ export default function JsmFormDialog({
             name={radio ? `radio-${c.parent}` : undefined}
             checked={Boolean(state[c.name])}
             disabled={disabled}
-            onKeyDown={onEnterNext}
+            onKeyDown={(e) => {
+              if (radio) {
+                const group = controls.filter((x) => x.parent === c.parent && RADIO_TYPES.test(x.type));
+                const idx = group.findIndex((g) => g.name === c.name);
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  const next = group[(idx + 1) % group.length];
+                  if (next) {
+                    const patch = { ...state };
+                    group.forEach((g) => { patch[g.name] = g.name === next.name; });
+                    onChange(patch);
+                    setTimeout(() => {
+                      const allRadios = Array.from(rootRef.current?.querySelectorAll('input[type="radio"]') || []);
+                      const targetEl = allRadios.find((r) => r.checked);
+                      targetEl?.focus();
+                    }, 10);
+                  }
+                  return;
+                }
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  const prev = group[(idx - 1 + group.length) % group.length];
+                  if (prev) {
+                    const patch = { ...state };
+                    group.forEach((g) => { patch[g.name] = g.name === prev.name; });
+                    onChange(patch);
+                    setTimeout(() => {
+                      const allRadios = Array.from(rootRef.current?.querySelectorAll('input[type="radio"]') || []);
+                      const targetEl = allRadios.find((r) => r.checked);
+                      targetEl?.focus();
+                    }, 10);
+                  }
+                  return;
+                }
+              } else {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                  const checks = Array.from(rootRef.current?.querySelectorAll('input[type="checkbox"]:not([tabindex="-1"])') || []);
+                  const idx = checks.indexOf(e.target);
+                  if (idx > -1 && checks[idx + 1]) {
+                    e.preventDefault();
+                    checks[idx + 1].focus();
+                    return;
+                  }
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                  const checks = Array.from(rootRef.current?.querySelectorAll('input[type="checkbox"]:not([tabindex="-1"])') || []);
+                  const idx = checks.indexOf(e.target);
+                  if (idx > 0 && checks[idx - 1]) {
+                    e.preventDefault();
+                    checks[idx - 1].focus();
+                    return;
+                  }
+                }
+              }
+              onEnterNext(e);
+            }}
             onChange={(e) => {
               if (radio) {
                 const group = controls.filter((x) => x.parent === c.parent && RADIO_TYPES.test(x.type));
@@ -279,17 +434,38 @@ export default function JsmFormDialog({
         <button
           key={c.name}
           type="button"
+          data-button-name={c.name}
           className="jsmf-button"
           style={boxStyle(c)}
           disabled={disabled}
           onClick={() => onButton?.(c.name)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+              e.preventDefault();
+              const allButtons = Array.from(rootRef.current?.querySelectorAll('button.jsmf-button:not([disabled])') || []);
+              const idx = allButtons.indexOf(e.currentTarget);
+              if (allButtons.length > 1 && idx > -1) {
+                const nextIdx = e.key === 'ArrowRight'
+                  ? (idx + 1) % allButtons.length
+                  : (idx - 1 + allButtons.length) % allButtons.length;
+                allButtons[nextIdx]?.focus();
+              }
+              return;
+            }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              const focusables = getFocusableControls().filter((el) => el.tagName !== 'BUTTON');
+              focusables[focusables.length - 1]?.focus();
+              return;
+            }
+          }}
         >
           <Caption text={captionOf(c)} />
         </button>
       );
     }
     if (c.type === 'ListView') return renderListView(c);
-    // A tick-list that JSM draws as a DataGridView (Sales Summary's Party tab) is filled from `lists`.
+    // A tick-list that JSM draws as a DataGridView (Sales Summary's Party tab, Balance Sheet's Dgv1) is filled from `lists`.
     if (/DataGridView$/.test(c.type) && !grids[c.name] && lists[c.name]) return renderListView(c);
     if (/DataGridView$|ListView$/.test(c.type) && grids[c.name]) {
       // Data grids carry no columns in the blueprint (JSM adds them in code), so the screen supplies

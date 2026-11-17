@@ -22,17 +22,22 @@ function sideGroups(groups, want) {
   return groups.filter((g) => g.balanceType === want && !/PROFIT & LOSS/.test(g.name));
 }
 
-function buildLines(groups, want) {
+function buildLines(groups, want, ticked = null) {
   const lines = [];
   let total = 0;
   for (const g of groups) {
+    const matchingLines = ticked ? g.lines.filter((l) => ticked.has(l.name)) : g.lines;
+    if (matchingLines.length === 0) continue;
     lines.push({ type: 'header', label: g.name });
-    for (const l of g.lines) {
+    let groupTotal = 0;
+    for (const l of matchingLines) {
       const v = want === 'Cr' ? l.credit : l.debit;
       lines.push({ type: 'detail', label: l.name, value: v });
+      groupTotal += v;
     }
-    lines.push({ type: 'total', label: '', value: want === 'Cr' ? g.totalCredit : g.totalDebit });
-    total += want === 'Cr' ? g.totalCredit : g.totalDebit;
+    const gt = round2(groupTotal);
+    lines.push({ type: 'total', label: '', value: gt });
+    total += gt;
   }
   return { lines, total: round2(total) };
 }
@@ -56,8 +61,9 @@ async function run(companyId, p = {}) {
     financialReportsService.profitAndLoss(companyId, { from: p.from, to: asOn }),
   ]);
 
-  const liab = buildLines(sideGroups(tb.groups, 'Cr'), 'Cr');
-  const asset = buildLines(sideGroups(tb.groups, 'Dr'), 'Dr');
+  const ticked = Array.isArray(p.accounts) && p.accounts.length ? new Set(p.accounts) : null;
+  const liab = buildLines(sideGroups(tb.groups, 'Cr'), 'Cr', ticked);
+  const asset = buildLines(sideGroups(tb.groups, 'Dr'), 'Dr', ticked);
   const netProfit = pl.netProfit;
   const netProfitSide = netProfit >= 0 ? 'left' : 'right';
   const netProfitLabel = netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS';
@@ -80,6 +86,9 @@ async function run(companyId, p = {}) {
   };
 }
 
-async function options() { return {}; }
+async function options(companyId) {
+  const tb = await financialReportsService.groupedTrialBalance(companyId, { withZeroBalance: true });
+  return { accounts: tb.groups.flatMap((g) => g.lines.map((l) => l.name)).sort((a, b) => a.localeCompare(b)) };
+}
 
 module.exports = { run, options };

@@ -101,6 +101,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   const openedOnceRef = useRef(false);
   const modalContainerRef = useRef(null);
   const lastEnterRef = useRef({ time: 0, idx: -1 });
+  const btnNewRef = useRef(null);
 
   const [showFindModal, setShowFindModal] = useState(false);
   const [findSearch, setFindSearch] = useState('');
@@ -1007,6 +1008,15 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
   handleNewRef.current = handleNew;
 
   useEffect(() => {
+    if (isOpen && mode === 'View' && !showFindModal) {
+      const timer = setTimeout(() => {
+        btnNewRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, mode, showFindModal]);
+
+  useEffect(() => {
     if (!isOpen || showFindModal) return undefined;
     const onKey = (e) => {
       if (document.querySelector('[data-erp-confirm-dialog]')) return;
@@ -1024,9 +1034,30 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         navigateToAdjacentBill(prevKey ? -1 : 1);
         return;
       }
+      if (mode === 'View' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        if (!['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target?.tagName)) {
+          const bar = modalContainerRef.current?.querySelector('.erp-bill-action-bar');
+          if (bar) {
+            const buttons = Array.from(bar.querySelectorAll('button:not([disabled])'));
+            const currentIndex = buttons.indexOf(document.activeElement);
+            if (buttons.length > 0) {
+              e.preventDefault();
+              e.stopPropagation();
+              const nextIndex = currentIndex === -1
+                ? (e.key === 'ArrowRight' ? 0 : buttons.length - 1)
+                : e.key === 'ArrowRight'
+                  ? (currentIndex + 1) % buttons.length
+                  : (currentIndex - 1 + buttons.length) % buttons.length;
+              buttons[nextIndex]?.focus();
+              return;
+            }
+          }
+        }
+      }
       if (mode !== 'View' || readOnly) return;
       if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
         if (e.target?.closest?.('[data-book-selection-modal], [data-command-palette]')) return;
+        if (e.target instanceof HTMLButtonElement || e.target?.closest?.('button')) return;
         const own = modalContainerRef.current?.closest('.erp-bill-window-shell') || modalContainerRef.current;
         const inOwn = own && e.target instanceof Node && own.contains(e.target);
         if (!inOwn && e.target instanceof Element && e.target.closest('[data-erp-dialog], [data-form-enter-nav], .classic-erp-window')) return;
@@ -2531,9 +2562,27 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       </div>
 
         {/* Action bar — outside window so New/Save never clip */}
-        <div className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]">
+        <div 
+          className="erp-bill-action-bar shrink-0 flex flex-wrap items-center justify-end gap-1.5 px-2 py-1 border-t border-[var(--border)] bg-[var(--bg-base,#f8fafc)]"
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+              const buttons = Array.from(e.currentTarget.querySelectorAll('button:not([disabled])'));
+              const currentIndex = buttons.indexOf(document.activeElement);
+              if (buttons.length > 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                const nextIndex = currentIndex === -1
+                  ? (e.key === 'ArrowRight' ? 0 : buttons.length - 1)
+                  : e.key === 'ArrowRight'
+                    ? (currentIndex + 1) % buttons.length
+                    : (currentIndex - 1 + buttons.length) % buttons.length;
+                buttons[nextIndex]?.focus();
+              }
+            }
+          }}
+        >
           <ErpKeyboardHintBar items={SALES_KEYBOARD_HINTS} dense className="mr-auto min-w-0 flex-1 max-w-full sm:max-w-[55%]" />
-          <button className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving} title="New Bill (Alt+N)">New</button>
+          <button ref={btnNewRef} className="classic-erp-btn" type="button" onClick={handleNew} disabled={readOnly || mode !== 'View' || saving} title="New Bill (Alt+N)">New</button>
           <button className="classic-erp-btn btn-blue" type="button" data-enter-save onClick={handleSave} disabled={locked || saving || bootLoading}>
             <SaveButtonLabel saving={saving} />
           </button>
