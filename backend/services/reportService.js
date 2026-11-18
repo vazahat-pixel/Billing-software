@@ -664,8 +664,9 @@ class ReportService {
         // The bill's own running figure — shown so a drift between the report and the
         // document itself is visible rather than hidden.
         billPaidAmount: round2(doc.paidAmount || 0),
-        broker: doc.brokerId || null,
-        station: doc.station || '',
+        broker: doc.brokerId || bucket.party?.brokerId || null,
+        station: doc.station || bucket.party?.station || bucket.party?.city || '',
+        transport: doc.transport || bucket.party?.transport || '',
         haste: doc.haste || '',
         bookId: doc.bookId || '',
         remarks: doc.remarks || '',

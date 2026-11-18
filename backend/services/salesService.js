@@ -470,7 +470,8 @@ class SalesService {
     const skip = size ? (parseInt(page, 10) - 1) * size : 0;
     const [sales, total] = await Promise.all([
       Sales.find(query)
-        .populate('customerId', 'name gstin state city station')
+        .populate('customerId', 'name gstin state city station brokerId transport')
+        .populate('brokerId', 'name mobile')
         .populate('items.itemId', 'name hsnCode gstRate')
         .sort({ date: -1, createdAt: -1 })
         .skip(skip)
@@ -484,7 +485,8 @@ class SalesService {
 
   async getSaleById(id, companyId) {
     const sale = await Sales.findOne({ _id: id, companyId })
-      .populate('customerId', 'name gstin state city')
+      .populate('customerId', 'name gstin state city station brokerId transport')
+      .populate('brokerId', 'name mobile')
       .populate('items.itemId', 'name hsnCode gstRate unit');
     if (!sale) throw new Error('Sale not found');
     return sale;

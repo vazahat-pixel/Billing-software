@@ -22,6 +22,10 @@ const BILL_SYNONYMS = {
   amount: ['amount', 'value', 'taxable', 'taxable amount', 'line amount'],
   gstPer: ['gst', 'gst %', 'gst rate', 'tax %', 'tax rate', 'gst per'],
   hsn: ['hsn', 'hsn code', 'hsn sac'],
+  broker: ['broker', 'broker name', 'dalal', 'dalal name', 'agent', 'agent name', 'dallal'],
+  transport: ['transport', 'transport name', 'transporter', 'transporter name', 'carrier', 'truck'],
+  station: ['station', 'city', 'place', 'destination'],
+  lrNo: ['lr no', 'lr number', 'bilty no', 'bilty number', 'lr'],
 };
 
 const clean = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9%]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -93,9 +97,18 @@ function groupBills(rows, mappings) {
     const rate = num(r.rate);
     const amount = r.amount != null && r.amount !== '' ? num(r.amount) : Number(((mts || pcs) * rate).toFixed(2));
     if (!(mts > 0 || pcs > 0)) return errors.push({ row: rowNo, error: 'Pcs or Mts must be more than 0' });
+    const broker = String(r.broker ?? '').trim();
+    const transport = String(r.transport ?? '').trim();
+    const station = String(r.station ?? '').trim();
+    const lrNo = String(r.lrNo ?? '').trim();
     const key = `${billNo}|${party.toUpperCase()}|${date.toISOString().slice(0, 10)}`;
-    if (!bills.has(key)) bills.set(key, { billNo, party, date, lines: [] });
-    bills.get(key).lines.push({
+    if (!bills.has(key)) bills.set(key, { billNo, party, date, broker, transport, station, lrNo, lines: [] });
+    const b = bills.get(key);
+    if (!b.broker && broker) b.broker = broker;
+    if (!b.transport && transport) b.transport = transport;
+    if (!b.station && station) b.station = station;
+    if (!b.lrNo && lrNo) b.lrNo = lrNo;
+    b.lines.push({
       item, mts, pcs, rate, amount,
       gstPer: r.gstPer != null && r.gstPer !== '' ? num(String(r.gstPer).replace('%', '')) : null,
       hsn: String(r.hsn ?? '').trim(),
@@ -108,7 +121,7 @@ const nameKey = (s) => String(s || '').trim().toUpperCase();
 
 async function masterMaps(companyId) {
   const [parties, items] = await Promise.all([
-    Party.find({ companyId }).select('name type').lean(),
+    Party.find({ companyId }).select('name type brokerId transport city station').lean(),
     Item.find({ companyId }).select('name gstRate').lean(),
   ]);
   return {
@@ -204,14 +217,34 @@ async function execute({ companyId, entity, rows, columnMappings, options = {}, 
       const operationId = opIdFor(entity, companyId, bill);
       const taxable = Number(items.reduce((s, it) => s + it.amount, 0).toFixed(2));
       if (entity === 'salesBill') {
+        let brokerId = null;
+        if (bill.broker) {
+          let brkParty = maps.parties.get(nameKey(bill.broker));
+          if (!brkParty && createMissing) {
+            const createdBrk = await partyService.createParty({ name: bill.broker, type: 'Broker', companyId });
+            brkParty = createdBrk.party || createdBrk;
+            maps.parties.set(nameKey(bill.broker), brkParty);
+            result.createdParties += 1;
+          }
+          brokerId = brkParty?._id || null;
+        }
+        if (!brokerId && party?.brokerId) {
+          brokerId = party.brokerId;
+        }
+        const transport = bill.transport || party?.transport || '';
+        const station = bill.station || party?.station || party?.city || '';
         await salesService.createInvoice({
           companyId, customerId: party._id, invoiceNo: bill.billNo, date: bill.date, items,
           taxableAmount: taxable, operationId, createdBy: userId,
+          brokerId, transport, station, lrNo: bill.lrNo || '',
         }, { operationId });
       } else {
+        const transport = bill.transport || party?.transport || '';
+        const station = bill.station || party?.station || party?.city || '';
         await purchaseService.createPurchase({
           companyId, supplierId: party._id, invoiceNo: 'AUTO', supplierInvoiceNo: bill.billNo, date: bill.date, items,
           taxableAmount: taxable, operationId, createdBy: userId,
+          transport, station, lrNo: bill.lrNo || '',
         });
       }
       result.created += 1;

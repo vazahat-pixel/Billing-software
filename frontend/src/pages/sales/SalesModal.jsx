@@ -617,11 +617,17 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     const partyObj = typeof inv.customerId === 'object' ? inv.customerId : (parties || []).find((p) => String(p._id || p.id) === String(inv.customerId));
     const resolvedCity = inv.station || inv.customerId?.station || inv.customerId?.city || partyObj?.station || partyObj?.city || inv.city || '';
     const resolvedTransport = inv.transport || inv.customerId?.transport || partyObj?.transport || '';
+    const rawBroker = typeof inv.brokerId === 'object' ? (inv.brokerId?._id || inv.brokerId?.id) : (inv.brokerId || partyObj?.brokerId || '');
+    let resolvedBroker = rawBroker;
+    if (resolvedBroker && !(parties || []).some((p) => String(p._id || p.id) === String(resolvedBroker))) {
+      const matched = (parties || []).find((p) => p.name?.trim().toLowerCase() === String(resolvedBroker).trim().toLowerCase());
+      if (matched) resolvedBroker = matched._id || matched.id;
+    }
 
     setHeader({
       party: isFromPurchase ? '' : (inv.customerId?._id || inv.customerId || ''),
       add: isFromPurchase ? '' : (inv.remarks || ''),
-      broker: inv.brokerId || '',
+      broker: isFromPurchase ? '' : (resolvedBroker || ''),
       book: inv.bookId || selectedBook || 'SALES BOOK',
       gstin: isFromPurchase ? '' : (inv.customerId?.gstin || partyObj?.gstin || ''),
       city: isFromPurchase ? '' : resolvedCity,
@@ -901,7 +907,12 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       return;
     }
     setHeader(prev => ({
-      ...prev, party: id, add: newAccount.address || '', gstin: newAccount.gstin || '', city: newAccount.station || newAccount.city || ''
+      ...prev,
+      party: id,
+      add: newAccount.address || '',
+      gstin: newAccount.gstin || '',
+      city: newAccount.station || newAccount.city || '',
+      ...(newAccount.brokerId ? { broker: newAccount.brokerId } : {})
     }));
     focusAfterParty();
   };
@@ -1351,8 +1362,8 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
 
   const brokerOptions = useMemo(
     () => {
-      const list = parties
-        .filter((p) => p.type === 'Broker')
+      const list = (parties || [])
+        .filter((p) => p.type === 'Broker' || /broker/i.test(p.type || '') || /broker/i.test(p.group || ''))
         .map((p) => ({
           value: p._id || p.id,
           label: p.name,
@@ -1425,6 +1436,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
       add: p?.address || '',
       gstin: p?.gstin || '',
       city: p?.station || p?.city || '',
+      ...(p?.brokerId ? { broker: p.brokerId } : {}),
       ...(autoType ? { type: autoType } : {}),
     });
 

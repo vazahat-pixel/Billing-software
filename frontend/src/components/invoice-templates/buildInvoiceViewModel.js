@@ -151,9 +151,12 @@ export function buildInvoiceViewModel({
       ? { name: invoice.customerName || 'Cash Customer' }
       : { name: invoice.supplierName || 'Vendor' });
 
+  const partyBroker = party?.brokerId ? resolveParty(party.brokerId, parties) : null;
   const broker =
     resolveParty(invoice.brokerId, parties) ||
-    (invoice.brokerName ? { name: invoice.brokerName } : null);
+    partyBroker ||
+    (invoice.brokerName ? { name: invoice.brokerName } : null) ||
+    (party?.broker ? { name: party.broker } : null);
 
   const taxable = Number(invoice.taxableAmount ?? invoice.totals?.subtotal ?? 0);
   const gst = Number(invoice.gstAmount || 0);
@@ -379,15 +382,15 @@ export function buildInvoiceViewModel({
       orderDate: invoice.orderDate ? fmtDateDMY(invoice.orderDate) : '',
       challanNo: invoice.challanNo || '',
       chDate: invoice.chDate ? fmtDateDMY(invoice.chDate) : '',
-      transport: invoice.transport || '',
+      transport: invoice.transport || party?.transport || '',
       lrNo: invoice.lrNo || '',
       lrDate: invoice.lrDate ? fmtDateDMY(invoice.lrDate) : '',
-      station: invoice.station || '',
+      station: invoice.station || party?.station || party?.city || '',
       eway: invoice.eway || '',
       baleNo: invoice.baleNo || '',
       freight: Number(invoice.freight || 0),
       weight: Number(invoice.weight || 0),
-      broker: broker?.name || invoice.brokerName || '',
+      broker: broker?.name || invoice.brokerName || party?.broker || '',
       brokerAddress: partyAddress(broker) || broker?.city || '',
       haste: invoice.haste || '',
       remarks: invoice.remarks || invoice.narration || '',

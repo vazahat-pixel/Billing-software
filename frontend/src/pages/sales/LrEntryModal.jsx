@@ -58,10 +58,13 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill, defaultFy }) => {
     const embedded = raw && typeof raw === 'object' ? raw : null;
     const id = embedded ? (embedded._id || embedded.id) : raw;
     const party = (parties || []).find((p) => String(p._id || p.id) === String(id || ''));
+    const brokerId = bill?.brokerId?._id || bill?.brokerId || party?.brokerId;
+    const brokerObj = brokerId ? (parties || []).find((p) => String(p._id || p.id) === String(brokerId)) : null;
     return {
       name: party?.name || embedded?.name || bill?.customerName || bill?.partyName || '',
       city: bill?.station || party?.city || party?.station || embedded?.city || embedded?.station || bill?.city || '',
       transport: bill?.transport || party?.transport || embedded?.transport || '',
+      broker: brokerObj?.name || bill?.brokerName || '',
     };
   }, [parties]);
 
@@ -512,6 +515,11 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill, defaultFy }) => {
                         <button type="button" className="text-left hover:underline" onClick={openBill}>
                           {party.name || '—'}
                         </button>
+                        {party.broker && (
+                          <div className="text-[9px] font-normal text-emerald-700 truncate" title={`Broker: ${party.broker}`}>
+                            BRK: {party.broker}
+                          </div>
+                        )}
                       </td>
 
                       {COLS.map((col, colIdx) => (

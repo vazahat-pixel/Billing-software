@@ -21,8 +21,8 @@ const { round } = require('../jcEngine');
 
 const TYPE_OF = { sales: 'receivable', purchase: 'payable', process: 'process', jobwork: 'jobwork' };
 
-async function resolveBrokerNames(companyId, invoices) {
-  const ids = [...new Set(invoices.map((i) => i.broker).filter(Boolean).map(String))];
+async function resolveBrokerNames(companyId, invoices, parties = []) {
+  const ids = [...new Set([...invoices.map((i) => i.broker), ...parties.map((p) => p.brokerId)].filter(Boolean).map(String))];
   if (!ids.length) return new Map();
   const Party = require('../../../models/Party');
   const rows = await Party.find({ _id: { $in: ids } }).select('name').lean();
@@ -38,14 +38,14 @@ async function loadOutstandingRows(companyId, kind, filters = {}) {
   const parties = await reportService.getOutstanding(companyId, TYPE_OF[kind], filters);
 
   const allInvoices = parties.flatMap((p) => p.invoices);
-  const brokerNames = await resolveBrokerNames(companyId, allInvoices);
+  const brokerNames = await resolveBrokerNames(companyId, allInvoices, parties);
 
   const rows = [];
   for (const p of parties) {
     for (const inv of p.invoices) {
       rows.push({
         PARTY: p.partyName,
-        BROKER: inv.broker ? (brokerNames.get(String(inv.broker)) || '') : '',
+        BROKER: inv.broker ? (brokerNames.get(String(inv.broker)) || '') : (p.brokerId ? (brokerNames.get(String(p.brokerId)) || '') : ''),
         STATION: p.city || '',
         MAINGROUP: p.mainGroupId || '',
         PARTY_MOBILE: p.phone || '',
@@ -114,10 +114,10 @@ async function loadOutstandingAgeRows(companyId, kind, filters = {}, ageDays) {
   };
 
   const allInvoices = parties.flatMap((p) => p.invoices);
-  const brokerNames = await resolveBrokerNames(companyId, allInvoices);
+  const brokerNames = await resolveBrokerNames(companyId, allInvoices, parties);
   const brokerOf = (p) => {
     const first = p.invoices.find((i) => i.broker);
-    return first ? (brokerNames.get(String(first.broker)) || '') : '';
+    return first ? (brokerNames.get(String(first.broker)) || '') : (p.brokerId ? (brokerNames.get(String(p.brokerId)) || '') : '');
   };
 
   return parties.map((p) => {

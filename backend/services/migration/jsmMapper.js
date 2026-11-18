@@ -477,10 +477,15 @@ function buildPlan(tables, { companyId }) {
     const cg = num(h.SGST_AMT); const sg = num(h.CGST_AMT); const ig = num(h.IGST_AMT);
     let add = 0; let less = 0; for (let i = 1; i <= 7; i += 1) { const a = num(h[`AMT_${i}`]); if (str(h[`PM_${i}`]) === '-') less += a; else add += a; }
     const taxable = num(h.TAXABLE_AMT) || num(h.SUB_TOT);
+    const brk = num(h.BR_CODE) ? (acc.get(str(h.BR_CODE))?.partyId || partyFor(h.BR_CODE, 'Broker', `Sales broker ${str(h.NCBILL_NO)}`)?.partyId) : null;
+    const st = num(h.ST_CODE) ? stationOf(path, h.ST_CODE) : null;
+    const tr = num(h.TRNS_CODE) ? transportOf(path, h.TRNS_CODE) : null;
+    const resolvedStation = st ? (str(st.ST_NAME) || '') : '';
+    const resolvedTransport = tr ? (str(tr.TRNS_NAME) || '') : '';
     const doc = {
       _id: id, companyId, customerId: cust.partyId, invoiceNo: uniqueNo(str(h.NCBILL_NO) || `SL-${path}-${num(h.ENT_NO)}`, saleNos, [path, `B${str(h.TR_CODE)}`]),
       date: at, bookId: bookName(h.TR_CODE), challanNo: str(h.NCCHLN_NO), chDate: date(h.CHLN_DATE), orderNo: str(h.ORD_NO), orderDate: date(h.ORD_DATE),
-      invoiceType: 'Tax', haste: str(h.HASTE), transport: '', station: '', lrNo: str(h.LR_NO), lrDate: date(h.LR_DATE), weight: num(h.WEIGHT), eway: str(h.EWAY_NO),
+      invoiceType: 'Tax', haste: str(h.HASTE), brokerId: brk || null, transport: resolvedTransport, station: resolvedStation, lrNo: str(h.LR_NO), lrDate: date(h.LR_DATE), weight: num(h.WEIGHT), eway: str(h.EWAY_NO),
       items, taxableAmount: r2(taxable), gstType: ig > 0 ? 'IGST' : (cg + sg > 0 ? 'CGST+SGST' : 'Exempt'), cgst: cg, sgst: sg, igst: ig, gstAmount: r2(cg + sg + ig),
       netAmount: r2(num(h.NET_TOT)), roundOff: num(h.ROUND_OFF), totalAdd: r2(add), totalLess: r2(less), tcsPer: num(h.TCS_PER), tcsAmount: num(h.TCS_AMT),
       dueDate: date(h.DUE_DATE), dueDays: num(h.DUE_DAYS), freight: num(h.FREIGHT), paidAmount: 0, status: 'active', createdAt: at, updatedAt: at,
@@ -664,6 +669,15 @@ function buildPlan(tables, { companyId }) {
     const b = acc.get(bc); if (!b) continue;
     if (!b.partyId) partyFor(bc, 'Broker', `Broker of ${pd.name}`);
     if (b.partyId) pd.brokerId = String(b.partyId);
+  }
+
+  // Ensure any sales bill without an explicit broker falls back to the customer's broker
+  const partyMapById = new Map(docs.Party.map((p) => [String(p._id), p]));
+  for (const s of docs.Sales) {
+    const cp = partyMapById.get(String(s.customerId));
+    if (!s.brokerId && cp?.brokerId) s.brokerId = oid(cp.brokerId);
+    if (!s.transport && cp?.transport) s.transport = cp.transport;
+    if (!s.station && (cp?.station || cp?.city)) s.station = cp.station || cp.city;
   }
 
   // ---- expected figures taken from JSM's own data (for reconciliation) --------------------------------------------------------------------------------------

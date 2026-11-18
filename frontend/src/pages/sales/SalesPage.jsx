@@ -271,6 +271,17 @@ const SalesPage = () => {
                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                                  {sale.destination || sale.station || sale.city || 'LOCAL'}
                               </p>
+                              {(() => {
+                                 const cust = parties.find(p => String(p._id || p.id) === String(sale.customerId?._id || sale.customerId));
+                                 const bId = sale.brokerId?._id || sale.brokerId || cust?.brokerId;
+                                 const brk = bId ? parties.find(p => String(p._id || p.id) === String(bId)) : null;
+                                 const brokerName = brk?.name || sale.brokerName || sale.brokerId?.name;
+                                 return brokerName ? (
+                                    <p className="text-[9px] font-semibold text-emerald-700 uppercase tracking-wider mt-0.5">
+                                       BRK: {brokerName}
+                                    </p>
+                                 ) : null;
+                              })()}
                            </td>
                            <td className="px-8 py-6 text-right font-bold text-slate-400 text-[11px]">
                               ₹ {(sale.taxableAmount || sale.totals?.subtotal || 0).toLocaleString('en-IN')}
