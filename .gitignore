@@ -2,8 +2,6 @@
 node_modules/
 
 # Environment & secrets (never commit)
-.env
-.env.*
 !.env.example
 
 # Build output
@@ -48,7 +46,6 @@ Thumbs.db
 Desktop.ini
 
 # Editors
-.vscode/*
 !.vscode/extensions.json
 .idea/
 *.suo
@@ -104,3 +101,4 @@ temp_interactive_push.bat
 backend/tests/fixtures/migration/*.gz
 *.webm
 *.mp4
+config.bat

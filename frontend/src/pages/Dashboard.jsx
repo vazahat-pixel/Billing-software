@@ -1794,7 +1794,7 @@ const Dashboard = () => {
                         <span key={t.sep} className="erp-jsm-toolbar__sep" aria-hidden>|</span>
                      ) : (
                         <button
-                           key={t.label}
+                           key={t.id || t.label}
                            type="button"
                            data-jsm-tool={t.id}
                            title={t.hotkey ? `${t.title} (${t.hotkey})` : t.title}
