@@ -15,11 +15,14 @@
  * Single are different physical layouts with no ground truth yet.
  */
 const financialReportsService = require('../../financialReportsService');
+const { jsmProfitAndLoss } = require('../finalAccounts');
 
 const round2 = (n) => Number(Number(n || 0).toFixed(2));
 
+// A group sits on the side of its net balance; the P&L heads (Income / Expense ledgers) are not on the
+// Balance Sheet at all — they arrive as the Net Profit / Loss line.
 function sideGroups(groups, want) {
-  return groups.filter((g) => g.balanceType === want && !/PROFIT & LOSS/.test(g.name));
+  return groups.filter((g) => g.balanceType === want && g.lines.length > 0);
 }
 
 function buildLines(groups, want, ticked = null) {
@@ -31,7 +34,8 @@ function buildLines(groups, want, ticked = null) {
     lines.push({ type: 'header', label: g.name });
     let groupTotal = 0;
     for (const l of matchingLines) {
-      const v = want === 'Cr' ? l.credit : l.debit;
+      // signed on the group's own side: a debit ledger inside a credit group is shown as a minus, not dropped
+      const v = round2(want === 'Cr' ? l.credit - l.debit : l.debit - l.credit);
       lines.push({ type: 'detail', label: l.name, value: v });
       groupTotal += v;
     }
@@ -58,10 +62,19 @@ async function run(companyId, p = {}) {
 
   const [tb, pl] = await Promise.all([
     financialReportsService.groupedTrialBalance(companyId, { asOn }),
-    financialReportsService.profitAndLoss(companyId, { from: p.from, to: asOn }),
+    jsmProfitAndLoss(companyId, { from: p.from, to: asOn }),
   ]);
 
   const ticked = Array.isArray(p.accounts) && p.accounts.length ? new Set(p.accounts) : null;
+  // leave the Income / Expense ledgers out (they make up the Net Profit line)
+  const LedgerMaster = require('../../../models/LedgerMaster');
+  const plIds = new Set((await LedgerMaster.find({ companyId, group: { $in: ['Income', 'Expenses'] } }).select('_id').lean()).map((l) => String(l._id)));
+  tb.groups = tb.groups
+    .map((g) => {
+      const lines = g.lines.filter((l) => !plIds.has(String(l.ledgerId)));
+      const net = round2(lines.reduce((s, l) => s + (l.debit || 0) - (l.credit || 0), 0));
+      return { ...g, lines, balanceType: net >= 0 ? 'Dr' : 'Cr' };
+    });
   const liab = buildLines(sideGroups(tb.groups, 'Cr'), 'Cr', ticked);
   const asset = buildLines(sideGroups(tb.groups, 'Dr'), 'Dr', ticked);
   const netProfit = pl.netProfit;
@@ -87,8 +100,13 @@ async function run(companyId, p = {}) {
 }
 
 async function options(companyId) {
-  const tb = await financialReportsService.groupedTrialBalance(companyId, { withZeroBalance: true });
-  return { accounts: tb.groups.flatMap((g) => g.lines.map((l) => l.name)).sort((a, b) => a.localeCompare(b)) };
+  const LedgerMaster = require('../../../models/LedgerMaster');
+  const ledgers = await LedgerMaster.find({
+    companyId,
+    isActive: { $ne: false },
+    group: { $nin: ['Income', 'Expenses'] },
+  }).select('name').lean();
+  return { accounts: [...new Set(ledgers.map((l) => l.name).filter(Boolean))].sort((a, b) => a.localeCompare(b)) };
 }
 
 module.exports = { run, options };

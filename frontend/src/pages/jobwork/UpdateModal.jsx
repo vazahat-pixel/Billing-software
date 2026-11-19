@@ -1102,7 +1102,7 @@ export default function UpdateModal({ isOpen, onClose, selectedBook = null, init
         bare
       >
         {({ WindowControls }) => (
-          <div className="classic-erp-window erp-density erp-job-issue-window flex flex-col h-full min-h-0 !max-h-none" data-enter-skip={mode === 'View' ? 'true' : undefined}>
+          <div className="classic-erp-window erp-density erp-job-issue-window flex flex-col h-full min-h-0 !max-h-none" data-enter-skip={mode === 'View' ? 'true' : undefined} data-erp-bill data-erp-mode={mode}>
             <ErpBusyOverlay show={bootLoading} message="Loading job issue registry…" />
             <ErpBusyOverlay show={!bootLoading && saving} message="Saving job issue entries…" />
 

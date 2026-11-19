@@ -18,7 +18,7 @@ const AdminLayout = () => {
     const [notifications] = useState(3);
     const now = new Date();
 
-    const handleLogout = () => { logout(); navigate('/portal'); };
+    const handleLogout = () => { logout(); navigate('/admin/login'); };
 
     const navGroups = [
         {

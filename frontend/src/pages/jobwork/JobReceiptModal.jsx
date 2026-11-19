@@ -725,7 +725,7 @@ const JobReceiptModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment =
         bare
       >
         {({ WindowControls }) => (
-          <div className="classic-erp-window erp-density erp-job-receipt-window flex flex-col h-full min-h-0 !max-h-none" data-enter-skip={mode === 'View' ? 'true' : undefined}>
+          <div className="classic-erp-window erp-density erp-job-receipt-window flex flex-col h-full min-h-0 !max-h-none" data-enter-skip={mode === 'View' ? 'true' : undefined} data-erp-bill data-erp-mode={mode}>
             <ErpBusyOverlay show={bootLoading} message="Loading job receipt…" />
             <ErpBusyOverlay show={!bootLoading && saving} message="Saving job receipt…" />
 

@@ -74,4 +74,28 @@ async function loadMillReceiptRows(companyId, bookModule = 'millRec') {
   });
 }
 
-module.exports = { loadMillReceiptRows };
+/**
+ * Mill / Job receipts as GST bill rows (taxable, SGST/CGST/IGST, net, party GSTIN), for the GST screens
+ * (GSTIN Process/JobWork, 3B Inward/Outward, GSTR-9, 2A/2B/4A matching). The rows above carry no tax
+ * fields, so those screens showed GST and net as 0. Figures are the ones saved on the receipt.
+ * `kind`: 'Mill' | 'Job' (also accepts the book modules 'millRec' / 'jobRec').
+ */
+async function loadReceiptGstRows(companyId, kind = 'Mill') {
+  const { loadMillReceiptSummaryRows } = require('./millReceiptSummary');
+  const rows = await loadMillReceiptSummaryRows(companyId, /job/i.test(String(kind)) ? 'jobRec' : 'millRec');
+  return rows.map((r) => {
+    const gst = Number(r.SGST_AMT || 0) + Number(r.CGST_AMT || 0) + Number(r.IGST_AMT || 0);
+    return {
+      ...r,
+      TAX_RATE: r.TAXABLE_AMT ? round((gst / r.TAXABLE_AMT) * 100) : 0,
+      GST_RATE: r.TAXABLE_AMT ? round((gst / r.TAXABLE_AMT) * 100) : 0,
+      CHALLAN_NO: r.NCBILL_NO,
+      REC_PCS: r.TO_PCS,
+      REC_QTY: r.TO_REC_QTY,
+    };
+  });
+}
+
+const loadJobReceiptRows = (companyId) => loadReceiptGstRows(companyId, 'Job');
+
+module.exports = { loadMillReceiptRows, loadReceiptGstRows, loadJobReceiptRows };

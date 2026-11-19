@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { buildGridLines, layoutColumns } from './jcGrid';
 import { accel } from './winforms';
@@ -44,10 +44,34 @@ export default function JsmGridReport({ result, layouts, fallbackColumns, compan
     XLSX.writeFile(wb, `${(grid.title || 'Report').replace(/[^\w ]+/g, '')}.xlsx`);
   };
 
+  // The grid holds the keyboard as soon as the report opens: Up/Down (PgUp/PgDn, Home/End) walk the rows,
+  // Left/Right slide the columns, Enter opens the row's voucher, Tab reaches the buttons (Left/Right there).
+  const winRef = useRef(null);
+  const gridRef = useRef(null);
+  useEffect(() => {
+    const t = setTimeout(() => winRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, []);
   const onKey = (e) => {
     if (e.key === 'Escape') { e.preventDefault(); onClose?.(); return; }
-    if (e.key === 'ArrowDown') { setSelected((s) => Math.min(lines.length - 1, s + 1)); e.preventDefault(); }
-    if (e.key === 'ArrowUp') { setSelected((s) => Math.max(0, s - 1)); e.preventDefault(); }
+    const onGrid = e.target === winRef.current;
+    if (onGrid && !e.altKey && !e.ctrlKey) {
+      const last = lines.length - 1;
+      const step = { ArrowDown: 1, ArrowUp: -1, PageDown: 20, PageUp: -20 }[e.key];
+      if (step) { e.preventDefault(); setSelected((s) => Math.max(0, Math.min(last, (s < 0 ? -1 : s) + step))); return; }
+      if (e.key === 'Home') { e.preventDefault(); setSelected(0); return; }
+      if (e.key === 'End') { e.preventDefault(); setSelected(last); return; }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        gridRef.current?.scrollBy({ left: e.key === 'ArrowRight' ? 120 : -120 });
+        return;
+      }
+      if (e.key === 'Enter' && selected > -1) {
+        const l = lines[selected];
+        if (onOpenRow && l?.type === 'detail' && l.row?.ENT_NO) { e.preventDefault(); onOpenRow(l.row); }
+        return;
+      }
+    }
     if (e.altKey) {
       const k = e.key.toLowerCase();
       if (k === 'e') onClose?.();
@@ -58,7 +82,7 @@ export default function JsmGridReport({ result, layouts, fallbackColumns, compan
   };
 
   return (
-    <div className="jsmg-window" tabIndex={0} onKeyDown={onKey}>
+    <div className="jsmg-window" tabIndex={0} onKeyDown={onKey} ref={winRef}>
       <div className="jsmg-print-head">
         <div className="jsmg-print-company">{companyName}</div>
         <div>{grid.title}</div>
@@ -69,7 +93,7 @@ export default function JsmGridReport({ result, layouts, fallbackColumns, compan
           {grid.notice}
         </div>
       )}
-      <div className="jsmg-grid">
+      <div className="jsmg-grid" ref={gridRef}>
         <table>
           <colgroup>
             <col style={{ width: 22 }} />
@@ -87,6 +111,7 @@ export default function JsmGridReport({ result, layouts, fallbackColumns, compan
                 key={i}
                 className={`${l.type}${i === selected ? ' is-selected' : ''}${onOpenRow && l.type === 'detail' && l.row?.ENT_NO ? ' jsmg-row--clickable' : ''}`}
                 style={l.style}
+                ref={i === selected ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
                 onClick={() => {
                   setSelected(i);
                   if (onOpenRow && l.type === 'detail' && l.row?.ENT_NO) onOpenRow(l.row);

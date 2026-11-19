@@ -96,7 +96,7 @@ async function loadPurchasesForMatch(companyId, p, deps) {
   const [pu, puRtn, mill, job] = await Promise.all([
     deps.purchases || billSrc.loadPurchaseRegisterRows(companyId),
     deps.purchaseRtn || billSrc.loadReturnRegisterRows(companyId, 'Purchase'),
-    deps.millReceipts || mrSrc.loadMillReceiptRows(companyId),
+    deps.millReceipts || mrSrc.loadReceiptGstRows(companyId, 'Mill'),
     deps.jobReceipts || mrSrc.loadJobReceiptRows(companyId),
   ]);
   let notes = deps.purchaseNotes;

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -104,6 +105,16 @@ const CuttingBeamEntryModal = lazy(() => import('./inventory/CuttingBeamEntryMod
 const JobWorkerMaster = lazy(() => import('./masters/JobWorkerMaster'));
 const InventoryPage = lazy(() => import('./inventory/InventoryPage'));
 const Gst3bMonthlyModal = lazy(() => import('./gst/Gstr3bJsmReport'));
+
+/** The entries of one menu level (a section's dropdown or one side flyout), in screen order. */
+const menuListItems = (container) => (container
+  ? [...container.querySelectorAll(':scope > button.erp-menu-item, :scope > .erp-menu-item-row > button.erp-menu-item')]
+    .filter((b) => !b.disabled && b.offsetParent !== null)
+  : []);
+const focusMenuList = (container, last = false) => {
+  const list = menuListItems(container);
+  (last ? list[list.length - 1] : list[0])?.focus();
+};
 const JsmGstr1Screen = lazy(() => import('../jsm/JsmGstr1Screen'));
 const JsmLedgerOsDiffScreen = lazy(() => import('../jsm/JsmLedgerOsDiffScreen'));
 const JsmTdsAddressScreen = lazy(() => import('../jsm/JsmTdsAddressScreen'));
@@ -922,8 +933,8 @@ const Dashboard = () => {
 
    useEffect(() => {
       const isTyping = (el) => el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
-      const triggers = () => [...document.querySelectorAll('.erp-menu-bar .erp-menu-trigger')];
-      const openItems = () => [...document.querySelectorAll('.erp-menu-dropdown button.erp-menu-item')].filter((el) => el.offsetParent !== null);
+      // The section buttons only — never the bar's Exit (logout) button.
+      const triggers = () => [...document.querySelectorAll('.erp-menu-bar .erp-menu-trigger')].filter((b) => !b.hasAttribute('data-menu-exit'));
       // A plain Alt press-and-release focuses the menu bar, as in JSM (Windows menus); F10 is JSM's Help.
       let altAlone = false;
       const onAltDown = (e) => { altAlone = e.key === 'Alt' && !e.ctrlKey && !e.shiftKey && !e.metaKey; };
@@ -963,39 +974,94 @@ const Dashboard = () => {
             next?.focus();
             return;
          }
+         // ── Menu bar, Windows / JSM style: Left/Right between sections, Down into the list, Up/Down in a
+         // list, Right (or Enter) opens a side list and goes into it, Left (or Esc) comes back out of it.
          const onTrigger = el?.closest?.('.erp-menu-trigger');
-         const inMenu = el?.closest?.('.erp-menu-dropdown');
+         const item = el?.closest?.('button.erp-menu-item');
+         const inMenu = item && item.closest('.erp-menu-dropdown') ? item : null;
          if (!onTrigger && !inMenu) return;
-         if (e.key === 'Escape') {
-            e.preventDefault();
-            setOpenMenuSection(null);
-            setOpenFlyoutPath(null);
-            return;
-         }
-         if (onTrigger && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+         const pathOf = (b) => b?.getAttribute('data-menu-path') || null;
+         const levelOf = (b) => b.closest('.erp-menu-flyout, .erp-menu-dropdown');
+         const ownerOf = (level) => (level?.classList.contains('erp-menu-flyout')
+            ? level.parentElement?.querySelector(':scope > button.erp-menu-item') : null);
+         const sectionTrigger = (b) => b.closest('.erp-menu-dropdown')?.parentElement?.querySelector(':scope > .erp-menu-trigger');
+         const goSection = (from, dir) => {
             const list = triggers();
-            const i = list.indexOf(onTrigger);
+            const i = list.indexOf(from);
             if (i < 0) return;
-            e.preventDefault();
-            const next = list[(i + (e.key === 'ArrowRight' ? 1 : list.length - 1)) % list.length];
+            const next = list[(i + dir + list.length) % list.length];
             next?.focus();
-            next?.click();
+            next?.click(); // opens it; the click puts the cursor on its first entry
+         };
+         const stop = () => { e.preventDefault(); e.stopPropagation(); };
+
+         if (onTrigger) {
+            if (e.key === 'Escape') { stop(); setOpenMenuSection(null); setOpenFlyoutPath(null); return; }
+            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { stop(); goSection(onTrigger, e.key === 'ArrowRight' ? 1 : -1); return; }
+            if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowUp') {
+               stop();
+               if (!onTrigger.classList.contains('erp-menu-trigger--open')) onTrigger.click();
+               focusMenuList(onTrigger.parentElement?.querySelector(':scope > .erp-menu-dropdown'), e.key === 'ArrowUp');
+            }
             return;
          }
-         if (onTrigger && (e.key === 'ArrowDown' || e.key === 'Enter')) {
-            e.preventDefault();
-            if (!document.querySelector('.erp-menu-dropdown')) onTrigger.click();
-            setTimeout(() => openItems()[0]?.focus(), 30);
+
+         const level = levelOf(inMenu);
+         const owner = ownerOf(level);
+         const isParent = inMenu.classList.contains('erp-menu-item--parent');
+         const backOut = () => {
+            // close this side list and put the cursor back on the entry that opened it
+            const ownerLevel = levelOf(owner);
+            setOpenFlyoutPath(pathOf(ownerOf(ownerLevel)));
+            owner.focus();
+         };
+         const goIn = () => {
+            // rendered at once, so a fast next key press already lands inside the side list
+            flushSync(() => setOpenFlyoutPath(pathOf(inMenu)));
+            focusMenuList(inMenu.parentElement?.querySelector(':scope > .erp-menu-flyout'));
+         };
+
+         if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
+            const list = menuListItems(level);
+            const i = list.indexOf(inMenu);
+            if (i < 0) return;
+            stop();
+            const next = e.key === 'Home' ? list[0]
+               : e.key === 'End' ? list[list.length - 1]
+               : list[(i + (e.key === 'ArrowDown' ? 1 : list.length - 1)) % list.length];
+            // moving within a list closes any side list another entry had open
+            setOpenFlyoutPath(pathOf(owner));
+            next?.focus();
             return;
          }
-         if (inMenu && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-            const list = openItems();
-            const i = list.indexOf(el.closest('button') || el);
-            if (i < 0) return;
-            e.preventDefault();
-            const next = list[(i + (e.key === 'ArrowDown' ? 1 : list.length - 1)) % list.length];
-            next?.focus();
+         if (e.key === 'ArrowRight') {
+            stop();
+            if (isParent) goIn();
+            else goSection(sectionTrigger(inMenu), 1);
+            return;
          }
+         if (e.key === 'ArrowLeft') {
+            stop();
+            if (owner) backOut();
+            else goSection(sectionTrigger(inMenu), -1);
+            return;
+         }
+         if ((e.key === 'Enter' || e.key === ' ') && isParent) {
+            stop();
+            goIn();
+            return;
+         }
+         if (e.key === 'Escape') {
+            stop();
+            if (owner) backOut();
+            else {
+               const trig = sectionTrigger(inMenu);
+               setOpenMenuSection(null);
+               setOpenFlyoutPath(null);
+               trig?.focus();
+            }
+         }
+         // Enter on an ordinary entry: the browser presses the button, which opens the screen.
       };
       window.addEventListener('keydown', onMenuKey, true);
       window.addEventListener('keydown', onAltDown, true);
@@ -1006,6 +1072,16 @@ const Dashboard = () => {
          window.removeEventListener('keyup', onAltUp, true);
       };
    }, []);
+
+   // The quick-toolbar sidebar's width, read by the bill windows (useErpWindow / erp-polish.css) so they open
+   // beside it instead of over it. Cleared when the shell unmounts (login, admin pages).
+   useEffect(() => {
+      const root = document.documentElement;
+      if (isCaUser) root.style.removeProperty('--erp-rail-w');
+      else root.style.setProperty('--erp-rail-w', '96px');
+      window.dispatchEvent(new Event('resize'));
+      return () => root.style.removeProperty('--erp-rail-w');
+   }, [isCaUser]);
 
    const [gstHubInitialReport, setGstHubInitialReport] = useState('gstr1');
    // The older GSTR-1 Excel entries open the same report but download that template's layout.
@@ -1584,6 +1660,27 @@ const Dashboard = () => {
             </div>
          </aside>}
 
+         {/* JSM quick toolbar as a left sidebar (1 Sales, 2 Pur, ...). F9 focuses it; Up/Down move, Enter opens. */}
+         {!isCaUser && (
+            <nav className="erp-jsm-toolbar erp-jsm-toolbar--side select-none" aria-label="Quick toolbar (F9)">
+               <span className="erp-jsm-toolbar__user" aria-hidden>{(user?.name || 'U').charAt(0).toUpperCase()}</span>
+               {JSM_TOOLBAR.map((t) => (t.sep ? (
+                  <span key={t.sep} className="erp-jsm-toolbar__sep" aria-hidden />
+               ) : (
+                  <button
+                     key={t.id || t.label}
+                     type="button"
+                     data-jsm-tool={t.id}
+                     title={t.hotkey ? `${t.title} (${t.hotkey})` : t.title}
+                     onClick={() => runToolbarItem(t)}
+                     className={`erp-jsm-toolbar__btn${t.small ? ' erp-jsm-toolbar__btn--small' : ''}${activeMenuKey === t.id ? ' erp-jsm-toolbar__btn--active' : ''}`}
+                  >
+                     {t.hotkey && !t.small ? `${t.hotkey} ` : ''}{t.label}
+                  </button>
+               )))}
+            </nav>
+         )}
+
          {/* Main area */}
          <main className="flex-1 min-w-0 flex flex-col bg-[var(--bg-base)] relative min-h-0">
             <header className="shrink-0 relative z-[4000] bg-[var(--bg-card)] border-b border-[var(--border)]">
@@ -1690,9 +1787,14 @@ const Dashboard = () => {
                      <div key={section} className="relative shrink-0">
                         <button
                            type="button"
-                           onClick={() => {
-                              setOpenMenuSection(isOpen ? null : section);
-                              setOpenFlyoutPath(null);
+                           onClick={(e) => {
+                              const self = e.currentTarget;
+                              flushSync(() => {
+                                 setOpenMenuSection(isOpen ? null : section);
+                                 setOpenFlyoutPath(null);
+                              });
+                              // Opened (mouse or keys): put the cursor on the first entry so the arrows work from here on.
+                              if (!isOpen) focusMenuList(self.parentElement?.querySelector(':scope > .erp-menu-dropdown'));
                            }}
                            className={`erp-menu-trigger ${isOpen ? 'erp-menu-trigger--open' : ''}`}
                         >
@@ -1719,12 +1821,17 @@ const Dashboard = () => {
                                                 >
                                                    <button
                                                       type="button"
+                                                      data-menu-path={keyPrefix}
+                                                      aria-haspopup="menu"
                                                       className={`erp-menu-item erp-menu-item--parent ${openFlyoutPath === keyPrefix ? 'erp-menu-trigger--open' : ''}`}
                                                       onClick={(e) => {
                                                          e.stopPropagation();
                                                          // Hovering already opened this flyout, so a click must keep it open
                                                          // (toggling shut here made a click look like it did nothing).
-                                                         setOpenFlyoutPath(keyPrefix);
+                                                         const self = e.currentTarget;
+                                                         flushSync(() => setOpenFlyoutPath(keyPrefix));
+                                                         // Clicked: carry the cursor into the side list, so the arrows go on from there.
+                                                         focusMenuList(self.parentElement?.querySelector(':scope > .erp-menu-flyout'));
                                                       }}
                                                    >
                                                       {badge && (
@@ -1753,6 +1860,7 @@ const Dashboard = () => {
                                              {needsSeparator && <div className="erp-menu-separator" />}
                                              <button
                                                 type="button"
+                                                data-menu-path={keyPrefix}
                                                 onClick={() => {
                                                    setOpenMenuSection(null);
                                                    setOpenFlyoutPath(null);
@@ -1780,32 +1888,13 @@ const Dashboard = () => {
                   );})}
                   <button
                      type="button"
+                     data-menu-exit
                      className="erp-menu-trigger ml-auto text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                      onClick={handleLogout}
                   >
                      Exit
                   </button>
                </div>}
-
-               {!isCaUser && (
-                  <nav className="erp-jsm-toolbar select-none" aria-label="Quick toolbar (F9)">
-                     <span className="erp-jsm-toolbar__user" aria-hidden>{(user?.name || 'U').charAt(0).toUpperCase()}</span>
-                     {JSM_TOOLBAR.map((t) => (t.sep ? (
-                        <span key={t.sep} className="erp-jsm-toolbar__sep" aria-hidden>|</span>
-                     ) : (
-                        <button
-                           key={t.id || t.label}
-                           type="button"
-                           data-jsm-tool={t.id}
-                           title={t.hotkey ? `${t.title} (${t.hotkey})` : t.title}
-                           onClick={() => runToolbarItem(t)}
-                           className={`erp-jsm-toolbar__btn${t.small ? ' erp-jsm-toolbar__btn--small' : ''}${activeMenuKey === t.id ? ' erp-jsm-toolbar__btn--active' : ''}`}
-                        >
-                           {t.hotkey && !t.small ? `${t.hotkey} ` : ''}{t.label}
-                        </button>
-                     )))}
-                  </nav>
-               )}
 
             </header>
 

@@ -1369,7 +1369,7 @@ const ReceiveModal = ({ isOpen, onClose, selectedBook = null, onOpenPayment = nu
          bare
       >
          {({ WindowControls }) => (
-            <div className="classic-erp-window erp-density mill-rec-sheet flex flex-col h-full min-h-0 overflow-hidden !max-h-none bg-[#d4d0c8]">
+            <div className="classic-erp-window erp-density mill-rec-sheet flex flex-col h-full min-h-0 overflow-hidden !max-h-none bg-[#d4d0c8]" data-erp-bill data-erp-mode={mode}>
                <ErpBusyOverlay show={bootLoading} message="Loading mill receive…" />
                <ErpBusyOverlay show={!bootLoading && saving} message="Saving receive…" />
 

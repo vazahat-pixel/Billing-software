@@ -92,7 +92,53 @@ export default function JsmFormDialog({
       rootRef.current.querySelectorAll(
         'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), .jsmf-listview[tabindex="0"]'
       )
-    ).filter((el) => el.offsetParent !== null && !el.disabled);
+    ).filter((el) => el.offsetParent !== null && !el.disabled)
+      // top-to-bottom, left-to-right as drawn (the blueprint lists controls in creation order, not screen order)
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .sort((a, b) => Math.round(a.r.top / 10) - Math.round(b.r.top / 10) || a.r.left - b.r.left)
+      .map((x) => x.el);
+  };
+
+  // The Enter chain, as in JSM: every field in screen order, a radio group as ONE stop (its selected
+  // button), no side buttons (the small "T" test button etc.), and finally the run button (OK / Screen).
+  const enterChain = () => {
+    const all = getFocusableControls();
+    const seen = new Set();
+    const fields = all.filter((el) => {
+      if (el.tagName === 'BUTTON') return false;
+      // option boxes are not Enter stops (Space ticks, arrows walk them, Tab reaches them): Enter goes
+      // straight through the dates / lists / combos to OK, so a form is never 25 Enters long
+      if (el.type === 'checkbox') return false;
+      // a tick-list is one stop (the list itself); its row checkboxes are walked with the arrows
+      if (!el.classList.contains('jsmf-listview') && el.closest('.jsmf-listview')) return false;
+      if (el.type === 'radio') {
+        if (seen.has(el.name || el)) return false;
+        const group = all.filter((x) => x.type === 'radio' && x.name === el.name);
+        const rep = group.find((x) => x.checked) || group[0];
+        seen.add(el.name || el);
+        return el === rep || (rep !== el && false);
+      }
+      return true;
+    });
+    // a radio that was not the representative still has to find its group's stop
+    // The account / party list is the last stop: after picking accounts there, Enter goes straight to
+    // OK — never on through the option boxes, combos and filters drawn below the list.
+    const lastList = fields.map((el) => el.classList.contains('jsmf-listview')).lastIndexOf(true);
+    if (lastList > -1) fields.splice(lastList + 1);
+    const repOf = (el) => (el.type === 'radio'
+      ? fields.find((x) => x.type === 'radio' && x.name === el.name) || el
+      : el);
+    const caption = (b) => String(b.textContent || '').replace(/&/g, '').trim();
+    const buttons = all.filter((el) => el.tagName === 'BUTTON');
+    // Several screens carry a second small "Ok" (a utility) beside the real one: the real one is named
+    // btn_ok / btn_screen, else it is the lowest matching button (the bottom bar).
+    const lowest = (list) => [...list].sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0];
+    const byName = buttons.filter((b) => /^btn_?(ok|screen)$/i.test(b.dataset?.buttonName || ''));
+    const byCaption = buttons.filter((b) => /^(ok|screen|show|display|refresh|generate|run|load|preview)$/i.test(caption(b)));
+    const run = (byName.length ? lowest(byName) : null)
+      || (byCaption.length ? lowest(byCaption) : null)
+      || buttons.find((b) => caption(b).length > 2 && !/^(exit|cancel|close)$/i.test(caption(b)));
+    return { fields, run, repOf };
   };
 
   // Initial Auto-Focus: Focus first text/date input or combo or first control
@@ -126,16 +172,15 @@ export default function JsmFormDialog({
     if (e.target.tagName === 'BUTTON') return;
     if (e.key === 'Enter') {
       e.preventDefault();
-      const fields = getFocusableControls();
-      const i = fields.indexOf(e.target);
-      if (i > -1) {
-        if (fields[i + 1]) {
-          fields[i + 1].focus();
-        } else {
-          const okBtn = fields.find((el) => el.tagName === 'BUTTON' && /ok|screen|print/i.test(el.textContent || el.dataset?.buttonName || ''));
-          okBtn?.focus();
-        }
+      e.stopPropagation();
+      const { fields, run, repOf } = enterChain();
+      const i = fields.indexOf(repOf(e.target));
+      if (e.shiftKey) {
+        if (i > 0 && fields[i - 1]) fields[i - 1].focus();
+        return;
       }
+      if (i > -1 && fields[i + 1]) fields[i + 1].focus();
+      else (run || fields[i])?.focus(); // after the last field the cursor lands on OK / Screen; Enter there runs it
     } else if (e.key === 'ArrowDown' && e.target.tagName === 'INPUT' && e.target.type !== 'radio' && e.target.type !== 'checkbox') {
       e.preventDefault();
       const fields = getFocusableControls();
@@ -198,9 +243,15 @@ export default function JsmFormDialog({
             set(c.name, [...next]);
           } else if (e.key === 'Enter') {
             e.preventDefault();
-            const fields = getFocusableControls();
+            e.stopPropagation();
+            const { fields, run } = enterChain();
             const i = fields.indexOf(e.currentTarget);
+            if (e.shiftKey) {
+              if (i > 0 && fields[i - 1]) fields[i - 1].focus();
+              return;
+            }
             if (i > -1 && fields[i + 1]) fields[i + 1].focus();
+            else run?.focus();
           } else if (e.key === 'Backspace') {
             setSearch((s) => s.slice(0, -1));
             e.preventDefault();
@@ -306,6 +357,8 @@ export default function JsmFormDialog({
           style={boxStyle(c)}
           value={state[c.name] ?? ''}
           disabled={disabled}
+          // Enter moves on (Ctrl+Enter / Shift+Enter keep a new line in a notes box)
+          onKeyDown={(e) => { if (!(e.shiftKey || e.ctrlKey)) onEnterNext(e); }}
           onChange={(e) => set(c.name, e.target.value)}
         />
       );
@@ -466,7 +519,7 @@ export default function JsmFormDialog({
     }
     if (c.type === 'ListView') return renderListView(c);
     // A tick-list that JSM draws as a DataGridView (Sales Summary's Party tab, Balance Sheet's Dgv1) is filled from `lists`.
-    if (/DataGridView$/.test(c.type) && !grids[c.name] && lists[c.name]) return renderListView(c);
+    if (/DataGridView$/.test(c.type) && !grids[c.name] && (lists[c.name] !== undefined || c.name in lists)) return renderListView(c);
     if (/DataGridView$|ListView$/.test(c.type) && grids[c.name]) {
       // Data grids carry no columns in the blueprint (JSM adds them in code), so the screen supplies
       // { columns: [{ key, label, width, num, fmt }], rows, onRowClick } per grid name.
@@ -500,6 +553,7 @@ export default function JsmFormDialog({
   return (
     <div
       ref={rootRef}
+      data-enter-skip="true"
       className="jsmf-form"
       style={{
         position: 'relative',

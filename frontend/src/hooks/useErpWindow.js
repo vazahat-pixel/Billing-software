@@ -1,7 +1,13 @@
 ﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import useWindowDockStore, { yieldOtherWindows } from '../store/useWindowDockStore';
 
-const TOP_CHROME = 76;
+// Header (company row + menu bar). The quick toolbar now sits in a left sidebar of width --erp-rail-w.
+const TOP_CHROME = 66;
+const railWidth = () => {
+  if (typeof window === 'undefined') return 0;
+  const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--erp-rail-w'));
+  return Number.isFinite(v) ? v : 0;
+};
 const MIN_W = 320;
 const MIN_H = 240;
 let windowZ = 1200;
@@ -27,7 +33,8 @@ export function minimizeErpWindow(windowId) {
 
 const floatingSize = (initialSize) => {
   if (typeof window === 'undefined') return { w: initialSize?.w || 1100, h: initialSize?.h || 640 };
-  const maxW = Math.max(320, window.innerWidth - 24);
+  const work = window.innerWidth - railWidth();
+  const maxW = Math.max(320, work - 24);
   const maxH = Math.max(280, window.innerHeight - TOP_CHROME - 28);
   if (initialSize?.w && initialSize?.h) {
     return { w: Math.min(maxW, initialSize.w), h: Math.min(maxH, initialSize.h) };
@@ -35,15 +42,16 @@ const floatingSize = (initialSize) => {
   // Bill windows grow with the screen (the Sales/Purchase grids need ~1500px) instead of sitting at a
   // fixed 1180x660 in the middle of a big monitor; small screens keep the old size.
   return {
-    w: Math.min(maxW, Math.max(1180, Math.round(window.innerWidth * 0.9))),
+    w: Math.min(maxW, Math.max(1180, Math.round(work * 0.92))),
     h: Math.min(maxH, Math.max(660, Math.min(820, maxH))),
   };
 };
 
 const floatingPos = (box) => {
   if (typeof window === 'undefined') return { x: 24, y: TOP_CHROME };
+  const rail = railWidth();
   return {
-    x: Math.max(8, Math.round((window.innerWidth - box.w) / 2)),
+    x: Math.max(rail + 8, Math.round(rail + (window.innerWidth - rail - box.w) / 2)),
     y: TOP_CHROME,
   };
 };

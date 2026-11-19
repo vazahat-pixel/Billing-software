@@ -118,10 +118,21 @@ function supplyReport(spec) {
       src.loadReturnRegisterRows(companyId, spec.returnType),
       noteRows(companyId, spec.noteType),
     ]);
+    // JSM's ALL_OUTWARD_SUPPLY_SALES_MAIN / ALL_INWARD_SUPPLY_PURCHASE_MAIN take a return (SLR / PUR) and
+    // the note that cuts the supply (Credit Note on sales, Debit Note on purchase) as MINUS figures, so
+    // the totals are the net supply GSTR-3B reports. They were added here as plus figures.
+    const minus = (r) => ({
+      ...r,
+      BILL_AMT: -Math.abs(r.BILL_AMT || 0),
+      TAXABLE_AMT: -Math.abs(r.TAXABLE_AMT || 0),
+      SGST_AMT: -Math.abs(r.SGST_AMT || 0),
+      CGST_AMT: -Math.abs(r.CGST_AMT || 0),
+      IGST_AMT: -Math.abs(r.IGST_AMT || 0),
+    });
     return [
       ...bills.map((r) => supplyRow(r, 'BILL')),
-      ...returns.map((r) => supplyRow(r, spec.returnLabel, spec.returnLabel)),
-      ...notes,
+      ...returns.map((r) => minus(supplyRow(r, spec.returnLabel, spec.returnLabel))),
+      ...notes.map(minus),
     ];
   }
 

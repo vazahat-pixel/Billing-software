@@ -22,22 +22,23 @@
  * Only A-Current (not provisional) is wired; "Provisional" and "Net Sales %"/"Show %" toggles are
  * cosmetic additions with no captured ground truth yet.
  */
-const financialReportsService = require('../../financialReportsService');
+const { jsmProfitAndLoss } = require('../finalAccounts');
 
 const round2 = (n) => Number(Number(n || 0).toFixed(2));
 
-function detailLines(items, pick) {
-  return items.map((b) => ({ type: 'detail', label: b.ledger.name, value: round2(pick(b)) }));
+function detailLines(items) {
+  return items.map((r) => ({ type: 'detail', label: r.ledger.name, value: round2(r.amount) }));
 }
 
 async function run(companyId, p = {}) {
   const asOn = p.to || p.from;
-  const pl = await financialReportsService.profitAndLoss(companyId, { from: p.from, to: asOn });
+  // JSM's figures: period movement + the P&L heads' opening (OPENING STOCK), Trading = Direct/Trading heads
+  const pl = await jsmProfitAndLoss(companyId, { from: p.from, to: asOn });
   const closingStock = Number(p.closingStock || 0);
 
   // Trading Account
-  const tradeExp = detailLines(pl.directExpense, (b) => b.balance);
-  const tradeInc = detailLines(pl.directIncome, (b) => b.balance);
+  const tradeExp = detailLines(pl.tradingExpense);
+  const tradeInc = detailLines(pl.tradingIncome);
   if (closingStock > 0.001) tradeInc.push({ type: 'detail', label: 'CLOSING STOCK', value: round2(closingStock) });
 
   const tradeExpTotal = round2(tradeExp.reduce((s, l) => s + l.value, 0));
@@ -61,8 +62,8 @@ async function run(companyId, p = {}) {
   if (grossSide === 'left') left1.push({ type: 'detail', label: 'GROSS PROFIT', value: round2(Math.abs(gross)) });
 
   // Profit & Loss Account — opens with the Gross figure carried down.
-  const plExp = detailLines(pl.indirectExpense, (b) => b.balance);
-  const plInc = detailLines(pl.indirectIncome, (b) => b.balance);
+  const plExp = detailLines(pl.otherExpense);
+  const plInc = detailLines(pl.otherIncome);
   const left2 = [{ type: 'header', label: 'PROFIT & LOSS ACCOUNT' }];
   const right2 = [{ type: 'header', label: '' }];
   if (grossSide === 'right') left2.push({ type: 'detail', label: 'GROSS LOSS', value: round2(Math.abs(gross)) });
@@ -73,7 +74,7 @@ async function run(companyId, p = {}) {
   const plExpSubtotal = round2(left2.filter((l) => l.type === 'detail').reduce((s, l) => s + l.value, 0));
   const plIncSubtotal = round2(right2.filter((l) => l.type === 'detail').reduce((s, l) => s + l.value, 0));
   right2.push({ type: 'total', label: 'TOTAL.', value: plIncSubtotal });
-  const netProfit = pl.netProfit;
+  const netProfit = round2(pl.netProfit + closingStock);
   if (netProfit < 0) right2.push({ type: 'detail', label: 'NET LOSS', value: round2(Math.abs(netProfit)) });
   else left2.push({ type: 'detail', label: 'NET PROFIT', value: round2(netProfit) });
   // Both sides foot to the same figure by construction (standard double-entry T-account close),

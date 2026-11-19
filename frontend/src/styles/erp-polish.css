@@ -122,3 +122,105 @@
 .classic-erp-window.erp-sales-bill-compact .classic-erp-label[class*='red'] {
   color: #8b0000 !important;
 }
+
+/* ── Quick toolbar as a left sidebar (1 Sales, 2 Pur, ...) ─────────────────────────────────────
+   Same black JSM strip, stood on its side. Its width is published as --erp-rail-w by the shell,
+   and the window rules below keep every bill / report window to the right of it. */
+.erp-jsm-toolbar.erp-jsm-toolbar--side {
+  flex-direction: column;
+  align-items: stretch;
+  width: var(--erp-rail-w, 96px);
+  flex: 0 0 var(--erp-rail-w, 96px);
+  height: auto;
+  padding: 6px 0 28px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  position: relative;
+  z-index: 4000;
+}
+.erp-jsm-toolbar--side .erp-jsm-toolbar__user {
+  margin: 0 auto 6px;
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+}
+.erp-jsm-toolbar--side .erp-jsm-toolbar__btn {
+  height: 30px;
+  min-height: 30px;
+  width: 100%;
+  padding: 0 10px;
+  text-align: left;
+  font-size: 13px;
+  border-right: 0;
+  border-bottom: 1px solid #333;
+}
+.erp-jsm-toolbar--side .erp-jsm-toolbar__btn--small {
+  height: 24px;
+  min-height: 24px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+.erp-jsm-toolbar--side .erp-jsm-toolbar__btn:hover,
+.erp-jsm-toolbar--side .erp-jsm-toolbar__btn:focus-visible,
+.erp-jsm-toolbar--side .erp-jsm-toolbar__btn--active {
+  color: #fff;
+}
+.erp-jsm-toolbar--side .erp-jsm-toolbar__sep {
+  display: block;
+  height: 0;
+  margin: 6px 8px;
+  border-top: 2px solid #fff;
+}
+
+/* Windows open below the header (now 66px: company row + menu bar) and right of the sidebar. */
+.erp-bill-window--max {
+  top: 66px !important;
+  left: var(--erp-rail-w, 0px) !important;
+}
+.cash-bank-window.erp-bill-window--floating,
+.job-book-window.erp-bill-window--floating {
+  top: 66px !important;
+  left: calc(var(--erp-rail-w, 0px) + (100vw - var(--erp-rail-w, 0px)) / 2) !important;
+}
+.cash-bank-window.erp-bill-window--floating {
+  width: min(1140px, calc(100vw - var(--erp-rail-w, 0px) - 40px)) !important;
+}
+.job-book-window.erp-bill-window--floating {
+  width: min(1880px, calc(100vw - var(--erp-rail-w, 0px) - 24px)) !important;
+}
+.erp-modal-safe {
+  padding: 66px 10px 36px calc(var(--erp-rail-w, 0px) + 10px) !important;
+}
+
+/* Keyboard cursor in the menu bar: the focused entry looks like the hovered one. */
+.erp-menu-trigger:focus-visible,
+.erp-menu-trigger:focus {
+  outline: none;
+  background: var(--accent-light);
+  color: var(--accent);
+}
+.erp-menu-item:focus,
+.erp-menu-item:focus-visible {
+  outline: none;
+  background: var(--accent-light);
+  color: var(--accent);
+}
+.erp-menu-dropdown--jsm .erp-menu-item:focus,
+.erp-menu-dropdown--jsm .erp-menu-item:focus-visible {
+  background: #cce8ff !important;
+  color: #000 !important;
+  box-shadow: inset 0 0 0 1px #99d1ff;
+}
+
+/* Keyboard cursor on a window's button row (New, Save, Find, Exit ...): a clear JSM-style focus box,
+   so it is obvious which button Enter will press and where Left / Right move to. */
+.classic-erp-btn:focus-visible,
+.classic-erp-btn:focus,
+.mill-rec-btn:focus,
+.jsmg-button:focus {
+  outline: 2px solid #0078d7 !important;
+  outline-offset: -2px;
+  box-shadow: 0 0 0 2px rgba(0, 120, 215, 0.25) !important;
+}
+.jsmg-window:focus { outline: none; }

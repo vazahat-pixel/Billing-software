@@ -114,7 +114,70 @@ async function loadTdsBook(companyId) {
       TDS_AMT: round(j.receiveTdsAmount), NCBILL_NO: j.billGpNo || '', SP_TYPE: j.workKind === 'Job' ? 'Job Receipt' : 'Mill Receipt',
     }));
   }
+  for (const j of receipts) covered.add(String(j._id));
+  out.push(...await ledgerTdsRows(companyId, base, covered));
   return out.map((r, i) => ({ ...r, ENT_NO: i + 1, SRAL_NO: i + 1 }));
+}
+
+/**
+ * TDS deducted as the books record it: a voucher that credits a TDS ledger ("TDS ACCOUNT", "TDS ON
+ * JOBWORK", ...) against a party's debit — how JSM's mill / job bills and journals carry it, and how an
+ * imported company holds all of its TDS (the JSM TDS book itself is not imported). The TDS head is the
+ * TDS ledger's name, the amount paid is the bill's own charge (its expense lines). A TDS ledger on the
+ * debit side is a payment of TDS to the government, not a deduction, and is left out. Read-only.
+ */
+async function ledgerTdsRows(companyId, base, covered) {
+  const LedgerMaster = require('../../../models/LedgerMaster');
+  const AccountingEntry = require('../../../models/AccountingEntry');
+  const Party = require('../../../models/Party');
+  const Job = require('../../../models/Job');
+  const ledgers = await LedgerMaster.find({ companyId }).select('name group linkedPartyId').lean();
+  const byId = new Map(ledgers.map((l) => [String(l._id), l]));
+  const tdsIds = ledgers.filter((l) => /\btds\b/i.test(l.name || '')).map((l) => l._id);
+  if (!tdsIds.length) return [];
+  const tdsSet = new Set(tdsIds.map(String));
+  const entries = await AccountingEntry.find({
+    companyId, isReversed: { $ne: true }, status: { $ne: 'Reversed' },
+    lines: { $elemMatch: { ledgerId: { $in: tdsIds }, type: 'Cr' } },
+  }).lean();
+  const partyIds = new Set(ledgers.filter((l) => l.linkedPartyId).map((l) => String(l.linkedPartyId)));
+  const parties = new Map((await Party.find({ _id: { $in: [...partyIds] } }).select('name pan').lean()).map((p) => [String(p._id), p]));
+  const jobIds = entries.filter((e) => e.refType === 'JobWorkCharges' && e.refId).map((e) => e.refId);
+  const jobs = new Map((await Job.find({ _id: { $in: jobIds } }).select('processBillNo billGpNo challanNo').lean()).map((j) => [String(j._id), j]));
+
+  const out = [];
+  for (const e of entries) {
+    if (e.refId && covered.has(String(e.refId))) continue;
+    const lines = e.lines || [];
+    const expense = round(lines.reduce((s, ln) => {
+      const l = byId.get(String(ln.ledgerId));
+      if (!l || l.group !== 'Expenses') return s;
+      return s + (ln.type === 'Dr' ? 1 : -1) * Number(ln.amount || 0);
+    }, 0));
+    for (const t of lines.filter((ln) => ln.type === 'Cr' && tdsSet.has(String(ln.ledgerId)))) {
+      const amt = round(t.amount);
+      if (amt <= 0) continue;
+      // the party the TDS was cut from: a party ledger debited with the same amount, else any party ledger
+      const partyLine = lines.find((ln) => ln.type === 'Dr' && byId.get(String(ln.ledgerId))?.linkedPartyId && Math.abs(Number(ln.amount) - amt) < 0.01)
+        || lines.find((ln) => byId.get(String(ln.ledgerId))?.linkedPartyId)
+        // no party account on the voucher (a journal against a loan / other account): name that account
+        || lines.filter((ln) => ln.type === 'Dr' && !tdsSet.has(String(ln.ledgerId)) && byId.get(String(ln.ledgerId))?.group !== 'Expenses')
+          .sort((a, b) => Math.abs(Number(a.amount) - amt) - Math.abs(Number(b.amount) - amt))[0];
+      // only TDS heads on the voucher: a transfer between TDS heads, not a deduction
+      if (!partyLine) continue;
+      const partyLedger = byId.get(String(partyLine.ledgerId));
+      const party = partyLedger ? parties.get(String(partyLedger.linkedPartyId)) : null;
+      const job = e.refId ? jobs.get(String(e.refId)) : null;
+      out.push(tdsRow(base, {
+        ENT_NO: 0, ENT_DATE: e.entryDate, TDSHEAD: byId.get(String(t.ledgerId))?.name || 'TDS ACCOUNT',
+        PARTY: party?.name || partyLedger?.name || '', PANNO: party?.pan || '',
+        AMOUNT: expense > 0 ? expense : 0, TDS_PER: expense > 0 ? round((amt / expense) * 100) : 0, TDS_AMT: amt,
+        NCBILL_NO: job?.processBillNo || job?.billGpNo || e.entryNo || '',
+        SP_TYPE: e.refType === 'JobWorkCharges' ? 'Mill / Job Bill' : (e.refType || 'Journal'),
+      }));
+    }
+  }
+  return out;
 }
 
 // JSM's Account / Acc Head tick-lists hold every account, not only the ones that already have TDS

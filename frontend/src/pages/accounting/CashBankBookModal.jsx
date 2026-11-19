@@ -1208,7 +1208,7 @@ const CashBankBookModal = ({
     <>
     <ErpWindowedModal isOpen={isOpen} onClose={onClose} title={windowTitle} windowId={`cashbank-${bookKind}-${initialType || 'Receipt'}`} defaultMode="normal" className="cash-bank-window" bare>
       {({ WindowControls }) => (
-      <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 !max-h-none" data-enter-skip={mode === 'View' ? 'true' : undefined}>
+      <div className="classic-erp-window erp-density flex flex-col h-full min-h-0 !max-h-none" data-enter-skip={mode === 'View' ? 'true' : undefined} data-erp-bill data-erp-mode={mode}>
         <ErpBusyOverlay show={bootLoading} message="Loading cash/bank book…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving voucher…" />
         <div className="classic-erp-header shrink-0">

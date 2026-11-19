@@ -132,7 +132,10 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       return undefined;
     }
     let cancelled = false;
-    setBootLoading(true);
+    // Accounts already in memory (or the offline cache): open at once and refresh them quietly behind.
+    // Only a first open with nothing loaded yet waits behind the "Loading accounts…" cover.
+    const haveParties = (useStore.getState().parties || []).length > 0;
+    setBootLoading(!haveParties);
     Promise.all([
       Promise.resolve(fetchParties()),
       fetchSubMasters ? Promise.resolve(fetchSubMasters('City')) : Promise.resolve(),

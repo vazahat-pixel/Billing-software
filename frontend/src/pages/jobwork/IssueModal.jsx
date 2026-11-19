@@ -1049,7 +1049,7 @@ const IssueModal = ({ isOpen, onClose, selectedBook = null, initialData = null }
         bare
       >
         {({ WindowControls }) => (
-          <div className="classic-erp-window erp-density erp-job-issue-window erp-mill-issue-window flex flex-col h-full min-h-0 !max-h-none" data-enter-skip={mode === 'View' ? 'true' : undefined}>
+          <div className="classic-erp-window erp-density erp-job-issue-window erp-mill-issue-window flex flex-col h-full min-h-0 !max-h-none" data-enter-skip={mode === 'View' ? 'true' : undefined} data-erp-bill data-erp-mode={mode}>
             <ErpBusyOverlay show={bootLoading} message="Loading mill issue…" />
             <ErpBusyOverlay show={!bootLoading && saving} message="Saving mill issue…" />
 

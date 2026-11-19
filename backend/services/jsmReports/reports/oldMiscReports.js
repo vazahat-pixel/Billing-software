@@ -186,12 +186,11 @@ async function runListPrintOld(companyId, p = {}, deps = {}) {
     const Party = require('../../../models/Party');
     require('../../../models/AccountGroup');
     parties = await Party.find({ companyId, isDeleted: { $ne: true } })
-      .populate('accountGroupId', 'name')
       .populate('brokerId', 'name')
       .lean();
   }
   const rows = parties.map((pt) => ({
-    GROUP_NAME: mode === 5 ? (pt.brokerId?.name || '') : (mode === 6 ? (pt.transport || '') : (pt.accountGroupId?.name || pt.type || '')),
+    GROUP_NAME: mode === 5 ? (pt.brokerId?.name || '') : (mode === 6 ? (pt.transport || '') : (pt.group || pt.type || '')),
     NAME: pt.name || '',
     CITY: pt.city || pt.station || '',
     ADDRESS: [pt.address, pt.address2].filter(Boolean).join(', '),

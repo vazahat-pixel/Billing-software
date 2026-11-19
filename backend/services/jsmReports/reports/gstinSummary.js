@@ -162,7 +162,7 @@ async function runPurchaseSummary(companyId, p = {}, deps = {}) {
 }
 
 async function runReceiptGstSummary(companyId, p = {}, deps = {}, kind = 'Mill') {
-  const raw = deps.receipts || await mrSrc.loadMillReceiptRows(companyId, kind);
+  const raw = deps.receipts || await mrSrc.loadReceiptGstRows(companyId, kind);
   let rows = inDateRange(raw, 'BILL_DATE', p.from, p.to).map((r) => ({
     BOOK: r.BOOK || (kind === 'Job' ? 'JOB WORK' : 'PROCESS RECEIPT'),
     BILL_DATE: r.BILL_DATE,
@@ -279,7 +279,7 @@ const sideOptions = (load, withDelivery) => async (companyId) => {
 };
 
 const receiptOptions = (kind) => async (companyId) => {
-  const rows = await mrSrc.loadMillReceiptRows(companyId, kind);
+  const rows = await mrSrc.loadReceiptGstRows(companyId, kind);
   const parties = [...new Set(rows.map((r) => r.PARTY || r.MILL_NAME).filter(Boolean))].sort();
   return {
     books: [...new Set(rows.map((r) => r.BOOK || (kind === 'Job' ? 'JOB WORK' : 'PROCESS RECEIPT')))].sort(),

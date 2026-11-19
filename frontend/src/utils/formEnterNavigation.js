@@ -382,7 +382,11 @@ export function moveAlongButtonRow(e) {
     return Math.abs(r.top + r.height / 2 - midY) <= Math.max(6, box.height / 2);
   }).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
   const idx = row.indexOf(target);
-  const next = idx < 0 ? null : row[idx + (e.key === 'ArrowRight' ? 1 : -1)];
+  if (idx < 0) return false;
+  const nextIdx = e.key === 'ArrowRight'
+    ? (idx + 1) % row.length
+    : (idx - 1 + row.length) % row.length;
+  const next = row[nextIdx];
   if (!next) return false;
   e.preventDefault();
   e.stopPropagation();

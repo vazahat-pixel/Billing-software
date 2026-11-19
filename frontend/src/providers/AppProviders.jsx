@@ -8,6 +8,7 @@ import useConfigStore from '../store/useConfigStore';
 import useStore from '../store/useStore';
 import useUiStore from '../store/useUiStore';
 import { useFormEnterNavigation } from '../hooks/useFormEnterNavigation';
+import { useBillNewButtonFocus } from '../hooks/useBillNewButtonFocus';
 import { installBrowserDialogGuard } from '../utils/browserDialogGuard';
 import { stage6Api } from '../api/stage6.api';
 import { consumeSupportSession } from '../utils/supportSession';
@@ -28,6 +29,7 @@ export function AppProviders({ children }) {
   const [bootDone, setBootDone] = useState(false);
 
   useFormEnterNavigation(!commandPaletteOpen); // Enter, Shift+Tab → footer
+  useBillNewButtonFocus(Boolean(token)); // bill windows open with the cursor on New (JSM)
 
   useEffect(() => {
     installBrowserDialogGuard();

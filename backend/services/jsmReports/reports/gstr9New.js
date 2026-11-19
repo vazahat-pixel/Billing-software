@@ -53,7 +53,7 @@ async function run(companyId, p = {}, deps = {}) {
     deps.purchases || src.loadPurchaseRegisterRows(companyId),
     deps.salesRtn || src.loadReturnRegisterRows(companyId, 'Sales'),
     deps.purchaseRtn || src.loadReturnRegisterRows(companyId, 'Purchase'),
-    deps.mill || mrSrc.loadMillReceiptRows(companyId),
+    deps.mill || mrSrc.loadReceiptGstRows(companyId, 'Mill'),
     deps.job || mrSrc.loadJobReceiptRows(companyId),
   ]);
   const w = (xs) => inDateRange(xs, 'BILL_DATE', p.from, p.to);

@@ -77,8 +77,9 @@ async function run(companyId, p = {}) {
 }
 
 async function options(companyId) {
-  const tb = await financialReportsService.groupedTrialBalance(companyId, { withZeroBalance: true });
-  return { accounts: tb.groups.flatMap((g) => g.lines.map((l) => l.name)).sort((a, b) => a.localeCompare(b)) };
+  const LedgerMaster = require('../../../models/LedgerMaster');
+  const ledgers = await LedgerMaster.find({ companyId, isActive: { $ne: false } }).select('name').lean();
+  return { accounts: [...new Set(ledgers.map((l) => l.name).filter(Boolean))].sort((a, b) => a.localeCompare(b)) };
 }
 
 module.exports = { run, options };

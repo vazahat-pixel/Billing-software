@@ -1611,7 +1611,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
         className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-card)] erp-bill-window-shell relative"
         onPointerDown={win.onShellPointerDown}
       >
-      <div className="classic-erp-window erp-density erp-sales-bill-compact flex flex-col flex-1 min-h-0 overflow-hidden !max-h-none !h-auto" data-enter-skip={mode === 'View' ? 'true' : undefined}>
+      <div className="classic-erp-window erp-density erp-sales-bill-compact flex flex-col flex-1 min-h-0 overflow-hidden !max-h-none !h-auto" data-enter-skip={mode === 'View' ? 'true' : undefined} data-erp-bill data-erp-mode={mode}>
         <ErpBusyOverlay show={bootLoading} message="Loading sales bill…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving invoice…" />
         {/* Title Bar */}

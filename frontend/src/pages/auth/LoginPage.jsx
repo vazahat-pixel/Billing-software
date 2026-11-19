@@ -345,10 +345,7 @@ const LoginPage = () => {
                     </div>
 
                     {/* Bottom Navigation Links */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-3 mt-2 border-t border-slate-100 text-[11px] text-slate-500">
-                        <Link to="/portal" className="text-slate-500 hover:text-[#0066FF] font-semibold transition-colors">
-                            ← Panel Selection
-                        </Link>
+                    <div className="flex flex-wrap items-center justify-end gap-2 pt-3 mt-2 border-t border-slate-100 text-[11px] text-slate-500">
                         <div className="flex items-center gap-3">
                             <Link to="/landing" className="hover:text-[#0066FF] font-semibold transition-colors">
                                 Software Info

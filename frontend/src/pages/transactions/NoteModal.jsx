@@ -466,7 +466,7 @@ const NoteModal = ({ isOpen, onClose, initialType = 'Credit', initialSide = 'Sal
     <>
       <ErpWindowedModal isOpen={isOpen} onClose={onClose} title={title} windowId={`note-${noteSide}-${noteType}`} defaultMode="maximized" bare>
         {({ WindowControls }) => (
-          <div className="classic-erp-window note-window flex flex-col h-full min-h-0 !max-h-none">
+          <div className="classic-erp-window note-window flex flex-col h-full min-h-0 !max-h-none" data-erp-bill data-erp-mode={mode}>
             <ErpBusyOverlay show={bootLoading} message="Loading masters…" />
             <ErpBusyOverlay show={!bootLoading && saving} message="Saving note…" />
             

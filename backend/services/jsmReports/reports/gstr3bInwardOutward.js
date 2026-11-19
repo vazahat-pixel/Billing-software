@@ -67,7 +67,7 @@ function toBillRow(b, entType, head, sign = 1) {
 
 async function loadJobRows(companyId) {
   const [mill, job] = await Promise.all([
-    mrSrc.loadMillReceiptRows(companyId),
+    mrSrc.loadReceiptGstRows(companyId, 'Mill'),
     mrSrc.loadJobReceiptRows(companyId),
   ]);
   const mapJob = (r, book, entType) => {

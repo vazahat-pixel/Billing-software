@@ -53,6 +53,10 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
     setError('');
     setState(config.defaults(financialYear()));
     loadBlueprint().then((bp) => live && setBlueprint(bp));
+    // Pre-populate empty arrays for all declared lists immediately so no blank gray boxes appear while loading
+    const initialLists = {};
+    for (const lv of Object.keys(config.lists || {})) initialLists[lv] = [];
+    setLists(initialLists);
     jsmReportApi.options(apiForm)
       .then((opts) => {
         if (!live) return;

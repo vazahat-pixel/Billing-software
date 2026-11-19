@@ -1,9 +1,6 @@
 import { Navigate } from 'react-router-dom';
-import { isOffline } from '../../utils/offlineHelpers';
 
-/** Unknown routes: offline → login, online → portal */
-const FallbackRedirect = () => (
-  <Navigate to={isOffline() ? '/login' : '/portal'} replace />
-);
+/** Unknown routes go to the ERP login. The admin panel is reached only at /admin/login. */
+const FallbackRedirect = () => <Navigate to="/login" replace />;
 
 export default FallbackRedirect;

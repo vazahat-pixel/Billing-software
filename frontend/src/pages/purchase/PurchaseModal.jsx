@@ -1719,7 +1719,7 @@ const PurchaseModal = ({
           className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-card)] erp-bill-window-shell relative"
           onPointerDown={win.onShellPointerDown}
         >
-          <div className="classic-erp-window erp-density erp-sales-bill-compact flex flex-col flex-1 min-h-0 overflow-hidden !max-h-none !h-auto">
+          <div className="classic-erp-window erp-density erp-sales-bill-compact flex flex-col flex-1 min-h-0 overflow-hidden !max-h-none !h-auto" data-erp-bill data-erp-mode={mode}>
             <ErpBusyOverlay show={bootLoading} message="Loading purchase bill…" />
             <ErpBusyOverlay show={!bootLoading && saving} message="Saving purchase…" />
             <div className="classic-erp-header shrink-0">

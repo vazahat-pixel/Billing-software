@@ -136,7 +136,8 @@ async function runGstr3bMonthly(companyId, p = {}, deps = {}, isExcelMode = fals
 }
 
 async function runBrokregZoomColumn(companyId, p = {}, deps = {}) {
-  const res = await brokStmt.run(companyId, { ...p, side: 'Sales', dateField: p.dateMode === 'RecDate' ? 'REC_DATE' : 'BILL_DATE' }, deps);
+  const statement = p.dateMode === 'RecDate' ? brokStmt.salesRecDate : brokStmt.salesBillDate;
+  const res = await statement.run(companyId, { ...p, side: 'Sales', dateField: p.dateMode === 'RecDate' ? 'REC_DATE' : 'BILL_DATE' }, deps);
   return {
     rows: res.rows,
     grid: {

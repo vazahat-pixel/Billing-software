@@ -57,7 +57,7 @@ async function run(companyId, p = {}, deps = {}) {
 
   // No file uploaded yet: list recent Sales invoices for offline E-Way generation preview
   const docs = deps.sales || await Sales.find({ companyId, status: { $ne: 'cancelled' } })
-    .populate('partyId', 'name gstin state')
+    .populate('customerId', 'name gstin state')
     .sort({ date: -1 })
     .limit(200)
     .lean();
@@ -67,7 +67,7 @@ async function run(companyId, p = {}, deps = {}) {
     SUPPLY_TYPE: 'Outward',
     DOC_NO: s.invoiceNo || '',
     DOC_DATE: s.date || null,
-    PARTY_GSTIN: s.partyId?.gstin || '',
+    PARTY_GSTIN: s.customerId?.gstin || '',
     VEHICLE_NO: s.transport || '',
     EWB_NO: s.eway || '',
     EWB_DATE: '',

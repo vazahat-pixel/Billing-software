@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import useStore from '../../store/useStore';
-import { isOffline } from '../../utils/offlineHelpers';
 import { hasPendingSupportSession } from '../../utils/supportSession';
 
 /**
@@ -52,10 +51,8 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     if (location.pathname.startsWith('/admin')) {
       return <Navigate to="/admin/login" state={{ from: location }} replace />;
     }
-    if (isOffline()) {
-      return <Navigate to="/login" state={{ from: location }} replace />;
-    }
-    return <Navigate to="/portal" state={{ from: location }} replace />;
+    // ERP users land on the ERP login only; the admin panel has its own address (/admin/login).
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // Session hydrate runs in AppProviders / AuthBootstrap (outside this gate)
@@ -81,7 +78,7 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
       if (isAdminRoute) {
         return <Navigate to="/admin/login" replace />;
       }
-      return <Navigate to="/portal" replace />;
+      return <Navigate to="/login" replace />;
     }
   }
 
