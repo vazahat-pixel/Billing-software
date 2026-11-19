@@ -1,11 +1,17 @@
-version: 1.0.14
+version: 1.0.15
 files:
-  - url: TextileERP-Setup-1.0.14.exe
+  - url: TextileERP-Setup-1.0.15.exe
     sha512: KyL0AatA6z/cyy+8gUnO17vaq8l9+i4TBj93WTLArrUMGPCWvnfvS92HHgL9Ydkxa5+mtUKQPwGmj2xTdnwvJA==
     size: 90172996
-path: TextileERP-Setup-1.0.14.exe
+path: TextileERP-Setup-1.0.15.exe
 sha512: KyL0AatA6z/cyy+8gUnO17vaq8l9+i4TBj93WTLArrUMGPCWvnfvS92HHgL9Ydkxa5+mtUKQPwGmj2xTdnwvJA==
 releaseNotes: |
+  - v1.0.15: 100% Mouse-Free ERP Keyboard Navigation & JSM Report Account Lists:
+    - Transaction Modals (Sales, Purchase, Return, Notes, Job Work, Cash/Bank): Cursor auto-lands on "New" button on open; Enter starts new entry and moves cursor to first field; ArrowLeft/ArrowRight cycles action bar buttons (New, Edit, Delete, Print, Exit) with circular wrap-around.
+    - Seamless Enter-key traversal across header fields, item table rows, and footer; Shift+Enter and Up Arrow navigate backwards.
+    - ERPCombobox automatically advances focus to next column on selection.
+    - JSM Reports: Fixed Balance Sheet, Trial Balance, and Group Balance empty/grey account list; replaced heavy calculation with instant indexed LedgerMaster lookup (~200ms); Enter chain, Spacebar checkbox toggle, and letter-jump in tick-lists.
+    - Fixed broker auto-fill & transport/station wiring for imported bills.
   - v1.0.14: Fixed offline restart error (graceful fallback to cloud mode, prevents mongod code 62 crash loop), instant entry and sales/purchase loading with Stale-While-Revalidate caching, optimized query execution.
   - Gst Reports: new "Gstr-2 Report" folder exactly as in JSM — Gstr2 All Inward, Gstr2 Error Checking and Gstr2 Excel Format (B2B, B2BUR, CDNR, CDNUR, EXEMP, HSN, RETURN grids and GSTR-2 Excel download). "E-Way Excel Upload" added; entries JSM hides (3B Form - Monthly Excel, Hsn Wise Reports) no longer show.
   - Party / Broker / Station / Book tick-lists now fill on every report screen: Sales and Purchase Summary, ItemDetail, all Return registers, Outstanding (Sales, Purchase, Process, Jobwork, All Purchase), GSTIN registers, Supply registers, 3B Inward/Outward, E-Way register, Sales Challan, Purchase Stock, Slip Detail, Brokerage, Receipt/Payment registers, GSTIN Journal and Expense.
