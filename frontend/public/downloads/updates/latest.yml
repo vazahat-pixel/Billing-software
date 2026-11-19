@@ -1,10 +1,10 @@
 version: 1.0.15
 files:
   - url: TextileERP-Setup-1.0.15.exe
-    sha512: KyL0AatA6z/cyy+8gUnO17vaq8l9+i4TBj93WTLArrUMGPCWvnfvS92HHgL9Ydkxa5+mtUKQPwGmj2xTdnwvJA==
-    size: 90172996
+    sha512: IG+QPVpqbf9rJclxMiGeacvGD/E/hfGMSQ/f+km2a/OY8NXUfB6HSkmrFKvIP4sDL+dOgWd3CXl7DhZuBxk9Kw==
+    size: 90179339
 path: TextileERP-Setup-1.0.15.exe
-sha512: KyL0AatA6z/cyy+8gUnO17vaq8l9+i4TBj93WTLArrUMGPCWvnfvS92HHgL9Ydkxa5+mtUKQPwGmj2xTdnwvJA==
+sha512: IG+QPVpqbf9rJclxMiGeacvGD/E/hfGMSQ/f+km2a/OY8NXUfB6HSkmrFKvIP4sDL+dOgWd3CXl7DhZuBxk9Kw==
 releaseNotes: |
   - v1.0.15: 100% Mouse-Free ERP Keyboard Navigation & JSM Report Account Lists:
     - Transaction Modals (Sales, Purchase, Return, Notes, Job Work, Cash/Bank): Cursor auto-lands on "New" button on open; Enter starts new entry and moves cursor to first field; ArrowLeft/ArrowRight cycles action bar buttons (New, Edit, Delete, Print, Exit) with circular wrap-around.
@@ -20,4 +20,4 @@ releaseNotes: |
   - E-Way Bill bulk JSON matches the file JSM writes; the grid shows one row per bill.
   - Stock Mts Reports and Stock Mts Reports (Kgs) print JSM's single statement (Grey, Mill Grey, Mill Rf, Finish).
   - TDS / TCS reports, Tds Address/Acknowledge, Import Bank, Check Diff Os/Ledger and Cash/Bank screens on JSM's own forms.
-releaseDate: '2026-11-14T08:13:38.165Z'
+releaseDate: '2026-11-19T11:22:44.843Z'
