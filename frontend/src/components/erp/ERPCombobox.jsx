@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, Plus } from 'lucide-react';
 import { highlightMatch } from '../../utils/highlightMatch';
 import { getRecent, pushRecent } from '../../hooks/useRecentSelections';
-import { focusNextField } from '../../utils/formEnterNavigation';
+import { focusNextField, focusPrevField } from '../../utils/formEnterNavigation';
 
 /**
  * Enterprise searchable combobox — replaces native <select> in billing forms.
@@ -196,6 +196,23 @@ export default function ERPCombobox({
       }
       setActiveIdx((i) => Math.max(i - 1, 0));
       return;
+    }
+
+    // Left at the start of the box (nothing typed, or all of it selected) goes back to the previous cell
+    // even while the list is open — JSM's grid behaviour. With the list open, the global arrow keys skip
+    // this box, so without this the cursor could not get back out to the left.
+    if (e.key === 'ArrowLeft' && open && !e.shiftKey) {
+      const el = e.target;
+      const len = String(el.value ?? '').length;
+      const atStart = !query || (el.selectionStart === 0 && (el.selectionEnd === 0 || el.selectionEnd === len));
+      if (atStart) {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+        setQuery('');
+        focusPrevField(el);
+        return;
+      }
     }
 
     if (e.key === 'Escape') {

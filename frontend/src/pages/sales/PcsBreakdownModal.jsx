@@ -209,7 +209,8 @@ export default function PcsBreakdownModal({
     if (e.key !== 'Enter') return;
     e.preventDefault();
     e.stopPropagation();
-    const order = ['pcs', 'qtyBndl', 'remark'];
+    // Pcs -> Qty -> next line's Pcs (JSM). Remark is reached with the arrows / mouse, not on every Enter.
+    const order = field === 'remark' ? ['remark'] : ['pcs', 'qtyBndl'];
     const i = order.indexOf(field);
     if (i < order.length - 1) {
       document.getElementById(`pcs-${idx}-${order[i + 1]}`)?.focus();

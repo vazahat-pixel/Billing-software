@@ -435,6 +435,22 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     dis2: true,
     addAmt: true,
   };
+  // T.Sales = this financial year's sales (1 April - 31 March of the bill being shown), cancelled bills left
+  // out — the same total the Sales register / P&L show. It summed every bill in memory before: all years,
+  // the old outstanding bills brought in by the JSM import, and cancelled ones too.
+  const yearSalesTotal = useMemo(() => {
+    const d = header?.date ? new Date(header.date) : new Date();
+    const base = Number.isNaN(d.getTime()) ? new Date() : d;
+    const y = base.getMonth() >= 3 ? base.getFullYear() : base.getFullYear() - 1;
+    const from = new Date(y, 3, 1).getTime();
+    const to = new Date(y + 1, 2, 31, 23, 59, 59).getTime();
+    return (sales || []).reduce((sum, s) => {
+      if (/cancel/i.test(String(s.status || ''))) return sum;
+      const t = new Date(s.date || s.invoiceDate || 0).getTime();
+      return t >= from && t <= to ? sum + Number(s.netAmount || 0) : sum;
+    }, 0);
+  }, [sales, header?.date]);
+
   const [salesCols, setSalesCols] = useState(() => {
     try {
       const saved = localStorage.getItem('erp_sales_grid_cols');
@@ -1630,7 +1646,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             )}
           </span>
           <span className="text-xs font-mono opacity-90 hidden md:inline erp-window-meta">
-            T.Sales: <strong>{sales.reduce((a, s) => a + (s.netAmount || 0), 0).toFixed(0)}</strong>
+            T.Sales: <strong>{yearSalesTotal.toFixed(0)}</strong>
             &nbsp;&nbsp;|
             &nbsp;&nbsp;{new Date().toLocaleDateString('en-IN', { weekday: 'long' })}
           </span>

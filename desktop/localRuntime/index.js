@@ -59,8 +59,10 @@ async function bootLocalStack(ctx) {
 
   let mode = String(cfg.mode || process.env.ERP_DESKTOP_MODE || 'remote').toLowerCase();
 
-  // If user config had localhost/5050 written from an old run, heal it to remote cloud
-  if (cfg.apiBaseUrl && (cfg.apiBaseUrl.includes('127.0.0.1') || cfg.apiBaseUrl.includes('localhost'))) {
+  // If user config had localhost/5050 written from an old standalone run, heal it to remote cloud.
+  // Not in hybrid (offline) mode: hybrid itself writes its local 127.0.0.1 API address here on every
+  // start, so healing it threw every offline desktop back to cloud-only from its second start on.
+  if (mode !== 'hybrid' && cfg.apiBaseUrl && (cfg.apiBaseUrl.includes('127.0.0.1') || cfg.apiBaseUrl.includes('localhost'))) {
     console.log('[localRuntime] Healing legacy local 5050 config to live cloud API');
     mode = 'remote';
   }

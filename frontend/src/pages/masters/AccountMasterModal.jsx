@@ -102,7 +102,9 @@ const EMPTY_ACCOUNT = {
 const emptyBankRow = () => ({ name: '', accountNo: '', ifsc: '' });
 
 const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null, readOnly = false, initialTab = 'Account', prefillBankName = '' }) => {
-  const { addParty, updateParty, deleteParty, parties, fetchParties, subMasters, fetchSubMasters } = useStore();
+  const { addParty, updateParty, deleteParty, parties, fetchParties, subMasters, fetchSubMasters, addSubMaster } = useStore();
+  // Broker typed in place ("+ Add" beside Broker) when it is not in the master yet
+  const [brokerAdd, setBrokerAdd] = useState(null);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [mode, setMode] = useState('View'); // 'View', 'Add', 'Edit'
   const [selectedPartyId, setSelectedPartyId] = useState('');
@@ -140,6 +142,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       Promise.resolve(fetchParties()),
       fetchSubMasters ? Promise.resolve(fetchSubMasters('City')) : Promise.resolve(),
       fetchSubMasters ? Promise.resolve(fetchSubMasters('AccountGroup')) : Promise.resolve(),
+      fetchSubMasters ? Promise.resolve(fetchSubMasters('Transport')) : Promise.resolve(),
     ])
       .catch(() => {})
       .finally(() => {
@@ -325,6 +328,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
         notifySuccess('Account saved successfully!');
       }
       
+      await Promise.all([ensureMaster('City', formData.city), ensureMaster('Transport', formData.transport)]);
       if (onSuccess) onSuccess(result);
       fetchParties();
       if (onSuccess || mode === 'Add') {
@@ -364,6 +368,44 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
     () => parties.map((p) => ({ value: p._id || p.id, label: `${p.name} (${p.accd || 'No Code'})` })),
     [parties]
   );
+
+  const transportOptions = useMemo(() => {
+    const list = new Set();
+    (subMasters || []).filter((sm) => sm.type === 'Transport').forEach((sm) => { if (sm.name) list.add(sm.name.toUpperCase()); });
+    parties.forEach((p) => { if (p.transport) list.add(String(p.transport).toUpperCase()); });
+    return Array.from(list).sort();
+  }, [subMasters, parties]);
+
+  // A City / Transport typed here that is not in its master yet is added to that master on Save, so it
+  // is offered everywhere next time (no separate trip to Master > Station / Transport).
+  const ensureMaster = async (type, raw) => {
+    const name = String(raw || '').trim().toUpperCase();
+    if (!name || typeof addSubMaster !== 'function') return;
+    const have = (subMasters || []).some((sm) => sm.type === type && String(sm.name || '').trim().toUpperCase() === name);
+    if (have) return;
+    try { await addSubMaster({ type, name }); } catch { /* the account is saved; the master entry can be added later */ }
+  };
+
+  const saveQuickBroker = async () => {
+    const name = String(brokerAdd?.name || '').trim().toUpperCase();
+    if (!name) { setBrokerAdd(null); return; }
+    const existing = parties.find((p) => p.type === 'Broker' && String(p.name || '').trim().toUpperCase() === name);
+    if (existing) {
+      setFormData((prev) => ({ ...prev, brokerId: existing._id || existing.id }));
+      setBrokerAdd(null);
+      return;
+    }
+    try {
+      const created = await addParty({ name, type: 'Broker', group: 'BROKER', status: 'Active' });
+      const id = created?._id || created?.id;
+      if (id) setFormData((prev) => ({ ...prev, brokerId: id }));
+      notifySuccess(`Broker "${name}" added`);
+      setBrokerAdd(null);
+      fetchParties();
+    } catch (err) {
+      notifyError(err, 'Could not add broker');
+    }
+  };
 
   const cityOptions = useMemo(() => {
     const list = new Set(['SURAT', 'AHMEDABAD', 'MUMBAI', 'DELHI', 'JAIPUR', 'KOLKATA', 'LUDHIANA', 'CHENNAI']);
@@ -591,11 +633,43 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                 {L(535, 377, 'Exp.City')}
                 {T(611, 372, 158, 'expCity')}
                 {L(10, 350, 'Broker')}
-                <div style={at(107, 347, 345)}>
-                  <ERPSelect className="classic-erp-select w-full" value={formData.brokerId} onChange={setField('brokerId')} disabled={locked} options={brokerOptions} placeholder="- Direct/No Broker -" recentKey="account-broker" />
-                </div>
+                {brokerAdd ? (
+                  <div style={at(107, 347, 345)} className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      className="classic-erp-input uppercase flex-1"
+                      placeholder="New broker name"
+                      value={brokerAdd.name}
+                      onChange={(e) => setBrokerAdd({ name: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); saveQuickBroker(); }
+                        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setBrokerAdd(null); }
+                      }}
+                    />
+                    <button type="button" className="classic-erp-btn btn-blue" style={{ height: 24, padding: '0 8px' }} onClick={saveQuickBroker}>Save</button>
+                    <button type="button" className="classic-erp-btn" style={{ height: 24, padding: '0 6px' }} onClick={() => setBrokerAdd(null)}>x</button>
+                  </div>
+                ) : (
+                  <>
+                    <div style={at(107, 347, 290)}>
+                      <ERPSelect className="classic-erp-select w-full" value={formData.brokerId} onChange={setField('brokerId')} disabled={locked} options={brokerOptions} placeholder="- Direct/No Broker -" recentKey="account-broker" />
+                    </div>
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      style={{ ...at(401, 347, 51), height: 24 }}
+                      className="classic-erp-btn"
+                      disabled={locked}
+                      title="Add a new broker without leaving this account"
+                      onClick={() => setBrokerAdd({ name: '' })}
+                    >+ Add</button>
+                  </>
+                )}
                 {L(10, 374, 'Transport')}
-                {T(107, 371, 345, 'transport')}
+                {T(107, 371, 345, 'transport', { list: 'transport-options-list', className: 'classic-erp-input uppercase' })}
+                <datalist id="transport-options-list">
+                  {transportOptions.map((t) => <option key={t} value={t} />)}
+                </datalist>
                 {L(11, 407, 'TIN CstNo')}
                 {T(107, 405, 225, 'tinCstNo')}
                 {L(347, 410, 'Hsn Code')}

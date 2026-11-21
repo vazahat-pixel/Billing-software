@@ -1,3 +1,10 @@
+- v1.0.16: Offline mode on by default.
+  - The desktop now keeps the company on this PC and works fully without internet (sale, purchase, mill, job, vouchers, reports); entries upload by themselves when the internet is back. The first start needs internet once to download the company. A PC that was cloud-only switches after its pending entries are uploaded (it asks to restart).
+  - Fixed: offline mode turned itself back to cloud-only from the second start.
+  - Fixed: a bill made offline always got Bill No. 1 (clashed with the cloud and could not upload); it now continues the series.
+  - Account Master: new City / Transport go into their masters on Save; "+ Add" beside Broker adds a broker in place.
+  - Sales: T.Sales shows this financial year's sales (no cancelled or old-year bills).
+  - Item grid: Left arrow on the Unit box goes back to the previous cell. Pcs popup: Pcs -> Qty -> next line's Pcs.
 - v1.0.15: 100% Mouse-Free ERP Keyboard Navigation & JSM Report Account Lists:
   - Transaction Modals (Sales, Purchase, Return, Notes, Job Work, Cash/Bank): Cursor auto-lands on "New" button on open; Enter starts new entry and moves cursor to first field; ArrowLeft/ArrowRight cycles action bar buttons (New, Edit, Delete, Print, Exit) with circular wrap-around.
   - Seamless Enter-key traversal across header fields, item table rows, and footer; Shift+Enter and Up Arrow navigate backwards.
