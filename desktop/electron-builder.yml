@@ -21,6 +21,18 @@ extraResources:
     to: config.json
   - from: config.example.json
     to: config.example.json
+  - from: resources/backend
+    to: backend
+    filter:
+      - '**/*'
+      - '!**/.env*'
+      - '!**/api.js'
+      - '!**/backups/**'
+      - '!**/data/**'
+  - from: vendor/mongodb
+    to: vendor/mongodb
+  - from: vendor/node/node.exe
+    to: vendor/node/node.exe
 asarUnpack:
   - localRuntime/**/*
 win:
