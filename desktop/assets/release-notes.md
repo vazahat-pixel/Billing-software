@@ -1,5 +1,9 @@
 - v1.0.16: Offline mode on by default.
   - The desktop now keeps the company on this PC and works fully without internet (sale, purchase, mill, job, vouchers, reports); entries upload by themselves when the internet is back. The first start needs internet once to download the company. A PC that was cloud-only switches after its pending entries are uploaded (it asks to restart).
+  - When the internet returns, a message shows that data is syncing and when it is safe to shut down the PC.
+  - Use offline mode on one PC only, and keep Setup System > Setting > Desktop-only Entries ON, so that bill numbers never clash with the web.
+  - Account Master: type a City, Broker or Transport that is not in the list and press Enter to save it in its master.
+  - Fixed: offline mode could not start; if it ever cannot, the app now says so and tries again next time.
   - Fixed: offline mode turned itself back to cloud-only from the second start.
   - Fixed: a bill made offline always got Bill No. 1 (clashed with the cloud and could not upload); it now continues the series.
   - Account Master: new City / Transport go into their masters on Save; "+ Add" beside Broker adds a broker in place.

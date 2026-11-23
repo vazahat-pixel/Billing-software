@@ -51,7 +51,9 @@ async function bootLocalStack(ctx) {
   const cfgPath = path.join(userData, 'config.json');
   const desktopCfg = ctx.desktopRoot ? readJson(path.join(ctx.desktopRoot, 'config.json')) : null;
   const exampleCfg = ctx.desktopRoot ? readJson(path.join(ctx.desktopRoot, 'config.example.json')) : null;
-  const cfg = { ...(exampleCfg || {}), ...(desktopCfg || {}), ...(readJson(cfgPath) || {}) };
+  // In the installed app config.json is beside app.asar (resources), not inside it.
+  const shippedCfg = ctx.resourcesPath ? readJson(path.join(ctx.resourcesPath, 'config.json')) : null;
+  const cfg = { ...(exampleCfg || {}), ...(desktopCfg || {}), ...(shippedCfg || {}), ...(readJson(cfgPath) || {}) };
 
   const centralApiBaseUrl = cfg.centralApiBaseUrl
     ? String(cfg.centralApiBaseUrl).replace(/\/$/, '')
