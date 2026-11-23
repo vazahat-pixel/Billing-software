@@ -327,6 +327,9 @@ export function shouldHandleFormNavigation(e) {
 export function handleFormEnterKeyDown(e) {
   if (e.key !== 'Enter') return;
 
+  // The box runs its own Enter (e.g. a new City opens its master window); arrows still navigate as usual.
+  if (e.target?.dataset?.enterOwn === 'true') return;
+
   // Preserve normal multiline newline behavior in textarea unless explicitly configured
   if (e.target?.tagName === 'TEXTAREA' && e.target.dataset?.enterNext !== 'true') {
     return;

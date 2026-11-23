@@ -9,6 +9,7 @@ import { ErpBusyOverlay, SaveButtonLabel } from '../../components/ui/loaders';
 import DataImportModal from '../../components/import/DataImportModal';
 import useConfigStore from '../../store/useConfigStore';
 import { GST_STATE_CODES, stateNameFromCode, stateCodeFromGstin, resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
+import { focusNextField, focusPrevField } from '../../utils/formEnterNavigation';
 
 const MSME_TYPE_OPTIONS = [
   'None',
@@ -103,8 +104,11 @@ const emptyBankRow = () => ({ name: '', accountNo: '', ifsc: '' });
 
 const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = null, readOnly = false, initialTab = 'Account', prefillBankName = '' }) => {
   const { addParty, updateParty, deleteParty, parties, fetchParties, subMasters, fetchSubMasters, addSubMaster } = useStore();
-  // Broker typed in place ("+ Add" beside Broker) when it is not in the master yet
-  const [brokerAdd, setBrokerAdd] = useState(null);
+  // City / Broker / Transport typed here that is not in its master yet: a small master window opens on
+  // Enter (as in JSM) to save it there, then the cursor carries on to the next field.
+  const [quickMaster, setQuickMaster] = useState(null); // { kind: 'City' | 'Broker' | 'Transport', name }
+  const [quickSaving, setQuickSaving] = useState(false);
+  const quickReturnRef = useRef(null);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [mode, setMode] = useState('View'); // 'View', 'Add', 'Edit'
   const [selectedPartyId, setSelectedPartyId] = useState('');
@@ -386,25 +390,69 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
     try { await addSubMaster({ type, name }); } catch { /* the account is saved; the master entry can be added later */ }
   };
 
-  const saveQuickBroker = async () => {
-    const name = String(brokerAdd?.name || '').trim().toUpperCase();
-    if (!name) { setBrokerAdd(null); return; }
-    const existing = parties.find((p) => p.type === 'Broker' && String(p.name || '').trim().toUpperCase() === name);
-    if (existing) {
-      setFormData((prev) => ({ ...prev, brokerId: existing._id || existing.id }));
-      setBrokerAdd(null);
-      return;
-    }
+  const openQuickMaster = (kind, name, returnEl) => {
+    if (locked) return;
+    quickReturnRef.current = returnEl || null;
+    setQuickMaster({ kind, name: String(name || '').trim().toUpperCase() });
+  };
+
+  const closeQuickMaster = (moveOn) => {
+    const el = quickReturnRef.current;
+    quickReturnRef.current = null;
+    setQuickMaster(null);
+    requestAnimationFrame(() => {
+      if (!el || !el.isConnected) return;
+      if (moveOn) focusNextField(el);
+      else el.focus();
+    });
+  };
+
+  const saveQuickMaster = async () => {
+    if (!quickMaster || quickSaving) return;
+    const { kind } = quickMaster;
+    const name = String(quickMaster.name || '').trim().toUpperCase();
+    if (!name) { closeQuickMaster(false); return; }
+    setQuickSaving(true);
     try {
-      const created = await addParty({ name, type: 'Broker', group: 'BROKER', status: 'Active' });
-      const id = created?._id || created?.id;
-      if (id) setFormData((prev) => ({ ...prev, brokerId: id }));
-      notifySuccess(`Broker "${name}" added`);
-      setBrokerAdd(null);
-      fetchParties();
+      if (kind === 'Broker') {
+        const existing = parties.find((p) => p.type === 'Broker' && String(p.name || '').trim().toUpperCase() === name);
+        let id = existing?._id || existing?.id;
+        if (!id) {
+          const created = await addParty({ name, type: 'Broker', group: 'BROKER', status: 'Active' });
+          id = created?._id || created?.id;
+          notifySuccess(`Broker "${name}" saved`);
+          fetchParties();
+        }
+        if (id) setFormData((prev) => ({ ...prev, brokerId: id }));
+      } else {
+        const have = (subMasters || []).some((sm) => sm.type === kind && String(sm.name || '').trim().toUpperCase() === name);
+        if (!have) {
+          await addSubMaster({ type: kind, name });
+          notifySuccess(`${kind} "${name}" saved`);
+        }
+        setFormData((prev) => ({ ...prev, [kind === 'City' ? 'city' : 'transport']: name }));
+      }
+      closeQuickMaster(true);
     } catch (err) {
-      notifyError(err, 'Could not add broker');
+      notifyError(err, `Could not save ${kind.toLowerCase()}`);
+    } finally {
+      setQuickSaving(false);
     }
+  };
+
+  // Enter on City / Transport: a name not in the list opens its master window; otherwise move on as usual.
+  const masterFieldEnter = (kind, options) => (e) => {
+    if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = e.target;
+    if (e.shiftKey) { focusPrevField(el); return; }
+    // read the box after the browser has applied a suggestion picked from its list
+    setTimeout(() => {
+      const name = String(el.value || '').trim().toUpperCase();
+      if (name && !options.includes(name)) openQuickMaster(kind, name, el);
+      else focusNextField(el);
+    }, 0);
   };
 
   const cityOptions = useMemo(() => {
@@ -508,6 +556,48 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       >
         <ErpBusyOverlay show={bootLoading} message="Loading accounts…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving account…" />
+        {quickMaster && (
+          <div
+            data-enter-action="true"
+            data-quick-master={quickMaster.kind}
+            style={{ position: 'fixed', inset: 0, zIndex: 10060, background: 'rgba(15, 23, 42, 0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onMouseDown={(e) => { if (e.target === e.currentTarget) closeQuickMaster(false); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeQuickMaster(false); return; }
+              if (e.key === 'Enter' && !e.target.closest('button')) { e.preventDefault(); e.stopPropagation(); saveQuickMaster(); return; }
+              // keep every other key (F2, F3, arrows…) away from the account form behind
+              e.stopPropagation();
+            }}
+          >
+            <div role="dialog" aria-label={`${quickMaster.kind} Master`} style={{ width: 400, maxWidth: 'calc(100vw - 32px)', background: '#f4f2ea', border: '1px solid #64748b', borderRadius: 6, overflow: 'hidden', boxShadow: '0 18px 40px rgba(15, 23, 42, 0.35)' }}>
+              <div className="classic-erp-header">
+                <span>{quickMaster.kind} Master — New</span>
+                <button type="button" className="classic-erp-close-btn" onClick={() => closeQuickMaster(false)} title="Cancel (Esc)">×</button>
+              </div>
+              <div className="classic-erp-body" style={{ padding: 14 }}>
+                <label className="flex items-center gap-3">
+                  <span className="jsm-am-lbl" style={{ width: 70 }}>{quickMaster.kind === 'City' ? 'City' : 'Name'}</span>
+                  <input
+                    autoFocus
+                    onFocus={(e) => e.target.select()}
+                    className="classic-erp-input uppercase font-bold flex-1"
+                    style={{ height: 24 }}
+                    value={quickMaster.name}
+                    onChange={(e) => setQuickMaster((q) => ({ ...q, name: e.target.value.toUpperCase() }))}
+                    disabled={quickSaving}
+                  />
+                </label>
+                <p style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>
+                  Not in the {quickMaster.kind.toLowerCase()} list yet. Enter = save it and fill it in, Esc = go back.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2" style={{ padding: '0 14px 12px' }}>
+                <button type="button" className="classic-erp-btn btn-blue" onClick={saveQuickMaster} disabled={quickSaving}>{quickSaving ? 'Saving…' : 'Save'}</button>
+                <button type="button" className="classic-erp-btn" onClick={() => closeQuickMaster(false)} disabled={quickSaving}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="classic-erp-header">
           <span>Main Account Master</span>
           <div className="flex items-center gap-2">
@@ -591,7 +681,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                 {T(107, 161, 519, 'address2')}
                 {T(107, 184, 519, 'address3')}
                 {L(10, 209, 'City')}
-                <input style={at(107, 208, 234)} list="city-options-list" className="classic-erp-input uppercase" value={formData.city} onChange={setField('city')} disabled={locked} />
+                <input style={at(107, 208, 234)} list="city-options-list" className="classic-erp-input uppercase" value={formData.city} onChange={setField('city')} disabled={locked} data-enter-own="true" onKeyDown={masterFieldEnter('City', cityOptions)} title="Not in the list? Type it and press Enter to save it in City master" />
                 <datalist id="city-options-list">
                   {cityOptions.map((c) => <option key={c} value={c} />)}
                 </datalist>
@@ -633,40 +723,30 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                 {L(535, 377, 'Exp.City')}
                 {T(611, 372, 158, 'expCity')}
                 {L(10, 350, 'Broker')}
-                {brokerAdd ? (
-                  <div style={at(107, 347, 345)} className="flex items-center gap-1">
-                    <input
-                      autoFocus
-                      className="classic-erp-input uppercase flex-1"
-                      placeholder="New broker name"
-                      value={brokerAdd.name}
-                      onChange={(e) => setBrokerAdd({ name: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); saveQuickBroker(); }
-                        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setBrokerAdd(null); }
-                      }}
-                    />
-                    <button type="button" className="classic-erp-btn btn-blue" style={{ height: 24, padding: '0 8px' }} onClick={saveQuickBroker}>Save</button>
-                    <button type="button" className="classic-erp-btn" style={{ height: 24, padding: '0 6px' }} onClick={() => setBrokerAdd(null)}>x</button>
-                  </div>
-                ) : (
-                  <>
-                    <div style={at(107, 347, 290)}>
-                      <ERPSelect className="classic-erp-select w-full" value={formData.brokerId} onChange={setField('brokerId')} disabled={locked} options={brokerOptions} placeholder="- Direct/No Broker -" recentKey="account-broker" />
-                    </div>
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      style={{ ...at(401, 347, 51), height: 24 }}
-                      className="classic-erp-btn"
-                      disabled={locked}
-                      title="Add a new broker without leaving this account"
-                      onClick={() => setBrokerAdd({ name: '' })}
-                    >+ Add</button>
-                  </>
-                )}
+                <div style={at(107, 347, 290)}>
+                  <ERPSelect
+                    className="classic-erp-select w-full"
+                    value={formData.brokerId}
+                    onChange={setField('brokerId')}
+                    disabled={locked}
+                    options={brokerOptions}
+                    placeholder="- Direct/No Broker -"
+                    recentKey="account-broker"
+                    createLabel="Broker"
+                    onCreateNew={(name) => openQuickMaster('Broker', name, document.activeElement)}
+                  />
+                </div>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  style={{ ...at(401, 347, 51), height: 22, padding: 0, whiteSpace: 'nowrap', fontSize: 11 }}
+                  className="classic-erp-btn"
+                  disabled={locked}
+                  title="Add a new broker without leaving this account"
+                  onClick={(e) => openQuickMaster('Broker', '', e.currentTarget.previousElementSibling?.querySelector('input'))}
+                >+ Add</button>
                 {L(10, 374, 'Transport')}
-                {T(107, 371, 345, 'transport', { list: 'transport-options-list', className: 'classic-erp-input uppercase' })}
+                {T(107, 371, 345, 'transport', { list: 'transport-options-list', className: 'classic-erp-input uppercase', 'data-enter-own': 'true', onKeyDown: masterFieldEnter('Transport', transportOptions), title: 'Not in the list? Type it and press Enter to save it in Transport master' })}
                 <datalist id="transport-options-list">
                   {transportOptions.map((t) => <option key={t} value={t} />)}
                 </datalist>
