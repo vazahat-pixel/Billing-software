@@ -233,6 +233,8 @@ async function importSnapshot() {
   if (snapshotRunning) return snapshotRunning;
   snapshotRunning = importSnapshotOnce()
     .catch(async (err) => {
+      // Nobody has signed in on this PC yet: the download has not started, so it has not failed either.
+      if (err.code === 'NO_LOGIN') throw err;
       await setState('mirror:snapshot', { state: 'failed', error: err.message }).catch(() => {});
       throw err;
     })
@@ -244,17 +246,48 @@ async function importSnapshot() {
 // upload
 // ---------------------------------------------------------------------------
 
+const PUSH_ROWS = 1000;
+let progress = null; // { total, done } from the cloud answering until the whole round (download too) is over
+
+/** Upload everything waiting. A long offline day is more than one batch; do not wait a round for each. */
 async function push() {
+  const sum = { pushed: 0, failed: 0 };
   await capture.flush();
-  const rows = await db().collection(DIRTY).find({}).sort({ seq: 1 }).limit(1000).toArray();
-  if (!rows.length) return { pushed: 0, failed: 0 };
+  const total = await pendingCount();
+  if (!total) return sum;
+  await central('/sync/status'); // the cloud really answers: only now tell the screen it is uploading
+  progress = { total, done: 0 };
+  for (;;) {
+    const r = await pushOnce();
+    sum.pushed += r.pushed;
+    sum.failed += r.failed;
+    if (r.rows < PUSH_ROWS || !r.pushed) return sum;
+  }
+}
+
+/**
+ * The built-in books (SALES BOOK, CASH RECEIPT BOOK, ...) belong to no company and every install makes
+ * its own; bills refer to them by name. They are not company data, so they are not uploaded.
+ */
+const isSystemBook = (coll, doc) => coll === 'books' && !!doc && (doc.companyId === null || doc.companyId === undefined);
+
+async function pushOnce() {
+  await capture.flush();
+  const rows = await db().collection(DIRTY).find({}).sort({ seq: 1 }).limit(PUSH_ROWS).toArray();
+  if (!rows.length) return { pushed: 0, failed: 0, rows: 0 };
 
   const items = [];
   for (const row of rows) {
     const id = EJSON.parse(row.id, { relaxed: false });
     const doc = await db().collection(row.coll).findOne({ _id: id });
+    if (isSystemBook(row.coll, doc)) {
+      await db().collection(DIRTY).deleteOne({ _id: row._id, seq: row.seq });
+      continue;
+    }
     items.push({ key: row._id, seq: row.seq, coll: row.coll, id, op: doc ? 'upsert' : 'delete', doc: doc || undefined });
   }
+
+  if (!items.length) return { pushed: 0, failed: 0, rows: rows.length };
 
   // Batches under the cloud's body limit.
   const batches = [];
@@ -283,6 +316,7 @@ async function push() {
         // Only if not changed again while uploading — otherwise the newer change stays queued.
         await db().collection(DIRTY).deleteOne({ _id: r.key, seq: bySeq.get(r.key) });
         pushed += 1;
+        if (progress) progress.done += 1;
       } else {
         failed += 1;
         await db().collection(DIRTY).updateOne(
@@ -293,7 +327,7 @@ async function push() {
     }
   }
   await setState('mirror:push', { lastAt: new Date().toISOString(), lastPushed: pushed, lastFailed: failed });
-  return { pushed, failed };
+  return { pushed, failed, rows: rows.length };
 }
 
 // ---------------------------------------------------------------------------
@@ -302,21 +336,37 @@ async function push() {
 
 async function pull() {
   const { since } = await getState('mirror:pull', {});
-  const status = await central('/sync/status');
-  const until = status?.serverTime || new Date().toISOString();
+  let bundle = null;
+  if (since) {
+    try {
+      bundle = await central(`/sync/mirror/changes?${new URLSearchParams({ since })}`);
+    } catch (err) {
+      if (err.status !== 404) throw err; // a cloud not updated yet: read collection by collection as before
+    }
+  }
+  const until = bundle?.serverTime || (await central('/sync/status'))?.serverTime || new Date().toISOString();
+  if (bundle?.lock) await setState('mirror:lock', { ...bundle.lock, checkedAt: new Date().toISOString() });
   let applied = 0;
   const conflicts = [];
 
-  for (const name of scope.ALL) {
+  // Counters first: a bill from the web must never be here before the counter that covers it, or the
+  // next bill on this PC is offered a number that is already taken.
+  const bundled = new Map((bundle?.collections || []).map((c) => [c.collection, c]));
+  const names = ['counters', ...scope.ALL.filter((c) => c !== 'counters')].filter((n) => !bundle || bundled.has(n));
+  for (const name of names) {
     // Counters carry no updatedAt: always read them, and only ever move them forward.
     const windowed = name !== 'counters';
     let after = null;
+    let first = bundled.get(name) || null;
     for (;;) {
       const qs = new URLSearchParams({ collection: name, limit: '500' });
       if (after) qs.set('after', after);
       if (windowed && since) qs.set('since', since);
       if (windowed) qs.set('until', until);
-      const page = await central(`/sync/mirror/page?${qs}`);
+      const page = first || await central(`/sync/mirror/page?${qs}`);
+      const unread = first && !first.done && !first.nextAfter; // did not fit in the bundle: read from its start
+      first = null;
+      if (unread) continue;
       const docs = EJSON.parse(page.docs, { relaxed: false });
       for (const d of docs) {
         if (name === 'counters') {
@@ -346,10 +396,18 @@ async function pull() {
       after = page.nextAfter;
     }
   }
+  // A web entry that could not be stored here stays listed (later rounds would otherwise forget it) until
+  // it is here. It is sent again when it is next changed on the cloud.
+  const { conflicts: earlier = [] } = await getState('mirror:pull', {});
+  for (const c of earlier) {
+    if (conflicts.some((x) => x.id === c.id)) continue;
+    const here = await db().collection(c.collection).findOne({ _id: EJSON.parse(c.id, { relaxed: false }) }, { projection: { _id: 1 } });
+    if (!here) conflicts.push(c);
+  }
   await setState('mirror:pull', {
     since: until, lastAt: new Date().toISOString(), lastApplied: applied, conflicts: conflicts.slice(0, 50),
   });
-  return { applied, conflicts: conflicts.length };
+  return { applied, conflicts: conflicts.length, lockRead: !!bundle?.lock };
 }
 
 // ---------------------------------------------------------------------------
@@ -377,6 +435,25 @@ async function pendingCount() {
   return db().collection(DIRTY).countDocuments({});
 }
 
+const KIND = {
+  sales: 'Sale bill', purchases: 'Purchase bill', jobs: 'Challan', paymentvouchers: 'Voucher', debitcreditnotes: 'Note',
+  accountingentries: 'Journal entry', parties: 'Account', items: 'Item', ledgermasters: 'Ledger', returns: 'Return', orders: 'Order',
+};
+
+/** A refused entry in the owner's words: which bill, and what to do. */
+async function describeFailure(f) {
+  let label = '';
+  try {
+    const d = await db().collection(f.coll).findOne({ _id: EJSON.parse(f.id, { relaxed: false }) });
+    label = String(d?.invoiceNo || d?.challanNo || d?.voucherNo || d?.noteNo || d?.returnNo || d?.orderNo || d?.entryNo || d?.name || '');
+  } catch { /* shown without a number */ }
+  const what = `${KIND[f.coll] || f.coll}${label ? ` "${label}"` : ''}`;
+  const help = f.lastCode === 'DUPLICATE'
+    ? `${what}: this number has also been used on the web, so it was not uploaded. Please contact support, and keep Desktop-only Entries ON in Settings.`
+    : `${what}: ${f.lastError || f.lastCode}`;
+  return { collection: f.coll, label, code: f.lastCode, message: f.lastError, help, attempts: f.attempts };
+}
+
 async function status() {
   const [snapshot, pushState, pullState, lock, pending, failing] = await Promise.all([
     snapshotState(),
@@ -390,12 +467,14 @@ async function status() {
   return {
     snapshot,
     pending,
-    failing: failing.map((f) => ({ collection: f.coll, code: f.lastCode, message: f.lastError, attempts: f.attempts })),
+    progress,
+    failing: await Promise.all(failing.map(describeFailure)),
     lastPushAt: pushState.lastAt || null,
     lastPullAt: pullState.lastAt || null,
     conflicts: pullState.conflicts || [],
     lastError: tick.lastError || null,
     online: tick.online ?? null,
+    lastTickAt: tick.at || null,
     lock,
     capture: capture.getStatus(),
   };
@@ -412,8 +491,8 @@ async function tickOnce() {
       await capture.start();
     }
     await push();
-    await pull();
-    await getLock({ refresh: true });
+    const pulled = await pull();
+    if (!pulled.lockRead) await getLock({ refresh: true });
     await setState('mirror:tick', { at: new Date().toISOString(), online: true, lastError: null });
   } catch (err) {
     // Only a failed connection means "no internet"; anything else is shown as itself.
@@ -425,6 +504,8 @@ async function tickOnce() {
       online: offline ? false : true,
       lastError: offline ? 'No internet — entries are kept on this PC and upload automatically.' : err.message,
     }).catch(() => {});
+  } finally {
+    progress = null;
   }
 }
 

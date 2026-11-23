@@ -28,6 +28,7 @@
       "preload.js",
       "updater.js",
       "machineId.js",
+      "syncAgent.js",
       "config.json",
       "config.example.json",
       "localRuntime/**/*",

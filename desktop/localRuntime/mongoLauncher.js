@@ -14,6 +14,8 @@ let startedByUs = false;
 let memoryServer = null;
 let lastStartedPort = null;
 let lastDataDir = null;
+let lastOpts = null;
+const MAX_START_ATTEMPTS = 8;
 
 function exists(p) {
   try {
@@ -188,12 +190,8 @@ function resolveMemoryServerModule(desktopRoot) {
   }
 }
 
-/**
- * Initiate single-node replica set so local Express can use real ACID transactions.
- * Safe to call repeatedly (already-initiated sets are ignored).
- */
-async function ensureReplicaSet(port, replSetName = 'rs0', opts = {}) {
-  let MongoClient;
+/** The mongodb driver that ships with the bundled backend (the desktop has none of its own). */
+function loadMongoClient(opts = {}) {
   const candidates = [
     'mongodb',
     opts?.resourcesPath && path.join(opts.resourcesPath, 'backend', 'node_modules', 'mongodb'),
@@ -205,12 +203,20 @@ async function ensureReplicaSet(port, replSetName = 'rs0', opts = {}) {
   for (const c of candidates) {
     try {
       const m = require(c);
-      MongoClient = m.MongoClient || m;
-      if (MongoClient) break;
+      if (m.MongoClient || m) return m.MongoClient || m;
     } catch {
       /* continue */
     }
   }
+  return null;
+}
+
+/**
+ * Initiate single-node replica set so local Express can use real ACID transactions.
+ * Safe to call repeatedly (already-initiated sets are ignored).
+ */
+async function ensureReplicaSet(port, replSetName = 'rs0', opts = {}) {
+  const MongoClient = loadMongoClient(opts);
   if (!MongoClient) {
     console.warn('[localRuntime] mongodb driver missing in all candidates; skipping rs.initiate');
     return false;
@@ -290,6 +296,7 @@ async function startMongo(opts) {
   lastStartedPort = port;
   const dataDir = opts.dataDir;
   lastDataDir = dataDir;
+  lastOpts = opts;
   const replSetName =
     opts.replicaSet === false
       ? null
@@ -374,10 +381,18 @@ async function startMongo(opts) {
     });
 
     try {
-      await waitForPort(port, '127.0.0.1', 45000, mongodProc, opts.logPath);
+      await waitForPort(port, '127.0.0.1', 120000, mongodProc, opts.logPath);
     } catch (err) {
       await stopMongo();
-      if (replSetName) {
+      // Just closed and reopened: the previous mongod can still hold its files for a while on a slow or
+      // full disk. Wait for it instead of failing.
+      const attempt = Number(opts.attempt || 1);
+      if (/exited prematurely/.test(err.message) && attempt < MAX_START_ATTEMPTS) {
+        console.warn(`[localRuntime] mongod did not start (attempt ${attempt}), waiting for its files to be released...`);
+        await new Promise((r) => setTimeout(r, 5000));
+        return await startMongo({ ...opts, attempt: attempt + 1 });
+      }
+      if (replSetName && !opts.requireReplicaSet) {
         console.warn('[localRuntime] mongod failed with replSet, retrying in standalone mode...');
         return await startMongo({ ...opts, replicaSet: false });
       }
@@ -385,7 +400,11 @@ async function startMongo(opts) {
     }
 
     if (replSetName) {
-      await ensureReplicaSet(port, replSetName, opts);
+      const ready = await ensureReplicaSet(port, replSetName, opts);
+      if (!ready && opts.requireReplicaSet) {
+        await stopMongo();
+        throw new Error('Local database could not be prepared for sync (replica set not ready)');
+      }
     }
 
     const qs = replSetName ? `?replicaSet=${replSetName}` : '';
@@ -426,6 +445,20 @@ async function startMongo(opts) {
   };
 }
 
+async function askToShutDown(port, opts) {
+  const MongoClient = loadMongoClient(opts || {});
+  if (!MongoClient || !port) return;
+  const client = new MongoClient(`mongodb://127.0.0.1:${port}/?directConnection=true`, { serverSelectionTimeoutMS: 2000, connectTimeoutMS: 2000 });
+  try {
+    await client.connect();
+    await client.db('admin').command({ shutdown: 1, force: true, timeoutSecs: 5 });
+  } catch {
+    /* the connection drops when it shuts down; if it was already gone there is nothing to ask */
+  } finally {
+    await client.close().catch(() => {});
+  }
+}
+
 async function stopMongo() {
   if (memoryServer) {
     try {
@@ -455,14 +488,21 @@ async function stopMongo() {
       }
     };
     proc.once('exit', done);
+    if (proc.exitCode !== null) done();
     try {
       if (process.platform === 'win32') {
-        try {
-          const { execSync } = require('child_process');
-          execSync(`taskkill /pid ${proc.pid} /f /t`, { windowsHide: true, stdio: 'ignore' });
-        } catch {
-          /* ignore if already dead */
-        }
+        // Ask it to close properly first (writes everything out, releases its files); force only if it won't.
+        askToShutDown(lastStartedPort, lastOpts)
+          .then(() => new Promise((r) => setTimeout(r, 15000)))
+          .then(() => {
+            if (finished) return;
+            try {
+              const { execSync } = require('child_process');
+              execSync(`taskkill /pid ${proc.pid} /f /t`, { windowsHide: true, stdio: 'ignore' });
+            } catch {
+              /* ignore if already dead */
+            }
+          });
       } else {
         proc.kill('SIGTERM');
         setTimeout(() => {
@@ -476,7 +516,7 @@ async function stopMongo() {
     } catch {
       done();
     }
-    setTimeout(done, 5000);
+    setTimeout(done, 40000); // normally ends at once on 'exit'
   });
 
   // Ensure socket teardown is complete before resolving

@@ -40,6 +40,13 @@ exports.page = asyncHandler(async (req, res) => {
   return ok(res, await central.snapshotPage(req.companyId, { collection, after, limit, since, until }));
 });
 
+exports.changes = asyncHandler(async (req, res) => {
+  cloudOnly();
+  assertOwnerOrAdmin(req);
+  const central = require('../services/replication/centralService');
+  return ok(res, await central.changes(req.companyId, { since: req.query.since }));
+});
+
 exports.apply = asyncHandler(async (req, res) => {
   cloudOnly();
   assertOwnerOrAdmin(req);

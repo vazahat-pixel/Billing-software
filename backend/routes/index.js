@@ -142,6 +142,10 @@ router.use('/ledgers', requireModule('accounting'), (req, res, next) => {
   next();
 }, ledgerRoutes);
 router.use('/festivals', require('./festival.routes'));
-router.use('/developer/qa', require('../developer/routes/qa.routes'));
+// Developer tools are not part of the desktop installer; requiring them there stopped the whole
+// offline backend from starting.
+if (String(process.env.DESKTOP_LOCAL || '').toLowerCase() !== 'true') {
+  router.use('/developer/qa', require('../developer/routes/qa.routes'));
+}
 
 module.exports = router;

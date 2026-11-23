@@ -79,6 +79,37 @@ async function snapshotPage(companyId, { collection, after, limit, since, until 
   };
 }
 
+const CHANGES_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Everything that changed since `since`, in one reply. A desktop asks every 20 seconds; one request per
+ * collection was about 3,500 requests in 15 minutes, which used up the server's request limit and
+ * locked out the web users too. A collection that does not fit is marked done:false and read by page.
+ */
+async function changes(companyId, { since } = {}) {
+  if (!since || Number.isNaN(new Date(since).getTime())) {
+    const err = new Error('since is required');
+    err.status = 400;
+    throw err;
+  }
+  const serverTime = new Date().toISOString();
+  const collections = [];
+  let bytes = 0;
+  for (const name of ['counters', ...scope.ALL.filter((c) => c !== 'counters')]) {
+    // Counters carry no updatedAt: always sent whole.
+    const window = name === 'counters' ? {} : { since, until: serverTime };
+    if (bytes > CHANGES_BYTES) {
+      collections.push({ collection: name, docs: '[]', nextAfter: null, done: false });
+      continue;
+    }
+    const page = await snapshotPage(companyId, { collection: name, limit: 500, ...window });
+    if (!page.count) continue;
+    bytes += page.docs.length;
+    collections.push({ collection: name, docs: page.docs, nextAfter: page.nextAfter, done: page.done });
+  }
+  return { serverTime, lock: await getLock(companyId), collections };
+}
+
 /**
  * Store what a desktop changed. Each item: { coll, op: 'upsert'|'delete', id, doc }.
  * Per item, never all-or-nothing: one bad document must not stop the rest of a day's work.
@@ -201,4 +232,4 @@ async function isLocked(companyId) {
   return desktopOnly;
 }
 
-module.exports = { groupCompanyIds, manifest, snapshotPage, applyBatch, getLock, setLock, isLocked };
+module.exports = { groupCompanyIds, manifest, snapshotPage, changes, applyBatch, getLock, setLock, isLocked };

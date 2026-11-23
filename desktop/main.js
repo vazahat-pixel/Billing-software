@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 // Registers the update:* IPC handlers early, so the screen can ask for the update state at any time.
 const updater = require('./updater');
+const modePolicy = require('./localRuntime/modePolicy');
 
 // Ensure only a single instance of Textile ERP runs at any time.
 // Prevents duplicate processes from locking or corrupting the IndexedDB backing store (%APPDATA%/Textile ERP/IndexedDB).
@@ -341,15 +342,12 @@ ipcMain.handle('desktop:notify', (_e, { title, body }) => {
  * switching earlier could strand an entry. Then the owner is asked to restart.
  */
 let mirrorSwitchOffered = false;
+let offlineStartError = null; // set when offline mode failed to start in this session
 function shouldMoveToMirror() {
   const userCfgPath = path.join(app.getPath('userData'), 'config.json');
   const userCfg = readJsonSafe(userCfgPath);
   const shipped = readJsonSafe(path.join(process.resourcesPath || __dirname, 'config.json')) || readJsonSafe(path.join(__dirname, 'config.json'));
-  return (
-    String(shipped?.mode || '').toLowerCase() === 'hybrid' &&
-    String(userCfg?.mode || '').toLowerCase() === 'remote' &&
-    !userCfg?.mirrorSwitchedAt
-  );
+  return modePolicy.shouldOfferMirror(userCfg, shipped, app.getVersion());
 }
 
 async function offerMirrorSwitch() {
@@ -362,6 +360,7 @@ async function offerMirrorSwitch() {
     mode: 'hybrid',
     apiBaseUrl: userCfg.centralApiBaseUrl || userCfg.apiBaseUrl,
     mirrorSwitchedAt: new Date().toISOString(),
+    mirrorSwitchVersion: app.getVersion(),
   });
   const { response } = await dialog.showMessageBox(mainWindow || undefined, {
     type: 'info',
@@ -384,6 +383,16 @@ async function offerMirrorSwitch() {
 
 ipcMain.on('desktop:pending-sync', (_e, count) => {
   rendererPendingSync = Math.max(0, Number(count) || 0);
+  // After a failed offline start: try offline mode again next time, but only while nothing is waiting here.
+  if (localStack?.mode === 'remote') {
+    try {
+      const userCfgPath = path.join(app.getPath('userData'), 'config.json');
+      const next = modePolicy.onQueueReport(readJsonSafe(userCfgPath), rendererPendingSync);
+      if (next) writeJsonSafe(userCfgPath, next);
+    } catch (err) {
+      console.warn('[desktop] offline retry not saved:', err.message);
+    }
+  }
   if (rendererPendingSync === 0) offerMirrorSwitch().catch(() => {});
 });
 ipcMain.handle('desktop:version', () => app.getVersion());
@@ -490,6 +499,11 @@ app.whenReady().then(async () => {
       resourcesPath: process.resourcesPath,
       isPackaged: app.isPackaged,
     });
+    if (localStack.mode === 'hybrid') {
+      const userCfgPath = path.join(userData, 'config.json');
+      const clean = modePolicy.afterGoodStart(readJsonSafe(userCfgPath));
+      if (clean) writeJsonSafe(userCfgPath, clean);
+    }
     try {
       const syncAgent = require('./syncAgent');
       syncAgent.setStatus({ mode: localStack.mode || 'local' });
@@ -504,13 +518,11 @@ app.whenReady().then(async () => {
     try {
       const userCfgPath = path.join(userData, 'config.json');
       const cur = readJsonSafe(userCfgPath) || {};
+      const shipped = readJsonSafe(path.join(process.resourcesPath || __dirname, 'config.json')) || readJsonSafe(path.join(__dirname, 'config.json'));
       const cloudUrl = cur.centralApiBaseUrl || 'https://app.dealingindia.com/api';
-      writeJsonSafe(userCfgPath, {
-        ...cur,
-        mode: 'remote',
-        apiBaseUrl: cloudUrl,
-        centralApiBaseUrl: cloudUrl,
-      });
+      const next = modePolicy.afterFailedStart(cur, shipped, cloudUrl, err.message);
+      writeJsonSafe(userCfgPath, next);
+      if (next.hybridRetry) offlineStartError = next.hybridLastError || 'unknown error';
       localStack = {
         mode: 'remote',
         apiBaseUrl: cloudUrl,
@@ -546,6 +558,19 @@ app.whenReady().then(async () => {
   buildMenu();
   createWindow();
   createTray();
+  if (offlineStartError) {
+    // Never drop to cloud-only silently: the owner would find out only when the internet goes.
+    dialog.showMessageBox({
+      type: 'warning',
+      title: 'Offline mode did not start',
+      message: 'Offline mode did not start. Textile ERP is working on the cloud for now (internet needed).',
+      detail:
+        'It will try offline mode again the next time you open the app. Entries made earlier on this computer are not deleted; ' +
+        'any not yet uploaded will upload once offline mode starts. If this message keeps coming, send it to support.\n\n' +
+        offlineStartError,
+      buttons: ['OK'],
+    }).catch(() => {});
+  }
   try {
     updater.setupAutoUpdater();
   } catch {

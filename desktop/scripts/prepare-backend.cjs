@@ -153,4 +153,40 @@ execFileSync(npmCmd, ['install', '--omit=dev'], {
 // Gate again after npm install — a postinstall script must not plant anything in our source.
 securityGate();
 
+// ── Every file our code loads must be in the bundle ────────────────────────────
+// A require of a folder that is not on the allowlist means the offline backend cannot start on the
+// customer's PC (it silently fell back to cloud-only). Listed here: only code the desktop never runs.
+const NOT_ON_DESKTOP = new Set([
+  'routes/index.js -> ../developer/routes/qa.routes', // skipped when DESKTOP_LOCAL
+  'services/certifiers/apiCoverageCertifier.js -> ../../tests/api/routeManifest', // QA tool, loaded on demand
+  'services/certifiers/businessFlowCertifier.js -> ../../qa/utils/tenant', // QA tool, loaded on demand
+]);
+function missingModules() {
+  const { createRequire } = require('module');
+  const missing = [];
+  const walk = (dir) => {
+    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        if (ent.name !== 'node_modules' && abs !== path.join(dest, 'public')) walk(abs);
+      } else if (ent.name.endsWith('.js')) {
+        const req = createRequire(abs);
+        for (const m of fs.readFileSync(abs, 'utf8').matchAll(/require\(\s*['"](\.[^'"]+)['"]\s*\)/g)) {
+          const id = `${path.relative(dest, abs).replace(/\\/g, '/')} -> ${m[1]}`;
+          if (NOT_ON_DESKTOP.has(id)) continue;
+          try { req.resolve(m[1]); } catch { missing.push(id); }
+        }
+      }
+    }
+  };
+  walk(dest);
+  return missing;
+}
+const missing = missingModules();
+if (missing.length) {
+  console.error('\n❌  The bundled backend would not start — these files are not in the bundle:');
+  for (const m of missing) console.error(`      ${m}`);
+  process.exit(3);
+}
+
 console.log('\nBackend ready at', dest, '(allowlist-only, prod deps installed, security gate passed)');

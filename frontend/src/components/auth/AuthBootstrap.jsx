@@ -5,6 +5,7 @@ import { subscribeNetworkStatus, isOffline as isNetworkOffline } from '../../uti
 import SessionExpiredModal from './SessionExpiredModal';
 import AppLockScreen from '../AppLock/AppLockScreen';
 import MirrorDownloadOverlay from '../desktop/MirrorDownloadOverlay';
+import MirrorSyncPopup from '../desktop/MirrorSyncPopup';
 import { useLocalApiAsSourceOfTruth, isDesktopShell } from '../../utils/desktopMode';
 import { notifySuccess, notifyWarning } from '../../utils/notify';
 
@@ -181,6 +182,7 @@ const AuthBootstrap = ({ children }) => {
       <SessionExpiredModal />
       {token ? <AppLockScreen /> : null}
       {token && desktopLocal ? <MirrorDownloadOverlay /> : null}
+      {token && desktopLocal ? <MirrorSyncPopup /> : null}
     </div>
   );
 };

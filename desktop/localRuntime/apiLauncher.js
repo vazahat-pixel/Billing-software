@@ -111,6 +111,9 @@ async function startApi(opts) {
     HOST: '127.0.0.1',
     CENTRAL_API_BASE_URL: opts.centralApiBaseUrl || process.env.CENTRAL_API_BASE_URL || '',
     MONGO_REPLICA_SET: opts.replicaSet ? 'true' : 'false',
+    // This API answers only this computer: the per-IP web limits would just stop a busy operator.
+    RATE_LIMIT_MAX: '100000',
+    AUTH_RATE_LIMIT_MAX: '400',
     ALLOW_PUBLIC_REGISTER: 'false',
     ALLOW_SUBSCRIPTION_BYPASS: 'false',
     DUNNING_INTERVAL_MS: '0',
@@ -182,8 +185,15 @@ async function startApi(opts) {
     apiProc = null;
   });
 
+  // A backend that has already exited will never become ready: fail now instead of after 2 minutes.
+  const earlyEnd = new Promise((_, reject) => {
+    const fail = (x) => reject(new Error(`API process ended before it was ready (${x?.message || `exit ${x}`})`));
+    apiProc.once('exit', fail);
+    apiProc.once('error', fail);
+  });
+  earlyEnd.catch(() => {});
   try {
-    await waitForHealth(port, 120000);
+    await Promise.race([waitForHealth(port, 120000), earlyEnd]);
   } catch (err) {
     await stopApi();
     throw new Error(`${err.message}\n${stderr.slice(-1000)}`);

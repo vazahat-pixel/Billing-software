@@ -113,8 +113,12 @@ async function bootLocalStack(ctx) {
       resourcesPath: ctx.resourcesPath,
       desktopRoot: ctx.desktopRoot,
       replicaSet: 'rs0',
+      requireReplicaSet: isHybrid,
     });
   } catch (mongoErr) {
+    // Without a replica set nothing records what changed, so entries made in such a session would never
+    // reach the cloud. Offline (hybrid) mode therefore fails to start instead, and says so.
+    if (isHybrid) throw mongoErr;
     console.warn('[localRuntime] Local replicaSet start failed, retrying in robust standalone mode:', mongoErr.message);
     try {
       mongo = await startMongo({

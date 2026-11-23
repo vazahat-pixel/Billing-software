@@ -22,6 +22,7 @@ router.post('/agent-tick', syncController.agentTick);
 const mirror = require('../controllers/mirror.controller');
 router.get('/mirror/manifest', mirror.manifest);
 router.get('/mirror/page', mirror.page);
+router.get('/mirror/changes', mirror.changes);
 router.post('/mirror/apply', mirror.apply);
 router.get('/mirror/lock', mirror.getLock);
 router.put('/mirror/lock', mirror.setLock);
