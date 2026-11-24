@@ -17,7 +17,9 @@ import Modal from '../../components/ui/Modal';
  *     Kgs → Amount = totalNetQty × Rate  (treated as kgs)
  */
 
-const emptyRow = (srNo) => ({ srNo, remark: '', pcs: 0, qtyBndl: 0 });
+// A new row shows 1 piece; it only counts once something is typed in it (see isUsed).
+const emptyRow = (srNo) => ({ srNo, remark: '', pcs: 1, qtyBndl: 0 });
+const isUsed = (r) => !!(r.touched || r.remark || Number(r.qtyBndl) > 0);
 const ROWS_DEFAULT = 6;
 
 const normalizeRows = (rows) => {
@@ -30,7 +32,7 @@ const normalizeRows = (rows) => {
         const storedNetQty = Number(r.netQty ?? r.kgs ?? 0);
         qtyBndl = storedNetQty > 0 ? Number((storedNetQty / pcs).toFixed(3)) : 0;
       }
-      return { srNo: i + 1, remark: String(r.remark || ''), pcs, qtyBndl };
+      return { srNo: i + 1, remark: String(r.remark || ''), pcs, qtyBndl, touched: true };
     });
     while (mapped.length < ROWS_DEFAULT) {
       mapped.push(emptyRow(mapped.length + 1));
@@ -104,7 +106,7 @@ export default function PcsBreakdownModal({
   );
 
   const totals = useMemo(() => {
-    const totalPcs = rowsWithNetQty.reduce((s, r) => s + (Number(r.pcs) || 0), 0);
+    const totalPcs = rowsWithNetQty.reduce((s, r) => s + (isUsed(r) ? Number(r.pcs) || 0 : 0), 0);
     const totalNetQty = rowsWithNetQty.reduce((s, r) => s + (Number(r.netQty) || 0), 0);
     return { pcs: totalPcs, netQty: Number(totalNetQty.toFixed(3)) };
   }, [rowsWithNetQty]);
@@ -112,7 +114,7 @@ export default function PcsBreakdownModal({
   const patchRow = (idx, patch) => {
     setLocalRows((prev) => {
       const next = [...prev];
-      next[idx] = { ...next[idx], ...patch };
+      next[idx] = { ...next[idx], ...patch, touched: true };
       return next;
     });
   };
@@ -123,7 +125,7 @@ export default function PcsBreakdownModal({
 
   const handleOk = () => {
     const cleaned = rowsWithNetQty.filter(
-      (r) => r.remark || r.pcs > 0 || r.qtyBndl > 0
+      (r) => isUsed(r) && (r.remark || r.pcs > 0 || r.qtyBndl > 0)
     );
     const formatted = cleaned.map((r) => ({
       srNo: r.srNo,

@@ -1,3 +1,11 @@
+- v1.0.17:
+  - Sale bill: the Description typed on a line now prints under the item on the bill.
+  - Pcs popup: a new row starts with 1 piece (blank rows are not counted).
+  - Dashboard figures update by themselves as soon as a bill, voucher or challan is saved.
+  - Offline desktop: this PC works for one company; signing in with another company is stopped with a clear message (use the website for other companies). Entries left behind by such a sign-in no longer keep the sync waiting.
+  - Offline desktop: the status shows Online when the internet is on (it showed Offline), and the sync message lists any entry the cloud refused.
+  - Offline desktop: a new account can be created from the desktop sign-up page (it is made on the cloud and then downloaded to this PC).
+  - The File / Edit / View / Help bar is hidden (Alt shows it) and the app always opens at 100% size.
 - v1.0.16: Offline mode on by default.
   - The desktop now keeps the company on this PC and works fully without internet (sale, purchase, mill, job, vouchers, reports); entries upload by themselves when the internet is back. The first start needs internet once to download the company. A PC that was cloud-only switches after its pending entries are uploaded (it asks to restart).
   - When the internet returns, a message shows that data is syncing and when it is safe to shut down the PC.

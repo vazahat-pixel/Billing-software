@@ -643,6 +643,16 @@ const Dashboard = () => {
       }
    }, [user?.companyId, user?.role, fetchDashboardSummary, fetchBooks]);
 
+   // A bill, voucher or challan saved anywhere changes these lists; recount the cards a moment later
+   // (one recount for a burst of changes) instead of only on login and the Sync button.
+   const firstListsRender = useRef(true);
+   useEffect(() => {
+      if (firstListsRender.current) { firstListsRender.current = false; return undefined; }
+      if (!user?.companyId && user?.role !== 'super_admin') return undefined;
+      const t = setTimeout(() => { fetchDashboardSummary(); }, 800);
+      return () => clearTimeout(t);
+   }, [sales, purchases, vouchers, notes, jobWorkEntries, user?.companyId, user?.role, fetchDashboardSummary]);
+
    useEffect(() => {
       if (!user?.companyId || user?.role === 'super_admin') return;
       const dismissed = sessionStorage.getItem('erp_onboarding_dismissed');

@@ -171,6 +171,7 @@ export default function RoyalGold({ data }) {
                 <td className="rg-ctr">{line.sno}</td>
                 <td>
                   <span style={{ fontWeight: 700 }}>{line.name}</span>
+                  {line.desc && <div style={{ fontSize: '7.5pt', fontWeight: 400, marginTop: '0.5mm' }}>{line.desc}</div>}
                   {line.colour && <span style={{ fontSize: '6.5pt', color: MUTED }}> · {line.colour}</span>}
                   {line.designNo && <span style={{ fontSize: '6.5pt', color: MUTED }}> · {line.designNo}</span>}
                 </td>

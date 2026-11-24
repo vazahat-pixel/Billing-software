@@ -29,8 +29,10 @@ const OfflineIndicator = ({ onOpenSync }) => {
   const hasIssues = failedSync > 0 || hybrid?.syncState === 'issue';
   const pending = Math.max(pendingSync || 0, hybrid?.pendingCount || 0);
   const connectivity = hybrid?.connectivity;
+  // 'degraded' = the cloud answered but this probe has no login; the internet is on.
   const online =
     connectivity === 'online' ||
+    connectivity === 'degraded' ||
     (connectivity == null && isOnline);
 
   const label = (() => {

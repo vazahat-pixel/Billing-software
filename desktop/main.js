@@ -101,7 +101,13 @@ function createWindow() {
       spellcheck: true,
       webSecurity: false,
     },
+    // Like any desktop program: no File/Edit/View/Help bar (Alt still shows it, for support).
+    autoHideMenuBar: true,
   });
+  mainWindow.setMenuBarVisibility(false);
+  // Always 100%: a stray Ctrl+minus or Ctrl+wheel left the whole app tiny for the next start.
+  mainWindow.webContents.on('did-finish-load', () => mainWindow?.webContents.setZoomFactor(1));
+  mainWindow.webContents.on('zoom-changed', () => mainWindow?.webContents.setZoomFactor(1));
 
   const target = resolveStartUrl();
   if (target.type === 'file') {
@@ -127,12 +133,9 @@ function createWindow() {
 
   // Right-click Inspect Element & Reload context menu
   mainWindow.webContents.on('context-menu', (_e, params) => {
-    const contextMenu = Menu.buildFromTemplate([
-      { label: 'Inspect Element', click: () => mainWindow.webContents.inspectElement(params.x, params.y) },
-      { type: 'separator' },
-      { label: 'Reload', role: 'reload' },
-      { label: 'Toggle Developer Tools (F12)', click: () => mainWindow.webContents.toggleDevTools() },
-    ]);
+    const contextMenu = Menu.buildFromTemplate(params.isEditable
+      ? [{ role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { type: 'separator' }, { role: 'selectAll' }]
+      : [{ role: 'copy', enabled: !!params.selectionText }, { role: 'selectAll' }]);
     contextMenu.popup(mainWindow);
   });
 
@@ -264,9 +267,6 @@ function buildMenu() {
       label: 'View',
       submenu: [
         { role: 'togglefullscreen' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { role: 'resetZoom' },
         { type: 'separator' },
         {
           label: 'Toggle Developer Tools (Console)',

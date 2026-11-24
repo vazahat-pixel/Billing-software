@@ -5,6 +5,36 @@ import { authApi } from '../../api';
 import { billingApi } from '../../api/billing.api';
 import useStore from '../../store/useStore';
 import { saveOfflineCredential } from '../../utils/offlineAuth';
+import { isDesktopLocalMode } from '../../utils/desktopMode';
+import { loginWithOfflineSupport } from '../../utils/loginService';
+
+/**
+ * The offline desktop's own server never creates companies (a company is made on the cloud, with its
+ * plan). There, sign-up goes straight to the cloud; the desktop then signs in with the same email and
+ * password, which downloads the new company to this PC.
+ */
+async function cloudRegistrationApi() {
+    if (!isDesktopLocalMode()) return null;
+    const base = String((await window.textileDesktop?.getCentralApiUrl?.()) || '').replace(/\/$/, '');
+    if (!base) return null;
+    const post = async (path, body) => {
+        const res = await fetch(`${base}${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json?.message || `Cloud replied HTTP ${res.status}`);
+        return json?.data ?? json;
+    };
+    return {
+        sendRegistrationOtp: (b) => post('/auth/send-registration-otp', b),
+        verifyRegistrationOtp: (b) => post('/auth/verify-registration-otp', b),
+        register: (b) => post('/auth/register', b),
+    };
+}
+
+const registrationApi = async () => (await cloudRegistrationApi()) || authApi;
 
 const SignupPage = () => {
     const [formData, setFormData] = useState({
@@ -75,7 +105,7 @@ const SignupPage = () => {
         setError('');
         setInfoMsg('');
         try {
-            const res = await authApi.sendRegistrationOtp({
+            const res = await (await registrationApi()).sendRegistrationOtp({
                 email: formData.email,
                 username: formData.username || undefined,
             });
@@ -101,7 +131,7 @@ const SignupPage = () => {
         setError('');
         setInfoMsg('');
         try {
-            const res = await authApi.verifyRegistrationOtp({
+            const res = await (await registrationApi()).verifyRegistrationOtp({
                 email: formData.email,
                 otp: formData.otp.trim(),
             });
@@ -148,7 +178,7 @@ const SignupPage = () => {
         if (!otpVerified && !activeToken) {
             const codeToVerify = (formData.otp || '').trim() || '123456';
             try {
-                const res = await authApi.verifyRegistrationOtp({
+                const res = await (await registrationApi()).verifyRegistrationOtp({
                     email: formData.email,
                     otp: codeToVerify,
                 });
@@ -164,7 +194,8 @@ const SignupPage = () => {
         setLoading(true);
 
         try {
-            const data = await authApi.register({
+            const cloud = await cloudRegistrationApi();
+            const data = await (cloud || authApi).register({
                 name: formData.customerName.trim(),
                 email: formData.email.toLowerCase().trim(),
                 mobile: formData.mobile.trim(),
@@ -175,6 +206,13 @@ const SignupPage = () => {
                 planId: formData.planId || undefined,
             });
 
+            if (cloud) {
+                // Made on the cloud; now sign in on this PC, which downloads the new company here.
+                const signedIn = await loginWithOfflineSupport({ email: formData.email.toLowerCase().trim(), password: formData.password });
+                await setAuth({ token: signedIn.token, user: signedIn.user });
+                navigate('/');
+                return;
+            }
             const token = data?.token || data?.data?.token;
             const user = data?.user || data?.data?.user;
 

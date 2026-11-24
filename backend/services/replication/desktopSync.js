@@ -48,6 +48,29 @@ async function setState(key, patch) {
 }
 
 const snapshotState = () => getState('mirror:snapshot', { state: 'pending' });
+
+/**
+ * A mirrored desktop holds ONE company (group). Signing in here with another company's account made
+ * this PC create that company's default ledgers and settings on its own; the cloud already had them
+ * under other ids, so they could never upload and blocked the sync. Refuse it with a clear message.
+ */
+async function assertThisPcCompany(companyId) {
+  const snap = await snapshotState();
+  const ids = (snap.companyIds || []).map(String);
+  if (!ids.length || !companyId || ids.includes(String(companyId))) return;
+  let name = '';
+  try {
+    const co = await db().collection('companies').findOne({ _id: new mongoose.Types.ObjectId(ids[0]) }, { projection: { name: 1 } });
+    name = co?.name || '';
+  } catch { /* message without the name */ }
+  const err = new Error(
+    `This computer is set up for ${name ? `"${name}"` : 'another company'}. Sign in here with that company's account. ` +
+    'For any other company, use the website (app.dealingindia.com) or another computer.'
+  );
+  err.status = 403;
+  err.code = 'OTHER_COMPANY_ON_THIS_PC';
+  throw err;
+}
 const isSnapshotDone = async () => (await snapshotState()).state === 'done';
 
 // ---------------------------------------------------------------------------
@@ -276,10 +299,17 @@ async function pushOnce() {
   const rows = await db().collection(DIRTY).find({}).sort({ seq: 1 }).limit(PUSH_ROWS).toArray();
   if (!rows.length) return { pushed: 0, failed: 0, rows: 0 };
 
+  const { companyIds = [] } = await snapshotState();
   const items = [];
   for (const row of rows) {
     const id = EJSON.parse(row.id, { relaxed: false });
     const doc = await db().collection(row.coll).findOne({ _id: id });
+    // Left over from signing in here with another company: it can never be accepted, so it must not
+    // keep the real company's sync looking stuck.
+    if (doc && companyIds.length && !scope.docInScope(row.coll, doc, companyIds)) {
+      await db().collection(DIRTY).deleteOne({ _id: row._id, seq: row.seq });
+      continue;
+    }
     if (isSystemBook(row.coll, doc)) {
       await db().collection(DIRTY).deleteOne({ _id: row._id, seq: row.seq });
       continue;
@@ -455,13 +485,14 @@ async function describeFailure(f) {
 }
 
 async function status() {
-  const [snapshot, pushState, pullState, lock, pending, failing] = await Promise.all([
+  const [snapshot, pushState, pullState, lock, pending, failing, failingCount] = await Promise.all([
     snapshotState(),
     getState('mirror:push', {}),
     getState('mirror:pull', {}),
     getState('mirror:lock', { desktopOnly: false }),
     pendingCount(),
     db().collection(DIRTY).find({ lastCode: { $exists: true } }).sort({ seq: 1 }).limit(20).toArray(),
+    db().collection(DIRTY).countDocuments({ lastCode: { $exists: true } }),
   ]);
   const tick = await getState('mirror:tick', {});
   return {
@@ -469,6 +500,7 @@ async function status() {
     pending,
     progress,
     failing: await Promise.all(failing.map(describeFailure)),
+    failingCount,
     lastPushAt: pushState.lastAt || null,
     lastPullAt: pullState.lastAt || null,
     conflicts: pullState.conflicts || [],
@@ -516,5 +548,6 @@ function tick() {
 }
 
 module.exports = {
+  assertThisPcCompany,
   importSnapshot, push, pull, tick, status, pendingCount, getLock, setLock, isSnapshotDone, central,
 };

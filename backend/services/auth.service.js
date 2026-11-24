@@ -212,6 +212,9 @@ exports.login = async (email, password, req = null) => {
                 const payload = uj?.data || uj;
                 if (up.ok && payload?.token && payload?.user) {
                     const cu = payload.user;
+                    if (String(process.env.DESKTOP_REPLICATION || '').toLowerCase() === 'true') {
+                        await require('./replication/desktopSync').assertThisPcCompany(cu.companyId);
+                    }
                     if (cu.companyId) {
                         const existingCo = await Company.findById(cu.companyId);
                         if (!existingCo) {
@@ -248,6 +251,7 @@ exports.login = async (email, password, req = null) => {
                     user = await User.findById(cu.id).select('+password +failedLoginAttempts +lockUntil +totpSecret +totpEnabled');
                 }
             } catch (centralErr) {
+                if (centralErr.code === 'OTHER_COMPANY_ON_THIS_PC') throw centralErr;
                 console.warn('[authService] Desktop cloud bootstrap attempt failed:', centralErr.message);
             }
         }
@@ -255,6 +259,10 @@ exports.login = async (email, password, req = null) => {
             if (req) await sessionService.recordLogin(null, 'login_failed', req, { success: false, reason: 'unknown_user', meta: { email } });
             throw new Error('Invalid credentials');
         }
+    }
+
+    if (String(process.env.DESKTOP_REPLICATION || '').toLowerCase() === 'true' && String(process.env.DESKTOP_LOCAL || '').toLowerCase() === 'true' && user.role !== 'super_admin') {
+        await require('./replication/desktopSync').assertThisPcCompany(user.companyId);
     }
 
     if (user.isLocked && user.isLocked()) {

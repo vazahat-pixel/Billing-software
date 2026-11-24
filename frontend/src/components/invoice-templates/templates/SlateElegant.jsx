@@ -161,6 +161,7 @@ export default function SlateElegant({ data }) {
               <td className="se-ctr" style={{ color: SLATE_LIGHT, fontWeight: 600 }}>{line.sno}</td>
               <td>
                 <div style={{ fontWeight: 700, color: TEXT }}>{line.name}</div>
+                {line.desc && <div style={{ fontSize: '7.5pt', fontWeight: 400, marginTop: '0.5mm' }}>{line.desc}</div>}
                 <div style={{ fontSize: '6.5pt', color: MUTED, marginTop: '0.3mm' }}>
                   {[line.colour && `Col: ${line.colour}`, line.designNo && `Des: ${line.designNo}`, line.quality && `Qual: ${line.quality}`].filter(Boolean).join(' · ')}
                 </div>

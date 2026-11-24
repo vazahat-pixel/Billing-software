@@ -77,6 +77,7 @@ export default function CompactThermal({ data, pageSize = 'thermal-80' }) {
           <div style={{ fontWeight: 700 }}>
             {l.sno}. {l.name}
           </div>
+          {l.desc && <div style={{ fontSize: '7.5pt', fontWeight: 400, marginTop: '0.5mm' }}>{l.desc}</div>}
           <div style={{ fontSize: 9 }}>
             HSN {l.hsn} | {fmt.num(l.qty)} {l.rateOn || 'Met'} x {fmt.num(l.rate)}
             {Number(l.fold) ? ` | Fold ${l.fold}` : ''}

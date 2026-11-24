@@ -43,7 +43,8 @@ export default function MirrorSyncPopup() {
           // Until a round that began after the internet came back has finished and said otherwise.
           const triedSince = s.lastTickAt && new Date(s.lastTickAt).getTime() > cameOnlineAt + 1500;
           const justOnline = cameOnlineAt > 0 && Date.now() - cameOnlineAt < 60000 && !(triedSince && offline);
-          const onlyRefused = pending > 0 && failing.length >= pending && !s.progress;
+          const refused = Number(s.failingCount ?? failing.length) || 0;
+          const onlyRefused = pending > 0 && refused >= pending && !s.progress;
           const problemKey = failing.map((f) => `${f.collection}:${f.label || ''}:${f.code}`).join('|');
 
           if (armed.current && !onlyRefused && (s.progress || (pending > 0 && (justOnline || !offline)))) {

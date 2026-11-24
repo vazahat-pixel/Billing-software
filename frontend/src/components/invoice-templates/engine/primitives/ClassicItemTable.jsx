@@ -43,6 +43,9 @@ export default function ClassicItemTable({ data, templateId = 'textile-pro', pay
                   className={col.format === 'money' || col.align === 'right' ? 'ipe-num' : ''}
                 >
                   {val}
+                  {col.id === 'item' && line.desc ? (
+                    <div style={{ fontSize: '8pt', fontWeight: 400, marginTop: '0.5mm' }}>{line.desc}</div>
+                  ) : null}
                   {col.id === 'item' && Array.isArray(line.pcsDetails) && line.pcsDetails.length > 0 && (
                     <div style={{ fontSize: '7.5pt', color: '#1e293b', marginTop: '0.8mm', fontStyle: 'normal', fontWeight: 400 }}>
                       {line.pcsDetails.map((pd) => {
