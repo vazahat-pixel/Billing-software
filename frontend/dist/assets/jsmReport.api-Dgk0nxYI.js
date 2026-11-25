@@ -1,1 +1,0 @@
-import{u as r,g as t,p}from"./index-cufCXaWs.js";const e={run:(s,o)=>r(t(`/reports/jsm/${s}`,{q:JSON.stringify(o)})),runPost:(s,o)=>r(p(`/reports/jsm/${s}`,o)),options:s=>r(t(`/reports/jsm/${s}/options`))};export{e as j};
