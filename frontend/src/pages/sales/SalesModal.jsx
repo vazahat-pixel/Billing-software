@@ -444,12 +444,16 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
     const y = base.getMonth() >= 3 ? base.getFullYear() : base.getFullYear() - 1;
     const from = new Date(y, 3, 1).getTime();
     const to = new Date(y + 1, 2, 31, 23, 59, 59).getTime();
+    // As in JSM: T.Sales is the balance of this book's sales account, i.e. the taxable value (before
+    // GST) of this book's bills in the financial year. Bills saved without a book belong to SALES BOOK.
+    const book = String(header?.book || selectedBook || 'SALES BOOK').trim().toUpperCase();
     return (sales || []).reduce((sum, s) => {
       if (/cancel/i.test(String(s.status || ''))) return sum;
+      if (String(s.bookId || 'SALES BOOK').trim().toUpperCase() !== book) return sum;
       const t = new Date(s.date || s.invoiceDate || 0).getTime();
-      return t >= from && t <= to ? sum + Number(s.netAmount || 0) : sum;
+      return t >= from && t <= to ? sum + Number(s.taxableAmount || 0) : sum;
     }, 0);
-  }, [sales, header?.date]);
+  }, [sales, header?.date, header?.book, selectedBook]);
 
   const [salesCols, setSalesCols] = useState(() => {
     try {
@@ -1646,7 +1650,7 @@ const SalesModal = ({ isOpen, onClose, initialData = null, selectedBook = null, 
             )}
           </span>
           <span className="text-xs font-mono opacity-90 hidden md:inline erp-window-meta">
-            T.Sales: <strong>{yearSalesTotal.toFixed(0)}</strong>
+            T.Sales: <strong>{yearSalesTotal.toFixed(2)}</strong>
             &nbsp;&nbsp;|
             &nbsp;&nbsp;{new Date().toLocaleDateString('en-IN', { weekday: 'long' })}
           </span>
