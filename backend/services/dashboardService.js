@@ -65,9 +65,10 @@ class DashboardService {
         { $match: { companyId: cid, status: { $ne: 'cancelled' }, date: { $gte: monthStart } } },
         { $group: { _id: null, amount: { $sum: '$netAmount' } } },
       ]),
+      // Sales FY card = taxable value (before GST), as JSM's T.Sales and the sale form show it.
       Sales.aggregate([
         { $match: { companyId: cid, status: { $ne: 'cancelled' }, date: { $gte: fyStart } } },
-        { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: '$netAmount' } } },
+        { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: { $ifNull: ['$taxableAmount', '$netAmount'] } } } },
       ]),
       Purchase.aggregate([
         { $match: { companyId: cid, status: { $ne: 'cancelled' }, date: { $gte: fyStart } } },

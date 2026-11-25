@@ -1,3 +1,5 @@
+- v1.0.19:
+  - Dashboard: the Sales FY card shows the taxable value (before GST), the same basis as JSM's T.Sales and the sale form.
 - v1.0.18:
   - Sale bill: T.Sales now shows the same figure as JSM - the taxable value (before GST) of this book's bills in the financial year, i.e. the balance of the book's sales account.
 - v1.0.17:

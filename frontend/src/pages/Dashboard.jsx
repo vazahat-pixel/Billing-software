@@ -1995,7 +1995,7 @@ const Dashboard = () => {
                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 erp-motion-stagger">
                    {[
                       { 
-                         label: `Sales FY ${dashboardSummary?.currentFy || ''}`, 
+                         label: `Sales FY ${dashboardSummary?.currentFy || ''} (Taxable)`, 
                          value: dashboardSummary?.salesFy?.amount, 
                          sub: dashboardSummary?.salesFy?.count != null ? `${dashboardSummary.salesFy.count} bills` : null,
                          iconBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
