@@ -98,7 +98,10 @@ export default function useErpWindow(isOpen, options = {}) {
 
   useEffect(() => {
     const onFocus = (e) => {
-      if (e.detail?.id === id) raise();
+      if (e.detail?.id === id) {
+        setMode((m) => (m === 'minimized' ? (defaultMode === 'maximized' ? 'maximized' : 'normal') : m));
+        raise();
+      }
     };
     const onMin = (e) => {
       if (e.detail?.id === id && isOpen) setMode('minimized');

@@ -63,6 +63,11 @@
 .jsmg-side-table .is-num { text-align: right; }
 .jsmg-side-table tr.header td { font-weight: 700; padding-top: 6px; }
 .jsmg-side-table tr.total td, .jsmg-side-table tr.grand td { font-weight: 700; }
+.jsmg-side-table tr.clickable { cursor: pointer; }
+.jsmg-side-table tr.clickable:hover { background: #fff6dd !important; color: #1e3a8a; }
+.jsmg-side-table tr.clickable:hover td:first-child { text-decoration: underline; font-weight: 600; }
+.jsmg-side-table tr.is-selected { background: #fef08a !important; color: #0f172a; outline: 1px dashed #ca8a04; }
+.jsmg-side-table tr.is-selected td:first-child { font-weight: 700; }
 .jsmg-two-col-footer { flex: none; background: #e6ffe6; padding: 4px 2px; font: bold 9.75pt Tahoma, sans-serif; }
 .jsmg-two-col-footer > div { display: flex; }
 .jsmg-two-col-footer > div > span { flex: 1; min-width: 0; padding: 1px 6px; text-align: right; }

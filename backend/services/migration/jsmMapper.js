@@ -577,11 +577,15 @@ function buildPlan(tables, { companyId }) {
       return { invoiceId: tgt.t?.doc?._id, invoiceNo: str(r.INVOICE), billDate: date(r.BILL_DATE), billAmt: num(r.BILL_AMT), osAmt: num(r.OUT_AMT), amount: adjust, discount: disc, tds: num(r.TDS_AMT), billType: str(r.SP_TYPE) };
     });
     const isCash = book.info.acct === 'Cash' || /CASH/i.test(str(book.row.AC_NAME));
+    const pBank = str(drawBankOf(path, v.CHQ_CODE)?.MST_NAME)
+      || (num(v.CHQ_CODE) ? '' : str(v.CHQ_CODE))
+      || str(drawBankOf(path, party.row?.AC_BANK_1)?.MST_NAME)
+      || '';
     const doc = {
       _id: id, companyId, voucherNo: uniqueNo(str(v.NCSRAL_NO) || str(v.SRAL_NO), rec ? voucherNosR : voucherNosP, [`${book.row.AC_CODE}`, path]),
       date: at, voucherType: rec ? 'Receipt' : 'Payment', partyLedgerId: party.ledgerId, partyName: str(party.row.AC_NAME), amount: r2(amount),
       paymentMode: isCash ? 'Cash' : (str(v.CHQ_NO) ? 'Cheque' : 'NEFT'), bankLedgerId: book.ledgerId, chequeNo: str(v.CHQ_NO), chequeDate: date(v.CHQ_DATE), slipNo: str(v.SLIP_NO),
-      accBill: str(v.ACC_BILL), bookName: str(book.row.AC_NAME), bookKind: isCash ? 'cash' : 'bank', narration: str(v.REMARK_1),
+      accBill: str(v.ACC_BILL), bookName: str(book.row.AC_NAME), bookKind: isCash ? 'cash' : 'bank', narration: str(v.REMARK_1), partyBank: pBank,
       againstInvoices: against.filter((a) => a.invoiceId), status: 'Posted', isReversed: false, createdAt: at, updatedAt: at,
     };
     docs.PaymentVoucher.push(doc); keys.PaymentVoucher[`${path}:T_CASH_MN:${num(v.ENT_NO)}`] = id;

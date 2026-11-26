@@ -104,3 +104,5 @@ temp_interactive_push.bat
 backend/tests/fixtures/migration/*.gz
 *.webm
 *.mp4
+*.xls
+*.xlsx

@@ -248,10 +248,11 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill, defaultFy }) => {
   }, [lrData, fetchSales, onSaved]);
 
   const COLS = [
-    { key: 'transport', label: 'Transport', type: 'text',   width: '18%' },
-    { key: 'station',   label: 'Station',   type: 'text',   width: '10%' },
-    { key: 'lrDate',    label: 'LR Date',   type: 'date',   width: '11%' },
-    { key: 'lrNo',      label: 'LR No.',    type: 'text',   width: '12%', required: true },
+    // Client's order: Date, Party, Transport, LR Date, LR No, Save, View, Print. Station is still saved
+    // (filled from the party's city), just not shown.
+    { key: 'transport', label: 'Transport', type: 'text',   width: '24%' },
+    { key: 'lrDate',    label: 'LR Date',   type: 'date',   width: '12%' },
+    { key: 'lrNo',      label: 'LR No.',    type: 'text',   width: '14%', required: true },
   ];
 
   const focusCell = (rowIdx, colIdx) => {
@@ -459,9 +460,8 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill, defaultFy }) => {
               <thead className="sticky top-0 z-10">
                 <tr className="bg-[#e8ecf1] border-b-2 border-[#1a3353]">
                   <th className="px-2 py-2 font-bold text-[10px] uppercase text-slate-600 w-6 text-center">#</th>
-                  <th className="px-2 py-2 font-bold text-[10px] uppercase text-slate-600" style={{ width: '8%' }}>Bill No</th>
-                  <th className="px-2 py-2 font-bold text-[10px] uppercase text-slate-600" style={{ width: '7%' }}>Date</th>
-                  <th className="px-2 py-2 font-bold text-[10px] uppercase text-slate-600" style={{ width: '14%' }}>Party</th>
+                  <th className="px-2 py-2 font-bold text-[10px] uppercase text-slate-600" style={{ width: '9%' }}>Date</th>
+                  <th className="px-2 py-2 font-bold text-[10px] uppercase text-slate-600" style={{ width: '20%' }}>Party</th>
                   {COLS.map((c) => (
                     <th key={c.key} className="px-1 py-2 font-bold text-[10px] uppercase text-slate-600" style={{ width: c.width }}>
                       {c.label}{c.required ? <span className="text-red-500">*</span> : ''}
@@ -495,18 +495,9 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill, defaultFy }) => {
                       }`}
                     >
                       <td className="px-2 py-1 text-center text-slate-400 font-mono text-[10px]">{rowIdx + 1}</td>
-                      <td className="px-2 py-1 font-bold font-mono">
-                        <button
-                          type="button"
-                          className="text-blue-800 underline decoration-blue-300 hover:text-blue-950"
-                          title="Open this bill"
-                          onClick={openBill}
-                        >
-                          {bill.invoiceNo}
-                        </button>
-                      </td>
-                      <td className="px-2 py-1 text-slate-500 text-[10px]">
+                      <td className="px-2 py-1 text-slate-600 text-[11px]">
                         {bill.date ? new Date(bill.date).toLocaleDateString('en-IN') : '—'}
+                        <div className="text-[9px] font-mono text-slate-400" title="Bill No">{bill.invoiceNo}</div>
                       </td>
                       <td className="px-2 py-1 font-semibold text-slate-800 truncate max-w-[160px]" title={party.name}>
                         <button type="button" className="text-left hover:underline" onClick={openBill}>

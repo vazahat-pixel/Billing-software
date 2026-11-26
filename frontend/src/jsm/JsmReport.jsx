@@ -32,7 +32,7 @@ export function hasJsmReport(formName) {
 }
 
 /** A JSM report: its parameter screen, then JSM's "Report Control" grid. */
-export default function JsmReport({ formName, isOpen, onClose, companyName = '', onOpenRow }) {
+export default function JsmReport({ formName, isOpen, onClose, companyName = '', onOpenRow, onOpenLedger }) {
   const config = JSM_REPORTS[formName];
   // Two menu entries can share one JSM form (a register's Summary and Detail): the config then
   // names which blueprint screen to draw and which backend report to ask.
@@ -267,6 +267,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
                   result={result}
                   companyName={companyName}
                   onClose={() => setResult(null)}
+                  onOpenLedger={onOpenLedger}
                 />
               ) : (
                 <JsmGridReport

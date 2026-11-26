@@ -585,7 +585,7 @@ async function createCashBankVoucher(req, res, voucherType) {
       slipNo: req.body.slipNo || '',
       intBillNo: req.body.intBillNo || '',
       intBillFlag: req.body.intBillFlag || 'N',
-      partyBank: req.body.partyBank || '',
+      partyBank: req.body.partyBank || (partyLedger?.linkedPartyId ? ((await Party.findById(partyLedger.linkedPartyId).select('banks').lean())?.banks?.[0]?.name || '') : ''),
       accBill: req.body.accBill || 'B',
       finance: Number(req.body.finance || 0),
       financeFlag: !!req.body.financeFlag,
@@ -930,7 +930,26 @@ exports.listVouchers = async (req, res) => {
       if (to) filter.date.$lte = new Date(to);
     }
 
-    const vouchers = await PaymentVoucher.find(filter).sort({ date: -1, createdAt: -1 });
+    const vouchers = await PaymentVoucher.find(filter).sort({ date: -1, createdAt: -1 }).lean();
+    // Backfill partyBank display on the fly for any vouchers where partyBank was omitted
+    const emptyBankPartyLedgerIds = [...new Set(vouchers.filter((v) => !v.partyBank && v.partyLedgerId).map((v) => String(v.partyLedgerId)))];
+    if (emptyBankPartyLedgerIds.length > 0) {
+      const ledgers = await LedgerMaster.find({ _id: { $in: emptyBankPartyLedgerIds }, linkedPartyId: { $ne: null } }).select('_id linkedPartyId').lean();
+      const partyIdByLedger = new Map(ledgers.map((l) => [String(l._id), String(l.linkedPartyId)]));
+      const partyIds = [...new Set(Array.from(partyIdByLedger.values()))];
+      if (partyIds.length > 0) {
+        const partyDocs = await Party.find({ _id: { $in: partyIds } }).select('_id banks').lean();
+        const bankByPartyId = new Map(partyDocs.map((p) => [String(p._id), p.banks?.[0]?.name || '']));
+        for (const v of vouchers) {
+          if (!v.partyBank && v.partyLedgerId) {
+            const pId = partyIdByLedger.get(String(v.partyLedgerId));
+            if (pId && bankByPartyId.has(pId)) {
+              v.partyBank = bankByPartyId.get(pId) || '';
+            }
+          }
+        }
+      }
+    }
     res.status(200).json({ success: true, data: vouchers });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

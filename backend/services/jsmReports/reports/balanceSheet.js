@@ -36,7 +36,7 @@ function buildLines(groups, want, ticked = null) {
     for (const l of matchingLines) {
       // signed on the group's own side: a debit ledger inside a credit group is shown as a minus, not dropped
       const v = round2(want === 'Cr' ? l.credit - l.debit : l.debit - l.credit);
-      lines.push({ type: 'detail', label: l.name, value: v });
+      lines.push({ type: 'detail', label: l.name, value: v, ledgerId: l.ledgerId, group: g.name });
       groupTotal += v;
     }
     const gt = round2(groupTotal);

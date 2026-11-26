@@ -387,7 +387,20 @@ const LedgerModal = ({
       }
     } else if (initialAccountText) {
       setAccountText(initialAccountText);
-      setView('entry');
+      const wanted = String(initialAccountText).trim().toUpperCase();
+      const opt = ledgerOptions.find(
+        (o) =>
+          acName(o).toUpperCase() === wanted ||
+          String(o.label || '').toUpperCase() === wanted ||
+          String(o.ledger?.name || '').toUpperCase() === wanted
+      );
+      if (opt && autoRun) {
+        setLedgerId(opt.value);
+        runLedgerForId(opt.value);
+      } else {
+        if (opt) setLedgerId(opt.value);
+        setView('entry');
+      }
     } else {
       setView('entry');
       setLedgerId('');
@@ -506,7 +519,8 @@ const LedgerModal = ({
         pickHead('');
       }
     } else if (e.key === 'Escape') {
-      setListOpen(null);
+      if (listOpen) setListOpen(null);
+      else onClose?.();
     }
   };
 
@@ -538,7 +552,8 @@ const LedgerModal = ({
         runLedger();
       }
     } else if (e.key === 'Escape') {
-      setListOpen(null);
+      if (listOpen) setListOpen(null);
+      else onClose?.();
     }
   };
 
@@ -645,7 +660,7 @@ const LedgerModal = ({
       return;
     }
     // mill (process) and job work bills open their receipt form
-    if (vt.includes('job') || refType.includes('job')) {
+    if (vt.includes('job') || refType.includes('job') || vt.includes('mill') || refType.includes('mill') || desc.includes('mill')) {
       open(onOpenJob, () => setJvRow(row));
       return;
     }
@@ -653,7 +668,7 @@ const LedgerModal = ({
       open(onOpenNote, () => toast.info(`Note #${docNo}`));
       return;
     }
-    if (desc.includes('sales book') || desc.includes('sales a/c') || refType.includes('sale') || vt.includes('sale') || docUp.startsWith('INV') || docUp.startsWith('SL')) {
+    if (desc.includes('sales') || refType.includes('sale') || vt.includes('sale') || docUp.startsWith('INV') || docUp.startsWith('SL') || docUp.includes('GST')) {
       open(onOpenSales, () => toast.info(`Sales Invoice #${docNo}`));
       return;
     }
@@ -673,6 +688,17 @@ const LedgerModal = ({
       open(onOpenReceipt, () => toast.info(`Receipt Voucher #${docNo}`));
       return;
     }
+    // Check if docNo is in sales or purchases list
+    const salesList = useStore.getState().sales || [];
+    if (salesList.some((s) => (docNo && (s.invoiceNo === docNo || s.billNo === docNo)) || (row.refId && String(s._id || s.id) === String(row.refId)))) {
+      open(onOpenSales, () => toast.info(`Sales Invoice #${docNo}`));
+      return;
+    }
+    const purList = useStore.getState().purchases || [];
+    if (purList.some((p) => (docNo && (p.invoiceNo === docNo || p.billNo === docNo || p.supplierInvoiceNo === docNo)) || (row.refId && String(p._id || p.id) === String(row.refId)))) {
+      open(onOpenPurchase, () => toast.info(`Purchase Bill #${docNo}`));
+      return;
+    }
     // a journal opens as the voucher itself (its Dr / Cr lines), not an empty new-journal form
     setJvRow(row);
   };
@@ -680,6 +706,12 @@ const LedgerModal = ({
   useEffect(() => {
     if (!isOpen || view !== 'statement') return undefined;
     const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose?.();
+        return;
+      }
       if (e.key === 'F3' || e.key === 'F5') {
         e.preventDefault();
         setFilterField(e.key === 'F3' ? 'description' : 'remark');

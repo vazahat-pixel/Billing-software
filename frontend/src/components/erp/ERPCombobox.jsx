@@ -169,7 +169,7 @@ export default function ERPCombobox({
 
   const handleInputKeyDown = (e) => {
     if (disabled || readOnly) return;
-    if (onKeyDownProp) {
+    if (onKeyDownProp && (!open || (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp'))) {
       onKeyDownProp(e);
       if (e.defaultPrevented) return;
     }

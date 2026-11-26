@@ -1,6 +1,6 @@
 {
   "name": "billing-software-backend",
-  "version": "1.0.15",
+  "version": "1.0.20",
   "description": "Backend for Billing Software SaaS",
   "main": "server.js",
   "scripts": {

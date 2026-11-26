@@ -1509,8 +1509,34 @@ const Dashboard = () => {
       toggleModal(isJobWork ? 'jobRec' : 'millRec', true);
       setTimeout(() => focusErpWindow(isJobWork ? 'jobRec' : 'millRec'), 40);
    };
-   const onOpenJsmReportRow = (row) => {
-      if (row?.ENT_NO) onOpenJobById(row.ENT_NO);
+   const onOpenJsmReportRow = async (row) => {
+      if (!row) return;
+      const id = row.ENT_NO || row._id || row.id || '';
+      const billNo = row.NCBILL_NO || row.SRAL_NO || row.INVOICE || row.billNo || row.invoiceNo || '';
+      const saleDoc = await resolveSaleDoc(sales, id, billNo);
+      if (saleDoc) {
+         setSalesInitialData(saleDoc);
+         openModalDirect('sales');
+         setTimeout(() => focusErpWindow('sales'), 40);
+         return;
+      }
+      const purDoc = await resolvePurchaseDoc(purchases, id, billNo);
+      if (purDoc) {
+         setPurchaseInitialData(purDoc);
+         openModalDirect('purchase');
+         setTimeout(() => focusErpWindow('purchase'), 40);
+         return;
+      }
+      const jobs = useStore.getState().jobWorkEntries || [];
+      const foundJob = jobs.find((j) => (id && idOf(j._id || j.id) === id) || (billNo && (String(j.billGpNo || '') === billNo || String(j.jobCardNo || '') === billNo)));
+      if (foundJob) {
+         const isJobWork = String(foundJob.processType || '') === 'Job Work';
+         setJobInitialId(idOf(foundJob._id || foundJob.id));
+         openModalDirect(isJobWork ? 'jobRec' : 'millRec');
+         setTimeout(() => focusErpWindow(isJobWork ? 'jobRec' : 'millRec'), 40);
+         return;
+      }
+      if (id) onOpenJobById(id);
    };
    const onOpenGstr1Invoice = async (invoiceNo) => {
       try {
@@ -2310,7 +2336,7 @@ const Dashboard = () => {
             isOpen={modals.sales}
             onClose={() => {
                setSalesInitialData(null);
-               toggleModal('sales', false);
+               toggleModal('sales', false); if (modals.ledger) focusErpWindow('ledger'); else if (jsmReportForm) focusErpWindow('jsm-grid-' + jsmReportForm);
             }}
             initialData={salesInitialData}
             selectedBook={selectedBooks.sales?.name}
@@ -2321,7 +2347,7 @@ const Dashboard = () => {
             isOpen={modals.purchase} 
             onClose={() => {
                setPurchaseInitialData(null);
-               toggleModal('purchase', false);
+               toggleModal('purchase', false); if (modals.ledger) focusErpWindow('ledger'); else if (jsmReportForm) focusErpWindow('jsm-grid-' + jsmReportForm);
             }}
             initialData={purchaseInitialData}
             selectedBook={selectedBooks.purchase?.name} 
@@ -2444,7 +2470,7 @@ const Dashboard = () => {
             isOpen={modals.ledger}
             onClose={() => {
                setLedgerOpenSeed(null);
-               toggleModal('ledger', false);
+               toggleModal('ledger', false); if (jsmReportForm) focusErpWindow('jsm-grid-' + jsmReportForm);
             }}
             initialLedgerId={ledgerOpenSeed?.ledgerId || null}
             initialAccountText={ledgerOpenSeed?.name || ''}
@@ -2987,6 +3013,7 @@ const Dashboard = () => {
                   onClose={() => setJsmReportForm(null)}
                   companyName={user?.companyName || user?.company?.name || companySettings?.legalName || companyMeta?.name || ''}
                   onOpenRow={onOpenJsmReportRow}
+                  onOpenLedger={onOpenReportLedger}
                />
             </Suspense>
          )}

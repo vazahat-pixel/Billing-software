@@ -27,7 +27,7 @@ const { jsmProfitAndLoss } = require('../finalAccounts');
 const round2 = (n) => Number(Number(n || 0).toFixed(2));
 
 function detailLines(items) {
-  return items.map((r) => ({ type: 'detail', label: r.ledger.name, value: round2(r.amount) }));
+  return items.map((r) => ({ type: 'detail', label: r.ledger.name, value: round2(r.amount), ledgerId: r.ledger._id || r.ledger.id || r.ledgerId }));
 }
 
 async function run(companyId, p = {}) {

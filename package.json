@@ -1,6 +1,6 @@
 {
   "name": "billing-software-root",
-  "version": "1.0.15",
+  "version": "1.0.20",
   "private": true,
   "scripts": {
     "test": "npm --prefix backend test",

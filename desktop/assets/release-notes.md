@@ -1,4 +1,7 @@
 - v1.0.20:
+  - Account Master: typing a new broker name or clicking + in the Broker field now opens the full Broker Account Master (A/c Head: CREDITORS FOR BROKERAGE, Code: 132) with all standard fields; saving it immediately selects the new broker on the account.
+  - Balance Sheet: all liability and asset account entries are now clickable (and navigable with arrow keys + Enter) to directly open the Zoom Ledger for that account, and exiting the ledger returns directly to the Balance Sheet.
+  - Party Bank dropdown in Bank Receipt and Payment now loads all imported banks (from JSM Drawee Banks MST_DRAW_BANK), party-specific banks, and voucher history. Selecting a party auto-selects their saved bank, and typing a new bank name and clicking Add immediately saves it to Party Bank Master and the party.
   - Cash / Bank receipt and payment: saving from a bank book no longer fails with "BOOKID: CAST TO OBJECTID". Clear Dt and Type boxes removed, the bank is shown as fixed text, the party's ledger balance shows next to Cl.Bal as soon as the party is picked, and outstanding bills list oldest first.
   - Sales / Purchase / Receipt / Payment / Mill / Job ask for the book every time they are opened (a bill opened from a ledger or report still opens directly).
   - LR Registry: columns Date, Party, Transport, Station, LR Date, LR No, Save, View, Print (Bale No, Weight, Freight, Haste, Remarks removed); a saved row shows Saved.

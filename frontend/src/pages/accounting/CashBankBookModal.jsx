@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import useStore from '../../store/useStore';
-import { accountingApi } from '../../api';
+import { accountingApi, subMastersApi } from '../../api';
 import { ERPCombobox, ErpKeyboardHintBar, FORM_KEYBOARD_HINTS } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import { notifySuccess, notifyWarning, notifyError } from '../../utils/notify';
@@ -124,6 +124,19 @@ const CashBankBookModal = ({
   const [billLookupTargetIdx, setBillLookupTargetIdx] = useState(null);
   const [bankMasterOpen, setBankMasterOpen] = useState(false);
   const [bankLedgerOpen, setBankLedgerOpen] = useState(false);
+  const [partyBankSubMasters, setPartyBankSubMasters] = useState([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let live = true;
+    subMastersApi.list({ type: 'PartyBank' })
+      .then((res) => {
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        if (live && Array.isArray(list)) setPartyBankSubMasters(list);
+      })
+      .catch((e) => console.warn('Could not load PartyBank submasters:', e));
+    return () => { live = false; };
+  }, [isOpen]);
   // Credit Note modal — opened directly after a discounted receipt/payment save
   const [creditNoteModal, setCreditNoteModal] = useState({ open: false, noteId: null, type: 'Credit', side: 'Sales' });
   const [showFindModal, setShowFindModal] = useState(false);
@@ -190,31 +203,67 @@ const CashBankBookModal = ({
 
   const partyBankOptions = useMemo(() => {
     const names = new Map();
+    // 1. Selected party's own configured banks (highest priority)
     (selectedParty?.banks || []).forEach((b) => {
       const name = String(b.name || b.bankName || '').trim();
       if (!name) return;
       names.set(name.toUpperCase(), {
         value: name,
         label: name,
-        meta: b.accountNo || '',
+        meta: b.accountNo ? `A/c: ${b.accountNo}` : 'Party Bank',
+        isPartyOwn: true,
       });
     });
-    (vouchers || []).forEach((v) => {
-      if (String(v.partyLedgerId?._id || v.partyLedgerId) !== String(header.partyId)) return;
-      const name = String(v.partyBank || '').trim();
+    // 2. Party Bank SubMasters (all banks imported from JSM MST_DRAW_BANK or entered in Party Bank Master)
+    (partyBankSubMasters || []).forEach((sm) => {
+      const name = String(sm.name || '').trim();
       if (!name) return;
-      if (!names.has(name.toUpperCase())) {
-        names.set(name.toUpperCase(), { value: name, label: name });
+      const upper = name.toUpperCase();
+      if (!names.has(upper)) {
+        names.set(upper, {
+          value: name,
+          label: name,
+          meta: sm.extraFields?.code ? `Code: ${sm.extraFields.code}` : '',
+        });
       }
     });
+    // 3. Banks from all parties across the company
+    (parties || []).forEach((p) => {
+      (p.banks || []).forEach((b) => {
+        const name = String(b.name || b.bankName || '').trim();
+        if (!name) return;
+        const upper = name.toUpperCase();
+        if (!names.has(upper)) {
+          names.set(upper, {
+            value: name,
+            label: name,
+            meta: b.accountNo ? `A/c: ${b.accountNo}` : '',
+          });
+        }
+      });
+    });
+    // 4. Banks from previous PaymentVouchers across the company
+    (vouchers || []).forEach((v) => {
+      const name = String(v.partyBank || '').trim();
+      if (!name) return;
+      const upper = name.toUpperCase();
+      if (!names.has(upper)) {
+        names.set(upper, { value: name, label: name });
+      }
+    });
+    // 5. Current typed/selected partyBank
     if (header.partyBank && !names.has(String(header.partyBank).toUpperCase())) {
       names.set(String(header.partyBank).toUpperCase(), {
         value: header.partyBank,
         label: header.partyBank,
       });
     }
-    return Array.from(names.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [selectedParty, vouchers, header.partyId, header.partyBank]);
+    return Array.from(names.values()).sort((a, b) => {
+      if (a.isPartyOwn && !b.isPartyOwn) return -1;
+      if (!a.isPartyOwn && b.isPartyOwn) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  }, [selectedParty, partyBankSubMasters, parties, vouchers, header.partyBank]);
 
   /**
    * Only genuine Cash/Bank ledgers may be picked. cashBook()/bankBook() select purely on
@@ -613,7 +662,9 @@ const CashBankBookModal = ({
   }, [header.partyId, header.accBill]);
 
   const handlePartyChange = (val) => {
-    setHeader((h) => ({ ...h, partyId: val, partyBank: '' }));
+    const party = parties.find((p) => String(p._id || p.id) === String(val));
+    const defaultBank = party?.banks?.[0]?.name || '';
+    setHeader((h) => ({ ...h, partyId: val, partyBank: defaultBank }));
   };
 
   /** BillNo Entry — click, Enter, Space, or F4 on a row's BillNo cell opens the bill picker. */
@@ -784,26 +835,51 @@ const CashBankBookModal = ({
     });
   };
 
-  /** Party already has this bank — just select it, no master screen needed. New name?
-   *  Open the Party Master on Bank Details so Account No / IFSC get filled properly
-   *  instead of a bare name-only row. */
-  const handleAddPartyBank = (rawName = '') => {
-    const bankName = String(rawName || '').trim().toUpperCase();
+  /** Party Bank add/select handler. If a name is typed, saves to PartyBank submaster & party
+   *  master immediately. If empty, opens AccountMasterModal on Bank Details for full entry. */
+  const handleAddPartyBank = async (rawName = '') => {
+    const bankName = String(rawName || header.partyBank || '').trim().toUpperCase();
     if (!bankName) {
-      notifyWarning('Type bank name to add as P.Bank');
-      return;
-    }
-    if (!header.partyId) {
-      notifyWarning('Select Party first — a bank needs a party to belong to');
+      if (header.partyId) {
+        setBankMasterOpen(true);
+        return;
+      }
+      notifyWarning('Type bank name or select Party first');
       return;
     }
     setHeader((h) => ({ ...h, partyBank: bankName }));
-    const existing = selectedParty?.banks || [];
-    if (existing.some((b) => String(b.name || b.bankName || '').toUpperCase() === bankName)) {
-      notifySuccess('P.Bank selected');
-      return;
+
+    // 1. Create in SubMaster (PartyBank) if not already present
+    const inSub = (partyBankSubMasters || []).some(
+      (s) => String(s.name || '').trim().toUpperCase() === bankName
+    );
+    if (!inSub) {
+      try {
+        const created = await subMastersApi.create({ type: 'PartyBank', name: bankName });
+        if (created) {
+          const rec = created?.data || created;
+          setPartyBankSubMasters((prev) => [...prev, rec]);
+        }
+      } catch (err) {
+        console.warn('Could not save PartyBank submaster:', err);
+      }
     }
-    setBankMasterOpen(true);
+
+    // 2. Add to party's banks if party is selected and not already on party
+    if (header.partyId && selectedParty) {
+      const existing = selectedParty?.banks || [];
+      if (!existing.some((b) => String(b.name || b.bankName || '').toUpperCase() === bankName)) {
+        try {
+          await updateParty(header.partyId, {
+            banks: [...existing, { name: bankName, accountNo: '', ifsc: '' }],
+          });
+          await fetchParties();
+        } catch (err) {
+          console.warn('Could not update party banks:', err);
+        }
+      }
+    }
+    notifySuccess(`P.Bank "${bankName}" selected`);
   };
 
   const updateRow = (idx, key, value) => {
@@ -1349,40 +1425,30 @@ const CashBankBookModal = ({
                       onChange={(val) => setHeader((h) => ({ ...h, partyBank: val }))}
                       options={partyBankOptions}
                       placeholder={
-                        !header.partyId
-                          ? 'Select Party first…'
-                          : partyBankOptions.length
-                            ? 'Select party bank (optional)…'
-                            : 'No party bank (optional) — type & Add'
+                        partyBankOptions.length
+                          ? 'Select party bank (optional)…'
+                          : 'Type bank name & Add'
                       }
-                      disabled={locked || !header.partyId}
+                      disabled={locked}
                       recentKey="cash-bank-pbank"
-                      onCreateNew={!locked && header.partyId ? handleAddPartyBank : undefined}
+                      onCreateNew={!locked ? handleAddPartyBank : undefined}
                       createLabel="P.Bank"
-                      emptyMessage="No party bank. Type name & Add"
+                      emptyMessage="Type bank name & press Enter to add"
                       allowClear
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          focusNextField(e.target);
-                        }
-                      }}
                     />
                     {!locked && (
                       <button
                         type="button"
                         tabIndex={-1}
                         data-enter-skip="true"
-                        title={header.partyId ? 'Add P.Bank to party' : 'Select a Party first — a bank needs a party to belong to'}
+                        title={header.partyBank ? 'Add P.Bank to master' : (header.partyId ? 'Add P.Bank to party' : 'Type bank name or select Party')}
                         onClick={() => handleAddPartyBank(header.partyBank)}
-                        disabled={!header.partyId}
                         style={{
                           flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 2,
                           padding: '3px 8px', fontSize: 11, fontWeight: 700, color: '#fff',
-                          background: header.partyId ? '#16a34a' : '#94a3b8',
+                          background: '#16a34a',
                           border: 'none', borderRadius: 4,
-                          cursor: header.partyId ? 'pointer' : 'not-allowed',
+                          cursor: 'pointer',
                           whiteSpace: 'nowrap',
                         }}
                       >

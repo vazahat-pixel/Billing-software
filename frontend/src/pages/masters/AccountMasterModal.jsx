@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useStore from '../../store/useStore';
 import Modal from '../../components/ui/Modal';
 import MasterFindOverlay from '../../components/erp/MasterFindOverlay';
@@ -394,9 +394,14 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   };
 
   const [fullMaster, setFullMaster] = useState(null); // { kind: 'City' | 'Transport', name } — the real master form
+  const [brokerMaster, setBrokerMaster] = useState(null); // { name: string } — full broker account master
   const openQuickMaster = (kind, name, returnEl) => {
     if (locked) return;
     quickReturnRef.current = returnEl || null;
+    if (kind === 'Broker') {
+      setBrokerMaster({ name: String(name || '').trim().toUpperCase() });
+      return;
+    }
     if (kind === 'City' || kind === 'Transport') {
       setFullMaster({ kind, name: String(name || '').trim().toUpperCase() });
       return;
@@ -440,7 +445,21 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
         const existing = parties.find((p) => p.type === 'Broker' && String(p.name || '').trim().toUpperCase() === name);
         let id = existing?._id || existing?.id;
         if (!id) {
-          const created = await addParty({ name, type: 'Broker', group: 'BROKER', status: 'Active' });
+          const q = quickMaster;
+          const gstin = String(q.gstin || '').trim().toUpperCase();
+          const sc = /^\d{2}/.test(gstin) ? gstin.slice(0, 2) : '24';
+          const created = await addParty({
+            ...EMPTY_ACCOUNT,
+            name, type: 'Broker', group: 'BROKER', status: 'Active',
+            address: String(q.address || '').trim().toUpperCase(),
+            city: String(q.city || '').trim().toUpperCase(),
+            mobile: String(q.mobile || '').trim(),
+            gstin,
+            pan: String(q.pan || '').trim().toUpperCase(),
+            commi: Number(q.commi) || 0,
+            stateCode: sc,
+            stateName: `${sc}-${GST_STATE_CODES[sc] || 'GUJARAT'}`,
+          });
           id = created?._id || created?.id;
           notifySuccess(`Broker "${name}" saved`);
           fetchParties();
@@ -487,7 +506,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
   }, [subMasters, parties]);
 
   const groupOptions = useMemo(() => {
-    const list = new Set(['SUNDRY DEBTORS', 'SUNDRY CREDITORS', 'EXPENCES', 'INCOME', 'BANK ACCOUNTS', 'BROKER', 'JOB WORKER', 'CASH-IN-HAND', 'CAPITAL ACCOUNT']);
+    const list = new Set(['SUNDRY DEBTORS', 'SUNDRY CREDITORS', 'EXPENCES', 'INCOME', 'BANK ACCOUNTS', 'BROKER', 'CREDITORS FOR BROKERAGE', 'JOB WORKER', 'CASH-IN-HAND', 'CAPITAL ACCOUNT']);
     (subMasters || [])
       .filter((sm) => sm.type === 'AccountGroup')
       .forEach((sm) => { if (sm.name) list.add(sm.name.toUpperCase()); });
@@ -591,6 +610,42 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
             />
           </div>
         )}
+        {brokerMaster && (
+          <div data-enter-action="true" onKeyDown={(e) => e.stopPropagation()}>
+            <AccountMasterModal
+              isOpen
+              initialData={{
+                name: brokerMaster.name || '',
+                group: 'CREDITORS FOR BROKERAGE',
+                accd: '132',
+                type: 'Broker',
+                status: 'Active',
+                openingBalance: 0,
+                openingBalanceType: 'Cr',
+              }}
+              onClose={() => {
+                setBrokerMaster(null);
+                const el = quickReturnRef.current;
+                quickReturnRef.current = null;
+                requestAnimationFrame(() => el?.focus?.());
+              }}
+              onSuccess={(newBroker) => {
+                setBrokerMaster(null);
+                const newId = newBroker?._id || newBroker?.id;
+                if (newId) {
+                  setFormData((prev) => ({ ...prev, brokerId: newId }));
+                }
+                fetchParties();
+                const el = quickReturnRef.current;
+                quickReturnRef.current = null;
+                requestAnimationFrame(() => {
+                  if (!el || !el.isConnected) return;
+                  focusNextField(el);
+                });
+              }}
+            />
+          </div>
+        )}
         {quickMaster && (
           <div
             data-enter-action="true"
@@ -599,7 +654,15 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
             onMouseDown={(e) => { if (e.target === e.currentTarget) closeQuickMaster(false); }}
             onKeyDown={(e) => {
               if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeQuickMaster(false); return; }
-              if (e.key === 'Enter' && !e.target.closest('button')) { e.preventDefault(); e.stopPropagation(); saveQuickMaster(); return; }
+              if (e.key === 'Enter' && !e.target.closest('button')) {
+                e.preventDefault(); e.stopPropagation();
+                // Broker form: Enter walks the boxes, the last box (or Ctrl+Enter) saves.
+                const boxes = [...e.currentTarget.querySelectorAll('input:not([disabled])')];
+                const at = boxes.indexOf(e.target);
+                if (!e.ctrlKey && at > -1 && at < boxes.length - 1) { boxes[at + 1].focus(); boxes[at + 1].select?.(); return; }
+                saveQuickMaster();
+                return;
+              }
               // keep every other key (F2, F3, arrows…) away from the account form behind
               e.stopPropagation();
             }}
@@ -622,8 +685,33 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
                     disabled={quickSaving}
                   />
                 </label>
+                {quickMaster.kind === 'Broker' && [
+                  ['address', 'Address'],
+                  ['city', 'City'],
+                  ['mobile', 'Mobile'],
+                  ['gstin', 'GSTIN'],
+                  ['pan', 'PAN No'],
+                  ['commi', 'Comm %'],
+                ].map(([k, label]) => (
+                  <label key={k} className="flex items-center gap-3" style={{ marginTop: 6 }}>
+                    <span className="jsm-am-lbl" style={{ width: 70 }}>{label}</span>
+                    <input
+                      className={`classic-erp-input flex-1 ${k === 'commi' ? 'text-right' : 'uppercase'}`}
+                      style={{ height: 24 }}
+                      data-broker-field={k}
+                      list={k === 'city' ? 'city-options-list' : undefined}
+                      inputMode={k === 'commi' || k === 'mobile' ? 'decimal' : undefined}
+                      value={quickMaster[k] ?? ''}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setQuickMaster((q) => ({ ...q, [k]: k === 'commi' || k === 'mobile' ? e.target.value : e.target.value.toUpperCase() }))}
+                      disabled={quickSaving}
+                    />
+                  </label>
+                ))}
                 <p style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>
-                  Not in the {quickMaster.kind.toLowerCase()} list yet. Enter = save it and fill it in, Esc = go back.
+                  {quickMaster.kind === 'Broker'
+                    ? 'New broker (A/c Head BROKER). Enter = next box, Enter on the last box or Ctrl+Enter = save, Esc = go back.'
+                    : `Not in the ${quickMaster.kind.toLowerCase()} list yet. Enter = save it and fill it in, Esc = go back.`}
                 </p>
               </div>
               <div className="flex justify-end gap-2" style={{ padding: '0 14px 12px' }}>
@@ -634,7 +722,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
           </div>
         )}
         <div className="classic-erp-header">
-          <span>Main Account Master</span>
+          <span>{formData.type === 'Broker' || formData.group === 'CREDITORS FOR BROKERAGE' ? 'Account Master — Broker' : 'Main Account Master'}</span>
           <div className="flex items-center gap-2">
             <button
               type="button"
