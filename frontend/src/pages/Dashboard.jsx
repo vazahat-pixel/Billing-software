@@ -723,7 +723,9 @@ const Dashboard = () => {
       return list;
    }, [storeBooks, ledgers]);
 
-   const toggleModal = (key, val) => {
+   // opts.askBook: the user opened the screen (toolbar / menu / hotkey) — ask for the book every time, as
+   // JSM does. Opening a particular bill from a ledger / report keeps the book already chosen.
+   const toggleModal = (key, val, opts = {}) => {
       if (val === true && CORE_MODULES_WITH_BOOKS.includes(key)) {
          const available = getAvailableBooksForModule(key);
 
@@ -736,8 +738,14 @@ const Dashboard = () => {
             return;
          }
 
-         // 2. Previously Selected Book: If user already selected a book in this session, reuse it directly!
-         if (selectedBooks[key]) {
+         // 2. Already open: bring that window forward instead of asking again. Otherwise ask every
+         //    time, as JSM does (it used to remember the first choice for the whole session).
+         if (modals[key]) {
+            yieldOtherWindows(key);
+            setModals(prev => ({ ...prev, [key]: true }));
+            return;
+         }
+         if (!opts.askBook && selectedBooks[key]) {
             yieldOtherWindows(key);
             setModals(prev => ({ ...prev, [key]: true }));
             return;
@@ -904,7 +912,7 @@ const Dashboard = () => {
          const ctrl = e.ctrlKey || e.metaKey;
          if (ctrl && !e.altKey && !e.shiftKey && key === 's') {
             e.preventDefault();
-            toggleModal('sales', true);
+            toggleModal('sales', true, { askBook: true });
             return;
          }
          if (!ctrl && !e.altKey && !e.shiftKey && (e.key === 'F2' || e.key === 'F3')) {
@@ -923,13 +931,13 @@ const Dashboard = () => {
          }
          if (!e.altKey || ctrl || e.shiftKey) return;
          const open = {
-            s: () => toggleModal('sales', true),
-            p: () => toggleModal('purchase', true),
+            s: () => toggleModal('sales', true, { askBook: true }),
+            p: () => toggleModal('purchase', true, { askBook: true }),
             r: () => openReportsHub('summary'),
             l: () => { setLedgerOpenSeed(null); toggleModal('ledger', true); },
-            b: () => toggleModal('receipt', true),
-            y: () => toggleModal('payment', true),
-            m: () => toggleModal('millIssue', true),
+            b: () => toggleModal('receipt', true, { askBook: true }),
+            y: () => toggleModal('payment', true, { askBook: true }),
+            m: () => toggleModal('millIssue', true, { askBook: true }),
             g: () => toggleModal('gstr1', true),
             o: () => toggleModal('outstanding', true),
          }[key];
@@ -1180,7 +1188,7 @@ const Dashboard = () => {
       if (item.action) {
          item.action();
       } else if (item.key) {
-         toggleModal(item.key, true);
+         toggleModal(item.key, true, { askBook: true });
       } else {
          openPlaceholder(item.label || item);
       }
@@ -1579,7 +1587,7 @@ const Dashboard = () => {
       else if (t.id === 'update') refreshAllData().then(() => toast.success('All data refreshed.'));
       else if (t.id === 'eway') openGstReport('ewayStatus');
       else if (t.id === 'desk') toggleModal('caDashboard', true);
-      else toggleModal(t.id, true);
+      else toggleModal(t.id, true, { askBook: true });
    };
    const runToolbarItemRef = useRef(runToolbarItem);
    runToolbarItemRef.current = runToolbarItem;

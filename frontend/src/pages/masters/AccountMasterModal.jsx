@@ -10,6 +10,7 @@ import DataImportModal from '../../components/import/DataImportModal';
 import useConfigStore from '../../store/useConfigStore';
 import { GST_STATE_CODES, stateNameFromCode, stateCodeFromGstin, resolveInvoiceSupplyType } from '../../utils/gstStateCodes';
 import { focusNextField, focusPrevField } from '../../utils/formEnterNavigation';
+import JsmSubMasterWindow from './jsm/JsmSubMasterWindow';
 
 const MSME_TYPE_OPTIONS = [
   'None',
@@ -176,7 +177,9 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       setMode('View');
     } else if (parties && parties.length > 0) {
       if (!selectedPartyId || !parties.some(p => (p._id || p.id) === selectedPartyId)) {
-        const recent = parties[parties.length - 1];
+        // The account made last (as JSM opens the master on it), not the last one in name order.
+        const stamp = (p) => new Date(p.createdAt || 0).getTime() || 0;
+        const recent = parties.reduce((best, p) => (stamp(p) >= stamp(best) ? p : best), parties[parties.length - 1]);
         const id = recent._id || recent.id;
         setSelectedPartyId(id);
         setFormData({ ...EMPTY_ACCOUNT, ...recent });
@@ -390,10 +393,29 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
     try { await addSubMaster({ type, name }); } catch { /* the account is saved; the master entry can be added later */ }
   };
 
+  const [fullMaster, setFullMaster] = useState(null); // { kind: 'City' | 'Transport', name } — the real master form
   const openQuickMaster = (kind, name, returnEl) => {
     if (locked) return;
     quickReturnRef.current = returnEl || null;
+    if (kind === 'City' || kind === 'Transport') {
+      setFullMaster({ kind, name: String(name || '').trim().toUpperCase() });
+      return;
+    }
     setQuickMaster({ kind, name: String(name || '').trim().toUpperCase() });
+  };
+  const closeFullMaster = (saved) => {
+    const kind = fullMaster?.kind;
+    setFullMaster(null);
+    if (saved?.name && kind) {
+      setFormData((prev) => ({ ...prev, [kind === 'City' ? 'city' : 'transport']: String(saved.name).toUpperCase() }));
+      fetchSubMasters?.(kind);
+    }
+    const el = quickReturnRef.current;
+    quickReturnRef.current = null;
+    requestAnimationFrame(() => {
+      if (!el || !el.isConnected) return;
+      if (saved) focusNextField(el); else el.focus();
+    });
   };
 
   const closeQuickMaster = (moveOn) => {
@@ -517,6 +539,8 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       <div
         className="classic-erp-window erp-master-form"
         data-form-enter-nav="true"
+        data-erp-bill="account-master"
+        data-erp-mode={mode}
         onKeyDown={(e) => {
           if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || (e.altKey && e.key.toLowerCase() === 's')) {
             // the app-wide Ctrl+Enter / Alt+S already pressed this window's Save; don't save a second time
@@ -556,6 +580,17 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
       >
         <ErpBusyOverlay show={bootLoading} message="Loading accounts…" />
         <ErpBusyOverlay show={!bootLoading && saving} message="Saving account…" />
+        {fullMaster && (
+          <div data-enter-action="true" onKeyDown={(e) => e.stopPropagation()}>
+            <JsmSubMasterWindow
+              isOpen
+              type={fullMaster.kind}
+              startNewWith={fullMaster.name}
+              onSaved={(rec) => closeFullMaster(rec)}
+              onClose={() => closeFullMaster(null)}
+            />
+          </div>
+        )}
         {quickMaster && (
           <div
             data-enter-action="true"
@@ -940,6 +975,7 @@ const AccountMasterModal = ({ isOpen, onClose, initialData = null, onSuccess = n
               type="button"
               data-action="new"
               onClick={handleNew}
+              data-autofocus={mode === 'View' ? 'true' : undefined}
               disabled={readOnly || saving}
               title="New Account (Alt+N / F2)"
             >

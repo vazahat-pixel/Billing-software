@@ -134,7 +134,7 @@ export default function JsmFormDialog({
     // btn_ok / btn_screen, else it is the lowest matching button (the bottom bar).
     const lowest = (list) => [...list].sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0];
     const byName = buttons.filter((b) => /^btn_?(ok|screen)$/i.test(b.dataset?.buttonName || ''));
-    const byCaption = buttons.filter((b) => /^(ok|screen|show|display|refresh|generate|run|load|preview)$/i.test(caption(b)));
+    const byCaption = buttons.filter((b) => /^(ok|screen|show|display|refresh|generate|run|load|load ?data|preview)$/i.test(caption(b)));
     const run = (byName.length ? lowest(byName) : null)
       || (byCaption.length ? lowest(byCaption) : null)
       || buttons.find((b) => caption(b).length > 2 && !/^(exit|cancel|close)$/i.test(caption(b)));
@@ -200,8 +200,8 @@ export default function JsmFormDialog({
     const cols = columnsOf[c.name]?.length ? columnsOf[c.name] : [{ text: 'Name' }];
     const widths = cols.map((h, i) => (i === 0 ? (cols.length === 1 ? 420 : 300) : i === 1 ? 120 : 60));
     const q = focusList === c.name ? search.toUpperCase() : '';
-    const hit = q ? rows.findIndex((r) => String(r).toUpperCase().startsWith(q)) : -1;
-    const curIndex = hit > -1 ? hit : Math.min(Math.max(0, activeRow), Math.max(0, rows.length - 1));
+    const shown = q ? rows.filter((r) => String(r).toUpperCase().includes(q)) : rows;
+    const curIndex = Math.min(Math.max(0, activeRow), Math.max(0, shown.length - 1));
 
     return (
       <div
@@ -213,16 +213,14 @@ export default function JsmFormDialog({
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setSearch('');
-            setActiveRow((prev) => Math.min(rows.length - 1, (prev < 0 ? 0 : prev) + 1));
+            setActiveRow((prev) => Math.min(shown.length - 1, (prev < 0 ? 0 : prev) + 1));
           } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setSearch('');
             setActiveRow((prev) => Math.max(0, (prev < 0 ? 0 : prev) - 1));
           } else if (e.key === 'PageDown') {
             e.preventDefault();
             setSearch('');
-            setActiveRow((prev) => Math.min(rows.length - 1, (prev < 0 ? 0 : prev) + 10));
+            setActiveRow((prev) => Math.min(shown.length - 1, (prev < 0 ? 0 : prev) + 10));
           } else if (e.key === 'PageUp') {
             e.preventDefault();
             setSearch('');
@@ -234,10 +232,10 @@ export default function JsmFormDialog({
           } else if (e.key === 'End') {
             e.preventDefault();
             setSearch('');
-            setActiveRow(Math.max(0, rows.length - 1));
-          } else if (e.key === ' ' && rows.length > 0 && curIndex >= 0 && curIndex < rows.length) {
+            setActiveRow(Math.max(0, shown.length - 1));
+          } else if (e.key === ' ' && shown.length > 0 && curIndex >= 0 && curIndex < shown.length) {
             e.preventDefault();
-            const name = rows[curIndex];
+            const name = shown[curIndex];
             const next = new Set(ticked);
             if (next.has(name)) next.delete(name); else next.add(name);
             set(c.name, [...next]);
@@ -254,22 +252,32 @@ export default function JsmFormDialog({
             else run?.focus();
           } else if (e.key === 'Backspace') {
             setSearch((s) => s.slice(0, -1));
+            setActiveRow(0);
             e.preventDefault();
+          } else if (e.key === 'Escape' && search) {
+            setSearch('');
+            setActiveRow(0);
+            e.preventDefault();
+            e.stopPropagation();
           } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && e.key !== ' ') {
-            const nextSearch = (search + e.key).toUpperCase();
             setSearch((s) => s + e.key);
-            const found = rows.findIndex((r) => String(r).toUpperCase().startsWith(nextSearch));
-            if (found > -1) setActiveRow(found);
+            setActiveRow(0);
             e.preventDefault();
           }
         }}
       >
+        <div
+          className="jsmf-list-search"
+          style={{ position: 'sticky', top: 0, zIndex: 2, background: q ? '#fff7d6' : '#f1f5f9', borderBottom: '1px solid #cbd5e1', padding: '1px 4px', fontSize: 11, color: q ? '#0f172a' : '#64748b' }}
+        >
+          🔍 {q ? <><b>{search}</b> — {shown.length} of {rows.length} (Backspace / Esc to clear)</> : 'Type to search…'}
+        </div>
         <table>
           <thead>
             <tr>{cols.map((h, i) => <th key={i} style={{ width: widths[i] }}>{h.text}</th>)}</tr>
           </thead>
           <tbody>
-            {rows.map((name, i) => {
+            {shown.map((name, i) => {
               const isSelected = i === curIndex;
               return (
                 <tr

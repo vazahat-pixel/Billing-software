@@ -18,7 +18,7 @@ import { stateCodeFromGstin, stateNameFromCode } from '../../../utils/gstStateCo
  *  - Find / Sp.Find open the Help list (Sp.Find matches anywhere in the name)
  *  - Esc: cancels New/Edit, otherwise closes the window
  */
-export default function JsmSubMasterWindow({ isOpen, onClose, type, readOnly = false }) {
+export default function JsmSubMasterWindow({ isOpen, onClose, type, readOnly = false, startNewWith = null, onSaved = null }) {
   const cfg = JSM_SUBMASTER_FORMS[type];
   const layout = LAYOUTS[cfg?.form];
   const { subMasters, fetchSubMasters, addSubMaster, updateSubMaster, deleteSubMaster } = useStore();
@@ -65,9 +65,16 @@ export default function JsmSubMasterWindow({ isOpen, onClose, type, readOnly = f
     Promise.resolve(fetchSubMasters(type)).finally(() => setLoaded(true));
   }, [isOpen, type]);
 
-  // JSM DataBind: show the last record
+  // JSM DataBind: show the last record (or, opened from another form to add one, start a new one)
   useEffect(() => {
     if (!isOpen || !loaded) return;
+    if (startNewWith != null && !readOnly) {
+      setCurrentId(null);
+      setValues({ ...recordToValues(cfg, null), [cfg.name]: String(startNewWith).toUpperCase() });
+      setMode('ADD');
+      focusBox(cfg.name);
+      return;
+    }
     show(records[records.length - 1]);
     focusBox('btn_New');
   }, [isOpen, loaded]);
@@ -122,6 +129,8 @@ export default function JsmSubMasterWindow({ isOpen, onClose, type, readOnly = f
     focusBox(firstBox);
   };
   const doCancel = () => {
+    // Opened from another form only to add one: Cancel / Esc goes straight back to that form.
+    if (onSaved && startNewWith != null) { onClose?.(); return; }
     show(current || records[records.length - 1]);
     focusBox('btn_New');
   };
@@ -145,6 +154,10 @@ export default function JsmSubMasterWindow({ isOpen, onClose, type, readOnly = f
         ? await updateSubMaster(current._id, payload)
         : await addSubMaster(payload);
       notifySuccess(mode === 'EDIT' ? 'Record updated' : 'Record saved');
+      if (onSaved) {
+        onSaved(saved || { name });
+        return;
+      }
       setCurrentId(saved?._id || currentId);
       setValues(saved ? recordToValues(cfg, saved) : values);
       setMode('VIEW');

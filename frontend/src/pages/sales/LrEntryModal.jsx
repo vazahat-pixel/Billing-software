@@ -248,15 +248,10 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill, defaultFy }) => {
   }, [lrData, fetchSales, onSaved]);
 
   const COLS = [
-    { key: 'lrNo',      label: 'LR No.',    type: 'text',   width: '10%', required: true },
-    { key: 'lrDate',    label: 'LR Date',   type: 'date',   width: '9%'  },
-    { key: 'baleNo',    label: 'Bale No.',  type: 'text',   width: '7%'  },
-    { key: 'weight',    label: 'Weight',    type: 'number', width: '6%'  },
-    { key: 'freight',   label: 'Freight',   type: 'number', width: '6%'  },
-    { key: 'transport', label: 'Transport', type: 'text',   width: '12%' },
-    { key: 'station',   label: 'Station',   type: 'text',   width: '8%'  },
-    { key: 'haste',     label: 'Haste',     type: 'text',   width: '6%'  },
-    { key: 'remarks',   label: 'Remarks',   type: 'text',   width: '14%' },
+    { key: 'transport', label: 'Transport', type: 'text',   width: '18%' },
+    { key: 'station',   label: 'Station',   type: 'text',   width: '10%' },
+    { key: 'lrDate',    label: 'LR Date',   type: 'date',   width: '11%' },
+    { key: 'lrNo',      label: 'LR No.',    type: 'text',   width: '12%', required: true },
   ];
 
   const focusCell = (rowIdx, colIdx) => {
@@ -473,6 +468,8 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill, defaultFy }) => {
                     </th>
                   ))}
                   <th className="px-2 py-2 font-bold text-[10px] uppercase text-slate-600 text-center" style={{ width: '5%' }}>Save</th>
+                  <th className="px-2 py-2 font-bold text-[10px] uppercase text-slate-600 text-center" style={{ width: '5%' }}>View</th>
+                  <th className="px-2 py-2 font-bold text-[10px] uppercase text-slate-600 text-center" style={{ width: '5%' }}>Print</th>
                 </tr>
               </thead>
               <tbody>
@@ -547,13 +544,7 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill, defaultFy }) => {
 
                       <td className="px-1 py-1 text-center whitespace-nowrap">
                         {isSaved ? (
-                          <button
-                            type="button"
-                            onClick={() => setPrintId(id)}
-                            className="px-2 py-1 bg-emerald-700 text-white text-[10px] font-bold rounded hover:bg-emerald-800"
-                          >
-                            Invoice Print
-                          </button>
+                          <span className="text-[10px] font-bold text-emerald-700">Saved ✓</span>
                         ) : (
                           <button
                             onClick={() => handleSaveRow(bill)}
@@ -563,6 +554,26 @@ const LrEntryModal = ({ isOpen, onClose, onSaved, onOpenBill, defaultFy }) => {
                             Save
                           </button>
                         )}
+                      </td>
+                      <td className="px-1 py-1 text-center">
+                        <button
+                          type="button"
+                          onClick={openBill}
+                          className="px-2 py-1 bg-slate-600 text-white text-[10px] font-bold rounded hover:bg-slate-700"
+                          title="Open this sale bill"
+                        >
+                          View
+                        </button>
+                      </td>
+                      <td className="px-1 py-1 text-center">
+                        <button
+                          type="button"
+                          onClick={() => setPrintId(id)}
+                          className="px-2 py-1 bg-emerald-700 text-white text-[10px] font-bold rounded hover:bg-emerald-800"
+                          title="Print this sale bill"
+                        >
+                          Print
+                        </button>
                       </td>
                     </tr>
                   );

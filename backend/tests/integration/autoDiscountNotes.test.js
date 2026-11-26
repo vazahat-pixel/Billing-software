@@ -526,6 +526,23 @@ describe('Regression — manual Notes and plain vouchers are unaffected', () => 
     assert.equal(noteAfter.status, 'Reversed');
   });
 
+  it('a Cash/Bank book listed from a bank ledger (bookId "ledger_book_<id>") saves and edits without a BOOKID cast error', async () => {
+    const bill = await mkSale(1200);
+    const body = {
+      partyLedgerId: customerLedgerId, bankLedgerId, paymentMode: 'NEFT', bookKind: 'bank',
+      bookId: `ledger_book_${bankLedgerId}`,
+      accBill: 'B', status: 'Posted', amount: 1200, date: new Date('2026-07-07').toISOString(),
+      narration: 'Book from bank ledger',
+      againstInvoices: [{ invoiceId: bill._id, invoiceNo: bill.invoiceNo, amount: 1200, discount: 0 }],
+    };
+    const res = await request(app).post('/api/accounting/receipts').set(auth(tok)).send(body);
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const voucher = unwrap(res);
+    assert.equal(voucher.bookId ?? null, null, 'a ledger_book_ id is not stored as a Book id');
+    const edit = await request(app).put(`/api/accounting/payments/${voucher._id}`).set(auth(tok)).send({ ...body, narration: 'edited' });
+    assert.ok([200, 201].includes(edit.status), JSON.stringify(edit.body));
+  });
+
   it('a plain Receipt/Payment with no discount still posts correctly (no notes, balanced journal)', async () => {
     const bill = await mkSale(1500);
     const res = await postReceipt({ bill, amount: 1500, discount: 0 });

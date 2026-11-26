@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import ErpWindowedModal from '../components/erp/ErpWindowedModal';
 import JsmFormDialog from './JsmFormDialog';
+import JsmMonthPicker from './JsmMonthPicker';
 import { GSTR1_COLS_MAP, flatGstr1 } from '../pages/gst/Gstr1JsmReport';
 import { exportGstr1TemplateExcel } from '../utils/gstr1TemplateExport';
 import useStore from '../store/useStore';
@@ -128,6 +129,7 @@ export default function JsmGstr1Screen({ formName, isOpen, onClose, onOpenInvoic
         <div className="jsm-window">
           <div className="jsm-titlebar">
             <span>{form?.title || 'GSTR-1'}</span>
+            {form && <JsmMonthPicker form={form} state={state} onChange={setState} />}
             <WindowControls />
           </div>
           {form ? (

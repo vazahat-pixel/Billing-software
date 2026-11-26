@@ -162,15 +162,42 @@ export default function useErpWindow(isOpen, options = {}) {
   }, [isOpen, mode, id, title, raise, defaultMode]);
 
   // When another window opens maximized, yield this one to the dock
+  const yieldedByRef = useRef(null);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   useEffect(() => {
     const onYield = (e) => {
       if (!isOpen) return;
       if (e.detail?.except === id) return;
+      if (modeRef.current === 'maximized') yieldedByRef.current = e.detail?.except || null;
       setMode((m) => (m === 'maximized' ? 'minimized' : m));
     };
+    const onClosed = (e) => {
+      if (!isOpen || !yieldedByRef.current || e.detail?.id !== yieldedByRef.current) return;
+      yieldedByRef.current = null;
+      if (modeRef.current !== 'minimized') return;
+      raise();
+      setMode('maximized');
+    };
     window.addEventListener('erp-window-yield', onYield);
-    return () => window.removeEventListener('erp-window-yield', onYield);
-  }, [id, isOpen]);
+    window.addEventListener('erp-window-closed', onClosed);
+    return () => {
+      window.removeEventListener('erp-window-yield', onYield);
+      window.removeEventListener('erp-window-closed', onClosed);
+    };
+  }, [id, isOpen, raise]);
+
+  // Tell the windows this one pushed aside that it has closed.
+  const wasOpenRef = useRef(isOpen);
+  useEffect(() => {
+    if (wasOpenRef.current && !isOpen) {
+      window.dispatchEvent(new CustomEvent('erp-window-closed', { detail: { id } }));
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, id]);
+  useEffect(() => () => {
+    if (wasOpenRef.current) window.dispatchEvent(new CustomEvent('erp-window-closed', { detail: { id } }));
+  }, [id]);
 
   // Opening maximized claims focus â€” ask others to minimize
   useEffect(() => {

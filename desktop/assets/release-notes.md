@@ -1,3 +1,12 @@
+- v1.0.20:
+  - Cash / Bank receipt and payment: saving from a bank book no longer fails with "BOOKID: CAST TO OBJECTID". Clear Dt and Type boxes removed, the bank is shown as fixed text, the party's ledger balance shows next to Cl.Bal as soon as the party is picked, and outstanding bills list oldest first.
+  - Sales / Purchase / Receipt / Payment / Mill / Job ask for the book every time they are opened (a bill opened from a ledger or report still opens directly).
+  - LR Registry: columns Date, Party, Transport, Station, LR Date, LR No, Save, View, Print (Bale No, Weight, Freight, Haste, Remarks removed); a saved row shows Saved.
+  - Search in every report: just start typing on a report (or Ctrl+F) to keep only the matching rows; Party / Broker / Station / Book lists search by any part of the name.
+  - Report windows have a Month box in the title bar: pick a month and the From / To dates are set to it. Debtors Outstanding can be grouped by Month.
+  - GSTR-1: Enter from the dates goes straight to LoadData.
+  - Account Master opens on the last account with the cursor on New; a new City or Transport typed there opens the real City / Transport master (name filled in), and Save brings you back.
+  - Closing a bill opened from the ledger brings the ledger back.
 - v1.0.19:
   - Dashboard: the Sales FY card shows the taxable value (before GST), the same basis as JSM's T.Sales and the sale form.
 - v1.0.18:

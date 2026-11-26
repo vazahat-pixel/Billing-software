@@ -48,6 +48,7 @@ const GROUP_BY_OPTIONS = [
   { v: 'Book', l: 'Book' },
   { v: 'State', l: 'State' },
   { v: 'MSME Type', l: 'MSME Type' },
+  { v: 'Month', l: 'Month' },
   { v: 'None', l: 'None' },
 ];
 
@@ -414,6 +415,13 @@ const OutstandingReportModal = ({
         return party?.state || '—';
       case 'MSME Type':
         return party?.msmeType || 'None';
+      case 'Month': {
+        // Bill month, written so the groups sort in date order: 2026-06 (JUN-2026)
+        const d = new Date(inv?.date || inv?.billDate || 0);
+        if (Number.isNaN(d.getTime()) || d.getTime() === 0) return '—';
+        const mon = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][d.getMonth()];
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')} (${mon}-${d.getFullYear()})`;
+      }
       default:
         return null;
     }

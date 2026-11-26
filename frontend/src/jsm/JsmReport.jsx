@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ErpWindowedModal from '../components/erp/ErpWindowedModal';
 import JsmFormDialog from './JsmFormDialog';
+import JsmMonthPicker from './JsmMonthPicker';
 import JsmGridReport from './JsmGridReport';
 import JsmGridReportsTwoColumn from './JsmGridReportsTwoColumn';
 import { JSM_REPORTS } from './reports';
@@ -227,6 +228,7 @@ export default function JsmReport({ formName, isOpen, onClose, companyName = '',
           <div className="jsm-window">
             <div className="jsm-titlebar">
               <span>{config.title || form?.runtimeTitle || form?.title}</span>
+              {form && <JsmMonthPicker form={form} state={state} onChange={setState} />}
               <WindowControls />
             </div>
             {error && <div className="jsm-error">{error}</div>}

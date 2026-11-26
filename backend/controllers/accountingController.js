@@ -1,4 +1,7 @@
 const mongoose = require('mongoose');
+
+/** A real Book id, or undefined (Cash/Bank books listed from bank ledgers carry ledger_book_<id>). */
+const realBookId = (v) => (v && mongoose.isValidObjectId(v) && /^[0-9a-f]{24}$/i.test(String(v)) ? v : undefined);
 const LedgerMaster = require('../models/LedgerMaster');
 const AccountingEntry = require('../models/AccountingEntry');
 const PaymentVoucher = require('../models/PaymentVoucher');
@@ -587,7 +590,9 @@ async function createCashBankVoucher(req, res, voucherType) {
       finance: Number(req.body.finance || 0),
       financeFlag: !!req.body.financeFlag,
       remark2: req.body.remark2 || '',
-      bookId: req.body.bookId || undefined,
+      // Cash/Bank books listed from bank ledgers carry a made-up id (ledger_book_<id>); only a real
+      // Book id is stored, the book name is kept either way.
+      bookId: realBookId(req.body.bookId),
       bookName: req.body.bookName || '',
       bookKind: req.body.bookKind || '',
       idempotencyKey: idempotencyKey || undefined,
@@ -859,7 +864,7 @@ exports.updateVoucher = async (req, res) => {
     voucher.finance = Number(req.body.finance || 0);
     voucher.financeFlag = !!req.body.financeFlag;
     voucher.remark2 = req.body.remark2 || '';
-    voucher.bookId = req.body.bookId || voucher.bookId;
+    voucher.bookId = realBookId(req.body.bookId) || voucher.bookId;
     voucher.bookName = req.body.bookName || voucher.bookName;
     voucher.bookKind = req.body.bookKind || voucher.bookKind;
     voucher.narration = narration;

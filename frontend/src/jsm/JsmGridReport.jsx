@@ -33,7 +33,14 @@ export default function JsmGridReport({ result, layouts, fallbackColumns, compan
   const [setOpen, setSetOpen] = useState(false);
   const [selected, setSelected] = useState(-1);
   const columns = allColumns.filter((c) => !hidden.has(c.field));
-  const lines = useMemo(() => buildGridLines(rows, columns, grid), [rows, columns, grid]);
+  const [query, setQuery] = useState('');
+  const searchRef = useRef(null);
+  const shownRows = useMemo(() => {
+    const q = query.trim().toUpperCase();
+    if (!q) return rows;
+    return rows.filter((r) => Object.values(r || {}).some((v) => v != null && typeof v !== 'object' && String(v).toUpperCase().includes(q)));
+  }, [rows, query]);
+  const lines = useMemo(() => buildGridLines(shownRows, columns, grid), [shownRows, columns, grid]);
 
   const exportExcel = () => {
     if (typeof onExcel === 'function' && onExcel(result) !== false) return;
@@ -53,8 +60,20 @@ export default function JsmGridReport({ result, layouts, fallbackColumns, compan
     return () => clearTimeout(t);
   }, []);
   const onKey = (e) => {
+    if (e.target === searchRef.current) {
+      if (e.key === 'Escape') { e.preventDefault(); if (query) setQuery(''); else winRef.current?.focus(); return; }
+      if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); setSelected(0); winRef.current?.focus(); }
+      return;
+    }
     if (e.key === 'Escape') { e.preventDefault(); onClose?.(); return; }
     const onGrid = e.target === winRef.current;
+    // Typing a letter or digit on the grid starts a search (Ctrl+F also opens it).
+    if (onGrid && ((e.key.length === 1 && !e.altKey && !e.ctrlKey && e.key !== ' ') || (e.ctrlKey && e.key.toLowerCase() === 'f'))) {
+      e.preventDefault();
+      if (e.key.length === 1 && !e.ctrlKey) setQuery((q) => q + e.key);
+      setTimeout(() => searchRef.current?.focus(), 0);
+      return;
+    }
     if (onGrid && !e.altKey && !e.ctrlKey) {
       const last = lines.length - 1;
       const step = { ArrowDown: 1, ArrowUp: -1, PageDown: 20, PageUp: -20 }[e.key];
@@ -93,6 +112,18 @@ export default function JsmGridReport({ result, layouts, fallbackColumns, compan
           {grid.notice}
         </div>
       )}
+      <style>{'@media print{.jsmg-search{display:none!important}}'}</style>
+      <div className="jsmg-search" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 8px', background: query ? '#fff7d6' : '#eef2f7', borderBottom: '1px solid #cbd5e1', fontSize: 12 }}>
+        <span>🔍</span>
+        <input
+          ref={searchRef}
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setSelected(-1); }}
+          placeholder="Search name, bill no, amount… (just start typing)"
+          style={{ flex: 1, maxWidth: 360, height: 22, padding: '0 6px', border: '1px solid #94a3b8', borderRadius: 3, fontSize: 12 }}
+        />
+        {query ? <span>{shownRows.length} of {rows.length} rows — Esc clears</span> : null}
+      </div>
       <div className="jsmg-grid" ref={gridRef}>
         <table>
           <colgroup>

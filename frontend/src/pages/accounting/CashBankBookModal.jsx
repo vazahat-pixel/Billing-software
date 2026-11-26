@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import useStore from '../../store/useStore';
+import { accountingApi } from '../../api';
 import { ERPCombobox, ErpKeyboardHintBar, FORM_KEYBOARD_HINTS } from '../../components/erp';
 import ErpWindowedModal from '../../components/erp/ErpWindowedModal';
 import { notifySuccess, notifyWarning, notifyError } from '../../utils/notify';
@@ -229,10 +230,35 @@ const CashBankBookModal = ({
     return bankCashLedgers.find((l) => String(l._id || l.id) === String(header.bankLedgerId));
   }, [bankCashLedgers, header.bankLedgerId]);
 
+  // Ledger balances (Dr +, Cr -) from the trial balance, refreshed on open and after each save.
+  const [ledgerBalances, setLedgerBalances] = useState(null);
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    let live = true;
+    accountingApi.trialBalance()
+      .then((rows) => {
+        if (!live) return;
+        const map = new Map();
+        for (const r of (Array.isArray(rows) ? rows : rows?.lines || [])) {
+          const id = String(r.ledgerId || r.ledger?._id || r._id || '');
+          if (!id) continue;
+          const signed = r.debit != null || r.credit != null
+            ? Number(r.debit || 0) - Number(r.credit || 0)
+            : (r.type === 'Cr' ? -1 : 1) * Number(r.balance || 0);
+          map.set(id, signed);
+        }
+        setLedgerBalances(map);
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [isOpen, vouchers?.length]);
+
   const bankLedgerBal = useMemo(() => {
     if (!selectedBankLedger) return null;
+    const id = String(selectedBankLedger._id || selectedBankLedger.id);
+    if (ledgerBalances?.has(id)) return ledgerBalances.get(id);
     return Number(selectedBankLedger.closingBalance ?? selectedBankLedger.balance ?? 0);
-  }, [selectedBankLedger]);
+  }, [selectedBankLedger, ledgerBalances]);
 
   const noBookLedger = !bootLoading && bankCashLedgers.length === 0;
 
@@ -315,7 +341,9 @@ const CashBankBookModal = ({
       })
       .filter((inv) => inv.osAmt >= 0.01);
 
-    return [...regularBills, ...jobBills];
+    // Oldest bill first, as in JSM.
+    const when = (r) => new Date(r.billDt || r.billDate || r.date || 0).getTime() || 0;
+    return [...regularBills, ...jobBills].sort((a, b) => when(a) - when(b));
   }, [header.partyId, voucherType, sales, purchases, jobWorkEntries]);
 
   /** Outstanding across the listed bills — feeds Cl.Bal, not the UnPaid box. */
@@ -371,6 +399,16 @@ const CashBankBookModal = ({
       oth2: sum('oth2'),
     };
   }, [billRows]);
+
+  /** The party's ledger balance (Dr +, Cr -), shown as soon as the party is picked, as in JSM. */
+  const partyLedgerBal = useMemo(() => {
+    if (!header.partyId || !ledgerBalances) return null;
+    const l = (ledgers || []).find((x) => String(x.linkedPartyId?._id || x.linkedPartyId || x.partyId || '') === String(header.partyId))
+      || (ledgers || []).find((x) => selectedParty && String(x.name || '').trim().toUpperCase() === String(selectedParty.name || '').trim().toUpperCase());
+    if (!l) return null;
+    const id = String(l._id || l.id);
+    return ledgerBalances.has(id) ? ledgerBalances.get(id) : 0;
+  }, [header.partyId, ledgers, ledgerBalances, selectedParty]);
 
   const closingBal = useMemo(() => {
     if (selectedParty) {
@@ -1266,10 +1304,7 @@ const CashBankBookModal = ({
                     <span className="classic-erp-label">Date:</span>
                     <input type="date" className="classic-erp-input" value={header.chequeDate} onChange={setH('chequeDate')} disabled={locked} />
                   </div>
-                  <div className="classic-erp-field cb-f-clear">
-                    <span className="classic-erp-label">Clear Dt:</span>
-                    <input type="date" className="classic-erp-input" value={header.clearDate} onChange={setH('clearDate')} disabled={locked} title="Date the cheque/transfer cleared the bank" />
-                  </div>
+                  {/* Clear Dt is not asked here (client: not in JSM's entry screen); the bank reconciliation sets it. */}
                   {voucherType === 'Payment' && (
                     <div className="classic-erp-field cb-f-payee" title="Cheque Payee / In Favour Of (_txt_chqPayName)">
                       <span className="classic-erp-label">In Favour:</span>
@@ -1359,11 +1394,16 @@ const CashBankBookModal = ({
               )}
               <div className="cash-bank-clbal">
                 <span className="classic-erp-label">Cl.Bal</span>
-                <span className="font-mono">{fmtAmt(closingBal)}</span>
+                <span className="font-mono" title="Party ledger balance">
+                  {partyLedgerBal != null ? `${fmtAmt(Math.abs(partyLedgerBal))} ${partyLedgerBal < 0 ? 'Cr' : 'Dr'}` : fmtAmt(closingBal)}
+                </span>
               </div>
               <div className="classic-erp-field cb-f-bank">
                 <span className="classic-erp-label">{isBank ? 'Bank:' : 'Cash:'}</span>
                 <div className="classic-erp-control">
+                  {selectedBook && selectedBankLedger ? (
+                    <span className="font-semibold" style={{ padding: '0 4px', whiteSpace: 'nowrap' }}>{selectedBankLedger.name}</span>
+                  ) : (
                   <ERPCombobox
                     value={header.bankLedgerId}
                     onChange={(val) => setHeader((h) => ({ ...h, bankLedgerId: val }))}
@@ -1373,6 +1413,7 @@ const CashBankBookModal = ({
                     recentKey={`cash-bank-ledger-${settlementKind}`}
                     emptyMessage={`No ledger with account type "${isBank ? 'Bank' : 'Cash'}"`}
                   />
+                  )}
                   {bankLedgerBal !== null && !isNaN(bankLedgerBal) && (
                     <span
                       className="cash-bank-book-bal"
@@ -1405,13 +1446,7 @@ const CashBankBookModal = ({
                   <option value="A">A</option>
                 </select>
               </div>
-              <div className="classic-erp-field cb-f-type" data-enter-skip>
-                <span className="classic-erp-label">Type:</span>
-                <select className="classic-erp-select" value={voucherType} onChange={(e) => setVoucherType(e.target.value)} disabled={locked || mode === 'Edit'}>
-                  <option value="Receipt">Receipt</option>
-                  <option value="Payment">Payment</option>
-                </select>
-              </div>
+              {/* Receipt / Payment comes from the book chosen (shown in the title bar), as in JSM: no Type box. */}
               {!isOnAccount && (
                 <div
                   className="cash-bank-paid-indicator"
